@@ -5500,6 +5500,26 @@ export const ActionSchema = z
       ),
     /** It lights the spilled oil within `feet` of its user, an area that waits for fire (a Tinderbox: "Using it to light
      *  ... anything else with exposed fuel takes a Bonus Action"). */
+    /** What it does to the door on the map it is aimed at (`wallId`): fixes an Immovable Rod against it (`fix-rod`,
+     *  held shut until the rod's button is pushed or a DC 30 Strength (Athletics) check moves it), glues it shut with
+     *  Sovereign Glue (`glue`, which only Universal Solvent undoes), dissolves that glue (`dissolve`), or makes a Strength
+     *  check of d20 plus `bonus` to break it open against what holds it shut (`force`: a Ring of the Ram). */
+    doorWork: z
+      .object({
+        does: z.enum(["fix-rod", "glue", "dissolve", "force"]),
+        bonus: z.number().int().min(0).max(30).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "What it does to the door it is aimed at: fix-rod (an Immovable Rod holds it shut, DC 30 to force), glue (Sovereign Glue, undone only by dissolve), dissolve (Universal Solvent), or force (a Strength check of d20 plus bonus against what holds it shut: a Ring of the Ram)"
+      ),
+    /** It points its user at the nearest secret door or hidden trap within `feet` (a Wand of Secrets). */
+    findsSecrets: z
+      .object({ feet: z.number().int().min(5).max(300) })
+      .strict()
+      .optional()
+      .describe("It points its user at the nearest secret door or hidden trap within `feet` (a Wand of Secrets)"),
     lightsArea: z
       .object({ feet: z.number().int().min(5).max(30) })
       .strict()

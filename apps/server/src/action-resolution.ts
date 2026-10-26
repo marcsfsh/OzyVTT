@@ -122,6 +122,7 @@ import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
 import { checkObjectTarget, harmObjectsInArea, strikeObjectTarget } from "./resolution/object-targets.js";
+import { applyDoorWork, checkDoorWork, findSecrets } from "./resolution/door-work.js";
 import {
   applyAdjustsLight,
   applyDouses,
@@ -214,6 +215,7 @@ export function resolveDefinitionAction(
   areaHealRecipient(ctx);
   checkWallTarget(ctx);
   checkObjectTarget(ctx);
+  checkDoorWork(ctx);
   checkLightTarget(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent, and so is a full flask.
@@ -417,6 +419,8 @@ export function resolveDefinitionAction(
   applyCastWalls(ctx);
   strikeObjectTarget(ctx);
   harmObjectsInArea(ctx);
+  applyDoorWork(ctx);
+  findSecrets(ctx);
   applyKindles(ctx);
   applyDouses(ctx);
   applyLightsArea(ctx);

@@ -13,6 +13,7 @@ import {
   FailureMarginSchema,
   HealthDisplaySchema,
   HitPointBandSchema,
+  InventoryItemSchema,
   ObjectStatsSchema,
   SaveFailureDurationSchema,
   StoredCastSchema
@@ -1173,14 +1174,27 @@ export type VisionSource = z.infer<typeof VisionSourceSchema>;
 /** What keeps a door shut (SRD 5.2.1 Lock, Iron Spikes, Knock): a `lock` picked with Thieves' Tools (`dc` is the
  *  Dexterity (Sleight of Hand) check, 15 for the SRD Lock; `forceDc` the Strength check that breaks it, absent when no
  *  check does) and opened by those who hold its key; a door `stuck`, `barred` or `jammed` shut with a spike, forced
- *  with a Strength (Athletics) check against `dc` (15 when the GM sets none); `sealed` by Stone Shape, which no check
+ *  with a Strength (Athletics) check against `dc` (15 when the GM sets none); held by an Immovable Rod (`rod`, DC 30);
+ *  `glued` with Sovereign Glue, which only Universal Solvent undoes; `sealed` by Stone Shape, which no check
  *  opens. */
 export const DoorFasteningSchema = z
   .object({
-    kind: z.enum(["lock", "stuck", "barred", "jammed", "sealed"]),
+    kind: z.enum(["lock", "stuck", "barred", "jammed", "sealed", "rod", "glued"]),
     dc: z.number().int().min(1).max(40).optional(),
     forceDc: z.number().int().min(1).max(40).optional(),
-    keyHolderIds: z.array(z.uuid()).max(20).optional()
+    keyHolderIds: z.array(z.uuid()).max(20).optional(),
+    /** The Immovable Rod fixed against it (`rod`) and the creature that fixed it, which gets it back when it is moved. */
+    item: InventoryItemSchema.optional(),
+    ownerId: z.uuid().optional(),
+    /** Sovereign Glue (`glued`) holds once it has set, a minute on: through this round of the fight, or to this
+     *  game-clock minute. */
+    setsAt: z
+      .object({
+        round: z.number().int().positive().optional(),
+        minute: z.number().int().min(0).max(1_000_000_000).optional()
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type DoorFastening = z.infer<typeof DoorFasteningSchema>;

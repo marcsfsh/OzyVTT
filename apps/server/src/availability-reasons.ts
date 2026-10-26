@@ -279,6 +279,8 @@ const structured = (action: DefinitionAction): boolean =>
   action.endsConditions !== undefined ||
   action.douses !== undefined ||
   action.lightsArea !== undefined ||
+  action.doorWork !== undefined ||
+  action.findsSecrets !== undefined ||
   action.replacesAttack === true;
 
 /**

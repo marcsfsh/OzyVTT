@@ -1372,22 +1372,35 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "ring-of-telekinesis": { casts: [{ spellId: "telekinesis" }] },
 
   // One action for each number of charges spent: a ranged spell attack at +7 against a creature it sees within 60 feet,
-  // 2d10 Force and a 5-foot push for each charge. 3 charges, 1d3 back at dawn. Breaking an object with its Strength
-  // check is the GM's.
+  // 2d10 Force and a 5-foot push for each charge, or "a Strength check with a +5 bonus for each charge you spend" to
+  // break a door it sees within 60 feet open. 3 charges, 1d3 back at dawn.
   "ring-of-the-ram": {
     charges: { regain: "1d3" },
-    actions: ([1, 2, 3] as const).map((spent) => ({
-      id: `ram-${spent}`,
-      name: `Ram (${spent} charge${spent === 1 ? "" : "s"})`,
-      activation: "action" as const,
-      description: `Expend ${spent} charge${spent === 1 ? "" : "s"}: a spectral ram's head makes a ranged spell attack with a +7 bonus against one creature you can see within 60 feet. On a hit, it takes ${2 * spent}d10 Force damage and is pushed ${5 * spent} feet away from you.`,
-      attack: { ability: "spellcasting" as const, bonus: 7, rangeFeet: 60 },
-      damage: [{ formula: `${2 * spent}d10`, type: "force" as const }],
-      onHitPush: { feet: 5 * spent },
-      targets: { count: 1, rangeFeet: 60, seen: true as const },
-      uses: { limit: 3, per: "long-rest" as const, pool: "ring-of-the-ram-charges" },
-      ...(spent > 1 ? { useCost: spent } : {})
-    }))
+    actions: [
+      ...([1, 2, 3] as const).map((spent) => ({
+        id: `ram-${spent}`,
+        name: `Ram (${spent} charge${spent === 1 ? "" : "s"})`,
+        activation: "action" as const,
+        description: `Expend ${spent} charge${spent === 1 ? "" : "s"}: a spectral ram's head makes a ranged spell attack with a +7 bonus against one creature you can see within 60 feet. On a hit, it takes ${2 * spent}d10 Force damage and is pushed ${5 * spent} feet away from you.`,
+        attack: { ability: "spellcasting" as const, bonus: 7, rangeFeet: 60 },
+        damage: [{ formula: `${2 * spent}d10`, type: "force" as const }],
+        onHitPush: { feet: 5 * spent },
+        targets: { count: 1, rangeFeet: 60, seen: true as const },
+        uses: { limit: 3, per: "long-rest" as const, pool: "ring-of-the-ram-charges" },
+        ...(spent > 1 ? { useCost: spent } : {})
+      })),
+      ...([1, 2, 3] as const).map((spent) => ({
+        id: `break-${spent}`,
+        name: `Break a door (${spent} charge${spent === 1 ? "" : "s"})`,
+        activation: "action" as const,
+        description: `Expend ${spent} charge${spent === 1 ? "" : "s"}: the ring makes a Strength check with a +${5 * spent} bonus to break open a door you can see within 60 feet.`,
+        damage: [],
+        doorWork: { does: "force" as const, bonus: 5 * spent },
+        targets: { count: 1, rangeFeet: 60, seen: true as const },
+        uses: { limit: 3, per: "long-rest" as const, pool: "ring-of-the-ram-charges" },
+        ...(spent > 1 ? { useCost: spent } : {})
+      }))
+    ]
   },
   /** "you can expend 1 of its 3 charges to cast Wish from it": three Wishes in all, which never come back, and "the
    *  ring becomes nonmagical when you use the last charge". */
@@ -2301,7 +2314,64 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge. If a secret door or trap is within 60 feet of you, the wand pulses and points at the one nearest to you.",
+        findsSecrets: { feet: 60 },
         uses: { limit: 3, per: "long-rest", pool: "wand-of-secrets-charges" }
+      }
+    ]
+  },
+
+  // "You can take a Utilize action to press the button, which causes the rod to become magically fixed in place": fixed
+  // against a door on the map, it holds the door shut until a creature pushes the button again or makes the DC 30
+  // Strength (Athletics) check (doors.ts).
+  "immovable-rod": {
+    actions: [
+      {
+        id: "fix",
+        name: "Fix against a door",
+        activation: "action",
+        description:
+          "Press the button with the rod against a closed door within reach: the rod is fixed in place and holds the door shut until a creature pushes the button again or moves it with a DC 30 Strength (Athletics) check.",
+        damage: [],
+        doorWork: { does: "fix-rod" },
+        targets: { count: 1, rangeFeet: 5 }
+      }
+    ]
+  },
+
+  // "When found, a container contains 1d6 + 1 ounces", and "Applying an ounce of Sovereign Glue takes a Utilize action,
+  // and the applied glue takes 1 minute to set": a door glued shut, which only Universal Solvent undoes (doors.ts).
+  "sovereign-glue": {
+    charges: { starting: "1d6 + 1" },
+    actions: [
+      {
+        id: "glue",
+        name: "Glue a door shut",
+        activation: "action",
+        description:
+          "Apply an ounce to a closed door within reach. In a minute the glue sets, and nothing but Universal Solvent, Oil of Etherealness or a Wish undoes the bond.",
+        damage: [],
+        doorWork: { does: "glue" },
+        targets: { count: 1, rangeFeet: 5 },
+        uses: { limit: 7, per: "never", pool: "sovereign-glue-ounces" }
+      }
+    ]
+  },
+
+  // "When found, a tube contains 1d6 + 1 ounces", and "Each ounce instantly dissolves up to 1 square foot of adhesive it
+  // touches, including Sovereign Glue" (doors.ts).
+  "universal-solvent": {
+    charges: { starting: "1d6 + 1" },
+    actions: [
+      {
+        id: "dissolve",
+        name: "Dissolve glue on a door",
+        activation: "action",
+        description:
+          "Pour an ounce onto a door within reach: it dissolves the glue that holds it, Sovereign Glue included.",
+        damage: [],
+        doorWork: { does: "dissolve" },
+        targets: { count: 1, rangeFeet: 5 },
+        uses: { limit: 7, per: "never", pool: "universal-solvent-ounces" }
       }
     ]
   },

@@ -50,7 +50,7 @@ function wallsOf(ctx: ResolveContext): { spell: SpellReference; walls: Walls; la
 export function checkWallTarget(ctx: ResolveContext): void {
   const { input, state, attacker } = ctx;
   // An action that takes an object as its target checks it itself (`object-targets.ts`).
-  if (input.wallId === undefined || aimsAtObject(ctx)) return;
+  if (input.wallId === undefined || aimsAtObject(ctx) || ctx.action.doorWork) return;
   const cast = wallsOf(ctx);
   if (!cast || (!cast.walls.door && !cast.walls.cuts && !cast.walls.disintegrates))
     throw new CommandRejectedError(`${ctx.action.name} doesn't act on a door or a wall.`);

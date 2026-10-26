@@ -43,7 +43,11 @@ function aimable(ctx: ResolveContext): VisionWall {
  *  spent. */
 export function checkObjectTarget(ctx: ResolveContext): void {
   if (!aimsAtObject(ctx)) return;
-  const wall = aimable(ctx);
+  checkWallReach(ctx, aimable(ctx));
+}
+
+/** The wall or door an action is aimed at is within its targets' range of the user and, where they say so, seen. */
+export function checkWallReach(ctx: ResolveContext, wall: VisionWall): void {
   const { state, attacker, input } = ctx;
   const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot ?? null;
   const at = nearestPointOf(state, wall, attacker.id);

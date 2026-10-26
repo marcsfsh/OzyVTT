@@ -2377,8 +2377,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:amulet-of-the-planes": guided(
     "Its Plane Shift is cast only after a DC 15 Intelligence (Arcana) check, which the server rolls in a fight and outside one; a failure spends the action and casts nothing (cast-check.ts). Where a failure sends its wearer and those within 15 feet, on the d100 table, is the GM's."
   ),
-  "item:ring-of-the-ram": guided(
-    "Each of its three actions spends 1 to 3 of its 3 charges (1d3 back at dawn) on a ranged spell attack at its printed +7 against a creature within 60 feet, dealing 2d10 Force and pushing it 5 feet for each charge. Its Strength check at +5 a charge to break an object is the GM's."
+  "item:ring-of-the-ram": enforced(
+    "Each of its three actions spends 1 to 3 of its 3 charges (1d3 back at dawn) on a ranged spell attack at its printed +7 against a creature within 60 feet, dealing 2d10 Force and pushing it 5 feet for each charge. Aimed at a door on the map it sees within 60 feet, the same charges make a Strength check at +5 a charge against the highest DC of what holds the door shut (10 more under an Arcane Lock), and a success breaks it open; Sovereign Glue and Stone Shape's seal don't give (resolution/door-work.ts, doors.ts). The DC to break any other object, which the SRD doesn't print, is the GM's."
+  ),
+  "item:immovable-rod": guided(
+    "Its Utilize action fixes the rod against a closed door on the map within reach, which it holds shut: the rod leaves its bearer's hands, a DC 30 Strength (Athletics) check forcing the door moves it back to whoever fixed it, and a creature beside the door can push its button with a Utilize action and take it (resolution/door-work.ts, doors.ts). The rod fixed anywhere else, as a ladder rung, a bar or a weight holding 8,000 pounds, is open-ended use the GM rules on."
+  ),
+  "item:sovereign-glue": guided(
+    "Its 1d6 + 1 ounces are rolled when it is added and counted. A Utilize action spends an ounce to glue a closed door on the map within reach shut; a minute later the glue has set, and then no check, tool, Knock or Ring of the Ram opens it until Universal Solvent dissolves it (resolution/door-work.ts, doors.ts). Bonding any other two objects, and Oil of Etherealness or Wish breaking the bond, are the GM's."
+  ),
+  "item:universal-solvent": guided(
+    "Its 1d6 + 1 ounces are rolled when it is added and counted. A Utilize action spends an ounce on a door on the map within reach and dissolves the Sovereign Glue that holds it (resolution/door-work.ts, doors.ts). Dissolving any other adhesive is the GM's."
+  ),
+  "item:wand-of-secrets": enforced(
+    "Its Magic action spends 1 of its 3 charges (1d3 back at dawn): if a secret door on the map or a hidden trap or glyph lies within 60 feet of its holder, the table hears which way the wand points at the nearest, and the GM what it is and how far (resolution/door-work.ts)."
   ),
   "item:dragon-orb": guided(
     "Peering into it is a DC 15 Charisma save its user makes: a success gives control of the orb, and a failure leaves the user Charmed by it while attuned, and a player can't end that attunement (attunement.ts); the GM ending the attunement ends either. Only a user who controls it casts its spells, at their printed charges from 7 (1d4 + 3 back at dawn): Cure Wounds at level 9 for 4, Daylight for 1, Death Ward for 2, Detect Magic for none, Scrying at DC 18 for 3; and Call Dragons waits an hour of game time (clock-pools.ts). The Suggestion it casts on a charmed user and its AC 20 are the GM's."

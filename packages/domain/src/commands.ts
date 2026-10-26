@@ -1454,8 +1454,8 @@ export const DoorUseSchema = z
     wallId: z.uuid(),
     actorId: z.uuid(),
     /** Pick its lock (Thieves' Tools), force it, jam it with an Iron Spike, pry it open (Carpenter's or Smith's
-     *  Tools) or seal it (Carpenter's Tools). */
-    how: z.enum(["pick", "force", "jam", "pry", "seal"]),
+     *  Tools), seal it (Carpenter's Tools), or push the button of the Immovable Rod that holds it (`release`). */
+    how: z.enum(["pick", "force", "jam", "pry", "seal", "release"]),
     /** Another character helping with a Portable Ram (Advantage on the check). */
     helperId: z.uuid().optional(),
     /** Fast Hands (Thief): the use takes the Bonus Action. */
