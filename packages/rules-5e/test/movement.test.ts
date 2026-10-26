@@ -47,6 +47,63 @@ describe("movement over a square grid", () => {
     expect(path?.difficultSteps).toBe(3);
   });
 
+  it("charges a foot more for each foot swum without a Swim Speed, two more in difficult water", () => {
+    // A river across the box in columns 1 to 3; column 3 is also choked with reeds.
+    const river = (column: number) => column >= 1 && column <= 3;
+    const path = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: (column) => column === 3,
+      isWater: river,
+      swimExtra: 1
+    });
+    // Two swimming steps (2 each), one swimming step into reeds (3) and one step onto the far bank.
+    expect(path?.costCells).toBe(8);
+  });
+
+  it("charges nothing more for swimming with a Swim Speed, and doesn't add swimming to swimming counted already", () => {
+    const river = (column: number) => column >= 1 && column <= 3;
+    const swimmer = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: open,
+      isWater: river,
+      swimExtra: 0
+    });
+    expect(swimmer?.costCells).toBe(4);
+    const swimmingAlready = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: open,
+      isWater: river,
+      swimExtra: 1,
+      extraPerStep: 1
+    });
+    expect(swimmingAlready?.costCells).toBe(8);
+  });
+
+  it("goes round a pool when that costs less than swimming across it", () => {
+    const pool = cellSet([
+      [2, 0],
+      [2, 1],
+      [2, -1]
+    ]);
+    const path = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: open,
+      isWater: pool,
+      swimExtra: 1
+    });
+    // Diagonally round its end costs 4, swimming across it 5.
+    expect(path?.costCells).toBe(4);
+    expect(path?.steps.some((step) => pool(step.column, step.row))).toBe(false);
+  });
+
   it("charges twice a step's cost where the mover's Speed is halved, difficult terrain included", () => {
     // Halved from column 3 on (Spirit Guardians' Emanation); column 4 is also rubble.
     const path = movementPath({

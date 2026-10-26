@@ -142,6 +142,11 @@ export function movementPath(
     isHalved?: (column: number, row: number) => boolean;
     /** Whether this step costs double for the way it goes (Gust of Wind: moving closer to its caster in the Line). */
     isStepCostly?: (from: GridCell, to: GridCell) => boolean;
+    /** Whether entering this cell is swimming (painted water). A swimming step costs `swimExtra` more cells, in place
+     *  of `extraPerStep` when that is less: swimming doesn't add to crawling or to swimming already counted. */
+    isWater?: (column: number, row: number) => boolean;
+    /** Cells a swimming step adds: 1 without a Swim Speed used to swim (SRD Swimming), 0 with one. */
+    swimExtra?: number;
     maxNodes?: number;
   }>
 ): MovementPath | null {
@@ -149,9 +154,9 @@ export function movementPath(
   const { from, to } = input;
   const straight = Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row));
   if (straight === 0) return { steps: [from], costCells: 0, difficultSteps: 0 };
-  // No path costs more than walking straight through difficult ground (2 per step), so nothing cheaper lies
-  // further than that from the start.
-  const radius = straight * 2 + 1;
+  // No path costs more than walking straight through difficult ground (2 per step), or swimming through it (3), so
+  // nothing cheaper lies further than that from the start.
+  const radius = straight * (input.isWater && (input.swimExtra ?? 0) > 0 ? 3 : 2) + 1;
   const width = radius * 2 + 1;
   const keyOf = (column: number, row: number) => (row - from.row + radius) * width + (column - from.column + radius);
   const inBox = (column: number, row: number) =>
@@ -206,6 +211,19 @@ export function movementPath(
   const goalKey = keyOf(to.column, to.row);
   const limit = input.maxNodes ?? 40_000;
   const extraPerStep = Math.max(0, input.extraPerStep ?? 0);
+  const swimExtra = Math.max(0, input.swimExtra ?? 0);
+  const waterCache = new Map<number, boolean>();
+  const enteringWater = (column: number, row: number) => {
+    if (!input.isWater) return false;
+    const key = keyOf(column, row);
+    const cached = waterCache.get(key);
+    if (cached !== undefined) return cached;
+    let water = false;
+    for (let dc = 0; dc < size && !water; dc++)
+      for (let dr = 0; dr < size && !water; dr++) water = input.isWater(column + dc, row + dr);
+    waterCache.set(key, water);
+    return water;
+  };
   let expanded = 0;
 
   while (queue.size > 0) {
@@ -223,7 +241,8 @@ export function movementPath(
         input.isStepSqueezed?.({ column: node.column, row: node.row }, { column, row }) === true;
       const halved = input.isHalved?.(column, row) === true;
       const costly = input.isStepCostly?.({ column: node.column, row: node.row }, { column, row }) === true;
-      const cost = node.cost + ((difficult ? 2 : 1) + extraPerStep) * (halved ? 2 : 1) * (costly ? 2 : 1);
+      const extraHere = enteringWater(column, row) ? Math.max(extraPerStep, swimExtra) : extraPerStep;
+      const cost = node.cost + ((difficult ? 2 : 1) + extraHere) * (halved ? 2 : 1) * (costly ? 2 : 1);
       const key = keyOf(column, row);
       const known = best.get(key);
       if (known !== undefined && known <= cost) continue;
