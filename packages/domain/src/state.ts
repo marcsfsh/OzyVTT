@@ -319,6 +319,8 @@ export const PendingSaveSchema = z
       .max(9)
       .optional(),
     halfOnSuccess: z.boolean().default(true),
+    /** A success still takes the whole damage: the save is against what follows it alone (a Potion of Poison). */
+    fullOnSuccess: z.literal(true).optional(),
     /** Conditions a failed save imposes. */
     conditionIds: z
       .array(

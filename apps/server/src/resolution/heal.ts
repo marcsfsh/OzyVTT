@@ -10,6 +10,7 @@ import { conditionCost, useCostOf } from "../use-cost.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { isItemActionId } from "../item-actions.js";
 import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
+import { CURED_BY_PREFIX } from "./restoration.js";
 
 /** Healing (Cure Wounds): rolled once, and every target regains it on the resolve. A willing creature's healing has
  *  nothing to gate, so it applies here with no Apply tap, which damage waits on. Second Wind heals its user;
@@ -277,8 +278,12 @@ function applyPrintedCures(ctx: ResolveContext): void {
         actorIds: [target.id]
       });
     }
+    // An effect the spell ends by name is something it does (Dust of Sneezing and Choking's sneezing).
+    const named =
+      action.spellId !== undefined &&
+      target.effects.some((effect) => effect.tags.includes(`${CURED_BY_PREFIX}${action.spellId}`));
     if (present.length === 0) {
-      if (!alone || latent.length > 0) continue;
+      if (!alone || latent.length > 0 || named) continue;
       throw new CommandRejectedError(
         `${target.name} isn't ${cures.map((id) => conditionLabel(id)).join(" or ")}, so ${action.name} would do nothing.`
       );

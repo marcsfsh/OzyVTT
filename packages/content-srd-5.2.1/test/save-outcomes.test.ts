@@ -53,7 +53,7 @@ describe("save outcomes in the shipped content", () => {
     expect(blocks.length).toBeGreaterThan(300);
     const incomplete = blocks.filter(
       ({ save }) =>
-        (save.successDamage !== "half" && save.successDamage !== "none") ||
+        (save.successDamage !== "half" && save.successDamage !== "none" && save.successDamage !== "full") ||
         !(
           Array.isArray(save.failureConditions) &&
           save.failureConditions.every((id: unknown) => SaveConditionSchema.safeParse(id).success)

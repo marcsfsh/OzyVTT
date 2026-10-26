@@ -1813,8 +1813,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:sword-of-life-stealing": enforced(
     "On a rolled 20 against a creature that is neither a Construct nor an Undead it deals 15 Necrotic damage more, and its wielder gains Temporary Hit Points equal to the Necrotic damage the target takes (resolution/damage.ts)."
   ),
-  "item:potion-of-poison": guided(
-    "Drinking it deals its 4d6 Poison damage to the drinker. The DC 13 Constitution save against an hour of Poisoned, and its disguise, are the GM's: the GM names the row."
+  "item:potion-of-poison": enforced(
+    "Drunk or given as a Potion of Healing is, it deals its 4d6 Poison damage whatever the drinker's DC 13 Constitution save, and a failure leaves an hour of Poisoned (saving-throws.ts). Its holder sees it as a Potion of Healing, by row id, name, text and actions, until Identify reveals it (disguised-items.ts, projections.ts)."
+  ),
+  "item:dust-of-disappearance": enforced(
+    "Thrown with an action, it makes its user and each creature in its 10-foot Emanation Invisible for one roll of 2d4 minutes, ending for a creature that makes an attack roll, deals damage or casts a spell, and is used up (resolution/grant.ts). The objects it hides are scenery."
+  ),
+  "item:philter-of-love": enforced(
+    "Drunk, it waits 10 minutes for the first creature its drinker sees, which then Charms it for 1 hour as the charmer (first-sight.ts, with dynamic vision on; with it off the GM names the creature). Whether that creature is its true love is the story's."
   ),
   "item:boots-of-speed": enforced(
     "A Bonus Action doubles its wearer's Speed (speed.ts) and gives Opportunity Attacks against it Disadvantage. Its 10 minutes a Long Rest are 100 rounds: a click lasts all that is left, and ending it early gives the rest back (use-cost.ts, effects.ts)."
@@ -1828,8 +1834,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:oathbow": enforced(
     "Naming a sworn enemy marks it for 7 days, once a dawn and one at a time (resolution/grant.ts), and the bow's ranged attacks against it have Advantage, set Half and Three-Quarters Cover and long range's Disadvantage aside and deal 3d6 Piercing more; while it lives its wielder has Disadvantage on attacks with every other weapon (resolution/attack.ts)."
   ),
-  "item:energy-bow": guided(
-    "It binds to its Longbow or Shortbow with +1 to attack and damage rolls, and its arrows deal Force damage with no ammunition to spend (inventory.ts weapon changes). The arrows' light, Arrow of Restraint, Arrow of Transport and the Energy Ladder are the GM's."
+  "item:energy-bow": enforced(
+    "It binds to its Longbow or Shortbow with +1 to attack and damage rolls, and its arrows deal Force damage with no ammunition to spend (inventory.ts weapon changes). Arrow of Restraint is a hit option that deals no damage and asks a DC 15 Strength save against a minute of Restrained, escaped with a DC 20 Athletics check (resolution/hit-options.ts), and Arrow of Transport teleports a willing Medium or smaller creature within 60 feet to a space within 10 feet of its wielder (resolution/movement-grants.ts). The arrows' light and the Energy Ladder are the GM's."
   ),
   "item:ioun-stone": guided(
     "The GM says which stone a found one is (item-records.ts), the bearer learns it on attuning, and two stones of different kinds attune as two items. Agility, Fortitude, Insight, Intellect, Leadership and Strength raise their score live (live-abilities.ts); Awareness and Protection are applied. Absorption, Greater Absorption, Mastery, Regeneration, Reserve and Sustenance are the GM's."
@@ -1837,8 +1843,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:mace-of-terror": enforced(
     "Its 3 charges come back 1d3 at dawn, and each opens the DC 15 Wisdom save against Frightened for a minute on the creatures its wielder picks within 30 feet, repeated at the end of each turn. A Frightened creature must spend its movement getting as far from the wielder as it can (compelled-moves.ts, movement-rules.ts), makes no Opportunity Attacks, and for its action can only Dash, try to escape what holds it, or Dodge when it has nowhere to move (resolution/economy.ts)."
   ),
-  "item:dust-of-sneezing-and-choking": guided(
-    "Thrown, it opens the DC 15 Constitution save against Incapacitated on its thrower and every creature in its 30-foot Emanation but Constructs, Elementals, Oozes, Plants and Undead, repeated at the end of each turn, and is used up. Suffocating is the GM's."
+  "item:dust-of-sneezing-and-choking": enforced(
+    "Thrown, it opens the DC 15 Constitution save against Incapacitated on its thrower and every creature in its 30-foot Emanation but Constructs, Elementals, Oozes, Plants and Undead, repeated at the end of each turn, and is used up. A creature that fails chokes, gaining a level of Exhaustion at the end of each of its turns until it saves, when those levels go (breath.ts), and Lesser Restoration ends it (resolution/restoration.ts)."
   ),
   "item:potion-of-vitality": enforced(
     "Drinking it ends the drinker's Exhaustion and the Poisoned condition, and for 24 hours each Hit Point Die it spends restores its maximum (rests.ts, resolution/hit-point-die.ts)."
@@ -1846,8 +1852,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:ring-of-regeneration": enforced(
     "Its wearer regains 1d6 Hit Points for every 10 minutes of game time while it has at least 1 (clock-healing.ts), and in a fight every 100 rounds. Regrowing a lost body part is the story's: the sheet has no body parts."
   ),
-  "item:ring-of-elemental-command": guided(
-    "Elemental Bane's Advantage on attacks against Elementals and their Disadvantage against its wearer, and Elemental Compulsion's DC 18 save against Charmed, are applied. The GM says which plane a found ring is (item-records.ts): its Resistance, Immunity or speed, and its spells at DC 18 on 5 charges with their printed costs. The languages, breathing water and moving through earth are the GM's."
+  "item:ring-of-elemental-command": enforced(
+    "Elemental Bane's Advantage on attacks against Elementals and their Disadvantage against its wearer are applied, and an Elemental that fails Elemental Compulsion's DC 18 save is Charmed and commanded by the wearer until the wearer's next turn (summons.ts). The GM says which plane a found ring is (item-records.ts): its Resistance, Immunity or speed, and its spells at DC 18 on 5 charges with their printed costs. The Water ring's wearer breathes water (breath.ts), and the Earth ring's moves through the map's walls as Difficult Terrain and is shunted out of one it ends its turn in (wall-passage.ts). The languages are the GM's."
   ),
   "item:weapon-of-warning": enforced(
     "Advantage on Initiative for its attuned bearer and the allies within 30 feet of it, and the Alarm that wakes each of them sleeping naturally (Unconscious with Hit Points and no effect holding it there) as the fight begins, are applied (encounter.ts)."

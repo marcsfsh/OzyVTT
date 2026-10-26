@@ -25,6 +25,7 @@ import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
 import { isGmGrade, principalTag, type CommandContext, type GamePrincipal, type Kit } from "./kit.js";
 import { brightLightEndings, settleBrightLight } from "../light-endings.js";
+import { firstSightCharms, settleFirstSight } from "../first-sight.js";
 
 /** A command's reply: the accepted revision and idempotent-duplicate flag, plus whatever the command adds. */
 export type GameReply = Readonly<Record<string, unknown>>;
@@ -401,6 +402,26 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     kit.publishNarrations(events);
   }
 
+  /** A Philter of Love's drinker is Charmed by the first creature it sees (`first-sight.ts`), as its own write. */
+  async function settleFirstSightAfter() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null) return;
+    const content = {
+      definition: (definitionId: string) => kit.resolveDefinitionIn(before, definitionId),
+      catalog: kit.equipmentCatalog()
+    };
+    if (firstSightCharms(before, content).length === 0) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "effects.first-sight" }, (draft) => {
+      events = settleFirstSight(draft, {
+        definition: (definitionId: string) => kit.resolveDefinitionIn(draft, definitionId),
+        catalog: kit.equipmentCatalog()
+      });
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
   async function dispatch(
     type: GameCommandType,
     principal: GamePrincipal,
@@ -453,6 +474,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       await settleSummoned();
       await settleWardingBonds();
       await settleBrightLightAfter();
+      await settleFirstSightAfter();
       await settleFalls();
       // A creature that left the plane ends what it commanded across it (an aboleth's Dominate Mind).
       await settleSummoned();

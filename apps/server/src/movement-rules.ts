@@ -25,7 +25,7 @@ import { ridesWith } from "./mounts.js";
 import { isEthereal, onOtherPlanes } from "./ethereal.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
-import { burrowsThroughWalls, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
+import { burrowsThroughWalls, passesEarth, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
 import { effectiveActions } from "./effective-actions.js";
 import {
   endEffect,
@@ -256,7 +256,7 @@ export function movementStatus(
       ? { dragging: true }
       : {}),
     ...grantsOf(state, actor),
-    ...(incorporeal(definition) ? { throughWalls: true } : {}),
+    ...(incorporeal(definition) || (actor && passesEarth(actor)) ? { throughWalls: true } : {}),
     ...(openingPassage(definition) ? { opening: openingPassage(definition)! } : {}),
     ...(burrowsThroughWalls(definition) ? { burrowsThroughWalls: burrowsThroughWalls(definition)! } : {}),
     ...(actor && isEthereal(actor) ? { ethereal: true } : {}),
@@ -1000,7 +1000,9 @@ function costOptions(
       ...(isNimble(moverDefinition) ? { nimble: true } : {}),
       // A ghost through walls as Difficult Terrain; a burrower through earth and stone: freely (Earth Glide), or at
       // half its Burrow Speed (Tunneler).
-      ...(incorporeal(moverDefinition) || (travel === "burrow" && burrowsThroughWalls(moverDefinition) === "half")
+      ...(incorporeal(moverDefinition) ||
+      passesEarth(mover) ||
+      (travel === "burrow" && burrowsThroughWalls(moverDefinition) === "half")
         ? { throughWalls: true }
         : {}),
       ...((travel === "burrow" && burrowsThroughWalls(moverDefinition) === "free") || isEthereal(mover)

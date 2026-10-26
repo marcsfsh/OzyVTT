@@ -100,10 +100,11 @@ export function applyMovementGrants(ctx: ResolveContext): void {
       id: `${input.commandId}:teleport`,
       name: action.name,
       teleport,
+      userId: attacker.id,
       ...(passenger ? { passengerId: passenger.id } : {})
     });
     say(
-      `${traveler.name} may teleport up to ${teleport.feet} ft to an unoccupied space ${attacker.name} can see${passenger ? `, ${passenger.name} arriving beside it` : ""}.`
+      `${traveler.name} may teleport up to ${teleport.feet} ft to an unoccupied space ${attacker.name} can see${teleport.nearUserFeet !== undefined && traveler.id !== attacker.id ? ` within ${teleport.nearUserFeet} ft of ${attacker.name}` : ""}${passenger ? `, ${passenger.name} arriving beside it` : ""}.`
     );
   }
   // "Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without

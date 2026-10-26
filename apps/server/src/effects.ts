@@ -359,6 +359,9 @@ export function removeConditionDirect(actor: Actor, conditionId: string) {
 
 /** The tag on what keeps its bearer from breathing while it lasts ("is suffocating": engulfed, whelmed). */
 export const SMOTHERING_TAG = "smothering";
+/** On a failure's effect, its bearer is choking while it lasts: it has no breath to hold and suffocates at once (Dust
+ *  of Sneezing and Choking: "is suffocating"). */
+export const CHOKING_TAG = "choking";
 
 /** Goodberry's berries: the inventory row the cast fills, and the tag on the caster's effect that keeps them. */
 export const GOODBERRY_ID = "goodberry";
@@ -729,7 +732,7 @@ function endEffectInternal(
     });
   }
   // What smothered the creature (an engulfing, a whelm) lets go: it breathes again.
-  if (effect.tags.includes(SMOTHERING_TAG))
+  if (effect.tags.includes(SMOTHERING_TAG) || effect.tags.includes(CHOKING_TAG))
     for (const held of actor.effects.filter((candidate) => candidate.breath !== undefined))
       endEffectInternal(state, actor, held.id, events, sweeping);
   // A weapon conjured with a binding disappears when the binding ends (a conjured pact weapon).

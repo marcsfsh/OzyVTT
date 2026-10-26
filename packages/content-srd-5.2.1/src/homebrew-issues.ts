@@ -373,6 +373,7 @@ const LABELS: Readonly<Record<string, string>> = {
   servesAsFocus: "focus it serves as",
   savesNegateSpells: "spells a successful save negates",
   attractsMissiles: "ranged attacks it draws onto its bearer",
+  disguisedAs: "item it passes for",
   unarmedStrike: "what its Unarmed Strikes deal",
   initiativeAura: "aura of Advantage on Initiative",
   wakesSleepers: "wakes sleepers as a fight begins",

@@ -45,6 +45,7 @@ import { craftingDeps } from "./crafting.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";
+import { rowAsSeen } from "../disguised-items.js";
 
 // The reads both transports serve. Every catalog is scoped to the caller through `catalogFor`, so a homebrew
 // GM-only record never reaches a player; which reads a player may call at all is the `gmOnly` gate.
@@ -217,12 +218,17 @@ export const gameReads = [
         "check",
         "You can only check your own character's actions."
       );
-      const actor = state.actors.find((candidate) => candidate.id === actorId);
-      if (!actor) throw new GameNotFoundError("That combatant no longer exists.");
+      const found = state.actors.find((candidate) => candidate.id === actorId);
+      if (!found) throw new GameNotFoundError("That combatant no longer exists.");
+      const catalog = kit.equipmentCatalog();
+      // A player reads a disguised copy's actions as the item it passes for: the same row and action ids, so using one
+      // uses the copy as it is.
+      const actor = isGmGrade(principal)
+        ? found
+        : { ...found, inventory: found.inventory.map((row) => rowAsSeen(row, catalog)) };
       const definition = actor.definitionId ? kit.resolveDefinition(actor.definitionId) : undefined;
       if (actor.definitionId && !definition) throw new GameNotFoundError("That combatant's stat block is unavailable.");
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
-      const catalog = kit.equipmentCatalog();
       const available = effectiveActions(definition, actor, catalog);
       const builtins = builtinActionsFor(definition, actor).filter(
         (candidate) => !available.some((declared) => declared.id === candidate.id)

@@ -849,6 +849,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       proposedDamageParts: parts,
       saveBonus,
       halfOnSuccess: action.save.successDamage === "half" || potentCantrip(ctx),
+      ...(action.save.successDamage === "full" ? { fullOnSuccess: true } : {}),
       // A pick's own Prone stays bare, as the action's does (Command's Grovel).
       conditionIds: swallows ? [...conditionIds, ...barePicks(option)] : [],
       ...(onFailEffect ? { onFailEffect } : {}),

@@ -2541,7 +2541,14 @@ export const InventoryItemSchema = z
     penalty: z.number().int().min(1).max(10).optional(),
     /** Identify was cast on this copy: its carrier's player learns its kind and the type the GM picked without
      *  attuning to it. Only the cast sets it; the server keeps it. */
-    identified: z.literal(true).optional()
+    identified: z.literal(true).optional(),
+    /** The item its holder takes this copy for until it is identified (a Potion of Poison's Potion of Healing). Never
+     *  sent to a player: the holder's projection shows the row as that item. The server keeps it. */
+    disguisedAs: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
@@ -3511,9 +3518,11 @@ export type FailureMargin = z.infer<typeof FailureMarginSchema>;
  */
 export const SaveOutcomeFields = {
   successDamage: z
-    .enum(["half", "none"])
+    .enum(["half", "none", "full"])
     .default("half")
-    .describe('The damage a successful save takes: "half" (Fireball) or "none" (Sacred Flame)'),
+    .describe(
+      'The damage a successful save takes: "half" (Fireball), "none" (Sacred Flame), or "full" where the save is against what follows the damage alone (a Potion of Poison\'s 4d6 Poison, the Poisoned condition on a failure)'
+    ),
   /** Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated). */
   failureConditions: z
     .array(SaveConditionSchema)
@@ -4573,6 +4582,9 @@ export const HitRiderSchema = z
       .string()
       .regex(/^1d(?:4|6|8|10|12)$/)
       .optional(),
+    /** It takes the place of the hit's damage ("try to restrain the target instead of dealing damage to it": an Energy
+     *  Bow's Arrow of Restraint). */
+    insteadOfDamage: z.literal(true).optional(),
     /** What the table finishes by hand, said with the hit. */
     reminder: z.string().min(1).max(400).optional()
   })
@@ -5209,7 +5221,10 @@ export const ActionTeleportSchema = z
      *  Mountebank). */
     smoke: z.literal(true).optional(),
     /** Taking it spends this many feet of its user's movement (Tree Stride: 5 to enter a tree and 5 to step out). */
-    costFeet: z.number().int().min(5).max(60).optional()
+    costFeet: z.number().int().min(5).max(60).optional(),
+    /** The creature it moves arrives within this many feet of its user (an Energy Bow's Arrow of Transport: "to an
+     *  unoccupied space you can see within 10 feet of you"). */
+    nearUserFeet: z.number().int().min(5).max(120).optional()
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;

@@ -68,6 +68,7 @@ import {
   addEffect,
   CONCENTRATING_TAG,
   SMOTHERING_TAG,
+  CHOKING_TAG,
   dropHeldItems,
   effectDurationOf,
   endConcentrationSustainedBy,
@@ -639,9 +640,9 @@ export function applyFailureEffect(
   if (onFail.tags.includes(SWALLOWED_TAG) && onFail.sourceActorId)
     events.push(...swallowLands(state, target, onFail.sourceActorId));
   // "Is suffocating" while engulfed or whelmed: it holds its breath until what smothers it ends.
-  if (onFail.tags.includes(SMOTHERING_TAG)) {
+  if (onFail.tags.includes(SMOTHERING_TAG) || onFail.tags.includes(CHOKING_TAG)) {
     const definition = target.definitionId ? immunities?.resolveDefinition?.(target.definitionId) : undefined;
-    events.push(...startHoldingBreath(state, target, definition));
+    events.push(...startHoldingBreath(state, target, definition, { choking: onFail.tags.includes(CHOKING_TAG) }));
   }
   // Calm Emotions: a Charmed or Frightened it holds off is kept on the effect for later; one it makes the creature
   // immune to and doesn't hold off ends.
@@ -1198,23 +1199,29 @@ export function answerSave(
   const turnedBy = success ? spellTurnedBy(target, pending, deps.catalog) : null;
   // A failure that acts by the target's Hit Points (Divine Word, Slaying Bow) does its band's outcome instead.
   const band = success ? null : hitPointBandOf(pending, target);
+  // A save against what follows the damage alone leaves the damage whole (a Potion of Poison).
+  const whole = success && pending.fullOnSuccess === true && turnedBy === null;
   const outcomeParts = band
     ? []
-    : parts && parts.length > 0
-      ? success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
-        ? []
-        : halved
-          ? halveDamageParts(parts)
-          : parts
-      : null;
+    : whole && parts && parts.length > 0
+      ? parts
+      : parts && parts.length > 0
+        ? success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
+          ? []
+          : halved
+            ? halveDamageParts(parts)
+            : parts
+        : null;
   const outcomeDamage =
     outcomeParts !== null
       ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
-      : success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
-        ? 0
-        : halved
-          ? Math.floor(proposedTotal / 2)
-          : proposedTotal;
+      : whole
+        ? proposedTotal
+        : success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
+          ? 0
+          : halved
+            ? Math.floor(proposedTotal / 2)
+            : proposedTotal;
   const outcomeCondition =
     !success &&
     band === null &&

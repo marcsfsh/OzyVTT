@@ -1383,6 +1383,15 @@ export const EquipmentReferenceSchema = z
       .describe(
         "Its riders stop while its bearer's Speed is 0, and from the moment its bearer takes damage until the start of its next turn (a Cloak of Displacement)"
       ),
+    /** To its holder it is this other item until it is identified (a Potion of Poison passes for a Potion of Healing). */
+    disguisedAs: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
+      .describe(
+        "To its holder it is this other item until Identify reveals it: a Potion of Poison passes for a Potion of Healing"
+      ),
     /** While its bearer is attuned, a Ranged weapon attack at another creature within `feet` of the bearer targets the
      *  bearer instead, held or not (a Shield of Missile Attraction's curse). */
     attractsMissiles: z

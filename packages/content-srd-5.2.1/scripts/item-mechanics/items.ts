@@ -881,13 +881,56 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "An arrow produced by this weapon deals Force damage instead of Piercing damage", with no ammunition to spend. Not
-  // modeled: the arrows' light, Arrow of Restraint, Arrow of Transport and the Energy Ladder.
+  // "An arrow produced by this weapon deals Force damage instead of Piercing damage", with no ammunition to spend. Arrow
+  // of Restraint rides a hit in place of its damage (DC 15 Strength or Restrained for 1 minute, a DC 20 Athletics check
+  // as an action to escape), and Arrow of Transport sends a willing creature within 60 feet to a space within 10 feet of
+  // its user. The arrows' light is momentary, and the Energy Ladder is a climbable surface the map has no model for.
   "energy-bow": {
     weaponChanges: { damageType: "force", removeProperties: ["ammunition"] },
     modifiers: [
       { type: "attack-bonus", amount: 1 },
       { type: "damage-bonus", amount: 1 }
+    ],
+    actions: [
+      {
+        id: "arrow-of-restraint",
+        name: "Arrow of Restraint",
+        activation: "other",
+        description:
+          "When you hit a creature with a ranged attack using this weapon, you can try to restrain it instead of dealing damage to it. It makes a DC 15 Strength saving throw or has the Restrained condition for 1 minute. As an action, it can make a DC 20 Strength (Athletics) check to break the restraint.",
+        damage: [],
+        save: {
+          ability: "str",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["restrained"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          failureEffect: {
+            name: "Arrow of Restraint",
+            tags: [],
+            modifiers: [],
+            endAction: {
+              activation: "action",
+              kind: "check",
+              ability: "str",
+              skill: "athletics",
+              dc: 20,
+              label: "Break the restraint"
+            }
+          }
+        },
+        ridesHit: { rides: "this-weapon", insteadOfDamage: true }
+      },
+      {
+        id: "arrow-of-transport",
+        name: "Arrow of Transport",
+        activation: "action",
+        description:
+          "Fire an arrow at a willing creature you can see within 60 feet of you that is Medium or smaller. It teleports to an unoccupied space you can see within 10 feet of you.",
+        damage: [],
+        targets: { count: 1, rangeFeet: 60, seen: true, maxSize: "medium", who: "others" },
+        teleport: { feet: 75, orAnother: true, nearUserFeet: 10 }
+      }
     ]
   },
 
@@ -1170,8 +1213,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // "Each Ring of Elemental Command is linked to one of the four Elemental Planes. The GM chooses": the plane is the
   // copy's kind. Every ring has Elemental Bane (Advantage on attack rolls against Elementals, which have Disadvantage
   // against its wearer) and Elemental Compulsion (a DC 18 Wisdom save or Charmed until the start of the wearer's next
-  // turn). The plane gives its Resistance, Immunity or speed, and its spells on 5 charges (1d4 + 1 back at dawn), each
-  // at DC 18 and its printed charges. The languages, breathing water and moving through earth are the GM's.
+  // turn, which is the wearer's to play). The plane gives its Resistance, Immunity or speed, and its spells on 5 charges
+  // (1d4 + 1 back at dawn), each at DC 18 and its printed charges. The water ring's wearer breathes water (`breath.ts`),
+  // and the earth ring's moves through the map's walls as Difficult Terrain (`wall-passage.ts`). The languages are the
+  // GM's.
   "ring-of-elemental-command": {
     charges: { regain: "1d4 + 1" },
     modifiers: [
@@ -1201,7 +1246,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           dc: 18,
           successDamage: "none",
           failureConditions: ["charmed"],
-          failureDuration: { type: "until-source-next-turn" }
+          failureDuration: { type: "until-source-next-turn" },
+          failureEffect: { name: "Elemental Compulsion", tags: ["commanded"], modifiers: [] }
         },
         targets: { count: 1, rangeFeet: 60, seen: true, creatureTypes: ["elemental"] }
       }
@@ -3303,8 +3349,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `pipes-of-the-sewers`, `cubic-gate` and `iron-bands`. Not when the sheet would then be wrong
   // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a Long Rest.
   //
-  // Trap items (`bag-of-devouring`, `dust-of-sneezing-and-choking`) are not authored: a button naming the real effect
-  // would spoil the trap. A Potion of Poison is the GM's to name.
+  // A trap item that passes for another (a Potion of Poison) says so with `disguisedAs`: its holder sees, and is offered,
+  // the item it passes for until it is identified.
 
   // ---- Carried wondrous items (alphabetical, absences inline) ----------------------------------
 
@@ -3842,8 +3888,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
   // Thrown into the air, it makes its thrower and every creature in a 30-foot Emanation save (DC 15 Constitution) or be
-  // Incapacitated with sneezing, repeating the save at the end of each turn. Constructs, Elementals, Oozes, Plants and
-  // Undead succeed, so none of them is a target. Suffocating is the GM's.
+  // Incapacitated with sneezing and suffocating (`choking`: no breath to hold, a level of Exhaustion at the end of each of
+  // its turns, gone when it saves), repeating the save at the end of each turn. Constructs, Elementals, Oozes, Plants and
+  // Undead succeed, so none of them is a target. Lesser Restoration on a creature ends it.
   "dust-of-sneezing-and-choking": {
     consumedOnUse: true,
     actions: [
@@ -3859,6 +3906,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           dc: 15,
           successDamage: "none",
           failureConditions: ["incapacitated"],
+          failureEffect: { name: "Sneezing", tags: ["choking", "cured-by-lesser-restoration"], modifiers: [] },
           repeatSave: true
         },
         area: { shape: "emanation", sizeFeet: 30, widthFeet: null },
@@ -5251,6 +5299,49 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
+  // Thrown with a Utilize action: its user and each creature in a 10-foot Emanation are Invisible for 2d4 minutes, one roll
+  // for all, ending for a creature that makes an attack roll, deals damage or casts a spell. Objects in it are scenery.
+  "dust-of-disappearance": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "throw",
+        name: "Throw the Dust",
+        activation: "action",
+        description:
+          "Throw the dust into the air: you and each creature within a 10-foot Emanation originating from you have the Invisible condition for 2d4 minutes, the same for all. The condition ends for a creature immediately after it makes an attack roll, deals damage, or casts a spell.",
+        damage: [],
+        area: { shape: "emanation", sizeFeet: 10, widthFeet: null },
+        grants: {
+          name: "Dust of Disappearance",
+          target: "self-and-targets",
+          tags: ["until-it-acts"],
+          conditions: ["invisible"],
+          duration: { type: "minutes", minutes: 8 },
+          minutesRolled: "2d4"
+        }
+      }
+    ]
+  },
+
+  // "The next time you see a creature within 10 minutes after drinking this philter, you have the Charmed condition for
+  // 1 hour": the first creature the drinker sees with dynamic vision on charms it (`first-sight.ts`); with it off the GM
+  // names it. Whether it is the drinker's true love is the story's.
+  "philter-of-love": {
+    consumedOnUse: true,
+    actions: [
+      drink(
+        "Philter of Love",
+        "Drink it: the next time you see a creature within 10 minutes, you have the Charmed condition for 1 hour, charmed by that creature.",
+        {
+          name: "Philter of Love",
+          tags: ["first-sight-charms"],
+          duration: { type: "minutes", minutes: 10 }
+        }
+      )
+    ]
+  },
+
   // The Invisible condition for 1 hour, ending early if the drinker makes an attack roll, deals damage or casts a spell.
   "potion-of-invisibility": {
     consumedOnUse: true,
@@ -5391,19 +5482,28 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // (`clock-healing.ts`). Regrowing a lost body part is the story's: the sheet has no body parts.
   "ring-of-regeneration": { regainsHitPoints: { everyMinutes: 10, formula: "1d6" } },
 
-  // The poison's 4d6 Poison damage, dealt to its drinker. The DC 13 Constitution save against an hour of Poisoned, which
-  // a success does not halve the damage of, is the GM's, and so is its disguise: the GM names the row.
+  // It "looks, smells, and tastes like a Potion of Healing": its holder sees a Potion of Healing until Identify reveals
+  // it, and it is drunk or given as one is. The drinker takes 4d6 Poison damage whatever its DC 13 Constitution save,
+  // which is against an hour of Poisoned.
   "potion-of-poison": {
     consumedOnUse: true,
+    disguisedAs: "potion-of-healing",
     actions: [
       {
         id: "drink",
         name: "Drink the Potion",
         activation: "bonus-action",
         description:
-          "Drink it: you take 4d6 Poison damage and must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 hour.",
+          "Drink it, or give it to a creature within 5 feet of you. The drinker takes 4d6 Poison damage and must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 hour.",
         damage: [{ formula: "4d6", type: "poison" }],
-        targets: { who: "self" }
+        save: {
+          ability: "con",
+          dc: 13,
+          successDamage: "full",
+          failureConditions: ["poisoned"],
+          failureDuration: { type: "minutes", minutes: 60 }
+        },
+        targets: { count: 1, rangeFeet: 5 }
       }
     ]
   }

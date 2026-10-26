@@ -62,6 +62,7 @@ export type ItemRiderKey =
   | "servesAsFocus"
   | "savesNegateSpells"
   | "attractsMissiles"
+  | "disguisedAs"
   | "unarmedStrike"
   | "initiativeAura"
   | "regainsHitPoints"
@@ -98,6 +99,7 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "servesAsFocus",
   "savesNegateSpells",
   "attractsMissiles",
+  "disguisedAs",
   "unarmedStrike",
   "initiativeAura",
   "regainsHitPoints",

@@ -747,6 +747,7 @@ describe("what no carried item can carry", () => {
       "oil-of-etherealness",
       "oil-of-sharpness",
       "oil-of-slipperiness",
+      "philter-of-love",
       "potion-of-animal-friendship",
       "potion-of-climbing",
       "potion-of-diminution",

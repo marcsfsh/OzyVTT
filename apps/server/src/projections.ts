@@ -33,6 +33,7 @@ import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight 
 import { sensedBy } from "./vision/detect.js";
 import { huntersLoreOf } from "./hunters-lore.js";
 import type { SightContent } from "./vision/senses.js";
+import { rowAsSeen } from "./disguised-items.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
 
@@ -211,6 +212,7 @@ const PENDING_SAVE_FIELDS = {
   proposedDamage: "player",
   proposedDamageParts: "player",
   halfOnSuccess: "player",
+  fullOnSuccess: "player",
   conditionIds: "player",
   saveBonus: "player",
   createdAt: "player",
@@ -891,9 +893,14 @@ const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filte
 /** Copies the listed fields. Optional ones that are unset are left out. */
 /** A carried row for a player. The GM's pick of a resistance type stays the GM's until the bearer attunes, when
  *  the item's properties are learned (and the resistance starts to apply); so does which kind an item that needs
- *  attunement is (an Ioun Stone's). */
-function playerInventoryRow(item: Actor["inventory"][number]): Actor["inventory"][number] {
-  const { chosenDamageType, variantId, storedCasts, ...row } = item;
+ *  attunement is (an Ioun Stone's). A copy that passes for another item is that item until it is identified
+ *  (`disguised-items.ts`). */
+function playerInventoryRow(
+  source: Actor["inventory"][number],
+  catalog: SightContent["catalog"]
+): Actor["inventory"][number] {
+  const item = rowAsSeen(source, catalog);
+  const { chosenDamageType, variantId, storedCasts, disguisedAs: _disguisedAs, ...row } = item;
   // Identify tells its caster what attuning would: the copy's kind and the type the GM picked.
   const learned = item.attuned || item.identified === true || item.magic?.attunementRequired !== true;
   return {
@@ -1126,7 +1133,7 @@ export function projectPlayerView(
                   restStep === null
                     ? null
                     : { after: restStep.after, ...(restStep.swaps ? { swaps: { ...restStep.swaps } } : {}) },
-                inventory: inventory.map(playerInventoryRow),
+                inventory: inventory.map((row) => playerInventoryRow(row, content.catalog)),
                 currency: { ...currency }
               }
             : {}),
