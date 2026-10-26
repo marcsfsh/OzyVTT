@@ -1665,6 +1665,34 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   // selected by you when you cast this spell, deals 5d8 Fire damage to each creature that ends its turn within 10 feet
   // of that side or inside the wall": each form and burning side is an option of the cast.
   "wall-of-fire": wallOfFireForms(),
+  // "You can form it into a hemispherical dome or a globe with a radius of up to 10 feet, or you can shape a flat
+  // surface made up of ten 10-foot-by-10-foot panels": each form is an option of the cast, raised round what it places.
+  "wall-of-force": [
+    {
+      ...lasting("wall", "The wall stands where it was placed while the spell lasts.", { on: [] }),
+      option: { id: "flat", name: "Flat, ten 10-foot panels" }
+    },
+    {
+      ...lasting("globe", "The dome or globe stands round the point it was placed on while the spell lasts.", {
+        on: []
+      }),
+      area: { shape: "sphere", sizeFeet: 10, widthFeet: null },
+      option: { id: "globe", name: "Dome or globe, 10-foot radius" }
+    }
+  ],
+  // "The wall is 6 inches thick and is composed of ten 10-foot-by-10-foot panels ... Alternatively, you can create
+  // 10-foot-by-20-foot panels that are only 3 inches thick" (`spell-walls.ts` prints each form's panels).
+  "wall-of-stone": [
+    {
+      ...lasting("wall", "The wall stands where it was placed while the spell lasts.", { on: [] }),
+      option: { id: "thick", name: "Ten 10-foot panels, 6 inches thick" }
+    },
+    {
+      ...lasting("thin wall", "The wall stands where it was placed while the spell lasts.", { on: [] }),
+      area: { shape: "line", sizeFeet: 200, widthFeet: 5 },
+      option: { id: "thin", name: "Ten 10-by-20-foot panels, 3 inches thick" }
+    }
+  ],
   "wall-of-thorns": [
     {
       name: "save",

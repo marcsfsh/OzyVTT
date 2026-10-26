@@ -7,6 +7,7 @@ import { laterRowOf } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { cutWall, disintegrateWall, nearestPointOf, raiseSpellWalls } from "../spell-walls.js";
 import { policeBarrier } from "../zone-barriers.js";
+import { pickedZoneRow } from "../spell-zones.js";
 import { distance, type Point } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
@@ -149,14 +150,21 @@ export function applyCastWalls(ctx: ResolveContext): void {
   if (walls.raises && input.placedArea && pixelsPerFoot && !cast.later) {
     const keeper = keeperOf(ctx, spell);
     const full = spellEffectDuration(spell, level);
+    // The form the cast picked (Wall of Stone's thin panels, Wall of Force's globe) and the panels it prints.
+    const row = pickedZoneRow(spell, input.option);
+    const form = walls.raises.forms?.find((candidate) => candidate.option === input.option);
     const events = raiseSpellWalls(state, {
       commandId: input.commandId,
       casterId: attacker.id,
       spellId: spell.id,
       level,
-      raises: walls.raises,
+      raises: {
+        ...walls.raises,
+        ...(form?.panelFeet !== undefined ? { panelFeet: form.panelFeet } : {}),
+        ...(form?.panel ? { panel: form.panel } : {})
+      },
       area: input.placedArea,
-      widthFeet: spell.area?.widthFeet ?? null,
+      widthFeet: (row?.area ?? spell.area)?.widthFeet ?? null,
       pixelsPerFoot,
       ...keeper,
       ...(full.type === "rounds"

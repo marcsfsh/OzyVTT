@@ -125,7 +125,25 @@ export const SpellWallsSchema = z
         /** It stays for good once its caster's Concentration lasts the spell's full duration (Wall of Stone). */
         permanentAfterFull: z.literal(true).optional(),
         /** A creation of magical force, which Disintegrate destroys whole (Wall of Force). */
-        force: z.literal(true).optional()
+        force: z.literal(true).optional(),
+        /** The panels a form its cast picks raises instead (Wall of Stone's 10-by-20-foot panels, 3 inches thick), by
+         *  the option of the spell's zone row that names the form. */
+        forms: z
+          .array(
+            z
+              .object({
+                option: z
+                  .string()
+                  .regex(/^[a-z0-9-]+$/)
+                  .max(60),
+                panelFeet: z.number().int().min(5).max(100).optional(),
+                panel: ObjectPrintSchema.optional()
+              })
+              .strict()
+          )
+          .min(1)
+          .max(4)
+          .optional()
       })
       .strict()
       .optional(),

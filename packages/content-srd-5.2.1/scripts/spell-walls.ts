@@ -8,16 +8,25 @@ import type { SpellWalls } from "../src/schemas.js";
 const SPELL_WALLS: Readonly<Record<string, SpellWalls>> = {
   // "An Invisible wall of force ... Nothing can physically pass through the wall. It is immune to all damage ... A
   // Disintegrate spell destroys the wall instantly." Invisible, so sight passes; a creature it cuts is pushed aside.
+  // "A hemispherical dome or a globe with a radius of up to 10 feet" is raised round the circle its form places.
   "wall-of-force": { raises: { kind: "window", pushes: true, force: true } },
-  // "Each panel has AC 15 and 30 Hit Points per inch of thickness": the 6-inch panels, 180 Hit Points each. "If you
-  // maintain your Concentration on this spell for its full duration, the wall becomes permanent."
+  // "Each panel has AC 15 and 30 Hit Points per inch of thickness, and it has Immunity to Poison and Psychic damage":
+  // the 6-inch panels, 180 Hit Points each, or the "10-foot-by-20-foot panels that are only 3 inches thick", 90 each.
+  // "If you maintain your Concentration on this spell for its full duration, the wall becomes permanent."
   "wall-of-stone": {
     raises: {
       kind: "wall",
       panelFeet: 10,
-      panel: { name: "Stone panel", armorClass: 15, hitPoints: 180 },
+      panel: { name: "Stone panel", armorClass: 15, hitPoints: 180, immunities: ["poison", "psychic"] },
       pushes: true,
-      permanentAfterFull: true
+      permanentAfterFull: true,
+      forms: [
+        {
+          option: "thin",
+          panelFeet: 20,
+          panel: { name: "Thin stone panel", armorClass: 15, hitPoints: 90, immunities: ["poison", "psychic"] }
+        }
+      ]
     }
   },
   // "It has AC 12 and 30 Hit Points per 10-foot section, and it has Immunity to Cold, Poison, and Psychic damage and
