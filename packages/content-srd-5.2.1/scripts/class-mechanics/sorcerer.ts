@@ -225,12 +225,20 @@ export const sorcerer: ClassMechanicsModule = {
           }
         ]
       },
-      // The only route to Summon Dragon, with one free casting per Long Rest, and "whenever you start casting the
-      // spell, you can modify it so that it doesn't require Concentration": then it lasts 1 minute. The no-Material
-      // modification stays prose.
+      // The only route to Summon Dragon, cast "without a Material component", with one free casting per Long Rest,
+      // and "whenever you start casting the spell, you can modify it so that it doesn't require Concentration": then it
+      // lasts 1 minute.
       "dragon-companion": {
         grants: {
-          spells: [{ id: "summon-dragon", level: 5, withoutSlot: "free", summon: { concentrationOptional: true } }]
+          spells: [
+            {
+              id: "summon-dragon",
+              level: 5,
+              withoutSlot: "free",
+              waives: ["material"],
+              summon: { concentrationOptional: true }
+            }
+          ]
         },
         uses: { limit: 1, per: "long-rest" }
       }

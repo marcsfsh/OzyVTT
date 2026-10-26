@@ -5,6 +5,7 @@ import { calmAtTurnStart } from "./berserker-axe.js";
 import { breathAtTurnEnd } from "./breath.js";
 import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { formsLapseAtTurnStart } from "./inventory.js";
 import { endEffect, expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
 import { confusedTurn } from "./random-outcomes.js";
@@ -34,6 +35,7 @@ import { disgorge, regurgitationSaves } from "./swallow.js";
 import { selfRestorationAtTurnEnd } from "./self-restoration.js";
 import { stealthAttackAtTurnEnd } from "./supreme-sneak.js";
 import { setDownCarried } from "./movement-rules.js";
+import { offerNearbyReactions } from "./triggered-reactions.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -101,6 +103,10 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
   // "If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must succeed on a
   // DC 14 Constitution saving throw at the end of that turn".
   events.push(...regurgitationSaves(state, { ...deps, resolveDefinition: deps.resolveDefinition }));
+  // "A creature ends its turn within 5 feet of the octopus" (Ink Cloud).
+  events.push(
+    ...offerNearbyReactions(state, actorId, "ends-turn-near", { ...deps, resolveDefinition: deps.resolveDefinition })
+  );
 }
 
 /**
@@ -197,6 +203,8 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
       })
     );
   heroicWarrior(state, actorId, events, deps);
+  // A Defender's bonus moved to AC holds "until the start of your next turn".
+  if (deps.catalog) events.push(...formsLapseAtTurnStart(state, actorId, deps.catalog, deps.resolveDefinition));
   // "At the start of each of its turns, the Restrained target repeats the save" (Conjure Elemental).
   if (deps.newId)
     events.push(
@@ -216,6 +224,9 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
     events.push(waitingNarration(state, state.combat.turnSteps!));
   else events.push(...runSteps(steps));
   events.push(...aurasAtTurnStart(state, actorId, deps));
+  // "A creature the devil can see starts its turn within 30 feet of the devil" (Unnerving Gaze).
+  if (deps.newId)
+    events.push(...offerNearbyReactions(state, actorId, "starts-turn-near", { ...deps, newId: deps.newId }));
 }
 
 /**

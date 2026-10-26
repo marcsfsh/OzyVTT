@@ -79,3 +79,18 @@ export function endCursesOn(state: GameState, actorId: string): EffectNarration[
     .filter((effect) => effect.tags.includes(CURSE_TAG))
     .flatMap((effect) => endEffectIfPresent(state, actorId, effect.id));
 }
+
+/** Ends a caster's spell as a whole (Detect Thoughts: "On a successful save, the spell ends"): its Concentration on
+ *  the spell, which ends what it holds, the effect that keeps a spell with none up on it, and every effect the spell
+ *  left on a creature. */
+export function endCasterSpell(state: GameState, casterId: string, spellId: string): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  const caster = state.actors.find((actor) => actor.id === casterId);
+  for (const effect of [...(caster?.effects ?? [])])
+    if (effect.spell?.id === spellId) events.push(...endEffectIfPresent(state, casterId, effect.id));
+  for (const actor of state.actors)
+    for (const effect of [...actor.effects])
+      if (effect.spell?.id === spellId && effect.sourceActorId === casterId)
+        events.push(...endEffectIfPresent(state, actor.id, effect.id));
+  return events;
+}

@@ -42,7 +42,7 @@ describe("Hit Point Dice are spent during a Short Rest", () => {
 
   it("heals a player's character in the party's Short Rest", () => {
     const state = game();
-    startPartyRest(state, [HERO], "short", resolve(state));
+    startPartyRest(state, [HERO], "short");
     spendHitDice(state, HERO, [6], player, resolve(state));
     expect(state.actors[0].hitDice?.remaining).toBe(6);
     expect(state.actors[0].hp.current).toBeGreaterThan(20);

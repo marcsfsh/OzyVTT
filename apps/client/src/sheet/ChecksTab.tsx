@@ -8,6 +8,7 @@ import { modeLabel } from "../encounter/roll-mode-notes";
 import { RollModeNotes, RollModeTag } from "../encounter/RollModeTag";
 import type { SrdExtension } from "../encounter/sheet-extension";
 import { HelpAnAlly } from "./HelpAnAlly";
+import { ToolUses } from "./ToolUses";
 import { ABILITY_WORDS, exhaustionLevel, type SheetActor, type SheetState } from "./sheet-model";
 import type { Quarry } from "./useSheetController";
 import type { SheetEdit } from "./useSheetEdit";
@@ -331,7 +332,9 @@ export function ChecksTab({
   edit,
   onEdited,
   helping,
-  onFeedback
+  onFeedback,
+  inFight = false,
+  party
 }: Readonly<{
   actor: SheetActor;
   definition: ActorDefinition;
@@ -345,6 +348,10 @@ export function ChecksTab({
   /** Outside a fight, the table whose party members the character may help with a check. */
   helping?: SheetState | undefined;
   onFeedback?: (text: string) => void;
+  /** The character is in the running fight, where a tool's use takes its action. */
+  inFight?: boolean;
+  /** The table, for the creature a use works for (Cobbler's Tools' footwear). */
+  party?: SheetState | undefined;
 }>) {
   const skills = useSkillRows(definition, derived);
   const [editing, setEditing] = useState(false);
@@ -406,7 +413,7 @@ export function ChecksTab({
               <button
                 key={tool.id}
                 type="button"
-                className="cs-roll has-label is-proficient"
+                className={`cs-roll has-label${tool.proficient !== false ? " is-proficient" : ""}`}
                 disabled={rolls.rolling}
                 aria-label={`Roll ${tool.name}, ${signed(tool.bonus)}${modeLabel(tool.mode)}`}
                 onClick={() =>
@@ -422,38 +429,9 @@ export function ChecksTab({
               </button>
             ))}
           </div>
-          {/* What each tool's Utilize line does, at its printed DC. In a fight it is the Utilize action. */}
-          {tools.some((tool) => (tool.uses ?? []).length > 0) && (
-            <ul className="cs-tool-uses" aria-label="Tool uses">
-              {tools.flatMap((tool) =>
-                (tool.uses ?? []).map((use) => (
-                  <li key={`${tool.id}-${use.label}`}>
-                    <span>
-                      {use.label} <em>{tool.name}</em>
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={rolls.rolling}
-                      aria-label={`Roll ${use.label} with ${tool.name}, DC ${use.dc}`}
-                      onClick={() =>
-                        void rolls.rollCheck(
-                          { ability: tool.ability, tool: tool.id },
-                          `${use.label} (${tool.name})`,
-                          undefined,
-                          use.dc
-                        )
-                      }
-                    >
-                      DC {use.dc}
-                    </Button>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
         </>
       )}
+      <ToolUses actor={actor} derived={derived} rolls={rolls} inFight={inFight} state={party} />
       {quarry.map((creature) => (
         <div key={creature.id} className="cs-chiprow" role="group" aria-label={`Find ${creature.name}`}>
           <span className="cs-eyebrow">Find {creature.name}</span>

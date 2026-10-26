@@ -102,7 +102,9 @@ const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
   // The explosive rune's "Acid, Cold, Fire, Lightning, or Thunder damage (your choice when you create the glyph)".
   "glyph-of-warding": ["thunder", "acid", "cold", "fire", "lightning"],
   // The Resistance the touched creature gains: "one damage type of your choice".
-  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"]
+  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"],
+  // Wish's Resistance: "one damage type you choose".
+  wish: [...DamageTypeSchema.options]
 };
 
 /** Spell attack rolls one cast makes, where the text's wording misleads the reader. */
@@ -239,6 +241,8 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   telekinesis: { count: 1 },
   "telepathic-bond": { count: 8 },
   teleport: { count: 9 },
+  // Instant Health: "you and up to twenty other creatures"; Resistance and Spell Immunity take up to ten.
+  wish: { count: 20 },
   tongues: { count: 1 },
   "true-polymorph": { count: 1 },
   "true-resurrection": { count: 1 },
@@ -338,6 +342,8 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "conjure-elemental",
   "conjure-woodland-beings",
   "delayed-blast-fireball",
+  // The Wisdom save belongs to probing deeper on a later turn (`LATER_ACTIONS`).
+  "detect-thoughts",
   "dragons-breath",
   "dream",
   "faithful-hound",
@@ -385,6 +391,152 @@ const lasting = (name: string, when: string, zone: Zone): Later => ({
   damage: [],
   zone
 });
+
+/** Wall of Fire's forms: a straight wall burning on its left or right as drawn, or a ring 20 feet across burning
+ *  inside or outside, each 5d8 Fire damage to a creature entering the wall or ending its turn in it or within 10 feet
+ *  of the burning side. */
+function wallOfFireForms(): Later[] {
+  const ring = { shape: "cylinder" as const, sizeFeet: 10, widthFeet: null, heightFeet: 20 };
+  const form = (
+    name: string,
+    option: Readonly<{ id: string; name: string }>,
+    side: "left" | "right" | "inside" | "outside"
+  ): Later => {
+    const ringed = side === "inside" || side === "outside";
+    const burning = ringed ? `${side} the ring within 10 feet of it` : `within 10 feet of its ${side} side`;
+    return {
+      name,
+      activation: "other",
+      when: `A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn ${burning}.`,
+      damage: [{ formula: "5d8", type: "fire" }],
+      ...(ringed ? { area: ring } : {}),
+      zone: { on: ["enter", "end-turn"], band: { feet: 10, side }, ...(ringed ? { ring: true as const } : {}) },
+      option
+    };
+  };
+  return [
+    form("burn", { id: "left", name: "Straight, burning on the left" }, "left"),
+    form("burn right", { id: "right", name: "Straight, burning on the right" }, "right"),
+    form("burn inside", { id: "ring-inside", name: "Ring, burning inside" }, "inside"),
+    form("burn outside", { id: "ring-outside", name: "Ring, burning outside" }, "outside")
+  ];
+}
+
+/** One of Conjure Celestial's ways to shine: Healing Light on the caster and its allies with Searing Light on the rest,
+ *  or one light on every creature; on the cast and whenever the Cylinder or a creature meets it, once a turn. */
+function celestialLight(
+  name: string,
+  option: Readonly<{ id: string; name: string }>,
+  heals: "allies" | "all" | null
+): Later {
+  return {
+    name,
+    activation: "other",
+    when: `${option.name}: Healing Light restores 4d12 plus your spellcasting ability modifier, and Searing Light asks for the save. Each creature in the Cylinder, entering it or ending its turn there is bathed once a turn.`,
+    save: save("dex"),
+    damage: [{ formula: "6d12", type: "radiant" }],
+    zone: {
+      on: ["enter", "end-turn"],
+      oncePerTurn: true,
+      atCast: true,
+      dicePerSlot: 1,
+      ...(heals ? { heals: { formula: "4d12", addsModifier: true, who: heals } } : {})
+    },
+    option
+  };
+}
+
+/** Symbol's six glyphs, each a hidden glyph that glows when a creature comes onto it (SRD 5.2.1 text): Death,
+ *  Discord, Fear, Pain, Sleep and Stunning. Fear's "must move at least 30 feet away from the glyph" is the
+ *  Frightened creature's to obey. */
+function symbolGlyphs(): Later[] {
+  const MINUTE = { type: "rounds" as const, rounds: 10 };
+  const glyph = (
+    id: string,
+    name: string,
+    when: string,
+    saved: NonNullable<Later["save"]>,
+    damage: Later["damage"] = []
+  ): Later => ({
+    name: `${id} glyph`,
+    activation: "other",
+    when: `A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, ${when}`,
+    save: saved,
+    damage,
+    zone: {
+      on: ["enter", "end-turn"],
+      oncePerTurn: true,
+      around: "point",
+      feet: 60,
+      hidden: true,
+      glyph: { feet: 5, growsToFeet: 60, rounds: 100 }
+    },
+    option: { id, name }
+  });
+  const fails = (
+    ability: "con" | "wis",
+    rest: Partial<NonNullable<Later["save"]>> = {}
+  ): NonNullable<Later["save"]> => ({
+    ability,
+    successDamage: "none",
+    failureConditions: [],
+    ...rest
+  });
+  return [
+    glyph(
+      "death",
+      "Death",
+      "makes a Constitution save against 10d10 Necrotic damage, half on a success.",
+      { ability: "con", successDamage: "half", failureConditions: [] },
+      [{ formula: "10d10", type: "necrotic" }]
+    ),
+    glyph(
+      "discord",
+      "Discord",
+      "makes a Wisdom save or argues for 1 minute, with Disadvantage on attack rolls and ability checks.",
+      fails("wis", {
+        failureDuration: MINUTE,
+        failureEffect: {
+          name: "Discord",
+          tags: ["discord"],
+          modifiers: [
+            { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] },
+            { type: "roll-mode", roll: "check", mode: "disadvantage", when: [{ type: "on-ability-check" }] }
+          ]
+        }
+      })
+    ),
+    glyph(
+      "fear",
+      "Fear",
+      "makes a Wisdom save or is Frightened for 1 minute.",
+      fails("wis", { failureConditions: ["frightened"], failureDuration: MINUTE })
+    ),
+    glyph(
+      "pain",
+      "Pain",
+      "makes a Constitution save or is Incapacitated for 1 minute.",
+      fails("con", { failureConditions: ["incapacitated"], failureDuration: MINUTE })
+    ),
+    glyph(
+      "sleep",
+      "Sleep",
+      "makes a Wisdom save or is Unconscious for 10 minutes, until it takes damage or is shaken awake.",
+      fails("wis", {
+        failureConditions: ["unconscious"],
+        failureDuration: { type: "rounds", rounds: 100 },
+        endsOnDamage: true,
+        failureEffect: { name: "Symbol of Sleep", tags: ["wakeable"], modifiers: [] }
+      })
+    ),
+    glyph(
+      "stunning",
+      "Stunning",
+      "makes a Wisdom save or is Stunned for 1 minute.",
+      fails("wis", { failureConditions: ["stunned"], failureDuration: MINUTE })
+    )
+  ];
+}
 
 /**
  * What a spell lets its caster do after the cast (SRD 5.2.1 text): the attacks a summoned thing or a held flame
@@ -464,29 +616,91 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       }
     )
   ],
+  // "A creature of the chosen kind makes a Wisdom saving throw when it comes within 120 feet of the target": the area is
+  // round the targeted creature and moves with it, acting on the creature type picked with the form. A creature that
+  // ends its turn more than 120 feet from the target saves again; a success frees it and leaves it immune for now.
+  antipathysympathy: [
+    {
+      name: "antipathy",
+      activation: "other",
+      when: "A creature of the chosen kind that comes within 120 feet of the target makes a Wisdom save or is Frightened of the target, and must use its movement to get as far from it as it can.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: ["frightened"],
+        repeatBeyondFeet: 120,
+        immuneOnSuccess: true
+      },
+      damage: [],
+      zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
+      option: { id: "antipathy", name: "Antipathy" }
+    },
+    {
+      name: "sympathy",
+      activation: "other",
+      when: "A creature of the chosen kind that comes within 120 feet of the target makes a Wisdom save or is Charmed by the target, and must use its movement to get as close to it as it can.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: ["charmed"],
+        repeatBeyondFeet: 120,
+        repeatOnDamage: { fromSourceOnly: true },
+        immuneOnSuccess: true
+      },
+      damage: [],
+      zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
+      option: { id: "sympathy", name: "Sympathy" }
+    }
+  ],
   // "When you cast the spell and as a Bonus Action on your later turns, you can move the hand up to 60 feet and then
-  // cause one of the following effects": each reaches from the hand (`spell-summons.ts`). Forceful Hand's push and
-  // Interposing Hand's cover are the table's.
+  // cause one of the following effects": each reaches from the hand (`spell-summons.ts`), and the cast takes one free.
   "arcane-hand": [
     {
       name: "clenched fist",
       activation: "bonus-action",
+      withCast: true,
       when: "The hand moves up to 60 feet and strikes a target within 5 feet of it with a melee spell attack.",
       attackRange: melee(125),
-      damage: [{ formula: "5d8", type: "force" }]
+      // "The damage of the Clenched Fist increases by 2d8 ... for each spell slot level above 5."
+      damage: [{ formula: "5d8", type: "force", perSlot: "2d8" }]
+    },
+    {
+      name: "forceful hand",
+      activation: "bonus-action",
+      withCast: true,
+      when: "The hand moves up to 60 feet and pushes a Huge or smaller creature within 5 feet of it that fails a Strength save up to 5 feet plus five times your spellcasting ability modifier, following it.",
+      save: {
+        ability: "str",
+        successDamage: "none",
+        failureConditions: [],
+        failurePush: { feet: 5, upTo: true, maxTargetSize: "huge" }
+      },
+      pushPerModifier: 5,
+      damage: []
     },
     {
       name: "grasping hand",
       activation: "bonus-action",
+      withCast: true,
       when: "The hand moves up to 60 feet and grapples a Huge or smaller creature within 5 feet of it that fails a Dexterity save.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["grappled"] },
+      save: { ability: "dex", successDamage: "none", failureConditions: ["grappled"], failureMaxSize: "huge" },
       damage: []
     },
     {
       name: "crush",
       activation: "bonus-action",
+      bearerOnly: true,
       when: "While the hand grapples a creature, a Bonus Action crushes it.",
-      damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true }]
+      // "... and the damage of the Grasping Hand increases by 2d6 for each spell slot level above 5."
+      damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true, perSlot: "2d6" }]
+    },
+    {
+      name: "interposing hand",
+      activation: "bonus-action",
+      withCast: true,
+      interposes: true,
+      when: "The hand moves up to 60 feet and grants you Half Cover against attacks and other effects from or through its space, which is Difficult Terrain for your enemies.",
+      damage: []
     }
   ],
   "arcane-sword": [
@@ -509,6 +723,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
+  // "A straight wall up to 100 feet long ... or a ringed wall up to 60 feet in diameter": the form is the cast's option.
   "blade-barrier": [
     {
       name: "save",
@@ -516,10 +731,23 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.`,
       save: save("dex"),
       damage: [{ formula: "6d10", type: "force" }],
-      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters" }
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters" },
+      option: { id: "straight", name: "Straight wall" }
+    },
+    {
+      name: "ring save",
+      activation: "other",
+      when: `A creature that enters the ringed wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.`,
+      save: save("dex"),
+      damage: [{ formula: "6d10", type: "force" }],
+      area: { shape: "cylinder", sizeFeet: 30, widthFeet: null, heightFeet: 20 },
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters", ring: true },
+      option: { id: "ring", name: "Ringed wall" }
     }
   ],
-  // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
+  // "A storm cloud appears at a point within range that you can see above yourself. It takes the shape of a Cylinder
+  // that is 10 feet tall with a 60-foot radius", and each bolt strikes "a point you can see under the cloud". "If you're
+  // outdoors in a storm when you cast this spell ... the spell's damage increases by 1d10."
   "call-lightning": [
     {
       name: "bolt",
@@ -527,7 +755,27 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "Until the spell ends, a Magic action calls down another bolt at a point under the cloud.",
       save: save("dex"),
       damage: [{ formula: "3d10", type: "lightning" }],
-      area: { shape: "sphere", sizeFeet: 5, widthFeet: null }
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+      inArea: true
+    },
+    {
+      ...lasting("cloud", "The storm cloud stays where it formed, reaching 60 feet out from its middle.", {
+        on: [],
+        around: "caster",
+        feet: 60,
+        stays: true
+      }),
+      option: { id: "clear", name: "No storm" }
+    },
+    {
+      ...lasting("storm cloud", "In a storm, the cloud is the storm's, and the spell's damage is 1d10 more.", {
+        on: [],
+        around: "caster",
+        feet: 60,
+        stays: true,
+        extraDice: 1
+      }),
+      option: { id: "storm", name: "Outdoors in a storm" }
     }
   ],
   cloudkill: [
@@ -537,17 +785,45 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The Sphere moves 10 feet away from you at the start of each of your turns.`,
       save: save("con"),
       damage: [{ formula: "5d8", type: "poison" }],
-      zone: { ...ENTER_OR_END_ONCE, drifts: 10 }
+      // "The fog lasts for the duration or until strong wind (such as the one created by Gust of Wind) disperses it":
+      // destroying fog ends it too.
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10, endsBy: ["wind", "water"] }
     }
   ],
+  // "You have Advantage on Strength saving throws while you're within 5 feet of the pack, and when you move on your
+  // turn, you can also move the pack up to 30 feet to an unoccupied space you can see."
   "conjure-animals": [
     {
       name: "save",
       activation: "other",
-      when: `When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. ${ONCE_PER_TURN}`,
+      when: `When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. ${ONCE_PER_TURN} You have Advantage on Strength saving throws within 5 feet of the pack.`,
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
       damage: [{ formula: "3d10", type: "slashing" }],
-      zone: { ...ENTER_OR_END_ONCE, around: "point", feet: 10, affects: "enemies" }
+      zone: {
+        ...ENTER_OR_END_ONCE,
+        around: "point",
+        feet: 10,
+        affects: "enemies",
+        casterHolds: {
+          feet: 5,
+          modifiers: [
+            {
+              type: "roll-mode",
+              roll: "save",
+              mode: "advantage",
+              when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }]
+            }
+          ]
+        }
+      }
+    },
+    {
+      name: "move",
+      activation: "other",
+      when: "When you move on your turn, you can also move the pack up to 30 feet to an unoccupied space.",
+      damage: [],
+      area: { shape: "sphere", sizeFeet: 10, widthFeet: null },
+      movesArea: { feet: 30, withCasterMove: true, unoccupied: true }
     }
   ],
   "conjure-elemental": [
@@ -590,6 +866,46 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       terrain: { cost: 2, for: "enemies" }
     })
   ],
+  // "Create Water ... Alternatively, the water falls as rain in a 30-foot Cube within range, extinguishing exposed flames
+  // there", or "Destroy Water ... Alternatively, you destroy fog in a 30-foot Cube within range." Water in an open
+  // container is description.
+  "create-or-destroy-water": [
+    {
+      name: "rain",
+      activation: "other",
+      when: "Rain falls over the Cube and puts out the exposed flames there.",
+      damage: [],
+      zone: { on: [], douses: true, instant: true },
+      option: { id: "create", name: "Create Water: rain" }
+    },
+    {
+      name: "destroy fog",
+      activation: "other",
+      when: "The fog in the Cube is destroyed.",
+      damage: [],
+      zone: { on: [], destroysFog: true, instant: true },
+      option: { id: "destroy", name: "Destroy Water: fog" }
+    }
+  ],
+  // "For each creature you can see in the Cylinder, choose which of these lights shines on it": Healing Light (4d12 plus
+  // your spellcasting ability modifier) or Searing Light (a Dexterity save against 6d12 Radiant damage); "when you move
+  // on your turn, you can also move the Cylinder up to 30 feet", and "whenever the Cylinder moves into the space of a
+  // creature you can see and whenever a creature you can see enters the Cylinder or ends its turn there, you can bathe
+  // it in one of the lights. A creature can be affected by this spell only once per turn." The caster picks as it
+  // casts which light each creature gets: by side, or one light for all.
+  "conjure-celestial": [
+    celestialLight("light", { id: "by-side", name: "Heal you and your allies, sear the rest" }, "allies"),
+    celestialLight("healing light", { id: "heal-all", name: "Healing Light on everyone" }, "all"),
+    celestialLight("searing light", { id: "sear-all", name: "Searing Light on everyone" }, null),
+    {
+      name: "move",
+      activation: "other",
+      when: "When you move on your turn, you can also move the Cylinder up to 30 feet.",
+      damage: [],
+      area: { shape: "cylinder", sizeFeet: 10, widthFeet: null, heightFeet: 40 },
+      movesArea: { feet: 30, withCasterMove: true }
+    }
+  ],
   "conjure-woodland-beings": [
     {
       name: "save",
@@ -608,7 +924,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: save("dex"),
       damage: [{ formula: "12d6", type: "fire" }],
       area: { shape: "sphere", sizeFeet: 20, widthFeet: null },
-      zone: { on: ["spell-end"], grows: true }
+      // "If a creature touches the bead": its Dexterity save, and a success throws it up to 40 feet.
+      zone: { on: ["spell-end"], grows: true, touched: { throwFeet: 40 } }
     }
   ],
   "dragons-breath": [
@@ -641,14 +958,34 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       terrain: { cost: 2, kind: "plants" }
     })
   ],
+  // "The hound remains for the duration or until the two of you are more than 300 feet apart", "No one but you can see
+  // the hound", "When a Small or larger creature comes within 30 feet of it ... the hound starts barking loudly", and "On
+  // your later turns, you can take a Magic action to move the hound up to 30 feet." The password is the GM's.
   "faithful-hound": [
     {
       name: "bite",
       activation: "other",
-      when: "At the start of each of your turns, the hound bites one enemy within 5 feet of it.",
+      when: "At the start of each of your turns, the hound bites one enemy within 5 feet of it. It barks when a Small or larger creature comes within 30 feet of it.",
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
       damage: [{ formula: "4d8", type: "force" }],
-      zone: { on: ["caster-turn-start"], around: "point", feet: 5, affects: "enemies" }
+      zone: {
+        on: ["caster-turn-start"],
+        around: "point",
+        feet: 5,
+        affects: "enemies",
+        hidden: true,
+        warns: { feet: 30, sizes: ["small", "medium", "large", "huge", "gargantuan"] },
+        leash: 300
+      }
+    },
+    {
+      name: "move",
+      activation: "action",
+      when: "On your later turns, a Magic action moves the hound up to 30 feet.",
+      laterTurnsOnly: true,
+      damage: [],
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+      movesArea: { feet: 30 }
     }
   ],
   // "When a creature of a chosen type enters the spell's area for the first time on a turn or ends its turn there, the
@@ -705,7 +1042,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "A creature that ends its turn in the Line makes the save, and a failure pushes it 15 feet away from you. Moving closer to you in the Line costs 2 feet for every foot.",
       save: { ability: "str", successDamage: "none", failureConditions: [], failurePush: { feet: 15 } },
       damage: [],
-      zone: { on: ["end-turn"], towardCaster: true }
+      // "The gust disperses gas or vapor, and it extinguishes candles and similar unprotected flames in the area."
+      zone: { on: ["end-turn"], towardCaster: true, wind: true }
     },
     {
       name: "turn",
@@ -756,7 +1094,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: "A creature that steps onto the glyph sets it off: each creature in the 20-foot-radius Sphere makes the save, and the spell ends.",
       save: save("dex"),
-      damage: [{ formula: "5d8", type: "thunder" }],
+      // "The damage of an explosive rune increases by 1d8 for each spell slot level above 3."
+      damage: [{ formula: "5d8", type: "thunder", perSlot: "1d8" }],
       zone: { on: ["enter", "spell-end"], around: "point", feet: 5, once: true, hidden: true }
     }
   ],
@@ -768,6 +1107,131 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: save("dex"),
       damage: [{ formula: "20", type: "radiant" }],
       zone: { on: ["enter", "start-turn"], around: "point", feet: 10, affects: "enemies", damageCap: 60 }
+    }
+  ],
+  // "You can make the messenger terrifying to the target. If you do so, the messenger can deliver a message of no more
+  // than ten words, and then the target makes a Wisdom saving throw. On a failed save, the target gains no benefit from
+  // its rest, and it takes 3d6 Psychic damage when it wakes up."
+  dream: [
+    {
+      name: "terrifying message",
+      activation: "other",
+      when: "The messenger turns terrifying: after its message of ten words or fewer, the target makes the Wisdom save, and a failure denies it the benefit of its rest and deals it 3d6 Psychic damage as it wakes.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: [],
+        // It waits for the sleeper's next rest, past the 8 hours the spell lasts.
+        failureDuration: { type: "minutes", minutes: 1440 },
+        atRest: { at: "long-rest", noBenefit: "long", damage: [{ formula: "3d6", type: "psychic" }], once: true }
+      },
+      failureEffect: { name: "Dream's nightmare", tags: [], modifiers: [] },
+      damage: []
+    }
+  ],
+  // "As a Magic action on your next turn, you can try to probe deeper into the target's mind. If you probe deeper, the
+  // target makes a Wisdom saving throw. ... On a successful save, the spell ends. Either way, the target knows that you
+  // are probing into its mind, and ... the target can take an action on its turn to make an Intelligence (Arcana) check
+  // against your spell save DC, ending the spell on a success." What the caster learns is the GM's.
+  "detect-thoughts": [
+    {
+      name: "probe",
+      activation: "action",
+      laterTurnsOnly: true,
+      when: "On a later turn, a Magic action probes the target's mind: it makes the Wisdom save, a success ending the spell, and may then take an action for an Intelligence (Arcana) check that ends it.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: [],
+        successEndsSpell: true,
+        endedBy: {
+          name: "Push the probe out",
+          by: "bearer",
+          check: { ability: "int", skill: "arcana" },
+          endsSpell: true
+        }
+      },
+      failureEffect: { name: "Detect Thoughts", tags: [], modifiers: [] },
+      damage: []
+    }
+  ],
+  // "While Charmed, the creature takes 5d10 Psychic damage if it acts in a manner directly counter to your command. It
+  // takes this damage no more than once each day." The GM judges the defiance.
+  geas: [
+    {
+      name: "defiance",
+      activation: "other",
+      bearerOnly: true,
+      gmOnly: true,
+      uses: { limit: 1, per: "time", afterHours: "24" },
+      when: "When the charmed creature acts directly counter to the command, the GM deals it 5d10 Psychic damage, once a day at most.",
+      damage: [{ formula: "5d10", type: "psychic" }]
+    }
+  ],
+  // "If you are the target, you can move up or down as part of your move. Otherwise, you can take a Magic action to
+  // move the target, which must remain within the spell's range."
+  levitate: [
+    {
+      name: "raise",
+      activation: "action",
+      liftFeet: 20,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn", pool: "levitate-height" },
+      when: "On your turn, a Magic action raises the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you rise as part of your move.",
+      damage: []
+    },
+    {
+      name: "lower",
+      activation: "action",
+      liftFeet: -20,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn", pool: "levitate-height" },
+      when: "On your turn, a Magic action lowers the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you sink as part of your move.",
+      damage: []
+    }
+  ],
+  // "On each of your turns, such a phantasm can deal 2d8 Psychic damage to the target if it is in the phantasm's area
+  // or within 5 feet of the phantasm." Where the phantasm is, and whether the target is near it, are the caster's to
+  // say and the GM's to refuse.
+  "phantasmal-force": [
+    {
+      name: "harm",
+      activation: "other",
+      bearerOnly: true,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn" },
+      when: "On each of your turns, the phantasm can deal 2d8 Psychic damage to the creature that perceives it, if it is in the phantasm's area or within 5 feet of it.",
+      damage: [{ formula: "2d8", type: "psychic" }]
+    }
+  ],
+  // "Until the spell ends, the target can revert to cloud form, which also requires a Magic action followed by a
+  // 1-minute transformation."
+  "wind-walk": [
+    {
+      name: "cloud form",
+      activation: "action",
+      when: "Until the spell ends, a target in its normal form takes a Magic action to become a cloud again, with the Stunned condition for the minute of its transformation.",
+      shapeShift: {
+        from: "printed",
+        printed: [
+          {
+            id: "cloud",
+            name: "Cloud",
+            speeds: { walk: 0, fly: 300, hover: true },
+            noActions: true,
+            allowsActions: ["dash"],
+            conditionImmunities: ["prone"],
+            modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+          }
+        ],
+        keeps: [],
+        gear: "worn",
+        leaveAs: "action",
+        revertRounds: 10,
+        descendsSafely: true,
+        takesRounds: 10
+      },
+      damage: []
     }
   ],
   // "If the target drops to 0 Hit Points before this spell ends, you can take a Bonus Action on a later turn to curse a
@@ -841,10 +1305,19 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The cloud moves 10 feet away from you at the start of each of your turns.`,
+      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The cloud moves 10 feet away from you at the start of each of your turns, the way you pick, until a strong wind disperses it.`,
       save: save("dex"),
       damage: [{ formula: "10d8", type: "fire" }],
-      zone: { ...ENTER_OR_END_ONCE, drifts: 10 }
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10, steered: true, endsBy: ["wind"] }
+    },
+    // "The cloud moves 10 feet away from you in a direction you choose at the start of each of your turns."
+    {
+      name: "steer",
+      activation: "other",
+      when: "At the start of each of your turns, move the cloud 10 feet the way you pick, farther from you; if you don't, it moves straight away from you as your turn ends.",
+      damage: [],
+      area: { shape: "sphere", sizeFeet: 20, widthFeet: null },
+      movesArea: { feet: 10, steersDrift: true }
     }
   ],
   "insect-plague": [
@@ -878,6 +1351,31 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       movesArea: { feet: 60 }
     }
   ],
+  // "If you are within range of the illusion, you can take a Magic action to cause the image to move to any other spot
+  // within range." The image itself is the GM's to run.
+  "major-image": [
+    lasting("image", "The image stands where it was placed.", { on: [] }),
+    {
+      name: "move",
+      activation: "action",
+      when: "While you are within 120 feet of the image, a Magic action moves it to any other spot within 120 feet of you.",
+      damage: [],
+      area: { shape: "cube", sizeFeet: 20, widthFeet: null },
+      movesArea: { feet: 120, anywhereInRange: true, casterInRange: true }
+    }
+  ],
+  // "As a Magic action, you can cause the image to move to any spot within range."
+  "silent-image": [
+    lasting("image", "The image stands where it was placed.", { on: [] }),
+    {
+      name: "move",
+      activation: "action",
+      when: "A Magic action moves the image to any spot within 60 feet of you.",
+      damage: [],
+      area: { shape: "cube", sizeFeet: 15, widthFeet: null },
+      movesArea: { feet: 60, anywhereInRange: true }
+    }
+  ],
   // "As a Magic action on your later turns, you can control the hand thus again": it opens or closes an unlocked door.
   "mage-hand": [
     {
@@ -898,11 +1396,55 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ],
   // Overgrowth: "A creature moving through that area must spend 4 feet of movement for every 1 foot it moves." The
   // plants stay overgrown, so the area stays until the GM ends it.
+  // "You can exclude one or more areas of any size within the spell's area from being affected": each 10-foot square
+  // the caster leaves out as it casts.
   "plant-growth": [
     lasting("ground", "A creature moving through the overgrown area spends 4 feet of movement for every foot.", {
       on: [],
       terrain: { cost: 4, kind: "plants" }
-    })
+    }),
+    {
+      name: "leave out",
+      activation: "other",
+      when: "As you cast it, leave a 10-foot square of the Sphere out of the overgrowth, as many times as you like.",
+      damage: [],
+      area: { shape: "cube", sizeFeet: 10, widthFeet: null },
+      cutsArea: true
+    }
+  ],
+  // "You can also turn Difficult Terrain caused by plant growth (such as thickets and undergrowth) into ordinary terrain
+  // that lasts for the duration. Or you can turn ordinary terrain where plants are present into Difficult Terrain that
+  // lasts for the duration." The immobile Emanation stays where it was cast; the plants' answers are the GM's.
+  "speak-with-plants": [
+    {
+      ...lasting("plants", "The plants in the Emanation speak with you; the ground is as it was.", {
+        on: [],
+        around: "caster",
+        feet: 30,
+        stays: true
+      }),
+      option: { id: "talk", name: "Leave the ground as it is" }
+    },
+    {
+      ...lasting("thicket", "The plants in the Emanation make its ground Difficult Terrain.", {
+        on: [],
+        around: "caster",
+        feet: 30,
+        stays: true,
+        terrain: { cost: 2, kind: "plants" }
+      }),
+      option: { id: "thicket", name: "Make the ground Difficult Terrain" }
+    },
+    {
+      ...lasting("clearing", "The plants in the Emanation clear their Difficult Terrain into ordinary ground.", {
+        on: [],
+        around: "caster",
+        feet: 30,
+        stays: true,
+        clearsTerrain: true
+      }),
+      option: { id: "clearing", name: "Clear the plants' Difficult Terrain" }
+    }
   ],
   "produce-flame": [
     {
@@ -946,7 +1488,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration. The ground is Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
       damage: [],
-      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "ice" } }
+      // "Exposed flames in the area are doused."
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "ice" }, douses: true }
     }
   ],
   "spike-growth": [
@@ -991,7 +1534,89 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         failureDuration: { type: "until-bearer-turn-end" }
       },
       damage: [],
-      zone: { on: ["start-turn"] }
+      // "The cloud lingers in the air for the duration or until a strong wind (such as the one created by Gust of Wind)
+      // disperses it."
+      zone: { on: ["start-turn"], endsBy: ["wind"] }
+    }
+  ],
+  // "The glyph is nearly imperceptible", and "Once triggered, the glyph glows, filling a 60-foot-radius Sphere with Dim
+  // Light for 10 minutes, after which time the spell ends. Each creature in the Sphere when the glyph activates is
+  // targeted by its effect, as is a creature that enters the Sphere for the first time on a turn or ends its turn there.
+  // A creature is targeted only once per turn." The effect is picked as it is inscribed.
+  symbol: symbolGlyphs(),
+  // "At the start of each of your later turns, the storm produces different effects": acid on turn 2, six lightning
+  // bolts on turn 3, hail on turn 4, and on turns 5 to 10 freezing rain that leaves the area "Difficult Terrain and
+  // Heavily Obscured, ranged attacks with weapons are impossible there, and strong wind blows through the area".
+  "storm-of-vengeance": [
+    lasting("storm", "At the start of each of your later turns, the storm under the cloud changes.", {
+      on: [],
+      schedule: [
+        { turn: 2, row: "acid rain" },
+        { turn: 3, row: "lightning" },
+        { turn: 4, row: "hail" },
+        { turn: 5, row: "freezing rain" }
+      ]
+    }),
+    {
+      name: "acid rain",
+      activation: "other",
+      when: "Turn 2: each creature under the cloud takes the damage.",
+      damage: [{ formula: "4d6", type: "acid" }],
+      zone: { on: ["caster-turn-start"], everyone: true }
+    },
+    lasting("lightning", "Turn 3: you call six bolts down on six creatures under the cloud.", { on: [] }),
+    {
+      name: "bolts",
+      activation: "other",
+      when: "On the storm's third turn, six bolts strike six different creatures you pick under the cloud; each makes the save.",
+      save: save("dex"),
+      damage: [{ formula: "10d6", type: "lightning" }],
+      inArea: true,
+      targetCount: 6,
+      atRow: "lightning"
+    },
+    {
+      name: "hail",
+      activation: "other",
+      when: "Turn 4: each creature under the cloud takes the damage.",
+      damage: [{ formula: "2d6", type: "bludgeoning" }],
+      zone: { on: ["caster-turn-start"], everyone: true }
+    },
+    {
+      name: "freezing rain",
+      activation: "other",
+      when: "Turns 5 to 10: each creature under the cloud takes the damage; the area is Difficult Terrain and Heavily Obscured, ranged weapon attacks there miss, and a strong wind blows.",
+      damage: [{ formula: "1d6", type: "cold" }],
+      zone: {
+        on: ["caster-turn-start"],
+        everyone: true,
+        terrain: DIFFICULT,
+        obscures: true,
+        stopsRangedWeapons: true,
+        wind: true
+      }
+    }
+  ],
+  // "At the start of each of your turns after the wall appears, the wall, along with any creatures in it, moves 50 feet
+  // away from you. Any Huge or smaller creature inside the wall or whose space the wall enters when it moves must
+  // succeed on a Strength saving throw or take 5d10 Bludgeoning damage", "At the end of the turn, the wall's height is
+  // reduced by 50 feet, and the damage the wall deals on later rounds is reduced by 1d10", and a creature in the wall
+  // "must succeed on a Strength (Athletics) check against your spell save DC to move at all".
+  tsunami: [
+    {
+      name: "wave",
+      activation: "other",
+      when: "At the start of each of your turns the wall moves 50 feet away from you with the creatures in it, and each Huge or smaller creature it holds makes the save. It then loses 50 feet of height and 1d10 of damage. A creature in it moves only after a Strength (Athletics) check.",
+      save: save("str"),
+      damage: [{ formula: "5d10", type: "bludgeoning" }],
+      zone: {
+        on: [],
+        drifts: 50,
+        carries: true,
+        sizes: ["tiny", "small", "medium", "large", "huge"],
+        fadesFeet: 50,
+        athleticsToMove: true
+      }
     }
   ],
   // "Until the spell ends, you can take a Magic action to create a new Line of radiance."
@@ -1021,15 +1646,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       drain: { damageType: "necrotic", heals: "half" }
     }
   ],
-  "wall-of-fire": [
-    {
-      name: "burn",
-      activation: "other",
-      when: "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn within 10 feet of the burning side.",
-      damage: [{ formula: "5d8", type: "fire" }],
-      zone: { on: ["enter", "end-turn"] }
-    }
-  ],
+  // "A straight wall up to 60 feet long ... or a ringed wall up to 20 feet in diameter", and "one side of the wall,
+  // selected by you when you cast this spell, deals 5d8 Fire damage to each creature that ends its turn within 10 feet
+  // of that side or inside the wall": each form and burning side is an option of the cast.
+  "wall-of-fire": wallOfFireForms(),
   "wall-of-thorns": [
     {
       name: "save",
@@ -1056,7 +1676,9 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action. The webs are Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
       damage: [],
-      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" } }
+      // "The webs are flammable. Any 5-foot Cube of webs exposed to fire burns away in 1 round, dealing 2d4 Fire damage
+      // to any creature that starts its turn in the fire."
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" }, burns: { formula: "2d4" } }
     }
   ],
   "zone-of-truth": [
@@ -1143,6 +1765,10 @@ const CAST_CURES: Readonly<Record<string, Readonly<{ conditions: readonly string
   "lesser-restoration": { conditions: ["blinded", "deafened", "paralyzed", "poisoned"], one: true },
   "protection-from-poison": { conditions: ["poisoned"] }
 };
+
+/** Spells whose healing is their area's, on each creature it bathes, not the cast's on picked targets (Conjure
+ *  Celestial's Healing Light, `LATER_ACTIONS`). */
+const NO_CAST_HEALING: ReadonlySet<string> = new Set(["conjure-celestial"]);
 
 /** Healing the text gives as no single roll: Mass Heal's 700 divided among its targets, Power Word Heal's "regains all
  *  its Hit Points", and False Life's Temporary Hit Points. */
@@ -1672,6 +2298,44 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   }),
   // "Until the spell ends, the target can take a Magic action to exhale", the type chosen at the cast: the touched
   // creature's own action, at the caster's numbers.
+  // "Choose a spell of level 5 or lower that you can cast, that has a casting time of an action, and that can target
+  // you. You cast that spell, called the contingent spell, as part of casting Contingency." The next such spell its
+  // caster casts within a minute is held for the 10 days (`stored-casts.ts`); casting Contingency again replaces it.
+  contingency: spellGrant({
+    name: "Contingency",
+    tags: ["contingency"],
+    target: "self",
+    duration: { type: "minutes", minutes: 14_400 },
+    storeAwaits: { via: "contingency", maxLevel: 5 }
+  }),
+  // "Spell Glyph. You can store a prepared spell of level 3 or lower in the glyph by casting it as part of creating the
+  // glyph", up to the slot's level: the next such spell its caster casts within a minute makes the glyph a spell glyph.
+  "glyph-of-warding": spellGrant({
+    name: "Glyph of Warding",
+    tags: ["glyph-of-warding"],
+    target: "self",
+    duration: rounds(10),
+    storeAwaits: { via: "glyph", maxLevel: 3 }
+  }),
+  // "You or a willing creature you touch enters a trance state to act as a dream messenger. While in the trance, the
+  // messenger is Incapacitated and has a Speed of 0." Ending the effect is emerging from the trance, which ends the spell.
+  dream: spellGrant({
+    name: "Dream messenger's trance",
+    tags: ["dream-trance"],
+    target: "self",
+    duration: { type: "manual" },
+    conditions: ["incapacitated"],
+    speedZero: true
+  }),
+  // "Until the spell ends, the target can revert to cloud form": each target keeps the spell, and its action to become
+  // a cloud again, for the spell's duration.
+  "wind-walk": spellGrant({
+    name: "Wind Walk",
+    tags: ["wind-walk"],
+    target: "targets",
+    duration: { type: "manual" },
+    grantsLaterAction: "cloud form"
+  }),
   "dragons-breath": spellGrant({
     name: "Dragon's Breath",
     tags: ["dragons-breath"],
@@ -1881,6 +2545,30 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
       damageTypes: ["force"]
     }
   }),
+  // "Guided by a flash of magical insight, you make one attack with the weapon used in the spell's casting. The attack
+  // uses your spellcasting ability for the attack and damage rolls instead of using Strength or Dexterity. If the attack
+  // deals damage, it can be Radiant damage or the weapon's normal damage type (your choice)." Extra Radiant at levels 5,
+  // 11 and 17. The weapon must be one the caster is proficient with.
+  "true-strike": spellGrant({
+    name: "True Strike",
+    tags: ["true-strike"],
+    target: "self",
+    duration: { type: "until-source-turn-end" },
+    bindsWeapon: {
+      needsProficiency: true,
+      attacksNow: true,
+      ability: "spellcasting",
+      damageTypes: ["radiant"],
+      extraDamage: {
+        type: "radiant",
+        dice: [
+          { level: 5, formula: "1d6" },
+          { level: 11, formula: "2d6" },
+          { level: 17, formula: "3d6" }
+        ]
+      }
+    }
+  }),
   // "You take the Dash action, and until the spell ends, you can take that action again as a Bonus Action."
   "expeditious-retreat": spellGrant({
     name: "Expeditious Retreat",
@@ -1899,12 +2587,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     bonusActions: ["disengage"]
   }),
   // "Any attack you make deals an extra 2d8 damage when you hit a creature within 15 feet of yourself. This damage is
-  // Acid, Cold, Fire, or Lightning", picked at the cast.
+  // Acid, Cold, Fire, or Lightning (your choice when you make the attack)": the cast picks a default, each hit another.
   "conjure-minor-elementals": spellGrant({
     name: "Conjure Minor Elementals",
     tags: ["conjure-minor-elementals"],
     target: "self",
     duration: rounds(100),
+    // "The damage increases by 1d8 for each spell slot level above 4."
+    extraDamagePerSlot: "1d8",
     options: (["acid", "cold", "fire", "lightning"] as const).map((type) =>
       option(type, titled(type), {
         modifiers: [
@@ -1912,6 +2602,8 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
             type: "extra-damage",
             formula: "2d8",
             damageType: type,
+            // The type picked at the cast is the default; each attack may pick another.
+            damageTypes: ["acid", "cold", "fire", "lightning"],
             doubleOnCritical: true,
             when: [{ type: "on-hit" }, { type: "versus-within", feet: 15 }]
           }
@@ -1936,8 +2628,8 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
       naturalWeapon("hooves", "Hooves", "bludgeoning")
     ]
   }),
-  // "Until the spell ends, the target has a +1 bonus to AC and saving throws, and it has Resistance to all damage."
-  // The caster's share of its damage is the GM's.
+  // "Until the spell ends, the target has a +1 bonus to AC and saving throws, and it has Resistance to all damage." The
+  // tag shares its damage with the caster and ends the bond at 60 feet apart (warding-bond.ts).
   "warding-bond": spellGrant({
     name: "Warding Bond",
     tags: ["warding-bond"],
@@ -2098,7 +2790,12 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
           }
         ]
       }),
-      option("dodge", "Forced to Dodge", { tags: ["curse-dodge"] }),
+      // "In combat, the target must succeed on a Wisdom saving throw at the start of each of its turns or be forced to
+      // take the Dodge action on that turn."
+      option("dodge", "Forced to Dodge", {
+        tags: ["curse-dodge"],
+        turnStartSave: { ability: "wis", failureTags: ["dodge-only"] }
+      }),
       option("necrotic", "Extra Necrotic damage", {
         modifiers: [
           {
@@ -2354,7 +3051,8 @@ const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
   // "You and up to ten willing creatures ... assume gaseous forms ... a Fly Speed of 300 feet and can hover ... Immunity
   // to the Prone condition ... Resistance to Bludgeoning, Piercing, and Slashing damage. The only actions a target can
   // take in this form are the Dash action or a Magic action to begin reverting ... Reverting takes 1 minute, during
-  // which the target has the Stunned condition." Turning back into a cloud, and the descent when it ends, are the GM's.
+  // which the target has the Stunned condition." "If a target is in cloud form and flying when the effect ends, the
+  // target descends 60 feet per round for 1 minute until it lands, which it does safely."
   "wind-walk": {
     from: "printed",
     onTargets: true,
@@ -2372,7 +3070,8 @@ const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
     keeps: [],
     gear: "worn",
     leaveAs: "action",
-    revertRounds: 10
+    revertRounds: 10,
+    descendsSafely: true
   }
 };
 
@@ -2506,8 +3205,10 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "prismatic-wall": { shape: "line", sizeFeet: 90, widthFeet: 5 },
   // "Spreading to a radius of 300 feet": the creatures under the cloud.
   "storm-of-vengeance": { shape: "cylinder", sizeFeet: 300, widthFeet: null },
+  // The glyph itself, "no larger than 10 feet in diameter"; set off, it fills a 60-foot-radius Sphere.
+  symbol: { shape: "sphere", sizeFeet: 5, widthFeet: null },
   // "Up to 300 feet long, 300 feet high, and 50 feet thick."
-  tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50 },
+  tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50, heightFeet: 300 },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },
   // "A flat surface made up of ten 10-foot-by-10-foot panels" in a row; the dome and the globe are the GM's to draw.
   "wall-of-force": { shape: "line", sizeFeet: 100, widthFeet: 5 },
@@ -2533,7 +3234,7 @@ export function spellEffectFor(
   types: readonly string[],
   range: SpellRange
 ): SpellEffect {
-  const healing = CAST_HEALING[id] ?? healingOfText(description);
+  const healing = NO_CAST_HEALING.has(id) ? null : (CAST_HEALING[id] ?? healingOfText(description));
   const attacks = CAST_ATTACKS[id] ?? (/\bmakes? an? (?:ranged|melee) spell attack\b/i.test(description) ? 1 : 0);
   const attackRange = attacks > 0 ? spellAttackRangeOf(description, range) : null;
   const reaction = CAST_REACTIONS[id];
@@ -2563,6 +3264,11 @@ export function spellEffectFor(
     ...(burst ? { burst: structuredClone(burst) } : {}),
     damage: castDamage(id, roll, types, healing !== null),
     ...(choices ? { damageTypes: [...choices] } : {}),
+    // "If you roll an 8 on a d8 for this spell, you can roll another d8, and add it to the damage."
+    ...(id === "sorcerous-burst" ? { explodingDice: true as const } : {}),
+    ...(id === "teleport" ? { teleportOutcome: true as const } : {}),
+    ...(id === "identify" ? { identifiesItem: true as const } : {}),
+    ...(id === "wish" ? { wishUses: true as const } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
     ...(darts ? { darts } : {}),

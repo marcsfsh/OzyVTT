@@ -55,6 +55,7 @@ export function attunementRefusal(
   if (incoming.attuned === was) return null;
   const resting = inShortRest(state, actor.id) || actor.restStep !== null;
   if (incoming.attuned) {
+    if (stored?.dormant === true) return `${incoming.name} has lost its magic, so there is nothing to attune to.`;
     const prerequisites = record.attunement.restrictedTo;
     if (prerequisites.length > 0 && !prerequisites.some((entry) => meets(entry, actor, definition, incoming.id)))
       return `${incoming.name} requires attunement by ${prerequisites.map(prerequisiteName).join(" or ")}.`;
@@ -62,6 +63,10 @@ export function attunementRefusal(
       return `Attuning to ${incoming.name} takes a Short Rest focused on it. Start a Short Rest, then attune.`;
     return null;
   }
+  // A Dragon Orb's charm: "you can't voluntarily end your Attunement to it".
+  const holder = record.attunementHeldBy;
+  if (holder !== undefined && actor.effects.some((effect) => effect.tags.includes(holder)))
+    return `${incoming.name} holds ${actor.name} Charmed, so ${actor.name} can't end attunement to it.`;
   return resting
     ? null
     : `Ending attunement to ${incoming.name} takes a Short Rest focused on it. Start a Short Rest, then end it.`;

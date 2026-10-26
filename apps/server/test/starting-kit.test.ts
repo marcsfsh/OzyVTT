@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
+import { builderOffers } from "../src/builder-offers.js";
 import { ContentLibrary } from "../src/content-library.js";
 
 // SRD 5.2.1 core traits. Bard: "Tool Proficiencies: Choose 3 Musical Instruments", and its kit's "Musical Instrument of
@@ -114,6 +115,56 @@ describe("the starting kits", () => {
       "instrument-lute",
       1
     ]);
+  });
+
+  it("puts the instrument picked for the kit in the Bard's kit, any instrument at all", () => {
+    const kitPick = (id: string): CharacterChoice => ({ level: 1, classId: "bard", kind: "kit-item", id });
+    const proficient = ["instrument-drum", "instrument-flute", "instrument-viol"];
+    const picked = (id: string) => ({ ...bard(proficient), choices: [...bard(proficient).choices, kitPick(id)] });
+    expect(carried(picked("instrument-flute"))).toContainEqual(["instrument-flute", 1]);
+    expect(carried(picked("instrument-flute"))).not.toContainEqual(["instrument-drum", 1]);
+    // "Musical Instrument of your choice" names no proficiency, so one outside the three is taken too.
+    expect(carried(picked("instrument-horn"))).toContainEqual(["instrument-horn", 1]);
+    expect(() => buildCharacterDefinition(picked("dagger"), library, policy)).toThrow(/isn't one of the items/);
+  });
+
+  it("offers the kit's instrument as its own pick in the builder once the kit is chosen", () => {
+    const draft = (kit: string) =>
+      builderOffers(
+        {
+          speciesId: "human",
+          backgroundId: "acolyte",
+          classId: "bard",
+          level: 1,
+          picks: { "class-equipment": [kit] }
+        },
+        library
+      ).offers.find((offer) => offer.key === "class-equipment-item");
+    expect(draft("bard-a")).toMatchObject({ kind: "kit-item", step: "equipment", capacity: 1 });
+    expect(draft("bard-a")!.options.map((option) => option.id)).toEqual(
+      expect.arrayContaining(["instrument-lute", "instrument-horn", "instrument-viol"])
+    );
+    expect(draft("bard-b")).toBeUndefined();
+  });
+
+  it("reads the kit's instrument back from a stored ledger, so a level up keeps it", () => {
+    const proficient = ["instrument-drum", "instrument-flute", "instrument-viol"];
+    const kitPick: CharacterChoice = { level: 1, classId: "bard", kind: "kit-item", id: "instrument-horn" };
+    const reply = builderOffers(
+      {
+        speciesId: "human",
+        backgroundId: "acolyte",
+        classId: "bard",
+        level: 2,
+        // As the builder records them: the class's kit under the class.
+        choices: [
+          ...bard(proficient).choices.map((row) => (row.id === "bard-a" ? { ...row, classId: "bard" } : row)),
+          kitPick
+        ]
+      },
+      library
+    );
+    expect(reply.picks["class-equipment-item"]).toEqual(["instrument-horn"]);
   });
 
   it("puts the Monk's chosen tool in its kit", () => {

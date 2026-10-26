@@ -1,3 +1,4 @@
+import { isStoredCast } from "../stored-casts.js";
 import type { SpellMaterial, SpellReference } from "@vtt/content-srd-5.2.1";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
@@ -7,6 +8,8 @@ import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { isItemActionId, laterRowOf } from "../item-actions.js";
 import { isDivineCast } from "../divine-intervention.js";
 import type { RuleId } from "../rules-families.js";
+import { boundFocusRows } from "../pact-weapon.js";
+import { BOOK_OF_SHADOWS_ID, holdsPactOfTheTome } from "../book-of-shadows.js";
 import { scrollOfAction } from "../scrolls.js";
 import type { DefinitionAction, LiveActor } from "./context.js";
 
@@ -51,17 +54,22 @@ const SPELLBOOK_FOCUS: Readonly<Record<string, string>> = { wizard: "spellbook" 
 const carried = (row: InventoryItem) => row.quantity > 0;
 const equipped = (row: InventoryItem) => row.equipped && carried(row);
 
-/** The components a stat block's Spellcasting says this cast goes without. */
-function waivedBy(definition: ActorDefinition | undefined, action: DefinitionAction): ReadonlySet<Component> {
+/** The components this cast goes without: what the feature that gives it says (Wild Companion's Find Familiar, Divine
+ *  Intervention) or a stat block's Spellcasting. */
+export function waivedBy(
+  definition: ActorDefinition | undefined,
+  action: Pick<DefinitionAction, "id" | "waives">
+): ReadonlySet<Component> {
+  const waived = new Set<Component>(action.waives ?? []);
   // Divine Intervention: "without expending a spell slot or needing Material components".
-  if (isDivineCast(action.id)) return new Set(["material"]);
+  if (isDivineCast(action.id)) waived.add("material");
   for (const parent of definition?.actions ?? []) {
     const casts = parent.castsSpells;
     if (!casts?.waives) continue;
     if ((casts.self && parent.id === action.id) || casts.spells.some((entry) => entry.id === action.id))
-      return new Set(casts.waives);
+      for (const component of casts.waives) waived.add(component);
   }
-  return new Set();
+  return waived;
 }
 
 /** The focus kinds this cast may use: the spell's own class's, else any of the character's classes'. */
@@ -78,15 +86,29 @@ function focusKinds(
     const focus = catalog?.classRecord?.(id)?.spellcasting?.focus;
     return focus ? [focus] : [];
   });
-  return { kinds, books: classIds.flatMap((id) => (SPELLBOOK_FOCUS[id] ? [SPELLBOOK_FOCUS[id]!] : [])) };
+  const books = classIds.flatMap((id) => (SPELLBOOK_FOCUS[id] ? [SPELLBOOK_FOCUS[id]!] : []));
+  // Pact of the Tome: "You can use the book as a Spellcasting Focus."
+  if (holdsPactOfTheTome(definition)) books.push(BOOK_OF_SHADOWS_ID);
+  return { kinds, books };
 }
 
-/** The rows a cast can use as its Spellcasting Focus. */
-function focusRows(inventory: readonly InventoryItem[], kinds: readonly string[], books: readonly string[]) {
+/** The rows a cast can use as its Spellcasting Focus, a magic item that serves as one among them (a Talisman of Pure
+ *  Good is a Holy Symbol). */
+function focusRows(
+  inventory: readonly InventoryItem[],
+  kinds: readonly string[],
+  books: readonly string[],
+  catalog: EquipmentCatalog | undefined
+) {
   return inventory.filter((row) => {
     if (!carried(row)) return false;
     const id = catalogIdOf(row);
-    return books.includes(id) || kinds.some((kind) => FOCUS_ROWS[kind]?.(id) ?? id === kind);
+    const servesAs = row.dormant === true ? undefined : catalog?.equipmentRecord(id)?.servesAsFocus;
+    return (
+      books.includes(id) ||
+      kinds.some((kind) => FOCUS_ROWS[kind]?.(id) ?? id === kind) ||
+      (servesAs !== undefined && kinds.includes(servesAs))
+    );
   });
 }
 
@@ -111,11 +133,11 @@ function boundHands(attacker: LiveActor): Readonly<{ free: boolean; shield: bool
 }
 
 /** How many of a material the cast needs. */
-const neededOf = (material: SpellMaterial, targetCount: number) =>
+export const neededOf = (material: SpellMaterial, targetCount: number) =>
   (material.count ?? 1) * (material.perTarget ? Math.max(1, targetCount) : 1);
 
 /** The carried rows that are this material, by gear id or by a word of its name. */
-function materialRows(inventory: readonly InventoryItem[], material: SpellMaterial): InventoryItem[] {
+export function materialRows(inventory: readonly InventoryItem[], material: SpellMaterial): InventoryItem[] {
   return inventory.filter((row) => {
     if (!carried(row)) return false;
     const id = catalogIdOf(row);
@@ -126,7 +148,7 @@ function materialRows(inventory: readonly InventoryItem[], material: SpellMateri
 }
 
 /** "a diamond worth 300+ GP", "4 ivory strips worth 50+ GP each". */
-function materialWords(material: SpellMaterial, needed: number): string {
+export function materialWords(material: SpellMaterial, needed: number): string {
   const worth = material.costGp !== null ? ` worth ${material.costGp}+ GP${needed > 1 ? " each" : ""}` : "";
   return `${needed > 1 ? `${needed} ` : ""}${material.name}${worth}`;
 }
@@ -155,6 +177,9 @@ export function readComponents(
   const scroll = scrollOfAction(action, attacker.inventory, catalog) !== null;
   // "Requires no components unless the item's description notes otherwise"; a scroll is read without Material ones.
   if (isItemActionId(action.id) && !scroll) return NONE;
+  // A held spell paid its components when it was stored (Contingency, a ring, a guardian's "requiring no spell
+  // components").
+  if (isStoredCast(action.id)) return NONE;
   const waived = waivedBy(definition, action);
   const subtle = input.subtle === true;
   const needs = (component: Component) =>
@@ -182,7 +207,8 @@ export function readComponents(
   const hands = boundHands(attacker);
   const freeHand = hands.free;
   const { kinds, books } = focusKinds(definition, spell.id, catalog);
-  const focuses = focusRows(attacker.inventory, kinds, books);
+  // A weapon a binding lends as a focus serves too (a pact weapon).
+  const focuses = [...focusRows(attacker.inventory, kinds, books, catalog), ...boundFocusRows(attacker)];
   // An emblem borne on a Shield serves with no hand of its own, and the Shield's hand makes the gestures.
   const emblem = hands.shield && focuses.some((row) => equipped(row) && catalogIdOf(row) === EMBLEM_ID);
   const costly = material ? (spell.components.costly ?? []) : [];

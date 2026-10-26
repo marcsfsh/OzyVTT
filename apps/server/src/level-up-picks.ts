@@ -7,6 +7,7 @@ import {
   CLASS_SPELL_BUDGET,
   classBudgetKey,
   classSequenceOf,
+  KIT_ITEM_KIND,
   surveyForBuild,
   type ServerOfferSurvey
 } from "./character-offers.js";
@@ -64,7 +65,8 @@ function without(from: readonly string[], minus: readonly string[]): string[] {
 }
 
 /** How many of an offer's earlier answers this level up may replace, by group: a feature's own picks share one
- *  allowance ("one of the spells you chose for this feat"), and a clause naming a class budget has its own. */
+ *  allowance ("one of the spells you chose for this feat"), clauses naming one `shares` share theirs ("one of your
+ *  arcanum spells"), and a clause naming a class budget has its own. */
 function replacementAllowances(
   survey: ServerOfferSurvey,
   gainedIn: (classId: string | null) => number
@@ -76,7 +78,11 @@ function replacementAllowances(
       if (clause.when !== "level-up") continue;
       const key = classBudgetKey(clause.offer, classId, startingId);
       const own = clause.offer === `feature:${record.id}` || clause.offer.startsWith(`feature:${record.id}/`);
-      const group = own ? `own:${record.id}:${classId ?? ""}` : `${record.id}:${key}`;
+      const group = clause.shares
+        ? `shared:${clause.shares}:${classId ?? ""}`
+        : own
+          ? `own:${record.id}:${classId ?? ""}`
+          : `${record.id}:${key}`;
       const entry = groups.get(group) ?? { keys: new Set<string>(), amount: 0 };
       entry.keys.add(key);
       entry.amount = Math.max(entry.amount, clause.amount * gainedIn(classId));
@@ -97,7 +103,11 @@ const scoresKey = (request: CharacterCreateRequestInput) =>
 const detailRows = (choices: readonly CharacterChoice[]) =>
   choices
     .filter(
-      (row) => (row.kind === "asi-or-feat" && row.id === "asi") || row.kind === "equipment" || row.kind === "size"
+      (row) =>
+        (row.kind === "asi-or-feat" && row.id === "asi") ||
+        row.kind === "equipment" ||
+        row.kind === KIT_ITEM_KIND ||
+        row.kind === "size"
     )
     .map((row) =>
       JSON.stringify([row.kind, row.id, row.kind === "asi-or-feat" ? (row.payload?.increases ?? null) : null])

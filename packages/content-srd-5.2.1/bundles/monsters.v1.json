@@ -96,6 +96,14 @@
      "dc": 16,
      "successDamage": "half",
      "failureConditions": []
+    },
+    "targets": {
+     "conditionsFromSource": [
+      "charmed",
+      "grappled"
+     ],
+     "count": 1,
+     "rangeFeet": 30
     }
    },
    {
@@ -141,7 +149,15 @@
       "formula": "3d6",
       "type": "psychic"
      }
-    ]
+    ],
+    "targets": {
+     "conditionsFromSource": [
+      "charmed",
+      "grappled"
+     ],
+     "count": 1,
+     "rangeFeet": 30
+    }
    },
    {
     "id": "dominate-mind",
@@ -320,7 +336,21 @@
      "ability": "dex",
      "dc": 17,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Cloud of Insects",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "concentration",
+        "mode": "disadvantage"
+       }
+      ]
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -1041,7 +1071,17 @@
      "ability": "dex",
      "dc": 16,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Scorching Sands",
+      "tags": [
+       "speed-halved"
+      ],
+      "modifiers": []
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -3251,7 +3291,16 @@
      "ability": "con",
      "dc": 14,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Freezing Burst",
+      "tags": [],
+      "modifiers": [],
+      "speedZero": true
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -3777,7 +3826,21 @@
      "ability": "dex",
      "dc": 21,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Cloud of Insects",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "concentration",
+        "mode": "disadvantage"
+       }
+      ]
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -4512,7 +4575,17 @@
      "ability": "dex",
      "dc": 20,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Scorching Sands",
+      "tags": [
+       "speed-halved"
+      ],
+      "modifiers": []
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -6789,7 +6862,16 @@
      "ability": "con",
      "dc": 20,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Freezing Burst",
+      "tags": [],
+      "modifiers": [],
+      "speedZero": true
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -10622,14 +10704,34 @@
       "type": "acid"
      }
     ],
-    "reminder": "Nonmagical armor the target wears takes a cumulative -1 penalty to the AC it offers, and is destroyed when the penalty reduces its AC to 10. Mending removes the penalty. Change the armor by hand."
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Armor corroded",
+      "armorPenalty": true
+     }
+    ]
    },
    {
     "id": "black-pudding-split",
     "name": "Split",
     "activation": "reaction",
     "description": "_Trigger:_ While the pudding is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is subjected to Lightning or Slashing damage. _Response:_ The pudding splits into two new Black Puddings. Each new pudding is one size smaller than the original pudding and acts on its Initiative. The original pudding’s Hit Points are divided evenly between the new puddings (round down).",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "damaged",
+     "response": "split",
+     "damageTypes": [
+      "lightning",
+      "slashing"
+     ],
+     "bloodied": true,
+     "sizes": [
+      "large",
+      "medium"
+     ],
+     "minHitPoints": 10
+    }
    }
   ],
   "token": {
@@ -10663,6 +10765,12 @@
       "type": "acid"
      }
     ]
+   },
+   {
+    "kind": "corrodes-gear",
+    "name": "Corrosive Form",
+    "weapons": true,
+    "ammunition": true
    }
   ],
   "extensions": {
@@ -12675,7 +12783,30 @@
     "name": "Unnerving Gaze",
     "activation": "reaction",
     "description": "_Trigger:_ A creature the devil can see starts its turn within 30 feet of the devil and can see the devil. _Response––Wisdom Saving Throw:_ DC 15, the triggering creature. _Failure:_ The target has the Frightened condition until the end of its turn. _Success:_ The target is immune to this devil’s Unnerving Gaze for 24 hours.",
-    "damage": []
+    "save": {
+     "ability": "wis",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     },
+     "immuneOnSuccess": true
+    },
+    "damage": [],
+    "reaction": {
+     "trigger": "starts-turn-near",
+     "response": "strike-back",
+     "rangeFeet": 30,
+     "sight": "mutual"
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30,
+     "seen": true
+    }
    },
    {
     "id": "chain",
@@ -12733,7 +12864,8 @@
      "count": 1,
      "rangeFeet": 60,
      "seen": true
-    }
+    },
+    "reminder": "If the target is Large or smaller, move it up to 30 feet straight toward the devil."
    }
   ],
   "token": {
@@ -13954,6 +14086,15 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "pick",
+    "name": "Training",
+    "key": "training",
+    "of": "skill",
+    "skillAdvantage": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -15805,7 +15946,17 @@
      }
     },
     "damage": [],
-    "reminder": "The whirlwind lasts while the djinni concentrates on it. The djinni can move it up to 20 feet at the start of each of its turns, and the Restrained creatures move with it; a creature it enters, or that enters it, makes the save once a turn.",
+    "reminder": "The djinni can move the whirlwind up to 20 feet at the start of each of its turns: drag its area, and the Restrained creatures move with it.",
+    "zone": {
+     "on": [
+      "enter"
+     ],
+     "oncePerTurn": true,
+     "atCast": true,
+     "concentration": true,
+     "carriesHeld": true,
+     "sparesUser": true
+    },
     "area": {
      "shape": "cylinder",
      "sizeFeet": 20,
@@ -16069,6 +16220,9 @@
      "repeatSave": true
     },
     "damage": [],
+    "sight": {
+     "seenBy": "user"
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -16480,6 +16634,14 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
+     },
+     "failureEffect": {
+      "name": "Fetid Cloud",
+      "tags": [
+       "no-reactions",
+       "action-or-bonus"
+      ],
+      "modifiers": []
      }
     },
     "damage": [],
@@ -20019,6 +20181,11 @@
       "type": "psychic"
      }
     ],
+    "targets": {
+     "notCreatureTypes": [
+      "undead"
+     ]
+    },
     "sight": {
      "seenBy": "user"
     },
@@ -20239,7 +20406,13 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
-     }
+     },
+     "sparesCreatureTypes": [
+      "undead"
+     ],
+     "sparesSpecies": [
+      "elf"
+     ]
     },
     "damage": [
      {
@@ -20382,7 +20555,8 @@
      "successDamage": "half",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failureMaxSize": "large"
     },
     "damage": [
      {
@@ -22100,6 +22274,11 @@
      "limit": 1,
      "per": "long-rest"
     },
+    "reaction": {
+     "trigger": "damaged",
+     "response": "use-on-self",
+     "underwater": true
+    },
     "sight": {
      "area": {
       "kind": "heavily-obscured"
@@ -22615,7 +22794,8 @@
      "speed": "half",
      "mode": "swim",
      "provokes": false
-    }
+    },
+    "underwaterOnly": true
    },
    {
     "id": "ram",
@@ -23704,6 +23884,11 @@
   },
   "traitMechanics": [
    {
+    "kind": "difficult-ground",
+    "name": "Aberrant Ground",
+    "rangeFeet": 10
+   },
+   {
     "kind": "aura",
     "name": "Gibbering",
     "trigger": "turn-start-inside",
@@ -24090,7 +24275,8 @@
      "successDamage": "none",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failureMaxSize": "medium"
     },
     "damage": [
      {
@@ -25265,7 +25451,13 @@
       "type": "acid"
      }
     ],
-    "reminder": "Nonmagical armor the target wears takes a cumulative -1 penalty to the AC it offers, and is destroyed when the penalty reduces its AC to 10. Mending removes the penalty. Change the armor by hand."
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Armor corroded",
+      "armorPenalty": true
+     }
+    ]
    }
   ],
   "token": {
@@ -25279,6 +25471,14 @@
    "acid",
    "cold",
    "fire"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "corrodes-gear",
+    "name": "Corrosive Form",
+    "weapons": true,
+    "ammunition": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -26517,6 +26717,11 @@
      {
       "formula": "1d4 + 4",
       "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "acid",
+      "pick": "draconic-origin"
      }
     ]
    },
@@ -26534,7 +26739,8 @@
     "damage": [
      {
       "formula": "8d6",
-      "type": "fire"
+      "type": "acid",
+      "pick": "draconic-origin"
      }
     ],
     "uses": {
@@ -26542,13 +26748,6 @@
      "per": "recharge",
      "recharge": 5
     },
-    "damageTypes": [
-     "acid",
-     "cold",
-     "fire",
-     "lightning",
-     "poison"
-    ],
     "area": {
      "shape": "cone",
      "sizeFeet": 30,
@@ -26563,6 +26762,21 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "pick",
+    "name": "Draconic Origin",
+    "key": "draconic-origin",
+    "of": "damage-type",
+    "options": [
+     "acid",
+     "cold",
+     "fire",
+     "lightning",
+     "poison"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -27807,6 +28021,22 @@
      ],
      "failureDuration": {
       "type": "until-source-turn-end"
+     },
+     "failureByMargin": {
+      "by": 5,
+      "conditions": [
+       "poisoned"
+      ],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "whileFailed": {
+       "conditions": [
+        "unconscious"
+       ],
+       "endsOnDamage": true
+      }
      }
     },
     "damage": [
@@ -30186,7 +30416,8 @@
     "move": {
      "speed": "full",
      "provokes": true
-    }
+    },
+    "underwaterOnly": true
    },
    {
     "id": "fling",
@@ -30803,6 +31034,11 @@
       "type": "necrotic"
      }
     ],
+    "targets": {
+     "notCreatureTypes": [
+      "undead"
+     ]
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -33700,10 +33936,17 @@
     "reaction": {
      "trigger": "hit-by-attack",
      "response": "ac-bonus",
-     "amount": 2
+     "amount": 2,
+     "anyHit": true
     },
     "teleport": {
-     "feet": 60
+     "feet": 60,
+     "landing": {
+      "conditions": [
+       "blinded"
+      ],
+      "withinFeet": 5
+     }
     }
    },
    {
@@ -34110,7 +34353,14 @@
     "name": "Pursuit",
     "activation": "reaction",
     "description": "_Trigger:_ Another creature the nalfeshnee can see ends its move within 120 feet of the nalfeshnee. _Response:_ The nalfeshnee uses Teleport, but its destination space must be within 10 feet of the triggering creature.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "ends-move-near",
+     "response": "teleport-near",
+     "rangeFeet": 120,
+     "usesAction": "teleport",
+     "nearFeet": 10
+    }
    },
    {
     "id": "rend",
@@ -34738,7 +34988,21 @@
     "name": "Split",
     "activation": "reaction",
     "description": "_Trigger:_ While the jelly is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is subjected to Lightning or Slashing damage. _Response:_ The jelly splits into two new Ochre Jellies. Each new jelly is one size smaller than the original jelly and acts on its Initiative. The original jelly’s Hit Points are divided evenly between the new jellies (round down).",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "damaged",
+     "response": "split",
+     "damageTypes": [
+      "lightning",
+      "slashing"
+     ],
+     "bloodied": true,
+     "sizes": [
+      "large",
+      "medium"
+     ],
+     "minHitPoints": 10
+    }
    }
   ],
   "token": {
@@ -34848,6 +35112,12 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "reaction": {
+     "trigger": "ends-turn-near",
+     "response": "use-on-self",
+     "rangeFeet": 5,
+     "underwater": true
     },
     "sight": {
      "area": {
@@ -36096,7 +36366,15 @@
       "type": "poison"
      }
     ],
-    "reminder": "A target this damage drops to 0 Hit Points becomes Stable instead, and has the Poisoned condition for 1 hour, with the Paralyzed condition while Poisoned. Apply both by hand."
+    "drain": {
+     "stableAtZero": {
+      "conditions": [
+       "poisoned",
+       "paralyzed"
+      ],
+      "minutes": 60
+     }
+    }
    }
   ],
   "token": {
@@ -37005,6 +37283,9 @@
       "type": "radiant"
      }
     ],
+    "targets": {
+     "who": "enemies"
+    },
     "area": {
      "shape": "sphere",
      "sizeFeet": 20,
@@ -37885,6 +38166,19 @@
      "failureDuration": {
       "type": "minutes",
       "minutes": 60
+     },
+     "failureByMargin": {
+      "by": 5,
+      "whileFailed": {
+       "conditions": [
+        "unconscious"
+       ],
+       "endsOnDamage": true,
+       "endedBy": {
+        "name": "Wake",
+        "by": "others"
+       }
+      }
      }
     },
     "damage": [
@@ -38561,6 +38855,9 @@
       "type": "psychic"
      }
     ],
+    "targets": {
+     "who": "enemies"
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -39894,7 +40191,7 @@
     "description": "_Trigger:_ An attack roll hits the rust monster. _Response:_ The rust monster uses **Antennae**.",
     "damage": [],
     "reaction": {
-     "trigger": "damaged-by-creature",
+     "trigger": "hit-by-attack",
      "response": "strike-back",
      "rangeFeet": 5,
      "usesAction": "antennae"
@@ -39928,7 +40225,18 @@
      "failureConditions": []
     },
     "damage": [],
-    "reminder": "On a failure, the armor or weapon the rust monster targeted takes a cumulative -1 penalty: to the AC it offers, or to its attack rolls. Change the item by hand. Armor whose AC falls to 10, or a weapon at -5, is destroyed, and Mending removes the penalty."
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "object": {
+     "kinds": [
+      "armor",
+      "weapon"
+     ],
+     "metal": true,
+     "does": "penalty-on-failure"
+    }
    },
    {
     "id": "destroy-metal",
@@ -40997,7 +41305,8 @@
      "speed": "full",
      "mode": "swim",
      "provokes": false
-    }
+    },
+    "underwaterOnly": true
    }
   ],
   "token": {
@@ -41098,7 +41407,12 @@
     "onHit": [
      {
       "conditions": [],
-      "reminder": "The target's Strength score decreases by 1d4. The target dies if this reduces that score to 0."
+      "name": "Strength drained",
+      "lowersScore": {
+       "ability": "str",
+       "dice": "1d4",
+       "killsAtZero": true
+      }
      }
     ]
    },
@@ -41492,6 +41806,11 @@
     "name": "Regeneration",
     "hitPoints": 10,
     "needsHitPoints": true
+   },
+   {
+    "kind": "spell-storing",
+    "name": "Spell Storing",
+    "maxLevel": 4
    }
   ],
   "extensions": {
@@ -42511,6 +42830,9 @@
       "type": "psychic"
      }
     ],
+    "targets": {
+     "who": "enemies"
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -42792,6 +43114,9 @@
     "activation": "action",
     "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
     "damage": [],
+    "targets": {
+     "who": "enemies"
+    },
     "uses": {
      "limit": 3,
      "per": "long-rest"
@@ -43844,7 +44169,20 @@
      "ability": "con",
      "dc": 10,
      "successDamage": "half",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Steam Breath",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "speed",
+        "amount": -10
+       }
+      ]
+     },
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -44100,7 +44438,23 @@
     "name": "Deflect Missile (Recharge 5-6)",
     "activation": "reaction",
     "description": "_Trigger:_ The giant is hit by a ranged attack roll and takes Bludgeoning, Piercing, or Slashing damage from it. _Response:_ The giant reduces the damage it takes from the attack by 11 (1d10 + 6), and if that damage is reduced to 0, the giant can redirect some of the attack’s force. _Dexterity Saving Throw:_ DC 17, one creature the giant can see within 60 feet. Failure: 11 (1d10 + 6) Force damage.",
-    "damage": [],
+    "save": {
+     "ability": "dex",
+     "dc": 17,
+     "successDamage": "none",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "1d10 + 6",
+      "type": "force"
+     }
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -44117,7 +44471,8 @@
      ],
      "attackKinds": [
       "ranged"
-     ]
+     ],
+     "redirect": true
     }
    },
    {
@@ -45507,6 +45862,32 @@
      ],
      "failureDuration": {
       "type": "until-source-next-turn"
+     },
+     "failureEffect": {
+      "name": "Cacophony",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-attack-roll"
+         }
+        ]
+       }
+      ]
      }
     },
     "damage": [],
@@ -47878,7 +48259,15 @@
       "type": "necrotic"
      }
     ],
-    "reminder": "A target this damage drops to 0 Hit Points becomes Stable instead, and has the Poisoned condition for 1 hour, with the Paralyzed condition while Poisoned. Apply both by hand."
+    "drain": {
+     "stableAtZero": {
+      "conditions": [
+       "poisoned",
+       "paralyzed"
+      ],
+      "minutes": 60
+     }
+    }
    }
   ],
   "token": {

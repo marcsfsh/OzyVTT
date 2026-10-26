@@ -55,11 +55,13 @@ export function caughtByArea(
   placed: Readonly<{ origin: Readonly<{ x: number; y: number }>; target: Readonly<{ x: number; y: number }> }>,
   widthFeet: number | null,
   tokens: readonly EncounterToken[],
-  sizeFeet?: number
+  sizeFeet?: number,
+  /** A Line aimed at its target stops where it is dragged (a Javelin of Lightning's bolt). */
+  upTo = false
 ): string[] {
   const snapped =
     sizeFeet !== undefined
-      ? sizedShapePreview(calibration, shape, placed.origin, placed.target, sizeFeet)
+      ? sizedShapePreview(calibration, shape, placed.origin, placed.target, sizeFeet, upTo)
       : snapShapePreview(calibration, shape, placed.origin, placed.target);
   const from = imageToGridPreview(calibration, snapped.origin);
   const to = imageToGridPreview(calibration, snapped.target);

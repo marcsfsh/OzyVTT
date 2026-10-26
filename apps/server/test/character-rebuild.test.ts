@@ -270,7 +270,7 @@ describe("a level is not a rest", () => {
     expect(actor.spellSlots).toEqual([{ level: 1, remaining: 3 }]);
     actor.spellSlots = [{ level: 1, remaining: 1 }];
     actor.hitDice = { ...actor.hitDice!, entries: actor.hitDice!.entries.map((entry) => ({ ...entry, remaining: 0 })) };
-    actor.actionUses = { "arcane-recovery": 1, "no-such-pool": 1 };
+    actor.actionUses = { "arcane-recovery": 1, overchannel: 1 };
 
     rebuildActorDefinition(state, ACTOR_ID, buildCharacterDefinition(wizard(3), library, policy));
     // Level 3 slots are 4 + 2: the two spent level-1 slots stay spent, the new level-2 slots arrive whole.
@@ -280,8 +280,17 @@ describe("a level is not a rest", () => {
     ]);
     // Two Hit Dice were spent and a third arrives with the level.
     expect(actor.hitDice!.entries).toEqual([expect.objectContaining({ die: "d6", maximum: 3, remaining: 1 })]);
-    // Arcane Recovery stays used; a pool the new sheet has not got is dropped.
-    expect(actor.actionUses).toEqual({ "arcane-recovery": 1 });
+    // Arcane Recovery stays used, and a counter a rule keeps outside any pool is kept as it stands.
+    expect(actor.actionUses).toEqual({ "arcane-recovery": 1, overchannel: 1 });
+  });
+
+  it("drops the spent count of a pool the new sheet no longer has", () => {
+    const { state, definition } = tableWith();
+    const actor = state.actors[0];
+    actor.actionUses = { "second-wind": 1, "action-surge": 1 };
+    const levelOne = prefillFor(definition, 1, fighter({ subclassId: undefined }));
+    rebuildActorDefinition(state, ACTOR_ID, buildCharacterDefinition(levelOne, library, policy));
+    expect(actor.actionUses).toEqual({ "second-wind": 1 });
   });
 
   it("leaves a character at 0 hit points at 0, dying or dead", () => {

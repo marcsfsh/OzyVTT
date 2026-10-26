@@ -332,11 +332,12 @@ describe("a failure with no condition", () => {
   it("lets a half-dragon's breath take the type its Draconic Origin chose", () => {
     const built = table("half-dragon");
     const action = built.definition.actions.find((entry) => entry.id === "dragon-s-breath")!;
-    expect(action.damageTypes).toEqual(["acid", "cold", "fire", "lightning", "poison"]);
+    expect(action.damage).toEqual([{ formula: "8d6", type: "acid", pick: "draconic-origin" }]);
+    monster(built).statBlockPicks = { "draconic-origin": "cold" };
     resolveDefinitionAction(
       built.state,
       action,
-      { actorId: IDS.monster, targetIds: [IDS.hero], commandId: nextId(), damageType: "cold" },
+      { actorId: IDS.monster, targetIds: [IDS.hero], commandId: nextId() },
       {
         random: () => 4,
         newRollId: nextId,

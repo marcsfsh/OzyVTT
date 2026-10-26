@@ -1,3 +1,5 @@
+import { TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
+import { checkWishUse } from "./wish.js";
 import { abilityModifier, isMeleeWeapon } from "@vtt/rules-5e";
 import {
   catalogIdOf,
@@ -11,8 +13,12 @@ import {
   type Modifier
 } from "@vtt/schemas";
 import { spellClassOf } from "../class-features.js";
+import { trainingCovers } from "../item-actions.js";
+import { END_EFFECT_ACTION_ID } from "../ending-actions.js";
+import { ammunitionOf } from "../ammunition.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
+import { withArticle } from "@vtt/domain";
 import { spellOf } from "./concentration.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveInput } from "./context.js";
 
@@ -42,21 +48,33 @@ export function checkChoices(
   action: DefinitionAction,
   input: ResolveInput,
   attacker: LiveActor,
-  catalog: EquipmentCatalog | undefined
+  catalog: EquipmentCatalog | undefined,
+  definition: ActorDefinition | undefined
 ): void {
-  const offered = optionsOf(action);
-  const picks = [input.optionId, ...Object.values(input.targetOptions ?? {})].filter(
+  const offered =
+    optionsOf(action)?.options ??
+    (action.teleportOutcome ? TELEPORT_FAMILIARITY : action.wishUses ? WISH_USES : undefined);
+  // End an Effect's pick is the way out it takes (`resolution/endings.ts`).
+  const own = action.id === END_EFFECT_ACTION_ID ? [] : [input.optionId];
+  const picks = [...own, ...Object.values(input.targetOptions ?? {})].filter(
     (pick): pick is string => typeof pick === "string"
   );
   for (const pick of picks)
-    if (!offered?.options.some((option) => option.id === pick))
+    if (!offered?.some((option) => option.id === pick))
       throw new CommandRejectedError(`${action.name} doesn't offer that choice.`);
   if (Object.keys(input.targetOptions ?? {}).some((id) => !input.targetIds.includes(id)))
     throw new CommandRejectedError("Each choice must be for one of the action's targets.");
   const binds = action.grants?.bindsWeapon;
-  if (input.itemId != null && !binds) throw new CommandRejectedError(`${action.name} isn't cast on a weapon.`);
+  if (action.wishUses) checkWishUse(action, input, attacker);
+  if (action.identifiesItem) {
+    if (input.itemId != null && !attacker.inventory.some((row) => row.id === input.itemId && row.quantity > 0))
+      throw new CommandRejectedError(`${attacker.name} isn't carrying that item.`);
+    return;
+  }
+  if (input.itemId != null && !binds && !action.rebindsRow)
+    throw new CommandRejectedError(`${action.name} isn't cast on a weapon.`);
   if (binds && input.itemId != null && action.grants!.target === "self")
-    fittingRow(attacker, binds, input.itemId, catalog, action.name);
+    fittingRow(attacker, binds, input.itemId, catalog, action.name, definition);
 }
 
 /** The option picked for one recipient: its own under `optionsPerTarget`, else the resolve's, else the first. */
@@ -213,17 +231,64 @@ function grantedSpellActionOf(
   };
 }
 
+/**
+ * A weapon conjured in its user's hand as the binding is made, of the kind its user picked for the feature (Pact of
+ * the Blade: "conjure a pact weapon in your hand, a Simple or Martial Melee weapon of your choice"). A weapon an earlier
+ * binding of the same action conjured goes first, since the new bond ends the old one.
+ */
+function conjuredWeapon(ctx: ResolveContext, recipient: LiveActor, pickOf: string): InventoryItem {
+  const { deps, input, action } = ctx;
+  const kind = (deps.definition?.character?.choices ?? []).find(
+    (row) => row.kind === "weapon" && row.payload?.featureId === pickOf
+  )?.id;
+  const record = kind ? deps.catalog?.equipmentRecord(kind) : undefined;
+  if (!kind || !record?.weapon)
+    throw new CommandRejectedError(`${recipient.name} has no weapon picked for ${action.name} to conjure.`);
+  const earlier = recipient.effects.find(
+    (effect) => effect.sourceActionId === action.id && effect.weapon?.conjured === true && effect.itemId !== undefined
+  )?.itemId;
+  const row: InventoryItem = {
+    id: `${kind}-conjured-${input.commandId.slice(0, 8)}`,
+    recordId: kind,
+    name: `${record.name} (conjured)`,
+    quantity: 1,
+    equipped: true,
+    attuned: false,
+    category: record.category,
+    ...(record.weightLb !== null && record.weightLb !== undefined ? { weightEach: record.weightLb } : {}),
+    weapon: {
+      category: record.weapon.category,
+      damageDice: record.weapon.damageDice,
+      damageType: record.weapon.damageType,
+      rangeFeet: record.weapon.rangeFeet,
+      longRangeFeet: record.weapon.longRangeFeet,
+      ...(record.weapon.melee !== undefined ? { melee: record.weapon.melee } : {}),
+      ...(record.weapon.versatileDice ? { versatileDice: record.weapon.versatileDice } : {}),
+      ...(record.weapon.properties ? { properties: [...record.weapon.properties] } : {})
+    }
+  } as InventoryItem;
+  recipient.inventory = [...recipient.inventory.filter((entry) => entry.id !== earlier), row];
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${recipient.name} conjures ${withArticle(record.name)} in hand.`,
+    actorIds: [recipient.id]
+  });
+  return row;
+}
+
 /** The carried row a grant binds to on its recipient, refused when it doesn't fit what the grant names. */
 function fittingRow(
   bearer: Pick<LiveActor, "name" | "inventory">,
   binds: NonNullable<Grant["bindsWeapon"]>,
   itemId: string,
   catalog: EquipmentCatalog | undefined,
-  what: string
+  what: string,
+  definition: ActorDefinition | undefined
 ): InventoryItem {
   const row = bearer.inventory.find((entry) => entry.id === itemId && entry.quantity > 0);
-  if (!row) throw new CommandRejectedError(`${bearer.name} isn't carrying that weapon.`);
-  const problem = rowProblem(row, binds, catalog);
+  if (!row)
+    throw new CommandRejectedError(`${bearer.name} isn't carrying that ${binds.ammunition ? "ammunition" : "weapon"}.`);
+  const problem = rowProblem(row, binds, catalog, definition);
   if (problem) throw new CommandRejectedError(`${what} can't be cast on ${row.name}: ${problem}.`);
   return row;
 }
@@ -232,14 +297,20 @@ function fittingRow(
 function rowProblem(
   row: InventoryItem,
   binds: NonNullable<Grant["bindsWeapon"]>,
-  catalog: EquipmentCatalog | undefined
+  catalog: EquipmentCatalog | undefined,
+  definition: ActorDefinition | undefined
 ): string | null {
+  if (binds.ammunition) return ammunitionOf(row, catalog) === null ? "it isn't ammunition" : null;
   const weapon = row.weapon;
   if (!weapon) return "it isn't a weapon";
   const ids = row.baseId !== undefined ? [catalogIdOf(row), row.baseId] : [catalogIdOf(row)];
+  const trained = definition?.proficiencies?.weapons;
+  if (binds.needsProficiency && trained !== undefined && !trainingCovers(trained, weapon, ids))
+    return "its wielder isn't proficient with it";
   if (binds.weaponIds && !binds.weaponIds.some((id) => ids.includes(id)))
     return `it works only on ${binds.weaponIds.join(" or ")}`;
   if (binds.nonmagical && catalog?.equipmentRecord(catalogIdOf(row))?.isMagic === true) return "it is already magical";
+  if (binds.magical && catalog?.equipmentRecord(catalogIdOf(row))?.isMagic !== true) return "it isn't a magic weapon";
   if (binds.melee && !isMeleeWeapon(weapon.properties ?? [], weapon.rangeFeet, weapon.melee))
     return "it isn't a Melee weapon";
   return null;
@@ -265,11 +336,13 @@ export function boundWeaponOf(
   if (!binds) return null;
   const { input, deps, warnings, action } = ctx;
   let row: InventoryItem | undefined;
-  if (input.itemId != null) row = fittingRow(recipient, binds, input.itemId, deps.catalog, action.name);
+  if (input.itemId != null)
+    row = fittingRow(recipient, binds, input.itemId, deps.catalog, action.name, deps.definition);
+  else if (binds.conjures) row = conjuredWeapon(ctx, recipient, binds.conjures.pickOf);
   else {
     const carried = recipient.inventory.filter((entry) => entry.quantity > 0);
     row = [...carried.filter((entry) => entry.equipped), ...carried].find(
-      (entry) => rowProblem(entry, binds, deps.catalog) === null
+      (entry) => rowProblem(entry, binds, deps.catalog, deps.definition) === null
     );
     if (!row) {
       warnings.push(`${recipient.name} carries no weapon ${action.name} can be cast on, so nothing is bound.`);
@@ -287,7 +360,10 @@ export function boundWeaponOf(
   const weapon = {
     ...(ability ? { ability } : {}),
     ...(dice ? { dice } : {}),
-    ...(binds.damageTypes ? { damageTypes: [...binds.damageTypes] } : {})
+    ...(binds.damageTypes ? { damageTypes: [...binds.damageTypes] } : {}),
+    ...(binds.proficient ? { proficient: true as const } : {}),
+    ...(binds.focus ? { focus: true as const } : {}),
+    ...(input.itemId == null && binds.conjures ? { conjured: true as const } : {})
   };
   const castLevel = ctx.plan.castLevel ?? spellOf(ctx)?.level ?? 1;
   const slotBonus = [...(binds.bonusBySlot ?? [])]
@@ -300,9 +376,24 @@ export function boundWeaponOf(
       )
     : 0;
   const attackBonus = (slotBonus ?? 0) + abilityBonus;
+  const extraDice = [...(binds.extraDamage?.dice ?? [])]
+    .filter((entry) => entry.level <= level)
+    .sort((a, b) => b.level - a.level)[0]?.formula;
   const modifiers: Modifier[] = [
     ...(attackBonus !== 0 ? [{ type: "attack-bonus" as const, amount: attackBonus, scope: "this-item" as const }] : []),
-    ...(slotBonus ? [{ type: "damage-bonus" as const, amount: slotBonus, scope: "this-item" as const }] : [])
+    ...(slotBonus ? [{ type: "damage-bonus" as const, amount: slotBonus, scope: "this-item" as const }] : []),
+    ...(extraDice && binds.extraDamage
+      ? [
+          {
+            type: "extra-damage" as const,
+            formula: extraDice,
+            damageType: binds.extraDamage.type,
+            doubleOnCritical: true,
+            when: [{ type: "on-hit" as const }],
+            scope: "this-item" as const
+          }
+        ]
+      : [])
   ];
   return {
     fields: { itemId: row.id, ...(Object.keys(weapon).length > 0 ? { weapon } : {}) },

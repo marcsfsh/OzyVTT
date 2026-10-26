@@ -1,3 +1,4 @@
+import { picksFor } from "../class-features.js";
 import { conditionLabel } from "../condition-rules.js";
 import { endEffect } from "../effects.js";
 import { createPendingSaves } from "../saving-throws.js";
@@ -119,12 +120,8 @@ function parkMasterySaves(ctx: ResolveContext): void {
   }
 }
 
-/** The cantrip a Warlock's Repelling Blast rides: the pick the character made for it. */
-function repellingBlastCantrip(ctx: ResolveContext): string | undefined {
-  return ctx.deps.definition?.character?.choices?.find(
-    (choice) => choice.kind === "cantrip" && choice.payload?.featureId === "repelling-blast"
-  )?.id;
-}
+/** The cantrips a Warlock's Repelling Blast rides: each pick the character made for it. */
+const repellingBlastCantrips = (ctx: ResolveContext) => picksFor(ctx.deps.definition, "repelling-blast", "cantrip");
 
 /** Every push a landed hit makes: its weapon's Push mastery, the action's own (a fire giant's Hammer Throw), and SRD
  *  Repelling Blast's "push the creature up to 10 feet straight away from you" with the cantrip picked for it. */
@@ -143,7 +140,7 @@ function hitPushesOf(ctx: ResolveContext, swing: MasterySwing | null): readonly 
           }
         ]
       : []),
-    ...(action.spellId !== undefined && action.spellId === repellingBlastCantrip(ctx)
+    ...(action.spellId !== undefined && repellingBlastCantrips(ctx).includes(action.spellId)
       ? [{ ...target, distanceFeet: 10, maxTargetSize: "large" as const }]
       : [])
   ];

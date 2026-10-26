@@ -1,9 +1,8 @@
 import type { Actor, GameState } from "@vtt/domain";
 import type { ActorDefinition, InventoryItem } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
-import { GameAccessDeniedError } from "./authorization.js";
-import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
-import { effectiveModeFor, overrideCovers } from "./rules-families.js";
+import { CommandRejectedError } from "./game-store.js";
+import { fighting as inFight, spendUtilize } from "./utilize.js";
 import { storedArmorClass } from "./actor-roster.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 
@@ -39,10 +38,6 @@ function weightOf(armor: NonNullable<InventoryItem["armor"]>): "light" | "medium
   return armor.dexModifierCap === null ? "light" : "medium";
 }
 
-/** Whether `actor` is fighting now: a running encounter with it in the initiative order. */
-const inFight = (state: GameState, actor: Actor) =>
-  state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id);
-
 /**
  * What putting armor on or taking it off costs in a fight, for a player's write: body armor takes minutes, so it
  * can't be donned or doffed then; a Shield takes the Utilize action on its holder's turn. The GM may change it at any
@@ -68,18 +63,5 @@ export function donInFight(
       `${now ? "Donning" : "Doffing"} ${incoming.name} takes ${minutes} ${minutes === 1 ? "minute" : "minutes"}, so it can't be done in a fight.`
     );
   }
-  if (kind === "shield") spendUtilize(state, actor, `${now ? "Don" : "Doff"} ${incoming.name}`);
-}
-
-/** Spends a player's action as the Utilize action on its own turn in the fight. */
-function spendUtilize(state: GameState, actor: Actor, what: string): void {
-  const combat = state.combat;
-  if (combat.turnActorId !== actor.id) throw new GameAccessDeniedError(`${what} on ${actor.name}'s turn.`);
-  if (combat.turn.actionUsed) {
-    const rule = "economy.action-used" as const;
-    if (effectiveModeFor(combat, rule) === "strict" && !overrideCovers(combat.turn, rule))
-      throw new RulesBlockedError(rule, `${actor.name} has already used its action this turn.`);
-    return;
-  }
-  state.combat = { ...combat, turn: { ...combat.turn, actionUsed: true } };
+  if (kind === "shield") spendUtilize(state, actor, { role: "player" }, `${now ? "Don" : "Doff"} ${incoming.name}`);
 }

@@ -195,6 +195,19 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a ${rules.conditions.map(conditionLabel).join(" or ")} creature, and ${name} isn't.`
       });
+    // "Charmed or Grappled by the aboleth": the condition comes from the user's own effect.
+    if (
+      rules.conditionsFromSource &&
+      !target.effects.some(
+        (effect) =>
+          effect.sourceActorId === attacker.id &&
+          effect.linkedConditionIds.some((id) => rules.conditionsFromSource!.includes(id as never))
+      )
+    )
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a creature that is ${rules.conditionsFromSource.map(conditionLabel).join(" or ")} by ${attacker.name}, and ${name} isn't.`
+      });
     if (
       rules.heldByAction &&
       !target.effects.some(
@@ -272,6 +285,36 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
       });
   }
   return violations;
+}
+
+/**
+ * The creatures under an action's area that its own rules leave out ("each enemy in a 20-foot-radius Sphere"). An area
+ * catches everyone under it; these rules say whom it affects, so the rest are dropped from its catch rather than
+ * refusing the use. A creature type it doesn't affect ("each creature that isn't an Undead") stays in the catch and
+ * is left out of what it does as it resolves (`type-gates.ts`).
+ */
+export function areaLeavesOut(check: Omit<TargetCheck, "distanceFeet" | "definition">): ReadonlySet<string> {
+  const rules = check.action.targets;
+  if (!rules) return new Set();
+  const { who, typeTag } = rules;
+  const membership = {
+    ...(who && who !== "self" ? { who } : {}),
+    ...(typeTag ? { typeTag } : {})
+  };
+  if (Object.keys(membership).length === 0) return new Set();
+  const action = { ...check.action, targets: membership };
+  return new Set(
+    check.targetIds.filter(
+      (targetId) =>
+        actionTargetViolations({
+          ...check,
+          action,
+          targetIds: [targetId],
+          definition: undefined,
+          distanceFeet: undefined
+        }).filter((violation) => violation.rule !== "target.too-many").length > 0
+    )
+  );
 }
 
 /** The type tags a stat block prints ("Fiend (Demon)": demon), lower case. */

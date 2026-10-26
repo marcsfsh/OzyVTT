@@ -27,6 +27,7 @@ import type {
   ActorActionsAvailabilityResult,
   ActorAddResult,
   ActorMovementResult,
+  CraftingOffersResult,
   NextLevelResult,
   AnnotationAddResult,
   CharacterDraftResult,
@@ -58,6 +59,10 @@ import type { SoundBoardResult, SoundBoardView, SoundCommandResult } from "./sou
 import type {
   ActionResolveSchema,
   ActionUseSchema,
+  CraftingCancelSchema,
+  CraftingHelpSchema,
+  CraftingStartSchema,
+  CraftingWorkSchema,
   CharacterDraftDiscardSchema,
   CharacterDraftSaveSchema,
   ActorAddFromDefinitionSchema,
@@ -143,7 +148,9 @@ import type {
   RestAnswerSchema,
   RestAskSchema,
   RestFinishSchema,
+  RestInterruptSchema,
   RestMarkDoneSchema,
+  RestResumeSchema,
   RestPartySchema,
   RulesAnswerSchema,
   RulesAskSchema,
@@ -161,6 +168,7 @@ import type {
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
   SetActorLairSchema,
+  SetActorPickSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
   SetConditionSchema,
@@ -488,6 +496,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof SetActorLairSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** GM picks what a creature's stat block leaves to the GM (a Draconic Origin's damage type, a Training skill). */
+  "actor:set-pick": (
+    payload: CommandPayload<typeof SetActorPickSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "actor:set-speed": (
     payload: CommandPayload<typeof ActorSetSpeedSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -663,9 +676,19 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof RestMarkDoneSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  /** GM-only: end the party's Short Rest, with its benefits or without. */
+  /** GM-only: end the party's Short or Long Rest, with its benefits or without. */
   "rest:finish": (
     payload: CommandPayload<typeof RestFinishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A member of the party's Long Rest that was interrupted rests again. */
+  "rest:resume": (
+    payload: CommandPayload<typeof RestResumeSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: interrupt one member's Long Rest. */
+  "rest:interrupt": (
+    payload: CommandPayload<typeof RestInterruptSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM-only: move game time forward. */
@@ -779,6 +802,28 @@ export interface ClientToServerEvents {
   "actor:movement": (payload: { actorId: string }, acknowledgement: (result: ActorMovementResult) => void) => void;
   /** What a character's next level brings; only when the caller may level that character. */
   "character:next-level": (payload: { actorId: string }, acknowledgement: (result: NextLevelResult) => void) => void;
+  /** What a character could start crafting now; its owner or the GM. */
+  "actor:crafting-offers": (
+    payload: { actorId: string },
+    acknowledgement: (result: CraftingOffersResult) => void
+  ) => void;
+  "crafting:start": (
+    payload: CommandPayload<typeof CraftingStartSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "crafting:help": (
+    payload: CommandPayload<typeof CraftingHelpSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: log days of downtime work on a project. */
+  "crafting:work": (
+    payload: CommandPayload<typeof CraftingWorkSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "crafting:cancel": (
+    payload: CommandPayload<typeof CraftingCancelSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "turn:use": (
     payload: CommandPayload<typeof TurnUseSchema>,
     acknowledgement: (result: MutationResult) => void

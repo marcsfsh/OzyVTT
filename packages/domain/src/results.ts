@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ActionAreaSchema,
   ActionReactionSchema,
   CastShapingIdSchema,
   CharacterChoiceSchema,
@@ -548,12 +549,19 @@ export const ActionAvailabilitySchema = z.strictObject({
       options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
       optionsPerTarget: z.literal(true).optional(),
       bindsWeapon: z
-        .strictObject({ weaponIds: z.array(z.string()).optional(), melee: z.literal(true).optional() })
+        .strictObject({
+          weaponIds: z.array(z.string()).optional(),
+          melee: z.literal(true).optional(),
+          ammunition: z.enum(["only", "also"]).optional()
+        })
+        .optional(),
+      object: z
+        .strictObject({ kinds: z.array(z.enum(["armor", "weapon"])), metal: z.literal(true).optional() })
         .optional()
     })
     .optional()
     .describe(
-      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), and `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`)"
+      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`; `ammunition`: only a stack of ammunition (`only`), or one as well as a weapon (`also`)), and `object`, the target's armor or weapon it acts on (sent as `objectItemId`; absent, the target's worn armor, else its weapon in hand)"
     ),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple), and
    *  the tools its user may help with through Help with a Check, which carry their name. */
@@ -574,6 +582,14 @@ export const ActionAvailabilitySchema = z.strictObject({
     .optional()
     .describe(
       'Why it can\'t be used now, in one short sentence for the sheet ("Not prepared.", "No level 2 spell slots left.", "You used your Bonus Action this turn."). Present exactly when `available` is false. The character comes first (Stunned, 0 Hit Points), then the option itself, then the turn, then targeting; `violations` keeps the full account. A hint only: resolution checks again.'
+    ),
+  /** A Thief's Fast Hands can take this item action as a Bonus Action (`action.resolve`'s `fastHands`): whether that
+   *  form can be used now, and why not. */
+  fastHands: z
+    .strictObject({ available: z.boolean(), reason: z.string().optional() })
+    .optional()
+    .describe(
+      "A Thief's Fast Hands can take this item action (a Utilize action, or a magic item's Magic action) as a Bonus Action with `action.resolve`'s `fastHands`: whether that form can be used now, and why not"
     ),
   /** The ways its caster may shape this spell's cast (Metamagic, Sculpt Spells), for the cast to offer. */
   shaping: CastShapingOffersSchema.optional(),
@@ -599,8 +615,9 @@ export const ActionAvailabilitySchema = z.strictObject({
     .describe(
       "The forms a shape-shift may take now, sent back as the resolve's `form` (or `targetForms`, one per target, when `perTarget`); `gearChoice` lets the user say whether its gear melds or is worn. For Wild Shape, the Beasts its user may learn (`learnable`), how many it knows (`knownLimit`) and whether one may be replaced now (`swapOpen`)"
     ),
-  /** The effects a use picks one of (Enlarge or Reduce), sent back as the resolve's `option`. */
-  options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
+  /** The effects a use picks one of (Enlarge or Reduce), or the form of the area a cast leaves (Wall of Fire's ring),
+   *  sent back as the resolve's `option`; an option with an `area` is placed as that area. */
+  options: z.array(z.strictObject({ id: z.string(), name: z.string(), area: ActionAreaSchema.optional() })).optional(),
   /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
    *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
    *  (a spell area's later save). */
@@ -675,6 +692,20 @@ const DerivedSkillRowSchema = z.strictObject({
 });
 export type DerivedSkillRow = Wire<z.infer<typeof DerivedSkillRowSchema>>;
 /** A tool the character is proficient with, checked with the ability its SRD entry names. */
+/** One printed Utilize use: what it does and its DC. */
+const DerivedUtilizeUseSchema = z.strictObject({
+  label: z.string(),
+  dc: z.number().int().min(1).max(40),
+  /** The skill the check uses with it (Thieves' Tools' lock: Sleight of Hand). */
+  skill: z.string().optional().describe("The skill the check uses with it (Thieves' Tools' lock: Sleight of Hand)"),
+  /** The use works for a creature its user picks within 5 feet (Cobbler's Tools' footwear), sent as `forActorId`. */
+  forAnother: z
+    .literal(true)
+    .optional()
+    .describe(
+      "The use works for a creature its user picks within 5 feet (Cobbler's Tools' footwear), sent as `forActorId`"
+    )
+});
 const DerivedToolRowSchema = z.strictObject({
   id: z.string(),
   name: z.string(),
@@ -682,13 +713,32 @@ const DerivedToolRowSchema = z.strictObject({
   bonus: z.number().int(),
   mode: RollModeSummarySchema,
   reliableTalent: z.boolean(),
+  /** The character is proficient with the tool, so its checks add the Proficiency Bonus. */
+  proficient: z
+    .boolean()
+    .describe("The character is proficient with the tool, so its checks add the Proficiency Bonus"),
+  /** The tool is in the character's pack, which every use of it needs. */
+  carried: z.boolean().describe("The tool is in the character's pack, which every use of it needs"),
   uses: z
-    .array(z.strictObject({ label: z.string(), dc: z.number().int().min(1).max(40) }))
+    .array(DerivedUtilizeUseSchema)
     .describe(
-      "What the tool's Utilize line lets it do, each with its printed DC (Thieves' Tools: Pick a lock, DC 15), rolled as a check with `tool` and `dc`. In a fight it takes the Utilize action. Empty when the tool prints none"
+      "What the tool's Utilize line lets it do, each with its printed DC (Thieves' Tools: Pick a lock, DC 15), rolled with `check.roll`'s `tool` and `use` (its place in this list). It needs the tool carried, and in a fight it takes the Utilize action. Empty when the tool prints none"
     )
 });
 export type DerivedToolRow = Wire<z.infer<typeof DerivedToolRowSchema>>;
+/** A carried piece of gear's printed Utilize uses, each a check at its DC (a Grappling Hook's catch). */
+const DerivedGearUsesSchema = z.strictObject({
+  id: z.string().describe("The item's catalog id, sent as `check.roll`'s `item`"),
+  name: z.string(),
+  uses: z.array(
+    DerivedUtilizeUseSchema.extend({
+      ability: AbilityIdSchema,
+      bonus: z.number().int().describe("The check's bonus"),
+      mode: RollModeSummarySchema
+    })
+  )
+});
+export type DerivedGearUses = Wire<z.infer<typeof DerivedGearUsesSchema>>;
 /** A situation the character's riders name for its checks (a Book's topic, prying with a Crowbar), offered as a toggle
  *  beside the checks. */
 const DerivedSituationSchema = z.strictObject({
@@ -713,7 +763,18 @@ const ActorDerivedSheetSchema = z.strictObject({
   tools: z
     .array(DerivedToolRowSchema)
     .describe(
-      "The tools the character is proficient with that the SRD names an ability for, each with its check bonus"
+      "The tools the character is proficient with or carries that the SRD names an ability for, each with its check bonus"
+    ),
+  /** The carried gear with printed Utilize uses (a Grappling Hook's catch, tying a Rope's knot). */
+  gearUses: z
+    .array(DerivedGearUsesSchema)
+    .describe("The carried gear with printed Utilize uses, each a check at its DC (a Grappling Hook's catch)"),
+  /** A Thief's Fast Hands: a Utilize use, a magic item's Magic action and a Sleight of Hand check can be a Bonus
+   *  Action. */
+  fastHands: z
+    .boolean()
+    .describe(
+      "A Thief's Fast Hands: a Utilize use, a magic item's Magic action and a Dexterity (Sleight of Hand) check can be taken as a Bonus Action"
     ),
   /** 10 plus the Wisdom (Perception) bonus, 5 more with Advantage on such checks or 5 less with Disadvantage. */
   passivePerception: z
@@ -755,18 +816,24 @@ const ActorDerivedSheetSchema = z.strictObject({
     .min(1)
     .max(10)
     .describe("How many items the character can attune to at once: 3, or 4 with Use Magic Device"),
-  /** What the character carries against what it can; over capacity its Speed is at most 5 feet. */
+  /** What the creature carries against what it can; over capacity its Speed is at most 5 feet, over twice it 0. */
   carrying: z
     .strictObject({
-      pounds: z.number().min(0).describe("What its rows and coins weigh, in pounds (fifty coins to the pound)"),
+      pounds: z
+        .number()
+        .min(0)
+        .describe(
+          "What its rows and coins weigh, in pounds (fifty coins to the pound), what its containers hold counted as they weigh it"
+        ),
       capacity: z
         .number()
         .min(0)
-        .describe("The most it can carry: Strength times 15 pounds for a Small or Medium creature, by size")
+        .describe("The most it can carry: Strength times 15 pounds for a Small or Medium creature, by size"),
+      dragLimit: z.number().min(0).describe("The most it can drag, lift or push: twice its capacity")
     })
     .nullable()
     .describe(
-      "What the character carries against its carrying capacity. Beyond it, its Speed is no more than 5 feet. Null for a stat block, which says nothing of what it carries"
+      "What the creature carries against its carrying capacity. Beyond it, its Speed is no more than 5 feet, and beyond twice it 0. Null for a creature with no sheet or stat block"
     ),
   /** The weapon kinds chosen under Weapon Mastery, in the order chosen, each with the property it grants and the SRD
    *  text of what that property does. Empty for a sheet that records no such choice. */
@@ -837,6 +904,9 @@ const SpellChoicesSchema = z.strictObject({
     .strictObject({
       spellIds: z.array(z.string()),
       freeLeft: z.number().int().min(0),
+      /** Free additions a feature gives for spells of one school, beyond the levels' (Evocation Savant's one each time
+       *  a new level of spell slots opens). */
+      freeOfSchool: z.strictObject({ school: z.string(), left: z.number().int().min(0) }).nullable(),
       maxLevel: z.number().int().min(0).max(9),
       addable: z.array(z.string())
     })
@@ -957,10 +1027,15 @@ export const ActorMovementReplySchema = z.strictObject({
   /** The ground the spell areas the asker can see change for this mover, in grid cells near it, as the server charges
    *  it: Difficult Terrain (each cell), and where its footprint (named by its top-left cell) has its Speed halved,
    *  costs double again on the ground (Plant Growth), or pays double for a step toward an area's caster (Gust of
-   *  Wind's Line, the caster's position in image pixels). */
+   *  Wind's Line, the caster's position in image pixels). `cleared`: cells whose painted Difficult Terrain an area lifts
+   *  (Speak with Plants). */
   areaGround: z
     .strictObject({
       difficult: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      cleared: z
+        .array(z.strictObject({ column: z.number().int(), row: z.number().int() }))
+        .max(4000)
+        .optional(),
       halved: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
       costlyGround: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
       toward: z
@@ -994,6 +1069,60 @@ export const NextLevelReplySchema = z.strictObject({
 });
 export type NextLevelReply = Wire<z.infer<typeof NextLevelReplySchema>>;
 export type NextLevelResult = MutationResult & Partial<NextLevelReply>;
+
+/** One thing a character could start making: its raw materials and the 8-hour days of work it takes alone. */
+const CraftOfferSchema = z.strictObject({
+  id: z.string().describe("The catalog item, sent as `crafting.start`'s `itemId`"),
+  name: z.string(),
+  kind: z.enum(["item", "potion-of-healing", "spell-scroll", "magic-item"]),
+  materialsCp: z.number().int().min(0).describe("What its raw materials cost, in copper pieces"),
+  days: z.number().min(0).describe("The 8-hour days of work it takes one worker; helpers divide them"),
+  baseIds: z
+    .array(z.string())
+    .optional()
+    .describe("A magic weapon's or armor's choice of base, sent as `baseId`; the base's price is paid unless carried")
+});
+/** What `actor:crafting-offers` answers its owner or the GM (SRD 5.2.1 Crafting). */
+export const CraftingOffersReplySchema = z.strictObject({
+  tools: z
+    .array(
+      z.strictObject({
+        toolId: z.string(),
+        name: z.string(),
+        carried: z.boolean().describe("The tool is in the pack, which crafting with it needs"),
+        items: z.array(CraftOfferSchema)
+      })
+    )
+    .describe("The tools the character is proficient with, each with what its Craft line makes and the price"),
+  scrolls: z
+    .strictObject({
+      carried: z.boolean().describe("Calligrapher's Supplies are in the pack"),
+      spells: z.array(
+        z.strictObject({
+          id: z.string(),
+          name: z.string(),
+          level: z.number().int().min(0).max(9),
+          days: z.number(),
+          materialsCp: z.number().int().min(0)
+        })
+      )
+    })
+    .nullable()
+    .describe(
+      "Scribing Spell Scrolls with proficiency in Arcana or with Calligrapher's Supplies: the prepared spells it can scribe, with the Spell Scroll Costs table's days and gold; null without the proficiency"
+    ),
+  magicItems: z
+    .array(
+      CraftOfferSchema.extend({
+        rarity: z.string(),
+        toolIds: z.array(z.string()).describe("The tools it can be made with that the character is proficient with")
+      })
+    )
+    .describe("Magic items it can craft with Arcana proficiency and a tool it is proficient with"),
+  purseCp: z.number().int().min(0).describe("What its purse holds, in copper pieces")
+});
+export type CraftingOffersReply = Wire<z.infer<typeof CraftingOffersReplySchema>>;
+export type CraftingOffersResult = MutationResult & Partial<CraftingOffersReply>;
 
 /** What `vision:preview` answers the GM: where one creature (or the whole party) sees now, as image-pixel polygons
  *  (`[x0, y0, x1, y1, ...]`), and the creatures it perceives. Empty while the scene's vision is off. */

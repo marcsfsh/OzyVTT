@@ -590,20 +590,19 @@ describe("the casts that survived the spell-record check", () => {
     }
   });
 
-  it("the two SENSOR-GATED casts are absent, and a re-author would land a real Charm on any target", () => {
+  it("casts the two SENSOR-GATED spells only through the orb's Scrying", () => {
     // The SRD casts these through an active Scrying sensor ("targeting creatures you can see within 30 feet
-    // of the spell's sensor"), which no trigger can express, so the derived buttons would have no
-    // prerequisite. Suggestion resolved at a foe in melee would write a charmed pending save.
+    // of the spell's sensor"): each is offered only while its user concentrates on Scrying (`castThrough`).
     const definition = definitionOf();
     for (const [id, name, spell] of [
       ["crystal-ball-of-telepathy", "Crystal Ball of Telepathy", "suggestion"],
       ["crystal-ball-of-mind-reading", "Crystal Ball of Mind Reading", "detect-thoughts"]
     ] as const) {
       const row = view.equipmentRecord(id)!;
-      expect(row.casts.map((cast) => cast.spellId)).toEqual(["scrying"]);
+      expect(row.casts.map((cast) => cast.spellId)).toEqual(["scrying", spell]);
       const state = fight(stateWith([carried(id, name)]));
       const actions = effectiveActions(definition, state.actors[0], catalog);
-      expect(actions.find((entry) => entry.id === `item-${id}-cast-${spell}`)).toBeUndefined();
+      expect(actions.find((entry) => entry.id === `item-${id}-cast-${spell}`)?.castThrough).toBe("scrying");
       // The orb's own printed, ungated Scrying is still unlimited.
       expect(actions.find((entry) => entry.id === `item-${id}-cast-scrying`)!.uses).toBeUndefined();
     }
@@ -661,8 +660,8 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
       failureConditions: ["restrained"],
       // "a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check" escapes it.
       escapeDc: 15,
-      // "The rope has AC 20 and 20 Hit Points": breaking it frees the target.
-      heldBy: { name: "Rope", armorClass: 20, hitPoints: 20 }
+      // "The rope has AC 20, HP 20, and Immunity to Poison and Psychic damage. It regains 1 Hit Point every 5 minutes".
+      heldBy: { name: "Rope", armorClass: 20, hitPoints: 20, immunities: ["poison", "psychic"], regainsEvery: 5 }
     });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
     expect(action.damage).toEqual([]);
@@ -732,6 +731,8 @@ describe("what no carried item can carry", () => {
     expect(consumables.length).toBeGreaterThan(0);
     expect(consumables.filter(carries).map((row) => row.id)).toEqual([
       "elixir-of-health",
+      "oil-of-sharpness",
+      "oil-of-slipperiness",
       "potion-of-animal-friendship",
       "potion-of-climbing",
       "potion-of-diminution",
@@ -745,10 +746,12 @@ describe("what no carried item can carry", () => {
       "potion-of-heroism",
       "potion-of-invisibility",
       "potion-of-invulnerability",
+      "potion-of-mind-reading",
       "potion-of-poison",
       "potion-of-resistance",
       "potion-of-speed",
-      "potion-of-vitality"
+      "potion-of-vitality",
+      "potion-of-water-breathing"
     ]);
   });
 
@@ -780,25 +783,26 @@ describe("the absences that were measured and must stay absent", () => {
     expect(invulnerability.actions[0]!.grants?.duration).toEqual({ type: "rounds", rounds: 10 });
   });
 
-  it("leaves the rows whose hit points come back on the clock or a table prose", () => {
-    // Dragon Orb's healing cast and a Bag of Beans' rolled table; an Ioun Stone of Regeneration's hourly 15 is the GM's.
-    for (const id of ["dragon-orb", "bag-of-beans"]) {
-      const row = view.equipmentRecord(id)!;
-      expect({ id, carries: carries(row) }).toEqual({ id, carries: false });
-    }
+  it("leaves the hit points that come back on the clock or a table to the GM", () => {
+    // A Bag of Beans' planted bean names no outcome: its d100 table is the GM's. An Ioun Stone of Regeneration's hourly
+    // 15 is the GM's too.
+    const plant = view.equipmentRecord("bag-of-beans")!.actions.find((action) => action.id === "plant")!;
+    expect(plant.healing).toBeUndefined();
+    expect(plant.grants).toBeUndefined();
     const regeneration = view.equipmentRecord("ioun-stone")!.variants!.find((kind) => kind.id === "regeneration")!;
     expect(regeneration.modifiers).toEqual([]);
   });
 
-  it("the Bead of Force is used up as it is thrown, and the Horn of Blasting carries no action", () => {
+  it("the Bead of Force is used up as it is thrown, and the Horn of Blasting may explode as it is blown", () => {
     // Each bead is one of a stack, taken off as it is thrown.
     const bead = view.equipmentRecord("bead-of-force")!;
     expect(bead.consumedOnUse).toBe(true);
     expect(bead.actions.map((action) => action.id)).toEqual(["throw"]);
-    // The horn is absent for its 20% explosion chance.
+    // The horn's blast carries its 20 percent chance to explode.
     const horn = view.equipmentRecord("horn-of-blasting")!;
     expect(horn.description).toContain("20 percent chance of causing the horn to explode");
-    expect(carries(horn)).toBe(false);
+    expect(horn.breaks).toEqual({ percent: 20, damage: { formula: "10d6", type: "force" } });
+    expect(horn.actions.map((action) => action.id)).toEqual(["blast"]);
   });
 
   it("the six study books stay prose, and so do the reserved rows", () => {
@@ -814,7 +818,7 @@ describe("the absences that were measured and must stay absent", () => {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
     // Rows needing mechanics not modeled yet: a Pearl of Power is a slot recovery (conversions.ts), not an item row.
-    for (const id of ["mysterious-deck", "dragon-orb", "pearl-of-power"]) {
+    for (const id of ["mysterious-deck", "pearl-of-power"]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
   });

@@ -11,6 +11,7 @@ import { addEffect, applyCondition, hasEffectTag, makeEffect, type EffectNarrati
 import { sourceItemOf } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { upcastAction, UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
+import { pactWeaponRowId } from "../pact-weapon.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { SMITE_OF_PROTECTION_TAG } from "../paladin-auras.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
@@ -24,8 +25,9 @@ import {
   type ResolveContext
 } from "./context.js";
 import { openUnarmedSave } from "./builtins.js";
+import { afterItemSpend } from "./charges.js";
 import { beginConcentration } from "./concentration.js";
-import { criticalExpression, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
+import { criticalExpression, RIDER_TYPE_PREFIX, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy, spendSlot } from "./economy.js";
 import { applyHitOutcome, forceMove, grantHalfSpeedMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
@@ -71,16 +73,9 @@ function fromFlurry(ctx: ResolveContext): boolean {
   );
 }
 
-/** The pact weapon (SRD Pact of the Blade): the weapon of the kind the Warlock picked for it. Any other weapon may be a
- *  magic weapon the Warlock bonded instead, which the attacker vouches for. */
-function pactWeapon(ctx: ResolveContext): true | string {
-  const picked = ctx.deps.definition?.character?.choices?.find(
-    (choice) => choice.kind === "weapon" && choice.payload?.featureId === "pact-of-the-blade"
-  )?.id;
-  const item = ctx.attacker.inventory.find((row) => row.id === ctx.riderItemId);
-  if (picked !== undefined && item && (catalogIdOf(item) === picked || item.baseId === picked)) return true;
-  return `Only with ${ctx.attacker.name}'s pact weapon.`;
-}
+/** The pact weapon (SRD Pact of the Blade): the weapon the Warlock's bond holds, conjured or a magic weapon bonded. */
+const pactWeapon = (ctx: ResolveContext): boolean =>
+  ctx.riderItemId != null && pactWeaponRowId(ctx.attacker) === ctx.riderItemId;
 
 /** An attack of the stat block the attacker took a form from (a Wolf's Bite in Wild Shape). */
 function formAttack(ctx: ResolveContext): boolean {
@@ -128,8 +123,7 @@ function qualifies(ctx: ResolveContext, rider: HitRider, action: DefinitionActio
       if ((!weapon && !unarmed) || ctx.riderFilters.ability !== "str") return false;
       break;
     case "pact-weapon":
-      if (!weapon) return false;
-      verdict = pactWeapon(ctx);
+      if (!weapon || !pactWeapon(ctx)) return false;
       break;
     case "this-weapon":
     case "melee-this-weapon":
@@ -318,7 +312,7 @@ function punchAndGrab(ctx: ResolveContext): void {
 /** The extras a previewed hit may carry, for the card to offer. Empty unless the attack would land. */
 export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
   if (!landed(ctx) || ctx.targets.length !== 1) return [];
-  const offers: HitOffer[] = [];
+  const offers: HitOffer[] = [...riderTypeOffers(ctx)];
   const charge = chargeOf(ctx);
   if (charge)
     offers.push({
@@ -390,6 +384,26 @@ export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
     });
   }
   return offers;
+}
+
+/** The extra damage the attacker's effects add whose type it picks on each hit (Conjure Minor Elementals: "your choice
+ *  when you make the attack"): one offer per effect, its types picked once it is on. */
+function riderTypeOffers(ctx: ResolveContext): HitOffer[] {
+  return ctx.attacker.effects.flatMap((effect) => {
+    const types = effect.modifiers.find(
+      (modifier) => modifier.type === "extra-damage" && (modifier.damageTypes?.length ?? 0) > 1
+    );
+    if (!types || types.type !== "extra-damage" || !types.damageTypes) return [];
+    return [
+      {
+        id: `${RIDER_TYPE_PREFIX}${effect.id}`,
+        name: `${effect.name} · damage type`,
+        dice: "",
+        cost: null,
+        damageTypes: [...types.damageTypes]
+      }
+    ];
+  });
 }
 
 /** Refuses an extra this hit can't carry, unless the GM's override covers the targeting family. */
@@ -477,8 +491,8 @@ export function rollHitOptions(ctx: ResolveContext, diceOnly = false): void {
     byPool.set(pool, action.name);
   }
   for (const choice of chosen) {
-    // Rolled with the weapon's own dice (`rollWeaponDamage`).
-    if (choice.id === SAVAGE_ATTACKER) continue;
+    // Rolled with the weapon's own dice (`rollWeaponDamage`), or a type the effect's own dice take (`damage.ts`).
+    if (choice.id === SAVAGE_ATTACKER || choice.id.startsWith(RIDER_TYPE_PREFIX)) continue;
     if (choice.id === "charge") {
       rollCharge(ctx, roll);
       continue;
@@ -806,5 +820,7 @@ export function spendHitOptions(ctx: ResolveContext): void {
       plan: economy.plan,
       overridden: economy.overridden
     });
+    // A staff's charge spent on a hit rolls its last charge's d20 as any use of the staff does.
+    afterItemSpend(ctx, action, economy.plan.spendUse);
   }
 }

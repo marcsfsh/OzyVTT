@@ -17,7 +17,9 @@ describe("trait mechanics in the monster bundle", () => {
     const ran = new Map<string, number>();
     const printed = new Map<string, number>();
     for (const monster of monsters.values()) {
-      for (const mechanic of monster.traitMechanics ?? []) ran.set(mechanic.name, (ran.get(mechanic.name) ?? 0) + 1);
+      // A trait read as two mechanics (Corrosive Form's acid and its corroding) counts once for its stat block.
+      for (const name of new Set((monster.traitMechanics ?? []).map((mechanic) => mechanic.name)))
+        ran.set(name, (ran.get(name) ?? 0) + 1);
       for (const name of printedTraits(monster)) printed.set(name, (printed.get(name) ?? 0) + 1);
     }
     for (const name of [
@@ -41,7 +43,7 @@ describe("trait mechanics in the monster bundle", () => {
       "Vampire Weakness",
       "Invisibility"
     ])
-      expect(ran.get(name) ?? 0, name).toBe(name === "Corrosive Form" ? 1 : printed.get(name));
+      expect(ran.get(name) ?? 0, name).toBe(printed.get(name));
   });
 
   it("gives the troll its stopping types and its death that waits for its turn, and the oni its 1 HP", () => {
@@ -110,13 +112,18 @@ describe("trait mechanics in the monster bundle", () => {
     expect(mechanicsOf("hezrou")[0]).toMatchObject({ rangeFeet: 10, save: { dc: 16 } });
     expect(mechanicsOf("hezrou")[0]).not.toHaveProperty("save.immuneOnSuccess");
     expect(mechanicsOf("ghast")[0]).toMatchObject({ save: { immuneOnSuccess: true } });
-    // The mouther's failure is a d8 table the server rolls.
-    expect(mechanicsOf("gibbering-mouther")[0]).toMatchObject({
+    // The mouther's ground is Difficult Terrain round it, and its failure is a d8 table the server rolls.
+    expect(mechanicsOf("gibbering-mouther")[0]).toEqual({
+      kind: "difficult-ground",
+      name: "Aberrant Ground",
+      rangeFeet: 10
+    });
+    expect(mechanicsOf("gibbering-mouther")[1]).toMatchObject({
       rangeFeet: 20,
       save: { ability: "wis", dc: 10, failureConditions: [] },
       failureTable: "gibbering"
     });
-    expect(mechanicsOf("gibbering-mouther")[0]).not.toHaveProperty("reminder");
+    expect(mechanicsOf("gibbering-mouther")[1]).not.toHaveProperty("reminder");
     // "Any Beast or Humanoid that starts its turn within 30 feet of the hag and can see the hag's true form": the types
     // are read, and only a creature that sees the hag makes the save.
     expect(mechanicsOf("sea-hag")).toEqual([

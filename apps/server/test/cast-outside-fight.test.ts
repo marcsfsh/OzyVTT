@@ -55,7 +55,7 @@ describe("a spell cast outside a fight", () => {
 
   it("leaves anything but a cast to the loose route", () => {
     const { resolve } = fight(wizard, { combat: false });
-    expect(() => resolve("item-quarterstaff", { targetIds: [FOE] })).toThrow(
+    expect(() => resolve("item-arcane-focus-staff", { targetIds: [FOE] })).toThrow(
       "Start an encounter before resolving actions."
     );
   });

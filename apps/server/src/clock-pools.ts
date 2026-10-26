@@ -31,8 +31,13 @@ export function startTimedPool(
   afterHours: string,
   random: (sides: number) => number
 ): string | null {
+  return waitHours(state, actor, key, name, Math.max(1, rollRegain(afterHours, random)));
+}
+
+/** A spent timed pool waits this many hours from now (a figurine's days from when it reverts). Returns the line the
+ *  table reads, or null when it already waits. */
+export function waitHours(state: GameState, actor: Actor, key: string, name: string, hours: number): string | null {
   if (actor.readyAt[key] !== undefined) return null;
-  const hours = Math.max(1, rollRegain(afterHours, random));
   actor.readyAt = { ...actor.readyAt, [key]: { minute: nowOf(state) + hours * 60, name } };
   return `${name} can be used again in ${gameTimeSpanLabel(hours * 60)}.`;
 }

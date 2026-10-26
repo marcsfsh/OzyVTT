@@ -10,20 +10,15 @@ export type MonsterActionFix = Readonly<{
   save?: Partial<NonNullable<ActorAction["save"]>>;
   /** The damage in place of the reader's. */
   damage?: ActorAction["damage"];
-  /** The damage types a use picks from (Chromatic Orb's shape). */
-  damageTypes?: ActorAction["damageTypes"];
   /** What a hit leaves, in place of the reader's. */
   onHit?: OnHitRider[];
   /** The GM's reminder in place of the reader's; null drops it. */
   reminder?: string | null;
+  /** The area the action leaves, which the server runs (a djinni's whirlwind). */
+  zone?: ActorAction["zone"];
 }>;
 
 export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = {
-  "half-dragon/dragon-s-breath": {
-    why: "the damage is of the type chosen for the Draconic Origin trait, which each use picks",
-    damage: [{ formula: "8d6", type: "fire" }],
-    damageTypes: ["acid", "cold", "fire", "lightning", "poison"]
-  },
   "gelatinous-cube/engulf": {
     why: "the escape and the pull from outside are printed in the action and the Ooze Cube trait",
     save: {
@@ -199,11 +194,14 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     reminder: null
   },
   "djinni/create-whirlwind": {
-    why: "the thunder on each of the Restrained target's turns is printed after the failure's own sentence",
+    why: "the thunder on each of the Restrained target's turns is printed after the failure's own sentence, and the whirlwind stays on the map",
     // "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage."
     save: { ongoingDamage: { damage: [{ formula: "6d6", type: "thunder" }], at: "bearer-turn-start" } },
+    // "The whirlwind lasts until the djinni's Concentration on it ends", and "Whenever the whirlwind enters a creature's
+    // space or a creature enters the whirlwind", the save, "only once per turn, and the djinni is unaffected".
+    zone: { on: ["enter"], oncePerTurn: true, atCast: true, concentration: true, carriesHeld: true, sparesUser: true },
     reminder:
-      "The whirlwind lasts while the djinni concentrates on it. The djinni can move it up to 20 feet at the start of each of its turns, and the Restrained creatures move with it; a creature it enters, or that enters it, makes the save once a turn."
+      "The djinni can move the whirlwind up to 20 feet at the start of each of its turns: drag its area, and the Restrained creatures move with it."
   },
   "shambling-mound/engulf": {
     why: "the mound carries what it engulfs at no cost, which the save's text prints",
@@ -211,10 +209,19 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     save: { failureEffect: { name: "Engulfed", tags: ["carried-free"], modifiers: [] } },
     reminder: null
   },
-  "rust-monster/antennae": {
-    why: "the penalty is on one carried armor or weapon, which items don't track",
-    reminder:
-      "On a failure, the armor or weapon the rust monster targeted takes a cumulative -1 penalty: to the AC it offers, or to its attack rolls. Change the item by hand. Armor whose AC falls to 10, or a weapon at -5, is destroyed, and Mending removes the penalty."
+  "chain-devil/conjure-infernal-chain": {
+    why: "a failure's pull toward the devil is a forced move no save failure makes yet",
+    reminder: "If the target is Large or smaller, move it up to 30 feet straight toward the devil."
+  },
+  "chain-devil/unnerving-gaze": {
+    why: "the reaction prints its failure and success in italic labels the save reader doesn't take apart",
+    // "Failure: The target has the Frightened condition until the end of its turn. Success: The target is immune to
+    // this devil's Unnerving Gaze for 24 hours."
+    save: {
+      failureConditions: ["frightened"],
+      failureDuration: { type: "until-bearer-turn-end" },
+      immuneOnSuccess: true
+    }
   }
 };
 
@@ -223,8 +230,8 @@ export function fixedFields(fix: MonsterActionFix | undefined): Partial<ActorAct
   if (!fix) return {};
   return {
     ...(fix.damage ? { damage: fix.damage.map((part) => ({ ...part })) } : {}),
-    ...(fix.damageTypes ? { damageTypes: [...fix.damageTypes] } : {}),
     ...(fix.onHit ? { onHit: structuredClone(fix.onHit) } : {}),
-    ...(typeof fix.reminder === "string" ? { reminder: fix.reminder } : {})
+    ...(typeof fix.reminder === "string" ? { reminder: fix.reminder } : {}),
+    ...(fix.zone ? { zone: structuredClone(fix.zone) } : {})
   };
 }

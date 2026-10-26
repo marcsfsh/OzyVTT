@@ -226,12 +226,19 @@ describe("Antitoxin", () => {
 });
 
 describe("Basic Poison", () => {
-  it("coats a weapon: its next Piercing or Slashing hit deals 1d4 more Poison, then the coat is spent", () => {
+  it("coats the weapon picked: its next Piercing or Slashing hit deals 1d4 more Poison, then the coat is spent", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     write(table, IDS.fighter, catalogRow("basic-poison", { equipped: false }));
+    write(table, IDS.fighter, catalogRow("shortsword"));
     fight(table, IDS.fighter);
-    resolveAt(table, IDS.fighter, "item-basic-poison-coat-weapon", [], { targetIds: [] });
-    expect(fighter(table).effects).toMatchObject([{ name: "Basic Poison (weapon)", damageUses: 1 }]);
+    resolveAt(table, IDS.fighter, "item-basic-poison-coat-weapon", [], { targetIds: [], itemId: "greatsword" });
+    expect(fighter(table).effects).toMatchObject([
+      { name: "Basic Poison (weapon)", damageUses: 1, itemId: "greatsword" }
+    ]);
+    // A hit with another blade carries none of it.
+    const other = resolveAt(table, IDS.fighter, "item-shortsword", [15, 3]);
+    expect(other.damage.map((part) => part.type)).toEqual(["piercing"]);
+    fresh(table);
     const hit = resolveAt(table, IDS.fighter, "item-greatsword", [15, 3, 3, 2]);
     expect(hit.damage.map((part) => [part.type, part.total])).toEqual([
       ["slashing", 10],
@@ -241,11 +248,21 @@ describe("Basic Poison", () => {
     expect(hit.effectsEnded).toEqual([{ actorId: IDS.fighter, actorName: "Borin", name: "Basic Poison (weapon)" }]);
   });
 
-  it("coats three pieces of ammunition: three hits from a launcher, and none from a sword", () => {
+  it("refuses to coat a weapon as ammunition", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     write(table, IDS.fighter, catalogRow("basic-poison", { equipped: false }));
     fight(table, IDS.fighter);
-    resolveAt(table, IDS.fighter, "item-basic-poison-coat-ammunition", [], { targetIds: [] });
+    expect(() =>
+      resolveAt(table, IDS.fighter, "item-basic-poison-coat-ammunition", [], { targetIds: [], itemId: "greatsword" })
+    ).toThrow(/isn't ammunition/);
+  });
+
+  it("coats three pieces of one stack of ammunition: hits from shots that draw it, and none from a sword", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    write(table, IDS.fighter, catalogRow("basic-poison", { equipped: false }));
+    fight(table, IDS.fighter);
+    resolveAt(table, IDS.fighter, "item-basic-poison-coat-ammunition", [], { targetIds: [], itemId: "arrows-20" });
+    expect(fighter(table).effects).toMatchObject([{ itemId: "arrows-20" }]);
     // A greatsword hit leaves the arrows' coat alone.
     resolveAt(table, IDS.fighter, "item-greatsword", [15, 3, 3]);
     expect(fighter(table).effects).toMatchObject([{ name: "Basic Poison (ammunition)", damageUses: 3 }]);

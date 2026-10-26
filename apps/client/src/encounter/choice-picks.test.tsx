@@ -182,3 +182,75 @@ describe("the weapon a grant binds to", () => {
     expect(weaponChoicesOf(CARRIED, {}).map((row) => row.id)).toEqual(["longbow", "quarterstaff", "club-2"]);
   });
 });
+
+describe("the item a cast is on", () => {
+  const IDENTIFY = {
+    ...base,
+    id: "spell-identify",
+    name: "Identify",
+    targeting: "none",
+    choices: { pickItem: true }
+  } as unknown as ContentActionSummary;
+
+  it("offers every carried item, starts on none, and sends the one picked", async () => {
+    beginTargeting(IDENTIFY, CASTER);
+    render(<Picker />);
+    const select = screen.getByRole("combobox", { name: "Item" }) as HTMLSelectElement;
+    expect(select.value).toBe("");
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "None",
+      "Longbow",
+      "Quarterstaff",
+      "Club",
+      "Rope"
+    ]);
+    fireEvent.change(select, { target: { value: "rope" } });
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({ actionId: "spell-identify", itemId: "rope" });
+  });
+});
+
+const ANTENNAE = {
+  ...base,
+  id: "antennae",
+  name: "Antennae",
+  saveAbility: "dex",
+  choices: { object: { kinds: ["armor", "weapon"], metal: true } }
+} as unknown as ContentActionSummary;
+const GOBLIN_GEAR: CarriedRow[] = [
+  { id: "chain-shirt", name: "Chain Shirt", quantity: 1, armor: { acBase: 13 }, category: "armor", equipped: true },
+  { id: "shield", name: "Shield", quantity: 1, armor: { acBase: 2 }, category: "shield", equipped: true },
+  { id: "scimitar", name: "Scimitar", quantity: 1, weapon },
+  { id: "rope", name: "Rope", quantity: 1 }
+];
+
+function ObjectPicker() {
+  const session = useTargeting();
+  return session ? (
+    <ActionTargetPicker
+      picking={session}
+      targets={[{ id: GOBLIN, label: "Goblin" }]}
+      carriedBy={(actorId) => (actorId === GOBLIN ? GOBLIN_GEAR : [])}
+      busy={false}
+      onRoll={() => {}}
+    />
+  ) : null;
+}
+
+describe("the target's armor or weapon an action acts on", () => {
+  it("offers the one target's worn armor and weapons once it is picked, and sends the one picked", async () => {
+    beginTargeting(ANTENNAE, CASTER);
+    render(<ObjectPicker />);
+    expect(screen.queryByRole("combobox", { name: "Object" })).toBeNull();
+    act(() => toggleTarget(GOBLIN));
+    const select = screen.getByRole("combobox", { name: "Object" }) as HTMLSelectElement;
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "Worn armor, else weapon in hand",
+      "Chain Shirt",
+      "Scimitar"
+    ]);
+    fireEvent.change(select, { target: { value: "scimitar" } });
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({ actionId: "antennae", targetIds: [GOBLIN], objectItemId: "scimitar" });
+  });
+});

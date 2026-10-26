@@ -1567,15 +1567,20 @@
             "id": "high-elf-cantrip",
             "name": "Arcane Cantrip",
             "description": "You know the Prestidigitation cantrip. Whenever you finish a Long Rest, you can replace it with a different cantrip from the Wizard spell list.",
-            "grants": {
-              "spells": [
-                {
-                  "id": "prestidigitation",
-                  "level": 0,
-                  "alwaysPrepared": true
-                }
-              ]
-            }
+            "choice": {
+              "kind": "cantrip",
+              "choose": 1,
+              "fromCatalog": "wizard-spells",
+              "maxSpellLevel": 0,
+              "default": "prestidigitation"
+            },
+            "replaces": [
+              {
+                "offer": "feature:high-elf-cantrip",
+                "when": "long-rest",
+                "amount": 1
+              }
+            ]
           },
           {
             "id": "high-elf-lineage-3",

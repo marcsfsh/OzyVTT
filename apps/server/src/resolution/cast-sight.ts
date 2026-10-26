@@ -1,5 +1,7 @@
 import { laterRowOf } from "../item-actions.js";
+import { pickedZoneRow } from "../spell-zones.js";
 import { applyCastSight } from "../vision/cast-sight.js";
+import { RING_FEET } from "../zone-shapes.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
 
@@ -31,6 +33,8 @@ export function placeCastSight(ctx: ResolveContext): void {
     declared.rounds === undefined && duration?.type === "rounds" && duration.remaining > 0
       ? { ...declared, rounds: duration.remaining }
       : declared;
+  // A ringed wall blocks sight on its edge alone (Wall of Fire's ring).
+  const ringed = spell ? pickedZoneRow(spell, input.option)?.zone?.ring === true : false;
   const events = applyCastSight(state, {
     commandId: input.commandId,
     casterId: attacker.id,
@@ -40,7 +44,11 @@ export function placeCastSight(ctx: ResolveContext): void {
     effectId,
     targetIds: ctx.targets.map((target) => target.id),
     areaPlaced: input.areaPlaced === true,
-    widthFeet: ctx.action.area?.widthFeet ?? spell?.area?.widthFeet ?? null
+    widthFeet: ctx.action.area?.widthFeet ?? spell?.area?.widthFeet ?? null,
+    ...(ringed ? { ringFeet: RING_FEET } : {}),
+    ...(input.areaAt && ctx.action.area
+      ? { centredAt: { x: input.areaAt.x, y: input.areaAt.y, sizeFeet: ctx.action.area.sizeFeet } }
+      : {})
   });
   for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }

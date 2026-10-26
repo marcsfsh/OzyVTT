@@ -4,6 +4,7 @@ import type {
   Annotation,
   BuilderPolicy,
   CheckSubject,
+  CraftingProject,
   CombatState,
   EncounterToken,
   GameState,
@@ -57,8 +58,11 @@ export type PlayerEffect = Omit<
   | "optionId"
   | "bonusActions"
   | "grantedSpellAction"
+  | "storedCast"
+  | "storeAwaits"
   | "endAction"
   | "usedOnTurn"
+  | "refundsUses"
   | "shrinksEachLongRest"
   | "unarmedStrike"
   | "struck"
@@ -182,14 +186,18 @@ export type PlayerPendingSave = Omit<
   | "onSuccessEffect"
   | "failureNote"
   | "breaksConcentration"
+  | "successEndsSpell"
+  | "dropsRowId"
   | "zoneId"
   | "magical"
   | "immuneOnSuccess"
   | "drain"
   | "failurePush"
+  | "unseats"
   | "advantageAtSize"
   | "spell"
   | "confirmed"
+  | "spendsOnKill"
 > & {
   onFailEffect?: Omit<
     NonNullable<PendingSave["onFailEffect"]>,
@@ -315,6 +323,30 @@ export type PlayerRollCall = Readonly<{
 export type PlayerRestView = Readonly<{
   requests: readonly string[];
   shortRest: Readonly<{ actorIds: readonly string[]; done: readonly string[] }> | null;
+  /** The party's Long Rest when one of their characters is in it, cut down to them: who was interrupted and waits to
+   *  resume, and who of those has a Short Rest's benefits to spend Hit Point Dice in. */
+  longRest: Readonly<{
+    actorIds: readonly string[];
+    interrupted: readonly string[];
+    shortRestEarned: readonly string[];
+  }> | null;
+}>;
+/** A party crafting project as a player sees it (their own characters' and the visible party's): what it makes, with
+ *  what, and how far it has come. When it started and the scroll's numbers stay with the GM; helpers are named only
+ *  among the party's visible characters. */
+export type PlayerCraftingProject = Readonly<{
+  id: string;
+  crafterId: string;
+  itemId: string;
+  itemName: string;
+  kind: CraftingProject["kind"];
+  toolId: string;
+  spellId?: string;
+  helperIds: readonly string[];
+  workMinutes: number;
+  doneMinutes: number;
+  /** What its raw materials cost, in copper: only on the player's own characters' projects. */
+  paidCp?: number;
 }>;
 export type PlayerView = Pick<GameState, "revision"> & {
   combat: PlayerCombatView;
@@ -325,6 +357,7 @@ export type PlayerView = Pick<GameState, "revision"> & {
   /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;
   /** Long Rest requests and the party's Short Rest, for the player's own characters only. */ rest: PlayerRestView;
+  /** The party's crafting projects: their own characters' and the visible party's. */ crafting: readonly PlayerCraftingProject[];
 };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */

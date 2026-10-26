@@ -641,11 +641,27 @@
   min-width: 0;
   max-width: 100%;
 }
-/* Riding: one button a mount within reach, or the way off the one it rides. */
+/* Riding: a controlled ride and an independent one for each mount within reach, or the way off the one it rides. */
 .encounter-mount {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+.encounter-mount-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.encounter-mount .nh-btn {
+  min-height: var(--tap-min);
+  max-width: 100%;
+  white-space: normal;
+}
+.encounter-mount-note {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
 }
 /* A move or teleport an action granted this turn, on its own line under the modes. */
 .encounter-move-modes-grant {

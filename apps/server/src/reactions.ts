@@ -1,3 +1,4 @@
+import { reactionSpenders, reactionSpent } from "./commanded-reactions.js";
 import type { ActionResolution, DamageApplication, GameState, PendingReaction } from "@vtt/domain";
 import type { RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition, DamageType } from "@vtt/schemas";
@@ -35,6 +36,8 @@ import { answerAmount, type AnswerDeps } from "./roll-answers.js";
 import { answerSave, type SaveAnswerDependencies, type SaveOutcome } from "./saving-throws.js";
 import { swapPlaces } from "./resolution/redirect.js";
 import { redirectForce } from "./deflect-redirect.js";
+import { splitCreature } from "./split.js";
+import { grantTeleport } from "./granted-moves.js";
 
 export type ReactionAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -145,9 +148,11 @@ export function answerReaction(
   if (!pending) throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
   const reactor = adjustableActor(state, pending.actorId, scope);
   // An answer to a roll checks its own cost (an Improve Fate takes no Reaction); every other prompt is a Reaction.
-  if (use && pending.kind !== "roll-answer" && state.combat.reactionsUsed.includes(reactor.id)) {
+  if (use && pending.kind !== "roll-answer" && reactionSpent(state, reactor.id)) {
     throw new CommandRejectedError(
-      `${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`
+      state.combat.reactionsUsed.includes(reactor.id)
+        ? `${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`
+        : `${reactor.name}'s Reaction takes its commander's, which is spent this round. Decline instead.`
     );
   }
   // A creature at 0 HP can't take reactions (SRD Incapacitated / Unconscious).
@@ -174,8 +179,14 @@ export function answerReaction(
       state.combat = {
         ...state.combat,
         pendingReactions: state.combat.pendingReactions.filter((entry) => entry.id !== reactionId),
+        // A dominated creature's Reaction takes its commander's too.
         ...(markUsed
-          ? { reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== reactor.id), reactor.id] }
+          ? {
+              reactionsUsed: [
+                ...state.combat.reactionsUsed.filter((id) => !reactionSpenders(state, reactor.id).includes(id)),
+                ...reactionSpenders(state, reactor.id)
+              ]
+            }
           : {})
       };
     }
@@ -184,6 +195,8 @@ export function answerReaction(
     case "leaves-reach":
     case "damaged-by-creature":
       return answerStrike(answer, actionId, attackOptions);
+    case "triggered":
+      return answerTriggered(answer, actionId, attackOptions);
     case "attack-would-hit":
       return answerParkedAttack(answer, attackOptions.slotLevel);
     case "casts-spell":
@@ -368,10 +381,21 @@ function answerParkedDamage(answer: Answer, redirectTo: string | undefined): Rea
   const { state, commandId, pending, reactor, use, deps, base, clearPrompt } = answer;
   let parts = [...pending.proposedDamageParts];
   const events: EffectNarration[] = [];
+  const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
+  const siblings = effectiveActions(definition, reactor, deps.catalog);
+  const declared = use ? siblings.find((candidate) => candidate.id === pending.actionId) : undefined;
+  // Deflect Missile's redirect: the creature picked, else the attacker when it may be, else the only one there is.
+  const choices = pending.redirectChoices ?? [];
+  const redirectAt =
+    redirectTo ??
+    (choices.some((choice) => choice.actorId === pending.sourceActorId)
+      ? (pending.sourceActorId ?? undefined)
+      : choices.length === 1
+        ? choices[0]!.actorId
+        : undefined);
+  if (use && redirectTo !== undefined && !choices.some((choice) => choice.actorId === redirectTo))
+    throw new CommandRejectedError(`${pending.actionName} can't turn the force on that creature. Choose another.`);
   if (use) {
-    const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
-    const siblings = effectiveActions(definition, reactor, deps.catalog);
-    const declared = siblings.find((candidate) => candidate.id === pending.actionId);
     if (declared) {
       const economy = planEconomy(
         state,
@@ -459,7 +483,188 @@ function answerParkedDamage(answer: Answer, redirectTo: string | undefined): Rea
     application = outcome.application;
     events.push(...outcome.events);
   }
+  // "If that damage is reduced to 0, the giant can redirect some of the attack's force": the action's own save, at the
+  // creature picked, as part of the same Reaction.
+  const redirects = declared?.reaction?.response === "reduce-damage" && declared.reaction.redirect === true;
+  if (use && redirects && total === 0 && declared?.save && redirectAt !== undefined) {
+    const resolution = resolveDefinitionAction(
+      state,
+      declared,
+      {
+        actorId: reactor.id,
+        targetIds: [redirectAt],
+        commandId,
+        builtin: false,
+        rollMode: null,
+        override: null,
+        commit: true,
+        economyPaid: true,
+        attackKinds: ["reaction"]
+      },
+      resolveDepsOf(answer, definition)
+    );
+    const struck = state.actors.find((candidate) => candidate.id === redirectAt);
+    return {
+      ...base,
+      used: use,
+      appliedDamage,
+      resolution,
+      events,
+      ...(struck ? { other: { id: struck.id, name: struck.name } } : {}),
+      ...detailOf(application)
+    };
+  }
   return { ...base, used: use, appliedDamage, events, ...detailOf(application) };
+}
+
+/**
+ * A stat block's reaction to something other than a hit's damage (`triggered-reactions.ts`): what "use" does is its
+ * declared response's. A strike back resolves the action against the creature that set it off (a rust monster's
+ * Reflexive Antennae, a chain devil's Unnerving Gaze); the rest act on the reactor (`answerOnSelf`, `answerPursuit`,
+ * `splitCreature`). "decline" just clears.
+ */
+function answerTriggered(
+  answer: Answer,
+  actionId: string | undefined,
+  options: OpportunityAttackOptions
+): ReactionOutcome {
+  const { state, pending, reactor, use, deps, base, clearPrompt } = answer;
+  if (!use) {
+    clearPrompt(false);
+    return { ...base, used: false, appliedDamage: 0, events: [] };
+  }
+  const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
+  const available = effectiveActions(definition, reactor, deps.catalog);
+  const declared = available.find((candidate) => candidate.id === pending.actionId);
+  const reaction = declared?.reaction;
+  if (!declared || !reaction) {
+    clearPrompt(false);
+    throw new CommandRejectedError(`${reactor.name} no longer has ${pending.actionName}.`);
+  }
+  if (reaction.response === "strike-back") return answerStrike(answer, actionId, options);
+  if (reaction.response === "use-on-self") return answerOnSelf(answer, declared, definition);
+  if (reaction.response === "teleport-near")
+    return answerPursuit(answer, declared, available, definition, reaction.nearFeet, reaction.usesAction);
+  if (reaction.response === "split") {
+    clearPrompt(true);
+    const events = splitCreature(state, reactor, {
+      resolveDefinition: deps.resolveDefinition,
+      newId: deps.newRollId,
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    });
+    return { ...base, used: true, appliedDamage: 0, events };
+  }
+  clearPrompt(false);
+  throw new CommandRejectedError(`${pending.actionName} doesn't answer this.`);
+}
+
+/** The dependencies a reaction's own resolve takes. */
+function resolveDepsOf(answer: Answer, definition: ActorDefinition | undefined): ResolveDependencies {
+  const { deps, scope } = answer;
+  return {
+    random: deps.random,
+    newRollId: deps.newRollId,
+    gmSessionId: deps.gmSessionId,
+    initiatorRole: scope.role,
+    ...(scope.role === "player" ? { initiatorSessionId: scope.sessionId } : {}),
+    now: deps.now,
+    definition,
+    resolveDefinition: deps.resolveDefinition,
+    catalog: deps.catalog,
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+    ...(deps.pushToken ? { pushToken: deps.pushToken } : {})
+  };
+}
+
+/** An octopus's Ink Cloud: the action resolves on its user, its area centred where it stands ("ink that fills a
+ *  5-foot Cube centered on itself") and its move granted ("the octopus moves up to its Swim Speed"). */
+function answerOnSelf(
+  answer: Answer,
+  declared: DefinitionAction,
+  definition: ActorDefinition | undefined
+): ReactionOutcome {
+  const { state, commandId, reactor, base, clearPrompt } = answer;
+  const at = state.combat.tokens.find((token) => token.actorId === reactor.id)?.position;
+  const resolution = resolveDefinitionAction(
+    state,
+    declared,
+    {
+      actorId: reactor.id,
+      targetIds: [],
+      commandId,
+      builtin: false,
+      rollMode: null,
+      override: null,
+      commit: true,
+      attackKinds: ["reaction"],
+      ...(at && declared.area ? { areaAt: { x: at.x, y: at.y } } : {})
+    },
+    resolveDepsOf(answer, definition)
+  );
+  clearPrompt(true);
+  return { ...base, used: true, appliedDamage: 0, resolution, events: [] };
+}
+
+/** A nalfeshnee's Pursuit: "The nalfeshnee uses Teleport, but its destination space must be within 10 feet of the
+ *  triggering creature." The sibling Teleport resolves as the Reaction, and its grant keeps to that space. */
+function answerPursuit(
+  answer: Answer,
+  declared: DefinitionAction,
+  available: readonly DefinitionAction[],
+  definition: ActorDefinition | undefined,
+  nearFeet: number,
+  usesAction: string
+): ReactionOutcome {
+  const { state, commandId, pending, reactor, base, clearPrompt } = answer;
+  const quarry = pending.targetActorId
+    ? state.actors.find((candidate) => candidate.id === pending.targetActorId)
+    : undefined;
+  if (!quarry || !state.combat.initiative.some((entry) => entry.actorId === quarry.id)) {
+    clearPrompt(false);
+    throw new CommandRejectedError(`${pending.sourceName} is no longer in the fight.`);
+  }
+  const sibling = available.find((candidate) => candidate.id === usesAction);
+  if (!sibling?.teleport) {
+    clearPrompt(false);
+    throw new CommandRejectedError(`${reactor.name} no longer has the teleport ${declared.name} uses.`);
+  }
+  const resolution = resolveDefinitionAction(
+    state,
+    { ...sibling, activation: "reaction" },
+    {
+      actorId: reactor.id,
+      targetIds: [],
+      commandId,
+      builtin: false,
+      rollMode: null,
+      override: null,
+      commit: true,
+      attackKinds: ["reaction"]
+    },
+    resolveDepsOf(answer, definition)
+  );
+  // The grant the teleport left keeps to the space near the creature it follows.
+  reactor.effects = reactor.effects.map((effect) =>
+    effect.grantedTeleport
+      ? { ...effect, grantedTeleport: { ...effect.grantedTeleport, near: { actorId: quarry.id, feet: nearFeet } } }
+      : effect
+  );
+  clearPrompt(true);
+  return {
+    ...base,
+    used: true,
+    appliedDamage: 0,
+    other: { id: quarry.id, name: quarry.name },
+    resolution,
+    events: [
+      {
+        kind: "reaction",
+        text: `${reactor.name} may teleport to a space within ${nearFeet} ft of ${quarry.name}.`,
+        actorId: reactor.id,
+        source: { actorId: quarry.id, name: quarry.name }
+      }
+    ]
+  };
 }
 
 /** The Unarmed Strike's options: each is one melee attack an opportunity attack can be. */
@@ -513,7 +718,9 @@ function answerStrike(
   // Effective actions, so a magic weapon's derived attack resolves by id and is found as `fallbackMelee`.
   const available = effectiveActions(definition, reactor, deps.catalog);
   const declared = available.find((candidate) => candidate.id === pending.actionId);
-  const strikesWithItself = pending.kind === "damaged-by-creature" && declared?.reaction?.response === "strike-back";
+  const strikesWithItself =
+    (pending.kind === "damaged-by-creature" || pending.kind === "triggered") &&
+    declared?.reaction?.response === "strike-back";
   let chosen = declared;
   let isBuiltin = false;
   if (!strikesWithItself) {
@@ -564,7 +771,9 @@ function answerStrike(
       ...(options.pushFeet !== undefined ? { pushFeet: options.pushFeet } : {}),
       ...(options.hitOptions ? { hitOptions: options.hitOptions } : {}),
       // A reaction spell cast with a higher slot rolls that slot's dice (Hellish Rebuke's 3d10 from level 2).
-      ...(options.slotLevel !== undefined && chosen.spellSlot ? { slotLevel: options.slotLevel } : {})
+      ...(options.slotLevel !== undefined && chosen.spellSlot ? { slotLevel: options.slotLevel } : {}),
+      // A gaze met as the creature's turn starts lasts "until the end of its turn": this one.
+      ...(pending.kind === "triggered" && pending.cause === "turn-start" ? { currentTurnOf: struck.id } : {})
     },
     {
       random: deps.random,
@@ -801,6 +1010,7 @@ function answerParkedAttack(answer: Answer, slotLevel: number | undefined): Reac
   // Whether the AC rises: the reaction is used, and a scroll it was read from didn't lose the spell.
   let raised = use;
   let scrollLost: EffectNarration | null = null;
+  let teleportLine: EffectNarration | null = null;
   if (use) {
     const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
     const siblings = effectiveActions(definition, reactor, deps.catalog);
@@ -839,6 +1049,15 @@ function answerParkedAttack(answer: Answer, slotLevel: number | undefined): Reac
         })
       ).name;
     }
+    // Whirlwind of Sand: "the mummy teleports up to 60 feet to an unoccupied space it can see", with the same answer.
+    if (raised && declared.teleport) {
+      grantTeleport(state, reactor, { id: `${commandId}:teleport`, name: declared.name, teleport: declared.teleport });
+      teleportLine = {
+        kind: "effect",
+        text: `${reactor.name} may teleport up to ${declared.teleport.feet} ft to an unoccupied space it can see.`,
+        actorId: reactor.id
+      };
+    }
   }
   const finished = replayParkedAttack(answer, {
     targetId: defender.id,
@@ -851,7 +1070,8 @@ function answerParkedAttack(answer: Answer, slotLevel: number | undefined): Reac
         : {})
     }
   });
-  return { ...finished, used: use, events: scrollLost ? [scrollLost, ...finished.events] : finished.events };
+  const before = [scrollLost, teleportLine].filter((line): line is EffectNarration => line !== null);
+  return { ...finished, used: use, events: [...before, ...finished.events] };
 }
 
 /** What an answer to a roll needs from the reaction's own dependencies. */

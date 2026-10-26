@@ -24,7 +24,8 @@ const pints = (amount: number) => (amount === 1 ? "1 pint" : `${amount} pints`);
 
 /**
  * Today's food and water while the table tracks them: what the character ate and drank, what hunger and thirst hold,
- * and eating or drinking now (a meal, a ration, a Goodberry, its fill at a source, a Waterskin). A character holding
+ * and eating or drinking now (a meal, a ration or a Bead of Nourishment, a Goodberry, its fill at a source, a
+ * Waterskin). A character holding
  * Goodberries can eat one even when nothing is tracked.
  */
 export function FoodAndWater({
@@ -39,12 +40,13 @@ export function FoodAndWater({
   if (!today && berries === 0) return null;
   const need = NEEDS[actor.size ?? "medium"];
   const rations = inventory.filter(isRow("rations")).reduce((sum, row) => sum + row.quantity, 0);
+  const beads = inventory.filter(isRow("bead-of-nourishment")).reduce((sum, row) => sum + row.quantity, 0);
   const water = inventory
     .filter(isRow("waterskin"))
     .reduce((sum, row) => sum + (row.waterPints ?? row.quantity * WATERSKIN_PINTS), 0);
   const held = (today?.hungerLevels ?? 0) + (today?.thirstLevels ?? 0);
   const send = (
-    choice: Readonly<{ food?: "meal" | "ration" | "goodberry"; water?: "fill" | "waterskin" }>,
+    choice: Readonly<{ food?: "meal" | "ration" | "goodberry" | "bead"; water?: "fill" | "waterskin" }>,
     done: string
   ) => {
     setBusy(true);
@@ -81,6 +83,11 @@ export function FoodAndWater({
             Eat a ration ({rations})
           </Button>
         )}
+        {today && beads > 0 && (
+          <Button size="sm" disabled={busy} onClick={() => send({ food: "bead" }, "Ate a Bead of Nourishment.")}>
+            Eat a Bead of Nourishment ({beads})
+          </Button>
+        )}
         {berries > 0 && (
           <Button size="sm" disabled={busy} onClick={() => send({ food: "goodberry" }, "Ate a Goodberry.")}>
             Eat a Goodberry ({berries})
@@ -98,7 +105,9 @@ export function FoodAndWater({
         )}
       </div>
       {today && (
-        <p className="cs-sub">At the day&apos;s end, the Rations and Waterskins you carry cover what you still need.</p>
+        <p className="cs-sub">
+          At the day&apos;s end, the Rations, Beads of Nourishment and Waterskins you carry cover what you still need.
+        </p>
       )}
     </section>
   );

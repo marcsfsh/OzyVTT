@@ -155,11 +155,19 @@ export const FeatureAttackSchema = z
     rangeFeet: z.number().int().positive().optional(),
     rangeNormalFeet: z.number().int().positive().optional(),
     count: z.number().int().min(1).max(10).optional(),
-    criticalBonusDice: z.number().int().min(1).max(4).optional()
+    criticalBonusDice: z.number().int().min(1).max(4).optional(),
+    /** A printed to-hit that stands in for the derived one (a Ring of the Ram's "+7 bonus"). */
+    bonus: z
+      .number()
+      .int()
+      .min(-5)
+      .max(20)
+      .optional()
+      .describe('A printed to-hit that stands in for the derived one (a Ring of the Ram\'s "+7 bonus")')
   })
   .strict()
   .describe(
-    'An attack a feature grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is derived: the feature names the ability (or "spellcasting") and the builder resolves the number.'
+    'An attack a feature grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is derived: the feature names the ability (or "spellcasting") and the builder resolves the number, unless a printed `bonus` stands in.'
   );
 
 /**
@@ -401,6 +409,17 @@ export const FeatureGrantsFieldsSchema = z
             /** Which of its castings are a Magic action, whatever the spell's casting time: the one without a slot
              *  (Pact of the Chain's Find Familiar) or every one the feature gives (Wild Companion's). */
             asMagicAction: z.enum(["without-slot", "every-casting"]).optional(),
+            /** The components every casting the feature gives goes without (Wild Companion's and Dragon Companion's
+             *  "without Material components"). */
+            waives: z
+              .array(z.enum(["verbal", "somatic", "material"]))
+              .min(1)
+              .max(3)
+              .optional(),
+            /** Its casting without a slot targets only its caster ("cast Mage Armor on yourself"). */
+            self: z.literal(true).optional(),
+            /** Its casting without a slot gives its healing dice their highest faces (Fiendish Vigor). */
+            maximized: z.literal(true).optional(),
             /** How the feature changes the creatures the spell brings when cast this way: the creature type it takes
              *  (Wild Companion's Fey familiar), that it leaves when its caster finishes a Long Rest, more forms to pick
              *  (Pact of the Chain), and casting it without Concentration for a minute (Dragon Companion). */
@@ -560,7 +579,12 @@ export const ReplaceableChoiceSchema = z
       .min(1)
       .max(5)
       .default(1)
-      .describe("How many of that offer's answers may be swapped at once")
+      .describe("How many of that offer's answers may be swapped at once"),
+    /** A name several clauses share one allowance under (Mystic Arcanum: "replace one of your arcanum spells" across
+     *  its four arcana). */
+    shares: ContentIdSchema.optional().describe(
+      'A name several clauses share one allowance under: Mystic Arcanum\'s "replace one of your arcanum spells" is one swap across its four arcana'
+    )
   })
   .strict()
   .describe(
@@ -619,6 +643,27 @@ const featureChoiceBase = {
     .optional()
     .describe(
       'Floor on a spell pick\'s level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell"; both bounds at 6 make the pick exact'
+    ),
+  /** The answer the build takes when the ledger holds none (the High Elf's Prestidigitation, swapped later). */
+  default: ContentIdSchema.optional().describe(
+    "The answer the build takes when the ledger holds none (a High Elf knows Prestidigitation until a Long Rest swaps it), so a sheet made before the pick existed still builds and the builder starts on it"
+  ),
+  /** Only spells cast with this casting time (Spell Mastery: "spells ... that have a casting time of an action"). */
+  castingTime: z
+    .enum(["action", "bonus-action", "reaction"])
+    .optional()
+    .describe('Only spells cast with this casting time (Spell Mastery: "a casting time of an action")'),
+  /** Only spells with the Ritual tag (Pact of the Tome's "two level 1 spells that have the Ritual tag"). */
+  ritual: z
+    .literal(true)
+    .optional()
+    .describe("Only spells with the Ritual tag (Pact of the Tome's two level 1 rituals)"),
+  /** Only spells in the character's spellbook (Spell Mastery, Signature Spells), checked as the pick is made. */
+  fromSpellbook: z
+    .literal(true)
+    .optional()
+    .describe(
+      "Only spells in the character's spellbook (Spell Mastery, Signature Spells): the server checks the pick against the book when a build or a rest's re-choice makes it"
     ),
   /** The ceiling an ability-score pick from this choice may reach; absent = 20 (epic boons use 30). */
   maximum: z
@@ -710,6 +755,13 @@ export const FeatureOptionSchema = z
     level: ContentLevelSchema.optional().describe(
       'The class level this option may first be chosen at: an invocation\'s "Prerequisite: Level 5+ Warlock". A build below it is not offered the option'
     ),
+    /** It may be chosen more than once (an invocation's "Repeatable. You can gain this invocation more than once"). */
+    repeatable: z
+      .literal(true)
+      .optional()
+      .describe(
+        'It may be chosen more than once: an invocation\'s "Repeatable. You can gain this invocation more than once"'
+      ),
     /** A pick this option asks for once chosen, from a list of its own. */
     choice: FeatureOptionChoiceSchema.optional().describe(
       "A second-order pick this option owes once chosen, from a list of its own"
@@ -837,6 +889,20 @@ export const FeatureRecordSchema = z
       .describe(
         "Spell lists the class's own prepared and cantrip picks may also draw on, the spells counting as that class's (Magical Secrets: the Bard's picks may come from the Cleric, Druid and Wizard lists). Widens an existing budget; it adds no picks"
       ),
+    /** A free casting of a spell other features grant, on this feature's own uses, which the spells share (Natural
+     *  Recovery: "one of the level 1+ spells that you have prepared from your Circle Spells feature"). */
+    freeCastOf: z
+      .object({
+        /** The features whose granted spells it casts, with the options chosen under them. */
+        features: z.array(ContentIdSchema).min(1).max(8),
+        /** The lowest level of spell it casts (Natural Recovery's "level 1+"). */
+        minLevel: z.number().int().min(0).max(9).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A free casting of a spell other features grant, on this feature's own `uses`, which every such spell shares: Natural Recovery casts \"one of the level 1+ spells that you have prepared from your Circle Spells feature\" once per Long Rest. `features` names the granting features (their chosen options' grants count)"
+      ),
     ...featureRiders,
     /** This feature replaces an earlier one of the same id lineage (Indomitable at 9/13/17). */
     replacesFeatureId: ContentIdSchema.optional().describe(
@@ -887,7 +953,10 @@ export const StartingEquipmentOptionSchema = z
           .object({
             id: ContentIdSchema,
             name: z.string().min(1).max(120),
-            quantity: z.number().int().min(1).max(99).default(1)
+            quantity: z.number().int().min(1).max(99).default(1),
+            /** The item is one of these, picked as the kit is taken (the Bard's "Musical Instrument of your choice");
+             *  `id` is the one it gives when no pick is recorded. */
+            pickFrom: z.array(ContentIdSchema).min(2).max(40).optional()
           })
           .strict()
       )

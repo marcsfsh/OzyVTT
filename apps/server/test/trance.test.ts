@@ -3,7 +3,7 @@ import { GameStateSchema, type GameState } from "@vtt/domain";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition } from "@vtt/schemas";
 import { addEffect, makeEffect } from "../src/effects.js";
-import { applyRest, partyLongRestMinutes } from "../src/rests.js";
+import { applyRest, finishPartyLongRest, startPartyRest } from "../src/rests.js";
 
 // SRD Trance (Elf): "You don't need to sleep, and magic can't put you to sleep. You can finish a Long Rest in 4 hours
 // if you spend those hours in a trancelike meditation."
@@ -82,8 +82,12 @@ describe("Trance", () => {
   });
 
   it("takes the party 4 hours when every member is in Trance, and 8 with anyone who sleeps", () => {
-    const state = party();
-    expect(partyLongRestMinutes([actor(state, ELF)], resolveDefinition)).toBe(240);
-    expect(partyLongRestMinutes([actor(state, ELF), actor(state, HUMAN)], resolveDefinition)).toBe(480);
+    const rest = (ids: string[]) => {
+      const state = party();
+      startPartyRest(state, ids, "long");
+      return finishPartyLongRest(state, true, resolveDefinition).hours;
+    };
+    expect(rest([ELF])).toBe(4);
+    expect(rest([ELF, HUMAN])).toBe(8);
   });
 });

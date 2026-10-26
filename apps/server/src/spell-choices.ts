@@ -14,6 +14,7 @@ import { CommandRejectedError } from "./game-store.js";
 import { buildRequestOf } from "./ledger-rechoice.js";
 import { LONG_REST_PREPARATION } from "./spellcasting.js";
 import { withArticle } from "@vtt/domain";
+import { holdsFeature } from "./class-features.js";
 
 /**
  * Changing what a prepared caster can prepare (SRD Spell Preparation by Class). After a Long Rest a Cleric, Druid,
@@ -35,6 +36,12 @@ export const BOOK_PER_LEVEL = 2;
 /** SRD "Copying a Spell into the Book": for each level of the spell. */
 const COPY_HOURS_PER_LEVEL = 2;
 const COPY_GP_PER_LEVEL = 50;
+
+/** SRD Evocation Savant: "whenever you gain access to a new level of spell slots in this class, you can add one Wizard
+ *  spell from the Evocation school to your spellbook for free", from the level 3 slots the feature's level brings on. */
+const SCHOOL_SAVANTS: ReadonlyArray<
+  Readonly<{ featureId: string; name: string; school: string; fromSlotLevel: number }>
+> = [{ featureId: "evocation-savant", name: "Evocation Savant", school: "evocation", fromSlotLevel: 3 }];
 
 /** A class's own spell rows in the ledger: a "spell" pick no feature made. */
 const isClassSpellRow = (row: CharacterChoice) => row.kind === "spell" && typeof row.payload?.featureId !== "string";
@@ -86,10 +93,21 @@ export function spellChoicesOf(
         (row) => isClassSpellRow(row) && (row.classId ?? request.classId) === WIZARD
       ).length;
       // A spell the sheet lists again after a rebuild counts once.
-      const free = actor.spellbook.filter((entry) => !entry.copied && !onSheet.has(entry.id)).length;
+      const freeAdded = actor.spellbook.filter((entry) => !entry.copied && !onSheet.has(entry.id));
+      // A school's free additions are spent first on spells of that school, the levels' on the rest.
+      const savant = SCHOOL_SAVANTS.find((entry) => holdsFeature(definition, entry.featureId, entry.name));
+      const schoolTotal = savant ? Math.max(0, budget.maxSlotLevel - savant.fromSlotLevel + 1) : 0;
+      const ofSchool = savant
+        ? freeAdded.filter((entry) => library.spellRecord(entry.id)?.school === savant.school).length
+        : 0;
+      const schoolUsed = Math.min(ofSchool, schoolTotal);
       spellbook = {
         spellIds: [...book].sort((left, right) => levelOf(left) - levelOf(right) || left.localeCompare(right)),
-        freeLeft: Math.max(0, BOOK_AT_FIRST_LEVEL + BOOK_PER_LEVEL * (wizardLevel - 1) - fromLevels - free),
+        freeLeft: Math.max(
+          0,
+          BOOK_AT_FIRST_LEVEL + BOOK_PER_LEVEL * (wizardLevel - 1) - fromLevels - (freeAdded.length - schoolUsed)
+        ),
+        freeOfSchool: savant ? { school: savant.school, left: schoolTotal - schoolUsed } : null,
         maxLevel: budget.maxSlotLevel,
         addable: options.filter((option) => !book.has(option.id)).map((option) => option.id)
       };
@@ -259,9 +277,13 @@ export function addToSpellbook(
         : `${spell.name} isn't a Wizard spell of level 1 or higher.`
     );
   if (input.from === "level") {
-    if (book.freeLeft === 0)
+    const schoolFree =
+      book.freeOfSchool !== null && book.freeOfSchool.left > 0 && spell.school === book.freeOfSchool.school;
+    if (book.freeLeft === 0 && !schoolFree)
       throw new CommandRejectedError(
-        `${actor.name}'s spellbook already holds the spells the Wizard's levels give. Copy others in.`
+        book.freeOfSchool !== null && book.freeOfSchool.left > 0
+          ? `${actor.name}'s free spells left are for the ${book.freeOfSchool.school} school, and ${spell.name} isn't one. Copy it in instead.`
+          : `${actor.name}'s spellbook already holds the spells the Wizard's levels give. Copy others in.`
       );
     actor.spellbook = [...actor.spellbook, { id: spell.id }];
     return `${actor.name} adds ${spell.name} to the spellbook.`;

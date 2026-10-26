@@ -1,6 +1,7 @@
 import { SRD_SKILL_ABILITY } from "@vtt/content-srd-5.2.1";
 import { abilityModifier } from "@vtt/rules-5e";
 import type { AbilityId, ActorAction, ActorDefinition, Form, FormSpeeds } from "@vtt/schemas";
+import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { STATBLOCK_EXTENSION } from "../statblock-facts.js";
 import { SIZE_FOOTPRINT, type CreatureSize } from "./forms.js";
 
@@ -108,6 +109,69 @@ function identityOnly(character: NonNullable<ActorDefinition["character"]>): Act
   return { ...rest, features: [], feats: [], choices: [] };
 }
 
+/** The damage and condition defences a creature's class features and feats give it, kept in a form that keeps its
+ *  features (Wild Shape: "you retain ... class features ... and feats"). */
+export type KeptDefences = Readonly<{
+  damageResistances: readonly string[];
+  damageImmunities: readonly string[];
+  conditionImmunities: readonly string[];
+}>;
+
+type DefenceGrants = Readonly<{
+  when?: unknown;
+  damageResistances: readonly string[];
+  damageImmunities: readonly string[];
+  conditionImmunities: readonly string[];
+}>;
+
+/**
+ * The ungated defences the build baked in from the creature's class and subclass features, their chosen options and its
+ * feats, read back through the catalog; a species trait's or a background's stay with the true form. A gated grant is
+ * read live from the features the form keeps (`deriveEquipment`).
+ */
+export function featureDefences(own: ActorDefinition, catalog: EquipmentCatalog | undefined): KeptDefences {
+  const resistances = new Set<string>();
+  const immunities = new Set<string>();
+  const conditions = new Set<string>();
+  const add = (grants: DefenceGrants | undefined) => {
+    if (!grants || grants.when !== undefined) return;
+    for (const id of grants.damageResistances) resistances.add(id);
+    for (const id of grants.damageImmunities) immunities.add(id);
+    for (const id of grants.conditionImmunities) conditions.add(id);
+  };
+  const character = own.character;
+  if (character && catalog) {
+    const refs = character.features ?? [];
+    // An option belongs to the feature it was chosen under, which may itself be an option.
+    const rootKind = (ref: (typeof refs)[number], depth = 0): string | undefined => {
+      if (ref.kind !== "option") return ref.kind;
+      const parent = refs.find((candidate) => candidate.id === ref.sourceId);
+      return parent && depth < 4 ? rootKind(parent, depth + 1) : undefined;
+    };
+    for (const ref of refs) {
+      const kind = rootKind(ref);
+      if (kind === "class" || kind === "subclass") add(catalog.featureRecord?.(ref)?.grants);
+    }
+    for (const feat of character.feats ?? []) add(catalog.featRecord?.(feat.id)?.feature.grants);
+  }
+  return {
+    damageResistances: [...resistances],
+    damageImmunities: [...immunities],
+    conditionImmunities: [...conditions]
+  };
+}
+
+/** The stat block's list of a defence with the kept ones added; nothing when the stat block prints none and none is
+ *  kept. */
+function withKept<K extends keyof KeptDefences>(
+  key: K,
+  printed: readonly string[] | undefined,
+  kept: KeptDefences | undefined
+): Partial<Record<K, string[]>> {
+  const all = [...new Set([...(printed ?? []), ...(kept?.[key] ?? [])])];
+  return all.length > 0 || printed ? ({ [key]: all } as Partial<Record<K, string[]>>) : {};
+}
+
 /**
  * The definition a creature reads while it has taken a stat block's form (SRD Shape-Shifting, as each effect's text
  * says): the stat block's statistics (its size, scores, Armor Class, speeds, senses, defences, traits and actions) with
@@ -116,9 +180,15 @@ function identityOnly(character: NonNullable<ActorDefinition["character"]>): Act
  * proficiencies (`features`), its proficiencies alone, its Spellcasting feature and spell actions (`spellcasting`), and
  * its creature type (`type`).
  */
-export function composeStatBlockForm(own: ActorDefinition, statBlock: ActorDefinition, form: Form): ActorDefinition {
+export function composeStatBlockForm(
+  own: ActorDefinition,
+  statBlock: ActorDefinition,
+  form: Form,
+  kept?: KeptDefences
+): ActorDefinition {
   const keeps = new Set(form.keeps);
   const features = keeps.has("features");
+  const defences = features ? kept : undefined;
   const spellcasting = features || keeps.has("spellcasting");
   const abilityScores = Object.fromEntries(
     ABILITIES.map((ability) => [
@@ -162,10 +232,10 @@ export function composeStatBlockForm(own: ActorDefinition, statBlock: ActorDefin
     actions: [...formActions, ...keptActions, ...(leave ? [leave] : [])],
     token: { disposition: own.token.disposition, footprint: { width: footprint, height: footprint } },
     extensions: { ...own.extensions, [STATBLOCK_EXTENSION]: bag },
-    ...(statBlock.damageResistances ? { damageResistances: [...statBlock.damageResistances] } : {}),
-    ...(statBlock.damageImmunities ? { damageImmunities: [...statBlock.damageImmunities] } : {}),
+    ...withKept("damageResistances", statBlock.damageResistances, defences),
+    ...withKept("damageImmunities", statBlock.damageImmunities, defences),
     ...(statBlock.damageVulnerabilities ? { damageVulnerabilities: [...statBlock.damageVulnerabilities] } : {}),
-    ...(statBlock.conditionImmunities ? { conditionImmunities: [...statBlock.conditionImmunities] } : {}),
+    ...withKept("conditionImmunities", statBlock.conditionImmunities, defences),
     ...(statBlock.legendary ? { legendary: { ...statBlock.legendary } } : {}),
     ...(statBlock.traitMechanics ? { traitMechanics: structuredClone(statBlock.traitMechanics) } : {}),
     ...(ownCharacter ? { character: features ? ownCharacter : identityOnly(ownCharacter) } : {}),

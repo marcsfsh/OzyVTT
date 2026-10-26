@@ -159,7 +159,10 @@ export const ObjectPrintSchema = z
     resistances: z.array(DamageTypeSchema).max(13).optional(),
     vulnerabilities: z.array(DamageTypeSchema).max(13).optional(),
     /** Immune to all damage (Wall of Force): only a rule that names it ends it (Disintegrate). */
-    immuneToAll: z.literal(true).optional()
+    immuneToAll: z.literal(true).optional(),
+    /** It regains 1 Hit Point each time this many minutes of game time pass, while it has at least 1 (a Rope of
+     *  Entanglement's 5). */
+    regainsEvery: z.number().int().min(1).max(1440).optional()
   })
   .strict();
 export type ObjectPrint = z.infer<typeof ObjectPrintSchema>;
@@ -503,6 +506,14 @@ export const RiderTriggerSchema = z
       .describe(
         "Filter. Narrows a moment to the creature on the other side being one of these types: the attacker, for an attack against the bearer (`incoming-attack`), or the creature whose effect forces the bearer's save. Read from the stat block, so a character never matches."
       ),
+    /** The save is against a breath weapon (Dragon Scale Mail: "Advantage on saving throws against the breath weapons
+     *  of Dragons"), as its stat block names the action ("Fire Breath", "Breath Weapon"). */
+    z
+      .object({ type: z.literal("versus-breath-weapon") })
+      .strict()
+      .describe(
+        'Filter. Narrows a saving throw to one against a breath weapon, an action its stat block names "... Breath" or "Breath Weapon" (a Dragon\'s Fire Breath)'
+      ),
     /** On an effect, its rider fires only on a roll against the creature that put the effect on its bearer (Bestow
      *  Curse: "Disadvantage on attack rolls against you"). */
     z
@@ -614,6 +625,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "versus-condition": "filter",
   "by-effect-source": "filter",
   "source-creature-type-is": "filter",
+  "versus-breath-weapon": "filter",
   "versus-effect-source": "filter",
   "versus-marked": "filter",
   "versus-hurt": "filter",
@@ -1055,6 +1067,9 @@ export const ModifierSchema = z
          *  (Boon of Irresistible Offense's Overwhelming Strike). */
         abilityScore: z.union([AbilitySchema, z.literal("increased")]).optional(),
         damageType: DamageTypeSchema.optional(),
+        /** The types its bearer may pick from on each hit, `damageType` being the one it deals unpicked (Conjure Minor
+         *  Elementals: "Acid, Cold, Fire, or Lightning (your choice when you make the attack)"). */
+        damageTypes: z.array(DamageTypeSchema).min(2).max(13).optional(),
         doubleOnCritical: z.boolean().default(true),
         /** It is dealt once a turn at most, whoever's turn it is (Colossus Slayer). */
         oncePerTurn: z.literal(true).optional(),
@@ -1384,7 +1399,10 @@ const RepeatFailureDamageSchema = z
  * "bearer", the default) or of the effect's source (`near` "source": pulling a creature out of a gelatinous cube), or
  * either. With `check`, the action is an ability check that must succeed, against `dc` or the save's own DC; without,
  * the action alone ends it ("a creature within 5 feet of it takes an action to wake it"). `takerDamage` is what the
- * creature that succeeds takes (the cube's acid).
+ * creature that succeeds takes (the cube's acid). `tool` is a tool the taker must carry, whose proficiency the check
+ * adds (picking Manacles' lock with Thieves' Tools). `failureDamage` is what the bearer takes on each failed check (a
+ * Hunting Trap's 1 Piercing). `lockoutHours` makes a failed taker's later tries fail for that long (Iron Bands' 24
+ * hours), and `destroysItem` destroys the item whose action made the effect when the check succeeds (Iron Bands).
  */
 export const EndedBySchema = z
   .object({
@@ -1401,13 +1419,29 @@ export const EndedBySchema = z
       })
       .strict()
       .optional(),
-    takerDamage: RepeatFailureDamageSchema.optional()
+    takerDamage: RepeatFailureDamageSchema.optional(),
+    tool: RiderSlugSchema.optional(),
+    failureDamage: z
+      .array(z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema }).strict())
+      .min(1)
+      .max(2)
+      .optional(),
+    lockoutHours: z.number().int().min(1).max(168).optional(),
+    destroysItem: z.literal(true).optional(),
+    /** Its success ends the whole spell the effect came from, the caster's Concentration on it included (Detect
+     *  Thoughts: "ending the spell on a success"). */
+    endsSpell: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any, and the damage the one who succeeds takes"
+    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any (with a tool the taker must carry), the damage the one who succeeds takes, the damage the bearer takes on each failed check, how long a failed taker's later tries fail, whether success destroys the item that made the effect, and whether it ends the whole spell"
   );
 export type EndedBy = z.infer<typeof EndedBySchema>;
+/** The ways an effect ends by an action: one, or several (a Chain's escape and its burst). */
+export const EndedByListSchema = z.union([EndedBySchema, z.array(EndedBySchema).min(1).max(4)]);
+/** Every ending action an effect carries, in order. */
+export const endingsOf = (effect: Readonly<{ endedBy?: z.infer<typeof EndedByListSchema> | undefined }>): EndedBy[] =>
+  effect.endedBy === undefined ? [] : Array.isArray(effect.endedBy) ? effect.endedBy : [effect.endedBy];
 
 /**
  * What an effect does as its bearer rests or as days pass (a mummy's curse, an otyugh's poison):
@@ -1427,11 +1461,16 @@ export const RestTriggerSchema = z
       .optional(),
     maximumLoss: DiceFormulaSchema.optional(),
     noBenefit: z.enum(["short", "long", "both"]).optional(),
-    holdsMaximum: z.literal(true).optional()
+    holdsMaximum: z.literal(true).optional(),
+    /** Damage it deals as the rest ends, its bearer waking (Dream's terrifying messenger: 3d6 Psychic). */
+    damage: RepeatFailureDamageSchema.optional(),
+    /** It acts once and ends (Dream: "the target gains no benefit from its rest, and it takes 3d6 Psychic damage when
+     *  it wakes up"). */
+    once: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, and a maximum a Long Rest doesn't restore"
+    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, a maximum a Long Rest doesn't restore, damage as it wakes, and whether it acts only once"
   );
 export type RestTrigger = z.infer<typeof RestTriggerSchema>;
 
@@ -1445,7 +1484,9 @@ export const EffectStageSchema = z
     duration: SaveFailureDurationSchema.optional(),
     endsOnDamage: z.literal(true).optional(),
     repeats: z.literal(true).optional(),
-    endedBy: EndedBySchema.optional()
+    endedBy: EndedBySchema.optional(),
+    /** Tags the stage adds to the effect's own (Prismatic Spray's Violet ray: `off-plane`, sent to another plane). */
+    tags: z.array(EffectTagSchema).min(1).max(2).optional()
   })
   .strict();
 export type EffectStage = z.infer<typeof EffectStageSchema>;
@@ -1453,7 +1494,10 @@ export type EffectStage = z.infer<typeof EffectStageSchema>;
 /**
  * The save an effect's bearer repeats to end it (Hold Person), and when:
  * - `timing`: at the end of each of its turns (absent), at the start of each (`turn-start`, Conjure Elemental's
- *   restraint), or only when something else opens it (`none`: Dominate Person's damage).
+ *   restraint), at the start of the effect's source's turns (`source-turn-start`, Prismatic Spray's Violet ray), or
+ *   only when something else opens it (`none`: Dominate Person's damage).
+ * - `failureTurnTags`: a save that compels: a failure gives the bearer these tags until its turn ends, a success leaves
+ *   that turn free, and the effect stays either way (Bestow Curse's forced Dodge).
  * - `once`: only at the end of its next turn (a basilisk's gaze); `skipsCurrentTurn` marks one that began during that
  *   creature's own turn, so the end of that turn doesn't count.
  * - `onDamage`: each time the bearer takes damage too, with Advantage (`advantage`, Hideous Laughter), or only damage
@@ -1468,16 +1512,25 @@ export const RepeatSaveSchema = z
   .object({
     ability: AbilitySchema,
     dc: z.number().int().min(1).max(40),
-    timing: z.enum(["turn-start", "none"]).optional(),
+    timing: z.enum(["turn-start", "source-turn-start", "none"]).optional(),
     once: z.literal(true).optional(),
     skipsCurrentTurn: z.literal(true).optional(),
+    failureTurnTags: z.array(EffectTagSchema).min(1).max(2).optional(),
     onDamage: z
-      .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+      .object({
+        advantage: z.literal(true).optional(),
+        notFromSource: z.literal(true).optional(),
+        fromSourceOnly: z.literal(true).optional()
+      })
       .strict()
       .optional(),
     byAction: z.literal(true).optional(),
     /** Only when the bearer ends its turn where it can't see the effect's source (Fear). */
     unseenSource: z.literal(true).optional(),
+    /** Only when the bearer ends its turn more than this many feet from the effect's source (Antipathy/Sympathy). */
+    beyondFeet: z.number().int().min(5).max(5280).optional(),
+    /** A success makes the bearer immune to the effect's source for the rest of the fight (Antipathy/Sympathy). */
+    immuneOnSuccess: z.literal(true).optional(),
     failureDamage: RepeatFailureDamageSchema.optional(),
     tally: z
       .object({
@@ -1514,7 +1567,13 @@ export const EffectWeaponSchema = z
   .object({
     ability: AbilitySchema.optional(),
     dice: DiceFormulaSchema.optional(),
-    damageTypes: z.array(DamageTypeSchema).min(1).max(3).optional()
+    damageTypes: z.array(DamageTypeSchema).min(1).max(3).optional(),
+    /** Its wielder is proficient with it while bound (Pact of the Blade). */
+    proficient: z.literal(true).optional(),
+    /** Its wielder can use it as a Spellcasting Focus while bound (Pact of the Blade). */
+    focus: z.literal(true).optional(),
+    /** It was conjured with the binding and disappears when the binding ends (a conjured pact weapon). */
+    conjured: z.literal(true).optional()
   })
   .strict();
 /** The generic actions an effect or a feature can let its bearer take as a Bonus Action. */
@@ -1531,6 +1590,35 @@ export const GrantedSpellActionSchema = z
     modifier: z.number().int().min(-5).max(15),
     /** The damage type picked when the spell was cast, which every use deals. */
     damageType: DamageTypeSchema.optional()
+  })
+  .strict();
+/**
+ * A spell cast and held for later, at its original caster's numbers (SRD 5.2.1 Contingency, Glyph of Warding's spell
+ * glyph, Ring of Spell Storing, a shield guardian's Spell Storing): the spell, the level it was cast at, the caster's
+ * spell save DC, attack bonus and spellcasting ability modifier, and who cast it. `via` says what holds it.
+ */
+export const StoredCastSchema = z
+  .object({
+    spellId: RiderSlugSchema,
+    level: z.number().int().min(0).max(9),
+    saveDc: z.number().int().min(1).max(40),
+    attackBonus: z.number().int().min(-10).max(30),
+    modifier: z.number().int().min(-5).max(15),
+    casterId: z.string().min(1).max(120),
+    casterName: z.string().min(1).max(120),
+    via: z.enum(["contingency", "glyph", "ring", "guardian"])
+  })
+  .strict();
+export type StoredCast = z.infer<typeof StoredCastSchema>;
+/** What waits for the next spell its bearer casts, or one cast at it, to hold it (`StoredCastSchema`): Contingency's
+ *  contingent spell, a spell glyph's spell, a Ring of Spell Storing held out to a spell. `maxLevel` is the highest level
+ *  it takes. */
+export const StoreAwaitsSchema = z
+  .object({
+    via: z.enum(["contingency", "glyph", "ring"]),
+    maxLevel: z.number().int().min(0).max(9),
+    /** The bearer's effect that holds the spell once it is stored (Contingency's own). */
+    holderEffectId: z.string().min(1).max(120).optional()
   })
   .strict();
 /** An action an effect's bearer may take to end it: a save or a check at a DC. */
@@ -1644,6 +1732,9 @@ export const FormSchema = z
     endsAtZeroHitPoints: z.literal(true).optional(),
     /** Leaving it early takes this many rounds, with the Stunned condition (Wind Walk: 1 minute). */
     revertRounds: z.number().int().min(1).max(100).optional(),
+    /** Ending in the air, it lowers its creature 60 feet a round for a minute to a safe landing, and the creature falls
+     *  the rest (Wind Walk's cloud). */
+    descendsSafely: z.literal(true).optional(),
     /** It ends when the bearer has the Incapacitated condition (Wild Shape). */
     endsOnIncapacitated: z.literal(true).optional(),
     /** The Temporary Hit Points the form gave, any left of which vanish when it ends. */
@@ -1667,6 +1758,17 @@ export const FormSchema = z
   .strict();
 export type Form = z.infer<typeof FormSchema>;
 
+/** What a teleport's arrival does to the creatures near its destination: `conditions` on each enemy its traveler can
+ *  see within `withinFeet` of the space it lands in, until the end of the traveler's next turn (a mummy lord's
+ *  Whirlwind of Sand: "Each creature of its choice that it can see within 5 feet of its destination space has the
+ *  Blinded condition until the end of the mummy's next turn"). */
+export const TeleportLandingSchema = z
+  .object({
+    conditions: z.array(ConditionIdSchema).min(1).max(2),
+    withinFeet: z.number().int().min(5).max(60)
+  })
+  .strict();
+export type TeleportLanding = z.infer<typeof TeleportLandingSchema>;
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
 export const EffectInstanceSchema = z
@@ -1753,7 +1855,14 @@ export const EffectInstanceSchema = z
         round: z.number().int().positive(),
         turnActorId: z.uuid().nullable(),
         unseen: z.literal(true).optional(),
-        failDamage: DiceFormulaSchema.optional()
+        failDamage: DiceFormulaSchema.optional(),
+        /** Its destination must be within `feet` of this creature (a nalfeshnee's Pursuit). */
+        near: z
+          .object({ actorId: z.uuid(), feet: z.number().int().min(5).max(120) })
+          .strict()
+          .optional(),
+        /** What its arrival does near the destination (a mummy lord's Whirlwind of Sand). */
+        landing: TeleportLandingSchema.optional()
       })
       .strict()
       .optional(),
@@ -1761,6 +1870,13 @@ export const EffectInstanceSchema = z
      * effect lasts; a penalty is negative (Slow's -2). Kept apart from `modifiers`, whose `armor-class` is written onto
      * the sheet and would outlast it. */
     armorClassBonus: z.number().int().min(-10).max(10).optional(),
+    /** What it takes off one of the bearer's ability scores while it lasts (a shadow's Draining Swipe), read live with
+     *  the scores every rule uses and given back when it ends. Kept apart from `modifiers`, whose `ability-score` is
+     *  written onto the sheet. */
+    abilityReduction: z
+      .object({ ability: AbilitySchema, amount: z.number().int().min(1).max(30) })
+      .strict()
+      .optional(),
     /** Hit points this effect took off the bearer's Hit Point maximum (a Life Drain), given back when it ends. */
     hitPointMaximumLoss: z.number().int().min(1).max(10000).optional(),
     /** What this effect adds to the bearer's Hit Point maximum (Aid), taken back when it ends. */
@@ -1851,8 +1967,9 @@ export const EffectInstanceSchema = z
       })
       .strict()
       .optional(),
-    /** An action that ends it: waking a sleeper, stanching a wound, studying an illusion, detaching a stirge. */
-    endedBy: EndedBySchema.optional(),
+    /** The actions that end it: waking a sleeper, stanching a wound, studying an illusion, detaching a stirge, escaping
+     *  or bursting a Chain. */
+    endedBy: EndedByListSchema.optional(),
     /** What it does as its bearer rests or days pass (a mummy's curse); `dayMark` is the game-clock minute its next 24
      *  hours count from. */
     atRest: RestTriggerSchema.extend({ dayMark: z.number().int().min(0).optional() })
@@ -1863,6 +1980,20 @@ export const EffectInstanceSchema = z
     endsWhenUnaffected: z.literal(true).optional(),
     /** The bearer's Speed is multiplied by this after every other change (Haste: doubled), its special speeds too. */
     speedMultiplier: z.number().int().min(2).max(4).optional(),
+    /** Movement the bearer has already spent of its next turn (climbing out of a swallower's corpse off its turn),
+     *  charged as that turn starts. */
+    movementOwedFeet: z.number().int().min(1).max(1000).optional(),
+    /** Where the bearer is anchored (a Climber's Kit), in map pixels and feet of height: it can't move more than
+     *  `feet` from there, nor fall more than `feet` below it. */
+    anchor: z
+      .object({
+        x: z.number().min(0).max(1_000_000),
+        y: z.number().min(0).max(1_000_000),
+        altitudeFeet: z.number().int().min(0).max(100_000),
+        feet: z.number().int().min(5).max(300)
+      })
+      .strict()
+      .optional(),
     /** A way to work out base AC while the bearer wears no armor: this plus its Dexterity modifier, a Shield adding
      *  (Mage Armor's 13). The best of its ways counts, and AC bonuses add to it. */
     baseArmorClass: z.number().int().min(11).max(20).optional(),
@@ -1910,11 +2041,22 @@ export const EffectInstanceSchema = z
     /** A spell's later action its bearer may take while this lasts, at the numbers it was cast with (Dragon's Breath:
      *  the touched creature exhales, with the damage type picked at the cast). */
     grantedSpellAction: GrantedSpellActionSchema.optional(),
+    /** A spell it holds for later at its caster's numbers (Contingency's contingent spell, a shield guardian's stored
+     *  spell), released as an action of its bearer's (`stored-casts.ts`). */
+    storedCast: StoredCastSchema.optional(),
+    /** It waits for a spell to hold (Contingency, a spell glyph, a Ring of Spell Storing held out). */
+    storeAwaits: StoreAwaitsSchema.optional(),
     /** An action the bearer may take to end this: a save (Irresistible Dance: "take an action to collect itself") or
      *  a check (Maze's DC 20 Intelligence (Investigation)). */
     endAction: EffectEndActionSchema.optional(),
     /** The turn a once-a-turn part of this last applied (`round:actorId`), so it applies once a turn (Resistance). */
     usedOnTurn: z.string().max(160).optional(),
+    /** The pool of rounds it was paid from (Boots of Speed's 10 minutes): the rounds it has left when it ends early go
+     *  back to that pool of its source. */
+    refundsUses: z
+      .object({ key: z.string().min(1).max(120) })
+      .strict()
+      .optional(),
     /** Its attack, save, check and Initiative penalties move one toward 0 as each of the bearer's Long Rests ends, and
      *  it ends when none is left: a penalty that eases with rest, as Raise Dead's ordeal does in death.ts. */
     shrinksEachLongRest: z.literal(true).optional(),
@@ -2091,6 +2233,8 @@ export const InventoryItemSchema = z
       .optional(),
     weapon: ItemWeaponSchema.optional(),
     armor: ItemArmorSchema.optional(),
+    /** The spells cast into this copy, at their casters' numbers (a Ring of Spell Storing's up to 5 levels). */
+    storedCasts: z.array(StoredCastSchema).max(5).optional(),
     /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
      *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
     chosenDamageType: DamageTypeSchema.optional(),
@@ -2109,6 +2253,16 @@ export const InventoryItemSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(80)
       .optional(),
+    /** A Spell Scroll a character scribed (SRD Scribing Spell Scrolls): its spell uses the scribe's spell save DC and
+     *  attack bonus, and a cantrip on it works as if cast at the scribe's level. The server keeps it. */
+    scribed: z
+      .object({
+        saveDc: z.number().int().min(1).max(40),
+        attackBonus: z.number().int().min(-5).max(30),
+        casterLevel: z.number().int().min(1).max(20)
+      })
+      .strict()
+      .optional(),
     /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
      *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
     ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),
@@ -2118,6 +2272,12 @@ export const InventoryItemSchema = z
     /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
      *  server keeps it. */
     ammunitionFired: z.number().int().min(0).max(10_000).optional(),
+    /** Magic pieces from this row that hit in the running fight: their magic is spent, and half of them can be picked
+     *  up after it as plain ammunition of their kind. The server keeps it. */
+    ammunitionSpent: z.number().int().min(0).max(10_000).optional(),
+    /** Copies of this weapon thrown in the running fight, lying where they landed: they are picked up after it. The
+     *  server keeps it. */
+    thrownAway: z.number().int().min(0).max(10_000).optional(),
     /** A light source in hand is burning (a Torch, a Lamp, a Flame Tongue's flames). Dynamic vision lights its bearer
      *  while it is lit and equipped. The server keeps it. */
     lit: z.boolean().optional(),
@@ -2129,11 +2289,31 @@ export const InventoryItemSchema = z
     burnsOutAtHour: z.number().int().min(0).max(10_000_000).optional(),
     /** Hours of burning left in a light that was put out before it burned down. */
     burnHoursLeft: z.number().int().min(0).max(24).optional(),
+    /** The carried container row it is in (a Backpack, a Bag of Holding), by row id; absent, it is carried loose. The
+     *  server holds it to the container's limits and weighs it through the container. */
+    containerId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
+    /** Which of the container's compartments it is in (a Handy Haversack's side pouch). */
+    compartment: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(40)
+      .optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
     magic: ItemMagicMarkerSchema.optional(),
     /** A copy whose magic is spent for now: a manual or tome after its study (`character.study-item`), until it
      *  regains it in a century. The server keeps it. */
-    dormant: z.boolean().optional()
+    dormant: z.boolean().optional(),
+    /** The cumulative penalty acid or rust left on this armor or weapon (a black pudding's Pseudopod, a rust monster's
+     *  Antennae): armor offers that much less AC and a weapon that much less to its attack rolls, until Mending removes
+     *  it. Armor whose AC it takes to 10, or a weapon it takes to -5, is destroyed. The server keeps it. */
+    penalty: z.number().int().min(1).max(10).optional(),
+    /** Identify was cast on this copy: its carrier's player learns its kind and the type the GM picked without
+     *  attuning to it. Only the cast sets it; the server keeps it. */
+    identified: z.literal(true).optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
@@ -2310,7 +2490,32 @@ export const SummonedSchema = z
     strikesFrom: StrikesFromSchema.optional(),
     /** The cast whose Concentration ends when it is gone (Arcane Hand at 0 Hit Points, Project Image's copy when it
      *  takes damage). */
-    endsSpell: z.string().min(1).max(120).optional()
+    endsSpell: z.string().min(1).max(120).optional(),
+    /** The use whose wait starts when it leaves: its user's pool, and the hours rolled as it came (a figurine's 5
+     *  days). */
+    waitAfter: z
+      .object({
+        key: z.string().min(1).max(120),
+        name: z.string().min(1).max(120),
+        hours: z.number().int().min(1).max(100_000),
+        /** Its use paid `hoursPaid` hours from a pool of `hoursPool` (a Goat of Traveling's 24): what it leaves unspent
+         *  comes back, each hour or part of one it stayed costing 1, and the wait starts only once the pool is spent. */
+        hoursPaid: z.number().int().min(1).max(100).optional(),
+        hoursPool: z.number().int().min(1).max(100).optional()
+      })
+      .strict()
+      .optional(),
+    /** The carried row that brought it, and what its death at 0 Hit Points does to that item. */
+    itemEnd: z
+      .object({
+        itemId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        outcome: z.enum(["destroyed", "nonmagical"])
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type Summoned = z.infer<typeof SummonedSchema>;
@@ -2438,6 +2643,9 @@ export const ActorSchema = z.object({
   /** SRD Influence: a monster's or NPC's attitude toward the party, Indifferent when absent. The GM sets it; an
    *  Influence check against it has Advantage when Friendly and Disadvantage when Hostile. GM-only in projections. */
   attitude: z.enum(["friendly", "indifferent", "hostile"]).optional(),
+  /** What the GM chose for this creature where its stat block leaves a choice (a half-dragon's Draconic Origin: a
+   *  damage type; a commoner's Training: a skill), keyed by the pick its trait names. GM-only in projections. */
+  statBlockPicks: z.record(RiderSlugSchema, RiderSlugSchema).optional(),
   /** SRD Malnutrition and Dehydration, while the table tracks food and water (`rest.survival`): what the creature ate
    *  and drank this game day, the days in a row it ate nothing, and the Exhaustion levels hunger and thirst gave it,
    *  which no rest removes until it eats or drinks its full need for a day. The server keeps it. Owner and GM only. */
@@ -2689,6 +2897,13 @@ export const GrantOptionSchema = z
     bonusActions: z.array(BonusActionBaseSchema).min(1).max(3).optional(),
     /** The damage type this option sets for what the effect deals (Dragon's Breath's acid, Fire Shield's cold). */
     damageType: DamageTypeSchema.optional(),
+    /** In a fight, the bearer makes this save at the start of each of its turns against the effect's DC; a failure gives
+     *  it these tags until that turn ends (Bestow Curse: "succeed on a Wisdom saving throw at the start of each of its
+     *  turns or be forced to take the Dodge action on that turn"). */
+    turnStartSave: z
+      .object({ ability: AbilitySchema, failureTags: z.array(EffectTagSchema).min(1).max(2) })
+      .strict()
+      .optional(),
     /** The bearer's Unarmed Strike deals this die of this type while it lasts, using this ability, or the granter's
      *  spellcasting ability, for its attack and damage rolls (Alter Self's claws: 1d6 Slashing). */
     unarmedStrike: z
@@ -2722,6 +2937,12 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   temporaryHitPointsEachTurn: z
     .union([z.number().int().min(1).max(100), z.literal("spellcasting-modifier")])
     .optional(),
+  /** The dice each of its `extra-damage` riders gains for each slot level above the spell's (Conjure Minor Elementals:
+   *  1d8). */
+  extraDamagePerSlot: z
+    .string()
+    .regex(/^\d{1,2}d(?:4|6|8|10|12)$/)
+    .optional(),
   /** What the recipient's Hit Point maximum and current hit points rise by while it lasts (Aid's 5), `perSlot` more for
    *  each slot level above the spell's; with `formula`, a roll made for each recipient (Heroes' Feast's 2d10). */
   hitPointMaximumGain: z
@@ -2732,6 +2953,8 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
     })
     .strict()
     .optional(),
+  /** The recipient's Speed is 0 while it lasts (Dream's messenger in its trance). */
+  speedZero: z.literal(true).optional(),
   /** The recipient's Speed is multiplied by this while it lasts, after every other change (Haste: 2). */
   speedMultiplier: z.number().int().min(2).max(4).optional(),
   /** A base AC the recipient may use while it wears no armor: this plus its Dexterity modifier, a Shield adding
@@ -2750,11 +2973,23 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   /** The spell's later action, by name, that the recipient may take while it lasts at the cast's numbers (Dragon's
    *  Breath: "exhale"); the caster's own sheet doesn't offer it. */
   grantsLaterAction: z.string().min(1).max(60).optional(),
+  /** The effect waits for a spell to hold (Contingency's contingent spell, a spell glyph's, a Ring of Spell Storing
+   *  held out), which `stored-casts.ts` stores. */
+  storeAwaits: StoreAwaitsSchema.optional(),
   /** An action the recipient may take to end it: a save at the caster's spell save DC (`dc: "spellcasting"`) or a
    *  printed DC (Irresistible Dance: a Wisdom save as an action; Maze: DC 20 Intelligence (Investigation)). */
   endAction: EffectEndActionSchema.extend({
     dc: z.union([z.number().int().min(1).max(40), z.literal("spellcasting")])
   })
+    .strict()
+    .optional(),
+  /** More actions that end it, each with who may take it and its check (bursting a Chain: a DC 20 Strength (Athletics)
+   *  check; picking Manacles' lock with Thieves' Tools). */
+  endedBy: z.array(EndedBySchema).min(1).max(4).optional(),
+  /** It anchors the recipient where it stands (a Climber's Kit): it can't move more than `feet` from there, nor fall
+   *  more than `feet` below it, while this lasts. */
+  anchors: z
+    .object({ feet: z.number().int().min(5).max(300) })
     .strict()
     .optional(),
   /** The grant binds to one weapon its recipient carries, picked on the resolve (`input.itemId`): its riders scoped
@@ -2766,6 +3001,26 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
       weaponIds: z.array(RiderSlugSchema).min(1).max(6).optional(),
       nonmagical: z.literal(true).optional(),
       melee: z.literal(true).optional(),
+      /** Refuses a weapon its wielder lacks proficiency with (True Strike). */
+      needsProficiency: z.literal(true).optional(),
+      /** The cast makes one attack with the weapon as part of its own action, and the binding ends with that attack
+       *  (True Strike). */
+      attacksNow: z.literal(true).optional(),
+      /** Extra damage of one type on its hits, by the granter's character level from each row's level up (True
+       *  Strike: 1d6 Radiant from 5, 2d6 from 11, 3d6 from 17). */
+      extraDamage: z
+        .object({
+          type: DamageTypeSchema,
+          dice: z
+            .array(z.object({ level: z.number().int().min(1).max(20), formula: DiceFormulaSchema }).strict())
+            .min(1)
+            .max(4)
+        })
+        .strict()
+        .optional(),
+      /** It binds to a stack of ammunition instead (a coat of Basic Poison on three pieces): its riders ride a shot
+       *  that draws from that stack. */
+      ammunition: z.literal(true).optional(),
       /** The ability its attack and damage rolls use: the granter's spellcasting ability, or a named one. */
       ability: z.union([AbilitySchema, z.literal("spellcasting")]).optional(),
       /** Its damage dice, by the granter's character level from each row's level up (Shillelagh: d8, d10 from 5, d12
@@ -2775,8 +3030,17 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
         .min(1)
         .max(4)
         .optional(),
-      /** The damage types its wielder may pick on a hit besides the weapon's own (Shillelagh: Force). */
-      damageTypes: z.array(DamageTypeSchema).min(1).max(2).optional(),
+      /** The damage types its wielder may pick on a hit besides the weapon's own (Shillelagh: Force; a pact weapon:
+       *  Necrotic, Psychic or Radiant). */
+      damageTypes: z.array(DamageTypeSchema).min(1).max(3).optional(),
+      /** Only a magic weapon (Pact of the Blade: "create a bond with a magic weapon you touch"). */
+      magical: z.literal(true).optional(),
+      /** Its wielder is proficient with it, and can use it as a Spellcasting Focus (`focus`), while bound. */
+      proficient: z.literal(true).optional(),
+      focus: z.literal(true).optional(),
+      /** With no weapon picked on the resolve, it conjures one of the kind its user picked for this feature, which
+       *  disappears when the binding ends (Pact of the Blade: "conjure a pact weapon in your hand"). */
+      conjures: z.object({ pickOf: RiderSlugSchema }).strict().optional(),
       /** The granter's modifier in this ability, at least `minimum`, added to its attack rolls (Sacred Weapon's
        *  Charisma, minimum +1). */
       attackBonusAbility: z
@@ -2932,6 +3196,33 @@ export const HitPointBandSchema = z
 export type HitPointBand = z.infer<typeof HitPointBandSchema>;
 
 /**
+ * What a save failed by `by` or more does ("Failure by 5 or More"). Its `conditions` and `duration` stand in for the
+ * failure's (a homunculus's Bite: Poisoned for 1 minute in place of until its next turn); without them the failure stands
+ * as printed. `whileFailed` adds conditions that last while the failure's own do and may end sooner: on damage, or by
+ * another creature's action ("While Poisoned, the target also has the Unconscious condition, which ends early if the
+ * target takes damage or a creature within 5 feet of it takes an action to wake it").
+ */
+export const FailureMarginSchema = z
+  .object({
+    by: z.number().int().min(2).max(20),
+    conditions: z.array(SaveConditionSchema).min(1).max(4).optional(),
+    duration: SaveFailureDurationSchema.optional(),
+    whileFailed: z
+      .object({
+        conditions: z.array(SaveConditionSchema).min(1).max(3),
+        endsOnDamage: z.literal(true).optional(),
+        endedBy: EndedBySchema.optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "What a save failed by `by` or more does: its conditions and duration in place of the failure's, and conditions that last while the failure's do and may end sooner (on damage, or by another creature's action)"
+  );
+export type FailureMargin = z.infer<typeof FailureMarginSchema>;
+
+/**
  * What a saving throw does, as data: the damage a success takes ("half" for Fireball, "none" for Sacred
  * Flame) and the condition a failure imposes. Every save block (stat-block action, feature action, spell)
  * spreads these fields. Unset, they take the common printing: half damage on a success, no condition.
@@ -3047,13 +3338,18 @@ export const SaveOutcomeFields = {
     .optional()
     .describe("The target repeats the save at the start of each of its turns, not the end"),
   /** The target also repeats the save each time it takes damage (Dominate Person), with Advantage (Hideous Laughter),
-   *  or only for damage from another source (a harpy's Luring Song). */
+   *  only for damage from another source (a harpy's Luring Song), or only for its source's (Sympathy: "If the target
+   *  damages the Charmed creature"). */
   repeatOnDamage: z
-    .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+    .object({
+      advantage: z.literal(true).optional(),
+      notFromSource: z.literal(true).optional(),
+      fromSourceOnly: z.literal(true).optional()
+    })
     .strict()
     .optional()
     .describe(
-      "The target repeats the save each time it takes damage: with Advantage (advantage), or only for damage from another source (notFromSource)"
+      "The target repeats the save each time it takes damage: with Advantage (advantage), only for damage from another source (notFromSource), or only for its source's (fromSourceOnly)"
     ),
   /** The target can take an action to repeat the save (Irresistible Dance: "collect itself"). */
   repeatByAction: z.literal(true).optional().describe("The target can take an action on its turn to repeat the save"),
@@ -3098,6 +3394,15 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("Each failed repeat save deals the first failure's damage again"),
+  /** The target repeats the save at the end of its turns only when it ends one more than this many feet from the
+   *  source (Antipathy/Sympathy: "ends its turn more than 120 feet away from the target"). */
+  repeatBeyondFeet: z
+    .number()
+    .int()
+    .min(5)
+    .max(5280)
+    .optional()
+    .describe("The target repeats the save only when it ends its turn more than this many feet from the source"),
   /** The target repeats the save only when it ends its turn out of the source's line of sight (Fear). */
   repeatUnseenSource: z
     .literal(true)
@@ -3155,6 +3460,24 @@ export const SaveOutcomeFields = {
     .max(6)
     .optional()
     .describe("Only creatures of these types make the save; any other is spared it"),
+  /** Creatures of these types are spared the save and all it does ("If the target is a creature that isn't an Undead or
+   *  elf, it is subjected to the following effect": a ghoul's Claw). */
+  sparesCreatureTypes: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(6)
+    .optional()
+    .describe("Creatures of these types make no save and take nothing a failure does"),
+  /** Characters of these species are spared it too (a ghoul's Claw spares an elf). */
+  sparesSpecies: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(4)
+    .optional()
+    .describe("Characters of these species make no save and take nothing a failure does"),
+  /** What a failure by `by` or more does ("Failure by 5 or More"): its conditions and duration replace the failure's,
+   *  and `whileFailed` adds conditions that last while the failure's do and may end sooner. */
+  failureByMargin: FailureMarginSchema.optional(),
   /** A creature that still bears this action's failure is left out ("each creature that isn't currently affected by
    *  this breath"). */
   sparesAffected: z.literal(true).optional().describe("A creature still under this action's failure makes no new save"),
@@ -3197,6 +3520,12 @@ export const SaveOutcomeFields = {
     .max(6)
     .optional()
     .describe("A creature of these types that fails is sent back to its home plane for 24 hours"),
+  /** A success ends the spell the save is against, its caster's Concentration on it included (Detect Thoughts' probe:
+   *  "On a successful save, the spell ends"). */
+  successEndsSpell: z
+    .literal(true)
+    .optional()
+    .describe("A success ends the spell the save is against, and its caster's Concentration on it"),
   /** A failure also breaks the creature's Concentration (Earthquake: "its Concentration is broken"; Sleet Storm). */
   breaksConcentration: z
     .literal(true)
@@ -3218,13 +3547,22 @@ export const ActionAreaSchema = z
     /** How many of these areas one use places (Fire Storm's ten Cubes, Meteor Swarm's four Spheres); a creature under
      *  more than one is caught once. */
     count: z.number().int().min(2).max(10).optional(),
+    /** Each area one use places spends one of its uses ("For every charge you expend, you launch a glowing mote":
+     *  Ring of Shooting Stars). */
+    eachCostsAUse: z.literal(true).optional(),
     /** Each area must touch another ("Each Cube must be contiguous with at least one other Cube"). */
     contiguous: z.literal(true).optional(),
     /** How high a Cylinder rises from the ground it stands on ("5-foot-radius, 40-foot-high Cylinder"). */
     heightFeet: z.number().int().min(1).max(1000).optional(),
     /** The point it centres on lies within this many feet of its user, for an action that is no spell (Land's Aid:
      *  "choose a point within 60 feet of yourself"); a spell's range is its own. */
-    rangeFeet: z.number().int().min(5).max(1000).optional()
+    rangeFeet: z.number().int().min(5).max(1000).optional(),
+    /** A Line that ends where it is aimed, no longer than `sizeFeet` ("a 5-foot-wide Line between you and the target",
+     *  a Javelin of Lightning's bolt). */
+    toTarget: z
+      .literal(true)
+      .optional()
+      .describe("A Line that ends where it is aimed, no longer than its size (a Javelin of Lightning's bolt)")
   })
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;
@@ -3256,7 +3594,14 @@ export const SightEffectSchema = z
         kind: z.enum(["lightly-obscured", "heavily-obscured", "magical-darkness"]),
         aroundSelfFeet: z.number().int().min(5).max(120).optional(),
         /** Its user sees through it ("Heavily Obscured for creatures other than you": Insect Cloud). */
-        sparesUser: z.literal(true).optional()
+        sparesUser: z.literal(true).optional(),
+        /** What clears it, ending its spell: a strong wind (`wind`: Fog Cloud "until a strong wind (such as one created
+         *  by Gust of Wind) disperses it") or water that destroys fog (`water`: Destroy Water). */
+        dispersedBy: z
+          .array(z.enum(["wind", "water"]))
+          .min(1)
+          .max(2)
+          .optional()
       })
       .strict()
       .optional(),
@@ -3303,8 +3648,13 @@ const ReactionAttackKindSchema = z.enum(["melee", "ranged", "melee-weapon", "ran
  *   triggering damage included.
  * - ac-bonus (Parry, Shield): add `amount` to AC against the attack before it lands, possibly turning the hit into a
  *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
- * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage, or
- *   the sibling action `usesAction` names (a rust monster's Antennae).
+ * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action, or the sibling action `usesAction` names (a rust
+ *   monster's Reflexive Antennae uses Antennae), against the creature that dealt the damage, that hit the reactor with
+ *   an attack roll (`hit-by-attack`), or that started its turn within `rangeFeet` (`starts-turn-near`: a chain devil's
+ *   Unnerving Gaze).
+ * - use-on-self (an octopus's Ink Cloud): resolve this action by the reactor on itself, its area centred on the reactor.
+ * - teleport-near (a nalfeshnee's Pursuit): the sibling Teleport `usesAction` names, its destination near the creature.
+ * - split (a black pudding's Split): the reactor becomes two smaller creatures of its stat block.
  * - melee-attack (Retaliation): make one melee attack against that creature instead.
  * - counter (Counterspell): a creature the reactor can see casts a spell with components; the cast waits, and "use"
  *   makes the caster roll an `ability` saving throw against the reactor's spell save DC, its spell lost on a failure.
@@ -3327,7 +3677,11 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional(),
       /** Deflect Attacks: a reduction to 0 may spend 1 Focus Point to turn the attack's force on a creature nearby,
        *  which makes a Dexterity save against two Martial Arts dice plus the Dexterity modifier. */
-      redirectsAtZero: z.literal(true).optional()
+      redirectsAtZero: z.literal(true).optional(),
+      /** When the reduction takes the damage to 0, the reactor turns this action's own save on one creature it picks
+       *  within the action's range (a stone giant's Deflect Missile: "the giant can redirect some of the attack's
+       *  force"). */
+      redirect: z.literal(true).optional()
     })
     .strict(),
   z.object({ trigger: z.literal("takes-damage"), response: z.literal("resist-type") }).strict(),
@@ -3337,12 +3691,17 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       response: z.literal("ac-bonus"),
       amount: z.number().int().min(1).max(10),
       melee: z.boolean().optional(),
-      untilNextTurn: z.boolean().optional()
+      untilNextTurn: z.boolean().optional(),
+      /** Offered on every hit, even one the bonus can't turn into a miss, for what else the action does (a mummy
+       *  lord's Whirlwind of Sand teleports it). */
+      anyHit: z.literal(true).optional()
     })
     .strict(),
   z
     .object({
-      trigger: z.literal("damaged-by-creature"),
+      /** Damage from a creature (Hellish Rebuke), an attack roll that hits (a rust monster's Reflexive Antennae), or a
+       *  creature starting its turn within `rangeFeet` (a chain devil's Unnerving Gaze). */
+      trigger: z.enum(["damaged-by-creature", "hit-by-attack", "starts-turn-near"]),
       response: z.literal("strike-back"),
       rangeFeet: ReactionRangeFeet,
       /** The sibling action it uses instead of itself ("The rust monster uses Antennae"). */
@@ -3350,7 +3709,48 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
         .string()
         .regex(/^[a-z0-9-]+$/)
         .max(120)
-        .optional()
+        .optional(),
+      /** The reactor must see the creature, and with `mutual` the creature must see it too ("A creature the devil can
+       *  see starts its turn within 30 feet of the devil and can see the devil"). */
+      sight: z.enum(["reactor", "mutual"]).optional()
+    })
+    .strict(),
+  /** Ink Cloud: when a creature ends its turn within `rangeFeet` of the reactor (`ends-turn-near`), or the reactor takes
+   *  damage (`damaged`), the reactor uses this action on itself, its area centred on it and its move granted.
+   *  `underwater` offers it only in a fight the GM marked as underwater. */
+  z
+    .object({
+      trigger: z.enum(["ends-turn-near", "damaged"]),
+      response: z.literal("use-on-self"),
+      rangeFeet: ReactionRangeFeet,
+      underwater: z.literal(true).optional()
+    })
+    .strict(),
+  /** Pursuit: when another creature the reactor can see ends a move within `rangeFeet` of it, the reactor uses the
+   *  sibling action `usesAction` names (its Teleport), its destination within `nearFeet` of that creature. */
+  z
+    .object({
+      trigger: z.literal("ends-move-near"),
+      response: z.literal("teleport-near"),
+      rangeFeet: ReactionRangeFeet,
+      usesAction: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(120),
+      nearFeet: z.number().int().min(5).max(120)
+    })
+    .strict(),
+  /** Split: while the reactor is one of `sizes` and has `minHitPoints` or more, it becomes Bloodied (`bloodied`) or
+   *  takes damage of one of `damageTypes`; it splits into two creatures of its own stat block, each one size smaller
+   *  with half its Hit Points (round down), and leaves the fight. */
+  z
+    .object({
+      trigger: z.literal("damaged"),
+      response: z.literal("split"),
+      damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
+      bloodied: z.literal(true).optional(),
+      sizes: z.array(SizeSchema).min(1).max(6),
+      minHitPoints: z.number().int().min(1).max(1000)
     })
     .strict(),
   z
@@ -3504,6 +3904,16 @@ export const DamageDrainSchema = z
       })
       .strict()
       .optional(),
+    /** A creature the damage reduces to 0 Hit Points becomes Stable instead of dying, and has these conditions for
+     *  `minutes` (a phase spider's Bite: "the target becomes Stable, and it has the Poisoned condition for 1 hour. While
+     *  Poisoned, the target also has the Paralyzed condition"). */
+    stableAtZero: z
+      .object({
+        conditions: z.array(SaveConditionSchema).min(1).max(3),
+        minutes: z.number().int().min(1).max(1440)
+      })
+      .strict()
+      .optional(),
     /** A creature of `creatureTypes` the damage kills rises as `monsterId` on the dealer's side at the start of the
      *  dealer's next turn (Finger of Death: "A Humanoid killed by this spell rises at the start of your next turn as a
      *  Zombie"). */
@@ -3600,6 +4010,15 @@ export const OnHitRiderSchema = z
       ),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
     reminder: z.string().min(1).max(400).optional(),
+    /** The hit gives the nonmagical body armor its target wears a cumulative -1 to the AC it offers, destroyed when that
+     *  reaches 10 (a black pudding's Dissolving Pseudopod); Mending removes it. */
+    armorPenalty: z.literal(true).optional(),
+    /** The hit lowers one of the target's ability scores by `dice`, cumulatively and until ended (a shadow's Draining
+     *  Swipe: "the target's Strength score decreases by 1d4"); with `killsAtZero` the target dies if it reaches 0. */
+    lowersScore: z
+      .object({ ability: AbilitySchema, dice: DiceFormulaSchema, killsAtZero: z.literal(true).optional() })
+      .strict()
+      .optional(),
     /** An action that ends the effect ("The target or a creature within 5 feet of it can detach the stirge as an
      *  action"). */
     endedBy: EndedBySchema.optional(),
@@ -3613,6 +4032,21 @@ export const OnHitRiderSchema = z
      *  leaves the rider's conditions; without one the target dies. `beheads`: a Vorpal Sword's cut, which a creature
      *  immune to Slashing, without a head or too big takes as 30 more Slashing damage instead, as one does that spends
      *  a Legendary Resistance. */
+    /** Each creature it slays spends one of its item's charges, which never come back, and it fires only while one is
+     *  left: `pool` holds `limit` (Nine Lives Stealer's 1d8 + 1, rolled when the sword is added). */
+    spendsCharge: z
+      .object({
+        pool: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(120),
+        limit: z.number().int().min(1).max(MAX_ACTION_USES)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Each creature it slays spends one of its item's charges, which never come back, and it fires only while one is left (Nine Lives Stealer)"
+      ),
     kills: z
       .object({
         hitPointsUnder: z.number().int().min(1).max(1000).optional(),
@@ -3787,6 +4221,9 @@ export const ActionTargetsSchema = z
     grappledBySource: z.literal(true).optional(),
     /** Only a creature with one of these conditions (a Trample's Prone, Death Glare's Frightened). */
     conditions: z.array(ConditionSchema).min(1).max(4).optional(),
+    /** Only a creature with one of these conditions from this creature's own effect ("one creature within 30 feet
+     *  that is Charmed or Grappled by the aboleth"). */
+    conditionsFromSource: z.array(ConditionSchema).min(1).max(4).optional(),
     /** Only a creature whose space this creature shares or is in (a Vortex, a Whelm). */
     inSpace: z.literal(true).optional(),
     /** "Each enemy", "an ally", "another creature" (not the user itself), or only the user ("can target only
@@ -3827,7 +4264,7 @@ export const ActionTargetsSchema = z
   })
   .strict()
   .describe(
-    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies, others or only the user itself, a creature the user marked, one at 0 Hit Points, a Bloodied one, one with a special speed, or one that can see or hear the user."
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions (or conditions from the user's own effect), in the user's space, enemies, allies, others or only the user itself, a creature the user marked, one at 0 Hit Points, a Bloodied one, one with a special speed, or one that can see or hear the user."
   );
 export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 
@@ -3919,6 +4356,12 @@ export const ShapeShiftSchema = z
     endsAtZeroHitPoints: z.literal(true).optional(),
     leaveAs: z.enum(["bonus-action", "action"]).optional(),
     revertRounds: z.number().int().min(1).max(100).optional(),
+    /** A form that ends in the air lowers its creature gently, landing it safely within a minute's 60 feet a round and
+     *  letting it fall the rest (Wind Walk). */
+    descendsSafely: z.literal(true).optional(),
+    /** Taking it takes this many rounds, with the Stunned condition (Wind Walk's return to cloud form: "a Magic action
+     *  followed by a 1-minute transformation"). */
+    takesRounds: z.number().int().min(1).max(100).optional(),
     /** It lasts this many minutes (a Potion of Gaseous Form's hour). */
     durationMinutes: z.number().int().min(1).max(1440).optional(),
     /** It lasts hours equal to half the user's level in this class (Wild Shape). Absent: the spell's duration, or until
@@ -3963,7 +4406,12 @@ export const AreaTriggerSchema = z
       .array(z.enum(["enter", "start-turn", "end-turn", "travel", "caster-turn-start", "caster-turn-end", "spell-end"]))
       .max(3),
     oncePerTurn: z.literal(true).optional(),
-    around: z.enum(["caster", "point"]).optional(),
+    /** Measured from its caster (an Emanation), from the point it is placed at, or from the creature its cast targets
+     *  (`target`: Antipathy/Sympathy's 120 feet round its target, which moves with it). */
+    around: z.enum(["caster", "point", "target"]).optional(),
+    /** Its caster picks, as it casts, the one creature type it acts on (Antipathy/Sympathy: "specify a kind of
+     *  creature"). */
+    picksType: z.literal(true).optional(),
     feet: z.number().int().min(5).max(120).optional(),
     /** Only the caster's enemies, or only the caster and its allies ("you and your allies": Aura of Life). */
     affects: z.enum(["enemies", "allies"]).optional(),
@@ -4033,6 +4481,8 @@ export const AreaTriggerSchema = z
         modifiers: EffectModifiersSchema.optional(),
         conditions: z.array(ConditionSchema).min(1).max(2).optional(),
         keepsMaximum: z.literal(true).optional(),
+        /** A bonus to Armor Class while inside (a planted Rod of Alertness's +1). */
+        armorClassBonus: z.number().int().min(1).max(5).optional(),
         struck: StruckSchema.omit({ save: true })
           .extend({
             save: z
@@ -4058,7 +4508,158 @@ export const AreaTriggerSchema = z
     towardCaster: z.literal(true).optional(),
     /** A spell of this level or lower cast from outside it can't affect anything within, one level higher for each slot
      *  level the spell is cast above its own (Globe of Invulnerability's 5). */
-    wardsSpells: z.number().int().min(0).max(9).optional()
+    wardsSpells: z.number().int().min(0).max(9).optional(),
+    /** Its area is the edge of the circle it is placed as, 5 feet thick: a ringed wall (Wall of Fire, Blade Barrier).
+     *  The ground inside the ring is out of it. */
+    ring: z.literal(true).optional(),
+    /** A creature that ends its turn within `feet` of this side of it is affected as one inside it is (Wall of Fire's
+     *  burning side): the left or right of a straight wall as it was drawn, the inside or outside of a ring. */
+    band: z
+      .object({
+        feet: z.number().int().min(5).max(30),
+        side: z.enum(["left", "right", "inside", "outside"])
+      })
+      .strict()
+      .optional(),
+    /** It tells the GM when a creature of these sizes other than its caster comes within `feet` of its point, with no
+     *  save (Faithful Hound's bark: "When a Small or larger creature comes within 30 feet of it"). */
+    warns: z
+      .object({ feet: z.number().int().min(5).max(120), sizes: z.array(SizeSchema).min(1).max(6) })
+      .strict()
+      .optional(),
+    /** It ends, with its spell, when its caster is more than this many feet from its point (Faithful Hound: "until
+     *  the two of you are more than 300 feet apart"). */
+    leash: z.number().int().min(5).max(5280).optional(),
+    /** What its caster holds while within `feet` of its point (Conjure Animals: "You have Advantage on Strength saving
+     *  throws while you're within 5 feet of the pack"). */
+    casterHolds: z
+      .object({ feet: z.number().int().min(5).max(120), modifiers: EffectModifiersSchema })
+      .strict()
+      .optional(),
+    /** Its caster picks the way it drifts at the start of each of its turns, any way that takes it farther from the
+     *  caster (Incendiary Cloud: "in a direction you choose"); a turn that ends with no pick drifts it straight away. */
+    steered: z.literal(true).optional(),
+    /** It ends, with its spell, when a strong wind's area overlaps it (`wind`: "until a strong wind (such as the one
+     *  created by Gust of Wind) disperses it"), or water that destroys fog does (`water`: Cloudkill's fog). */
+    endsBy: z
+      .array(z.enum(["wind", "water"]))
+      .min(1)
+      .max(2)
+      .optional(),
+    /** A strong wind (Gust of Wind): it disperses the clouds and fog it overlaps and puts out the exposed flames in it,
+     *  and a lantern's protected flame there has a 50 percent chance to go out. */
+    wind: z.literal(true).optional(),
+    /** It puts out the exposed flames in it: a burning creature stops burning, and a lit Candle, Lamp or Torch goes out
+     *  (Sleet Storm: "exposed flames in the area are doused"). */
+    douses: z.literal(true).optional(),
+    /** It destroys the fog it overlaps (Destroy Water): a fog that water ends goes, and so does fog's Heavily Obscured
+     *  area. */
+    destroysFog: z.literal(true).optional(),
+    /** It acts once over the area it is placed on, then ends (Create or Destroy Water's instant rain). */
+    instant: z.literal(true).optional(),
+    /** It acts only on creatures of these sizes (Tsunami: "Any Huge or smaller creature"). */
+    sizes: z.array(SizeSchema).min(1).max(6).optional(),
+    /** As it drifts it carries the creatures in it, and each creature it holds or moves onto then makes its save, once
+     *  a round (Tsunami: "the wall, along with any creatures in it, moves 50 feet away from you"). */
+    carries: z.literal(true).optional(),
+    /** Moved, it carries the creatures its failed save holds (a djinni's whirlwind: "the target has the Restrained
+     *  condition and moves with the whirlwind"). */
+    carriesHeld: z.literal(true).optional(),
+    /** A creature's action area that lasts while its user keeps Concentration on it (a djinni's whirlwind). */
+    concentration: z.literal(true).optional(),
+    /** Its user is unaffected by it ("the djinni is unaffected"). */
+    sparesUser: z.literal(true).optional(),
+    /** A creature's action area that lasts this many rounds (a Rod of Alertness planted for 10 minutes). */
+    lastsRounds: z.number().int().min(1).max(100).optional(),
+    /** As a creature's turn starts within `withinFeet` of its middle, it is pulled `feet` toward the middle (Control
+     *  Water's whirlpool: "within 25 feet of the vortex is pulled 10 feet toward it"). */
+    pulls: z
+      .object({ withinFeet: z.number().int().min(5).max(120), feet: z.number().int().min(5).max(60) })
+      .strict()
+      .optional(),
+    /** A creature within `withinFeet` can take control of it with a Magic action and an Intelligence (Arcana) check
+     *  against `dc`, until the start of its next turn; a failure draws it `pullFeet` toward that creature. In control,
+     *  a Bonus Action moves it 5 feet for each point of the controller's Intelligence modifier (Sphere of
+     *  Annihilation). */
+    controlled: z
+      .object({
+        dc: z.number().int().min(1).max(40),
+        withinFeet: z.number().int().min(5).max(300),
+        pullFeet: z.number().int().min(5).max(60)
+      })
+      .strict()
+      .optional(),
+    /** Its first damage part's dice by how many areas the use placed, the first for one (a Ring of Shooting Stars'
+     *  lightning spheres: 4d12 for one, down to 2d4 each for four). */
+    damageByCount: z.array(DiceFormulaSchema).min(2).max(10).optional(),
+    /** A creature within 5 feet can touch it (Delayed Blast Fireball's bead): it makes the area's save, and a failure
+     *  sets it off, while a success lets it throw it up to `throwFeet` at a creature, where it goes off. */
+    touched: z
+      .object({ throwFeet: z.number().int().min(5).max(120) })
+      .strict()
+      .optional(),
+    /** At the end of each of its caster's turns on which it drifted, it loses this much height and one die of its
+     *  damage; the spell ends when no height is left (Tsunami's 50 feet and 1d10). */
+    fadesFeet: z.number().int().min(5).max(300).optional(),
+    /** A creature in it can't move on its turn unless it first succeeds on a Strength (Athletics) check against the
+     *  save DC, rolled as its turn starts (Tsunami: "must succeed on a Strength (Athletics) check ... to move at all"). */
+    athleticsToMove: z.literal(true).optional(),
+    /** What the area becomes at the start of its caster's later turns: on the spell's `turn` (the cast's turn is 1) it
+     *  turns into the spell's later row named `row`, and keeps that until another entry (Storm of Vengeance's acid,
+     *  lightning, hail and freezing rain). */
+    schedule: z
+      .array(z.object({ turn: z.number().int().min(2).max(100), row: z.string().min(1).max(60) }).strict())
+      .min(1)
+      .max(10)
+      .optional(),
+    /** At its caster's turn start it acts on every creature in it, not only the nearest (Storm of Vengeance's rain). */
+    everyone: z.literal(true).optional(),
+    /** Its area is Heavily Obscured while it stands as this (Storm of Vengeance's freezing rain). */
+    obscures: z.literal(true).optional(),
+    /** Ranged weapon attacks made from it or at a creature in it miss (Storm of Vengeance: "ranged attacks with
+     *  weapons are impossible there"). */
+    stopsRangedWeapons: z.literal(true).optional(),
+    /** A glyph that waits hidden until a creature other than its caster comes within `feet` of its point (Symbol). Set
+     *  off, it glows: its area grows to `growsToFeet` and is filled with Dim Light and drawn for everyone, it acts on
+     *  each creature in it at once and as its trigger says after, and the spell ends `rounds` later. */
+    glyph: z
+      .object({
+        feet: z.number().int().min(5).max(30),
+        growsToFeet: z.number().int().min(5).max(120),
+        rounds: z.number().int().min(1).max(100)
+      })
+      .strict()
+      .optional(),
+    /** The spell's damage has this many more dice while it stands, on the cast and every later action (Call
+     *  Lightning cast in a storm: "the spell's damage increases by 1d10"). */
+    extraDice: z.number().int().min(1).max(10).optional(),
+    /** It heals instead of asking its save: its caster and the caster's allies (`allies`), the others making the save,
+     *  or every creature (`all`). `formula` is rolled with the caster's spellcasting modifier where `addsModifier`
+     *  says so (Conjure Celestial's Healing Light: "4d12 plus your spellcasting ability modifier"). */
+    heals: z
+      .object({
+        formula: z.string().min(1).max(40),
+        addsModifier: z.boolean(),
+        who: z.enum(["allies", "all"])
+      })
+      .strict()
+      .optional(),
+    /** Its damage and healing gain this many dice for each slot level it was cast above the spell's own (Conjure
+     *  Celestial's 1d12). */
+    dicePerSlot: z.number().int().min(1).max(4).optional(),
+    /** It acts on each creature its cast catches, as the cast (Conjure Celestial's lights on the creatures in the
+     *  Cylinder). */
+    atCast: z.literal(true).optional(),
+    /** Fire burns it away (Web: "Any 5-foot Cube of webs exposed to fire burns away in 1 round, dealing 2d4 Fire damage
+     *  to any creature that starts its turn in the fire"): the cells fire reaches burn until the same point of the next
+     *  round, dealing this to a creature that starts its turn there, and are then gone. */
+    burns: z
+      .object({ formula: z.string().min(1).max(40) })
+      .strict()
+      .optional(),
+    /** It lifts the Difficult Terrain painted in it while it stands (Speak with Plants: "turn Difficult Terrain caused
+     *  by plant growth ... into ordinary terrain"). */
+    clearsTerrain: z.literal(true).optional()
   })
   .strict();
 export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;
@@ -4091,7 +4692,9 @@ export const ActionTeleportSchema = z
     failDamage: DiceFormulaSchema.optional(),
     /** It may teleport the one willing creature its targets name instead of its user (a balor's "itself or a willing
      *  demon within 10 feet of itself"). */
-    orAnother: z.literal(true).optional()
+    orAnother: z.literal(true).optional(),
+    /** What its arrival does to the enemies near its destination (a mummy lord's Whirlwind of Sand). */
+    landing: TeleportLandingSchema.optional()
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;
@@ -4166,6 +4769,14 @@ export const SummonCreatureSchema = z
      *  disappears"). */
     allegiance: z.enum(["user", "none", "hostile"]).optional(),
     rounds: z.number().int().min(1).max(100).optional(),
+    /** What the die bringing this row does to the item that brought it: its kind from then on (an Efreeti Bottle
+     *  opened the first time on 2 to 9 holds a servant), or its magic ended (on a 1 or a 10). */
+    itemBecomes: z
+      .union([z.literal("nonmagical"), z.object({ variantId: RiderSlugSchema }).strict()])
+      .optional()
+      .describe(
+        "What the die bringing this row does to the item that brought it: its kind from then on (an Efreeti Bottle's servant), or its magic ended"
+      ),
     /** How it differs from its stat block ("uses the Riding Horse stat block, except it has a Speed of 100 feet"; a
      *  treant's trees have Intelligence and Charisma scores of 1 and lack Animate Trees). */
     except: z
@@ -4189,7 +4800,13 @@ export const SummonCreatureSchema = z
           .max(6)
           .optional(),
         /** Conditions it is immune to beside its stat block's (a Horn of Valhalla's spirits: Charmed and Frightened). */
-        conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional()
+        conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional(),
+        /** Senses it has beside its stat block's, as a stat block prints them (an Onyx Dog's "blindsight 60 ft."). */
+        senses: z
+          .array(z.string().regex(/^(?:darkvision|blindsight|tremorsense|truesight) \d{1,4} ft\.$/))
+          .min(1)
+          .max(4)
+          .optional()
       })
       .strict()
       .optional()
@@ -4314,6 +4931,22 @@ export const SummonSchema = z
     strikesFrom: StrikesFromSchema.optional(),
     /** When it is gone before its time (0 Hit Points, damage), its spell ends too (Arcane Hand, Project Image). */
     endsSpell: z.literal(true).optional(),
+    /** The use's wait (`uses.afterHours`) starts when what it brought leaves, not as it is used ("When the creature
+     *  becomes a figurine again, its property can't be used again until ..."; a djinni's 24 hours after it departs). */
+    waitsFromEnd: z
+      .literal(true)
+      .optional()
+      .describe(
+        "The use's wait (uses.afterHours) starts when what it brought leaves, not as it is used (a figurine's days after it reverts)"
+      ),
+    /** When it dies at 0 Hit Points, the item that brought it is destroyed (the Staff of the Python shatters) or loses
+     *  its magic (a Ring of Djinni Summoning). */
+    itemEndsAtZero: z
+      .enum(["destroyed", "nonmagical"])
+      .optional()
+      .describe(
+        "When it dies at 0 Hit Points, the item that brought it is destroyed (the Staff of the Python) or loses its magic (a Ring of Djinni Summoning)"
+      ),
     /** Its user's spell attack bonus, spell save DC and spellcasting ability modifier, which a scaled stat block reads
      *  (`summonScaling`). The engine fills them when it makes a cast action. */
     numbers: z
@@ -4358,6 +4991,8 @@ export const ActionSchema = z
           ),
         /** Attack rolls this action grants (Extra Attack 2, Eldritch Blast beams). Absent = 1. */
         count: z.number().int().min(1).max(10).optional(),
+        /** Its extra attacks are made with this weapon alone (Thirsting Blade: "for your pact weapon only"). */
+        countWithItself: z.literal(true).optional(),
         /** Extra weapon dice on a critical hit beyond crit doubling (Savage Attacks). Applies to the first damage part. */
         criticalBonusDice: z.number().int().min(1).max(4).optional(),
         /** The roll has Advantage when the printing says so: against a creature its user grapples ("with Advantage if
@@ -4411,11 +5046,37 @@ export const ActionSchema = z
           formula: DamageFormulaSchema.describe(
             'One die term plus at most one flat modifier ("1d8 + 3"), or a fixed amount that uses no roll ("1", a Blowgun), which a crit leaves as it is. Anything richer stays prose (ADR-0008)'
           ),
-          type: z.string().min(1).max(40)
+          type: z.string().min(1).max(40),
+          /** The part's type is the one this creature's stat-block pick chose ("damage of the type chosen for the
+           *  Draconic Origin trait"); `type` is the first it may be. */
+          pick: RiderSlugSchema.optional().describe(
+            "The key of the stat-block pick whose damage type this part takes (a half-dragon's Draconic Origin); the action is refused until the creature has one"
+          )
         })
       )
       .max(8)
       .default([]),
+    /** Each die of its damage that rolls its highest face adds another such die, up to `most` dice in all (Sorcerous
+     *  Burst: an 8 on a d8 adds a d8, up to the caster's spellcasting ability modifier). */
+    explodingDice: z
+      .object({ most: z.number().int().min(0).max(10) })
+      .strict()
+      .optional()
+      .describe("Each damage die that rolls its highest face adds another, up to this many in all"),
+    /** Teleport: the caster picks the destination's familiarity as it casts (`optionId`), and the server rolls the
+     *  d100 on the Teleportation Outcome table. */
+    teleportOutcome: z
+      .literal(true)
+      .optional()
+      .describe("The cast picks a destination's familiarity and rolls on the Teleportation Outcome table"),
+    /** Identify: the cast names one item its caster carries (`itemId`), whose kind its player then learns. */
+    identifiesItem: z
+      .literal(true)
+      .optional()
+      .describe("The cast names a carried item (itemId) whose properties its caster learns"),
+    /** Wish: the cast picks one of the spell's uses (`optionId`), and any but duplicating a spell stresses its
+     *  caster. */
+    wishUses: z.literal(true).optional().describe("The cast picks one of Wish's uses"),
     /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
     healing: z
       .object({
@@ -4431,13 +5092,41 @@ export const ActionSchema = z
         /** Each target regains all its hit points, whatever the formula says (Power Word Heal). */
         toMaximum: z.literal(true).optional(),
         /** The roll is Temporary Hit Points, which a creature takes only when they beat what it has (False Life). */
-        temporary: z.literal(true).optional()
+        temporary: z.literal(true).optional(),
+        /** Its dice give their highest faces with no roll (Fiendish Vigor's False Life). */
+        maximized: z.literal(true).optional()
       })
       .strict()
       .optional(),
     /** How many of its uses one activation spends: a fixed number (Lay on Hands' 5 points to cure a poison), or
      *  `chosen`, picked by the user each time (Lay on Hands' healing). Absent: one. */
     useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
+    /** A second limit each of its uses counts against too, kept under `pool`: uses a Long Rest restores (a Luck
+     *  Blade's Wish: its charges never come back, and it is cast once a dawn), or with `per: "never"` uses that never
+     *  come back, the last ending the item as its charges say (an Efreeti Bottle's openings). */
+    alsoUses: z
+      .object({
+        limit: z.number().int().min(1).max(MAX_ACTION_USES),
+        per: z.literal("never").optional(),
+        pool: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(120)
+          .optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A second limit each of its uses counts against too: uses a Long Rest restores (a Luck Blade's Wish once a dawn), or with per never uses that never come back, the last ending the item as its charges say (an Efreeti Bottle's openings)"
+      ),
+    /** Its uses are time in this unit: a use spends all that is left and lasts that long, and what is left when it ends
+     *  early comes back (Boots of Speed's 10 minutes as 100 rounds, a Goat of Traveling's 24 hours). */
+    timePool: z
+      .enum(["rounds", "hours"])
+      .optional()
+      .describe(
+        "Its uses are time in this unit: a use spends all that is left and lasts that long, and what is left when it ends early comes back (Boots of Speed's 100 rounds, a Goat of Traveling's 24 hours)"
+      ),
     /** Conditions this action ends on each target (Lay on Hands: Poisoned). */
     endsConditions: z.array(ConditionIdSchema).min(1).max(6).optional(),
     /** It ends one of `endsConditions`, the one its user picks (Lesser Restoration); absent, it ends each one present. */
@@ -4464,7 +5153,7 @@ export const ActionSchema = z
     darts: z.number().int().min(2).max(20).optional(),
     /** The damage types the caster picks from on each use (Chromatic Orb); the resolve names one, and every damage
      *  part takes it. Absent: the damage's own types. */
-    damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    damageTypes: z.array(DamageTypeSchema).min(2).max(13).optional(),
     /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). A
      *  component's `or` names other actions that can fill its place ("using Scimitar or Shortbow in any combination"). */
     multiattack: z
@@ -4552,6 +5241,42 @@ export const ActionSchema = z
       .max(2)
       .optional()
       .describe("Targeting restrictions the engine enforces"),
+    /** An ability check its user makes first, at a DC: a failure spends the action and does nothing else (wrapping a
+     *  Chain around a creature takes a DC 13 Strength (Athletics) check). */
+    checkFirst: z
+      .object({
+        ability: AbilitySchema,
+        skill: RiderSlugSchema.optional(),
+        dc: z.number().int().min(1).max(40)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "An ability check its user makes first, at a DC: a failure spends the action and does nothing else (binding with a Chain takes a DC 13 Strength (Athletics) check)"
+      ),
+    /** It remakes one carried row as a magic item bound to it (Oil of Sharpness): a nonmagical Melee weapon dealing one
+     *  of `damageTypes` becomes `weapon`, or `pieces` of such ammunition become `ammunition`. The row is picked on the
+     *  resolve (`input.itemId`). */
+    rebindsRow: z
+      .object({
+        weapon: RiderSlugSchema,
+        ammunition: RiderSlugSchema,
+        pieces: z.number().int().min(1).max(100),
+        damageTypes: z.array(DamageTypeSchema).min(1).max(3)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "It remakes one carried row as the magic item named, bound to it (Oil of Sharpness): a nonmagical Melee weapon dealing one of `damageTypes` becomes `weapon`, or `pieces` of such ammunition become `ammunition`"
+      ),
+    /** It ends what the same carried item's other actions left on creatures (Iron Bands' command that releases the
+     *  target, a Rope of Entanglement's). */
+    endsItemEffects: z
+      .literal(true)
+      .optional()
+      .describe(
+        "It ends what the same carried item's other actions left on creatures (the command that releases a creature Iron Bands hold)"
+      ),
     /** Resolving this action grants an effect to the actor itself (Rage, Reckless Attack). */
     grants: ActionGrantSchema.optional().describe(
       "Resolving this action grants an effect to the actor itself (Rage, Reckless Attack)"
@@ -4585,6 +5310,29 @@ export const ActionSchema = z
     requiresEffectTag: EffectTagSchema.optional().describe(
       'The action requires an active self effect carrying this tag (Frenzy requires "raging")'
     ),
+    /** It is cast through this spell, which its user must be concentrating on: it needs no Concentration of its own,
+     *  and what it leaves ends when that spell does (a Crystal Ball's Detect Thoughts through its Scrying). */
+    castThrough: RiderSlugSchema.optional().describe(
+      "It is cast through this spell, which its user must be concentrating on: it needs no Concentration of its own, and what it leaves ends when that spell does (a Crystal Ball's Detect Thoughts through Scrying)"
+    ),
+    /** What the cast leaves lasts this many minutes, whatever the spell's own duration (Oil of Slipperiness' Grease: 8
+     *  hours). */
+    castLastsMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(14400)
+      .optional()
+      .describe("What the cast leaves lasts this many minutes, whatever the spell's own duration"),
+    /** A check its user makes as it is used: a failure spends it and nothing else happens (an Amulet of the Planes'
+     *  DC 15 Intelligence (Arcana) before its Plane Shift). */
+    castCheck: z
+      .object({ ability: AbilitySchema, skill: SkillIdSchema.optional(), dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional()
+      .describe(
+        "A check its user makes as it is used: a failure spends it and nothing else happens (an Amulet of the Planes' DC 15 Intelligence (Arcana))"
+      ),
     uses: ActionUsesSchema.optional().describe("Limited uses; unlike a feature's, an action's may recharge on a d6"),
     /** Resolving this action also spends one of the bearer's spell slots of this level ("expend a spell slot to cast
      * it from the staff"). Checked and spent by the limited-uses economy pass, so a preview never spends. */
@@ -4667,6 +5415,25 @@ export const ActionSchema = z
     useNumber: z.number().int().min(1).max(10).optional(),
     /** Its saves are against magic (a sphinx's "magical roar"), which Magic Resistance meets with Advantage. */
     magical: z.literal(true).optional(),
+    /** It can be used only in a fight underwater ("While underwater, the seahorse moves", a kraken's Toxic Ink). */
+    underwaterOnly: z.literal(true).optional().describe("It can be used only in a fight the GM marked as underwater"),
+    /** The object it acts on, worn or carried by its target: a nonmagical armor or weapon (`metal`: of metal) a failed
+     *  save gives a cumulative -1 (a rust monster's Antennae). The resolve names the row (`objectItemId`); absent, the
+     *  target's worn armor, else its weapon in hand. */
+    object: z
+      .object({
+        kinds: z
+          .array(z.enum(["armor", "weapon"]))
+          .min(1)
+          .max(2),
+        metal: z.literal(true).optional(),
+        does: z.enum(["penalty-on-failure"])
+      })
+      .strict()
+      .optional()
+      .describe(
+        "The object it acts on, worn or carried by its target: a nonmagical armor or weapon (of metal with `metal`) that a failed save gives a cumulative -1 (a rust monster's Antennae), named by the resolve's `objectItemId`, else the target's worn armor or its weapon in hand"
+      ),
     /** What it does to each target with no roll: conditions, on creatures of `maxTargetSize` or smaller, standing
      *  until ended or for `duration`; and a lost Concentration (a tarrasque's shock wave: "Creatures in that area lose
      *  Concentration and, if Medium or smaller, have the Prone condition"). */
@@ -4690,6 +5457,13 @@ export const ActionSchema = z
     /** Its spell is cast with this action alone, whatever the spell's casting time (Pact of the Chain: "cast it as a
      *  Magic action without expending a spell slot"). */
     castsAtOnce: z.literal(true).optional(),
+    /** The spell components its cast goes without, as the feature that gives it says (Wild Companion's Find Familiar
+     *  "without Material components"). */
+    waives: z
+      .array(z.enum(["verbal", "somatic", "material"]))
+      .min(1)
+      .max(3)
+      .optional(),
     /** A jump the action allows this turn ("jumps up to 30 feet by spending 10 feet of movement"). */
     leap: z
       .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })
@@ -5220,10 +5994,44 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
   /** "Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapacitated condition"
    *  (Blurred Form). */
   z.object({ kind: z.literal("blurred"), name: TraitNameSchema }).strict(),
+  /** What touching the creature does to gear (a black pudding's and a gray ooze's Corrosive Form): a nonmagical weapon
+   *  that hits and damages it takes a cumulative -1 to attack rolls, destroyed at -5 (`weapons`), and nonmagical
+   *  ammunition that hits it is destroyed (`ammunition`). */
+  z
+    .object({
+      kind: z.literal("corrodes-gear"),
+      name: TraitNameSchema,
+      weapons: z.literal(true).optional(),
+      ammunition: z.literal(true).optional()
+    })
+    .strict(),
+  /** A choice the stat block leaves to the GM for each creature (a half-dragon's Draconic Origin: "one of the following
+   *  damage types (DM's choice)"; a commoner's Training: "proficiency in one skill of the DM's choice"), stored on the
+   *  creature under `key`. A damage-type pick is what the actions' parts with this `pick` deal; a skill pick with
+   *  `skillAdvantage` gives proficiency in the skill and Advantage on ability checks with it. */
+  z
+    .object({
+      kind: z.literal("pick"),
+      name: TraitNameSchema,
+      key: RiderSlugSchema,
+      of: z.enum(["damage-type", "skill"]),
+      options: z.array(RiderSlugSchema).min(2).max(18).optional(),
+      skillAdvantage: z.literal(true).optional()
+    })
+    .strict(),
   /** "Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has
    *  Disadvantage on the saving throw" (Ooze Cube): the action whose save a creature entering its space makes. */
   z
     .object({ kind: z.literal("engulfs-entrants"), name: TraitNameSchema, actionId: z.string().min(1).max(120) })
+    .strict(),
+  /** "The ground in a 10-foot Emanation originating from the mouther is Difficult Terrain" (Aberrant Ground): ground
+   *  that moves with the creature, costing every other creature double. */
+  z
+    .object({
+      kind: z.literal("difficult-ground"),
+      name: TraitNameSchema,
+      rangeFeet: z.number().int().min(5).max(120)
+    })
     .strict(),
   /** A vampire's Misty Escape: dropped to 0 Hit Points, it turns to mist and lives on at 0 unless it stands in
    *  sunlight, where it can't shape-shift and is destroyed. */
@@ -5264,6 +6072,16 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
         .string()
         .regex(/^[a-z0-9-]+$/)
         .max(80)
+    })
+    .strict(),
+  /** A shield guardian's Spell Storing: its commander, wearing its amulet, casts a spell of `maxLevel` or lower on it
+   *  from within 5 feet, and the spell is stored in place of any other; the guardian casts it at the caster's numbers,
+   *  with no components, once. */
+  z
+    .object({
+      kind: z.literal("spell-storing"),
+      name: TraitNameSchema,
+      maxLevel: z.number().int().min(1).max(9)
     })
     .strict()
 ]);

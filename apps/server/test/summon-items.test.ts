@@ -121,12 +121,9 @@ describe("Efreeti Bottle, Figurines and the Staff of the Python", () => {
     else expect(kept.duration).toEqual({ type: "rounds", remaining: 5 });
   });
 
-  it("an Ivory Goat becomes the goat picked, for 3 hours", async () => {
+  it("the Goat of Travail becomes a Giant Goat for 3 hours", async () => {
     const table = await carrying("figurine-of-wondrous-power#ivory-goats");
-    const used = await table.resolve({
-      actionId: "item-figurine-of-wondrous-power-ivory-goats",
-      summon: { picks: [{ monsterId: "giant-goat", form: "travail" }] }
-    });
+    const used = await table.resolve({ actionId: "item-figurine-of-wondrous-power-goat-of-travail" });
     expect(used.status, await used.clone().text()).toBe(200);
     const [goat] = table.named("Goat of Travail");
     expect(goat!.control).toMatchObject({ by: CASTER, dodgesUncommanded: true });

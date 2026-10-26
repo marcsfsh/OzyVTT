@@ -9,12 +9,16 @@ import { needsSettling, settleFalls as settleFallsIn } from "../falling.js";
 import { compelledMoves, fleesNow } from "../granted-moves.js";
 import { needsPlaneSettling, settlePlanes } from "../off-plane.js";
 import { heldMoveReady, settleHeldMove } from "../held-moves.js";
+import { offerNearbyReactions } from "../triggered-reactions.js";
 import { movementCost } from "../terrain.js";
 import { burstEndedZones } from "../spell-zones.js";
+import { releaseGlyphSpells } from "../stored-cast-release.js";
 import { planNextTurn } from "../combat-history.js";
 import { nextInitiativeTurn } from "../encounter.js";
 import { holdsSummons, needsSummonSettling, settleSummons, summonHoldingTurnLeaves } from "../summons.js";
+import { holdsBonds, needsBondSettling, settleBonds } from "../warding-bond.js";
 import { holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
+import { holdsZoneOutcomes, settleZoneOutcomes, zoneOutcomesPending } from "../zone-outcomes.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -204,6 +208,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     const result = await context.store.execute({ id, type: "positions.settle", principal: "table" }, (draft) => {
       const deps = kit.fallDeps(draft, distance, id);
       const sameMap = geometry !== null && draft.combat.mapAssetId === mapAssetId;
+      const heldId = draft.combat.heldMove?.actorId;
       const held = sameMap
         ? settleHeldMove(draft, geometry, {
             zones: kit.zoneDeps(draft, geometry),
@@ -213,8 +218,20 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
             }
           })
         : [];
+      // A held move that went on to its end can open another creature's reaction to it (a nalfeshnee's Pursuit).
+      const pursued =
+        heldId && held.length > 0 && draft.combat.heldMove?.actorId !== heldId
+          ? offerNearbyReactions(draft, heldId, "ends-move-near", {
+              newId: context.newId,
+              now: () => new Date().toISOString(),
+              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+              catalog: kit.equipmentCatalog(),
+              distanceFeet: (a, b) => distance(draft, a, b),
+              commandId: id
+            })
+          : [];
       const planes = sameMap ? settlePlanes(draft, geometry) : [];
-      events = [...held, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
+      events = [...held, ...pursued, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
     });
     if (result.duplicate) return;
     await context.publishGameState(result.state);
@@ -256,11 +273,48 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       (draft) => {
         events = settleSummons(draft, {
           distanceFeet: leash(draft),
-          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId)
+          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+          catalog: kit.equipmentCatalog()
         });
       }
     );
     if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /** A Warding Bond whose caster dropped to 0 or ended more than 60 feet from its ward ends, as its own write. */
+  async function settleWardingBonds() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null || !holdsBonds(before)) return;
+    const distance = await kit.creatureDistance();
+    if (!needsBondSettling(before, (a, b) => distance(before, a, b))) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute(
+      { id: context.newId(), type: "bonds.settle", principal: "table" },
+      (draft) => {
+        events = settleBonds(draft, (a, b) => distance(draft, a, b));
+      }
+    );
+    if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /**
+   * What the standing spell areas do to fire, fog and clouds once a command has moved a creature or an area (Sleet
+   * Storm douses a torch carried in, Gust of Wind disperses a cloud), with the server's dice, as its own write when
+   * anything changed.
+   */
+  async function settleZoneOutcomesAfter() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null || !holdsZoneOutcomes(before, kit.equipmentCatalog())) return;
+    const geometry = await kit.liveGeometry();
+    if (!zoneOutcomesPending(before, kit.zoneDeps(before, geometry))) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "spell-zone.outcomes" }, (draft) => {
+      events = settleZoneOutcomes(draft, kit.zoneDeps(draft, geometry));
+    });
     await context.publishGameState(result.state);
     kit.publishNarrations(events);
   }
@@ -274,8 +328,16 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     if (!before.combat.spellZones.some((zone) => zone.bursting) || before.combat.historyCursor !== null) return;
     const geometry = await kit.liveGeometry();
     let events: EffectNarration[] = [];
+    const distance = await kit.creatureDistance();
     const result = await context.store.execute({ id: context.newId(), type: "spell-zone.burst" }, (draft) => {
-      events = burstEndedZones(draft, kit.zoneDeps(draft, geometry));
+      // A spell glyph's stored spell takes effect on the creature that set it off; an explosive rune bursts.
+      events = [
+        ...releaseGlyphSpells(draft, {
+          ...kit.zoneDeps(draft, geometry),
+          distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+        }),
+        ...burstEndedZones(draft, kit.zoneDeps(draft, geometry))
+      ];
     });
     await context.publishGameState(result.state);
     kit.publishNarrations(events);
@@ -342,10 +404,12 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     const accepted = committed ? { revision: committed.state.revision, duplicate: committed.duplicate } : {};
     const reply = projectReply(principal, { ...accepted, ...extras });
     if (settle && committed && !committed.duplicate) {
+      await settleZoneOutcomesAfter();
       await settleBurstingZones();
       await settleZoneAurasAfter();
       await settleDownedReactions();
       await settleSummoned();
+      await settleWardingBonds();
       await settleFalls();
     }
     return reply;

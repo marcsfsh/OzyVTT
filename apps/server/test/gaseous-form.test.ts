@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { setAltitude } from "../src/altitude.js";
 import { builtinActionFor } from "../src/builtin-actions.js";
+import { endEffect } from "../src/effects.js";
+import { startEncounter } from "../src/encounter.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { formViolations } from "../src/transform/rules.js";
 import { spaceSharingFor } from "../src/space-sharing.js";
@@ -130,5 +133,59 @@ describe("Wind Walk", () => {
     const reverting = fight.actor(HERO).effects.find((effect) => effect.name === "Reverting to its normal form")!;
     expect(reverting.duration).toEqual({ type: "rounds", remaining: 10 });
     expect(fight.actor(HERO).conditions.map((condition) => condition.id)).toContain("stunned");
+  });
+
+  it("lets a target become a cloud again with a Magic action, Stunned for the minute it takes, while the spell lasts", () => {
+    const fight = table(
+      druid(11, [{ level: 1, kind: "spell", id: "wind-walk" }]),
+      { [FOE]: "ogre" },
+      { combat: false }
+    );
+    fight.resolve(HERO, "spell-wind-walk", { targetIds: [HERO] });
+    const spell = fight.actor(HERO).effects.find((effect) => effect.grantedSpellAction?.spellId === "wind-walk")!;
+    expect(spell).toMatchObject({ name: "Wind Walk", duration: { type: "minutes", remaining: 480 } });
+    fight.resolve(HERO, "leave-form", {});
+    expect(formOf(fight, HERO)).toBeUndefined();
+    // A minute later it has reverted.
+    const reverting = fight.actor(HERO).effects.find((effect) => effect.name === "Reverting to its normal form")!;
+    endEffect(fight.state, HERO, reverting.id);
+    const again = effectiveActions(fight.definitionOf(HERO), fight.actor(HERO), catalog).find(
+      (entry) => entry.id === "spell-wind-walk-then-cloud-form"
+    )!;
+    expect(again.activation).toBe("action");
+    fight.resolve(HERO, again, {});
+    expect(formOf(fight, HERO)?.form?.printedId).toBe("cloud");
+    expect(formOf(fight, HERO)?.duration).toEqual(spell.duration);
+    const transforming = fight.actor(HERO).effects.find((effect) => effect.name === "Transforming into Cloud")!;
+    expect(transforming).toMatchObject({
+      duration: { type: "rounds", remaining: 10 },
+      linkedConditionIds: ["stunned"]
+    });
+  });
+
+  it("lowers a cloud still aloft when its form ends, landing it safely within 600 feet and dropping it the rest", () => {
+    const fight = table(
+      druid(11, [{ level: 1, kind: "spell", id: "wind-walk" }]),
+      { [FOE]: "ogre" },
+      { combat: false }
+    );
+    fight.resolve(HERO, "spell-wind-walk", { targetIds: [HERO] });
+    startEncounter(
+      fight.state,
+      { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: HERO, score: 20 }] },
+      () => 1,
+      { width: 1000, height: 1000, calibration: null }
+    );
+    const token = () => fight.state.combat.tokens.find((entry) => entry.actorId === HERO)!;
+    token().position = { x: 125, y: 125 };
+    setAltitude(fight.state, HERO, 120, "fly");
+    endEffect(fight.state, HERO, formOf(fight, HERO)!.id);
+    // Held up as a gentle descent, which the next settle lands safely.
+    expect(token()).toMatchObject({ altitudeFeet: 120, airborne: "levitate" });
+    fight.resolve(HERO, "spell-wind-walk-then-cloud-form", {});
+    setAltitude(fight.state, HERO, 900, "fly");
+    endEffect(fight.state, HERO, formOf(fight, HERO)!.id);
+    // A minute of 60 feet a round brings it 600 feet down; it falls the last 300.
+    expect(token()).toMatchObject({ altitudeFeet: 300, airborne: "fly" });
   });
 });

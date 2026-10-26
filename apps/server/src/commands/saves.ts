@@ -41,6 +41,7 @@ import {
 } from "../saving-throws.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { pushThroughZones } from "../pushed-through.js";
+import { placeBeside } from "../mounts.js";
 import { defineCommand } from "./pipeline.js";
 import { withArticle } from "@vtt/domain";
 
@@ -207,7 +208,7 @@ export const saveCommands = [
       const distance = await kit.creatureDistance();
       // A failure that pushes moves the token on the live map; one changed meanwhile asks the GM to move it.
       const mapAssetId = kit.read().combat.mapAssetId;
-      const geometry = pending?.failurePush ? await kit.liveGeometry() : null;
+      const geometry = pending?.failurePush || pending?.unseats ? await kit.liveGeometry() : null;
       let answered: ReturnType<typeof answerSave> | undefined;
       // What the spell areas a push moves the creature through did to it.
       const pushedThrough: EffectNarration[] = [];
@@ -232,7 +233,9 @@ export const saveCommands = [
             pushToken: (input) =>
               geometry && draft.combat.mapAssetId === mapAssetId
                 ? pushThroughZones(draft, input, geometry, kit.zoneDeps(draft, geometry), pushedThrough)
-                : null
+                : null,
+            placeBeside: (actorId, besideId) =>
+              draft.combat.mapAssetId === mapAssetId && placeBeside(draft, actorId, besideId, geometry)
           },
           legendaryResistance,
           rollMode,

@@ -85,6 +85,12 @@ export type ResolveInput = Readonly<{
   targetOptions?: Readonly<Record<string, string>>;
   /** The carried weapon a grant binds to (`grants.bindsWeapon`). */
   itemId?: string | null;
+  /** The armor or weapon of the target the action acts on (`action.object`, Mending). */
+  objectItemId?: string | null;
+  /** A reaction to this creature's turn starting: a failure "until the end of its turn" ends with that turn. */
+  currentTurnOf?: string;
+  /** The action's area is centred on its user where it stands (an octopus's ink), with no template placed. */
+  areaAt?: Readonly<{ x: number; y: number }>;
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];
@@ -193,6 +199,10 @@ export type ResolveDependencies = Readonly<{
   zoneCover?: (fromActorId: string, targetId: string) => "half" | "three-quarters" | "total" | null;
   /** The wall that deflects an ordinary projectile from the first combatant at the second (Wind Wall), or null. */
   deflectedBy?: (fromActorId: string, targetId: string) => string | null;
+  /** Feet from a combatant to the point a spell area was placed at (Delayed Blast Fireball's bead), or null. */
+  zoneFeet?: (actorId: string, zoneId: string) => number | null;
+  /** Moves an area straight toward a combatant, up to these feet, and reports what it met (a Sphere of Annihilation). */
+  moveZone?: (zoneId: string, towardActorId: string, feet: number) => EffectNarration[];
 }>;
 
 type RollBase = Pick<
@@ -338,6 +348,8 @@ export type ResolveContext = {
   summoned?: ReadonlyArray<Readonly<{ actorId: string; name: string }>>;
   /** A look at the damage records no roll: the roller alone sees its dice until the confirm deals them. */
   silentRolls?: boolean;
+  /** This later action comes with its spell's cast at no further cost (`takenWithCast`), and spends that free use. */
+  withCast?: boolean;
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die

@@ -22,6 +22,7 @@ import {
   SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorLairSchema,
+  SetActorPickSchema,
   SetActorSheetPreviewSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
@@ -29,6 +30,7 @@ import {
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { legendaryInLair } from "../lair.js";
+import { setStatBlockPick } from "../statblock-picks.js";
 import { setActorSize, setActorVisibility } from "../token-placement.js";
 import { importedDefinition } from "./characters.js";
 import { initiatorOf } from "./kit.js";
@@ -289,6 +291,38 @@ export const actorCommands = [
         kit.context.appendLog({
           kind: "encounter",
           text: `${kit.actorName(actorId)} ${inLair ? "fights in its lair" : "no longer fights in its lair"}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.set-pick",
+    operationId: "setActorPick",
+    description:
+      "Records what a creature's stat block leaves to the GM's choice (GM-grade only; SRD 5.2.1): a half-dragon's Draconic Origin damage type, which its Claw and Dragon's Breath deal, or a commoner's Training skill, which it rolls with proficiency and Advantage. `key` names the pick the stat block prints and `value` one of its options; null clears it. Refused for a pick the stat block doesn't print or a value it doesn't allow.",
+    summary: "Choose what a creature's stat block leaves to the GM, such as a damage type or a skill (GM).",
+    schema: SetActorPickSchema,
+    malformed: "The pick command is malformed.",
+    gmOnly: "Only the GM can make a stat block's choices.",
+    // Silent to players: what the GM chose shows when the creature uses it.
+    async run({ request, execute }, kit) {
+      const { actorId, key, value } = request;
+      let name = "";
+      const { duplicate } = await execute((state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That creature no longer exists.");
+        const definition = actor.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
+        name = setStatBlockPick(actor, definition, key, value).name;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text:
+            value === null
+              ? `${kit.actorName(actorId)}'s ${name} is no longer chosen.`
+              : `${kit.actorName(actorId)}'s ${name} is ${value.replace(/-/g, " ")}.`,
           actorIds: [actorId],
           gmOnly: true
         });

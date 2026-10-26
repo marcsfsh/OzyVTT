@@ -30,6 +30,9 @@ import { chargesAfterDawn, neverRegained } from "./item-charges.js";
 import { afterLongRest, deniedRestLine, holdsMaximumAtRest, restDeniedBy } from "./rest-triggers.js";
 import { divineInterventionWaiting } from "./divine-intervention.js";
 import { holdsTrance, TRANCE_LONG_REST_MINUTES } from "./trance.js";
+import { conjureBookOfShadows } from "./book-of-shadows.js";
+import { finishLongRest, openLongRest, type RestApplier } from "./long-rest.js";
+import { endTravelFor } from "./travel.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
@@ -58,9 +61,11 @@ export function hitDieSizesToSpend(entries: readonly HitDiceEntry[], count: numb
     .slice(0, count);
 }
 
-/** Whether `actorId` is in the Short Rest under way (the party's, or one its player started). */
+/** Whether `actorId` is in the Short Rest under way (the party's, or one its player started), or has a Short Rest's
+ *  benefits from a Long Rest interrupted after an hour, while it waits to resume. */
 export const inShortRest = (state: GameState, actorId: string) =>
-  state.rest.shortRest?.actorIds.includes(actorId) ?? false;
+  (state.rest.shortRest?.actorIds.includes(actorId) ?? false) ||
+  (state.rest.longRest?.members.some((member) => member.actorId === actorId && member.shortRestEarned) ?? false);
 
 /** Spends Hit Point Dice to heal (SRD 5.2.1 Short Rest): each die heals `face + Con modifier`, minimum 1.
  *  "A creature can spend Hit Dice during a Short Rest", so a player spends them only while their character is in the
@@ -248,12 +253,16 @@ export function applyRest(
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
   catalog?: EquipmentCatalog,
   charges?: Readonly<{ random: (sides: number) => number; lines: string[] }>,
-  clockMoved = false
+  clockMoved = false,
+  /** A Short Rest's benefits from an interrupted Long Rest: the Initiative that interrupted it may have begun a fight. */
+  interrupted = false
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  const refusal = restRefusal(state, actor, kind);
+  const refusal = interrupted ? atZeroRefusal(actor, "A Short Rest needs") : restRefusal(state, actor, kind);
   if (refusal) throw new CommandRejectedError(refusal);
+  // Resting isn't travelling.
+  endTravelFor(state, [actorId]);
   const events: EffectNarration[] = [];
   // SRD Trance: an elf "can finish a Long Rest in 4 hours", so its own rest runs out 4 hours of its effects.
   const restMinutes = holdsTrance(actor.definitionId ? resolveDefinition(actor.definitionId) : undefined)
@@ -300,6 +309,7 @@ export function applyRest(
       actor.preparation = { changesLeft: 1 };
     // What a feature does "when you finish a Short Rest" (Arcane Recovery, a re-choice) is made in the step this opens.
     actor.restStep = { after: "short-rest" };
+    events.push(...conjureBookOfShadows(state, actor, definition));
     return events;
   }
   // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
@@ -362,6 +372,7 @@ export function applyRest(
   // SRD Wild Shape: "Whenever you finish a Long Rest, you can replace one of your known forms."
   openFormSwap(actor);
   actor.restStep = { after: "long-rest" };
+  events.push(...conjureBookOfShadows(state, actor, longRestDefinition));
   // SRD Human, Resourceful: "You gain Heroic Inspiration whenever you finish a Long Rest." One at most.
   if (
     holdsFeature(longRestDefinition, "human-resourceful", "Resourceful") ||
@@ -440,17 +451,11 @@ function longRest(
 
 /**
  * The GM rests several characters together. Every one must be able to, or none rests: the refusal names who can't and
- * why. Long: 8 hours pass on the game clock for everyone (what runs out in them ends), and each rests. Short: the rest
- * opens for each player to spend Hit Dice on their own device, and `finishPartyShortRest` ends it.
+ * why. Long: the rest opens and lasts until the GM finishes it (`finishPartyLongRest`), so what happens meanwhile can
+ * interrupt it (`long-rest.ts`). Short: the rest opens for each player to spend Hit Dice on their own device, and
+ * `finishPartyShortRest` ends it.
  */
-export function startPartyRest(
-  state: GameState,
-  actorIds: readonly string[],
-  kind: "long" | "short",
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog,
-  random?: (sides: number) => number
-): EffectNarration[] {
+export function startPartyRest(state: GameState, actorIds: readonly string[], kind: "long" | "short"): void {
   if (kind === "short" && state.rest.shortRest)
     throw new CommandRejectedError("A Short Rest is already under way. Finish it first.");
   const members = actorIds.map((actorId) => {
@@ -462,29 +467,29 @@ export function startPartyRest(
     .map((actor) => restRefusal(state, actor, kind))
     .filter((refusal): refusal is string => refusal !== null);
   if (refusals.length > 0) throw new CommandRejectedError(refusals.join(" "));
-  if (kind === "short") {
-    state.rest = { ...state.rest, shortRest: { actorIds: [...actorIds], done: [] } };
-    return [];
-  }
-  const events = passGameTime(
-    state,
-    partyLongRestMinutes(members, resolveDefinition),
-    random ? { resolveDefinition, ...(catalog ? { catalog } : {}), random } : undefined
-  );
-  events.push(...members.flatMap((actor) => longRest(state, actor.id, resolveDefinition, catalog, random, true)));
-  for (const actor of members) actor.lastLongRestAt = state.rest.clockHours;
-  return events;
+  endTravelFor(state, actorIds);
+  if (kind === "short") state.rest = { ...state.rest, shortRest: { actorIds: [...actorIds], done: [] } };
+  else openLongRest(state, actorIds);
 }
 
-/** How long the party's Long Rest takes: 4 hours when every member holds Trance, 8 otherwise. */
-export function partyLongRestMinutes(
-  members: readonly Pick<Actor, "definitionId">[],
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
-): number {
-  const tranced = members.every((actor) =>
-    holdsTrance(actor.definitionId ? resolveDefinition(actor.definitionId) : undefined)
-  );
-  return tranced && members.length > 0 ? TRANCE_LONG_REST_MINUTES : LONG_REST_MINUTES;
+/** The GM ends the party's Long Rest: with `apply`, the clock moves to its end and each member still resting gets it;
+ *  without, it is called off (`long-rest.ts`). */
+export function finishPartyLongRest(
+  state: GameState,
+  apply: boolean,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  catalog?: EquipmentCatalog,
+  random?: (sides: number) => number
+): Readonly<{ events: EffectNarration[]; rested: string[]; hours: number }> {
+  const applier: RestApplier = (draft, actorId, kind, options) =>
+    kind === "long"
+      ? longRest(draft, actorId, resolveDefinition, catalog, random, options.clockMoved)
+      : applyRest(draft, actorId, kind, resolveDefinition, catalog, undefined, options.clockMoved, options.interrupted);
+  return finishLongRest(state, apply, applier, {
+    resolveDefinition,
+    ...(catalog ? { catalog } : {}),
+    ...(random ? { random } : {})
+  });
 }
 
 /** A player starts a Short Rest for their own character. It is under way, as the party's is: its player spends Hit
@@ -496,6 +501,9 @@ export function startOwnShortRest(state: GameState, actorId: string, scope: Init
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const refusal = restRefusal(state, actor, "short");
   if (refusal) throw new CommandRejectedError(refusal);
+  if (state.rest.longRest?.members.some((member) => member.actorId === actorId && !member.interrupted))
+    throw new CommandRejectedError(`${actor.name} is in the Long Rest under way.`);
+  endTravelFor(state, [actorId]);
   const rest = state.rest.shortRest;
   if (rest?.actorIds.includes(actorId)) throw new CommandRejectedError(`${actor.name} is already in the Short Rest.`);
   if (rest && rest.actorIds.length >= 12) throw new CommandRejectedError("The Short Rest under way is full.");

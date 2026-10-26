@@ -118,13 +118,24 @@ describe("a Material component", () => {
   it("is served by a Component Pouch or the class's focus, and refused with neither", () => {
     const { state, resolve, hero } = fight(wizard);
     strictComponents(state);
-    // The Wizard's spellbook is its focus ("an Arcane Focus or your spellbook").
-    hero.inventory = hero.inventory.filter((item) => item.id !== "spellbook");
+    // The Wizard's spellbook is its focus ("an Arcane Focus or your spellbook"), and so is its kit's Arcane Focus staff.
+    hero.inventory = hero.inventory.filter((item) => item.id !== "spellbook" && item.id !== "arcane-focus-staff");
     expect(() => resolve("spell-mage-armor", { targetIds: [HERO] })).toThrowError(
       /Mage Armor has a Material component \(a piece of cured leather\), and Ansel carries no Component Pouch or Spellcasting Focus/
     );
     hero.inventory.push(row("component-pouch", "Component Pouch"));
     expect(() => resolve("spell-mage-armor", { targetIds: [HERO] })).not.toThrow();
+  });
+
+  it("is served by a magic item that is a Holy Symbol (a Talisman of Pure Good)", () => {
+    const { state, resolve, hero } = fight(build(clericInput(["shield-of-faith"])));
+    strictComponents(state);
+    hero.inventory = hero.inventory.filter(
+      (item) => !item.id.startsWith("holy-symbol") && item.id !== "component-pouch"
+    );
+    expect(() => resolve("spell-shield-of-faith", { targetIds: [HERO] })).toThrowError(/carries no Component Pouch/);
+    hero.inventory.push({ ...row("talisman-of-pure-good", "Talisman of Pure Good"), attuned: true });
+    expect(() => resolve("spell-shield-of-faith", { targetIds: [HERO] })).not.toThrow();
   });
 
   it("needs a priced material itself, keeps one the spell doesn't consume, and uses up one it does", () => {

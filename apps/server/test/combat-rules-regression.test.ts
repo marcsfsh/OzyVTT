@@ -4164,7 +4164,8 @@ describe("Bonus Action forms of the generic actions (SRD Cunning Action, Nimble 
   it("lists a Rogue's Cunning Action forms and none for a creature without the feature", () => {
     const ids = (definition: ActorDefinition) =>
       builtinActionsFor(definition)
-        .filter((action) => action.activation === "bonus-action")
+        // The forms a feature gives, beside the catalog's own Bonus Actions (Move the Sphere).
+        .filter((action) => action.activation === "bonus-action" && action.id.endsWith("-bonus"))
         .map((action) => `${action.id}:${action.name}`);
     expect(ids(pipDefinition)).toEqual([
       "dash-bonus:Cunning Action: Dash",

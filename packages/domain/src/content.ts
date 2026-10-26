@@ -307,6 +307,29 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .optional()
     .describe(
       "How the item sheds light, as its own text says: lit and put out on its row (item.set-light) unless `always` (it glows while held), with a hood to lower (`hooded`) or a Cone to aim (`cone`). Absent on anything that sheds none"
+    ),
+  /** A container: what it holds, so the sheet can show the load and offer its compartments. */
+  container: z
+    .strictObject({
+      capacityLb: z.number().optional(),
+      pieces: z.number().int().optional(),
+      compartments: z
+        .array(
+          z.strictObject({
+            id: slug(40),
+            name: z.string().max(60),
+            capacityLb: z.number().optional(),
+            count: z.number().int().optional()
+          })
+        )
+        .max(4)
+        .optional(),
+      weighsLb: z.number().optional(),
+      retrieval: z.enum(["utilize", "utilize-or-bonus-action"]).optional()
+    })
+    .optional()
+    .describe(
+      "What a container holds as its text prints it: up to `capacityLb` pounds, `pieces` of ammunition, or a load in each of its `compartments`; `weighsLb` when it weighs the same whatever it holds, and `retrieval` when taking a thing out costs more than the free object interaction in a fight. A row is put in one by its `containerId` (and `compartment`). Absent on anything that holds nothing"
     )
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
@@ -874,6 +897,8 @@ export type ContentActionArea = Readonly<{
   count?: number;
   /** Each area must touch another. */
   contiguous?: true;
+  /** A Line that ends where it is aimed, no longer than `sizeFeet`. */
+  toTarget?: true;
 }>;
 /** A cast whose granted effect carries this tag takes an ability its caster chooses (Hex: the target has Disadvantage on
  *  ability checks made with it). */
@@ -885,42 +910,86 @@ export const choosesAbility = (action: Readonly<{ grants?: Readonly<{ tags: read
   action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true ||
   action.grants?.tags.includes(ENHANCED_ABILITY_TAG) === true;
 /** The choices an action asks for as it resolves: an option of its grant or failed save (Fire Shield's warm or
- *  chill, Bestow Curse's curse), one for each target where the text says so, and the carried weapon its grant binds to
- *  (Magic Weapon). Sent as `action.resolve`'s `optionId`, `targetOptions` and `itemId`. */
+ *  chill, Bestow Curse's curse), one for each target where the text says so, the carried weapon its grant binds to
+ *  (Magic Weapon), and the armor or weapon of its target it acts on (a rust monster's Antennae). Sent as
+ *  `action.resolve`'s `optionId`, `targetOptions`, `itemId` and `objectItemId`. */
 export type ActionChoices = Readonly<{
   options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
   optionsPerTarget?: true;
-  bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true }>;
+  bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true; ammunition?: "only" | "also" }>;
+  object?: Readonly<{ kinds: ReadonlyArray<"armor" | "weapon">; metal?: true }>;
+  /** Any item the user carries may be named (Identify). */
+  pickItem?: true;
 }>;
+/** Teleport's familiarity picks, the rows of its Teleportation Outcome table. */
+export const TELEPORT_FAMILIARITY: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "permanent-circle", name: "Permanent circle" },
+  { id: "linked-object", name: "Linked object" },
+  { id: "very-familiar", name: "Very familiar" },
+  { id: "seen-casually", name: "Seen casually" },
+  { id: "viewed-once", name: "Viewed once or described" },
+  { id: "false-destination", name: "False destination" }
+];
+/** Wish's uses, picked as it is cast: duplicating a spell, and the effects the spell lists. */
+export const WISH_USES: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "duplicate", name: "Duplicate a spell" },
+  { id: "object-creation", name: "Object Creation" },
+  { id: "instant-health", name: "Instant Health" },
+  { id: "resistance", name: "Resistance" },
+  { id: "spell-immunity", name: "Spell Immunity" },
+  { id: "sudden-learning", name: "Sudden Learning" },
+  { id: "roll-redo", name: "Roll Redo" },
+  { id: "reshape-reality", name: "Reshape Reality" }
+];
 type ChoosingAction = Readonly<{
+  teleportOutcome?: true;
+  wishUses?: true;
+  identifiesItem?: true;
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
     optionsPerTarget?: true;
-    bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true }>;
+    bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true; ammunition?: true }>;
   }>;
+  /** It remakes a carried Melee weapon or a stack of ammunition (Oil of Sharpness). */
+  rebindsRow?: unknown;
   save?: Readonly<{
     failureEffect?: Readonly<{
       options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
       optionsPerTarget?: true;
     }>;
   }>;
+  object?: Readonly<{ kinds: ReadonlyArray<"armor" | "weapon">; metal?: true }>;
 }>;
 /** What an action asks its user to choose as it resolves, or null when it asks nothing. */
 export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
-  const chooser = action.grants?.options ? action.grants : action.save?.failureEffect;
-  const binds = action.grants?.bindsWeapon;
-  if (!chooser?.options && !binds) return null;
+  const chooser = action.grants?.options
+    ? action.grants
+    : action.teleportOutcome
+      ? { options: TELEPORT_FAMILIARITY }
+      : action.wishUses
+        ? { options: WISH_USES }
+        : action.save?.failureEffect;
+  const granted = action.grants?.bindsWeapon;
+  // An oil that remakes a row asks for a Melee weapon or a stack of ammunition.
+  const binds: ActionChoices["bindsWeapon"] = granted
+    ? {
+        ...(granted.weaponIds ? { weaponIds: [...granted.weaponIds] } : {}),
+        ...(granted.melee ? { melee: true as const } : {}),
+        ...(granted.ammunition ? { ammunition: "only" as const } : {})
+      }
+    : action.rebindsRow !== undefined
+      ? { melee: true, ammunition: "also" }
+      : undefined;
+  const object = action.object;
+  if (!chooser?.options && !binds && !object && !action.identifiesItem) return null;
   return {
     ...(chooser?.options ? { options: chooser.options.map((option) => ({ id: option.id, name: option.name })) } : {}),
-    ...(chooser?.optionsPerTarget ? { optionsPerTarget: true as const } : {}),
-    ...(binds
-      ? {
-          bindsWeapon: {
-            ...(binds.weaponIds ? { weaponIds: [...binds.weaponIds] } : {}),
-            ...(binds.melee ? { melee: true as const } : {})
-          }
-        }
-      : {})
+    ...(chooser && "optionsPerTarget" in chooser && chooser.optionsPerTarget
+      ? { optionsPerTarget: true as const }
+      : {}),
+    ...(binds ? { bindsWeapon: binds } : {}),
+    ...(object ? { object: { kinds: [...object.kinds], ...(object.metal ? { metal: true as const } : {}) } } : {}),
+    ...(action.identifiesItem ? { pickItem: true as const } : {})
   };
 }
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */

@@ -74,6 +74,20 @@ const READERS: readonly Check[] = [
   },
   { pattern: /\bbody is then absorbed\b/, read: (action) => action.drain?.killsAtZero?.bodyGone === true },
   {
+    pattern:
+      /\bthe target becomes Stable\b|^While (?:it has the )?Poisoned(?: condition)?, the target (?:also )?has the Paralyzed condition\b/,
+    read: (action) => action.drain?.stableAtZero !== undefined
+  },
+  {
+    pattern: /\bscore decreases by \d+d\d+\b|\bThe target dies if this reduces that score to 0\b/,
+    read: (action) => (action.onHit ?? []).some((rider) => rider.lowersScore !== undefined)
+  },
+  {
+    pattern:
+      /\bNonmagical armor worn by the target takes a -1 penalty\b|^The armor is destroyed if the penalty\b|^The penalty can be removed by casting the Mending spell on the armor\b/,
+    read: (action) => (action.onHit ?? []).some((rider) => rider.armorPenalty === true)
+  },
+  {
     pattern: /\bHit Point maximum decreases by an amount equal to the damage taken\b/,
     read: (action) => action.drain?.reducesMaximum === true
   },

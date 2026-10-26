@@ -38,14 +38,14 @@ describe("Prismatic Spray", () => {
     ]);
   });
 
-  it("blinds on the Violet ray until the start of the caster's next turn", () => {
+  // The save at the start of the caster's next turn is pinned in spell-later-actions.test.ts.
+  it("blinds on the Violet ray until a Wisdom save at the start of the caster's next turn", () => {
     const fight = caster();
     cast(fight, "prismatic-spray", { targetIds: [FOE] }, [...twelve(3), 7]);
-    const events = answer(fight.state, FOE, 2).events.map((event) => event.text);
+    answer(fight.state, FOE, 2);
     expect(actorOf(fight.state, FOE).effects).toMatchObject([
-      { linkedConditionIds: ["blinded"], duration: { type: "until-source-next-turn" } }
+      { linkedConditionIds: ["blinded"], repeatSave: { ability: "wis", timing: "source-turn-start", once: true } }
     ]);
-    expect(events.join(" ")).toMatch(/makes a DC 15 Wisdom save\. On a failure it is sent to another plane/);
   });
 });
 

@@ -1,5 +1,6 @@
 import { weaponPropertiesOf } from "../equipment-derivation.js";
 import { itemActionId } from "../item-actions.js";
+import { countAttackForDraws } from "../object-interactions.js";
 import { masteryOpensCleave } from "../weapon-mastery.js";
 import type { ResolveContext } from "./context.js";
 
@@ -62,8 +63,10 @@ export function recordLoadingShot(ctx: ResolveContext): void {
 
 /** An attack roll made on the attacker's own turn, so Reckless Attack, decided with the first, can't come after it. */
 export function recordAttackRoll(ctx: ResolveContext): void {
-  const { state, attacker, attack, input } = ctx;
+  const { state, attacker, attack, input, action } = ctx;
   if (attack === null || input.economyPaid === true || state.combat.turnActorId !== attacker.id) return;
+  // An attack of the Attack action may carry a weapon draw.
+  if (action.activation === "action" && action.spellId === undefined) countAttackForDraws(state, attacker.id);
   if (state.combat.turn.attackRolled) return;
   state.combat = { ...state.combat, turn: { ...state.combat.turn, attackRolled: true } };
 }

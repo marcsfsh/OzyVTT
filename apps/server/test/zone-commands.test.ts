@@ -222,4 +222,30 @@ describe("spell areas through the table's commands", () => {
     ]);
     expect(server.store.snapshot.combat.spellZones).toEqual([]);
   });
+
+  it("holds a creature that fails the trap's save with no time limit, until a DC 13 Strength (Athletics) check", async () => {
+    const { server, place, resolve, post, gmToken } = await fight((state) => carry(state, HERO, "Hunting Trap"));
+    await resolve({
+      actionId: "item-hunting-trap-set",
+      template: { shape: "square", origin: { x: 500, y: 100 }, target: { x: 550, y: 150 } }
+    });
+    await place(FOE, 8, 2);
+    const save = server.store.snapshot.combat.pendingSaves.find((entry) => entry.targetActorId === FOE)!;
+    const failed = await post(GAME_PATHS.saveAnswer.replace("{saveId}", save.id), gmToken, {
+      saveId: save.id,
+      method: "manual",
+      total: 1,
+      commit: true
+    });
+    expect(failed.status, await failed.clone().text()).toBe(200);
+    const held = server.store.snapshot.actors
+      .find((actor) => actor.id === FOE)!
+      .effects.find((effect) => effect.name === "Hunting Trap")!;
+    expect(held).toMatchObject({ speedZero: true, duration: { type: "manual" } });
+    expect(held.endedBy).toMatchObject({
+      by: "either",
+      check: { ability: "str", skill: "athletics", dc: 13 },
+      failureDamage: [{ formula: "1", type: "piercing" }]
+    });
+  });
 });

@@ -306,10 +306,12 @@ of a hidden thing. When in doubt, leave it out.
   lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
   and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies,
   Gust of Wind's Line 2 feet for every foot a creature moves closer to its caster (`costlyStep`), and
-  a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. The
+  a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. Speak with
+  Plants clears the painted Difficult Terrain in its Emanation (`clearedAt`), and a gibbering mouther's ground is
+  Difficult round it wherever it goes. The
   server charges it on the ground (a mover off the ground passes over it as over painted terrain), and the
-  `actor:movement` reply gives the preview the cells it changes for the mover, of the areas the asker can see
-  (`areaGround`, `zone-preview.ts`); the area itself is on the map. A cast's template grows with a higher slot as
+  `actor:movement` reply gives the preview the cells it changes for the mover, of the areas and the creatures the
+  asker can see (`areaGround`, `zone-preview.ts`); the area itself is on the map. A cast's template grows with a higher slot as
   the availability row says (`areaPerSlot`), so the drawn template is the size the server places.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
   point is above the ground, and `airborne` says what holds it up in the air (flying, or a
@@ -382,7 +384,8 @@ of a hidden thing. When in doubt, leave it out.
 - Doors and objects (ADR-0023's second amendment): a door may be held shut (`VisionWall.door`: a lock with
   its key holders, stuck, barred, jammed with a spike, sealed by Stone Shape, an Arcane Lock), and
   `door.set-open` refuses a player one held shut against their character. `door.use` picks, forces, pries,
-  jams or seals a door beside the acting creature, the server rolling the check (`doors.ts`); `door.set-state`
+  jams or seals a door beside the acting creature, the server rolling the check and spending the Utilize action in a
+  fight (`doors.ts`, `utilize.ts`); `door.set-state`
   is the GM's. A wall or door may be an object with AC and Hit Points (`VisionWall.object`), as is what holds a
   creature (`EffectInstance.heldBy`: a Net, a web, a rope). `object.attack` rolls an attack against one
   (`object-strikes.ts`), `object.damage` is the GM's, and at 0 Hit Points a wall or door is gone and a held
@@ -457,11 +460,47 @@ under more than one is caught once (`multi-templates.ts`).
 A creature pushed or pulled by force meets the areas on its straight way as any mover does (`pushed-through.ts`).
 An item's action with a `zone` (spread Caltrops, a set Hunting Trap) rolls nothing as it is used: it opens
 a zone that carries the action's own save and damage (`SpellZone.rule`), which stays until the GM ends it
-or it goes off once.
+or it goes off once. Such an area may hold its user's Concentration (a djinni's whirlwind), last a set number of
+rounds (a planted Rod of Alertness), catch the creatures it appears on, spare its user, carry the creatures it
+Restrained when it is dragged, or open one zone per area placed with damage by their number (a Ring of Shooting
+Stars' lightning spheres, `zoneForEachArea`). A Sphere of Annihilation is such an area that a creature controls with
+an Arcana check and moves toward a creature (`zone-sphere.ts`); a Delayed Blast Fireball's bead is touched, and
+thrown on a success, with a generic action (`zone-touch.ts`).
+
+A cast picks its area among the spell's options (`option` on a later row): a wall's form, a ring that acts only on its
+edge and a burning side within 10 feet of it (`zone-shapes.ts`), a Symbol's glyph, Antipathy/Sympathy's creature type
+(one option per type), Conjure Celestial's lights, Create or Destroy Water's rain or fog, and the client swaps the
+template to the picked form's area. An area can be round the creature the cast targets and move with it
+(Antipathy/Sympathy), wait hidden until a creature comes onto it and then grow (Symbol), run a schedule of later rows
+at its caster's turn starts (Storm of Vengeance), be steered or drift and carry what is in it (Incendiary Cloud,
+Tsunami: `zone-waves.ts`), or be moved by a later row's terms (anywhere in range, with its caster's move, to an
+unoccupied space: `zone-moves.ts`). Later rows can aim inside the area (Call Lightning's bolts), cut squares out of it
+as it is cast (Plant Growth: `zone-later.ts`), and pull creatures toward its middle as their turns start. What an
+area does to the world settles after every command (`zone-outcomes.ts`): wind and water put out fires, carried
+flames and lanterns, and disperse the fog they reach, and fire burns flammable areas cell by cell (Web:
+`zone-fire.ts`). A stat block's ground trait (a gibbering mouther's Aberrant Ground) makes the ground round it
+Difficult Terrain as it moves (`zone-ground.ts`).
+
+A spell's later actions scale with the slot it was cast with, part by part (`perSlot` on a damage part, a grant's
+`extraDamagePerSlot`, `upcastAction` in `item-actions.ts`). One taken with the cast itself (`withCast`, Arcane Hand's
+first fist) costs no action, and one may need the bearer of the spell's effect (`bearerOnly`) or the caster's own turn
+(`ownTurnOnly`). A spell can hold another for later (`stored-casts.ts`): Contingency, a spell glyph and a Ring of
+Spell Storing open a window as they are cast, the next spell the caster casts is stored on the effect, the zone or the
+ring row (`storedCast`, `storedCasts`) at its caster's numbers, and it takes effect when released or set off
+(`stored-cast-release.ts`). Save stages move a creature through a spell's later stages on its repeat saves
+(`save-stages.ts`), including saves at the start of the caster's turn (Prismatic Spray's Violet) and failures that
+compel the bearer's turn (Bestow Curse). A commanded creature's Reaction spends its commander's too
+(`commanded-reactions.ts`). Damage dice may explode up to a count (`explodingDice`, Sorcerous Burst). Warding Bond
+passes its ward's damage to its caster as it lands and ends at 60 feet apart or when its caster drops
+(`warding-bond.ts`). True Strike binds the weapon and leaves its action open for one attack with it
+(`resolution/true-strike.ts`); Teleport rolls its outcome table from the familiarity picked (`teleport-outcome.ts`);
+Identify marks a carried row its player then reads in full (`resolution/identify.ts`); Wish runs the use picked and its
+stress (`resolution/wish.ts`); and Reincarnate rebuilds a character from its ledger as the rolled species after the
+cast lands (`reincarnation.ts`).
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
-(`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
-Rest moves it 8 hours and finishing the party's Short Rest moves it an hour, and `passGameTime`
+(`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), finishing the party's
+Long Rest moves it to the rest's end and finishing the party's Short Rest moves it an hour, and `passGameTime`
 (`game-time.ts`) counts every creature's effects down by it, 10 rounds to the minute. A fight's rounds
 don't move the clock. When a fight ends, what has a minute (10 rounds) or less left ends with it, and
 anything longer carries on in game time; a parked fight's combatants and a replay's copies wait outside
@@ -472,7 +511,8 @@ dispelled with no Concentration. An effect can also last until its bearer's next
 would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
 once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
 While the GM tracks food and water (`rest.survival`), each midnight it crosses ends a day for every
-character, which eats and drinks what it carries and meets the hunger and thirst rules (`survival.ts`).
+character, which eats and drinks what it carries (Rations, then a Bead of Nourishment) and meets the hunger and
+thirst rules (`survival.ts`).
 A creature out of air counts its held breath down on the clock as it does at its turns' ends (`breath.ts`).
 
 Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
@@ -533,7 +573,10 @@ A grant or a failed save can offer options (Fire Shield's warm or chill, Bestow 
 each target where the text says so. The resolve carries the pick (`optionId`, `targetOptions`), which is
 checked before anything rolls and kept on the effect with what it adds (`resolution/grant-extras.ts`). A
 grant can also bind to one carried weapon (`itemId`): its `this-item` riders reach that row's rolls and
-its `weapon` changes how the row swings, until the row leaves the pack (`bound-weapons.ts`). A live effect
+its `weapon` changes how the row swings, until the row leaves the pack (`bound-weapons.ts`). A binding can conjure
+the row it binds, lend proficiency with it and make it a Spellcasting Focus; Pact of the Blade's does, and its bonded
+weapon carries Thirsting and Devouring Blade's attacks and Eldritch Smite's and Lifedrinker's hits (`pact-weapon.ts`).
+A live effect
 can offer its bearer actions: a Bonus Action Dash or Disengage, an action that ends it with a save or a
 check, and another creature's spell action at the numbers it was cast with (`builtinActionsFor` in
 `builtin-actions.ts`, `granted-actions.ts`).
@@ -568,7 +611,8 @@ it over (`character.give-item`). One record can cover several kinds of an item (
 of Tricks' bags) or the forms its holder puts it in (a Rod of Lordly Might's buttons): a carried copy is one of
 them (`variantId`), read through `rowRecord` (`item-records.ts`) so its kind's riders, actions, casts, light and
 weapon join the record's or stand in for them. The GM says what a found copy is with `character.set-inventory`,
-and the player learns it on attuning (`projections.ts`); its holder changes a form with `item.set-form`
+and the player learns it on attuning or when Identify is cast on the copy (`identified`, `projections.ts`). Only
+a cast writes `identified` and a Ring of Spell Storing's `storedCasts`, and sheet writes keep them (`inventory.ts`); its holder changes a form with `item.set-form`
 (`setItemForm` in `inventory.ts`), paying the Bonus Action the item names. A creature attunes to one copy of an
 item, two kinds of one record being two items, and a player attunes or ends attunement only during a Short Rest or
 the step a finished rest opens, to an item whose printed prerequisites (`attunement.restrictedTo`: a class, a
@@ -576,13 +620,18 @@ species, a spellcaster or another item attuned) the character meets (`attunement
 What a worn item's own action gave its user (a Ring of Invisibility's Invisible) ends when it is taken off,
 unattuned or put away. A cast spends its printed cost (`useCost`), and one whose extra charges raise its
 level (`chargesRaiseLevel`, a Wand of Fireballs) is one action for each cost. A pool that never comes back
-(`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`).
-A Long Rest gives back the item's printed dice (`charges.regain`), not every charge; when the GM keeps a dawn hour
-(`time.set-dawn`) the clock's dawn gives them back instead (`clock-pools.ts`). Spending the last charge rolls the
-SRD's d20, and the record says what a 1 does (destroyed, or a plain item it becomes) and what a 20 gives back
-(`resolution/charges.ts`, which also rolls a Thief's Use Magic Device d6). A pool spent for a time (`per: "time"`,
-Wings of Flying) waits `afterHours` of game time from its first use (`readyAt` on the actor) and comes back as
-`passGameTime` passes it. Ammunition is
+(`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`,
+or `charges.startingByPool` for a Helm of Brilliance's kinds of gem). A use may count against a second limit too
+(`alsoUses`: a Luck Blade's Wish once a dawn). A Long Rest gives back the item's printed dice (`charges.regain`), not
+every charge; when the GM keeps a dawn hour (`time.set-dawn`) the clock's dawn gives them back instead
+(`clock-pools.ts`). Spending the last charge rolls the SRD's d20, and the record says what a 1 does (destroyed,
+nonmagical with its row kept dormant, or a plain item it becomes) and what a 20 gives back; a pool that never comes
+back ends the item with no roll (`resolution/charges.ts` and `item-spent.ts`; the former also rolls a Thief's Use
+Magic Device d6, and the d100 of an item that may break as it is used, `item-breaks.ts`). A pool spent for a time
+(`per: "time"`, Wings of Flying) waits `afterHours` of game time from its first use, or from when the creature it
+brought leaves (`waitsFromEnd`, a figurine), with `readyAt` on the actor, and comes back as `passGameTime` passes it.
+A pool of time (`timePool`: Boots of Speed's rounds, a Goat of Traveling's hours) is spent whole by a use, and what is
+left when the use ends early comes back. Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
 kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only
@@ -608,8 +657,23 @@ body armor, which takes minutes, and a Shield takes the Utilize action on their 
 Unconscious creature, or one a failed Fear save makes drop them, keeps its held rows carried but out of its hands
 (`dropHeldItems` in `effects.ts`), and what one gave its Armor Class (a Staff of Power's +2) goes with it. `carrying.ts`
 weighs what a character carries, coins included, against its Strength times its size's figure (a
-`carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that. The
-sheet offers each tool's Utilize uses as checks at the DCs its record prints (`toolUses` in `ability-checks.ts`).
+`carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that.
+
+The Utilize action is one module (`utilize.ts`): in a fight it spends the action on the user's own turn, or a Thief's
+Bonus Action with Fast Hands, and outside one nothing. A Shield, a door, and each tool's and gear's Utilize uses take
+it. The sheet offers the uses (a tool's from `toolUses` in `ability-checks.ts`, gear's from its record's `utilize`,
+a Grappling Hook's DC 13 Acrobatics), and `check.roll` with `use`, or with a tool and a DC, rolls one through
+`rollUtilizeCheck` (`tool-uses.ts`), which needs the item in the pack. That is also the call for a rule that rolls a
+tool check of its own. A Cobbler's success lands its rider when the held check settles (`settleUseOutcome`). A
+Thief's Fast Hands also takes a magic item's Magic action as a Bonus Action (`fast-hands.ts`).
+
+Crafting (SRD 5.2.1) is downtime work kept on the game state (`GameState.crafting`, `crafting.ts`). A character
+starts a project with a tool it is proficient with and carries: an item its tool's Craft line names, a Potion of
+Healing, a Spell Scroll of a prepared spell or a magic item, and pays the raw materials from its purse at the start.
+`time.pass` with `downtime` works each project up to 8 hours a game day, its helpers' hours added, and the GM can log
+days by hand (`crafting.work`). A finished item joins the crafter's pack; a scribed scroll keeps the scribe's save DC
+and attack bonus (`InventoryItem.scribed`). Players see their own characters' projects and the visible party's, with
+the price only on their own (`playerCrafting`).
 
 Every spell a sheet or stat block knows is a cast action (`character-build.ts`, `monster-spells.ts`), so even
 one with nothing to roll (Light) spends its casting time and slot, holds its Concentration, places its area and is
@@ -634,10 +698,15 @@ resource back is its own checked command. `conversions.ts` is one table of the f
 into another or recover one (Font of Magic both ways, Arcane and Natural Recovery, Magical Cunning, restoring a
 use with a slot or points, Pearl of Power), each with its timing, its check and its pick, offered by
 `actor:available-actions` and taken with `actor.convert`. Hit Point Dice are spent only during a Short Rest, a
-player's own or the party's (`rests.ts`). A finished rest opens a step on the actor (`restStep`) where its
+player's own or the party's (`rests.ts`), or by a member whose interrupted Long Rest gave it a Short Rest's benefits.
+The party's Long Rest is a span (`long-rest.ts`): it opens at the clock's time and lasts until the GM finishes it.
+Rolling Initiative, damage, a spell above a cantrip and the GM's interrupt for exertion stop a member's rest
+(`rest-interruptions.ts`), and resuming adds an hour. A finished rest opens a step on the actor (`restStep`) where its
 recoveries and re-choices are made until its player taps Done; a re-choice the build reads (a Weapon Mastery pick,
 a Wizard's cantrip, a Hunter's option) is written to the ledger and the sheet rebuilt (`ledger-rechoice.ts`), a
-pick of several one held answer at a time. When Initiative is rolled, `initiative-hooks.ts` opens a window for the
+pick of several one held answer at a time, and a feature's picks of different kinds each under its own offer (Pact of
+the Tome's cantrips and rituals). Pact of the Tome's book is a gear row the rest conjures anew (`book-of-shadows.ts`):
+its spells are prepared, and it serves as a focus, only while it is carried. When Initiative is rolled, `initiative-hooks.ts` opens a window for the
 features that act then (Persistent Rage, Uncanny Metabolism) and gives back what others restore (Perfect Focus,
 Superior Inspiration, Archdruid).
 
@@ -697,6 +766,11 @@ An attack can wait before its roll too, while a creature that may change its tar
 `resolution/redirect.ts`): Redirect Attack hands it to an ally, the two swapping places, and an Arrow-Catching Shield's
 wielder takes it on itself. A guardian's ward (Shield Guardian's Protection) is an `attack-would-hit` prompt to the
 guardian for the creature that commands it, whose AC it raises.
+A stat block's reaction to something else is a `triggered` prompt naming its `cause` (`triggered-reactions.ts`): an
+attack roll that hits it (Reflexive Antennae), a creature starting or ending its turn, or ending a move, nearby
+(Unnerving Gaze, Ink Cloud, Pursuit), or damage it takes (Split). Its answer does what the declared response says
+(`reactions.ts`): it resolves the action against that creature, on the reactor itself, as a teleport near that
+creature, or splits the reactor in two (`split.ts`).
 Players type die faces, never totals, and only while the table allows typed dice. On the client every roll prompt
 shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`).
@@ -759,6 +833,14 @@ names no family is the GM's own ruling on the whole command.
   imported as an actor definition. What a character's next level brings is read from the same
   survey at the next level (`next-level.ts`, `character:next-level`), for whoever may level it.
   The builder's own rolls carry the purpose `builder`, so a sheet's latest roll leaves them out.
+- A feature's granted spell can change how it is cast: components its castings go without (`waives`), a cast on its
+  caster only (`self`) or healing dice at their highest (`maximized`), merged with any other source of the same spell
+  (`character-build.ts`). `freeCastOf` spends a feature's own uses on free castings of what other features grant
+  (Natural Recovery). A spell pick can be held to a casting time, the Ritual tag or the character's spellbook, which
+  `spellbook.ts` checks as a build or a re-choice makes the pick, and a pick with a `default` is filled by the build
+  when the ledger names none, so a sheet made before the pick existed still builds. A `replaces` clause's `shares`
+  name lets several clauses spend one allowance (Mystic Arcanum's one swap a level). A kit item with `pickFrom` asks
+  which item the kit gives (a Bard's instrument), answered in its own ledger row.
 - A fresh table starts with a sample party (`sample-party.ts`): three level 7 characters made by the
   same builder from a fixed seed, so they level like any built character. Each is marked `sample`
   (GM-only), and one command (`actor.remove-samples`) removes every sample the roster rules let go and
@@ -820,7 +902,8 @@ The table has one clock (ADR-0029): the Codex calendar keeps the day and the gam
 of day (`rest.clockHours`, which the 16-hour rule between Long Rests reads, and `rest.clockMinutes`). A party rest or Pass time that
 crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
 `codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day. Pass time
-with a travel pace (SRD Travel Pace) logs how far the party went and what the pace does to its checks.
+with a travel pace (SRD Travel Pace) logs how far the party went, and each traveller holds the pace as an effect its
+checks read until time passes without one, it rests or it rolls Initiative (`travel.ts`).
 
 ## Public HTTP API
 

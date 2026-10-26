@@ -59,6 +59,13 @@ describe("casting through Divine Intervention", () => {
     expect(() => resolve("divine-intervention-cure-wounds", { targetIds: [HERO] })).toThrow(RulesBlockedError);
   });
 
+  it("casts a Bonus Action spell as part of the Magic action, leaving the Bonus Action", () => {
+    const { state, resolve, hero } = fight(cleric);
+    resolve("divine-intervention-healing-word", { targetIds: [HERO] });
+    expect(state.combat.turn).toMatchObject({ actionUsed: true, bonusActionUsed: false });
+    expect(hero.actionUses["divine-intervention"]).toBe(1);
+  });
+
   it("casts a spell of a minute or more at once, as part of the action", () => {
     const { resolve, hero } = fight(cleric);
     resolve("divine-intervention-commune", { targetIds: [] });

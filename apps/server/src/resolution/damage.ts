@@ -114,6 +114,8 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
   const savage = savageAttack(ctx);
   // Overchannel: each of the spell's damage dice deals its maximum.
   const dice = input.overchannel === true ? (sides: number) => sides : random;
+  // The dice that show their highest face, for a spell whose dice explode (Sorcerous Burst).
+  const maxed: number[] = [];
   parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
@@ -127,7 +129,32 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
       if (again.total > rolled.total) rolled = again;
     }
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
+    for (const term of rolled.terms)
+      if (term.kind === "dice")
+        for (const die of term.dice) if (die.kept && die.face === term.sides) maxed.push(term.sides);
   });
+  explodeDice(ctx, dice, maxed);
+}
+
+/** SRD 5.2.1 Sorcerous Burst: "If you roll an 8 on a d8 for this spell, you can roll another d8, and add it to the
+ *  damage ... the maximum number of these d8s you can add to the spell's damage equals your spellcasting ability
+ *  modifier." Each die of the cast's damage that shows its highest face adds another, and so does each added die, up
+ *  to that many; more damage is never worse, so the server rolls them all. */
+function explodeDice(ctx: ResolveContext, random: (sides: number) => number, maxed: readonly number[]): void {
+  const most = ctx.action.explodingDice?.most ?? 0;
+  const first = ctx.damage[0];
+  if (most <= 0 || !first || maxed.length === 0) return;
+  let pending = maxed.length;
+  const sides = maxed[0]!;
+  let added = 0;
+  while (pending > 0 && added < most) {
+    pending -= 1;
+    added += 1;
+    const extra = resolveDice(parseDiceFormula(`1d${sides}`), random);
+    recordRoll(ctx, extra, "damage", `${ctx.action.name}: another d${sides}`);
+    if (extra.total === sides) pending += 1;
+    ctx.damage.push({ formula: extra.expression.source, type: first.type, total: extra.total });
+  }
 }
 
 /** The face a `damage-die-minimum` rider raises the attack's own damage dice to (Great Weapon Fighting's 3), read at
@@ -288,7 +315,12 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       const abilityAmount =
         (modifier.abilityModifier === undefined ? 0 : abilityModifier(deps.definition, modifier.abilityModifier)) +
         (score === undefined ? 0 : (deps.definition?.abilityScores[score] ?? 0));
-      const type = modifier.damageType ?? damage[0]?.type ?? "untyped";
+      // A type the attacker picked for this hit (Conjure Minor Elementals), else the effect's own.
+      const type =
+        pickedRiderType(ctx, rider.sourceEffectId, modifier.damageTypes) ??
+        modifier.damageType ??
+        damage[0]?.type ??
+        "untyped";
       if (modifier.formula === undefined) {
         if (abilityAmount === 0) continue; // a +0 modifier adds no entry and no noise to the card
         damage.push({ formula: String(abilityAmount), type, total: abilityAmount });
@@ -356,4 +388,18 @@ export function spendDamageUses(ctx: ResolveContext): void {
     endEffect(state, attacker.id, effectId);
     effectsEnded.push(endedEffect(attacker, effect));
   }
+}
+
+/** The id prefix of a pick of another damage type for an effect's extra damage on this hit. */
+export const RIDER_TYPE_PREFIX = "rider-type:";
+
+/** The type picked on this hit for an effect's extra damage, when the effect lets it be picked. */
+export function pickedRiderType(
+  ctx: ResolveContext,
+  effectId: string | undefined,
+  types: readonly string[] | undefined
+) {
+  if (effectId === undefined || !types) return undefined;
+  const choice = (ctx.input.hitOptions ?? []).find((entry) => entry.id === `${RIDER_TYPE_PREFIX}${effectId}`);
+  return choice?.damageType && types.includes(choice.damageType) ? choice.damageType : undefined;
 }
