@@ -274,7 +274,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "While holding this Shield, you can take a Bonus Action to cause it to animate ... leaving your hands free" for 1
-  // minute: an animated shield fills no hand. Its fall when its wielder is Incapacitated is the GM's.
+  // minute: an animated shield fills no hand, and it falls when its wielder has the Incapacitated condition.
   "animated-shield": {
     actions: [
       {
@@ -1495,8 +1495,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `ring-of-regeneration` - no out-of-combat healing timer.
-
   // "The GM chooses the type": fire (the d10's Garnet row). Copy the item to choose another.
   // As Armor of Resistance: fire until the GM picks from the same d10 table.
   "ring-of-resistance": { grants: { damageResistances: ["fire"] }, damageTypeChoice: RESISTANCE_TABLE },
@@ -1724,7 +1722,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ---- Rods ------------------------------------------------------------------------------------
 
   // `immovable-rod`: acts on the world and on no creature; a GM ruling.
-  // `rod-of-absorption` - needs per-copy storage and a spell slot refund.
 
   /**
    * Initiative and Wisdom (Perception) advantage, four at-will detection casts, and the Protective Aura once a dawn:
@@ -4552,7 +4549,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `deck-of-illusions` - illusions and card state are not modeled.
   // "Use a Utilize action to place these shackles on an Incapacitated creature ... the shackles prevent a creature bound
   // by them from using any method of extradimensional movement, including teleportation or travel to a different plane
   // of existence": no teleport and no plane travel of its own (`ethereal.ts`). The Utilize action again removes them;
@@ -4662,7 +4658,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `dust-of-disappearance` - single use, rolled duration, area effect.
   // 1d6 + 4 pinches. A pinch on an Elemental of water within 5 feet: DC 13 Constitution, 10d6 Necrotic, half on a
   // success. Turning water into a pellet is the GM's.
   "dust-of-dryness": {
@@ -5311,7 +5306,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       extradimensional: true
     }
   },
-  // `hat-of-many-spells` - a cast gated on an Arcana check outcome with a wild-magic table.
   // A blast in a 30-foot Cone: DC 15 Constitution, 5d8 Thunder and Deafened for 1 minute on a failure, half on a
   // success. Each use has a 20 percent chance of exploding the horn for 10d6 Force to its user. The glass and crystal
   // it shatters are the GM's.
@@ -5430,9 +5424,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // All four worn by a horse (its own token, as the Horseshoes of Speed): it "ignores Difficult Terrain". Floating over
-  // water or lava waits on water areas on the map; leaving no tracks and the 12 hours of travel are overland travel.
+  // All four worn by a horse (its own token, as the Horseshoes of Speed): it "ignores Difficult Terrain", and floating
+  // above the ground it crosses the water painted on the map as solid ground. Lava isn't on the map, and leaving no
+  // tracks and the 12 hours of travel are overland travel.
   "horseshoes-of-a-zephyr": {
+    modifiers: [{ type: "movement", rule: "walks-on-liquid" }],
     effects: [
       {
         name: "Horseshoes of a Zephyr",
@@ -5673,12 +5669,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "tome-of-clear-thought": { study: { ability: "int", amount: 2, maximum: 30, hours: 48, days: 6 } },
   "tome-of-leadership-and-influence": { study: { ability: "cha", amount: 2, maximum: 30, hours: 48, days: 6 } },
   "tome-of-understanding": { study: { ability: "wis", amount: 2, maximum: 30, hours: 48, days: 6 } },
-  // `manual-of-golems` - crafting.
   // `marvelous-pigments` - GM fiat, consumed.
   // `mirror-of-life-trapping` - a passive save on anyone who sees their reflection.
-  // `mysterious-deck` - GM-fiat cards; the death-save card has no reader.
 
-  // `pearl-of-power` - no rider refunds a spent spell slot (`spell-slot` raises the maximum).
+  // `pearl-of-power` - no rider: conversions.ts restores the slot by the item id.
 
   /**
    * Spends a charge and puts a real DC 15 Wisdom save on the target that Frightens on a failure for 1 minute,
@@ -5883,8 +5877,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "sending", uses: { limit: 1, per: "long-rest", pool: "sending-stones-charges" } }]
   },
 
-  // `sovereign-glue` - consumed ounces, GM fiat.
-
   // The sphere set on the map by whoever has it: a creature whose space it enters, or that enters its space, makes the
   // DC 19 Dexterity save or takes 8d10 Force damage, obliterated at 0 Hit Points. Control the Sphere and Move the
   // Sphere are generic actions (`zone-sphere.ts`). Its meetings with portals are the GM's.
@@ -5932,8 +5924,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { type: "save-bonus", amount: 1 }
     ]
   },
-
-  // `universal-solvent` - consumed ounces.
 
   // Opening a portal starts its 1d8-hour wait on the game clock; where the portal leads is the GM's.
   "well-of-many-worlds": {

@@ -5,7 +5,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { HOLDING_BREATH_TAG } from "../src/breath.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { makeEffect } from "../src/effects.js";
-import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { passGameTime } from "../src/game-time.js";
 import { applyMovementRules, movementStatus } from "../src/movement-rules.js";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
@@ -162,6 +162,19 @@ describe("Limited Amphibiousness", () => {
     passGameTime(state, 1, { resolveDefinition, catalog, random: () => 10 });
     expect(state.actors[0]!.effects.some((effect) => effect.tags.includes(OUT_OF_WATER_TAG))).toBe(false);
     expect(state.actors[0]!.exposure?.dryMinutes ?? 0).toBe(0);
+  });
+});
+
+// SRD Horseshoes of a Zephyr: the creature floats above the ground and "can cross or stand above nonsolid or unstable
+// surfaces, such as water".
+describe("Horseshoes of a Zephyr", () => {
+  it("let the creature wearing them walk on the painted water", () => {
+    const shoes = { id: "horseshoes-of-a-zephyr", name: "Horseshoes of a Zephyr", quantity: 1, equipped: true };
+    const state = pool({ inventory: [shoes] });
+    const horse = state.actors[0]!;
+    expect(walksOnLiquid(horse, deriveEquipment(horse, undefined, catalog))).toBe(true);
+    const bare = pool();
+    expect(walksOnLiquid(bare.actors[0]!, deriveEquipment(bare.actors[0]!, undefined, catalog))).toBe(false);
   });
 });
 

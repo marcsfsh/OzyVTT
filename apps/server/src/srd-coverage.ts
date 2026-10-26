@@ -200,6 +200,22 @@ const saveApplies = (save: Readonly<Record<string, unknown>> | undefined) =>
     save.breaksConcentration === true ||
     save.failureEndsForm === true);
 
+type HitRider = NonNullable<ActorAction["onHit"]>[number];
+
+/** A hit rider applies when it leaves something on the target or its attacker. One that carries only its `reminder`
+ *  (and the name and duration that reminder would give) is said with the hit for the GM to apply. */
+const riderApplies = (rider: HitRider) =>
+  Object.entries(rider).some(
+    ([key, value]) =>
+      !["reminder", "name", "duration", "conditions"].includes(key) && value !== undefined && value !== false
+  ) || rider.conditions.length > 0;
+
+/** What the engine leaves to the GM when the action resolves: the action's own reminder and its hit riders'. */
+const remindersOf = (action: Pick<ActorAction, "reminder" | "onHit">): string[] => [
+  ...(action.reminder ? [action.reminder] : []),
+  ...(action.onHit ?? []).flatMap((rider) => (rider.reminder ? [rider.reminder] : []))
+];
+
 /** An action resolves when it rolls an attack or a save, deals damage, heals, grants an effect, ends conditions,
  *  runs a structured Multiattack, places light or an area of obscurement on the map, is offered as a reaction prompt,
  *  answers a roll (`roll-answers.ts`), grants a move, a jump or a teleport the movement rules charge
@@ -215,7 +231,7 @@ const actionResolves = (action: ResolvingFields) =>
   action.damageByLevel !== undefined ||
   action.healing !== undefined ||
   action.multiattack !== undefined ||
-  (action.onHit?.length ?? 0) > 0 ||
+  (action.onHit ?? []).some(riderApplies) ||
   action.darts !== undefined ||
   action.reaction !== undefined ||
   action.grants !== undefined ||
@@ -260,11 +276,11 @@ export function monsterActionRow(
     const stateOf = (spellId: string) => spellStates.get(spellId) ?? "reference";
     const spells = action.castsSpells.spells;
     if (action.castsSpells.self) {
-      // A single cast names its spell when that spell's row leaves something to a person.
+      // A single cast names its spell when that spell's row leaves something to a person, a story spell's included.
       const entry = spells[0]!;
       const state = most([stateOf(entry.spellId), floor]);
       const name = spellNames.get(entry.spellId) ?? entry.name;
-      return state === "enforced" || NARRATIVE_SPELLS.has(entry.spellId)
+      return state === "enforced"
         ? { state }
         : {
             state,
@@ -296,10 +312,22 @@ export function monsterActionRow(
   if (parts.length > 0)
     return { state: least(parts.map((part) => monsterActionRow(part, definition, spellStates, spellNames).state)) };
   const offered = builtinActionsFor(definition).some((builtin) => builtin.name.startsWith(`${action.name}: `));
-  // A reminder is what the engine leaves to the GM when the action resolves, so the action applies only in part.
-  if (actionResolves(withTakenActions(action)) || offered) return { state: action.reminder ? "guided" : "enforced" };
-  return { state: floor };
+  // A reminder is what the engine leaves to the GM when the action resolves, so the action applies only in part, and
+  // the reminder is the note.
+  const reminders = remindersOf(action).join(" ");
+  if (actionResolves(withTakenActions(action)) || offered)
+    return reminders
+      ? { state: "guided", note: `The server resolves it and says the GM's part with it: ${reminders}` }
+      : { state: "enforced" };
+  return reminders
+    ? { state: floor, note: `The app offers it and says the GM's part with it: ${reminders}` }
+    : { state: floor };
 }
+
+/** A feature's or an item's action that only spends its use and its place in the turn, or says a part for the GM
+ *  with it, leaves its record in part the GM's however much its other riders apply. */
+const leavesPart = (action: FeatureRecord["actions"][number]) =>
+  !actionResolves(withTakenActions(action as ActorAction)) || remindersOf(action).length > 0;
 
 /** `monsterActionRow`'s state alone. */
 export const monsterActionState = (
@@ -347,7 +375,8 @@ export function featureState(feature: FeatureRecord): CoverageState {
     (feature.extraPicks?.length ?? 0) > 0 ||
     (feature.extraSpellLists?.length ?? 0) > 0 ||
     feature.replacesFeatureId !== undefined;
-  if (ridersApply(feature) || pickApplies || buildApplies) return unreadModifier(feature) ? "guided" : "enforced";
+  if (ridersApply(feature) || pickApplies || buildApplies)
+    return unreadModifier(feature) || feature.actions.some(leavesPart) ? "guided" : "enforced";
   if (feature.uses !== undefined || feature.actions.length > 0 || picks.length > 0) return "guided";
   return "reference";
 }
@@ -367,7 +396,7 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     item.spellScroll !== undefined ||
     item.study !== undefined ||
     item.removesArmorDrawbacks === true ||
-    (item.onHit?.length ?? 0) > 0 ||
+    (item.onHit ?? []).some(riderApplies) ||
     // Its light, which dynamic vision reads while it is lit.
     item.light !== undefined ||
     item.weaponChanges !== undefined ||
@@ -377,13 +406,21 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     item.servesAsFocus !== undefined ||
     ridersApply(item) ||
     // A kind or form that carries riders of its own (an Ioun Stone's, a Rod of Lordly Might's battleaxe).
-    kinds.some((kind) => ridersApply(kind) || kind.weapon !== undefined || (kind.onHit?.length ?? 0) > 0);
+    kinds.some((kind) => ridersApply(kind) || kind.weapon !== undefined || (kind.onHit ?? []).some(riderApplies));
   // An item that casts is no more than the weakest of its casts: a cast the GM runs leaves the item in part theirs.
   const casts = [...item.casts, ...kinds.flatMap((kind) => kind.casts)].map(
     (cast) => spellStates.get(cast.spellId) ?? "reference"
   );
   if (applies) {
-    const own: CoverageState = unreadModifier(item) || kinds.some(unreadModifier) ? "guided" : "enforced";
+    // One rider that applies doesn't carry the rest: an action that only spends its use, a hit rider said for the GM
+    // or a modifier nothing reads leaves the item in part the GM's.
+    const actions = [...item.actions, ...kinds.flatMap((kind) => kind.actions)];
+    const partial =
+      unreadModifier(item) ||
+      kinds.some(unreadModifier) ||
+      actions.some(leavesPart) ||
+      [...(item.onHit ?? []), ...kinds.flatMap((kind) => kind.onHit ?? [])].some((rider) => rider.reminder);
+    const own: CoverageState = partial ? "guided" : "enforced";
     return casts.length === 0 ? own : least([own, most([least(casts), "guided"])]);
   }
   // A tool's checks roll with the ability its entry names and the sheet's proficiency; the GM sets what they do.
