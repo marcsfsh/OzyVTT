@@ -3,18 +3,23 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ActorSchema, GameStateSchema, type Actor } from "@vtt/domain";
 import { aggregateRollMode } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import {
+  loadArmor,
+  loadBackgrounds,
   loadClasses,
   loadConditions,
   loadEquipment,
   loadFeats,
   loadGlossary,
+  loadMagicItems,
   loadToolbox,
   loadMonsterDefinitions,
   loadSpecies,
   loadSpells,
-  loadSubclasses
+  loadSubclasses,
+  loadWeapons,
+  type EquipmentReference
 } from "@vtt/content-srd-5.2.1";
 import { abilityCheckClaims, checkPlan } from "../src/ability-checks.js";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
@@ -26,9 +31,19 @@ import { hasEvasion, magicResistanceOf, saveRollSources } from "../src/saving-th
 import { currentSpeedFeet, speedZeroed } from "../src/speed.js";
 import { wardingAura } from "../src/paladin-auras.js";
 import { applyDamageDetailed, healActor } from "../src/hit-points.js";
-import { monsterTraitKinds, renderSrdCoverage, spellState, srdCoverageRows, traitKind } from "../src/srd-coverage.js";
+import {
+  computedRecordStates,
+  itemState,
+  monsterActionRow,
+  monsterTraitKinds,
+  renderSrdCoverage,
+  spellState,
+  srdCoverageRows,
+  traitKind
+} from "../src/srd-coverage.js";
 import {
   CONDITION_COVERAGE,
+  CURATED_OVER_COMPUTED,
   GLOSSARY_COVERAGE,
   MONSTER_TRAIT_COVERAGE,
   RECORD_OVERRIDES,
@@ -52,6 +67,70 @@ describe("the SRD coverage manifest", () => {
       TOOLBOX_COVERAGE
     ])
       for (const [key, row] of Object.entries(curated)) expect(row.note.trim(), key).not.toBe("");
+  });
+
+  it("lists every record of the bundles in exactly one group", () => {
+    // Weapons, armor, magic items and gear share one catalog, and class features and species traits share the
+    // feature ids their keys use, so each family is counted across its groups.
+    const family = (group: string) =>
+      ["Magic items", "Gear and tools", "Weapons", "Armor"].includes(group)
+        ? "item"
+        : group.endsWith(" features") || group === "Species traits"
+          ? "feature"
+          : group;
+    const listed = srdCoverageRows().map((row) => `${family(row.group)}:${row.id}`);
+    const counts = new Map<string, number>();
+    for (const key of listed) counts.set(key, (counts.get(key) ?? 0) + 1);
+    expect([...counts].filter(([, count]) => count > 1).map(([key]) => key)).toEqual([]);
+    const toolbox = loadToolbox();
+    const expected = new Set([
+      ...loadSpells().map((spell) => `Spells:${spell.id}`),
+      ...loadMonsterDefinitions().flatMap((definition) =>
+        definition.actions
+          .filter((action) => action.partOf === undefined)
+          .map((action) => `Monster actions:${definition.name}/${action.id}`)
+      ),
+      ...[...monsterTraitKinds().keys()].map((kind) => `Monster traits:${kind}`),
+      ...[...loadClasses(), ...loadSubclasses()].flatMap((record) =>
+        record.features.map((feature) => `feature:${record.id}/${feature.id}`)
+      ),
+      ...loadSpecies().flatMap((species) =>
+        [...species.traits, ...species.lineages.flatMap((lineage) => lineage.traits)].map(
+          (feature) => `feature:${species.id}/${feature.id}`
+        )
+      ),
+      ...loadBackgrounds().map((background) => `Backgrounds:${background.id}`),
+      ...loadFeats().map((feat) => `Feats:${feat.id}`),
+      ...[...loadEquipment(), ...loadMagicItems(), ...loadWeapons(), ...loadArmor()].map((item) => `item:${item.id}`),
+      ...toolbox.filter((record) => record.kind === "poison").map((record) => `item:${record.id}`),
+      ...toolbox.filter((record) => record.kind !== "poison").map((record) => `Gameplay Toolbox:${record.id}`),
+      ...loadConditions().map((condition) => `Conditions:${condition.id}`),
+      ...loadGlossary().map((entry) => `Rules glossary:${entry.id}`)
+    ]);
+    expect([...expected].filter((key) => !counts.has(key))).toEqual([]);
+    expect(listed.filter((key) => !expected.has(key))).toEqual([]);
+  });
+
+  it("names what the app applies and what is left to the table on every guided or reference row", () => {
+    const bare = srdCoverageRows()
+      .filter((row) => row.state !== "enforced" && !row.note?.trim())
+      .map((row) => `${row.group}: ${row.name}`);
+    expect(bare).toEqual([]);
+  });
+
+  it("lists each curated row whose state differs from the computed one, with the state it overrides", () => {
+    const computed = computedRecordStates();
+    const unlisted = Object.entries(RECORD_OVERRIDES)
+      .filter(([key, row]) => computed.get(key) !== row.state && CURATED_OVER_COMPUTED[key] !== computed.get(key))
+      .map(([key, row]) => `${key}: computed ${computed.get(key)}, curated ${row.state}`);
+    expect(unlisted).toEqual([]);
+    const stale = Object.entries(CURATED_OVER_COMPUTED)
+      .filter(([key, state]) => computed.get(key) !== state || RECORD_OVERRIDES[key]?.state === state)
+      .map(
+        ([key, state]) =>
+          `${key}: listed ${state}, computed ${computed.get(key)}, curated ${RECORD_OVERRIDES[key]?.state}`
+      );
+    expect(stale).toEqual([]);
   });
 
   it("names only records that exist, so a renamed record can't keep a stale row", () => {
@@ -341,6 +420,38 @@ describe("the curated claims hold in the engine", () => {
       skill: "stealth"
     });
     expect(plan.subject.ability).toBe("str");
+  });
+
+  it("never counts a hit rider that carries only a reminder as applied, and makes the reminder the note", () => {
+    const definition = loadMonsterDefinitions().find((candidate) =>
+      candidate.actions.some((action) => action.attack !== undefined && action.save === undefined)
+    )!;
+    const swing = definition.actions.find((action) => action.attack !== undefined && action.save === undefined)!;
+    const told = { conditions: [], reminder: "The target is pushed where the GM says." };
+    const bare = { ...swing, attack: undefined, damage: [], onHit: [told] } as ActorAction;
+    const alone = monsterActionRow(bare, { ...definition, actions: [bare] }, new Map());
+    expect(alone.state).not.toBe("enforced");
+    expect(alone.note).toContain(told.reminder);
+    const struck = { ...swing, onHit: [told] } as ActorAction;
+    expect(monsterActionRow(struck, { ...definition, actions: [struck] }, new Map())).toEqual({
+      state: "guided",
+      note: expect.stringContaining(told.reminder)
+    });
+  });
+
+  it("names the spell row of a stat block's single cast whose outcome is the story's", () => {
+    const doppelganger = loadMonsterDefinitions().find((definition) => definition.name === "Doppelganger")!;
+    const read = doppelganger.actions.find((action) => action.id === "read-thoughts")!;
+    const row = monsterActionRow(read, doppelganger, new Map([["detect-thoughts", "guided"]]));
+    expect(row).toEqual({ state: "guided", note: expect.stringContaining("Detect Thoughts") });
+  });
+
+  it("holds an item to guided when one of its actions only spends its use", () => {
+    const ring = loadMagicItems().find((item) => item.id === "ring-of-protection")!;
+    expect(itemState(ring, new Map())).toBe("enforced");
+    const idle = { id: "twist", name: "Twist the Ring", activation: "action", description: "Twist it.", damage: [] };
+    const partial = { ...ring, actions: [idle] } as unknown as EquipmentReference;
+    expect(itemState(partial, new Map())).toBe("guided");
   });
 
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {
