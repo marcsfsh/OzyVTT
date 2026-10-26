@@ -31,7 +31,7 @@ describe("Find Traps", () => {
     expect(result.sensed).toEqual([
       "Find Traps: you sense a trap within 120 feet: a hidden pit. Where it is, the spell doesn't say."
     ]);
-    const told = result.tableNarration.find((line) => line.text.startsWith("Find Traps senses"));
+    const told = result.tableNarration?.find((line) => line.text.startsWith("Find Traps senses"));
     expect(told).toMatchObject({ gmOnly: true, text: "Find Traps senses for Mira: a hidden pit 30 feet away." });
     expect(JSON.stringify(result.sensed)).not.toContain("30 feet");
   });

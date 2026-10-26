@@ -1335,11 +1335,17 @@ describe("public game API over /api/v1", () => {
     }
     // No encounter running: nothing is spent, so everything reports available with no violations, but the actions
     // that need an effect nobody has: moving a Sphere of Annihilation needs the crocodile to control one, putting out a
-    // fire needs it to be burning, and End an Effect needs an effect an action ends.
+    // fire needs it to be burning, End an Effect needs an effect an action ends, and passing a liquid's surface needs
+    // Water Walk.
     const needsEffect = rows.filter(
-      (row) => row.id === "move-sphere" || row.id === "extinguish-fire" || row.id === "end-an-effect"
+      (row) =>
+        row.id === "move-sphere" ||
+        row.id === "extinguish-fire" ||
+        row.id === "end-an-effect" ||
+        row.id === "pass-the-surface"
     );
     expect(needsEffect.map((row) => [row.available, row.violations.map((violation) => violation.rule)])).toEqual([
+      [false, ["feature.requires-effect"]],
       [false, ["feature.requires-effect"]],
       [false, ["feature.requires-effect"]],
       [false, ["feature.requires-effect"]]

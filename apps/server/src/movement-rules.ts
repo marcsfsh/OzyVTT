@@ -226,13 +226,21 @@ export function movementStatus(
   const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
   const counted = actor !== undefined && movementCounts(state, actorId);
   const derivation = actor ? deriveEquipment(actor, definition, input.catalog) : null;
+  // What a creature can do only on its own turn (Acrobatic Movement's climb) isn't offered off it.
+  const offTurn = offItsTurn(state, actorId);
   const modes =
     actor && derivation
       ? TRAVEL_MODES.flatMap((mode) => {
-          const budget = travelBudgetFeet(actor, derivation, definition, mode);
+          const budget = travelBudgetFeet(actor, derivation, definition, mode, offTurn);
           return budget === null
             ? []
-            : [{ mode, budgetFeet: budget, extraCost: travelCostsExtra(actor, definition, mode, derivation) }];
+            : [
+                {
+                  mode,
+                  budgetFeet: budget,
+                  extraCost: travelCostsExtra(actor, definition, mode, derivation, offTurn)
+                }
+              ];
         })
       : [];
   return {

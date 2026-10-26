@@ -400,8 +400,8 @@ export function springTrapOn(
           text: openPit
             ? `${triggerer?.name ?? "A creature"} steps into the open ${record.name}.`
             : triggerer
-              ? `${triggerer.name} sets off a ${record.name}!`
-              : `A ${record.name} goes off!`,
+              ? `${triggerer.name} sets off a ${record.name}.`
+              : `A ${record.name} goes off.`,
           actorId: about
         }
       ]
@@ -777,4 +777,23 @@ export function visibleTraps(traps: readonly MapTrap[] | undefined): VisibleTrap
   return (traps ?? [])
     .filter((trap) => trap.found)
     .map((trap) => ({ id: trap.id, name: trap.name, area: { ...trap.area }, state: trap.state }));
+}
+
+/** A found trap as a player gets it: what the table sees, and while it is armed the ways its text gives to make it safe,
+ *  by name alone (a trap's text names them; their DCs stay the GM's). */
+export type PlayerTrapView = VisibleTrap & Readonly<{ ways: ReadonlyArray<Readonly<{ id: string; name: string }>> }>;
+
+export function playerTraps(traps: readonly MapTrap[] | undefined): PlayerTrapView[] {
+  return (traps ?? [])
+    .filter((trap) => trap.found)
+    .map((trap) => ({
+      id: trap.id,
+      name: trap.name,
+      area: { ...trap.area },
+      state: trap.state,
+      ways:
+        trap.state === "armed"
+          ? (trapRecord(trap.trapId)?.trap.disarm ?? []).map((way) => ({ id: way.id, name: way.name }))
+          : []
+    }));
 }

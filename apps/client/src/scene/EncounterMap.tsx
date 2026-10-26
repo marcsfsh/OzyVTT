@@ -66,8 +66,12 @@ type FogState = Readonly<{
   }>[];
 }>;
 
+type TerrainRect = Readonly<{ x: number; y: number; width: number; height: number }>;
 type TerrainState = Readonly<{
-  difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
+  difficult: readonly TerrainRect[];
+  water?: readonly TerrainRect[];
+  runningWater?: readonly TerrainRect[];
+  ice?: readonly TerrainRect[];
 }>;
 
 // On-brand annotation swatches. Concrete hexes, since theme vars can't travel: the colour goes over the wire and
@@ -189,6 +193,9 @@ export function EncounterMap({
   const playerVision = vision && "visible" in vision ? vision : null;
   const [lightPreset, setLightPreset] = useState<LightPresetId>("torch");
   const [areaKind, setAreaKind] = useState<AreaKindId>("heavily-obscured");
+  /** The trap the GM's next drag sets, and its band of levels. */
+  const [trapKind, setTrapKind] = useState<string>("hidden-pit");
+  const [trapTier, setTrapTier] = useState(1);
   /** Whose eyes the GM looks through: "party", an actor id, or nobody. The live table only. */
   const [lookThrough, setLookThrough] = useState<string | null>(null);
   const [lookedThrough, setLookedThrough] = useState<VisionPreviewReply | null>(null);
@@ -370,7 +377,8 @@ export function EncounterMap({
       setTool("select");
       setSelectedId(annotationId);
     },
-    waitingAsks: state?.combat.pendingRuleAsks?.length ?? 0
+    waitingAsks: state?.combat.pendingRuleAsks?.length ?? 0,
+    trapChoice: role === "gm" && !moveSceneId ? { trapId: trapKind, tier: trapTier } : null
   });
   const { message, busyActorId } = commands;
   const looking = role === "gm" && !moveSceneId && gmVision?.enabled === true ? lookThrough : null;
@@ -532,6 +540,12 @@ export function EncounterMap({
   // The drag's path and cost, as the server will charge it, and what that leaves of the mover's turn. Only the
   // combatant whose turn it is spends movement, so only that drag asks for the budget.
   const difficult = terrain?.difficult ?? [];
+  const water = terrain?.water ?? [];
+  const runningWater = terrain?.runningWater ?? [];
+  const ice = terrain?.ice ?? [];
+  // The traps on the live map: every one for the GM, the found ones for a player. A prepared scene shows none.
+  const gmTraps = !moveSceneId && state && "definitions" in state ? state.combat.traps : undefined;
+  const foundTraps = !moveSceneId && state && !("definitions" in state) ? state.combat.traps : undefined;
   // The walls a move can't pass, as far as this view knows them (a player's: the ones the party has seen).
   const moveWalls = gmVision?.enabled
     ? movementWallsOf(gmVision.walls)
@@ -569,6 +583,11 @@ export function EncounterMap({
           ...(draggedBudget?.nimble ? { nimble: true } : {}),
           ...(draggedBudget?.swarmIds ? { swarmIds: draggedBudget.swarmIds } : {}),
           ...(draggedBudget?.areaGround ? { areaGround: draggedBudget.areaGround } : {}),
+          water: [...water, ...runningWater],
+          ice,
+          swimsFree: draggedBudget?.modes?.some((entry) => entry.mode === "swim" && entry.extraCost !== true) === true,
+          walksOnWater: draggedBudget?.walksOnWater === true,
+          barredByWater: draggedBudget?.barredByWater === true,
           // A drag keeps the creature at its height; the token menu changes it.
           altitude: {
             fromFeet: tokensById.get(dragging.actorId)?.altitudeFeet ?? 0,
@@ -647,7 +666,23 @@ export function EncounterMap({
       onRevealAll={commands.revealAllFog}
       onHideAll={commands.hideAllFog}
       terrainBusy={commands.terrainBusy}
-      hasTerrain={difficult.length > 0}
+      hasTerrain={difficult.length + water.length + runningWater.length + ice.length > 0}
+      {...(gmTraps ? { traps: gmTraps } : {})}
+      trapKind={trapKind}
+      onTrapKindChange={setTrapKind}
+      trapTier={trapTier}
+      onTrapTierChange={setTrapTier}
+      onEditTrap={commands.editTrap}
+      onSpringTrap={commands.springTrap}
+      onRemoveTrap={commands.removeTrap}
+      {...(role === "gm" && !moveSceneId && state && "definitions" in state
+        ? { environment: state.combat.environment }
+        : {})}
+      onEnvironmentChange={commands.setEnvironment}
+      {...(foundTraps && ownActorId ? { foundTraps, disarmerName: actorsById.get(ownActorId)?.name ?? null } : {})}
+      onDisarmTrap={(trapId, wayId) => {
+        if (ownActorId) commands.disarmTrap(trapId, ownActorId, wayId);
+      }}
       onClearTerrain={commands.clearAllTerrain}
       visionEnabled={gmVision?.enabled ?? false}
       visionBusy={commands.visionBusy}
@@ -733,7 +768,14 @@ export function EncounterMap({
                   {showGrid && calibration && (
                     <GridLines calibration={calibration} width={size.width} height={size.height} />
                   )}
-                  <TerrainOverlay difficult={difficult} cellSizePx={calibration?.cellSizePx ?? 50} />
+                  <TerrainOverlay
+                    difficult={difficult}
+                    water={water}
+                    runningWater={runningWater}
+                    ice={ice}
+                    traps={gmTraps ?? foundTraps ?? []}
+                    cellSizePx={calibration?.cellSizePx ?? 50}
+                  />
 
                   {/* Shapes render below tokens; measurements render above them. */}
                   <ShapeLayer

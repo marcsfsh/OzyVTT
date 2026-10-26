@@ -28,7 +28,7 @@ import { healthBandOf } from "./hit-points.js";
 import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 import { OFF_PLANE_TAG } from "./off-plane.js";
 import { visibleTerrain } from "./terrain.js";
-import { visibleTraps } from "./traps.js";
+import { playerTraps } from "./traps.js";
 import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
 import { sensedBy } from "./vision/detect.js";
 import { huntersLoreOf } from "./hunters-lore.js";
@@ -509,7 +509,7 @@ export function projectPlayerCombat(
     // Only the revealed part: terrain under the fog would show the layout of ground players haven't seen.
     terrain: visibleTerrain(state.combat, sight.enabled ? exploredRectsOf(state) : undefined),
     // The traps the party has found, by name and area; a hidden one leaves no trace, and no DC reaches anyone.
-    traps: visibleTraps(state.combat.traps),
+    traps: playerTraps(state.combat.traps),
     // Where their own characters see now and what the party has seen; computed on the server whenever the map reaches
     // them, before a fight as in one.
     vision:

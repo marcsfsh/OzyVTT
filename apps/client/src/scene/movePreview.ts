@@ -112,6 +112,16 @@ export function previewMove(
     swarmIds?: readonly string[];
     /** The ground the spell areas change for the mover (the movement reply's). */
     areaGround?: ActorMovementReply["areaGround"];
+    /** Painted water, still and running: a foot swum costs 1 extra unless the mover has a Swim Speed. */
+    water?: readonly Rect[];
+    /** Painted slippery ice, which is Difficult Terrain. */
+    ice?: readonly Rect[];
+    /** The mover has a Swim Speed, so water costs it nothing extra. */
+    swimsFree?: boolean;
+    /** The mover walks on water as on ground (the movement reply's). */
+    walksOnWater?: boolean;
+    /** The mover can't pass through liquid (the movement reply's). */
+    barredByWater?: boolean;
   }>
 ): MovePreview | null {
   const { calibration, size, terrain, tokens, actorsById, moverId } = input;
@@ -190,6 +200,9 @@ export function previewMove(
   const passesWalls = input.throughWalls === true || input.throughWallsFree === true;
   // A Tiny creature fits an opening half a square wide; a bigger one squeezes through it.
   const lane = { tiny: mover?.size === "tiny" };
+  // Water a mover walks across is ground to it, and a mover off the ground passes over water and ice alike.
+  const water = input.walksOnWater === true || lowFeet > 0 ? [] : (input.water ?? []);
+  const ice = lowFeet > 0 ? [] : (input.ice ?? []);
   const path = movementPath({
     from,
     to,
@@ -198,7 +211,14 @@ export function previewMove(
       input.ignoresDifficult !== true &&
       (difficultCells.has(`${column},${row}`) ||
         areaDifficult.has(`${column},${row}`) ||
-        (lowFeet <= 0 && pointInRects(center(column, row), terrain) && !cleared.has(`${column},${row}`))),
+        (lowFeet <= 0 && pointInRects(center(column, row), terrain) && !cleared.has(`${column},${row}`)) ||
+        pointInRects(center(column, row), ice)),
+    ...(water.length > 0
+      ? {
+          isWater: (column: number, row: number) => pointInRects(center(column, row), water),
+          swimExtra: input.swimsFree === true ? 0 : 1
+        }
+      : {}),
     ...(halved.size > 0 ? { isHalved: (column: number, row: number) => halved.has(`${column},${row}`) } : {}),
     // Gust of Wind: a step closer to the Line's caster, from or into the Line, costs double.
     ...(toward.length > 0
@@ -217,6 +237,7 @@ export function previewMove(
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
       const point = center(column, row);
+      if (input.barredByWater === true && pointInRects(point, water)) return false;
       return point.x >= 0 && point.y >= 0 && point.x <= size.width && point.y <= size.height;
     },
     isStepOpen: (stepFrom, stepTo) =>

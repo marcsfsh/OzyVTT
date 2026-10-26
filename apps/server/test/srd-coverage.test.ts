@@ -10,6 +10,7 @@ import {
   loadEquipment,
   loadFeats,
   loadGlossary,
+  loadToolbox,
   loadMonsterDefinitions,
   loadSpecies,
   loadSpells,
@@ -30,7 +31,8 @@ import {
   CONDITION_COVERAGE,
   GLOSSARY_COVERAGE,
   MONSTER_TRAIT_COVERAGE,
-  RECORD_OVERRIDES
+  RECORD_OVERRIDES,
+  TOOLBOX_COVERAGE
 } from "../src/srd-coverage-curated.js";
 
 describe("the SRD coverage manifest", () => {
@@ -42,7 +44,13 @@ describe("the SRD coverage manifest", () => {
   it("classifies every condition, glossary entry and monster trait kind, saying how", () => {
     const unclassified = srdCoverageRows().filter((row) => row.note === "not classified");
     expect(unclassified.map((row) => `${row.group}: ${row.id}`)).toEqual([]);
-    for (const curated of [CONDITION_COVERAGE, GLOSSARY_COVERAGE, MONSTER_TRAIT_COVERAGE, RECORD_OVERRIDES])
+    for (const curated of [
+      CONDITION_COVERAGE,
+      GLOSSARY_COVERAGE,
+      MONSTER_TRAIT_COVERAGE,
+      RECORD_OVERRIDES,
+      TOOLBOX_COVERAGE
+    ])
       for (const [key, row] of Object.entries(curated)) expect(row.note.trim(), key).not.toBe("");
   });
 
@@ -51,6 +59,8 @@ describe("the SRD coverage manifest", () => {
     expect(Object.keys(CONDITION_COVERAGE).filter((id) => !conditions.has(id))).toEqual([]);
     const glossary = new Set(loadGlossary().map((entry) => entry.id));
     expect(Object.keys(GLOSSARY_COVERAGE).filter((id) => !glossary.has(id))).toEqual([]);
+    const toolbox = new Set(loadToolbox().map((record) => record.id));
+    expect(Object.keys(TOOLBOX_COVERAGE).filter((id) => !toolbox.has(id))).toEqual([]);
     const kinds = new Set(
       loadMonsterDefinitions().flatMap((definition) =>
         ((definition.extensions["open5e.srd-2024"] as { traits?: { name: string }[] } | undefined)?.traits ?? []).map(

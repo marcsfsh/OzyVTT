@@ -601,3 +601,65 @@ describe("the drag preview charges the ground spell areas make, as the server do
     expect(away.charged).toBe(15);
   });
 });
+
+describe("the drag preview charges water and ice as the server does", () => {
+  const painted = (ground: Partial<Record<"water" | "runningWater" | "ice", ReturnType<typeof cells>[]>>) => {
+    const state = table([], {});
+    state.combat.terrain = { ...state.combat.terrain, ...ground };
+    return state;
+  };
+  const both = (
+    state: GameState,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    mover: Readonly<{ swimsFree?: boolean; walksOnWater?: boolean; barredByWater?: boolean }> = {}
+  ) => {
+    const charged = movementCost(state, GRID, HERO, from, to, mover);
+    const previewed = previewMove({
+      calibration: CALIBRATION,
+      size: { width: GRID.width, height: GRID.height },
+      terrain: state.combat.terrain.difficult,
+      water: [...state.combat.terrain.water, ...state.combat.terrain.runningWater],
+      ice: state.combat.terrain.ice,
+      tokens: state.combat.tokens,
+      actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+      moverId: HERO,
+      from,
+      to,
+      ...mover
+    });
+    return { charged, previewed };
+  };
+
+  it("charges a swimmer without a Swim Speed double, and one with it single", () => {
+    const state = painted({ water: [cells(2, 0, 19, 19)] });
+    const swim = both(state, cell(0, 5), cell(5, 5));
+    expect(swim.previewed?.feet).toBe(swim.charged?.feet);
+    expect(swim.charged?.feet).toBe(45);
+    const swimmer = both(state, cell(0, 5), cell(5, 5), { swimsFree: true });
+    expect(swimmer.previewed?.feet).toBe(swimmer.charged?.feet);
+    expect(swimmer.charged?.feet).toBe(25);
+  });
+
+  it("walks round a pool, and across running water under Water Walk", () => {
+    const pool = painted({ water: [cells(3, 4, 3, 6)] });
+    const round = both(pool, cell(0, 5), cell(6, 5));
+    expect(round.previewed?.feet).toBe(round.charged?.feet);
+    const river = painted({ runningWater: [cells(3, 0, 3, 19)] });
+    const walking = both(river, cell(0, 5), cell(6, 5), { walksOnWater: true });
+    expect(walking.previewed?.feet).toBe(walking.charged?.feet);
+    expect(walking.charged?.feet).toBe(30);
+  });
+
+  it("closes the water to a mist, and charges ice as Difficult Terrain", () => {
+    const river = painted({ runningWater: [cells(3, 0, 3, 19)] });
+    const mist = both(river, cell(0, 5), cell(6, 5), { barredByWater: true });
+    expect(mist.previewed?.blocked).toBe(true);
+    expect(mist.charged?.blocked).toBe(true);
+    const ice = painted({ ice: [cells(3, 0, 3, 19)] });
+    const slide = both(ice, cell(0, 5), cell(6, 5));
+    expect(slide.previewed?.feet).toBe(slide.charged?.feet);
+    expect(slide.previewed?.difficultFeet).toBe(slide.charged?.difficultFeet);
+    expect(slide.charged?.feet).toBe(35);
+  });
+});

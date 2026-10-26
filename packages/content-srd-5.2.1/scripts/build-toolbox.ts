@@ -29,7 +29,7 @@ function plain(body: string): string {
     .map((paragraph) =>
       strip(paragraph.replace(/\n(?=[-*] )/g, LIST_BREAK).replace(/\n(?=\*\*[A-Z])/g, LIST_BREAK))
         .replace(/\*\*([^*]+)\*\*/g, "$1")
-        .replace(/(^|[\s("“])_([^_]+)_/g, "$1$2")
+        .replace(/(^|[\s("\u201c])_([^_]+)_/g, "$1$2")
         .replaceAll(LIST_BREAK, "\n")
     )
     .filter((paragraph) => paragraph.length > 0)
@@ -54,7 +54,7 @@ function childrenOf(parentBody: string, level: number): Array<{ heading: string;
   ].map(([, heading, body]) => ({ heading: heading!.trim(), body: body! }));
 }
 
-/** A record's first italic line ("_Deadly Trap (Levels 1–4)_"), and the text after it. */
+/** A record's first italic line ("_Deadly Trap (Levels 1-4)_", its dash an en dash), and the text after it. */
 function withSubtitle(body: string): { subtitle: string | null; text: string } {
   const match = /^\s*_([^_\n]+)_\s*\n/.exec(body);
   return match ? { subtitle: match[1]!.trim(), text: body.slice(match[0].length) } : { subtitle: null, text: body };
@@ -126,10 +126,10 @@ const TRAPS: Readonly<Record<string, TrapMechanics>> = {
     detect: [tripWire("the trip wire and the unstable section of ceiling")],
     disarm: [cutWire],
     tiers: [
-      { levels: "1–4", ...dexHalf(13, "2d10", "bludgeoning") },
-      { levels: "5–10", ...dexHalf(15, "4d10", "bludgeoning") },
-      { levels: "11–16", ...dexHalf(17, "10d10", "bludgeoning") },
-      { levels: "17–20", ...dexHalf(19, "18d10", "bludgeoning") }
+      { levels: "1-4", ...dexHalf(13, "2d10", "bludgeoning") },
+      { levels: "5-10", ...dexHalf(15, "4d10", "bludgeoning") },
+      { levels: "11-16", ...dexHalf(17, "10d10", "bludgeoning") },
+      { levels: "17-20", ...dexHalf(19, "18d10", "bludgeoning") }
     ]
   },
   "falling-net": {
@@ -140,7 +140,7 @@ const TRAPS: Readonly<Record<string, TrapMechanics>> = {
     detect: [tripWire("the trip wire and the suspended Net")],
     disarm: [cutWire],
     tiers: [10, 12, 14, 16].map((dc, index) => ({
-      levels: ["1–4", "5–10", "11–16", "17–20"][index]!,
+      levels: ["1-4", "5-10", "11-16", "17-20"][index]!,
       save: netSave(dc),
       damage: [],
       hugeSucceeds: true as const
@@ -168,10 +168,10 @@ const TRAPS: Readonly<Record<string, TrapMechanics>> = {
       ironSpike("plate", "under the pressure plate")
     ],
     tiers: [
-      { levels: "1–4", ...dexHalf(15, "2d10", "fire") },
-      { levels: "5–10", ...dexHalf(15, "4d10", "fire") },
-      { levels: "11–16", ...dexHalf(15, "10d10", "fire") },
-      { levels: "17–20", ...dexHalf(15, "18d10", "fire") }
+      { levels: "1-4", ...dexHalf(15, "2d10", "fire") },
+      { levels: "5-10", ...dexHalf(15, "4d10", "fire") },
+      { levels: "11-16", ...dexHalf(15, "10d10", "fire") },
+      { levels: "17-20", ...dexHalf(15, "18d10", "fire") }
     ]
   },
   "hidden-pit": {
@@ -182,7 +182,7 @@ const TRAPS: Readonly<Record<string, TrapMechanics>> = {
     detect: [lid],
     disarm: [ironSpike("lid", "between the lid and the floor")],
     tiers: [10, 30, 60, 120].map((feet, index) => ({
-      levels: ["1–4", "5–10", "11–16", "17–20"][index]!,
+      levels: ["1-4", "5-10", "11-16", "17-20"][index]!,
       damage: [],
       pitFeet: feet
     }))
@@ -199,7 +199,7 @@ const TRAPS: Readonly<Record<string, TrapMechanics>> = {
     ],
     disarm: [{ id: "plug", name: "Plug the holes", after: "holes" }, ironSpike("plate", "under the pressure plate")],
     tiers: ["1d6", "2d6", "4d6", "7d6"].map((formula, index) => ({
-      levels: ["1–4", "5–10", "11–16", "17–20"][index]!,
+      levels: ["1-4", "5-10", "11-16", "17-20"][index]!,
       save: { ability: "dex" as const, dc: 13, successDamage: "none" as const, failureConditions: [] },
       damage: [{ formula, type: "poison" as const }],
       darts: "1d3"
@@ -219,10 +219,10 @@ const TRAPS: Readonly<Record<string, TrapMechanics>> = {
       }
     ],
     tiers: [
-      { levels: "1–4", save: needleSave(11), damage: [{ formula: "1d10", type: "poison" }] },
-      { levels: "5–10", save: needleSave(13), damage: [{ formula: "2d10", type: "poison" }] },
-      { levels: "11–16", save: needleSave(15), damage: [{ formula: "4d10", type: "poison" }] },
-      { levels: "17–20", save: needleSave(17), damage: [{ formula: "10d10", type: "poison" }] }
+      { levels: "1-4", save: needleSave(11), damage: [{ formula: "1d10", type: "poison" }] },
+      { levels: "5-10", save: needleSave(13), damage: [{ formula: "2d10", type: "poison" }] },
+      { levels: "11-16", save: needleSave(15), damage: [{ formula: "4d10", type: "poison" }] },
+      { levels: "17-20", save: needleSave(17), damage: [{ formula: "10d10", type: "poison" }] }
     ]
   },
   "rolling-stone": {
@@ -232,7 +232,7 @@ const TRAPS: Readonly<Record<string, TrapMechanics>> = {
     rolls: true,
     detect: [plate(15, "study")],
     disarm: [ironSpike("plate", "under the pressure plate")],
-    tiers: [{ levels: "11–20", damage: [] }]
+    tiers: [{ levels: "11-20", damage: [] }]
   },
   "spiked-pit": {
     severity: "deadly",
@@ -249,7 +249,7 @@ const TRAPS: Readonly<Record<string, TrapMechanics>> = {
         [120, "13d8"]
       ] as const
     ).map(([feet, formula], index) => ({
-      levels: ["1–4", "5–10", "11–16", "17–20"][index]!,
+      levels: ["1-4", "5-10", "11-16", "17-20"][index]!,
       damage: [{ formula, type: "piercing" as const }],
       pitFeet: feet
     }))

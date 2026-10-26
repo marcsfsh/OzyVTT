@@ -398,7 +398,7 @@ describe("a hidden pit on the table", () => {
     // 1d6 from the fall and 2d8 from the spikes.
     expect(hero.hp.current).toBeLessThanOrEqual(60 - 3);
     expect(playerView().combat.traps).toEqual([
-      { id: trap.id, name: "Spiked Pit", area: cells(3, 2, 4, 2), state: "sprung" }
+      { id: trap.id, name: "Spiked Pit", area: cells(3, 2, 4, 2), state: "sprung", ways: [] }
     ]);
     expect(projectViewerEncounter(server.store.snapshot).encounter?.traps).toEqual([
       { id: trap.id, name: "Spiked Pit", area: cells(3, 2, 4, 2), state: "sprung" }
@@ -430,6 +430,17 @@ describe("a hidden pit on the table", () => {
     });
     expect(edit.status, await edit.clone().text()).toBe(200);
     const shown = projectPlayerView(server.store.snapshot, randomUUID(), () => null).combat.traps;
-    expect(shown).toEqual([{ id: trap.id, name: "Poisoned Darts", area: cells(5, 5), state: "armed" }]);
+    expect(shown).toEqual([
+      {
+        id: trap.id,
+        name: "Poisoned Darts",
+        area: cells(5, 5),
+        state: "armed",
+        ways: [
+          { id: "plug", name: "Plug the holes" },
+          { id: "wedge-spike", name: "Wedge an Iron Spike under the pressure plate" }
+        ]
+      }
+    ]);
   });
 });

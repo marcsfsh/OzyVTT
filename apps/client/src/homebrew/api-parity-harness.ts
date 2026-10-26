@@ -474,7 +474,9 @@ const SAVE_LIFETIME_KEYS = [
   "autoSuccess.**",
   "endedBy.**",
   "atRest.**",
-  "successEndsSpell"
+  "successEndsSpell",
+  "repeatTallySuccessesOnly",
+  "failureHoursRolled"
 ] as const;
 
 /** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
@@ -1397,6 +1399,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: FEATURE_CARRIERS,
     reason:
       "an effect that ends when its keeper has the Incapacitated condition (Superior Defense, Divine Sense, Draconic Flight) - authored in the class, species and item overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "poison.**",
+    types: ["equipment"],
+    reason:
+      "a poison's kind, save and damage (the Gameplay Toolbox's sample poisons), built from the toolbox chapter with the actions that deliver it; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].sensesTraps.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that senses the traps the map holds within a range (Find Traps) - authored in the spell scripts; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].ownTurn",
+    types: ACTION_CARRIERS,
+    reason:
+      "a speed or way of moving its bearer has only on its own turn (Acrobatic Movement) - authored in the class overlays; no control yet",
     status: "gap"
   },
   {

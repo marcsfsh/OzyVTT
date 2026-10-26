@@ -344,8 +344,10 @@ export function PlayerActionRunner({
   }, [castingId, castPlace.kind]);
 
   if (actions.length === 0 && facts.common.length === 0) return null;
-  const onOutcome = (ok: boolean, message?: string) => {
+  const onOutcome = (ok: boolean, message?: string, sensed?: readonly string[]) => {
     if (!ok && message) onFeedback(message);
+    // What a sense found (Find Traps) is told to whoever took the action.
+    if (ok && sensed && sensed.length > 0) onFeedback(sensed.join(" "));
   };
   /** A tap on an option: one with nothing to aim resolves at once; the rest go to targeting. */
   const take = (

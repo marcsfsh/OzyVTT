@@ -302,6 +302,8 @@ export type PlayerTrap = Readonly<{
   name: string;
   area: Readonly<{ x: number; y: number; width: number; height: number }>;
   state: "armed" | "sprung" | "disarmed";
+  /** While it is armed, the ways its text gives to make it safe, by name (`trap:disarm`'s `disarmId`). */
+  ways: ReadonlyArray<Readonly<{ id: string; name: string }>>;
 }>;
 /** The steps of a turn's start or end a player orders: each named, with the creature it lands on when they see it. */
 export type PlayerTurnSteps = Readonly<{
