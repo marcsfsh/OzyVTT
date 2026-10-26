@@ -3,15 +3,20 @@ import {
   loadBackgrounds,
   loadClasses,
   loadConditions,
+  loadDamageTypes,
   loadEquipment,
   loadFeats,
   loadGlossary,
+  loadLanguages,
+  loadRules,
+  loadSkills,
   loadToolbox,
   loadMagicItems,
   loadMonsterDefinitions,
   loadSpecies,
   loadSpells,
   loadSubclasses,
+  loadWeaponProperties,
   loadWeapons,
   featurePicks,
   type EquipmentReference,
@@ -28,6 +33,8 @@ import {
   TOOLBOX_COVERAGE,
   MONSTER_TRAIT_COVERAGE,
   RECORD_OVERRIDES,
+  RULES_COVERAGE,
+  WEAPON_PROPERTY_COVERAGE,
   type CoverageState,
   type CuratedCoverage
 } from "./srd-coverage-curated.js";
@@ -575,6 +582,10 @@ function classify(): Readonly<{ rows: CoverageRow[]; ledger: ComputedLedger }> {
   for (const weapon of loadWeapons())
     rows.push({ group: "Weapons", id: weapon.id, name: weapon.name, state: "enforced" });
   for (const armor of loadArmor()) rows.push({ group: "Armor", id: armor.id, name: armor.name, state: "enforced" });
+  for (const property of loadWeaponProperties())
+    rows.push(
+      curatedRow("Weapon properties and masteries", property.id, property.name, WEAPON_PROPERTY_COVERAGE[property.id])
+    );
 
   for (const condition of loadConditions())
     rows.push(curatedRow("Conditions", condition.id, condition.name, CONDITION_COVERAGE[condition.id]));
@@ -583,6 +594,33 @@ function classify(): Readonly<{ rows: CoverageRow[]; ledger: ComputedLedger }> {
   // The toolbox's poisons are gear, above; its other records are curated.
   for (const record of loadToolbox().filter((entry) => entry.kind !== "poison"))
     rows.push(curatedRow("Gameplay Toolbox", record.id, record.name, TOOLBOX_COVERAGE[record.id]));
+  // A section's name repeats across chapters ("Ability Checks"), so the chapter is named with it.
+  for (const rule of loadRules())
+    rows.push(curatedRow("Rules chapters", rule.id, `${rule.name} (${rule.ruleset})`, RULES_COVERAGE[rule.id]));
+  for (const skill of loadSkills())
+    rows.push({
+      group: "Skills",
+      id: skill.id,
+      name: skill.name,
+      state: "enforced",
+      note: `ability-checks.ts rolls it with ${ABILITY_NAMES[skill.ability ?? ""] ?? "its ability"}, adding the Proficiency Bonus, or twice it with Expertise, when the sheet has it. What a success achieves outside the actions that roll it is the GM's call.`
+    });
+  for (const type of loadDamageTypes())
+    rows.push({
+      group: "Damage types",
+      id: type.id,
+      name: type.name,
+      state: "enforced",
+      note: "Every damage roll carries its type, and hit-points.ts applies the creature's Resistance, Vulnerability and Immunity to it."
+    });
+  for (const language of loadLanguages())
+    rows.push({
+      group: "Languages",
+      id: language.id,
+      name: language.name,
+      state: "reference",
+      note: "The builder records it among the languages a character knows (character-build.ts); speaking and understanding it are the table's."
+    });
   return { rows, ledger };
 }
 
@@ -590,8 +628,27 @@ function classify(): Readonly<{ rows: CoverageRow[]; ledger: ComputedLedger }> {
 const byName = (a: CoverageRow, b: CoverageRow) => a.name.localeCompare(b.name, "en", { numeric: true });
 const capitalized = (state: CoverageState) => `${state[0]!.toUpperCase()}${state.slice(1)}`;
 
-/** Groups whose every row is curated: they print as one table with the notes. */
-const TABLE_GROUPS = new Set(["Monster traits", "Conditions", "Rules glossary", "Gameplay Toolbox"]);
+/** Groups whose every row carries a note: they print as one table with the notes. */
+const TABLE_GROUPS = new Set([
+  "Monster traits",
+  "Conditions",
+  "Rules glossary",
+  "Gameplay Toolbox",
+  "Weapon properties and masteries",
+  "Rules chapters",
+  "Skills",
+  "Damage types",
+  "Languages"
+]);
+
+const ABILITY_NAMES: Readonly<Record<string, string>> = {
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
+  cha: "Charisma"
+};
 
 /** How the rows of each kind of group get their state, for the page's opening. */
 const CLASSIFICATION = [
@@ -621,7 +678,10 @@ const CLASSIFICATION = [
   "  rolls their checks, and the GM sets what they achieve.",
   "- **Backgrounds, weapons and armor:** enforced. The builder applies a background, and every weapon and armor",
   "  statistic reaches the rolls.",
-  "- **Monster traits, conditions, the rules glossary and the Gameplay Toolbox:** curated by hand, each with a note.",
+  "- **Monster traits, conditions, the rules glossary, the Gameplay Toolbox, the rules chapters' sections and the",
+  "  weapon properties and masteries:** curated by hand, each with a note.",
+  "- **Skills and damage types:** enforced, each with the module that reads it. **Languages:** reference; the builder",
+  "  records them and speaking them is the table's.",
   "",
   "Records the data can't classify, because the engine handles them in code or their data applies only part of",
   "what they do, are curated too (`RECORD_OVERRIDES`). Each group lists their notes after its records."

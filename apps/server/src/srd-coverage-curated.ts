@@ -1,6 +1,7 @@
 /**
  * The coverage rows the data can't compute (`srd-coverage.ts`): the 15 conditions, the rules glossary, each kind of
- * monster trait, and records the engine handles in code that the data-driven pass gets wrong. Each says where it
+ * monster trait, the rules chapters' sections, the weapon properties and masteries, and records the engine handles in
+ * code that the data-driven pass gets wrong. Each says where it
  * happens, so the owner can check it. The states:
  * - enforced: the server applies the record in play. The GM may still supply a fact the map can't see (sight, light,
  *   a degree of cover), and the note names any narrative part left to the table.
@@ -3353,4 +3354,211 @@ export const TOOLBOX_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "Guidance for building fights; elevation, terrain and hazards run as their own rules."
   ),
   "section-troubleshooting": reference("Guidance for running fights.")
+};
+
+/** The rules chapters' sections (SRD 5.2.1 Playing the Game, Creating a Character and the rest), each with where the app applies it. */
+export const RULES_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
+  "combat-1": enforced(
+    "encounter.ts rolls Initiative, with Disadvantage for a surprised creature, orders the turns and runs the rounds; resolution/economy.ts holds each creature to its movement, one action and one Bonus Action on its turn and one Reaction a round. Placing the tokens before the fight is the GM's."
+  ),
+  "combat-2": enforced(
+    "The map's grid counts 5 feet a square; movement-rules.ts charges each square entered, diagonals included, and twice for Difficult Terrain (terrain.ts), and ranges count squares by the shortest route (movement-narration.ts). A large tree whose corner a diagonal would cross isn't on the map, so it is the GM's."
+  ),
+  "combat-3": enforced(
+    "movement-rules.ts charges each move against Speed, lets a creature split it around its action, charges Difficult Terrain, crawling, standing up, climbing and swimming, and lets it through another creature's space where the rules allow without ending there (space-entry.ts). Jumping is jumping.ts's."
+  ),
+  "combat-4": enforced(
+    "resolution/attack.ts rolls the attack with its bonus, Advantage and Disadvantage against the target's Armor Class, and resolution/damage.ts rolls the damage on a hit, doubling the dice on a Critical Hit."
+  ),
+  "combat-5": guided(
+    "With dynamic vision on, resolution/attack.ts gives an attack against a creature the attacker can't see Disadvantage, and one by an attacker its target can't see Advantage (vision/rules.ts); a hidden attacker gives its position away when it attacks (resolution/release.ts). Attacking a square where an unseen creature is guessed to be is the GM's: a player can target only a creature it is shown."
+  ),
+  "combat-6": enforced(
+    "cover.ts measures Half and Three-Quarters Cover from the walls and creatures between attacker and target, or the GM marks it, and resolution/attack.ts and saving-throws.ts add +2 or +5 to AC and Dexterity saves; Total Cover refuses the target (resolution/spell-targets.ts, action-targets.ts)."
+  ),
+  "combat-7": enforced(
+    "resolution/attack.ts gives a shot beyond normal range Disadvantage and resolution/economy.ts refuses one beyond long range, and a ranged attack with an able enemy within 5 feet that can see the attacker has Disadvantage."
+  ),
+  "combat-8": enforced(
+    "resolution/attack.ts holds a melee attack to the attacker's reach, the Unarmed Strike deals its damage, grapples or shoves (resolution/builtins.ts), and movement-rules.ts offers an Opportunity Attack when a creature leaves an enemy's reach without Disengaging."
+  ),
+  "combat-9": enforced(
+    "mounts.ts mounts and dismounts for half the rider's Speed, gives a controlled mount its rider's Initiative and only the Dash, Disengage and Dodge actions, and asks the rider the DC 10 Dexterity save against falling off Prone when the mount is moved against its will or either is knocked Prone. Whether a mount is trained to accept a rider, or lets one ride, is the GM's."
+  ),
+  "combat-10": enforced(
+    "In a fight the GM marks as underwater (encounter.ts), resolution/attack.ts gives a weapon's melee attack Disadvantage unless the attacker has a Swim Speed or the weapon deals Piercing damage, and a ranged weapon attack Disadvantage within normal range; resolution/economy.ts refuses one beyond it. hit-points.ts gives everything Resistance to Fire damage. A fight only partly underwater is the GM's to mark."
+  ),
+  "create-your-character-1": enforced(
+    "The builder offers each class with its features, proficiencies and starting equipment (character-build.ts, builder-offers.ts)."
+  ),
+  "create-your-character-2": enforced(
+    "The builder applies the background's ability increases, proficiencies, Origin feat and equipment, the species' traits and size, and the languages picked (character-build.ts)."
+  ),
+  "create-your-character-3": enforced(
+    "The builder takes the Standard Array, point buy or rolled scores, and applies the background's increases with the 20 cap (character-build.ts)."
+  ),
+  "create-your-character-4": reference("The sheet records the alignment the player picks; playing it is the table's."),
+  "create-your-character-5": enforced(
+    "The sheet works out the saving throws, skills, Passive Perception, Hit Points, Hit Point Dice, Initiative, Armor Class, attacks and spellcasting numbers from the build (character-build.ts, ability-checks.ts). The character's description and personality are the player's."
+  ),
+  "create-your-character-6": enforced(
+    "The Level flow adds a level's Hit Points (fixed or rolled), Hit Point Dice, features and picks (next-level.ts, level-up-picks.ts), and experience.ts tracks the XP each level needs."
+  ),
+  "create-your-character-7": enforced(
+    "The builder makes a character at any level with the same steps (character-build.ts). The bonus feats past level 20 and any extra starting equipment or magic items are the GM's to give."
+  ),
+  "d20-tests-1": enforced(
+    "ability-checks.ts rolls a check with its ability, skill or tool, proficiency, Advantage and Disadvantage against the DC the action or the GM sets."
+  ),
+  "d20-tests-2": enforced(
+    "saving-throws.ts rolls a save with its ability, proficiency, Advantage and Disadvantage against the effect's DC, and applies what a success or failure leaves."
+  ),
+  "d20-tests-3": enforced(
+    "resolution/attack.ts rolls an attack with its ability and proficiency, a natural 20 always hitting as a Critical Hit and a natural 1 always missing."
+  ),
+  "d20-tests-4": enforced(
+    "Advantage and Disadvantage from every source are gathered on each D20 Test, and having both cancels them (rules-5e aggregateRollMode)."
+  ),
+  "damage-and-healing-1": enforced(
+    "hit-points.ts tracks Hit Points against the maximum, and Bloodied at half or fewer."
+  ),
+  "damage-and-healing-2": enforced(
+    "rests.ts runs Short Rests with Hit Point Dice spending and Long Rests restoring Hit Points, spent Hit Point Dice and uses, and long-rest.ts lets a party's Long Rest be interrupted (rest-interruptions.ts)."
+  ),
+  "damage-and-healing-3": enforced("resolution/damage.ts rolls each damage roll with its modifiers and types."),
+  "damage-and-healing-4": enforced("resolution/damage.ts rolls a Critical Hit's damage dice twice."),
+  "damage-and-healing-5": enforced(
+    "saving-throws.ts and resolution/pending.ts deal a save's damage in full on a failure and half on a success where the effect says so."
+  ),
+  "damage-and-healing-6": enforced(
+    "Every damage roll carries its type, which hit-points.ts reads for Resistance, Vulnerability and Immunity."
+  ),
+  "damage-and-healing-7": enforced(
+    "hit-points.ts halves damage of a type the creature resists and doubles one it is vulnerable to, once each per instance, after other modifiers."
+  ),
+  "damage-and-healing-8": enforced(
+    "hit-points.ts takes no damage of a type the creature is immune to, and an immune creature can't be given a condition it is immune to (effects.ts)."
+  ),
+  "damage-and-healing-9": enforced(
+    "resolution/heal.ts restores Hit Points up to the maximum, and healing a creature at 0 brings it back to consciousness."
+  ),
+  "damage-and-healing-10": enforced(
+    "resolution/knock-out.ts offers a melee attack that would drop a creature to 0 the choice to leave it at 1 Hit Point and Unconscious for a Short Rest, ended early by healing or a DC 10 Wisdom (Medicine) check."
+  ),
+  "damage-and-healing-11": enforced(
+    "hit-points.ts drops a character at 0 into Unconscious and dying, or kills it outright when the damage left over reaches its maximum, and defeats any other creature; death-saves.ts rolls the Death Saving Throws until the character stabilizes, revives or dies."
+  ),
+  "damage-and-healing-12": enforced(
+    "hit-points.ts takes damage from Temporary Hit Points first, a new grant keeps the higher of the two (resolution/heal.ts), and a Long Rest clears them."
+  ),
+  "exploration-1": reference("A pointer to the Equipment chapter, whose gear has its own rows."),
+  "exploration-2": enforced(
+    "With dynamic vision on, the map's walls, doors, lights, light levels and each creature's senses decide what every creature sees (vision/sight.ts), and Lightly and Heavily Obscured areas apply their Disadvantage and blindness (vision/rules.ts). With it off, who sees what is the GM's."
+  ),
+  "exploration-3": enforced(
+    "The Hide action rolls Dexterity (Stealth) against DC 15 where the creature is out of sight or Heavily Obscured, makes it Invisible until it is found, attacks or makes a sound, and sets the DC to find it (resolution/builtins.ts, vision/rules.ts)."
+  ),
+  "exploration-4": enforced(
+    "One object interaction a turn is free and a second takes the Utilize action (object-interactions.ts), a Search can find what is hidden (resolution/builtins.ts, traps.ts), carrying.ts weighs the load, and doors and walls on the map are objects with AC and Hit Points (objects.ts). What a lever or a loose object does is the GM's to describe."
+  ),
+  "exploration-5": reference(
+    "The tokens' places on the map are the marching order; recording it any other way is the table's."
+  ),
+  "exploration-6": reference(
+    "A pointer. Each hazard it names has its own glossary row: Burning, Dehydration, Falling, Malnutrition and Suffocation."
+  ),
+  "exploration-7": enforced(
+    "While the GM passes time on the road with a pace, travel.ts gives each traveller the pace's Advantage or Disadvantage on Perception, Survival and Stealth checks, Passive Perception included. How far the group gets, mounts' faster hour and vehicles are the GM's, since overland travel isn't on the map."
+  ),
+  "multiclassing-1": enforced(
+    "The builder refuses a level in a new class without 13 in its primary ability and in every class already taken, read as the scores stand at that level (character-build.ts)."
+  ),
+  "multiclassing-2": enforced("experience.ts counts XP against the total level's thresholds."),
+  "multiclassing-3": enforced(
+    "The builder takes the level 1 maximum for the first class only, each later level from its own class's die, and keeps a Hit Point Dice pool for each die size (character-build.ts)."
+  ),
+  "multiclassing-4": enforced(
+    "A later class gives only its multiclass training and skills, never its saving throws (character-build.ts)."
+  ),
+  "multiclassing-5": enforced(
+    "Each class's features come at that class's own level, and the special rules for Extra Attack, Spellcasting and Armor Class calculations apply as their rows say (character-build.ts)."
+  ),
+  "multiclassing-6": enforced(
+    "Of several ways to calculate Armor Class, the sheet uses the best one, and only one applies (character-build.ts)."
+  ),
+  "multiclassing-7": enforced(
+    "Extra Attack from two classes doesn't stack, and a Fighter's own tiers count (character-build.ts, resolution/extra-attacks.ts)."
+  ),
+  "multiclassing-8": enforced(
+    "The classes share one spell slot table, Paladin and Ranger levels counting half, each class holds to its own highest spell level, and Pact Magic keeps its own slots (spellcasting.ts)."
+  ),
+  "proficiency-1": enforced(
+    "The Proficiency Bonus is added once to a roll, and Expertise doubles it once (ability-checks.ts)."
+  ),
+  "proficiency-2": enforced(
+    "A skill proficiency adds the Proficiency Bonus to checks with that skill (ability-checks.ts)."
+  ),
+  "proficiency-3": enforced(
+    "A saving throw proficiency adds the Proficiency Bonus to saves with that ability (saving-throws.ts)."
+  ),
+  "proficiency-4": enforced(
+    "Weapon proficiency adds the Proficiency Bonus to attacks, armor without training gives Disadvantage on Strength and Dexterity rolls and blocks spellcasting, and tool proficiency adds it to checks with the tool (equipment-derivation.ts, ability-checks.ts)."
+  ),
+  "social-interaction-1": reference("How the characters talk and how an NPC reacts are the table's."),
+  "social-interaction-2": enforced(
+    "The Influence action rolls the skill against the creature's attitude, Advantage when it is Friendly and Disadvantage when Hostile, with a DC of 15 or its Intelligence (resolution/builtins.ts, ability-checks.ts). What it agrees to is the GM's."
+  ),
+  "the-six-abilities-1": enforced(
+    "The sheet holds each ability score, raised and capped by the build and its items (live-abilities.ts)."
+  ),
+  "the-six-abilities-2": enforced(
+    "Every roll reads the ability modifier worked out from the score (rules-5e abilityModifier)."
+  )
+};
+
+/** The weapon properties and masteries, each read wherever a weapon that carries it swings. */
+export const WEAPON_PROPERTY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
+  "ammunition-wp": enforced(
+    "ammunition.ts draws a piece for each shot from the attacker's pack or quiver and refuses a shot without one, and half the spent pieces can be recovered after the fight."
+  ),
+  "finesse-wp": enforced("item-actions.ts lets the attack and its damage use the better of Strength and Dexterity."),
+  "heavy-wp": enforced(
+    "equipment-derivation.ts gives a Heavy melee weapon's attacks Disadvantage below Strength 13 and a Heavy ranged weapon's below Dexterity 13."
+  ),
+  "light-wp": enforced(
+    "resolution/extra-attacks.ts offers a second attack with a different Light weapon as a Bonus Action after an attack with one, without the ability modifier on its damage unless it is negative."
+  ),
+  "loading-wp": enforced(
+    "resolution/economy.ts fires only one piece of ammunition from it on each action, Bonus Action or Reaction."
+  ),
+  "reach-wp": enforced(
+    "item-actions.ts adds 5 feet to the reach of its attacks and of the Opportunity Attacks it offers."
+  ),
+  "thrown-wp": enforced(
+    "item-actions.ts offers it as a ranged attack at its range with the melee ability, and the weapon leaves the hand where it lands (resolution/ammunition.ts)."
+  ),
+  "two-handed-wp": enforced("resolution/economy.ts and resolution/attack.ts need both hands free to attack with it."),
+  "versatile-wp": enforced("equipment-derivation.ts deals its larger die when it is held in two hands."),
+  "cleave-mastery": enforced(
+    "resolution/extra-attacks.ts offers a second melee attack against another creature within 5 feet of the first, once a turn, without the ability modifier on its damage."
+  ),
+  "graze-mastery": enforced("resolution/masteries.ts deals the ability modifier's damage on a miss."),
+  "nick-mastery": enforced(
+    "resolution/extra-attacks.ts makes the Light weapon's extra attack part of the Attack action, once a turn."
+  ),
+  "push-mastery": enforced(
+    "resolution/masteries.ts pushes a Large or smaller creature hit up to 10 feet straight away."
+  ),
+  "sap-mastery": enforced(
+    "resolution/masteries.ts gives a creature hit Disadvantage on its next attack roll before the attacker's next turn."
+  ),
+  "slow-mastery": enforced(
+    "resolution/masteries.ts takes 10 feet off a creature's Speed after a hit that damages it, until the attacker's next turn, without stacking."
+  ),
+  "topple-mastery": enforced(
+    "resolution/masteries.ts asks a creature hit for a Constitution save against 8 plus the attack's ability modifier and Proficiency Bonus, Prone on a failure."
+  ),
+  "vex-mastery": enforced(
+    "resolution/masteries.ts gives the attacker Advantage on its next attack roll against a creature it hit and damaged, before the end of its next turn."
+  )
 };

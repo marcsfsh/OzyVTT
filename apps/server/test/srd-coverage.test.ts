@@ -9,15 +9,20 @@ import {
   loadBackgrounds,
   loadClasses,
   loadConditions,
+  loadDamageTypes,
   loadEquipment,
   loadFeats,
   loadGlossary,
+  loadLanguages,
   loadMagicItems,
   loadToolbox,
   loadMonsterDefinitions,
   loadSpecies,
+  loadRules,
+  loadSkills,
   loadSpells,
   loadSubclasses,
+  loadWeaponProperties,
   loadWeapons,
   type EquipmentReference
 } from "@vtt/content-srd-5.2.1";
@@ -47,7 +52,9 @@ import {
   GLOSSARY_COVERAGE,
   MONSTER_TRAIT_COVERAGE,
   RECORD_OVERRIDES,
-  TOOLBOX_COVERAGE
+  RULES_COVERAGE,
+  TOOLBOX_COVERAGE,
+  WEAPON_PROPERTY_COVERAGE
 } from "../src/srd-coverage-curated.js";
 
 describe("the SRD coverage manifest", () => {
@@ -64,7 +71,9 @@ describe("the SRD coverage manifest", () => {
       GLOSSARY_COVERAGE,
       MONSTER_TRAIT_COVERAGE,
       RECORD_OVERRIDES,
-      TOOLBOX_COVERAGE
+      TOOLBOX_COVERAGE,
+      RULES_COVERAGE,
+      WEAPON_PROPERTY_COVERAGE
     ])
       for (const [key, row] of Object.entries(curated)) expect(row.note.trim(), key).not.toBe("");
   });
@@ -105,7 +114,12 @@ describe("the SRD coverage manifest", () => {
       ...toolbox.filter((record) => record.kind === "poison").map((record) => `item:${record.id}`),
       ...toolbox.filter((record) => record.kind !== "poison").map((record) => `Gameplay Toolbox:${record.id}`),
       ...loadConditions().map((condition) => `Conditions:${condition.id}`),
-      ...loadGlossary().map((entry) => `Rules glossary:${entry.id}`)
+      ...loadGlossary().map((entry) => `Rules glossary:${entry.id}`),
+      ...loadRules().map((rule) => `Rules chapters:${rule.id}`),
+      ...loadWeaponProperties().map((property) => `Weapon properties and masteries:${property.id}`),
+      ...loadSkills().map((skill) => `Skills:${skill.id}`),
+      ...loadDamageTypes().map((type) => `Damage types:${type.id}`),
+      ...loadLanguages().map((language) => `Languages:${language.id}`)
     ]);
     expect([...expected].filter((key) => !counts.has(key))).toEqual([]);
     expect(listed.filter((key) => !expected.has(key))).toEqual([]);
@@ -140,6 +154,10 @@ describe("the SRD coverage manifest", () => {
     expect(Object.keys(GLOSSARY_COVERAGE).filter((id) => !glossary.has(id))).toEqual([]);
     const toolbox = new Set(loadToolbox().map((record) => record.id));
     expect(Object.keys(TOOLBOX_COVERAGE).filter((id) => !toolbox.has(id))).toEqual([]);
+    const rules = new Set(loadRules().map((rule) => rule.id));
+    expect(Object.keys(RULES_COVERAGE).filter((id) => !rules.has(id))).toEqual([]);
+    const properties = new Set(loadWeaponProperties().map((property) => property.id));
+    expect(Object.keys(WEAPON_PROPERTY_COVERAGE).filter((id) => !properties.has(id))).toEqual([]);
     const kinds = new Set(
       loadMonsterDefinitions().flatMap((definition) =>
         ((definition.extensions["open5e.srd-2024"] as { traits?: { name: string }[] } | undefined)?.traits ?? []).map(
