@@ -181,7 +181,7 @@ function combatantsOf(
     // An area that harms the objects under it may catch no creature (Clap of Thunder against a door).
     (action.objectDamage !== undefined && input.placedArea !== undefined) ||
     // Pointing at what is hidden (a Wand of Secrets) is something done.
-    action.findsSecrets !== undefined ||
+    action.pointsAtHidden !== undefined ||
     // Raising or shrinking a tower is something done (an Instant Fortress).
     action.raisesTower !== undefined ||
     action.dismissesTower === true ||
@@ -222,7 +222,7 @@ function combatantsOf(
     action.douses === undefined &&
     action.lightsArea === undefined &&
     action.doorWork === undefined &&
-    action.findsSecrets === undefined &&
+    action.pointsAtHidden === undefined &&
     action.raisesTower === undefined &&
     action.dismissesTower !== true &&
     action.adjustsLight === undefined &&

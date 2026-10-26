@@ -89,7 +89,7 @@ function wayTo(from: Point, to: Point): string {
 /** SRD Wand of Secrets: "if a secret door or trap is within 60 feet of you, the wand pulses and points at the one nearest
  *  to you". Secret doors on the map and hidden areas (traps, glyphs) count; the table hears which way it points. */
 export function findSecrets(ctx: ResolveContext): void {
-  const finds = ctx.action.findsSecrets;
+  const finds = ctx.action.pointsAtHidden;
   if (!finds || ctx.input.commit === false) return;
   const { state, attacker, deps } = ctx;
   const at = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position;

@@ -346,6 +346,7 @@ describe("the spell walls table", () => {
       "disintegrate",
       "elementalism",
       "forcecage",
+      "guards-and-wards",
       "knock",
       "mage-hand",
       "passwall",

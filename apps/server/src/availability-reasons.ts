@@ -280,7 +280,7 @@ const structured = (action: DefinitionAction): boolean =>
   action.douses !== undefined ||
   action.lightsArea !== undefined ||
   action.doorWork !== undefined ||
-  action.findsSecrets !== undefined ||
+  action.pointsAtHidden !== undefined ||
   action.replacesAttack === true;
 
 /**

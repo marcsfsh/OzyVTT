@@ -5616,7 +5616,7 @@ export const ActionSchema = z
         "What it does to the door it is aimed at: fix-rod (an Immovable Rod holds it shut, DC 30 to force), glue (Sovereign Glue, undone only by dissolve), dissolve (Universal Solvent), or force (a Strength check of d20 plus bonus against what holds it shut: a Ring of the Ram)"
       ),
     /** It points its user at the nearest secret door or hidden trap within `feet` (a Wand of Secrets). */
-    findsSecrets: z
+    pointsAtHidden: z
       .object({ feet: z.number().int().min(5).max(300) })
       .strict()
       .optional()

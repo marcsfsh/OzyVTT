@@ -2319,7 +2319,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge. If a secret door or trap is within 60 feet of you, the wand pulses and points at the one nearest to you.",
-        findsSecrets: { feet: 60 },
+        pointsAtHidden: { feet: 60 },
         uses: { limit: 3, per: "long-rest", pool: "wand-of-secrets-charges" }
       }
     ]
