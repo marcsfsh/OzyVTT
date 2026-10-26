@@ -383,6 +383,7 @@ export function spellCastMechanics(
       | "dispel"
       | "endsCurses"
       | "restores"
+      | "scryingModifiers"
       | "summons"
       | "shapeShift"
       | "effectOptions"
@@ -481,6 +482,8 @@ export function spellCastMechanics(
     ...(effect.endsCurses ? { endsCurses: true as const } : {}),
     // The harm it ends that its caster picks (Greater Restoration).
     ...(effect.restores ? { restores: true as const } : {}),
+    // Scrying's knowledge and connection, picked as it is cast.
+    ...(effect.scryingModifiers ? { scryingModifiers: true as const } : {}),
     // The creatures it brings, with the caster's numbers a spell-printed stat block reads (Summon Dragon's Rend).
     ...(effect.summons
       ? {

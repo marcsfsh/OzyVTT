@@ -5566,6 +5566,12 @@ export const ActionSchema = z
       .literal(true)
       .optional()
       .describe("It names the compass direction each creature its spell compels must move on its next turn"),
+    /** The cast picks how well its caster knows the target and what of it the caster has (`optionId`), whose modifiers
+     *  add to the target's save (Scrying: Secondhand +5 to Extensive -5, a likeness -2 to a body part -10). */
+    scryingModifiers: z
+      .literal(true)
+      .optional()
+      .describe("The cast picks its caster's knowledge of the target and connection to it, which modify the target's save"),
     /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
      *  The resolve's targets assign them in order, a target named twice taking two. */
     darts: z.number().int().min(2).max(20).optional(),

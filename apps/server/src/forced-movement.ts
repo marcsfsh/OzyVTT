@@ -25,6 +25,11 @@ import { moveEncounterToken, snappedTokenPosition, type TokenMapGeometry } from 
  * its unit into the narration.
  */
 
+/** On an effect, nothing moves its bearer (Imprisonment's Chaining: "can't be moved by any means"). */
+export const UNMOVABLE_TAG = "unmovable";
+const unmovable = (state: GameState, actorId: string) =>
+  state.actors.some((actor) => actor.id === actorId && actor.effects.some((effect) => effect.tags.includes(UNMOVABLE_TAG)));
+
 export type ForcedMove = Readonly<{
   /** Who is moved. */
   actorId: string;
@@ -80,6 +85,7 @@ export function pullTokenToward(
 ): Readonly<{ value: number; unit: string }> | null {
   const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
   if (from === null) return null;
+  if (unmovable(state, actorId)) return { value: 0, unit: "ft" };
   const destination = pushDestination(geometry, from, point, -distanceFeet);
   if (destination === null) return null;
   moveEncounterToken(state, actorId, destination, geometry);
@@ -99,6 +105,7 @@ export function pushTokenAway(
   const from = state.combat.tokens.find((token) => token.actorId === input.actorId)?.position ?? null;
   const source = state.combat.tokens.find((token) => token.actorId === input.awayFromActorId)?.position ?? null;
   if (from === null || source === null) return null;
+  if (unmovable(state, input.actorId)) return { value: 0, unit: "ft" };
   // A pull runs the same line the other way and stops beside the creature it is pulled to, edge to edge.
   const apart = input.toward
     ? (tokenCreatureDistance(state, geometry, input.actorId, input.awayFromActorId) ?? null)
@@ -124,7 +131,7 @@ export function pullIntoSpace(
 ): boolean {
   const at = state.combat.tokens.find((token) => token.actorId === intoActorId)?.position;
   const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position;
-  if (!geometry || !at || !from) return false;
+  if (!geometry || !at || !from || unmovable(state, actorId)) return false;
   moveEncounterToken(state, actorId, at, geometry);
   return true;
 }

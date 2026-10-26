@@ -772,6 +772,10 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // "Each Charmed target must use as much of its movement as possible to move in that direction on its next turn ...
   // After moving in this way, a target repeats the save, ending the spell on itself on a success."
   compulsion: { repeatAfterCompelledMove: true },
+  // "On a successful save, the target is unaffected, and it is immune to this spell for the next 24 hours."
+  imprisonment: { immuneOnSuccess: true, immuneMinutes: 24 * 60 },
+  // "On a successful save, the target isn't affected, and you can't use this spell on it again for 24 hours."
+  scrying: { immuneOnSuccess: true, immuneMinutes: 24 * 60 },
   // "Another 5d4 Acid damage at the end of its next turn", with no condition for the reader to hang it on.
   "vitriolic-sphere": {
     ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }

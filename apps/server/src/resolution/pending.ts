@@ -1,7 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { HELD_BY_CARRIED_TAG, heldByCarried } from "../carried-objects.js";
 import { prismaticSpray } from "./prismatic.js";
-import type { PendingReaction, PendingSave } from "@vtt/domain";
+import { SCRYING_PICKS, type PendingReaction, type PendingSave } from "@vtt/domain";
 import { catalogIdOf, DamageTypeSchema, type ActionReaction, type GrantOption, type InventoryItem } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { commanderOf } from "../authorization.js";
@@ -731,7 +731,10 @@ export function parkActionSave(ctx: ResolveContext): void {
                 : null
             )
         )
-      : 0;
+      : // Scrying: "modified ... by how well you know the target and the sort of physical connection you have to it".
+        (action.scryingModifiers
+          ? (SCRYING_PICKS.find((pick) => pick.id === input.optionId)?.bonus ?? 0)
+          : 0);
   // "It does so with Advantage if you or your allies are fighting it" (Charm Person): in a fight, a target on the other
   // side from the source.
   const fightingOf = (target: (typeof targets)[number]) =>

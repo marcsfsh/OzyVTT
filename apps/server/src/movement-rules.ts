@@ -48,6 +48,7 @@ import type { MovementCost, MovementCostOptions } from "./terrain.js";
 import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
 import { fearSources } from "./vision/rules.js";
 import { compelledMoveRefusal } from "./compelled-moves.js";
+import { UNMOVABLE_TAG } from "./forced-movement.js";
 import {
   effectiveModeFor,
   familyModeFor,
@@ -624,6 +625,12 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       ? compelledMoveRefusal(state, mover, from, to, input)
       : null;
   if (compelled) police(state, input, "movement.compelled", compelled, outcome);
+  // Imprisonment's Chaining: "can't be moved by any means", so neither its own move nor a drag takes it.
+  const chained = [actorId, ...(input.dragging?.actorIds ?? [])]
+    .map((id) => state.actors.find((actor) => actor.id === id))
+    .find((actor) => actor?.effects.some((effect) => effect.tags.includes(UNMOVABLE_TAG)));
+  if (chained && mode !== "teleport")
+    police(state, input, "movement.no-movement-remaining", `${chained.name} can't be moved by any means.`, outcome);
   // SRD Climber's Kit: "you can't move more than 25 feet from there without undoing the anchor".
   const tether = (counted || input.byPlayer || grant) && strainsAnchor(input, mover, to);
   if (tether) police(state, input, "movement.tether", tether, outcome);

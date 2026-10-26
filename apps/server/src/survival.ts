@@ -72,6 +72,10 @@ export function needsOf(actor: Pick<Actor, "size">): Readonly<{ food: number; wa
 }
 
 /** Whether the table tracks this creature's food and water: a character, while survival is on. */
+/** On an effect, its bearer needs no air, food or water while it lasts (Imprisonment). */
+export const SUSTAINED_TAG = "sustained";
+const isSustained = (actor: Actor) => actor.effects.some((effect) => effect.tags.includes(SUSTAINED_TAG));
+
 const tracked = (state: GameState, actor: Actor) =>
   state.rest.survival && actor.kind === "player-character" && !actor.archived;
 
@@ -287,7 +291,8 @@ export function endOfDays(
   const events: EffectNarration[] = [];
   for (let day = 0; day < days; day += 1)
     for (const actor of state.actors)
-      if (actorIds.has(actor.id) && tracked(state, actor) && !isDead(actor))
+      // An imprisoned creature "doesn't need to breathe, eat, or drink" (Imprisonment).
+      if (actorIds.has(actor.id) && tracked(state, actor) && !isDead(actor) && !isSustained(actor))
         events.push(...endDayFor(state, actor, deps));
   return events;
 }

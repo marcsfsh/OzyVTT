@@ -3208,7 +3208,22 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   banishment: { name: "Banished", tags: ["off-plane", "banished-home"], modifiers: [] },
   // Imprisoned "until the spell is dispelled": off the map until the GM ends it. Its form, and the trigger that frees
   // it, are the GM's.
-  imprisonment: { name: "Imprisoned", tags: ["off-plane"], modifiers: [] },
+  // "While imprisoned, the target doesn't need to breathe, eat, or drink ... Divination spells can't locate or perceive
+  // the imprisoned target, and the target can't teleport", in the form the caster picks: Burial, Hedged Prison and
+  // Minimus Containment take it from the map; Chaining holds it Restrained in place, unmovable by any means; Slumber
+  // leaves it Unconscious, and nothing wakes it.
+  imprisonment: {
+    name: "Imprisoned",
+    tags: ["imprisoned", "no-teleport", "sustained"],
+    modifiers: [{ type: "spell-ward", schools: ["divination"] }],
+    options: [
+      option("burial", "Burial", { tags: ["off-plane"] }),
+      option("chaining", "Chaining", { conditions: ["restrained"], tags: ["unmovable"] }),
+      option("hedged-prison", "Hedged Prison", { tags: ["off-plane"] }),
+      option("minimus-containment", "Minimus Containment", { tags: ["off-plane"] }),
+      option("slumber", "Slumber", { conditions: ["unconscious"] })
+    ]
+  },
   // "Must immediately use its Reaction, if available, to move as far away from you as it can, using the safest route":
   // the server spends the Reaction and gives the creature a move of its Speed that must end farther away.
   "dissonant-whispers": {
@@ -3672,6 +3687,10 @@ const CAST_ENDS_CURSES: ReadonlySet<string> = new Set(["remove-curse"]);
 /** Greater Restoration: the caster picks one harm the cast ends (an Exhaustion level, Charmed or Petrified, a curse, a
  *  lowered ability score or Hit Point maximum). */
 const CAST_RESTORES: ReadonlySet<string> = new Set(["greater-restoration"]);
+/** Scrying: the caster picks its knowledge of the target and its connection to it, which modify the save. */
+const CAST_SCRYING_MODIFIERS: ReadonlySet<string> = new Set(["scrying"]);
+/** What only a Dispel Magic of this slot level or higher ends (Imprisonment: level 9). */
+const DISPELLED_FROM_SLOT: Readonly<Record<string, number>> = { imprisonment: 9 };
 
 /** Concentration spells that keep a part of their own besides what they leave on creatures, so they don't end when no
  *  creature is affected any more: Entangle's tangled ground, an earthquake's shaking ground and fissures, Reverse
@@ -3800,6 +3819,8 @@ export function spellEffectFor(
     ...(dispel ? { dispel: { ...dispel } } : {}),
     ...(CAST_ENDS_CURSES.has(id) ? { endsCurses: true as const } : {}),
     ...(CAST_RESTORES.has(id) ? { restores: true as const } : {}),
+    ...(CAST_SCRYING_MODIFIERS.has(id) ? { scryingModifiers: true as const } : {}),
+    ...(DISPELLED_FROM_SLOT[id] !== undefined ? { dispelledFromSlot: DISPELLED_FROM_SLOT[id] } : {}),
     ...(PERSISTS_WITHOUT_TARGETS.has(id) ? { persistsWithoutTargets: true as const } : {}),
     ...(SEEN_TARGETS.has(id) ? { seenTargets: true as const } : {}),
     ...(TARGET_TYPES[id] ? { targetTypes: [...TARGET_TYPES[id]] } : {}),
@@ -3910,6 +3931,8 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_SELF_SAVES),
   ...CAST_ENDS_CURSES,
   ...CAST_RESTORES,
+  ...CAST_SCRYING_MODIFIERS,
+  ...Object.keys(DISPELLED_FROM_SLOT),
   ...PERSISTS_WITHOUT_TARGETS,
   ...SEEN_TARGETS,
   ...Object.keys(TARGET_TYPES),

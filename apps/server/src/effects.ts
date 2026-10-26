@@ -554,8 +554,9 @@ export function addEffect(
       throw new CommandRejectedError("That combatant already has too many active effects.");
     actor.effects = [...actor.effects, effect];
   }
-  // A creature that can breathe water now (the Water Breathing spell) stops holding its breath.
-  if (effect.tags.includes("water-breathing"))
+  // A creature that can breathe water now (the Water Breathing spell), or needs no air at all (Imprisonment), stops
+  // holding its breath.
+  if (effect.tags.includes("water-breathing") || effect.tags.includes("sustained"))
     for (const held of actor.effects.filter((candidate) => candidate.breath !== undefined))
       endEffectInternal(state, actor, held.id, events ?? []);
   for (const conditionId of effect.linkedConditionIds) {

@@ -90,6 +90,16 @@ function dispel(ctx: ResolveContext, printed: number, target: LiveActor | undefi
     return;
   }
   for (const spell of spells) {
+    // "A Dispel Magic spell can end the spell only if it is cast with a level 9 spell slot" (Imprisonment).
+    const floor = ctx.deps.catalog?.spellRecord?.(spell.spellId)?.effect?.dispelledFromSlot;
+    if (floor !== undefined && (ctx.plan.castLevel ?? 0) < floor) {
+      ctx.tableNarration.push({
+        kind: "effect",
+        text: `${spell.name} holds: only ${action.name} from a level ${floor} spell slot ends it.`,
+        actorIds: [target.id]
+      });
+      continue;
+    }
     if (!ends(ctx, spell.level, automatic, spell.name)) continue;
     for (const effectId of spell.effectIds) {
       const effect = target.effects.find((candidate) => candidate.id === effectId);

@@ -1,4 +1,4 @@
-import { COMPASS_HEADINGS, RESTORATION_PICKS, TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
+import { COMPASS_HEADINGS, RESTORATION_PICKS, SCRYING_PICKS, TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
 import { checkWishUse } from "./wish.js";
 import { abilityModifier, isMeleeWeapon } from "@vtt/rules-5e";
 import {
@@ -61,7 +61,9 @@ export function checkChoices(
           ? RESTORATION_PICKS
           : action.setsHeading
             ? COMPASS_HEADINGS
-            : undefined);
+            : action.scryingModifiers
+              ? SCRYING_PICKS
+              : undefined);
   // End an Effect's pick is the way out it takes (`resolution/endings.ts`).
   const own = action.id === END_EFFECT_ACTION_ID ? [] : [input.optionId];
   const picks = [...own, ...Object.values(input.targetOptions ?? {})].filter(

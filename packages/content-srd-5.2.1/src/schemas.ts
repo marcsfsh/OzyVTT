@@ -411,6 +411,11 @@ export const SpellEffectSchema = z
     endsCurses: z.literal(true).optional(),
     /** The cast ends one harm the caster picks on its target (Greater Restoration). */
     restores: ActionSchema.shape.restores,
+    /** The cast picks the knowledge and connection that modify its target's save (Scrying). */
+    scryingModifiers: ActionSchema.shape.scryingModifiers,
+    /** Dispel Magic ends what it leaves only when cast from a slot of this level or higher, with no check below it
+     *  (Imprisonment: "only if it is cast with a level 9 spell slot"). */
+    dispelledFromSlot: z.number().int().min(1).max(9).optional(),
     /** The spell keeps something of its own besides what it leaves on creatures (Entangle's tangled ground, an
      *  earthquake's fissures), so its Concentration holds when no creature is affected any more. */
     persistsWithoutTargets: z.literal(true).optional(),

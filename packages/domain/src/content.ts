@@ -941,6 +941,28 @@ export const RESTORATION_PICKS: ReadonlyArray<Readonly<{ id: string; name: strin
   // What another effect's own text says Greater Restoration ends (Befuddlement, Contact Other Plane's Incapacitated).
   { id: "other", name: "Another effect it ends" }
 ];
+/** Scrying's save modifiers, picked as it is cast: how well the caster knows the target, and what of it the caster
+ *  has. `bonus` adds to the target's Wisdom save. */
+export const SCRYING_PICKS: ReadonlyArray<Readonly<{ id: string; name: string; bonus: number }>> = (
+  [
+    ["secondhand", "Secondhand", 5],
+    ["firsthand", "Firsthand", 0],
+    ["extensive", "Extensive", -5]
+  ] as const
+).flatMap(([knowledge, known, knowledgeBonus]) =>
+  (
+    [
+      ["", "no connection", 0],
+      ["likeness", "a likeness", -2],
+      ["possession", "a possession", -4],
+      ["body-part", "a body part", -10]
+    ] as const
+  ).map(([connection, held, connectionBonus]) => ({
+    id: connection ? `${knowledge}-${connection}` : knowledge,
+    name: `${known}, ${held} (${knowledgeBonus + connectionBonus >= 0 ? "+" : ""}${knowledgeBonus + connectionBonus})`,
+    bonus: knowledgeBonus + connectionBonus
+  }))
+);
 /** The horizontal directions a compelling spell can name (Compulsion), by eighths of a turn from north. */
 export const COMPASS_HEADINGS: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
   { id: "north", name: "North" },
@@ -968,6 +990,7 @@ type ChoosingAction = Readonly<{
   wishUses?: true;
   restores?: true;
   setsHeading?: true;
+  scryingModifiers?: true;
   identifiesItem?: true;
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
@@ -996,7 +1019,9 @@ export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
           ? { options: RESTORATION_PICKS }
           : action.setsHeading
             ? { options: COMPASS_HEADINGS }
-            : action.save?.failureEffect;
+            : action.scryingModifiers
+              ? { options: SCRYING_PICKS.map(({ id, name }) => ({ id, name })) }
+              : action.save?.failureEffect;
   const granted = action.grants?.bindsWeapon;
   // An oil that remakes a row asks for a Melee weapon or a stack of ammunition.
   const binds: ActionChoices["bindsWeapon"] = granted
