@@ -166,6 +166,10 @@ export function applyShapeShift(ctx: ResolveContext): void {
     // A new form while the spell lasts (Shapechange's Magic action) keeps the cast's lifetime and Concentration.
     const lasting = spell && laterRowOf(spell, action.id) ? formEffectOf(recipient) : undefined;
     const kept = lasting?.spell?.id === spell?.id ? lasting : undefined;
+    // A form taken again by the spell's grant (Wind Walk's return to cloud form) lasts as long as the grant does.
+    const granted = spell
+      ? recipient.effects.find((effect) => effect.grantedSpellAction?.spellId === spell.id)
+      : undefined;
     // What a printed form has while it lasts (a vampire's mist: Resistance to all damage).
     const printed = shift.printed?.find((entry) => entry.id === form.printedId);
     const effect = makeEffect({
@@ -178,7 +182,7 @@ export function applyShapeShift(ctx: ResolveContext): void {
       sourceName: attacker.name,
       sourceActionId: kept?.sourceActionId ?? action.id,
       startedRound: kept?.startedRound ?? state.combat.round,
-      duration: kept?.duration ?? formDuration(ctx),
+      duration: kept?.duration ?? granted?.duration ?? formDuration(ctx),
       form,
       ...(kept?.castId !== undefined
         ? { castId: kept.castId, concentration: kept.concentration }
@@ -196,6 +200,23 @@ export function applyShapeShift(ctx: ResolveContext): void {
       ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
     });
     for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+    // Wind Walk: returning to cloud form "requires a Magic action followed by a 1-minute transformation".
+    if (shift.takesRounds !== undefined)
+      addEffect(
+        state,
+        recipient.id,
+        makeEffect({
+          id: `${input.commandId}:transforming:${recipient.id}`,
+          name: `Transforming into ${form.name}`.slice(0, 120),
+          sourceActorId: attacker.id,
+          sourceName: attacker.name,
+          // Its own source action, so it stands beside the form it leads into.
+          sourceActionId: `${action.id}:transforming`,
+          startedRound: state.combat.round,
+          duration: { type: "rounds", remaining: shift.takesRounds },
+          linkedConditionIds: ["stunned"]
+        })
+      );
     if (recipient.id !== attacker.id)
       ctx.effectsApplied.push({
         targetId: recipient.id,

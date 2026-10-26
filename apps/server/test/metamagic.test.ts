@@ -12,7 +12,7 @@ import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation
 import { openRepeatSaves } from "../src/save-stages.js";
 import { answerSave, saveRollSources, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { asiRows } from "./asi-rows.js";
-import { ALLY, build, fight, FOE, FOE2, HERO, wizardInput, type Fight } from "./spell-casters.js";
+import { ALLY, build, fight, FOE, FOE2, HERO, heroTurnAgain, wizardInput, type Fight } from "./spell-casters.js";
 
 // SRD 5.2.1 Metamagic: "You use the chosen options to temporarily modify spells you cast. To use an option, you must
 // spend the number of Sorcery Points that it costs. You can use only one Metamagic option on a spell when you cast it
@@ -450,6 +450,51 @@ describe("Quickened Spell: an action's casting time becomes a Bonus Action", () 
     expect(slots()).toBe(before - 1);
     expect(points(table)).toBe(2);
     expect(table.state.combat.turn.actionUsed).toBe(false);
+  });
+});
+
+describe("Elemental Affinity and Empowered Evocation add to one damage roll of a spell", () => {
+  /** The flat part an ability adds, as its own damage entry ("5" for Charisma +5). */
+  const flat = (result: ReturnType<typeof cast>, amount: number) =>
+    result.damage.filter((part) => part.formula === String(amount));
+
+  it("adds a Fire Sorcerer's Charisma modifier to Scorching Ray's first ray and none after", () => {
+    const table = sorcerer10(["careful-spell", "distant-spell", "quickened-spell", "subtle-spell"]);
+    const first = cast(table, "spell-scorching-ray", [], { targetIds: [FOE] }, [15, 3, 3]);
+    const second = cast(table, "spell-scorching-ray", [], { targetIds: [FOE] }, [15, 3, 3]);
+    const third = cast(table, "spell-scorching-ray", [], { targetIds: [FOE] }, [15, 3, 3]);
+    expect(flat(first, 5)).toEqual([{ formula: "5", type: "fire", total: 5 }]);
+    expect(flat(second, 5)).toEqual([]);
+    expect(flat(third, 5)).toEqual([]);
+    // A one-roll Fire Bolt takes it too.
+    heroTurnAgain(table.state);
+    expect(flat(cast(table, "spell-fire-bolt", [], { targetIds: [FOE] }, [15, 3, 3]), 5)).toEqual([
+      { formula: "5", type: "fire", total: 5 }
+    ]);
+  });
+
+  it("adds an Evoker 10's Intelligence modifier to the first ray alone", () => {
+    const input = wizardInput([
+      "scorching-ray",
+      "fireball",
+      "shield",
+      "magic-missile"
+    ]) as CharacterCreateRequestInput & {
+      level: number;
+      choices: CharacterCreateRequestInput["choices"][number][];
+    };
+    input.level = 10;
+    input.choices.push(
+      { level: 8, classId: "wizard", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: 8, kind: "ability-score", id: "int", payload: { featureId: "ability-score-improvement" } },
+      { level: 8, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } }
+    );
+    const table = fight(build(input));
+    // Intelligence 15 + 2 + 2 + 1 = 20: +5.
+    const first = cast(table, "spell-scorching-ray", [], { targetIds: [FOE] }, [15, 3, 3]);
+    const second = cast(table, "spell-scorching-ray", [], { targetIds: [FOE] }, [15, 3, 3]);
+    expect(first.warnings).toContainEqual(expect.stringMatching(/Empowered Evocation: \+5 fire \(INT\)/));
+    expect(second.warnings?.join(" ") ?? "").not.toMatch(/Empowered Evocation/);
   });
 });
 

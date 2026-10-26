@@ -22,6 +22,8 @@ const titled = (word: string) => `${word[0]!.toUpperCase()}${word.slice(1)}`;
  *  (Spare the Dying) is doubled at character levels 5, 11 and 17. Null for Self, Sight and the ranges a map can't
  *  measure. */
 export function castRangeFeet(spell: SpellReference, characterLevel: number): number | null {
+  // Wish's range is Self, and its uses reach the creatures its caster can see.
+  if (spell.effect?.wishUses) return null;
   const base = spellRangeFeet(spell.range) ?? (/^touch\b/i.test(spell.range.text ?? "") ? 5 : null);
   if (base === null || !spell.effect?.rangeDoubles) return base;
   const tiers = [5, 11, 17].filter((level) => characterLevel >= level).length;

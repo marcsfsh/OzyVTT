@@ -54,11 +54,19 @@ describe("rule families", () => {
       ["movement.jump", "movement"],
       ["movement.toward-fear", "movement"],
       ["movement.mount", "movement"],
+      // Dropping Prone on another's turn, and moving past a climbing anchor's tether.
+      ["movement.drop-prone", "movement"],
+      ["movement.tether", "movement"],
+      // A controlled mount's action: what it may take is the economy of its turn.
+      ["mount.controlled", "economy"],
       ["economy.action-used", "economy"],
       ["action.underwater-only", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
       ["economy.not-your-turn", "economy"],
+      ["economy.turn-start", "economy"],
+      ["economy.attack-action", "economy"],
+      ["economy.heavy-armor", "economy"],
       // Giving back a spent action, Bonus Action or Reaction lets a creature act twice.
       ["economy.spent-slot", "economy"],
       // No one acts while a wait-mode fight gathers initiative: the turn economy hasn't begun.

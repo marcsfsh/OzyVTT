@@ -28,7 +28,7 @@ describe("a spell card's text, kept to its own spell", () => {
 describe("a spell's map template", () => {
   it("covers the area the text gives a wall or a storm", () => {
     expect(spell("storm-of-vengeance").area).toEqual({ shape: "cylinder", sizeFeet: 300, widthFeet: null });
-    expect(spell("tsunami").area).toEqual({ shape: "line", sizeFeet: 300, widthFeet: 50 });
+    expect(spell("tsunami").area).toEqual({ shape: "line", sizeFeet: 300, widthFeet: 50, heightFeet: 300 });
     expect(spell("wind-wall").area).toEqual({ shape: "line", sizeFeet: 50, widthFeet: 5 });
     expect(spell("wall-of-ice").area).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
   });

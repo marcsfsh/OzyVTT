@@ -26,6 +26,70 @@ import { navigate } from "../router";
  * A player's own prompts keep their outcome line beside them: answering one unmounts it, and the
  * player panel has no feedback line of its own. Hidden while there is nothing to answer or report.
  */
+/** Whether the sheet holds the Alert feat, whose Initiative Swap the turn order offers. */
+const holdsAlert = (definition: PlayerView["actors"][number]["definition"]) =>
+  (definition?.character?.features ?? []).some((feature) => feature.id === "alert");
+
+/**
+ * Alert's Initiative Swap (SRD 5.2.1): "Immediately after you roll Initiative, you can swap your Initiative with the
+ * Initiative of one willing ally". The Alert holder's player offers it to another character; that character's player
+ * takes it here. The server checks the timing and the Incapacitated condition, and makes the swap.
+ */
+export function InitiativeSwap({ state, myId, alert }: Readonly<{ state: PlayerView; myId: string; alert: boolean }>) {
+  const combat = state.combat;
+  const nameOf = (actorId: string) => state.actors.find((actor) => actor.id === actorId)?.name ?? "an ally";
+  const offers = (combat.initiativeSwapOffers ?? []).filter((offer) => offer.withActorId === myId);
+  const offered = (combat.initiativeSwapOffers ?? []).find((offer) => offer.actorId === myId);
+  const allies = alert
+    ? combat.initiative.filter(
+        (entry) =>
+          entry.actorId !== myId &&
+          state.actors.find((actor) => actor.id === entry.actorId)?.kind === "player-character"
+      )
+    : [];
+  const send = (actorId: string, withActorId: string, done: string, onFeedback: (text: string) => void) =>
+    void command("initiative:swap", { actorId, withActorId }).then((result) =>
+      onFeedback(result.ok ? done : (result.message ?? "Refused."))
+    );
+  return (
+    <OwnFeedback className="initiative-tie-row" empty={offers.length === 0 && allies.length === 0}>
+      {(onFeedback) => (
+        <>
+          {offers.map((offer) => (
+            <Button
+              key={offer.actorId}
+              size="sm"
+              onClick={() =>
+                send(myId, offer.actorId, `You swapped Initiative with ${nameOf(offer.actorId)}.`, onFeedback)
+              }
+            >
+              Swap Initiative with {nameOf(offer.actorId)}
+            </Button>
+          ))}
+          {allies.map((ally) => (
+            <Button
+              key={ally.actorId}
+              size="sm"
+              variant="secondary"
+              aria-pressed={offered?.withActorId === ally.actorId}
+              onClick={() =>
+                send(
+                  myId,
+                  ally.actorId,
+                  `Initiative Swap offered to ${nameOf(ally.actorId)}. It is made when their player takes it.`,
+                  onFeedback
+                )
+              }
+            >
+              Offer {nameOf(ally.actorId)} a swap (Alert)
+            </Button>
+          ))}
+        </>
+      )}
+    </OwnFeedback>
+  );
+}
+
 function OwnFeedback({
   className,
   empty = false,
@@ -515,6 +579,10 @@ export function PlayerEncounterPanel({
                       ))
                   }
                 </OwnFeedback>
+              )}
+              {/* Alert's Initiative Swap, right after the roll: offered to another character, or taken from one. */}
+              {isMe && combat.round === 1 && myActor && (
+                <InitiativeSwap state={state} myId={entry.actorId} alert={holdsAlert(myActor.definition)} />
               )}
               {/* What this player's character holds on someone else (a grapple, a Concentration spell's hold):
                 theirs to let go of from that creature's row. */}

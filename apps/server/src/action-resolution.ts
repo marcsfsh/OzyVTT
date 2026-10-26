@@ -1,3 +1,4 @@
+import { rollDice } from "@vtt/rules-5e";
 import {
   actionChoicesOf,
   owedDamageParts,
@@ -10,6 +11,7 @@ import {
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
 import { conditionChoicesOf } from "./item-actions.js";
+import { castOptionsOf } from "./spell-zones.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
 import { builtinCheckSkills, helpToolsOf } from "./resolution/builtins.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -28,7 +30,7 @@ import {
   spendUntilItActs,
   spendUntilOwnAttack
 } from "./resolution/attack.js";
-import { rollLastCharge } from "./resolution/charges.js";
+import { breaksBeforeUse, rollLastCharge } from "./resolution/charges.js";
 import { recallSpellSlot } from "./resolution/spell-recall.js";
 import { rollForAnAnswer } from "./resolution/divinations.js";
 import { prayerShortRest, refuseThePrayedFor } from "./resolution/prayer-of-healing.js";
@@ -56,9 +58,14 @@ import { checkHolding, releaseHeld } from "./resolution/held-creatures.js";
 import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
+import { liftOnAction } from "./resolution/later-steps.js";
+import { spendStoredCast, storeOnCast } from "./stored-casts.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { applySummons } from "./resolution/summon.js";
-import { readScroll } from "./resolution/scroll.js";
+import { failsCastCheck, readScroll } from "./resolution/scroll.js";
+import { failsCheckFirst } from "./resolution/check-first.js";
+import { releaseItemEffects } from "./resolution/endings.js";
+import { rebindRow } from "./resolution/rebind.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import { mendOnCast } from "./resolution/mend.js";
@@ -68,10 +75,22 @@ import { killOnCast } from "./resolution/kill.js";
 import {
   recordAttackRoll,
   recordCleaveOpening,
+  recordHordeOpening,
   recordLightAttack,
   recordLoadingShot
 } from "./resolution/extra-attacks.js";
-import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
+import { recordAttackDealings } from "./resolution/dealings.js";
+import { vitalityOnHit, vitalityRecipient } from "./resolution/vitality.js";
+import { applyAreaHeal, areaHealRecipient } from "./resolution/area-heal.js";
+import {
+  applyMasteryForces,
+  checkTacticalMaster,
+  masterySwingOf,
+  offeredPush,
+  spendSap,
+  spendVex,
+  tacticalMasterOffer
+} from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { endTargetMarks } from "./resolution/action-targets.js";
@@ -114,6 +133,10 @@ import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-
 import { layOutProvisions } from "./resolution/provisions.js";
 import { turnedAwayByWard } from "./resolution/ward.js";
 import { orbLeap } from "./resolution/orb-leap.js";
+import { teleportOutcome } from "./resolution/teleport-outcome.js";
+import { identifyOnCast } from "./resolution/identify.js";
+import { wishOnCast, wishStressOnCast } from "./resolution/wish.js";
+import { openStrike, spendStrike } from "./resolution/true-strike.js";
 import { fastHandsAllows } from "./fast-hands.js";
 import { holdsFastHands } from "./utilize.js";
 import {
@@ -127,6 +150,7 @@ import {
 import {
   answerHeldDamage,
   damageLookOffered,
+  rollsHealingDice,
   damageTape,
   heldDamageFor,
   heldDamageLook,
@@ -171,11 +195,15 @@ export function resolveDefinitionAction(
   // Checked against the spell as printed, Transmuted Spell's type and Extended Spell's durations land on what it does.
   ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
   const look = input.commit === false && input.damageLook === true;
-  if (look && !ctx.action.damage.some((part) => /\d+d\d+/i.test(part.formula)))
+  if (look && !ctx.action.damage.some((part) => /\d+d\d+/i.test(part.formula)) && !rollsHealingDice(ctx.action))
     throw new CommandRejectedError(`${ctx.action.name} rolls no damage dice to look at.`);
   if (input.damageAnswer && !look)
     throw new CommandRejectedError("Answer the damage on a look at it, before it is dealt.");
   checkOverchannel(ctx);
+  checkTacticalMaster(ctx);
+  // Who a cantrip's vitality goes to, and who an area's healing goes to, are checked before anything rolls.
+  vitalityRecipient(ctx);
+  areaHealRecipient(ctx);
   checkWallTarget(ctx);
   checkLightTarget(ctx);
   ctx.builtin?.check?.(ctx);
@@ -218,6 +246,13 @@ export function resolveDefinitionAction(
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // A spell cast into what waits to hold it (Contingency, a spell glyph, a Ring of Spell Storing, a shield guardian)
+  // spends its slot and components and does nothing else now.
+  if (storeOnCast(ctx)) {
+    commitEconomy(ctx);
+    releaseHideAndReady(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits.
   if (input.moveFirst === true) {
     commitEconomy(ctx);
@@ -228,6 +263,22 @@ export function resolveDefinitionAction(
   if (readScroll(ctx)) {
     commitEconomy(ctx);
     useUpConsumable(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // A check the action needs first (binding with a Chain): a failure spends the action and does nothing else.
+  if (failsCheckFirst(ctx)) {
+    commitEconomy(ctx);
+    releaseHideAndReady(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // So does a failed check an item's cast asks first (an Amulet of the Planes).
+  if (failsCastCheck(ctx)) {
+    commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // An item that breaks as it fails to work (a Wind Fan) is gone with its pool, and its action is spent.
+  if (breaksBeforeUse(ctx)) {
+    commitEconomy({ ...ctx, plan: { ...ctx.plan, spendUse: null } });
     return { ...resolutionOf(ctx), save: null };
   }
   // Spread Caltrops or a set trap acts on whoever meets it later, so nothing is rolled now.
@@ -312,6 +363,8 @@ export function resolveDefinitionAction(
     recordLightAttack(ctx);
     recordLoadingShot(ctx);
     recordAttackRoll(ctx);
+    recordAttackDealings(ctx);
+    recordHordeOpening(ctx);
     releaseHideAndReady(ctx);
     spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
@@ -321,9 +374,10 @@ export function resolveDefinitionAction(
   if (input.commit !== false) strikeADuplicate(ctx);
   spendSundering(ctx);
   // The dice a look held are dealt now, as they were looked at; without a look the server throws them.
-  rollDamage(ctx, tape, heldDamageFor(state, ctx.attacker.id, ctx.action.id)?.dice ?? []);
+  const heldLook = heldDamageFor(state, ctx.attacker.id, ctx.action.id);
+  // The extras a hit carries throw their dice through the tape too, so a look at them deals what was looked at.
+  rollDamage(ctx, tape, heldLook?.dice ?? [], () => rollHitOptions(ctx));
   releaseHeldDamage(state, ctx.attacker.id);
-  rollHitOptions(ctx);
   // What the stat block leaves to the GM (damage on later turns) is said where the GM reads the result.
   if (ctx.action.reminder) ctx.warnings.push(ctx.action.reminder);
 
@@ -339,22 +393,30 @@ export function resolveDefinitionAction(
   markCastTurn(ctx);
   openSpellZone(ctx);
   applyMovementGrants(ctx);
+  liftOnAction(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
+  releaseItemEffects(ctx);
+  rebindRow(ctx);
   swallowOnAction(ctx);
   pullOnAction(ctx);
   inflictOnTargets(ctx);
   applySummons(ctx);
   applyShapeShift(ctx);
   layOutProvisions(ctx);
-  orbLeap(ctx);
   placeCastSight(ctx);
   applyCastWalls(ctx);
   applyKindles(ctx);
   applyDouses(ctx);
   applyAdjustsLight(ctx);
   refuseThePrayedFor(ctx);
-  applyHealing(ctx);
+  // A heal that was looked at restores the dice it showed.
+  if (heldLook && rollsHealingDice(ctx.action)) {
+    tape.start(heldLook.dice);
+    applyHealing(ctx);
+    tape.stop();
+  } else applyHealing(ctx);
+  applyAreaHeal(ctx);
   prayerShortRest(ctx);
   applyConditionCures(ctx);
   mendOnCast(ctx);
@@ -363,6 +425,10 @@ export function resolveDefinitionAction(
   reviveOnCast(ctx);
   raiseOnAction(ctx);
   killOnCast(ctx);
+  teleportOutcome(ctx);
+  identifyOnCast(ctx);
+  wishStressOnCast(ctx);
+  wishOnCast(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
@@ -373,7 +439,13 @@ export function resolveDefinitionAction(
   applyRageRules(ctx);
 
   commitEconomy(ctx);
+  vitalityOnHit(ctx);
+  // After the economy, which writes the action's instance that a leap continues.
+  orbLeap(ctx);
+  openStrike(ctx);
+  spendStrike(ctx);
   recallSpellSlot(ctx);
+  spendStoredCast(ctx);
   afterDivineWish(ctx);
   rollForAnAnswer(ctx);
   overchannelBacklash(ctx);
@@ -385,7 +457,9 @@ export function resolveDefinitionAction(
   recordLightAttack(ctx);
   recordLoadingShot(ctx);
   recordAttackRoll(ctx);
+  recordAttackDealings(ctx);
   recordCleaveOpening(ctx);
+  recordHordeOpening(ctx);
   releaseHideAndReady(ctx);
   spendUntilItActs(ctx);
   return resolutionOf(ctx);
@@ -396,7 +470,8 @@ export function resolveDefinitionAction(
 function rollDamage(
   ctx: ResolveContext,
   tape: DamageTape,
-  held: Parameters<DamageTape["start"]>[0]
+  held: Parameters<DamageTape["start"]>[0],
+  extras: () => void = () => {}
 ): ReturnType<DamageTape["stop"]> {
   tape.start(held);
   tape.own(true);
@@ -407,6 +482,7 @@ function rollDamage(
   ctx.bonusDamage.push(...masteryMissDamage(ctx.masterySwing));
   rollRiderDamage(ctx);
   ctx.builtin?.hitDamage?.(ctx);
+  extras();
   return tape.stop();
 }
 
@@ -424,7 +500,8 @@ function lookAtDamage(ctx: ResolveContext, tape: DamageTape): ActionResolution {
     held = answerHeldDamage(ctx, held, input.damageAnswer, tape.random);
   }
   ctx.silentRolls = true;
-  const dice = rollDamage(ctx, tape, held?.dice ?? []);
+  const healing = rollsHealingDice(action) ? lookAtHealing(ctx, tape, held?.dice ?? []) : null;
+  const dice = healing?.dice ?? rollDamage(ctx, tape, held?.dice ?? [], () => rollHitOptions(ctx, true));
   ctx.silentRolls = false;
   const kept = holdDamage(state, { actorId: attacker.id, actionId: action.id, dice, answers: held?.answers ?? [] });
   const { damage, bonusDamage } = ctx;
@@ -433,8 +510,19 @@ function lookAtDamage(ctx: ResolveContext, tape: DamageTape): ActionResolution {
     damage,
     damageTotal: owedDamageTotal({ damage, bonusDamage }),
     ...(bonusDamage.length > 0 ? { bonusDamage } : {}),
-    heldDamage: heldDamageLook(ctx, kept)
+    heldDamage: heldDamageLook(ctx, kept, healing?.total)
   };
+}
+
+/** A heal's look: its dice thrown through the tape and held, nothing restored; the confirm restores them. */
+function lookAtHealing(
+  ctx: ResolveContext,
+  tape: DamageTape,
+  held: Parameters<DamageTape["start"]>[0]
+): { dice: ReturnType<DamageTape["stop"]>; total: number } {
+  tape.start(held);
+  const total = rollDice(ctx.action.healing!.formula, tape.random).total;
+  return { dice: tape.stop(), total };
 }
 
 /** The roll mode is reported only when some source shaped it. */
@@ -456,6 +544,7 @@ function previewOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.warnings.length > 0 ? { warnings: ctx.warnings } : {}),
     overridden: ctx.overridden,
     push: offeredPush(ctx),
+    ...withMasteryOptions(tacticalMasterOffer(ctx)),
     preview: true,
     ...withOffers(hitOffersOf(ctx)),
     // A hit's damage may be looked at before it counts, for an answer to it.
@@ -470,6 +559,8 @@ function previewOf(ctx: ResolveContext): ActionResolution {
 }
 
 const withOffers = (offers: ReturnType<typeof hitOffersOf>) => (offers.length > 0 ? { hitOffers: offers } : {});
+const withMasteryOptions = (options: ActionResolution["masteryOptions"] | undefined) =>
+  options ? { masteryOptions: options } : {};
 
 /** With no attack roll and no save, every target takes the damage, owed like a hit's: the GM's Apply, or a player's
  *  proposal or direct damage. A darts action owes each creature what its own darts dealt (SRD Magic Missile: "A dart
@@ -608,7 +699,7 @@ export function actionAvailability(
       fastForm && fastEvaluation
         ? unavailableReason(fastEvaluation.violations, { state, attacker, action: fastForm, siblings, spell })
         : undefined;
-    const passive = passiveOf(action, builtin);
+    const passive = passiveOf(action, builtin, spell);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
     const damageLook = !builtin && damageLookOffered(state, attacker, action, definition, siblings);
     const forms = action.shapeShift ? formsOffer(state, attacker, action, definition, catalog) : undefined;
@@ -636,9 +727,7 @@ export function actionAvailability(
         ? { areaPerSlot: { feet: spell.effect.areaPerSlot, level: spell.level } }
         : {}),
       ...(forms !== undefined ? { forms } : {}),
-      ...(action.effectOptions
-        ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
-        : {}),
+      ...castOptionsOf(action, spell),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),

@@ -10,6 +10,8 @@ import { dropStaleGrants } from "./granted-moves.js";
 import { proneInSharedSpace } from "./occupied-space.js";
 import { blinkAway } from "./off-plane.js";
 import { timeStopGoesOn } from "./time-stop.js";
+import { secondTurnDue } from "./second-turns.js";
+import { areAllies } from "./creature-sides.js";
 import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
@@ -39,9 +41,11 @@ import {
 import { closeInitiativeWindow, rolledInitiative } from "./initiative-hooks.js";
 import { interruptRests } from "./rest-interruptions.js";
 import { endTravelFor } from "./travel.js";
-import { releaseSwallowedBy } from "./swallow.js";
+import { chargeOwedMovement, releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, playStartSteps, startOfTurn } from "./turn-boundaries.js";
 import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
+import { wavesAtTurnEnd, wavesAtTurnStart } from "./zone-waves.js";
+import { fireAtTurnStart } from "./zone-fire.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 import { lapseLongCasts } from "./resolution/long-casting.js";
@@ -288,6 +292,21 @@ function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) 
   ]);
 }
 
+/** A creature takes another's Initiative and its turn right after that creature's (SRD Mounted Combat: "The Initiative
+ *  of a controlled mount changes to match yours when you mount it"), or, with null, keeps its count and stops
+ *  following. Nothing for a creature not in the order. */
+export function followInInitiative(state: GameState, actorId: string, leaderId: string | null): void {
+  const leader = leaderId ? state.combat.initiative.find((entry) => entry.actorId === leaderId) : undefined;
+  if (!state.combat.initiative.some((entry) => entry.actorId === actorId)) return;
+  if (leaderId !== null && !leader) return;
+  const entries = state.combat.initiative.map((entry) => {
+    if (entry.actorId !== actorId) return entry;
+    const { follows: _old, ...rest } = entry;
+    return leader ? { ...rest, score: leader.score, tieBreaker: leader.tieBreaker, follows: leader.actorId } : rest;
+  });
+  state.combat = { ...state.combat, initiative: reorderMidRound(state, entries) };
+}
+
 /** A creature joins the order mid-fight or while it is staged (a summoned creature), in its place by count and after
  *  the creature it `follows`, as the order would put it now. */
 export function joinInitiative(state: GameState, entry: InitiativeEntry) {
@@ -413,6 +432,9 @@ export function startEncounter(
     pendingRuleAsks: [],
     pendingInitiative,
     initiativeWindow: [],
+    secondTurn: null,
+    secondTurnsTaken: [],
+    initiativeSwapOffers: [],
     // A fresh fight starts live; the handler captures this start state as the rewind baseline.
     historyCursor: null,
     historyDirty: false
@@ -631,6 +653,75 @@ export function orderTiedCharacters(state: GameState, scope: Initiator, actorId:
 /** SRD Alert, Initiative Swap: right after initiative is rolled, two combatants trade scores. Not while either
  *  is Incapacitated, and only before the first of them has taken a turn in this fight. */
 export function swapInitiative(state: GameState, actorId: string, withActorId: string) {
+  const [first, second] = swapEntries(state, actorId, withActorId);
+  const swapped = state.combat.initiative.map((entry) =>
+    entry.actorId === actorId
+      ? { ...entry, score: second.score, tieBreaker: second.tieBreaker }
+      : entry.actorId === withActorId
+        ? { ...entry, score: first.score, tieBreaker: first.tieBreaker }
+        : entry
+  );
+  state.combat = {
+    ...state.combat,
+    initiative: reorderMidRound(state, swapped),
+    // A swap made settles every offer either was in.
+    initiativeSwapOffers: state.combat.initiativeSwapOffers.filter(
+      (offer) => ![offer.actorId, offer.withActorId].some((id) => id === actorId || id === withActorId)
+    )
+  };
+}
+
+/**
+ * Alert's Initiative Swap from a player: "you can swap your Initiative with the Initiative of one willing ally". The
+ * character's player offers it, and the swap is made when the ally's player takes the offer (the same command naming
+ * the pair the other way round), or at once when that player controls the ally too. The GM swaps any two at once.
+ * Returns whether the swap was made, or only offered.
+ */
+export function offerInitiativeSwap(
+  state: GameState,
+  scope: Initiator,
+  actorId: string,
+  withActorId: string,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): "swapped" | "offered" {
+  if (scope.role === "gm") {
+    swapInitiative(state, actorId, withActorId);
+    return "swapped";
+  }
+  requireActorAccess(scope, state, actorId, "edit", "You can only swap your own character's Initiative.");
+  const taken = state.combat.initiativeSwapOffers.some(
+    (offer) => offer.actorId === withActorId && offer.withActorId === actorId
+  );
+  if (taken) {
+    swapInitiative(state, withActorId, actorId);
+    return "swapped";
+  }
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const ally = state.actors.find((candidate) => candidate.id === withActorId);
+  const definition = actor?.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  if (!actor || !holdsFeature(definition, "alert", "Alert"))
+    throw new CommandRejectedError(`${actor?.name ?? "That character"} doesn't have the Alert feat's Initiative Swap.`);
+  if (!ally || !areAllies(actor, ally, resolveDefinition))
+    throw new CommandRejectedError(
+      `Initiative Swap is made with a willing ally, and ${ally?.name ?? "that creature"} isn't one.`
+    );
+  swapEntries(state, actorId, withActorId);
+  if (ally.ownerSessionId === actor.ownerSessionId) {
+    swapInitiative(state, actorId, withActorId);
+    return "swapped";
+  }
+  state.combat = {
+    ...state.combat,
+    initiativeSwapOffers: [
+      ...state.combat.initiativeSwapOffers.filter((offer) => offer.actorId !== actorId),
+      { actorId, withActorId }
+    ].slice(-20)
+  };
+  return "offered";
+}
+
+/** The two entries an Initiative Swap trades, refused when it can't be made now. */
+function swapEntries(state: GameState, actorId: string, withActorId: string): [InitiativeEntry, InitiativeEntry] {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before swapping Initiative.");
   if (actorId === withActorId) throw new CommandRejectedError("Pick another combatant to swap with.");
   const entries = [actorId, withActorId].map((id) => state.combat.initiative.find((entry) => entry.actorId === id));
@@ -651,15 +742,7 @@ export function swapInitiative(state: GameState, actorId: string, withActorId: s
     throw new CommandRejectedError(
       "Initiative Swap happens right after initiative is rolled, before either has acted."
     );
-  const [first, second] = entries as InitiativeEntry[];
-  const swapped = state.combat.initiative.map((entry) =>
-    entry.actorId === actorId
-      ? { ...entry, score: second.score, tieBreaker: second.tieBreaker }
-      : entry.actorId === withActorId
-        ? { ...entry, score: first.score, tieBreaker: first.tieBreaker }
-        : entry
-  );
-  state.combat = { ...state.combat, initiative: reorderMidRound(state, swapped) };
+  return entries as [InitiativeEntry, InitiativeEntry];
 }
 
 /** A claimed player rolls their own initiative (or supplies `natural`, a physical die) and clears their
@@ -845,18 +928,38 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // Wait mode holds turns until every player has rolled their initiative (or the GM rolls the rest).
   if (state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0)
     throw new CommandRejectedError("Players are still rolling initiative. Roll for the rest to begin.");
-  const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
-  if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
+  const ownIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
+  if (ownIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
+  // Thief's Reflexes: a second turn goes on to the turn it came before, or ends the round.
+  const running = state.combat.secondTurn;
+  const fromSecond = running !== null && running.actorId === state.combat.turnActorId;
+  const resumeIndex =
+    fromSecond && running.resume !== null
+      ? state.combat.initiative.findIndex((entry) => entry.actorId === running.resume)
+      : -1;
+  const currentIndex = fromSecond ? (resumeIndex < 0 ? state.combat.initiative.length - 1 : resumeIndex - 1) : ownIndex;
   // A defeated creature takes no more turns: the order passes over it to the next one still in the fight.
   const length = state.combat.initiative.length;
   // So does a summoned thing with no turns of its own (Spiritual Weapon's force).
   const passedOver = (actorId: string) => isDefeated(state, actorId) || takesNoTurns(state, actorId);
   let steps = 1;
-  while (steps < length && passedOver(state.combat.initiative[(currentIndex + steps) % length].actorId)) steps += 1;
+  while (steps < length && passedOver(state.combat.initiative[(currentIndex + length + steps) % length].actorId))
+    steps += 1;
   if (steps === length) steps = 1;
   // Time Stop: the caster takes its turns in a row while no time passes for anyone else.
   const stopped = timeStopGoesOn(state);
-  const wraps = !stopped && currentIndex + steps >= length;
+  const passesRound = !stopped && currentIndex + steps >= length;
+  // A Thief's second turn of round 1 comes before the first turn below its Initiative minus 10.
+  const second = stopped
+    ? null
+    : secondTurnDue(
+        state,
+        fromSecond ? running.score : state.combat.initiative[ownIndex]!.score,
+        passesRound ? null : state.combat.initiative[currentIndex + steps]!.score,
+        deps?.resolveDefinition,
+        passedOver
+      );
+  const wraps = passesRound && second === null;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
@@ -883,19 +986,33 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
+  // A wave that moved this turn sinks and weakens (Tsunami).
+  if (zones && outgoingId) ending.push(...wavesAtTurnEnd(state, outgoingId, zones));
   events?.push(...ending);
   // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
   const nextActorId = stopped
     ? outgoingId!
-    : wraps
-      ? (order.find((entry) => !passedOver(entry.actorId)) ?? order[0]).actorId
-      : order[currentIndex + steps].actorId;
+    : second
+      ? second.actorId
+      : wraps
+        ? (order.find((entry) => !passedOver(entry.actorId)) ?? order[0]).actorId
+        : order[currentIndex + steps]!.actorId;
+  if (second)
+    events?.push({
+      kind: "effect",
+      text: `${state.actors.find((actor) => actor.id === second.actorId)?.name ?? "A Thief"} takes a second turn at Initiative ${second.score} (Thief's Reflexes).`,
+      actorId: second.actorId
+    });
   state.combat = {
     ...state.combat,
     initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
+    secondTurn: second
+      ? { ...second, resume: passesRound ? null : state.combat.initiative[currentIndex + steps]!.actorId }
+      : null,
+    ...(second ? { secondTurnsTaken: [...state.combat.secondTurnsTaken, second.actorId] } : {}),
     // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD). The turn
     // that just ended opens the window for legendary actions, until the incoming creature does something.
     turn: { ...EMPTY_TURN, ...(outgoingId && !stopped ? { afterActorId: outgoingId } : {}) },
@@ -907,6 +1024,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   };
   // A move or teleport granted for the turn that ended lapses with it.
   dropStaleGrants(state);
+  // Movement already spent of this turn (climbing out of a corpse off it) is used.
+  chargeOwedMovement(state, nextActorId);
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
@@ -919,6 +1038,10 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // Then the spell areas: each counts "once per turn" afresh, a spell's duration runs out at its caster's turn, and
   // the incoming creature starting its turn inside one (Web, Stinking Cloud) meets it.
   if (zones) starting.push(...zonesAtTurnStart(state, nextActorId, zones));
+  // A creature in a wave fights it before it can move (Tsunami).
+  if (zones) starting.push(...wavesAtTurnStart(state, nextActorId, zones));
+  // Burning webs burn out, and burn a creature starting its turn in them (Web).
+  if (zones) starting.push(...fireAtTurnStart(state, nextActorId, zones));
   events?.push(...starting);
   rollRecharges(state, nextActorId, deps, events);
   refreshOwnTurnUses(state, nextActorId, deps);
@@ -936,6 +1059,7 @@ export function previousInitiativeTurn(state: GameState) {
     ...state.combat,
     round: wraps && state.combat.round > 1 ? state.combat.round - 1 : state.combat.round,
     turnActorId: previousActorId,
+    secondTurn: null,
     // Backing up is a GM correction, so the strip starts clean. Effect durations do not rewind here; the
     // timeline restore is the real undo.
     turn: { ...EMPTY_TURN },

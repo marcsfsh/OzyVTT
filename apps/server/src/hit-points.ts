@@ -1,3 +1,4 @@
+import { bondCasterOf } from "./warding-bond.js";
 import { formsAfterDamage } from "./transform/rules.js";
 import { lycanthropyAtZero } from "./transform/at-zero.js";
 import {
@@ -10,6 +11,7 @@ import {
   type HealthBand
 } from "@vtt/domain";
 import { blessOnTheKill } from "./dark-ones-blessing.js";
+import { recordDealing } from "./resolution/dealings.js";
 import {
   adjustDamageParts,
   collectRiders,
@@ -40,6 +42,7 @@ import {
   endEffect,
   endEffectsOnDamage,
   endEffectsSustainedBy,
+  endWhatIncapacitationEnds,
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
@@ -70,6 +73,7 @@ import { interruptRests } from "./rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
+import { noteFire } from "./zone-fire-note.js";
 import { sightRules } from "./vision/rules.js";
 import {
   deathBurst,
@@ -109,6 +113,8 @@ export type DamageInput = Readonly<{
   nonlethal?: boolean;
   /** What the damage drains as it lands (a Life Drain's lower Hit Point maximum, Vampiric Touch's healing). */
   drain?: DamageDrain;
+  /** A Warding Bond caster's share of its ward's damage, which is not shared on again. */
+  bondShare?: true;
 }>;
 export type DamageDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -508,6 +514,7 @@ function fallToZero(
   // concentration (SRD Concentration).
   events.push(...endEffectsSustainedBy(state, actor.id));
   events.push(...endConcentrationSustainedBy(state, actor.id));
+  events.push(...endWhatIncapacitationEnds(state, actor, "unconscious"));
   // A spell whose last creature just died has nothing left.
   events.push(...endConcentrationOnTheDead(state, actor));
   return { instantDeath, defeated };
@@ -803,6 +810,8 @@ export function applyDamageDetailed(
   if (totalAdjusted > 0) events.push(...stopRegeneration(state, actor, definition, parts));
   // What a damage type does to the stat block it lands on (Acid Absorption, Aversion to Fire, Freeze).
   events.push(...damageTypeTraits(state, actor, definition, parts));
+  // Fire on a creature standing in webs sets them burning (Web), settled with the map after the command.
+  noteFire(state, actor.id, input.parts ?? parts);
   if (!isPlayerCharacter && !knockedOut && !wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
     undeadFortitude(
       state,
@@ -943,6 +952,8 @@ export function applyDamageDetailed(
     events.push(...blessOnTheKill(state, actor, input.sourceActorId, deps));
   // A swallower counts the damage the creatures inside it deal this turn.
   tallyDamageFromInside(state, actor.id, input.sourceActorId, totalAdjusted);
+  // Who damaged whom this turn (Superior Hunter's Prey).
+  if (totalAdjusted > 0 && input.sourceActorId) recordDealing(state, input.sourceActorId, actor.id, "damaged");
   // Damage on a creature already Bloodied opens its dealer's Rampage.
   markBloodiedHit(state, input.sourceActorId, hpBefore, actor.hp.maximum, totalAdjusted);
   // A hydra's heads and a troll's limbs count the damage of each turn.
@@ -1009,6 +1020,28 @@ export function applyDamageDetailed(
         actorId: actor.id
       });
     }
+  }
+
+  // Warding Bond: "Each time the target takes damage, you take the same amount of damage." Its Resistance has already
+  // halved what the target takes; the caster's share is that amount, untyped.
+  const bondCaster = totalAdjusted > 0 && input.bondShare !== true ? bondCasterOf(state, actor.id) : null;
+  if (bondCaster !== null) {
+    const shared = applyDamageDetailed(
+      state,
+      bondCaster,
+      { amount: totalAdjusted, sourceName: "Warding Bond", bondShare: true },
+      { role: "gm" },
+      deps
+    );
+    const casterName = state.actors.find((candidate) => candidate.id === bondCaster)?.name ?? "The caster";
+    events.push(
+      {
+        kind: "damage",
+        text: `${casterName} takes ${shared.application.totalApplied} damage through Warding Bond.`,
+        actorId: bondCaster
+      },
+      ...shared.events
+    );
   }
 
   // Damage from a creature can open the target's strike-back reaction (Hellish Rebuke). Skipped without an id-minter.

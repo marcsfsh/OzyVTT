@@ -281,8 +281,8 @@ export const druid: ClassMechanicsModule = {
   subclasses: {
     "circle-of-the-land": {
       /**
-       * Spends the shared Wild Shape pool (same scaling as Wild Shape). Damage grows 2d6 -> 3d6 -> 4d6; the
-       * healing half stays prose (no healing formula on actions).
+       * Spends the shared Wild Shape pool (same scaling as Wild Shape). Damage and the one creature's healing each
+       * grow 2d6 -> 3d6 -> 4d6, rolled apart (resolution/area-heal.ts).
        */
       "lands-aid": {
         actions: [
@@ -290,15 +290,20 @@ export const druid: ClassMechanicsModule = {
             id: "lands-aid",
             name: "Land's Aid",
             activation: "action",
-            area: { shape: "sphere", sizeFeet: 10, widthFeet: null },
+            area: { shape: "sphere", sizeFeet: 10, widthFeet: null, rangeFeet: 60 },
             description:
-              "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet. Each creature of your choice in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking the damage below on a failure and half as much on a success. One creature of your choice in that area regains the same amount in Hit Points. The damage and healing increase at Druid levels 10 and 14.",
+              "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet of yourself. Each creature of your choice in a 10-foot-radius Sphere centered on that point makes a Constitution saving throw against your spell save DC, taking 2d6 Necrotic damage on a failed save or half as much damage on a successful one. One creature of your choice in that area regains 2d6 Hit Points. The damage and healing increase by 1d6 at Druid levels 10 (3d6) and 14 (4d6).",
             save: { ability: "con", dc: "spellcasting", successDamage: "half", failureConditions: [] },
             damage: [{ formula: "2d6", type: "necrotic" }],
             damageByLevel: [
               { level: 3, formula: "2d6", type: "necrotic" },
               { level: 10, formula: "3d6", type: "necrotic" },
               { level: 14, formula: "4d6", type: "necrotic" }
+            ],
+            areaHealByLevel: [
+              { level: 3, formula: "2d6" },
+              { level: 10, formula: "3d6" },
+              { level: 14, formula: "4d6" }
             ]
           }
         ],

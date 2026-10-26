@@ -388,6 +388,11 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
     ...(heldBy ? { heldBy } : {}),
     ...(once && lifetime.repeatSave !== true ? { repeatOnce: true as const } : {}),
     ...(second ? { secondFailure: second } : {}),
+    // A magical sleep someone can wake the target from (a brass dragon's Sleep Breath): a creature that doesn't sleep,
+    // an elf in Trance, succeeds without rolling, as against the Sleep spell.
+    ...(second?.conditions.includes("unconscious") && second.endedBy?.name === "Wake"
+      ? { autoSuccess: { sleepless: true as const } }
+      : {}),
     ...(exhaustion ? { failureExhaustion: Number.parseInt(exhaustion[1]!, 10) } : {}),
     ...(onDamage ? { repeatOnDamage: onDamage } : {}),
     // "Success: The target is immune to this cloaker's Moan for the next 24 hours."
@@ -778,9 +783,12 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "phantasmal-killer": { repeatSave: true, repeatDamageAgain: true, autoSuccess: { truesight: true } },
   // "While Restrained, the target takes 1d6 Piercing damage at the start of each of its turns", and "A Large or larger
   // creature has Advantage on this save".
+  // "The target or a creature within reach of it can take an action to make a Strength (Athletics) check against your
+  // spell save DC. On a success, the vines wither away."
   "ensnaring-strike": {
     ongoingDamage: { damage: [{ formula: "1d6", type: "piercing" }], at: "bearer-turn-start" },
-    advantageAtSize: "large"
+    advantageAtSize: "large",
+    endedBy: { name: "Tear the vines away", by: "either", check: { ability: "str", skill: "athletics" } }
   },
   // "If the creature is shape-shifted (as a result of the Polymorph spell, for example), it reverts to its true form and
   // can't shape-shift until it leaves the Cylinder."

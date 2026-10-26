@@ -25,4 +25,16 @@ describe("an area template's preview", () => {
       expect(preview).toEqual({ origin: drawn.origin, target: drawn.target, feet: drawn.sizeFeet });
       expect(preview.feet).toBe(area.sizeFeet);
     });
+
+  it("stops a Line aimed at its target where it is dragged, as the server does, and never past its size", () => {
+    const area = { shape: "line", sizeFeet: 120, toTarget: true } as const;
+    for (const to of [cell(18, 5), cell(40, 5)]) {
+      const server = templateOfArea({ kind: "square", ...CALIBRATION }, { origin: cell(10, 5), target: to }, area);
+      const drawn = shapeGeometry({ kind: "square", ...CALIBRATION }, server.shape, server.origin, server.target);
+      const preview = sizedShapePreview(CALIBRATION, "line", cell(10, 5), to, area.sizeFeet, true);
+      expect(preview).toEqual({ origin: drawn.origin, target: drawn.target, feet: drawn.sizeFeet });
+    }
+    expect(sizedShapePreview(CALIBRATION, "line", cell(10, 5), cell(18, 5), 120, true).feet).toBe(40);
+    expect(sizedShapePreview(CALIBRATION, "line", cell(10, 5), cell(40, 5), 120, true).feet).toBe(120);
+  });
 });

@@ -34,11 +34,32 @@ export function spellClassOf(definition: ActorDefinition | undefined, spellId: s
   return definition.spellcasting?.spells.find((entry) => entry.id === spellId)?.classId ?? null;
 }
 
+/** The Temporary Hit Points Improved Blessed Strikes' Potent Spellcasting gives when a Cleric cantrip deals damage: twice
+ *  the Wisdom modifier, at least 1; 0 for any other spell or without the option. */
+export function potentVitality(
+  definition: ActorDefinition | undefined,
+  spell: Readonly<{ level: number; classes: readonly string[] }> | undefined
+): number {
+  if (!spell || spell.level !== 0 || !spell.classes.includes("cleric") || !definition) return 0;
+  const option = (definition.character?.features ?? []).some(
+    (feature) => feature.id === "improved-potent-spellcasting" && feature.sourceId === "improved-blessed-strikes"
+  );
+  if (!option) return 0;
+  return Math.max(1, 2 * Math.floor((definition.abilityScores.wis - 10) / 2));
+}
+
 /** The feet Improved Potent Spellcasting adds to a Druid cantrip's range, or 0. */
 export function potentRangeFeet(
   definition: ActorDefinition | undefined,
   spell: Readonly<{ level: number; classes: readonly string[] }> | undefined
 ): number {
   if (!spell || spell.level !== 0 || !spell.classes.includes("druid")) return 0;
-  return holdsFeature(definition, "improved-potent-spellcasting", "Improved Potent Spellcasting") ? 300 : 0;
+  // The Druid's own option (Improved Elemental Fury), never the Cleric's of the same name.
+  const druids = (definition?.character?.features ?? []).some(
+    (feature) => feature.id === "improved-potent-spellcasting" && feature.sourceId !== "improved-blessed-strikes"
+  );
+  const printed =
+    definition?.character === undefined &&
+    holdsFeature(definition, "improved-potent-spellcasting", "Improved Potent Spellcasting");
+  return druids || printed ? 300 : 0;
 }

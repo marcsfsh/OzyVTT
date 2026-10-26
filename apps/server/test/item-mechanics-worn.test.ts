@@ -633,8 +633,9 @@ describe("the casts that survived the spell-record check", () => {
     const detect = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-detect-thoughts")!;
     const suggest = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-suggestion")!;
 
-    // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored.
-    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: [] });
+    // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored. Detect Thoughts' cast
+    // asks no save: its Wisdom save is the probe's, a later action.
+    expect(detect.save).toBeUndefined();
     expect(suggest.save).toEqual({
       ability: "wis",
       dc: 13,
@@ -693,7 +694,7 @@ describe("the casts that survived the spell-record check", () => {
     const detect = effectiveActions(definition, medallion.actors[0], catalog).find(
       (entry) => entry.id === "item-medallion-of-thoughts-cast-detect-thoughts"
     )!;
-    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: [] });
+    expect(detect.save).toBeUndefined();
     expect(detect.uses).toEqual({ limit: 5, per: "long-rest", pool: "medallion-of-thoughts-charges" });
   });
 
@@ -850,12 +851,19 @@ describe("the worn items left as prose, by name", () => {
     ]);
   });
 
-  it("authors the talismans' +2 to spell attack rolls and nothing else", () => {
-    for (const id of ["talisman-of-pure-good", "talisman-of-ultimate-evil"]) {
+  it("authors the talismans' Holy Symbol, +2 to spell attack rolls, and the charges that destroy them", () => {
+    for (const [id, charges] of [
+      ["talisman-of-pure-good", 7],
+      ["talisman-of-ultimate-evil", 6]
+    ] as const) {
       const row = view.equipmentRecord(id)!;
       expect(row.modifiers, id).toEqual([{ type: "spell-attack-bonus", amount: 2 }]);
+      expect(row.servesAsFocus).toBe("holy-symbol");
+      expect(row.charges?.lastCharge).toBe("destroyed");
       expect(row.casts ?? []).toEqual([]);
-      expect(row.actions ?? []).toEqual([]);
+      expect(row.actions.map((action) => [action.id, action.uses?.limit, action.uses?.per])).toEqual([
+        ["rebuke", charges, "never"]
+      ]);
     }
   });
 

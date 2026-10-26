@@ -37,6 +37,7 @@ import {
 } from "../vision/edit.js";
 import { playerViewerIds } from "../vision/audience.js";
 import { heldShutAgainst, isHiddenDoor } from "../doors.js";
+import { spendObjectInteraction } from "../object-interactions.js";
 import { initiatorOf, isGmGrade, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -273,7 +274,7 @@ export const visionCommands = [
     type: "door.set-open",
     operationId: "setDoorOpen",
     description:
-      "Opens or closes a door. The GM opens any door, on the live table or (with `sceneId`) a prepared scene; a player only one within 5 feet of their own character's token on the live table, with no wall between them.",
+      "Opens or closes a door. The GM opens any door, on the live table or (with `sceneId`) a prepared scene; a player only one within 5 feet of their own character's token on the live table, with no wall between them. In a fight that is the character's one free object interaction on its turn, and a second takes the Utilize action.",
     summary: "Open or close a door; a player, one beside their own character.",
     schema: DoorSetOpenSchema,
     malformed: "The door command is malformed.",
@@ -293,11 +294,16 @@ export const visionCommands = [
             throw new GameAccessDeniedError("Move your character next to the door to open or close it.");
           // A locked, stuck, barred or jammed door opens only for a creature it doesn't hold shut against: one with
           // the key, or one an Arcane Lock names.
+          // In a fight the creature whose turn it is opens it, as its one free object interaction or a Utilize action.
+          const onTurn = reachable.filter((actorId) => actorId === state.combat.turnActorId);
+          const candidates = onTurn.length > 0 ? onTurn : reachable;
           const free = open
-            ? reachable.find((actorId) => heldShutAgainst(state, door!, actorId) === null)
-            : reachable[0];
-          if (free === undefined) throw new CommandRejectedError(heldShutAgainst(state, door!, reachable[0]!)!);
+            ? candidates.find((actorId) => heldShutAgainst(state, door!, actorId) === null)
+            : candidates[0];
+          if (free === undefined) throw new CommandRejectedError(heldShutAgainst(state, door!, candidates[0]!)!);
           opener = free;
+          const actor = state.actors.find((candidate) => candidate.id === free)!;
+          spendObjectInteraction(state, actor, { role: "player" }, `${open ? "Open" : "Close"} the door`);
         }
         setDoorOpen(state, sceneId, wallId, open);
       });

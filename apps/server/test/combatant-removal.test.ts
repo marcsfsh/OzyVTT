@@ -7,7 +7,8 @@ import { GameStateSchema, type GameState } from "@vtt/domain";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition } from "@vtt/schemas";
 import { addEffect, makeEffect } from "../src/effects.js";
-import { removeCombatant } from "../src/encounter.js";
+import { nextInitiativeTurn, removeCombatant } from "../src/encounter.js";
+import { setCondition } from "../src/actor-conditions.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { createServer } from "../src/server.js";
 
@@ -129,11 +130,25 @@ describe("taking a combatant out of the fight", () => {
     expect(state.combat.reactionsUsed).toEqual([]);
     expect(state.combat.legendaryUsed).toEqual({});
     expect(actor(state, ALLY).effects).toEqual([]);
-    // Off Borin's turn: his next turn carries the climb, as Speed lost until it ends.
+    // Off Borin's turn: his next turn carries the climb, as movement already spent of it.
     expect(conditions(state, HERO)).toEqual(["prone"]);
     expect(actor(state, HERO).effects).toMatchObject([
-      { name: "Climbing out of Purple Worm", modifiers: [{ type: "speed", amount: -20 }] }
+      { name: "Climbing out of Purple Worm", modifiers: [], movementOwedFeet: 20 }
     ]);
+  });
+
+  it("starts the climber's next turn with the climb spent, so a Speed 30 creature has 10 feet and can't stand", () => {
+    const state = fight(ALLY);
+    swallow(state);
+    removeCombatant(state, WORM, resolveDefinition);
+    nextInitiativeTurn(state);
+    expect(state.combat.turnActorId).toBe(HERO);
+    expect(state.combat.turn.movementUsedFeet).toBe(20);
+    expect(actor(state, HERO).effects).toEqual([]);
+    // Standing costs half of Speed 30, more than the 10 feet left.
+    expect(() => setCondition(state, HERO, "prone", false, undefined, { role: "gm" })).toThrow(
+      /Standing up costs 15 ft/
+    );
   });
 
   it("ends a grapple it held, and refuses the last combatant or one whose turn it is", () => {

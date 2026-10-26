@@ -1,4 +1,5 @@
-import type { ActorDefinition, EffectInstance } from "@vtt/schemas";
+import { endingsOf, type ActorDefinition, type EffectInstance } from "@vtt/schemas";
+import { ENDED_BY_PREFIX, endingSlug } from "./ending-actions.js";
 
 type BuiltinAction = ActorDefinition["actions"][number];
 
@@ -199,6 +200,26 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     replacesAttack: true
   },
   {
+    id: "improvised-weapon",
+    name: "Improvised Weapon",
+    activation: "action",
+    description:
+      "Attack with an object that isn't a weapon (a broken bottle, a chair leg): a melee attack within 5 feet with your Strength modifier and no Proficiency Bonus. On a hit it deals 1d4 plus your Strength modifier, of the type that fits the object (the GM's call). (SRD 5.2.1, Improvised Weapons)",
+    damage: [],
+    damageTypes: ["bludgeoning", "piercing", "slashing"],
+    replacesAttack: true
+  },
+  {
+    id: "improvised-weapon-thrown",
+    name: "Improvised Weapon (thrown)",
+    activation: "action",
+    description:
+      "Throw an object that isn't a weapon: a ranged attack with a normal range of 20 feet and a long range of 60, with your Strength modifier and no Proficiency Bonus. On a hit it deals 1d4 plus your Strength modifier, of the type that fits the object (the GM's call). (SRD 5.2.1, Improvised Weapons)",
+    damage: [],
+    damageTypes: ["bludgeoning", "piercing", "slashing"],
+    replacesAttack: true
+  },
+  {
     id: "unarmed-grapple",
     name: "Unarmed Strike (Grapple)",
     activation: "action",
@@ -221,7 +242,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Unarmed Strike (Shove Push)",
     activation: "action",
     description:
-      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet away. On a failure, the GM moves the token. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
+      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet straight away from you. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
     damage: [],
     replacesAttack: true
   },
@@ -247,6 +268,40 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "Shake or slap a creature within 5 feet out of a magical sleep, which ends it (SRD 5.2.1 Sleep: someone within 5 feet of it takes an action to shake it out of the spell's effect).",
+    damage: []
+  },
+  {
+    id: "touch-bead",
+    name: "Touch the Bead",
+    activation: "action",
+    description:
+      "Touch a Delayed Blast Fireball's bead within 5 feet and make a Dexterity saving throw. On a failure, the bead explodes. On a success, you throw it at the creature you choose, up to 40 feet away, and it explodes there; choose yourself to set it back down. (SRD 5.2.1 Delayed Blast Fireball)",
+    damage: []
+  },
+  {
+    id: "control-sphere",
+    name: "Control the Sphere",
+    activation: "action",
+    description:
+      "Within 60 feet of a Sphere of Annihilation, make a DC 25 Intelligence (Arcana) check. On a success, you control the sphere until the start of your next turn; on a failure, it moves 10 feet toward you. (SRD 5.2.1 Sphere of Annihilation)",
+    damage: []
+  },
+  {
+    id: "move-sphere",
+    name: "Move the Sphere",
+    activation: "bonus-action",
+    description:
+      "Move the Sphere of Annihilation you control toward the creature you choose, up to 5 times your Intelligence modifier in feet (minimum 5). A creature whose space it enters makes a DC 19 Dexterity saving throw or takes 8d10 Force damage. (SRD 5.2.1 Sphere of Annihilation)",
+    damage: [],
+    // Brought forward on the sheet while its user controls a sphere.
+    requiresEffectTag: "sphere-control"
+  },
+  {
+    id: "move-sphere-far",
+    name: "Move the Sphere (Talisman)",
+    activation: "action",
+    description:
+      "Holding a Talisman of the Sphere and having started your turn in control of a Sphere of Annihilation, move it toward the creature you choose, up to 10 feet plus 10 times your Intelligence modifier. (SRD 5.2.1 Talisman of the Sphere)",
     damage: []
   },
   {
@@ -372,12 +427,41 @@ function bonusSources(definition: ActorDefinition | undefined, bearer?: ActionBe
  *  one takes `BONUS_SUFFIX`. */
 export const END_EFFECT_ID = "end-effect";
 
-/** The actions the bearer's effects offer to end them, one for each activation: the first effect needing it names it. */
+/** The actions the bearer's effects offer to end them, one for each activation: the first effect needing it names it.
+ *  Then each printed way out its effects give the bearer itself, by name (a Chain's burst beside its escape). */
 function endEffectActions(bearer: ActionBearer | undefined): BuiltinAction[] {
   const byActivation = new Map<"action" | "bonus-action", EffectInstance>();
   for (const effect of bearer?.effects ?? [])
     if (effect.endAction && !byActivation.has(effect.endAction.activation))
       byActivation.set(effect.endAction.activation, effect);
+  return [...ownEndActions(byActivation), ...namedEndings(bearer)];
+}
+
+/** One action for each way out an effect gives its own bearer ("Burst the Chain"), the first effect naming it. */
+function namedEndings(bearer: ActionBearer | undefined): BuiltinAction[] {
+  const offered = new Map<string, BuiltinAction>();
+  for (const effect of bearer?.effects ?? [])
+    for (const ending of endingsOf(effect)) {
+      if (ending.by === "others") continue;
+      const id = `${ENDED_BY_PREFIX}${endingSlug(ending)}`;
+      if (offered.has(id)) continue;
+      const check = ending.check;
+      const roll = check
+        ? ` with a DC ${check.dc ?? "the effect's"} ${ABILITY_WORDS[check.ability]}${check.skill ? ` (${skillWords(check.skill)})` : ""} check`
+        : "";
+      offered.set(id, {
+        id,
+        name: `${ending.name} (${effect.name})`.slice(0, 120),
+        activation: "action",
+        description: `End ${effect.name}${roll}. A success ends it.`,
+        damage: [],
+        ...(effect.tags[0] !== undefined ? { requiresEffectTag: effect.tags[0] } : {})
+      });
+    }
+  return [...offered.values()];
+}
+
+function ownEndActions(byActivation: ReadonlyMap<"action" | "bonus-action", EffectInstance>): BuiltinAction[] {
   return [...byActivation].map(([activation, effect]) => {
     const end = effect.endAction!;
     const roll = `${ABILITY_WORDS[end.ability]}${end.skill ? ` (${skillWords(end.skill)})` : ""} ${end.kind === "save" ? "saving throw" : "check"}`;
@@ -487,9 +571,14 @@ export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   "unarmed-grapple": "single",
   "unarmed-shove-prone": "single",
   "unarmed-shove-push": "single",
+  "improvised-weapon": "single",
+  "improvised-weapon-thrown": "single",
   "unarmed-strike-bonus": "single",
   "unarmed-grapple-bonus": "single",
   "unarmed-shove-prone-bonus": "single",
   "unarmed-shove-push-bonus": "single",
-  "shake-awake": "single"
+  "shake-awake": "single",
+  "touch-bead": "single",
+  "move-sphere": "single",
+  "move-sphere-far": "single"
 };

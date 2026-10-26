@@ -18,6 +18,7 @@ import { UNARMED_STRIKE_ACTION_ID } from "../src/item-actions.js";
 import { applyDamageDetailed, RELENTLESS_RAGE_KEY } from "../src/hit-points.js";
 import { applyRest } from "../src/rests.js";
 import { currentSpeedFeet } from "../src/speed.js";
+import { carriedAlongBy, dragCostsExtra } from "../src/movement-rules.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
 // target is held to, the die the engine keeps, the counter it spends, or the refusal it prints. Runs
@@ -630,6 +631,47 @@ describe("Barbarian: Rage Damage on attacks using Strength", () => {
   });
 });
 
+describe("Berserker: Frenzy rides the first Strength hit of a reckless, raging turn", () => {
+  const reckless = (built: Built) => use(built, "reckless-attack");
+
+  it("offers d6s of the weapon's type on the first Strength hit, and not on the second", () => {
+    const built = onTheTable(build(barbarianInput(3)));
+    use(built, "rage");
+    reckless(built);
+    const first = swing(built, "item-greataxe", [15, 15], { commit: false });
+    expect(first.hitOffers?.find((offer) => offer.id === "frenzy")).toMatchObject({ dice: "2d6 Slashing" });
+    const hit = swing(built, "item-greataxe", [15, 15, 6, 3, 3], { hitOptions: [{ id: "frenzy" }] });
+    expect(hit.damage.filter((part) => part.source === "Frenzy")).toEqual([
+      { formula: "2d6", type: "slashing", total: 6, source: "Frenzy" }
+    ]);
+    built.state.combat.turn = { ...built.state.combat.turn, actionUsed: false, actionInstance: null };
+    expect(offerIds(swing(built, "item-greataxe", [15, 15], { commit: false }))).not.toContain("frenzy");
+  });
+
+  it("isn't offered without Reckless Attack or without the Rage, and rolls 3d6 at Barbarian 9", () => {
+    const calm = onTheTable(build(barbarianInput(3)));
+    reckless(calm);
+    expect(offerIds(swing(calm, "item-greataxe", [15, 15], { commit: false }))).not.toContain("frenzy");
+    const careful = onTheTable(build(barbarianInput(3)));
+    use(careful, "rage");
+    expect(offerIds(swing(careful, "item-greataxe", [15, 15], { commit: false }))).not.toContain("frenzy");
+    const ninth = onTheTable(build(barbarianInput(9)));
+    use(ninth, "rage");
+    reckless(ninth);
+    expect(swing(ninth, "item-greataxe", [15, 15], { commit: false }).hitOffers).toContainEqual(
+      expect.objectContaining({ id: "frenzy", dice: "3d6 Slashing" })
+    );
+  });
+
+  it("isn't offered after a Strength hit that went without it", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    use(built, "rage");
+    reckless(built);
+    swing(built, "item-greataxe", [15, 15, 6]);
+    expect(offerIds(swing(built, "item-greataxe", [15, 15], { commit: false }))).not.toContain("frenzy");
+  });
+});
+
 describe("Barbarian: Persistent Rage is a counter the engine spends", () => {
   it("spends its one long-rest use and refuses the second attempt", () => {
     const built = onTheTable(build(barbarianInput()));
@@ -889,6 +931,157 @@ describe("healing features heal what they print", () => {
     built.hero.hp.current = 10;
     use(built, "wholeness-of-body", [], [4]);
     expect(built.hero.hp.current).toBe(17);
+  });
+});
+
+describe("Grappler: Punch and Grab, and Fast Wrestler", () => {
+  /** A Barbarian 4 who took Grappler (+1 Strength) for the level-4 feat. */
+  const grappler = () => {
+    const input = barbarianInput(4);
+    input.choices = [
+      ...input.choices.filter(
+        (row) => !(row.level === 4 && (row.kind === "asi-or-feat" || row.kind === "ability-score"))
+      ),
+      { level: 4, classId: "barbarian", kind: "asi-or-feat", id: "grappler" },
+      { level: 4, kind: "ability-score", id: "str", payload: { featureId: "grappler" } }
+    ] as Row[];
+    return onTheTable(build(input));
+  };
+  const punch = (built: Built, faces: number[], hitOptions?: Array<{ id: string }>, commit = true) =>
+    resolveDefinitionAction(
+      built.state,
+      builtinActionFor(built.definition, "unarmed-strike")!,
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        builtin: true,
+        commit,
+        ...(hitOptions ? { hitOptions } : {})
+      },
+      deps(built, faces)
+    );
+
+  it("lets an Unarmed Strike hit in the Attack action both damage and open the Grapple, once a turn", () => {
+    const built = grappler();
+    expect(offerIds(punch(built, [15], undefined, false))).toContain("punch-and-grab");
+    const hit = punch(built, [15], [{ id: "punch-and-grab" }]);
+    expect(hit.damageTotal).toBeGreaterThan(0);
+    // Strength 18 (+4) and Proficiency Bonus 2: DC 14, the escape DC too.
+    const save = built.state.combat.pendingSaves.find((entry) => entry.targetActorId === IDS.foe)!;
+    expect(save).toMatchObject({ dc: 14, onFailEffect: { linkedConditionIds: ["grappled"], escapeDc: 14 } });
+    built.state.combat.turn = { ...built.state.combat.turn, actionUsed: false, actionInstance: null };
+    expect(offerIds(punch(built, [15], undefined, false))).not.toContain("punch-and-grab");
+  });
+
+  it("isn't offered without the feat", () => {
+    const built = onTheTable(build(barbarianInput(4)));
+    expect(offerIds(punch(built, [15], undefined, false))).not.toContain("punch-and-grab");
+  });
+
+  it("drags a grappled creature its size or smaller for no extra movement", () => {
+    const built = grappler();
+    const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    const resolveDefinition = () => built.definition;
+    // The halfling Barbarian is Small: a Small foe comes free, a Medium one still costs the extra foot.
+    foe.size = "small";
+    expect(dragCostsExtra(built.state, IDS.hero, [IDS.foe], resolveDefinition)).toBe(false);
+    foe.size = "medium";
+    expect(dragCostsExtra(built.state, IDS.hero, [IDS.foe], resolveDefinition)).toBe(true);
+    const plain = onTheTable(build(barbarianInput(4)));
+    plain.state.actors.find((actor) => actor.id === IDS.foe)!.size = "small";
+    expect(dragCostsExtra(plain.state, IDS.hero, [IDS.foe], () => plain.definition)).toBe(true);
+  });
+});
+
+describe("Fighter: Tactical Master swaps a mastery for Push, Sap or Slow on one attack", () => {
+  const swingWith = (
+    built: Built,
+    actionId: string,
+    faces: number[],
+    mastery: "push" | "sap" | "slow",
+    commit = false
+  ) =>
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, actionId),
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        mastery,
+        commit
+      },
+      deps(built, faces)
+    );
+
+  it("offers Push, Sap and Slow beside the Greatsword's Graze, and a Push pick offers the push", () => {
+    const built = onTheTable(build(fighterInput(9)));
+    const plain = swing(built, "item-greatsword", [15], { commit: false });
+    expect(plain.masteryOptions).toEqual({
+      own: { id: "graze", name: "Graze" },
+      alternatives: [
+        { id: "push", name: "Push" },
+        { id: "sap", name: "Sap" },
+        { id: "slow", name: "Slow" }
+      ]
+    });
+    expect(plain.push ?? null).toBeNull();
+    const pushed = swingWith(built, "item-greatsword", [15], "push");
+    expect(pushed.push).toEqual({ targetName: "Foe", maxFeet: 10 });
+    expect(pushed.masteryOptions?.picked).toBe("push");
+  });
+
+  it("saps the target in place of grazing it", () => {
+    const built = onTheTable(build(fighterInput(9)));
+    swingWith(built, "item-greatsword", [15, 3, 3, 3, 3], "sap", true);
+    const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    expect(foe.effects.some((effect) => effect.tags.includes("sap"))).toBe(true);
+  });
+
+  it("refuses the pick from a Fighter 8, and on an attack with no mastery the Fighter can use", () => {
+    const eighth = onTheTable(build(fighterInput(8)));
+    expect(swing(eighth, "item-greatsword", [15], { commit: false }).masteryOptions).toBeUndefined();
+    expect(() => swingWith(eighth, "item-greatsword", [15], "push")).toThrowError(/doesn't have Tactical Master/);
+    const ninth = onTheTable(build(fighterInput(9)));
+    // Javelins (Slow) aren't among this Fighter's four masteries.
+    expect(() => swingWith(ninth, "item-javelin", [15], "push")).toThrowError(
+      /can't use the mastery property of Javelin/
+    );
+  });
+});
+
+describe("Boon of Irresistible Offense: Overwhelming Strike on a rolled 20", () => {
+  // Strength 15 + 2 (Soldier) + 2 (level 4) + 1 (level 6) = 20, and the boon's increase makes it 21.
+  const boonFighter = () => {
+    const input = fighterInput(19);
+    input.choices.push(
+      {
+        level: 19,
+        classId: "fighter",
+        kind: "feat",
+        id: "boon-of-irresistible-offense",
+        payload: { featureId: "epic-boon" }
+      },
+      { level: 19, kind: "ability-score", id: "str", payload: { featureId: "boon-of-irresistible-offense" } }
+    );
+    return onTheTable(build(input));
+  };
+  const overwhelming = (resolution: ReturnType<typeof swing>) =>
+    resolution.damage.filter((part) => part.formula === "21");
+
+  it("adds damage equal to the increased Strength score, of the attack's type, on a natural 20", () => {
+    const built = boonFighter();
+    expect(built.definition.abilityScores.str).toBe(21);
+    const hit = swing(built, "item-greatsword", [20, 3, 3, 3, 3, 3, 3, 3, 3]);
+    expect(overwhelming(hit)).toEqual([{ formula: "21", type: "slashing", total: 21 }]);
+  });
+
+  it("adds nothing on a 19, though the Champion's 19 is a Critical Hit", () => {
+    const built = boonFighter();
+    const hit = swing(built, "item-greatsword", [19, 3, 3, 3, 3, 3, 3, 3, 3]);
+    expect(hit.attack?.outcome).toBe("crit");
+    expect(overwhelming(hit)).toEqual([]);
   });
 });
 
@@ -1311,6 +1504,47 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
   });
 });
 
+describe("Monk: Martial Arts sets the Grapple and Shove DC with Dexterity", () => {
+  const shove = (built: Built) =>
+    resolveDefinitionAction(
+      built.state,
+      builtinActionFor(built.definition, "unarmed-shove-prone")!,
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        builtin: true
+      },
+      deps(built)
+    );
+  const dcOf = (built: Built) => built.state.combat.pendingSaves.find((save) => save.targetActorId === IDS.foe)?.dc;
+
+  it("holds the target to 8 + Dexterity + Proficiency Bonus while Martial Arts holds, and Strength in armor", () => {
+    // Monk 1: Str 12 (+1), Dex 17 (+3), Proficiency Bonus 2.
+    const built = onTheTable(build(monkInput(1)));
+    shove(built);
+    expect(dcOf(built)).toBe(13);
+    const armored = onTheTable(build(monkInput(1)));
+    armored.hero.inventory.push({
+      id: "leather-armor",
+      name: "Leather Armor",
+      quantity: 1,
+      equipped: true,
+      attuned: false,
+      category: "armor",
+      armor: {
+        acBase: 11,
+        addDexModifier: true,
+        dexModifierCap: null,
+        stealthDisadvantage: false,
+        strengthRequired: null
+      }
+    } as (typeof armored.hero.inventory)[number]);
+    shove(armored);
+    expect(dcOf(armored)).toBe(11);
+  });
+});
+
 describe("Monk: Flurry of Blows opens its own Unarmed Strikes", () => {
   it("opens two strikes as a Bonus Action, each spent by an Unarmed Strike, leaving the Attack action alone", () => {
     const built = onTheTable(build(monkInput(5)));
@@ -1401,6 +1635,16 @@ describe("Monk: the Bonus Action forms Martial Arts and Monk's Focus give", () =
     // Dodge's half lapses at Speed 0 or while Incapacitated, as the Dodge action does.
     expect(effect.voidWhileIncapacitated).toBe(true);
     expect(built.hero.actionUses["focus-points"]).toBe(1);
+    expect(built.hero.hp.temporary ?? 0).toBe(0);
+  });
+
+  it("gives a Monk 10's paid Patient Defense Temporary Hit Points of two Martial Arts dice (Heightened Focus)", () => {
+    const built = onTheTable(build(monkInput(10)));
+    expect(actionOf(built, "patient-defense").healing).toEqual({ formula: "2d8", self: true, temporary: true });
+    use(built, "patient-defense", [], [5, 7]);
+    expect(built.hero.hp.temporary).toBe(12);
+    expect(built.hero.effects.some((entry) => entry.tags.includes("dodging"))).toBe(true);
+    expect(actionOf(onTheTable(build(monkInput(17))), "patient-defense").healing?.formula).toBe("2d12");
   });
 });
 
@@ -1502,6 +1746,82 @@ describe("Monk: Superior Defense grants Resistance to everything but Force", () 
   });
 });
 
+describe("Monk: Superior Defense at the start of the turn, until the Monk is Incapacitated", () => {
+  const defended = (built: Built) => built.hero.effects.find((effect) => effect.tags.includes("superior-defense"));
+
+  it("is taken at the start of the Monk's turn and refused once the turn is under way", () => {
+    const built = onTheTable(build(monkInput(18)));
+    use(built, "superior-defense");
+    expect(defended(built)).toBeDefined();
+    const later = onTheTable(build(monkInput(18)));
+    use(later, "unarmed-strike", [IDS.foe], [17, 5]);
+    expect(() => use(later, "superior-defense")).toThrowError(
+      "Superior Defense is used at the start of Shan's turn, before it moves or acts."
+    );
+    // Another creature's turn is no start of the Monk's.
+    const offTurn = onTheTable(build(monkInput(18)));
+    nextInitiativeTurn(offTurn.state);
+    expect(() => use(offTurn, "superior-defense")).toThrowError("Superior Defense is used on Shan's own turn.");
+  });
+
+  it("ends when the Monk is Stunned, and stays ended once the condition goes", () => {
+    const built = onTheTable(build(monkInput(18)));
+    use(built, "superior-defense");
+    setCondition(built.state, IDS.hero, "stunned", true, undefined, { role: "gm" });
+    expect(defended(built)).toBeUndefined();
+    setCondition(built.state, IDS.hero, "stunned", false, undefined, { role: "gm" });
+    expect(defended(built)).toBeUndefined();
+  });
+
+  it("ends when the Monk drops to 0 Hit Points", () => {
+    const built = onTheTable(build(monkInput(18)));
+    use(built, "superior-defense");
+    applyDamageDetailed(built.state, IDS.hero, { amount: 500 }, { role: "gm" });
+    expect(defended(built)).toBeUndefined();
+  });
+});
+
+describe("Open Hand: Fleet Step takes Step of the Wind right after another Bonus Action", () => {
+  /** A generic action this Monk can take by id, the Bonus Action forms its features give included. */
+  const take = (built: Built, actionId: string) =>
+    resolveDefinitionAction(
+      built.state,
+      builtinActionFor(built.definition, actionId)!,
+      {
+        actorId: IDS.hero,
+        targetIds: [],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        builtin: true
+      },
+      deps(built)
+    );
+
+  it("lets a Monk 11 use Step of the Wind after Flurry of Blows, once", () => {
+    const built = onTheTable(build(monkInput(11)));
+    use(built, "flurry-of-blows");
+    use(built, "step-of-the-wind");
+    expect(built.hero.effects.some((effect) => effect.tags.includes("dashing"))).toBe(true);
+    // Step of the Wind twice isn't Fleet Step's.
+    expect(() => take(built, "dash-bonus")).toThrowError(/already used a Bonus Action/);
+  });
+
+  it("takes the free Step of the Wind the same way", () => {
+    const built = onTheTable(build(monkInput(11)));
+    use(built, "flurry-of-blows");
+    take(built, "dash-bonus");
+    expect(built.hero.effects.some((effect) => effect.tags.includes("dashing"))).toBe(true);
+  });
+
+  it("gives a Monk 10 no second Bonus Action, and nothing after Step of the Wind itself", () => {
+    const tenth = onTheTable(build(monkInput(10)));
+    use(tenth, "flurry-of-blows");
+    expect(() => use(tenth, "step-of-the-wind")).toThrowError(/already used a Bonus Action/);
+    const built = onTheTable(build(monkInput(11)));
+    use(built, "step-of-the-wind");
+    expect(() => take(built, "dash-bonus")).toThrowError(/already used a Bonus Action/);
+  });
+});
+
 describe("Monk: Quivering Palm starts on an Unarmed Strike hit and ends on the marked creature", () => {
   it("spends the 4 Focus Points marking the hit creature, and ending it spends none", () => {
     const built = onTheTable(build(monkInput(20)));
@@ -1510,7 +1830,15 @@ describe("Monk: Quivering Palm starts on an Unarmed Strike hit and ends on the m
     swing(built, "unarmed-strike", [17, 6], { hitOptions: [{ id: "quivering-palm-start" }] });
     expect(built.hero.actionUses["focus-points"]).toBe(4);
     const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
-    expect(foe.effects).toMatchObject([{ name: "Quivering Palm", tags: ["quivering-palm"], sourceActorId: IDS.hero }]);
+    // "Which last for a number of days equal to your Monk level": 20 days on the game clock.
+    expect(foe.effects).toMatchObject([
+      {
+        name: "Quivering Palm",
+        tags: ["quivering-palm"],
+        sourceActorId: IDS.hero,
+        duration: { type: "minutes", remaining: 20 * 24 * 60 }
+      }
+    ]);
     // Ending it: the Constitution save against 10d12 Force, and no Focus Point.
     const ended = use(built, "quivering-palm", [IDS.foe], [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]);
     expect(ended.damage).toEqual([{ formula: "10d12", type: "force", total: 120 }]);
@@ -1607,6 +1935,43 @@ describe("Barbarian: Rage lasts while it is fed, and stops spells and Concentrat
     expect(built.hero.actionUses.rage).toBe(1);
     nextInitiativeTurn(built.state);
     expect(raging(built)).toBeDefined();
+  });
+
+  it("is refused in Heavy armor before a use or the Bonus Action is spent", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    built.hero.inventory.push({
+      id: "plate-armor",
+      name: "Plate Armor",
+      quantity: 1,
+      equipped: true,
+      attuned: false,
+      category: "armor",
+      armor: {
+        acBase: 18,
+        addDexModifier: false,
+        dexModifierCap: null,
+        stealthDisadvantage: true,
+        strengthRequired: 15
+      }
+    } as (typeof built.hero.inventory)[number]);
+    expect(() => use(built, "rage")).toThrowError("Ozar is wearing Heavy armor and can't enter a Rage.");
+    expect(built.hero.actionUses.rage).toBeUndefined();
+    expect(built.state.combat.turn.bonusActionUsed).toBe(false);
+    expect(raging(built)).toBeUndefined();
+  });
+
+  it("is extended by an attack against an enemy, and an attack on an ally doesn't feed it", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    const ally = { ...built.state.actors.find((actor) => actor.id === IDS.foe)!, id: OTHER, name: "Ally" };
+    built.state.actors.push({ ...ally, kind: "player-character" });
+    built.state.combat.initiative.push({ actorId: OTHER, score: 5 } as (typeof built.state.combat.initiative)[number]);
+    use(built, "rage");
+    nextInitiativeTurn(built.state); // the Barbarian's own turn ends: the Rage holds
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state); // the Barbarian's next turn begins
+    use(built, "item-greataxe", [OTHER], [3, 8]);
+    nextInitiativeTurn(built.state);
+    expect(raging(built)).toBeUndefined();
   });
 
   it("ends when the Barbarian is Incapacitated", () => {
@@ -2203,5 +2568,93 @@ describe("Monk: Open Hand Technique rides the strikes Flurry of Blows grants", (
     expect(foe.effects).toMatchObject([
       { name: "Addled", tags: ["no-opportunity-attacks"], duration: { type: "until-bearer-next-turn" } }
     ]);
+  });
+});
+
+describe("Monk: Self-Restoration ends a condition as the turn ends", () => {
+  const endTurn = (built: Built) =>
+    nextInitiativeTurn(built.state, [], {
+      resolveDefinition: (id: string) => (id === built.hero.definitionId ? built.definition : undefined),
+      catalog,
+      rollDie: () => 1,
+      newId: () => "40000000-0000-4000-8000-0000000000f1",
+      now: () => "2026-08-07T00:00:00.000Z"
+    });
+  const conditionIds = (built: Built) => built.hero.conditions.map((condition) => condition.id).sort();
+
+  it("ends Frightened of a Frightened and Poisoned Monk 10, and leaves it Poisoned", () => {
+    const built = onTheTable(build(monkInput(10)));
+    setCondition(built.state, IDS.hero, "frightened", true, undefined, { role: "gm" });
+    setCondition(built.state, IDS.hero, "poisoned", true, undefined, { role: "gm" });
+    endTurn(built);
+    expect(conditionIds(built)).toEqual(["poisoned"]);
+  });
+
+  it("ends an effect that imposes nothing but the condition", () => {
+    const built = onTheTable(build(monkInput(10)));
+    addEffect(
+      built.state,
+      IDS.hero,
+      makeEffect({
+        id: "fear",
+        name: "Cause Fear",
+        linkedConditionIds: ["frightened"],
+        duration: { type: "rounds", remaining: 10 }
+      })
+    );
+    expect(conditionIds(built)).toEqual(["frightened"]);
+    endTurn(built);
+    expect(conditionIds(built)).toEqual([]);
+    expect(built.hero.effects.some((effect) => effect.id === "fear")).toBe(false);
+  });
+
+  it("does nothing for a Monk 9", () => {
+    const built = onTheTable(build(monkInput(9)));
+    setCondition(built.state, IDS.hero, "poisoned", true, undefined, { role: "gm" });
+    endTurn(built);
+    expect(conditionIds(built)).toEqual(["poisoned"]);
+  });
+});
+
+describe("Monk: Heightened Focus carries a willing ally on Step of the Wind", () => {
+  /** A Monk with an ally beside it, of `size`. */
+  const withAlly = (level: number, size = "medium") => {
+    const built = onTheTable(build(monkInput(level)));
+    built.state.actors.push({
+      ...structuredClone(built.hero),
+      id: OTHER,
+      name: "Ally",
+      size,
+      definitionId: undefined,
+      effects: [],
+      conditions: [],
+      inventory: []
+    } as Actor);
+    built.state.combat.initiative.push({ actorId: OTHER, score: 5 } as (typeof built.state.combat.initiative)[number]);
+    return built;
+  };
+  const carry = (built: Built) => use(built, "step-of-the-wind-carry", [OTHER]);
+  const ally = (built: Built) => built.state.actors.find((actor) => actor.id === OTHER)!;
+
+  it("takes the ally along on the Monk's moves after Step of the Wind, until the turn ends", () => {
+    const built = withAlly(10);
+    expect(() => carry(built)).toThrow(/requires an active/);
+    use(built, "step-of-the-wind");
+    carry(built);
+    expect(ally(built).effects).toMatchObject([{ name: "Carried by Step of the Wind", tags: ["carried-along"] }]);
+    expect(carriedAlongBy(built.state, IDS.hero)).toEqual([OTHER]);
+    nextInitiativeTurn(built.state);
+    expect(ally(built).effects).toEqual([]);
+  });
+
+  it("refuses a Huge ally, and a Monk 9 has no such action", () => {
+    const huge = withAlly(10, "huge");
+    use(huge, "step-of-the-wind");
+    expect(() => carry(huge)).toThrow(/Large or smaller|larger than Large|too large|size/i);
+    expect(
+      effectiveActions(build(monkInput(9)), withAlly(9).hero, catalog).some(
+        (action) => action.id === "step-of-the-wind-carry"
+      )
+    ).toBe(false);
   });
 });

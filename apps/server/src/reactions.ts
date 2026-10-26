@@ -1,3 +1,4 @@
+import { reactionSpenders, reactionSpent } from "./commanded-reactions.js";
 import type { ActionResolution, DamageApplication, GameState, PendingReaction } from "@vtt/domain";
 import type { RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition, DamageType } from "@vtt/schemas";
@@ -34,6 +35,7 @@ import { recordRoll, rolledTerms } from "./roll-history.js";
 import { answerAmount, type AnswerDeps } from "./roll-answers.js";
 import { answerSave, type SaveAnswerDependencies, type SaveOutcome } from "./saving-throws.js";
 import { swapPlaces } from "./resolution/redirect.js";
+import { redirectForce } from "./deflect-redirect.js";
 import { splitCreature } from "./split.js";
 import { grantTeleport } from "./granted-moves.js";
 
@@ -100,7 +102,7 @@ export type OpportunityAttackOptions = Readonly<{
   slotLevel?: number;
   /** An answer to another creature's roll that may go either way (Improve Fate) takes its die off. */
   subtract?: boolean;
-  /** Redirect Attack: the ally the attack turns to. */
+  /** Redirect Attack: the ally the attack turns to. Deflect Attacks: the creature a reduction to 0 redirects at. */
   redirectTo?: string;
 }>;
 
@@ -146,9 +148,11 @@ export function answerReaction(
   if (!pending) throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
   const reactor = adjustableActor(state, pending.actorId, scope);
   // An answer to a roll checks its own cost (an Improve Fate takes no Reaction); every other prompt is a Reaction.
-  if (use && pending.kind !== "roll-answer" && state.combat.reactionsUsed.includes(reactor.id)) {
+  if (use && pending.kind !== "roll-answer" && reactionSpent(state, reactor.id)) {
     throw new CommandRejectedError(
-      `${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`
+      state.combat.reactionsUsed.includes(reactor.id)
+        ? `${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`
+        : `${reactor.name}'s Reaction takes its commander's, which is spent this round. Decline instead.`
     );
   }
   // A creature at 0 HP can't take reactions (SRD Incapacitated / Unconscious).
@@ -175,8 +179,14 @@ export function answerReaction(
       state.combat = {
         ...state.combat,
         pendingReactions: state.combat.pendingReactions.filter((entry) => entry.id !== reactionId),
+        // A dominated creature's Reaction takes its commander's too.
         ...(markUsed
-          ? { reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== reactor.id), reactor.id] }
+          ? {
+              reactionsUsed: [
+                ...state.combat.reactionsUsed.filter((id) => !reactionSpenders(state, reactor.id).includes(id)),
+                ...reactionSpenders(state, reactor.id)
+              ]
+            }
           : {})
       };
     }
@@ -365,7 +375,8 @@ function owesDamage(resolution: ActionResolution): boolean {
 
 /** The damage a damage reaction holds, applied either way: halved (Uncanny Dodge), less a rolled amount (Deflect
  *  Attacks, Stone's Endurance) or met with Resistance to its type until the turn ends (Superior Hunter's Defense) when
- *  used. The reaction's own cost (a use, a recharge) is spent with its Reaction. */
+ *  used. The reaction's own cost (a use, a recharge) is spent with its Reaction. Deflect Attacks brought to 0 turns
+ *  the force on the creature picked (`deflect-redirect.ts`). */
 function answerParkedDamage(answer: Answer, redirectTo: string | undefined): ReactionOutcome {
   const { state, commandId, pending, reactor, use, deps, base, clearPrompt } = answer;
   let parts = [...pending.proposedDamageParts];
@@ -441,6 +452,19 @@ function answerParkedDamage(answer: Answer, redirectTo: string | undefined): Rea
         })
       );
     }
+    const redirected = redirectForce(
+      state,
+      {
+        reactor,
+        pending,
+        redirectTo,
+        remaining: parts.reduce((sum, part) => sum + part.amount, 0),
+        commandId,
+        role: answer.scope.role
+      },
+      deps
+    );
+    if (redirected) events.push(redirected);
   }
   clearPrompt(use);
   const total = parts.reduce((sum, part) => sum + part.amount, 0);

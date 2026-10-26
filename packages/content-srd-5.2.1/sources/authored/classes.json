@@ -827,9 +827,12 @@
               "successDamage": "none",
               "failureConditions": ["frightened", "incapacitated"],
               "failureDuration": { "type": "rounds", "rounds": 10 },
-              "endsOnDamage": true
+              "endsOnDamage": true,
+              "endsWhenSourceIncapacitated": true,
+              "endsWhenSourceDies": true
             },
             "damage": [],
+            "damageDiceByAbility": { "level": 5, "ability": "wis", "die": "d8", "type": "radiant", "minimum": 1 },
             "targets": { "rangeFeet": 30, "creatureTypes": ["undead"] }
           }
         ],

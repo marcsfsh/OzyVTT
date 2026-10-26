@@ -5,6 +5,7 @@ import { calmAtTurnStart } from "./berserker-axe.js";
 import { breathAtTurnEnd } from "./breath.js";
 import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { formsLapseAtTurnStart } from "./inventory.js";
 import { endEffect, expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
 import { confusedTurn } from "./random-outcomes.js";
@@ -31,6 +32,9 @@ import {
   type TurnStep
 } from "./simultaneous-effects.js";
 import { disgorge, regurgitationSaves } from "./swallow.js";
+import { selfRestorationAtTurnEnd } from "./self-restoration.js";
+import { stealthAttackAtTurnEnd } from "./supreme-sneak.js";
+import { setDownCarried } from "./movement-rules.js";
 import { offerNearbyReactions } from "./triggered-reactions.js";
 import { teleportsEachTurn } from "./granted-moves.js";
 
@@ -66,7 +70,9 @@ export type TurnStartDeps = Readonly<{
  * 1. "until the end of its/your next turn" durations it owns end (`expireEffectsAtTurnEnd`);
  * 2. each effect it bears that "repeats the save at the end of each of its turns" opens that save (`openRepeatSaves`:
  *    a success ends the effect, unless the text counts them or makes the failure worse);
- * 3. its stat block's traits that act as its turn ends (Fire Aura, a hydra's heads) do, and the ongoing damage printed
+ * 3. a Monk's carried ally is set down (Heightened Focus), its Self-Restoration ends one of its Charmed, Frightened or Poisoned conditions, and a Thief's Stealth
+ *    Attack reveals it unless it has Three-Quarters or Total Cover;
+ * 4. its stat block's traits that act as its turn ends (Fire Aura, a hydra's heads) do, and the ongoing damage printed
  *    for the end of a turn lands, in the order its controller gave (`endSteps`), then a troll's limbs come off.
  */
 export function endOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps?: TurnEndDeps): void {
@@ -78,6 +84,11 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
     const sees = sightOf(state, deps);
     events.push(...endEffectsOutOfSight(state, actorId, { ...deps, sees }));
     events.push(...openRepeatSaves(state, actorId, "turn-end", { ...deps, sees }));
+  }
+  events.push(...setDownCarried(state, actorId));
+  if (deps?.resolveDefinition) {
+    events.push(...selfRestorationAtTurnEnd(state, actorId, deps.resolveDefinition));
+    events.push(...stealthAttackAtTurnEnd(state, actorId, deps.resolveDefinition));
   }
   if (!deps?.rollDie || !deps.resolveDefinition) {
     clearTurnSteps(state);
@@ -195,6 +206,8 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
   heroicWarrior(state, actorId, events, deps);
   // "You can use this transportation ability only once on each of your turns" (Tree Stride).
   if (deps.newId) teleportsEachTurn(state, actorId, deps.newId());
+  // A Defender's bonus moved to AC holds "until the start of your next turn".
+  if (deps.catalog) events.push(...formsLapseAtTurnStart(state, actorId, deps.catalog, deps.resolveDefinition));
   // "At the start of each of its turns, the Restrained target repeats the save" (Conjure Elemental).
   if (deps.newId)
     events.push(

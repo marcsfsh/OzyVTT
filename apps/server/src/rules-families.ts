@@ -12,6 +12,8 @@ const RULE_FAMILIES = {
   "movement.stand-up-cost": "movement",
   // Standing spends movement, which a creature has only on its own turn.
   "movement.stand-up-off-turn": "movement",
+  // Dropping Prone happens on your own turn, and not at Speed 0.
+  "movement.drop-prone": "movement",
   // Steady Aim is only for a creature that hasn't moved this turn.
   "movement.already-moved": "movement",
   // A player's move off their turn, and a player's teleport, are the GM's to allow.
@@ -28,10 +30,17 @@ const RULE_FAMILIES = {
   // Frightened: "You can't willingly move closer to the source of fear."
   "movement.toward-fear": "movement",
   "movement.mount": "movement",
+  // A Climber's Kit anchor holds its user within 25 feet of the anchor point.
+  "movement.tether": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
   "economy.not-your-turn": "economy",
+  // "At the start of your turn" (Superior Defense) and "when you take the Attack action" (Sacred Weapon).
+  "economy.turn-start": "economy",
+  "economy.attack-action": "economy",
+  // Rage: "if you aren't wearing Heavy armor".
+  "economy.heavy-armor": "economy",
   // Only the GM gives back a spent action, Bonus Action or Reaction: un-marking it would let a creature act twice.
   "economy.spent-slot": "economy",
   // Wait mode: no one acts until every player has rolled initiative.
@@ -54,6 +63,8 @@ const RULE_FAMILIES = {
   "condition.cant-attack": "economy",
   "condition.dash-only": "economy",
   "condition.one-thing-a-turn": "economy",
+  // A controlled mount takes only the Dash, Disengage and Dodge actions (SRD Mounted Combat).
+  "mount.controlled": "economy",
   // A creature that can't end the Prone condition on itself (Hideous Laughter).
   "movement.cant-stand": "movement",
   // A form forbids it: spells (Wild Shape, Polymorph), actions (a vampire's mist), or another form's attack.

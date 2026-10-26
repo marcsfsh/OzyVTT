@@ -170,7 +170,9 @@ export function sizedShapePreview(
   shape: "circle" | "cone" | "line" | "square",
   origin: { x: number; y: number },
   target: { x: number; y: number },
-  sizeFeet: number
+  sizeFeet: number,
+  /** A Line aimed at its target stops where it is dragged, never past `sizeFeet`. */
+  upTo = false
 ): SnappedGeometry {
   const cells = Math.max(1, Math.round(sizeFeet / calibration.distancePerCell));
   const placed = snapShapePreview(calibration, shape, origin, target);
@@ -186,7 +188,7 @@ export function sizedShapePreview(
   const dx = placed.target.x - placed.origin.x;
   const dy = placed.target.y - placed.origin.y;
   const length = Math.hypot(dx, dy) || 1;
-  const reach = cells * calibration.cellSizePx;
+  const reach = upTo ? Math.min(length, cells * calibration.cellSizePx) : cells * calibration.cellSizePx;
   return snapShapePreview(calibration, shape, placed.origin, {
     x: placed.origin.x + (dx / length) * reach,
     y: placed.origin.y + (dy / length) * reach

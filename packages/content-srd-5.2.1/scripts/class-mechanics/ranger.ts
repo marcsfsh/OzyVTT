@@ -163,9 +163,9 @@ export const ranger: ClassMechanicsModule = {
       },
 
       /**
-       * Tapped once the Ranger's damage lands on its marked creature: the mark's extra damage (1d6 Force, 1d10 from
-       * Foe Slayer at Ranger 20) to one other creature it can see, once per turn. That the mark took damage this turn
-       * and the 30 feet from it stay the table's.
+       * Taken once the Ranger's damage has landed on its marked creature this turn: the mark's extra damage (1d6 Force,
+       * 1d10 from Foe Slayer at Ranger 20) to one other creature it can see within 30 feet of the marked one, once per
+       * turn (`resolution/action-targets.ts`).
        */
       "superior-hunters-prey": {
         actions: [
@@ -181,7 +181,7 @@ export const ranger: ClassMechanicsModule = {
               { level: 20, formula: "1d10", type: "force" }
             ],
             uses: { limit: 1, per: "turn", pool: "superior-hunters-prey" },
-            targets: { count: 1, seen: true, who: "others" }
+            targets: { count: 1, seen: true, who: "others", nearMark: { tag: "hunters-mark", feet: 30 } }
           }
         ]
       },

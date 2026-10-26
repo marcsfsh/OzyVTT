@@ -28,6 +28,8 @@ import { spendBonusAction } from "./item-light.js";
 import { withVariantPick } from "./item-variants.js";
 import { attunementRefusal } from "./attunement.js";
 import { donInFight } from "./held-items.js";
+import { nestedIn, placeInContainer, type Placement } from "./containers.js";
+import { chargeHandling } from "./object-interactions.js";
 
 const MAX_ITEMS = 200;
 /** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
@@ -384,6 +386,17 @@ function keepDormant(stored: InventoryItem | undefined, item: InventoryItem): In
   return stored?.dormant ? { ...rest, dormant: true } : rest;
 }
 
+/** What only a cast writes on a row: Identify's mark and the spells a Ring of Spell Storing holds. A sheet write keeps
+ *  the stored ones and can't add any. */
+function keepCastMarks(stored: InventoryItem | undefined, item: InventoryItem): InventoryItem {
+  const { identified: _identified, storedCasts: _casts, ...rest } = item;
+  return {
+    ...rest,
+    ...(stored?.identified ? { identified: true as const } : {}),
+    ...(stored?.storedCasts ? { storedCasts: structuredClone(stored.storedCasts) } : {})
+  };
+}
+
 /** A scribed scroll's numbers are the server's record (`crafting.ts`): an edit keeps them as stored and can't set
  *  them. */
 function keepScribed(stored: InventoryItem | undefined, item: InventoryItem): InventoryItem {
@@ -466,6 +479,10 @@ export function setInventoryItem(
     actor.inventory.find((entry) => entry.id === item.id),
     item
   );
+  item = keepCastMarks(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item
+  );
   item = keepScribed(
     actor.inventory.find((entry) => entry.id === item.id),
     item
@@ -481,6 +498,15 @@ export function setInventoryItem(
     state.rest.clockHours
   );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  // Where it sits: loose, or in a container that holds it.
+  const placement = placeInContainer(
+    actor,
+    item,
+    actor.inventory.find((entry) => entry.id === item.id),
+    deps.catalog,
+    deps.role
+  );
+  item = placement.item;
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, definition, deps);
   // Armor goes on and comes off on the clock: body armor not at all in a fight, a Shield with the Utilize action.
@@ -491,6 +517,16 @@ export function setInventoryItem(
     item,
     deps.catalog?.equipmentRecord(catalogIdOf(item))?.slot ?? item.magic?.slot,
     deps.role
+  );
+  // Drawing a weapon, or taking a thing out of a container, is an object interaction in a fight.
+  chargeHandling(
+    state,
+    actor,
+    actor.inventory.find((entry) => entry.id === item.id),
+    item,
+    deps.role,
+    deps.catalog,
+    definition
   );
   // When attunement may start or end is a player's rule; the GM attunes anyone at any time.
   if (deps.role === "player") {
@@ -515,7 +551,10 @@ export function setInventoryItem(
       actor.actionUses = Object.fromEntries(
         Object.entries(actor.actionUses).filter(([key]) => !spentKeys.includes(key))
       );
-    actor.inventory = actor.inventory.filter((entry) => entry.id !== item.id);
+    // What it held spills out, loose.
+    actor.inventory = actor.inventory
+      .filter((entry) => entry.id !== item.id)
+      .map((entry) => (entry.containerId === item.id ? looseRow(entry) : entry));
   } else {
     const index = actor.inventory.findIndex((entry) => entry.id === item.id);
     if (index >= 0)
@@ -528,14 +567,34 @@ export function setInventoryItem(
       if (deps.random) rollStartingCharges(actor, item, definition, deps.catalog, deps.random);
     }
   }
+  const destroyed = destroyRows(state, actor, placement);
   reconcileEquipment(actor, definition, deps);
   if (definition) moveHitPointMaximum(actor, liveHitPointBonus(actor, definition, deps.catalog) - hitPointsBefore);
   return [
+    ...destroyed,
     ...immuneConditionsEnd(actor, definition, deps),
     ...donningEndsMageArmor(state, actor),
     ...endBindingsOfGoneRows(state, actor),
     ...(before ? endGrantsOfPutAway(state, actor, before, deps) : [])
   ];
+}
+
+/** A row taken out of a container that is gone. */
+function looseRow(row: InventoryItem): InventoryItem {
+  const { containerId: _container, compartment: _compartment, ...loose } = row;
+  return loose;
+}
+
+/** What a write destroyed (an overloaded Bag of Holding, two extradimensional spaces): those rows and all they held
+ *  leave the pack. */
+function destroyRows(state: GameState, actor: Actor, placement: Placement): EffectNarration[] {
+  if (placement.destroys.length === 0) return [];
+  const gone = new Set(placement.destroys.flatMap((id) => [id, ...nestedIn(actor.inventory, id).map((row) => row.id)]));
+  actor.inventory = actor.inventory.filter((row) => !gone.has(row.id));
+  return [
+    { kind: "effect" as const, text: placement.why ?? "", actorId: actor.id },
+    ...endBindingsOfGoneRows(state, actor)
+  ].filter((event) => event.text !== "");
 }
 
 /** A Hit Point maximum that a changed Constitution raises or lowers: current Hit Points move with a gain, and stay
@@ -559,9 +618,13 @@ function endGrantsOfPutAway(
   deps: InventoryDeps
 ): EffectNarration[] {
   const record = rowRecord(deps.catalog, before);
-  if (!record || record.consumedOnUse || !itemIsActive(before, record)) return [];
+  if (!record || record.consumedOnUse) return [];
   const now = actor.inventory.find((entry) => entry.id === before.id);
-  if (now && itemIsActive(now, rowRecord(deps.catalog, now))) return [];
+  // What a Dragon Orb's peering leaves lasts "for as long as you remain attuned to it", held or not.
+  const lasting = record.attunementHeldBy
+    ? (row: InventoryItem | undefined) => row !== undefined && row.quantity > 0 && row.attuned
+    : (row: InventoryItem | undefined) => row !== undefined && itemIsActive(row, rowRecord(deps.catalog, row));
+  if (!lasting(before) || lasting(now)) return [];
   const gone = actor.effects.filter(
     (effect) =>
       effect.sourceActorId === actor.id &&
@@ -693,6 +756,35 @@ export { itemIsActive };
 
 export type ItemFormChange = Readonly<{ actorId: string; itemId: string; variantId: string | null }>;
 
+/** A form that lasts until its holder's next turn starts (a Defender's bonus moved to AC) returns to the item's own as
+ *  that turn starts, for its holder to pick again with its first attack. */
+export function formsLapseAtTurnStart(
+  state: GameState,
+  actorId: string,
+  catalog: EquipmentCatalog,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  const lapsed = actor.inventory.filter(
+    (row) =>
+      row.variantId !== undefined && catalog.equipmentRecord(catalogIdOf(row))?.variantChoice?.untilTurnStart === true
+  );
+  if (lapsed.length === 0) return [];
+  actor.inventory = actor.inventory.map((row) => {
+    if (!lapsed.includes(row)) return row;
+    const { variantId: _form, weapon: _weapon, ...own } = row;
+    const weapon = rowWeaponFor(catalog, catalog.equipmentRecord(catalogIdOf(row))!, own);
+    return weapon ? { ...own, weapon } : own;
+  });
+  reconcileEquipment(actor, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined, { catalog });
+  return lapsed.map((row) => ({
+    kind: "effect" as const,
+    text: `${actor.name}'s ${row.name} returns to its own form.`,
+    actorId
+  }));
+}
+
 /** Its holder puts the item in another form (a Rod of Lordly Might's button, a Quarterstaff of the Acrobat turned into
  *  a pole), or back in its own with null, spending what the record says it costs. Returns the table's sentence. */
 export function setItemForm(
@@ -716,6 +808,19 @@ export function setItemForm(
   if (variant === undefined) throw new CommandRejectedError(`${row.name} has no form "${change.variantId}".`);
   if ((row.variantId ?? null) === (variant?.id ?? null))
     throw new CommandRejectedError(`${row.name} is already in that form.`);
+  // A Defender's split is made with the first attack of its wielder's turn and holds until its next turn starts.
+  if (
+    record.variantChoice?.untilTurnStart &&
+    state.combat.active &&
+    state.combat.initiative.some((entry) => entry.actorId === actor.id)
+  ) {
+    if (state.combat.turnActorId !== actor.id)
+      throw new CommandRejectedError(`${actor.name} changes ${row.name}'s form only on its own turn.`);
+    if (state.combat.turn.attackRolled === true)
+      throw new CommandRejectedError(
+        `${actor.name} has attacked this turn, so ${row.name} keeps its form until the start of its next turn.`
+      );
+  }
   if (record.variantChoice?.activation === "bonus-action")
     spendBonusAction(state, actor, initiator, `Change the form of ${row.name}`);
   const { variantId: _old, weapon: _weapon, ...rest } = row;

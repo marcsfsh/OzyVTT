@@ -11,8 +11,10 @@ import {
   makeEffect,
   type EffectNarration
 } from "./effects.js";
+import { waitHours } from "./clock-pools.js";
 import { joinInitiative, rollJoiningInitiative } from "./encounter.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { endItemMagic } from "./item-spent.js";
 import { CommandRejectedError } from "./game-store.js";
 import { RIDING_TAG } from "./mounts.js";
 import { DISTANCE_TOLERANCE_FEET, mapDistance } from "./movement-narration.js";
@@ -75,6 +77,14 @@ export type SummonRequest = Readonly<{
   corpseIds: readonly string[];
   choice: SummonChoice;
   numbers: SummonerNumbers;
+  /** The use whose wait starts when what it brought leaves (`Summon.waitsFromEnd`). */
+  waitAfter?: NonNullable<Actor["summon"]>["waitAfter"];
+  /** The carried row that brought it, which its death ends (`Summon.itemEndsAtZero`). */
+  itemEnd?: NonNullable<Actor["summon"]>["itemEnd"];
+  /** How long it stays when its use paid for its time (a Goat of Traveling's hours left), over `summon.lasts`. */
+  lastsMinutes?: number;
+  /** The carried row of the item that brought it, which the die's row may change (`SummonCreature.itemBecomes`). */
+  itemRowId?: string;
 }>;
 
 export type SummonOutcome = { created: Array<{ id: string; name: string }>; events: EffectNarration[] };
@@ -127,6 +137,28 @@ function hasTraining(
   return has(proficiencies?.weapons, wants.weapons) && has(proficiencies?.armor, wants.armor);
 }
 
+/** What the die does to the item that brought the summon: the kind it holds from now on (an Efreeti Bottle's servant,
+ *  which every later opening brings), or its magic ended (an efreeti that attacks, or grants a wish). */
+function itemBecomes(
+  user: Actor,
+  request: SummonRequest,
+  becomes: NonNullable<SummonCreature["itemBecomes"]>,
+  deps: SummonDeps
+): EffectNarration[] {
+  const row = user.inventory.find((entry) => entry.id === request.itemRowId);
+  if (!row) return [];
+  if (becomes === "nonmagical") {
+    const definition = user.definitionId ? deps.resolveDefinition(user.definitionId) : undefined;
+    return [
+      { kind: "effect", text: endItemMagic(user, row, "nonmagical", definition, deps.catalog), actorId: user.id }
+    ];
+  }
+  user.inventory = user.inventory.map((entry) =>
+    entry.id === row.id ? { ...entry, variantId: becomes.variantId } : entry
+  );
+  return [];
+}
+
 /** The stat blocks and counts this summon makes: rolled on its die, picked by its user, or its first row. */
 function plannedCreatures(request: SummonRequest, deps: SummonDeps, events: EffectNarration[], user: Actor): Planned[] {
   const { summon, choice } = request;
@@ -142,6 +174,7 @@ function plannedCreatures(request: SummonRequest, deps: SummonDeps, events: Effe
       text: `${user.name} rolls ${face} on the d${summon.die} for ${request.action.name}.`,
       actorId: user.id
     });
+    if (row?.itemBecomes) events.push(...itemBecomes(user, request, row.itemBecomes, deps));
     return row ? [plannedOf(row, summonCountAt(row, level, printed))] : [];
   }
   const picks = choice.picks ?? [];
@@ -328,7 +361,9 @@ function keepingEffect(
   const lasts =
     rounds !== undefined
       ? { type: "rounds" as const, rounds }
-      : (summon.lasts ?? (spell ? { type: "spell" as const } : { type: "untimed" as const }));
+      : request.lastsMinutes !== undefined
+        ? { type: "minutes" as const, minutes: request.lastsMinutes }
+        : (summon.lasts ?? (spell ? { type: "spell" as const } : { type: "untimed" as const }));
   const name = spell ? spell.name : request.action.name;
   const base = {
     name,
@@ -455,7 +490,9 @@ export function bringSummons(state: GameState, request: SummonRequest, deps: Sum
       ...(summon.dismiss ? { dismiss: summon.dismiss } : {}),
       ...(summon.deliversTouch !== undefined ? { deliversTouch: summon.deliversTouch } : {}),
       ...(summon.strikesFrom ? { strikesFrom: summon.strikesFrom } : {}),
-      ...(summon.endsSpell && request.castId !== null ? { endsSpell: request.castId } : {})
+      ...(summon.endsSpell && request.castId !== null ? { endsSpell: request.castId } : {}),
+      ...(request.waitAfter ? { waitAfter: request.waitAfter } : {}),
+      ...(request.itemEnd ? { itemEnd: request.itemEnd } : {})
     };
     const allegiance = entry.allegiance ?? summon.allegiance;
     if (allegiance === "user" && !trained)
@@ -654,6 +691,9 @@ export function retireSummoned(
   state.actors = state.actors.filter((candidate) => candidate.id !== actorId);
   pruneSummonDefinitions(state);
   if (!options.silent) events.push({ kind: "effect", text: `${actor.name} ${why}.`, actorId });
+  const waiting = actor.summon?.waitAfter;
+  const user = waiting ? state.actors.find((candidate) => candidate.id === actor.summon?.by) : undefined;
+  if (waiting && user) events.push(...startWaitAfter(state, actor, user, waiting));
   // Its spell ends with it (Arcane Hand at 0 Hit Points): its caster's Concentration on that cast.
   if (endsCast) {
     const holder = state.actors.find((candidate) =>
@@ -662,6 +702,44 @@ export function retireSummoned(
     const holding = holder?.effects.find((effect) => effect.castId === endsCast && effect.concentration);
     if (holder && holding) events.push(...endEffectIfPresent(state, holder.id, holding.id));
   }
+  return events;
+}
+
+/** A use that waits from when its creature leaves starts the wait once the last of them is gone (a figurine). One paid
+ *  in hours first gets back the whole hours its creature left unspent ("each hour or portion thereof ... costs 1
+ *  charge"), and waits only once none are left. */
+function startWaitAfter(
+  state: GameState,
+  creature: Actor,
+  user: Actor,
+  waiting: NonNullable<NonNullable<Actor["summon"]>["waitAfter"]>
+): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  const { key } = waiting;
+  if (waiting.hoursPool !== undefined && waiting.hoursPaid !== undefined) {
+    const keeping = creature.effects.find((effect) => effect.id === creature.summon?.keptBy);
+    // Whole hours unspent, with at least the hour it began charged.
+    const left =
+      keeping?.duration.type === "minutes"
+        ? Math.min(Math.floor(keeping.duration.remaining / 60), waiting.hoursPaid - 1)
+        : 0;
+    const spent = user.actionUses[key] ?? 0;
+    if (left > 0 && spent > 0) {
+      const { [key]: _old, ...others } = user.actionUses;
+      const now = Math.max(0, spent - left);
+      user.actionUses = now > 0 ? { ...others, [key]: now } : others;
+      events.push({
+        kind: "effect",
+        text: `${creature.name} has ${waiting.hoursPool - now} of its ${waiting.hoursPool} hours left.`,
+        actorId: user.id
+      });
+    }
+  }
+  const spent = user.actionUses[key] ?? 0;
+  const stillOut = state.actors.some((other) => other.summon?.by === user.id && other.summon.waitAfter?.key === key);
+  if (spent <= 0 || stillOut || (waiting.hoursPool !== undefined && spent < waiting.hoursPool)) return events;
+  const line = waitHours(state, user, key, waiting.name, waiting.hours);
+  if (line) events.push({ kind: "effect", text: line, actorId: user.id });
   return events;
 }
 
@@ -837,6 +915,8 @@ export function needsSummonSettling(
 export type SettleSummonDeps = Readonly<{
   distanceFeet: ((a: string, b: string) => number | null) | null;
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
+  /** The item catalog, so a creature's death can end the item that brought it. */
+  catalog?: EquipmentCatalog;
   /** Passes the turn on through the turn-change steps when a leaving creature holds it. */
   advance?: (state: GameState) => void;
 }>;
@@ -851,9 +931,22 @@ export function settleSummons(state: GameState, deps: SettleSummonDeps): EffectN
       .map((actor) => ({ actor, why: leavesBecause(state, actor, deps.distanceFeet) }))
       .find((entry) => entry.why !== null);
     if (!leaving) break;
+    const itemEnd = leaving.actor.summon?.itemEnd;
+    const dies = itemEnd !== undefined && leaving.actor.hp.current <= 0;
     events.push(
       ...retireSummoned(state, leaving.actor.id, leaving.why!, deps.advance ? { advance: deps.advance } : {})
     );
+    // Its death ends the item that brought it ("the staff then shatters and is destroyed").
+    const user = dies ? state.actors.find((candidate) => candidate.id === leaving.actor.summon?.by) : undefined;
+    const row = user?.inventory.find((entry) => entry.id === itemEnd?.itemId);
+    if (user && row && itemEnd && deps.catalog) {
+      const definition = user.definitionId ? deps.resolveDefinition?.(user.definitionId) : undefined;
+      events.push({
+        kind: "effect",
+        text: endItemMagic(user, row, itemEnd.outcome, definition, deps.catalog),
+        actorId: user.id
+      });
+    }
   }
   for (const actor of state.actors) {
     if (!commandLapsed(state, actor, deps.distanceFeet)) continue;

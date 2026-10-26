@@ -231,9 +231,10 @@ export function CharacterSheet({
   const restAsked = state?.rest?.requests.includes(actor.id) ?? false;
   const restOpen = state?.rest?.shortRest?.actorIds.includes(actor.id) ?? false;
   const session = useSessionRoll(state, actor.id);
+  // The latest check, or loose save, this sheet rolled, while it is still the character's latest roll.
   const canReroll =
-    rolls.lastCheck !== null &&
-    (state === undefined || rolls.lastCheck.rollId === session?.id) &&
+    ((rolls.lastCheck !== null && (state === undefined || rolls.lastCheck.rollId === session?.id)) ||
+      (rolls.lastSave !== null && state !== undefined && rolls.lastSave.rollId === session?.id)) &&
     (role === "gm" || inspired === true);
   const hitDice = "hitDice" in actor ? actor.hitDice : null;
   const constitution = definition ? abilityModifier(definition.abilityScores.con) : null;
@@ -381,8 +382,9 @@ export function CharacterSheet({
       }}
     />
   ) : null;
+  // The GM keeps a creature's gear too: a mount's saddle and barding.
   const gearBody =
-    actor.kind === "player-character" ? (
+    actor.kind === "player-character" || role === "gm" ? (
       <GearTab
         actor={actor}
         role={role}
@@ -621,6 +623,7 @@ export function CharacterSheet({
                 hitDice={hitDice}
                 constitution={constitution}
                 canSpend={role === "gm" || restOpen}
+                canReroll={role === "gm" || inspired === true}
                 onFeedback={say}
               />
             )}

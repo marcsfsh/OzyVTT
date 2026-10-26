@@ -286,6 +286,8 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
+    ...(action.vitality ? { vitality: { ...action.vitality } } : {}),
+    ...(action.areaHeal ? { areaHeal: { ...action.areaHeal } } : {}),
     // What it asks for as it resolves; a self grant that asks is aimed at no one, so the pick comes before the tap.
     ...(actionChoicesOf(action) ? { choices: actionChoicesOf(action)! } : {}),
     ...(actionChoicesOf(action) && action.grants?.target === "self" ? { targeting: "none" as const } : {}),
@@ -579,6 +581,26 @@ const featSummaryOf = (entry: FeatReference): ContentFeatSummary => ({
   feature: featureSummaryOf(entry.feature)
 });
 
+/** A container's printed limits, allow-listed for the catalog. */
+const containerSummary = (
+  container: NonNullable<EquipmentReference["container"]>
+): NonNullable<ContentEquipmentSummary["container"]> => ({
+  ...(container.capacityLb !== undefined ? { capacityLb: container.capacityLb } : {}),
+  ...(container.pieces ? { pieces: container.pieces.count } : {}),
+  ...(container.compartments
+    ? {
+        compartments: container.compartments.map((compartment) => ({
+          id: compartment.id,
+          name: compartment.name,
+          ...(compartment.capacityLb !== undefined ? { capacityLb: compartment.capacityLb } : {}),
+          ...(compartment.count !== undefined ? { count: compartment.count } : {})
+        }))
+      }
+    : {}),
+  ...(container.weighsLb !== undefined ? { weighsLb: container.weighsLb } : {}),
+  ...(container.retrieval ? { retrieval: container.retrieval } : {})
+});
+
 const nameBundleOf = (entry: ReturnType<typeof loadNames>[number]): ContentNameBundle => ({
   speciesId: entry.speciesId,
   source: entry.source,
@@ -711,7 +733,9 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
             ...(item.light.cone ? { cone: true as const } : {})
           }
         }
-      : {})
+      : {}),
+    // What a container holds, as its text prints it, for the sheet's load and compartments.
+    ...(item.container ? { container: containerSummary(item.container) } : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();

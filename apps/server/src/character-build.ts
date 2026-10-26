@@ -295,11 +295,17 @@ function builtHitRider(
   rider: FeatureHitRider,
   context: BuildContext
 ): NonNullable<ActorAction["ridesHit"]> {
-  const { saveDc, effectsChooseByLevel, ...rest } = rider;
+  const { saveDc, effectsChooseByLevel, appliesDaysPerLevel, ...rest } = rider;
   const rows = (effectsChooseByLevel ?? []).filter((row) => row.level <= context.level);
   const choose = rows.length > 0 ? Math.max(...rows.map((row) => row.choose)) : rest.effectsChoose;
+  // "Which last for a number of days equal to your Monk level", counted on the game clock.
+  const applies =
+    appliesDaysPerLevel && rest.applies
+      ? { applies: { ...rest.applies, duration: { type: "minutes" as const, minutes: context.level * 24 * 60 } } }
+      : {};
   return {
     ...rest,
+    ...applies,
     ...(saveDc !== undefined ? { saveDc: Math.max(1, Math.min(40, featureDc(feature, saveDc, context))) } : {}),
     ...(choose !== undefined ? { effectsChoose: choose } : {})
   };
@@ -315,8 +321,10 @@ function interpretAction(
     attack,
     save,
     damageByLevel,
+    damageDiceByAbility,
     multiattackByLevel,
     healingByLevel,
+    areaHealByLevel,
     adds,
     grantScaling,
     ridesHit,
@@ -372,13 +380,32 @@ function interpretAction(
     if (rows.length > 0)
       assembled.damage = [{ formula: rows[rows.length - 1].formula, type: rows[rows.length - 1].type }];
   }
+  // "A number of d8s equal to your Wisdom modifier (minimum of 1d8)" (Sear Undead), from its level.
+  if (damageDiceByAbility && damageDiceByAbility.level <= context.level) {
+    const count = Math.max(
+      damageDiceByAbility.minimum,
+      abilityModifier(context.finalScores[damageDiceByAbility.ability])
+    );
+    assembled.damage = [{ formula: `${count}${damageDiceByAbility.die}`, type: damageDiceByAbility.type }];
+  }
   const plan = (multiattackByLevel ?? []).filter((row) => row.level <= context.level).sort((a, b) => a.level - b.level);
   if (plan.length > 0) assembled.multiattack = plan[plan.length - 1].multiattack;
   const healingRows = (healingByLevel ?? [])
     .filter((row) => row.level <= context.level)
     .sort((left, right) => left.level - right.level);
-  if (healingRows.length > 0)
-    assembled.healing = { ...(action.healing ?? {}), formula: healingRows[healingRows.length - 1].formula };
+  if (healingRows.length > 0) {
+    const { formula, self, temporary } = healingRows[healingRows.length - 1];
+    assembled.healing = {
+      ...(action.healing ?? {}),
+      ...(self ? { self } : {}),
+      ...(temporary ? { temporary } : {}),
+      formula
+    };
+  }
+  const areaHealRows = (areaHealByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  if (areaHealRows.length > 0) assembled.areaHeal = { formula: areaHealRows[areaHealRows.length - 1].formula };
   // "1d10 plus your Fighter level", "add your Wisdom modifier": read off the character as it is built.
   if (adds) {
     const bonus =
@@ -673,7 +700,15 @@ function linkSpellActions(
       // effect, not the caster's.
       if (record.effect?.grant?.grantsLaterAction === later.name) continue;
       // An area that only changes the ground (Entangle's plants) is the server's alone, with nothing to take or roll.
-      if (later.activation === "other" && !later.save && later.damage.length === 0 && !later.attackRange) continue;
+      if (
+        later.activation === "other" &&
+        !later.save &&
+        later.damage.length === 0 &&
+        !later.attackRange &&
+        !later.movesArea &&
+        !later.cutsArea
+      )
+        continue;
       const action = laterSpellAction(
         record,
         later,

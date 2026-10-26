@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PendingSave, PlayerPendingReaction } from "@vtt/domain";
 
@@ -191,5 +191,25 @@ describe("another creature's roll waiting on an answer", () => {
     });
     expect(screen.getByRole("button", { name: "Use Deflect Attacks · -1d10 + 6" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Take 9" })).toBeTruthy();
+  });
+
+  it("sends the creature a reduction to 0 redirects the force at", async () => {
+    const user = userEvent.setup();
+    const orc = { actorId: "10000000-0000-4000-8000-0000000000aa", name: "Orc" };
+    mountReaction({
+      ...CUTTING_WORDS,
+      kind: "hit-by-attack",
+      actionId: "deflect-attacks",
+      actionName: "Deflect Attacks",
+      proposedDamage: 9,
+      proposedDamageParts: [{ amount: 9, type: "slashing" }],
+      damageResponse: { kind: "reduce", formula: "1d10 + 6" },
+      redirectChoices: [orc]
+    });
+    const force = within(screen.getByRole("group", { name: "Redirect the force at 0 damage" }));
+    expect(force.getByRole("button", { name: "No one" }).getAttribute("aria-pressed")).toBe("true");
+    await user.click(force.getByRole("button", { name: "Orc" }));
+    await user.click(screen.getByRole("button", { name: "Use Deflect Attacks · -1d10 + 6" }));
+    expect(sent("reaction:answer")).toEqual([{ reactionId: CUTTING_WORDS.id, use: true, redirectTo: orc.actorId }]);
   });
 });

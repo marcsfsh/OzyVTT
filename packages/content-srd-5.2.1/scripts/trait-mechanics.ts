@@ -387,6 +387,20 @@ function engulfsEntrants(trait: Trait): TraitMechanic | null {
     : null;
 }
 
+/** "A spellcaster who wears the guardian's amulet can cause the guardian to store one spell of level 4 or lower." */
+function spellStoring(trait: Trait): TraitMechanic | null {
+  const match = /\bcan cause the [\w -]+? to store one spell of level (\d) or lower\b/.exec(trait.description);
+  return match ? { kind: "spell-storing", name: trait.name, maxLevel: Number(match[1]) } : null;
+}
+
+/** "The ground in a 10-foot Emanation originating from the mouther is Difficult Terrain." */
+function difficultGround(trait: Trait): TraitMechanic | null {
+  const match = /^The ground in a (\d+)-foot Emanation originating from the [\w -]+? is Difficult Terrain\.$/.exec(
+    trait.description
+  );
+  return match ? { kind: "difficult-ground", name: trait.name, rangeFeet: Number(match[1]) } : null;
+}
+
 /** The key a creature's pick is stored under: the trait's name as a slug ("Draconic Origin": draconic-origin). */
 export const pickKeyOf = (name: string) =>
   name
@@ -421,6 +435,7 @@ function skillPick(trait: Trait): TraitMechanic | null {
 }
 
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
+  spellStoring,
   damageTypePick,
   skillPick,
   regeneration,
@@ -438,7 +453,8 @@ const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   absorption,
   damageWeakens,
   blurredForm,
-  engulfsEntrants
+  engulfsEntrants,
+  difficultGround
 ];
 
 /** "Nonmagical ammunition is destroyed immediately after hitting the pudding ... Any nonmagical weapon takes a

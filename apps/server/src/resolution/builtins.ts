@@ -1,4 +1,4 @@
-import { d20Count, d20FacesFor, otherDiceOf, type AggregatedRollMode } from "@vtt/rules-5e";
+import { d20Count, d20FacesFor, effectiveSlot, otherDiceOf, type AggregatedRollMode } from "@vtt/rules-5e";
 import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
@@ -26,6 +26,7 @@ import { builtinBaseId, END_EFFECT_ID } from "../builtin-actions.js";
 import {
   addEffect,
   endEffect,
+  endEffectIfPresent,
   ESCAPE_ATHLETICS_TAG,
   ESCAPE_DISADVANTAGE_TAG,
   makeEffect,
@@ -33,11 +34,12 @@ import {
 } from "../effects.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
-import { endingOptions } from "../ending-actions.js";
-import { openEndingSave } from "../save-stages.js";
-import { applyDamageDetailed } from "../hit-points.js";
-import { rollPlain } from "./hit-rider-outcomes.js";
+import { endAnEffect, isNamedEnding, namedEnding } from "./endings.js";
 import { CommandRejectedError } from "../game-store.js";
+import { touchBead } from "../zone-touch.js";
+import { holdsTalisman, SPHERE_CONTROL_TAG } from "../zone-sphere.js";
+import { liveZones } from "../spell-zones.js";
+import { zoneContentOf } from "../spell-zone-state.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
 import {
   abilityModifier,
@@ -86,9 +88,11 @@ export function rollCheck(
   stakes: readonly string[] = [],
   versus?: CheckVersus,
   /** A Disadvantage the check's own rule gives it, by name (escaping a mimic's grip). */
-  disadvantage?: string
+  disadvantage?: string,
+  /** An Advantage the check's own rule gives it, by name (a Talisman of the Sphere). */
+  advantage?: string
 ): boolean | null {
-  return rolledCheck(ctx, subject, dc, label, stakes, versus, disadvantage).success;
+  return rolledCheck(ctx, subject, dc, label, stakes, versus, disadvantage, advantage).success;
 }
 
 /** A check `rollCheck` made: its outcome, its plan's context, the dice it threw and the mode they were thrown under. */
@@ -107,7 +111,8 @@ function rolledCheck(
   label?: string,
   stakes: readonly string[] = [],
   versus?: CheckVersus,
-  disadvantage?: string
+  disadvantage?: string,
+  advantage?: string
 ): RolledCheck {
   // A Help an earlier check used ends before this one is planned.
   const helpEnded = endUsedHelp(ctx.state, ctx.attacker);
@@ -135,13 +140,21 @@ function rolledCheck(
     )
   });
   const forced = label === undefined ? (ctx.input.rollMode ?? undefined) : undefined;
+  const advantages = advantage === undefined ? plan.rollMode.advantage : [...plan.rollMode.advantage, advantage];
+  const disadvantages =
+    disadvantage === undefined ? plan.rollMode.disadvantage : [...plan.rollMode.disadvantage, disadvantage];
   const rollMode =
-    disadvantage === undefined
+    disadvantage === undefined && advantage === undefined
       ? plan.rollMode
       : {
-          mode: plan.rollMode.advantage.length > 0 ? ("normal" as const) : ("disadvantage" as const),
-          advantage: plan.rollMode.advantage,
-          disadvantage: [...plan.rollMode.disadvantage, disadvantage]
+          mode:
+            advantages.length > 0 && disadvantages.length > 0
+              ? ("normal" as const)
+              : advantages.length > 0
+                ? ("advantage" as const)
+                : ("disadvantage" as const),
+          advantage: advantages,
+          disadvantage: disadvantages
         };
   const mode = forced ?? rollMode.mode;
   ctx.rollMode = shownRollMode(rollMode, forced);
@@ -468,73 +481,6 @@ function escapeGrapple(ctx: ResolveContext): void {
   }
 }
 
-/**
- * End an Effect: the action an effect's text prints to end it, on the one creature targeted (the user itself when none
- * is). Repeating a save by action opens that save (a success ends it, as any repeat does); a check must succeed, and
- * the creature that succeeds takes what the text deals it (a gelatinous cube's acid); an action alone ends it (waking a
- * sleeper).
- */
-function endAnEffect(ctx: ResolveContext): void {
-  const { state, attacker, input, deps } = ctx;
-  const bearer = ctx.targets[0] ?? attacker;
-  const options = endingOptions(attacker, bearer, deps.distanceFeet);
-  const chosen = input.effectId ? options.find((option) => option.effect.id === input.effectId) : options[0];
-  if (!chosen)
-    throw new CommandRejectedError(
-      bearer.id === attacker.id
-        ? `${attacker.name} has no effect it can end with an action.`
-        : `${bearer.name} has no effect ${attacker.name} can end from where it stands.`
-    );
-  const { effect } = chosen;
-  if (chosen.kind === "repeat") {
-    const line = openEndingSave(state, bearer, effect, effect.repeatSave!, "repeats", {
-      newId: deps.newRollId,
-      now: deps.now,
-      rollDie: deps.random
-    });
-    ctx.tableNarration.push(tableLineOf(ctx, line));
-    return;
-  }
-  const ended = effect.endedBy!;
-  if (ended.check) {
-    const subject: CheckSubject = {
-      ability: ended.check.ability,
-      ...(ended.check.skill !== undefined ? { skill: ended.check.skill } : {})
-    };
-    if (rollCheck(ctx, subject, ended.check.dc ?? null, `${ended.name}: check`) !== true) return;
-  }
-  endEffect(state, bearer.id, effect.id);
-  ctx.effectsEnded.push(endedEffect(bearer, effect));
-  ctx.tableNarration.push({
-    kind: "effect",
-    text: `${attacker.name} ends ${effect.name} on ${bearer.name} (${ended.name}).`,
-    actorIds: [attacker.id, bearer.id]
-  });
-  // "The puller takes 10 (3d6) Acid damage."
-  for (const part of ended.takerDamage ?? []) {
-    const rolled = rollPlain(ctx, part.formula, part.type, ended.name);
-    const { application, events } = applyDamageDetailed(
-      state,
-      attacker.id,
-      { amount: rolled.amount, parts: [rolled], sourceName: effect.sourceName ?? effect.name },
-      { role: "gm" },
-      {
-        resolveDefinition: deps.resolveDefinition ?? (() => undefined),
-        newId: deps.newRollId,
-        now: deps.now,
-        rollDie: deps.random,
-        ...(deps.catalog ? { catalog: deps.catalog } : {})
-      }
-    );
-    ctx.tableNarration.push({
-      kind: "effect",
-      text: `${attacker.name} takes ${application.totalApplied} ${part.type[0]!.toUpperCase()}${part.type.slice(1)} damage (${ended.name}).`,
-      actorIds: [attacker.id]
-    });
-    for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
-  }
-}
-
 /** SRD Burning: rolling on the ground puts out the fire on yourself, and leaves you Prone. */
 function rollOnTheGround(ctx: ResolveContext): void {
   const { state, attacker, deps } = ctx;
@@ -606,6 +552,87 @@ function shakeAwake(ctx: ResolveContext): void {
   }
 }
 
+/** Taking control of a Sphere of Annihilation within 60 feet (`zone-sphere.ts`): the DC 25 Intelligence (Arcana) check,
+ *  with Advantage from a Talisman of the Sphere. A success holds it until the start of the creature's next turn; a
+ *  failure draws it 10 feet toward the creature. */
+function controlSphere(ctx: ResolveContext): void {
+  const { state, attacker, deps } = ctx;
+  const sphere = liveZones(state)
+    .flatMap((zone) => {
+      const controlled = zoneContentOf(zone, deps.catalog)?.trigger.controlled;
+      const feet = controlled ? (deps.zoneFeet?.(attacker.id, zone.id) ?? null) : null;
+      return controlled && (feet === null || feet <= controlled.withinFeet + DISTANCE_TOLERANCE_FEET)
+        ? [{ zone, controlled, feet: feet ?? 0 }]
+        : [];
+    })
+    .sort((a, b) => a.feet - b.feet)[0];
+  if (!sphere) throw new CommandRejectedError("There is no Sphere of Annihilation within 60 feet to control.");
+  const { zone, controlled } = sphere;
+  const success = rollCheck(
+    ctx,
+    { ability: "int", skill: "arcana" },
+    controlled.dc,
+    `${zone.name}: control`,
+    [],
+    undefined,
+    undefined,
+    holdsTalisman(attacker) ? "Talisman of the Sphere" : undefined
+  );
+  if (success === true) {
+    // "If it was under another creature's control, that creature loses control of the sphere."
+    const previous = zone.controllerId;
+    if (previous !== undefined) endEffectIfPresent(state, previous, `${zone.id}:control:${previous}`);
+    zone.controllerId = attacker.id;
+    addEffect(
+      state,
+      attacker.id,
+      makeEffect({
+        id: `${zone.id}:control:${attacker.id}`,
+        name: `In control of ${zone.name}`,
+        tags: [SPHERE_CONTROL_TAG],
+        sourceActorId: attacker.id,
+        sourceName: attacker.name,
+        startedRound: state.combat.round,
+        duration: { type: "until-source-next-turn" }
+      })
+    );
+    ctx.tableNarration.push({
+      kind: "effect",
+      text: `${attacker.name} takes control of ${zone.name}.`,
+      actorIds: [attacker.id]
+    });
+  } else if (success === false)
+    for (const event of deps.moveZone?.(zone.id, attacker.id, controlled.pullFeet) ?? [])
+      ctx.tableNarration.push(tableLineOf(ctx, event));
+}
+
+/** Moving a Sphere of Annihilation its user controls toward the creature it names: a Bonus Action's 5 feet for each
+ *  point of its Intelligence modifier (minimum 5), or with a Talisman of the Sphere, having started its turn in
+ *  control, a Magic action's 10 feet plus 10 for each point. */
+function moveSphere(far: boolean) {
+  return (ctx: ResolveContext): void => {
+    const { state, attacker, targets, deps } = ctx;
+    const zone = liveZones(state).find(
+      (candidate) =>
+        (far ? candidate.heldAtTurnStart : candidate.controllerId) === attacker.id &&
+        zoneContentOf(candidate, deps.catalog)?.trigger.controlled !== undefined
+    );
+    if (far && !holdsTalisman(attacker))
+      throw new CommandRejectedError("Only a creature holding a Talisman of the Sphere moves a sphere this way.");
+    if (!zone)
+      throw new CommandRejectedError(
+        far
+          ? `${attacker.name} didn't start this turn in control of a Sphere of Annihilation.`
+          : `${attacker.name} isn't in control of a Sphere of Annihilation.`
+      );
+    if (targets.length !== 1) throw new CommandRejectedError("Choose the creature to move the sphere toward.");
+    const intelligence = abilityModifier(deps.definition, "int");
+    const feet = far ? 10 + 10 * Math.max(0, intelligence) : Math.max(5, 5 * intelligence);
+    for (const event of deps.moveZone?.(zone.id, targets[0]!.id, feet) ?? [])
+      ctx.tableNarration.push(tableLineOf(ctx, event));
+  };
+}
+
 /** An effect's natural weapon for the Unarmed Strike (Alter Self): its die and type, and the ability it uses "rather
  *  than using Strength". */
 function naturalWeaponOf(
@@ -621,51 +648,93 @@ function naturalWeaponOf(
   };
 }
 
-/** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. */
-const unarmedDc = (definition: ActorDefinition | undefined): number =>
-  Math.max(1, 8 + abilityModifier(definition, "str") + (definition?.proficiencyBonus ?? 0));
+/** SRD Martial Arts holds while the Monk wears no armor and wields no Shield. */
+function martialArtsHolds(attacker: ResolveContext["attacker"], definition: ActorDefinition | undefined): boolean {
+  if (definition?.character?.martialArts === undefined) return false;
+  return !attacker.inventory.some(
+    (row) =>
+      row.equipped &&
+      row.quantity > 0 &&
+      row.armor !== undefined &&
+      ["armor", "shield"].includes(effectiveSlot({ slot: row.magic?.slot, category: row.category }))
+  );
+}
+
+/** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. Martial Arts: "you can use your
+ *  Dexterity modifier instead of your Strength modifier to determine the save DC". */
+function unarmedDc(attacker: ResolveContext["attacker"], definition: ActorDefinition | undefined): number {
+  const ability = martialArtsHolds(attacker, definition)
+    ? Math.max(abilityModifier(definition, "str"), abilityModifier(definition, "dex"))
+    : abilityModifier(definition, "str");
+  return Math.max(1, 8 + ability + (definition?.proficiencyBonus ?? 0));
+}
+
+/** An improvised attack's numbers: the Strength modifier to hit and on 1d4 damage, within 5 feet or at 20/60 feet. */
+function improvised(form: "melee" | "thrown") {
+  return ({ action, deps, input }: ResolveContext): DefinitionAction => {
+    const modifier = abilityModifier(deps.definition, "str");
+    const formula = modifier === 0 ? "1d4" : `1d4 ${modifier > 0 ? "+" : "-"} ${Math.abs(modifier)}`;
+    return {
+      ...action,
+      attack: { bonus: modifier, ...(form === "melee" ? { reachFeet: 5 } : { rangeFeet: 60, rangeNormalFeet: 20 }) },
+      damage: [{ formula, type: input.damageType ?? action.damageTypes?.[0] ?? "bludgeoning" }]
+    };
+  };
+}
 
 /** SRD Unarmed Strike Grapple/Shove: the target saves with its better of STR and DEX against the unarmed
- *  DC. A failed save is Grappled (escape DC = that DC), Prone, or a 5-foot push the GM moves. */
+ *  DC. A failed save is Grappled (escape DC = that DC), Prone, or a 5-foot push straight away from the shover. */
 function unarmedSave(failure: "grappled" | "prone" | "pushed") {
   return (ctx: ResolveContext): void => {
-    const { state, action, attacker, targets, deps } = ctx;
-    if (targets.length !== 1) throw new CommandRejectedError("Choose exactly one target.");
-    const target = targets[0];
-    const dc = unarmedDc(deps.definition);
-    const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
-    const ability: "str" | "dex" =
-      saveModifierFor(targetDefinition, "dex") >= saveModifierFor(targetDefinition, "str") ? "dex" : "str";
-    createPendingSaves(state, {
-      sourceActorId: attacker.id,
-      sourceName: attacker.name,
-      actionName: action.name,
-      ability,
-      dc,
-      targetIds: [target.id],
-      proposedDamage: 0,
-      halfOnSuccess: false,
-      conditionIds: failure === "prone" ? ["prone"] : [],
-      ...(failure === "grappled"
-        ? {
-            onFailEffect: {
-              name: `Grappled by ${attacker.name}`,
-              tags: ["grapple"],
-              linkedConditionIds: ["grappled"],
-              escapeDc: dc,
-              sourceActorId: attacker.id,
-              sourceName: attacker.name,
-              endsWhenSourceDefeated: true,
-              rangeFeet: 5
-            }
-          }
-        : {}),
-      newSaveId: deps.newRollId,
-      createdAt: Date.parse(deps.now())
-    });
-    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet. Move the token.`);
-    ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
+    if (ctx.targets.length !== 1) throw new CommandRejectedError("Choose exactly one target.");
+    openUnarmedSave(ctx, failure, ctx.action.name);
   };
+}
+
+/** The save an Unarmed Strike's Grapple or Shove opens on the one target, named `actionName` (Punch and Grab opens the
+ *  Grapple on a Damage hit). */
+export function openUnarmedSave(
+  ctx: ResolveContext,
+  failure: "grappled" | "prone" | "pushed",
+  actionName: string
+): void {
+  const { state, attacker, targets, deps } = ctx;
+  const action = { name: actionName };
+  const target = targets[0]!;
+  const dc = unarmedDc(attacker, deps.definition);
+  const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
+  const ability: "str" | "dex" =
+    saveModifierFor(targetDefinition, "dex") >= saveModifierFor(targetDefinition, "str") ? "dex" : "str";
+  createPendingSaves(state, {
+    sourceActorId: attacker.id,
+    sourceName: attacker.name,
+    actionName: action.name,
+    ability,
+    dc,
+    targetIds: [target.id],
+    proposedDamage: 0,
+    halfOnSuccess: false,
+    conditionIds: failure === "prone" ? ["prone"] : [],
+    ...(failure === "grappled"
+      ? {
+          onFailEffect: {
+            name: `Grappled by ${attacker.name}`,
+            tags: ["grapple"],
+            linkedConditionIds: ["grappled"],
+            escapeDc: dc,
+            sourceActorId: attacker.id,
+            sourceName: attacker.name,
+            endsWhenSourceDefeated: true,
+            rangeFeet: 5
+          }
+        }
+      : {}),
+    // "You push it 5 feet away", straight away from the shover, on the live map.
+    ...(failure === "pushed" ? { failurePush: { feet: 5 } } : {}),
+    newSaveId: deps.newRollId,
+    createdAt: Date.parse(deps.now())
+  });
+  ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
 }
 
 const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
@@ -678,6 +747,10 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   "end-an-effect": { check: endAnEffect },
   [END_EFFECT_ID]: { check: endOwnEffect },
   "shake-awake": { apply: shakeAwake },
+  "touch-bead": { apply: touchBead },
+  "control-sphere": { check: controlSphere },
+  "move-sphere": { apply: moveSphere(false) },
+  "move-sphere-far": { apply: moveSphere(true) },
 
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
    *  as a Bonus Action brings its own numbers, which stand. */
@@ -711,6 +784,9 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
       });
     }
   },
+  /** SRD Improvised Weapons: Strength to hit with no Proficiency Bonus, 1d4 plus Strength of the picked type. */
+  "improvised-weapon": { prepare: improvised("melee") },
+  "improvised-weapon-thrown": { prepare: improvised("thrown") },
   "unarmed-grapple": { forcedSave: unarmedSave("grappled"), atMostOneSizeLarger: true },
   "unarmed-shove-prone": { forcedSave: unarmedSave("prone"), atMostOneSizeLarger: true },
   "unarmed-shove-push": { forcedSave: unarmedSave("pushed"), atMostOneSizeLarger: true },
@@ -732,6 +808,7 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
 /** The special cases for a builtin action id, or undefined when it has none. A Bonus Action form ("hide-bonus") has
  *  its generic action's. */
 export function builtinHandlerFor(actionId: string): BuiltinHandler | undefined {
+  if (isNamedEnding(actionId)) return { check: namedEnding };
   const id = builtinBaseId(actionId);
   return Object.hasOwn(BUILTIN_HANDLERS, id) ? BUILTIN_HANDLERS[id] : undefined;
 }

@@ -1,3 +1,4 @@
+import { reactionSpent } from "./commanded-reactions.js";
 import { formEffectOf } from "./transform/forms.js";
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
@@ -25,13 +26,15 @@ import { areEnemies } from "./creature-sides.js";
 import { burrowsThroughWalls, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
 import { effectiveActions } from "./effective-actions.js";
 import {
+  endEffect,
   NO_OPPORTUNITY_ATTACKS_TAG,
   NO_REACTIONS_TAG,
   NO_TELEPORT_TAG,
   READIED_TAG,
-  releaseReadied
+  releaseReadied,
+  type EffectNarration
 } from "./effects.js";
-import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { jumpLimits, leapRider } from "./jumping.js";
 import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
@@ -234,7 +237,7 @@ export function movementStatus(
     ...(openingPassage(definition) ? { opening: openingPassage(definition)! } : {}),
     ...(burrowsThroughWalls(definition) ? { burrowsThroughWalls: burrowsThroughWalls(definition)! } : {}),
     ...(actor && isEthereal(actor) ? { ethereal: true } : {}),
-    ...(actor && freeOfDifficultTerrain(actor) ? { ignoresDifficultTerrain: true } : {})
+    ...(actor && freeOfDifficultTerrain(actor, derivation ?? undefined) ? { ignoresDifficultTerrain: true } : {})
   };
 }
 
@@ -258,6 +261,31 @@ function grantsOf(state: GameState, actor: GameState["actors"][number] | undefin
   };
 }
 
+/** On a willing ally a Monk's Step of the Wind carries (Heightened Focus): "You move the creature with you until the end
+ *  of your turn. The creature's movement doesn't provoke Opportunity Attacks." */
+export const CARRIED_ALONG_TAG = "carried-along";
+
+/** The creatures `moverId` carries along on its own turn (Heightened Focus), which its moves take with it. */
+export function carriedAlongBy(state: GameState, moverId: string): readonly string[] {
+  if (state.combat.turnActorId !== moverId) return [];
+  return state.actors
+    .filter((actor) =>
+      actor.effects.some((effect) => effect.tags.includes(CARRIED_ALONG_TAG) && effect.sourceActorId === moverId)
+    )
+    .map((actor) => actor.id);
+}
+
+/** "Until the end of your turn": what the creature carried ends as its turn does. */
+export function setDownCarried(state: GameState, actorId: string): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors)
+    for (const effect of actor.effects.filter(
+      (candidate) => candidate.tags.includes(CARRIED_ALONG_TAG) && candidate.sourceActorId === actorId
+    ))
+      events.push(...endEffect(state, actor.id, effect.id));
+  return events;
+}
+
 /** The creatures a grappler holds (its `grapple` effects on them). */
 export function grappledBy(state: GameState, grapplerId: string): readonly string[] {
   return state.actors
@@ -273,7 +301,7 @@ export const CARRIED_FREE_TAG = "carried-free";
 
 /** SRD Grappled: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot
  *  unless you are Tiny or two or more sizes smaller than it." A bugbear's Abduct: it "needn't spend extra movement to
- *  move a creature it is grappling". */
+ *  move a creature it is grappling", and Grappler's Fast Wrestler waives it for a creature its size or smaller. */
 export function dragCostsExtra(
   state: GameState,
   grapplerId: string,
@@ -291,8 +319,12 @@ export function dragCostsExtra(
       .find((actor) => actor.id === actorId)
       ?.effects.some((effect) => effect.sourceActorId === grapplerId && effect.tags.includes(CARRIED_FREE_TAG)) ===
     true;
+  // Grappler's Fast Wrestler: no extra movement "to move a creature Grappled by you if the creature is your size or
+  // smaller".
+  const wrestler = holdsFeature(definition, "grappler", "Grappler");
   return grappledIds.some((actorId) => {
     const size = state.actors.find((actor) => actor.id === actorId)?.size ?? "medium";
+    if (wrestler && rank(actorId) <= rank(grapplerId)) return false;
     return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2 && !carriedFree(actorId);
   });
 }
@@ -536,6 +568,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       `${mover.name} is Frightened and can't willingly move closer to ${feared}.`,
       outcome
     );
+  // SRD Climber's Kit: "you can't move more than 25 feet from there without undoing the anchor".
+  const tether = (counted || input.byPlayer || grant) && strainsAnchor(input, mover, to);
+  if (tether) police(state, input, "movement.tether", tether, outcome);
   // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
   const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
   // Etherealness: "you can move in any direction".
@@ -811,6 +846,18 @@ function chargeTeleport(
   state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + costFeet } };
 }
 
+/** Why a move takes an anchored creature too far from its anchor, or null. Height counts as distance does. */
+function strainsAnchor(input: MovementRulesInput, mover: GameState["actors"][number], to: Point): string | null {
+  const anchored = mover.effects.find((effect) => effect.anchor !== undefined);
+  const anchor = anchored?.anchor;
+  if (!anchor) return null;
+  const across = input.distance({ x: anchor.x, y: anchor.y }, to);
+  if (across === null) return null;
+  const up = Math.abs((input.toAltitudeFeet ?? input.fromAltitudeFeet ?? 0) - anchor.altitudeFeet);
+  if (Math.max(across, up) <= anchor.feet + DISTANCE_TOLERANCE_FEET) return null;
+  return `${mover.name} is anchored (${anchored.name}) and can't move more than ${anchor.feet} feet from the anchor. Undo the anchor first.`;
+}
+
 /** A readied move spends the creature's Reaction and uses up the ready, and a spell it held with it. */
 function spendReadied(state: GameState, moverId: string): void {
   state.combat = { ...state.combat, reactionsUsed: [...new Set([...state.combat.reactionsUsed, moverId])] };
@@ -824,9 +871,14 @@ const moverDefinitionOf = (mover: GameState["actors"][number], input: Pick<Movem
 const incorporeal = (definition: ActorDefinition | undefined) =>
   holdsFeature(definition, "incorporeal-movement", "Incorporeal Movement");
 
-/** Freedom of Movement: "The target's movement is unaffected by Difficult Terrain." */
-const freeOfDifficultTerrain = (mover: GameState["actors"][number]) =>
-  mover.effects.some((effect) => effect.tags.includes("freedom-of-movement"));
+/** The tags that free a mover from Difficult Terrain: Freedom of Movement's ("The target's movement is unaffected by
+ *  Difficult Terrain", a Ring of Free Action's too) and a creature that otherwise ignores it (Horseshoes of a Zephyr). */
+const DIFFICULT_TERRAIN_FREE_TAGS: readonly string[] = ["freedom-of-movement", "ignores-difficult-terrain"];
+
+/** Whether a live effect or a worn item's own effect frees the mover from Difficult Terrain. */
+const freeOfDifficultTerrain = (mover: GameState["actors"][number], derivation: EquipmentDerivation | undefined) =>
+  mover.effects.some((effect) => effect.tags.some((tag) => DIFFICULT_TERRAIN_FREE_TAGS.includes(tag))) ||
+  (derivation?.context.effectTags ?? []).some((tag) => DIFFICULT_TERRAIN_FREE_TAGS.includes(tag));
 
 /** What each foot of a move costs beside itself, and the options the path's cost is measured with. */
 function costOptions(
@@ -862,7 +914,7 @@ function costOptions(
         : {}),
       // Amorphous, Compression and the elementals' forms slip through any gap; a swarm through one a Tiny creature fits.
       ...(openingPassage(moverDefinition) ? { opening: openingPassage(moverDefinition)! } : {}),
-      ...(freeOfDifficultTerrain(mover) ? { ignoresDifficult: true } : {}),
+      ...(freeOfDifficultTerrain(mover, derivation) ? { ignoresDifficult: true } : {}),
       ...(fromAltitude !== 0 || toAltitude !== 0 ? { altitude: { fromFeet: fromAltitude, toFeet: toAltitude } } : {})
     }
   };
@@ -1010,7 +1062,7 @@ function openOpportunityAttacks(
       !enemy ||
       onOtherPlanes(mover, enemy) ||
       !areEnemies(mover, enemy, input.resolveDefinition) ||
-      state.combat.reactionsUsed.includes(enemy.id) ||
+      reactionSpent(state, enemy.id) ||
       isIncapacitated(enemy) ||
       // Shocking Grasp, or anything that takes away Reactions.
       enemy.effects.some(

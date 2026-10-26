@@ -37,7 +37,10 @@ export function giveHeroicInspiration(
   if (!recipient || recipient.kind !== "player-character" || recipient.archived || recipient.visibility !== "public")
     throw new CommandRejectedError("Heroic Inspiration goes to a player character in the party.");
   if (recipient.id === giver.id) throw new CommandRejectedError(`${giver.name} already has Heroic Inspiration.`);
-  if (recipient.heroicInspiration)
+  // A player who can't see the party's resources isn't told whether the recipient holds one: the gift goes, and one
+  // given to a holder is lost, as any excess is (SRD).
+  const seesResources = initiator.role === "gm" || state.partyVisibility === "sheet-and-resources";
+  if (recipient.heroicInspiration && seesResources)
     throw new CommandRejectedError(
       `${recipient.name} already has Heroic Inspiration. Give it to a player character who has none, or let it go.`
     );

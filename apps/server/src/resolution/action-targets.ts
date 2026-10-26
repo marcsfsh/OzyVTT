@@ -14,6 +14,7 @@ import { enteredOnMoveOf } from "../granted-moves.js";
 import { specialSpeedsOf } from "../speed.js";
 import type { RuleId } from "../rules-families.js";
 import { endedEffect, sizeAtMost, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
+import { dealt } from "./dealings.js";
 
 /**
  * Who an action without a spell may target, checked on the server as `spellTargetViolations` checks a spell (SRD
@@ -35,6 +36,41 @@ type TargetCheck = Readonly<{
   catalog?: EquipmentCatalog | undefined;
 }>;
 
+/** An action's Sphere centred on a point within its range (Land's Aid: "a point within 60 feet of yourself"): the
+ *  creatures picked in it stand within that range plus its radius, and no two farther apart than it is wide. A spell's
+ *  area is checked against the spell's range (`spell-targets.ts`). */
+function areaRangeViolations(
+  check: TargetCheck,
+  targets: readonly LiveActor[],
+  nameOf: (target: LiveActor) => string
+): Violation[] {
+  const { action, attacker, distanceFeet } = check;
+  const area = action.area;
+  if (!area?.rangeFeet || action.spellId !== undefined || !distanceFeet) return [];
+  if (area.shape !== "sphere" && area.shape !== "cylinder") return [];
+  const violations: Violation[] = [];
+  const reach = area.rangeFeet + area.sizeFeet;
+  for (const target of targets) {
+    const apart = target.id === attacker.id ? 0 : distanceFeet(attacker.id, target.id);
+    if (apart !== null && apart > reach + DISTANCE_TOLERANCE_FEET)
+      violations.push({
+        rule: "range.out-of-range",
+        message: `${nameOf(target)} is ${Math.round(apart)} ft away, beyond the ${area.sizeFeet}-foot ${area.shape} ${action.name} centres within ${area.rangeFeet} ft.`
+      });
+  }
+  for (const [index, first] of targets.entries())
+    for (const second of targets.slice(index + 1)) {
+      const apart = distanceFeet(first.id, second.id);
+      if (apart === null || apart <= area.sizeFeet * 2 + DISTANCE_TOLERANCE_FEET) continue;
+      violations.push({
+        rule: "target.outside-area",
+        message: `${nameOf(first)} and ${nameOf(second)} are ${Math.round(apart)} ft apart, too far for one ${area.sizeFeet}-foot ${area.shape} of ${action.name}.`
+      });
+      return violations;
+    }
+  return violations;
+}
+
 const words = (types: readonly string[]) =>
   types.map((type) => `${type[0]!.toUpperCase()}${type.slice(1)}`).join(" or ");
 
@@ -48,6 +84,34 @@ export function targetCountOf(action: DefinitionAction, definition: ActorDefinit
   const oneHeal =
     action.healing !== undefined && !action.healing.divided && !action.healing.self && action.spellId === undefined;
   return oneHeal ? 1 : null;
+}
+
+/**
+ * SRD Superior Hunter's Prey: "when you deal damage to a creature marked by your Hunter's Mark, you can also deal that
+ * spell's extra damage to a different creature that you can see within 30 feet of the first creature". Why `target`
+ * doesn't fit, or null when it does; a distance the map can't measure is the user's to vouch for.
+ */
+function nearMarkRefusal(
+  state: GameState,
+  attacker: LiveActor,
+  target: LiveActor,
+  near: NonNullable<NonNullable<DefinitionAction["targets"]>["nearMark"]>,
+  distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
+  nameOf: (target: LiveActor) => string
+): string | null {
+  const marked = state.actors.filter((candidate) =>
+    candidate.effects.some((effect) => effect.sourceActorId === attacker.id && effect.tags.includes(near.tag))
+  );
+  const damaged = marked.filter((creature) => dealt(state, attacker.id, "damaged", creature.id));
+  if (damaged.length === 0) return `${attacker.name} hasn't dealt damage to a creature it marks this turn.`;
+  if (damaged.some((creature) => creature.id === target.id) && damaged.length === 1)
+    return `it reaches a different creature than the marked one.`;
+  const near_ = damaged.some((creature) => {
+    if (creature.id === target.id) return false;
+    const apart = distanceFeet?.(creature.id, target.id) ?? null;
+    return apart === null || apart <= near.feet + DISTANCE_TOLERANCE_FEET;
+  });
+  return near_ ? null : `${nameOf(target)} isn't within ${near.feet} feet of the marked creature.`;
 }
 
 /** Every refusal the action's own targeting rules raise for these targets. */
@@ -67,6 +131,7 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
       rule: "target.too-many",
       message: `${action.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}; ${unique.length} were chosen.`
     });
+  violations.push(...areaRangeViolations(check, targets, nameOf));
   const rules = action.targets;
   if (!rules) return violations;
   // "A creature you can see": the map with its vision on, else the conditions and the senses by distance.
@@ -201,6 +266,10 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} needs a creature that can see or hear ${attacker.name}, and ${name} can do neither.`
       });
+    if (rules.nearMark) {
+      const refusal = nearMarkRefusal(state, attacker, target, rules.nearMark, distanceFeet, nameOf);
+      if (refusal) violations.push({ rule: "target.not-allowed", message: `${action.name}: ${refusal}` });
+    }
     if (rules.markedBy && !markedBy(target, attacker, rules.markedBy))
       violations.push({
         rule: "target.not-allowed",

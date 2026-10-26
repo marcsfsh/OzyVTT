@@ -25,6 +25,8 @@ export type TargetingTemplate = Readonly<{
   /** How many areas one use places (Fire Storm's ten Cubes), and the ones already set down beside the one moving. */
   count?: number;
   others?: ReadonlyArray<Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>>;
+  /** A Line that stops where it is aimed, never past `sizeFeet` (a Javelin of Lightning's bolt). */
+  toTarget?: true;
 }>;
 export type TargetingSession = Readonly<
   {
@@ -50,6 +52,11 @@ export type TargetingSession = Readonly<
     skill?: string;
     /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
     ability?: AbilityId;
+    /** Who a cantrip's Temporary Hit Points go to once its damage lands (Improved Potent Spellcasting); absent, the
+     *  caster. */
+    vitalityTo?: string;
+    /** Who regains an area's healing (Land's Aid); absent, nobody. */
+    aidTo?: string;
     /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
     conditionId?: string;
     /** The option picked for an action that offers several (Fire Shield's warm or chill); it starts on the first. */
@@ -137,6 +144,43 @@ const subscribe = (listener: () => void) => {
   };
 };
 
+/** The template an area is drawn as: the SRD shape as a drawable one (sphere, cylinder and emanation as a circle, cube
+ *  as a square), grown with a higher slot where the spell says so (Fog Cloud), as the server will place it. */
+function templateOf(
+  action: ContentActionSummary,
+  area: NonNullable<ContentActionSummary["area"]>,
+  slotLevel: number | undefined
+): TargetingTemplate {
+  const shape: AnnotationShapeKind =
+    area.shape === "sphere" || area.shape === "cylinder" || area.shape === "emanation"
+      ? "circle"
+      : area.shape === "cube"
+        ? "square"
+        : area.shape;
+  return {
+    shape,
+    // A higher slot grows the area where the spell says so (Fog Cloud), as the server will place it.
+    sizeFeet: Math.min(
+      1000,
+      area.sizeFeet +
+        (slotLevel !== undefined && action.areaPerSlot
+          ? action.areaPerSlot.feet * Math.max(0, slotLevel - action.areaPerSlot.level)
+          : 0)
+    ),
+    widthFeet: area.widthFeet,
+    placed: null,
+    ...(area.count !== undefined ? { count: area.count, others: [] } : {}),
+    ...(area.toTarget ? { toTarget: true as const } : {})
+  };
+}
+
+/** The area a use is placed as: the picked option's (Wall of Fire's ring), else the action's own. */
+export function pickedArea(
+  picking: Readonly<{ action: ContentActionSummary; option?: string }>
+): ContentActionSummary["area"] {
+  return picking.action.options?.find((entry) => entry.id === picking.option)?.area ?? picking.action.area;
+}
+
 export function beginTargeting(
   action: ContentActionSummary,
   attackerId: string,
@@ -145,7 +189,8 @@ export function beginTargeting(
   shaping?: readonly CastShaping[],
   options: Readonly<{ fastHands?: boolean }> = {}
 ) {
-  const area = action.area;
+  // An option starts on the first, and so does the area it is placed as.
+  const area = pickedArea({ action, ...(action.options?.[0] ? { option: action.options[0].id } : {}) });
   const dartTotal = dartsAtSlot ?? action.darts;
   // A check action starts on its usual skill; Escape a Grapple starts on the better of its two, the server's pick.
   const usualSkill = action.id === "escape-grapple" ? undefined : action.checkSkills?.[0]?.id;
@@ -162,32 +207,12 @@ export function beginTargeting(
     ...startingShapeChoice(action)
   };
   if (area) {
-    // Map the SRD area shape onto a drawable annotation shape (sphere/cylinder/emanation → circle, cube → square).
-    const shape: AnnotationShapeKind =
-      area.shape === "sphere" || area.shape === "cylinder" || area.shape === "emanation"
-        ? "circle"
-        : area.shape === "cube"
-          ? "square"
-          : area.shape;
     session = {
       action,
       attackerId,
       mode: "template",
       selected: [],
-      template: {
-        shape,
-        // A higher slot grows the area where the spell says so (Fog Cloud), as the server will place it.
-        sizeFeet: Math.min(
-          1000,
-          area.sizeFeet +
-            (slotLevel !== undefined && action.areaPerSlot
-              ? action.areaPerSlot.feet * Math.max(0, slotLevel - action.areaPerSlot.level)
-              : 0)
-        ),
-        widthFeet: area.widthFeet,
-        placed: null,
-        ...(area.count !== undefined ? { count: area.count, others: [] } : {})
-      },
+      template: templateOf(action, area, slotLevel),
       ...slot
     };
   } else {
@@ -306,9 +331,10 @@ export function setChoiceOption(optionId: string, targetId?: string) {
       : { ...session, targetOptions: { ...session.targetOptions, [targetId]: optionId } };
   emit();
 }
-/** Picks the carried weapon a grant binds to; undefined leaves it to the server (the first that fits). */
+/** Picks the carried weapon a grant binds to, or the item a cast is on (Identify); undefined leaves it to the server
+ *  (the first weapon that fits, or no item). */
 export function setBoundItem(itemId: string | undefined) {
-  if (!session?.action.choices?.bindsWeapon) return;
+  if (!session?.action.choices?.bindsWeapon && !session?.action.choices?.pickItem) return;
   const { itemId: _previous, ...rest } = session;
   session = itemId === undefined ? rest : { ...rest, itemId };
   emit();
@@ -343,16 +369,40 @@ export function setShapeGear(gear: "merged" | "worn") {
   session = { ...session, gear };
   emit();
 }
-/** Picks which of its effects a use takes (Enlarge or Reduce). */
+/** Picks which of its effects a use takes (Enlarge or Reduce), or the form of the area a cast leaves; a form with its
+ *  own area (Wall of Fire's ring) is drawn as that area, placed afresh. */
 export function setEffectOption(option: string) {
   if (!session?.action.options?.some((entry) => entry.id === option)) return;
-  session = { ...session, option };
+  const before = pickedArea(session);
+  const after = pickedArea({ action: session.action, option });
+  session = {
+    ...session,
+    option,
+    ...(session.mode === "template" && after && after !== before
+      ? { template: templateOf(session.action, after, session.slotLevel) }
+      : {})
+  };
   emit();
 }
 /** Picks the ability a cast chooses (Hex). */
 export function setChosenAbility(ability: AbilityId) {
   if (!session?.action.choosesAbility) return;
   session = { ...session, ability };
+  emit();
+}
+
+/** Who the cast's Temporary Hit Points go to (Improved Potent Spellcasting); the caster when `actorId` is its own. */
+export function setVitalityTo(actorId: string) {
+  if (!session?.action.vitality) return;
+  const { vitalityTo: _old, ...rest } = session;
+  session = actorId === session.attackerId ? rest : { ...rest, vitalityTo: actorId };
+  emit();
+}
+/** Who regains an area's healing (Land's Aid); "" picks nobody. */
+export function setAidTo(actorId: string) {
+  if (!session?.action.areaHeal) return;
+  const { aidTo: _old, ...rest } = session;
+  session = actorId === "" ? rest : { ...rest, aidTo: actorId };
   emit();
 }
 /** The picks of a cast's shaping that name creatures among its targets: Careful Spell's and Sculpt Spells' protected
@@ -486,6 +536,8 @@ export type ResolveOptions = Readonly<{
   reroll?: boolean;
   /** How far Push mastery shoves on the confirmed hit (0 declines); absent pushes the full distance. */
   pushFeet?: number;
+  /** Tactical Master's Push, Sap or Slow in place of the weapon's own mastery, on every look and the confirm. */
+  mastery?: "push" | "sap" | "slow";
   /** Extras the confirmed hit carries (Sneak Attack, a smite), from the preview's offers. */
   hitOptions?: readonly HitOptionChoice[];
   /** The confirmed melee hit knocks its target out if it drops it to 0 (SRD Knocking Out a Creature). */
@@ -518,6 +570,8 @@ export function resolveTargeting(
     damageType,
     skill,
     ability,
+    vitalityTo,
+    aidTo,
     conditionId,
     shaping,
     summonPick,
@@ -558,6 +612,7 @@ export function resolveTargeting(
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
     ...(opts.reroll ? { reroll: true } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
+    ...(opts.mastery !== undefined ? { mastery: opts.mastery } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(opts.knockOut ? { knockOut: true } : {}),
     ...(opts.answer ? { answer: { ...opts.answer } } : {}),
@@ -577,6 +632,8 @@ export function resolveTargeting(
     ...(damageType !== undefined ? { damageType } : {}),
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
+    ...(vitalityTo !== undefined ? { vitalityTo } : {}),
+    ...(aidTo !== undefined ? { aidTo } : {}),
     ...(conditionId !== undefined ? { conditionId } : {}),
     ...(optionId !== undefined ? { optionId } : {}),
     // Only the picks for creatures still selected.

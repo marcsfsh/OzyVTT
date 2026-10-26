@@ -98,6 +98,7 @@ export function setItemLight(
   if (!row) throw new CommandRejectedError("That item isn't carried.");
   const light = rowRecord(catalog, row)?.light;
   if (!light) throw new CommandRejectedError(`${row.name} sheds no light.`);
+  if (row.dormant === true) throw new CommandRejectedError(`${row.name} has lost its magic and sheds no light.`);
   const now = state.rest.clockHours;
   let next: InventoryItem = { ...row };
   let said: string | null = null;
@@ -175,6 +176,42 @@ export function setRowFlame(
   }
   actor.inventory = actor.inventory.map((entry) => (entry.id === row.id ? next : entry));
   return lit ? `${row.name} carried by ${actor.name} flares alight.` : `${row.name} carried by ${actor.name} goes out.`;
+}
+
+type CarriedLightRecord = NonNullable<NonNullable<ReturnType<typeof rowRecord>>["light"]>;
+
+/** A flame that burns in the open (a Candle, a Lamp, a Torch): it burns down and has no lantern's hood or shutter.
+ *  Gust of Wind "extinguishes candles and similar unprotected flames"; a lantern's flame is protected. */
+export const exposedFlame = (light: CarriedLightRecord): boolean =>
+  light.burnHours !== undefined && light.hooded === undefined && light.cone !== true;
+
+/** A lantern's flame: it burns down behind glass (a Hooded or Bullseye Lantern). */
+export const protectedFlame = (light: CarriedLightRecord): boolean =>
+  light.burnHours !== undefined && !exposedFlame(light);
+
+/**
+ * Puts out the burning lights a creature carries that `which` picks (Sleet Storm's exposed flames, Gust of Wind's), as
+ * putting them out by hand does: the fuel left waits for the next lighting. Returns the line for each one.
+ */
+export function douseCarriedLights(
+  actor: Actor,
+  catalog: EquipmentCatalog | undefined,
+  clockHours: number,
+  which: (light: CarriedLightRecord, row: InventoryItem) => boolean,
+  by: string
+): string[] {
+  const lines: string[] = [];
+  actor.inventory = actor.inventory.map((row) => {
+    const light = row.lit === true ? rowRecord(catalog, row)?.light : undefined;
+    if (!light || !which(light, row)) return row;
+    const { lit: _lit, burnsOutAtHour, ...rest } = row;
+    lines.push(`${by} puts out ${row.name} carried by ${actor.name}.`);
+    return {
+      ...rest,
+      ...(burnsOutAtHour !== undefined ? { burnHoursLeft: Math.max(1, burnsOutAtHour - clockHours) } : {})
+    };
+  });
+  return lines;
 }
 
 /**

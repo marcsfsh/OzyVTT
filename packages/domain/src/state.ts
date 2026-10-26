@@ -14,7 +14,8 @@ import {
   HealthDisplaySchema,
   HitPointBandSchema,
   ObjectStatsSchema,
-  SaveFailureDurationSchema
+  SaveFailureDurationSchema,
+  StoredCastSchema
 } from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
@@ -233,6 +234,8 @@ const PendingSaveEffectSchema = z
     speedZero: z.boolean().optional(),
     /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
     endsWhenSourceDefeated: z.boolean().optional(),
+    /** It ends when its source has the Incapacitated condition (Turn Undead). */
+    endsOnIncapacitated: EffectInstanceSchema.shape.endsOnIncapacitated,
     rangeFeet: EffectInstanceSchema.shape.rangeFeet,
     /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
      * once that has ended. */
@@ -333,6 +336,10 @@ export const PendingSaveSchema = z
     failureNote: z.string().min(1).max(300).optional(),
     /** A failure also breaks the creature's Concentration (Sleet Storm). */
     breaksConcentration: z.literal(true).optional(),
+    /** A success ends the spell the save is against, its caster's Concentration included (Detect Thoughts' probe). */
+    successEndsSpell: z.literal(true).optional(),
+    /** The carried row a failure makes the creature drop, still carried but out of its hands (Heat Metal's object). */
+    dropsRowId: z.string().min(1).max(80).optional(),
     /** A swallower's save against the damage from inside it: a failure lets out every creature it swallowed, Prone
      *  within this many feet of it. */
     regurgitates: z
@@ -341,6 +348,12 @@ export const PendingSaveSchema = z
       .optional(),
     /** The spell area that raised it (`SpellZone`), which counts the damage it deals toward its cap. Never projected. */
     zoneId: z.string().min(1).max(120).optional(),
+    /** A save for touching an area that goes off (Delayed Blast Fireball's bead): a failure sets it off where it is, a
+     *  success throws it at `throwAtId`, where it goes off. Never projected. */
+    touchedZone: z
+      .object({ zoneId: z.string().min(1).max(120), throwAtId: z.uuid().optional() })
+      .strict()
+      .optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
     repeatOf: z
       .object({
@@ -364,6 +377,9 @@ export const PendingSaveSchema = z
     drain: DamageDrainSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
     failurePush: ForcedPushSchema.optional(),
+    /** SRD Mounted Combat: a failure throws the rider off this mount, landing Prone within 5 feet of it. GM
+     *  bookkeeping, never projected: the fall is narrated when it lands. */
+    unseats: z.uuid().optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
     /** What gives the save Advantage beyond the target's own riders, as the roll card names it: the damage that opened
@@ -372,6 +388,12 @@ export const PendingSaveSchema = z
     /** Why the target succeeds without rolling (a Construct against Flesh to Stone, an elf against Sleep). GM
      *  bookkeeping, never projected: the result says it when the save is answered. */
     autoSucceeds: z.string().min(1).max(120).optional(),
+    /** The charge a kill spends: the pool on its source that loses one when the failure slays the target (Nine Lives
+     *  Stealer). GM bookkeeping, never projected. */
+    spendsOnKill: z
+      .object({ actorId: z.uuid(), key: z.string().min(1).max(120) })
+      .strict()
+      .optional(),
     /** A failure kills the target outright, and the source regains these hit points (Consume Life). GM bookkeeping,
      *  never projected. */
     failureKills: z
@@ -418,6 +440,17 @@ export const PendingSaveSchema = z
     /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save
      *  card says so, so it never reads as if the engine did. */
     gmApplies: z.literal(true).optional(),
+    /** Temporary Hit Points the cast gives when its damage lands, to the creature its caster picked, once for the cast
+     *  (`key`): the first of its saves to deal damage gives them (Improved Potent Spellcasting). GM bookkeeping, never
+     *  projected. */
+    vitality: z
+      .object({
+        actorId: z.uuid(),
+        amount: z.number().int().min(1).max(100),
+        key: z.string().min(1).max(120)
+      })
+      .strict()
+      .optional(),
     /** The spell the save is against, its school and level, and whether it aimed at this creature alone, for what
      *  answers a save against a spell (Staff of Charming's Resist Enchantment). GM bookkeeping, never projected. */
     spell: z
@@ -521,6 +554,8 @@ export const HeldRollSchema = z
     readAs: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** The other creatures already asked to answer this roll (a check's Cutting Words), so each is asked once. */
     asked: z.array(z.string().min(1).max(300)).max(40).optional(),
+    /** A loose save's ability (one rolled from the sheet with nothing owed), so Heroic Inspiration can reroll it. */
+    looseSave: z.object({ ability: AbilityIdSchema }).strict().optional(),
     /** A check's subject and how it was made, so Heroic Inspiration can reroll it. */
     check: z
       .object({
@@ -866,7 +901,8 @@ export const PendingReactionSchema = z
     /** attack-targeted and a ward's attack-would-hit: the attack's target as it stands, by name. */
     targetName: z.string().min(1).max(120).optional(),
     /** attack-targeted (Redirect Attack): the allies the reactor may make the target instead, one picked with the
-     *  answer; hit-by-attack (a stone giant's Deflect Missile): the creatures it may turn the deflected force on. */
+     *  answer. hit-by-attack: the creatures a reduction to 0 may turn the attack's force on (a stone giant's Deflect
+     *  Missile, a Monk's Deflect Attacks for a Focus Point). */
     redirectChoices: z
       .array(z.object({ actorId: z.uuid(), name: z.string().min(1).max(120) }).strict())
       .min(1)
@@ -1277,7 +1313,9 @@ export const VisionAreaSchema = z
         .object({
           type: z.literal("template"),
           annotationId: z.uuid(),
-          widthFeet: z.number().positive().max(1000).nullable().default(null)
+          widthFeet: z.number().positive().max(1000).nullable().default(null),
+          /** A ringed wall: only the circle's outer edge this many feet thick (Wall of Fire's ring). */
+          ringFeet: z.number().positive().max(100).optional()
         })
         .strict(),
       z
@@ -1286,7 +1324,12 @@ export const VisionAreaSchema = z
     ]),
     /** The one creature that sees through it (Insect Cloud: "Heavily Obscured for creatures other than you"). */
     sparedActorId: z.uuid().optional(),
-    source: VisionSourceSchema.optional()
+    source: VisionSourceSchema.optional(),
+    /** What clears it, ending the spell that made it: a strong wind (Gust of Wind) or water that destroys fog. */
+    dispersedBy: z
+      .array(z.enum(["wind", "water"]))
+      .max(2)
+      .optional()
   })
   .strict();
 export type VisionArea = z.infer<typeof VisionAreaSchema>;
@@ -1376,9 +1419,19 @@ export const SpellZoneSchema = z
     /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
      *  may be gone; a spell's area reads its spell instead. */
     rule: z
-      .object({ trigger: AreaTriggerSchema, save: ActionSchema.shape.save, damage: ActionSchema.shape.damage })
+      .object({
+        trigger: AreaTriggerSchema,
+        save: ActionSchema.shape.save,
+        damage: ActionSchema.shape.damage,
+        /** What its damage does at 0 Hit Points (a Sphere of Annihilation obliterates). */
+        drain: ActionSchema.shape.drain
+      })
       .strict()
       .optional(),
+    /** The creature in control of it until the start of its next turn (a Sphere of Annihilation). */
+    controllerId: z.uuid().optional(),
+    /** The creature that started its current turn in control of it, which a Talisman of the Sphere lets move it far. */
+    heldAtTurnStart: z.uuid().optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
     /** The damage type the caster chose at the cast (Conjure Elemental's element, Transmuted Spell's); absent, the
@@ -1386,8 +1439,71 @@ export const SpellZoneSchema = z
     damageType: z.string().min(1).max(40).optional(),
     /** The creature Heightened Spell gave Disadvantage on its saves against the spell. */
     heightened: z.uuid().optional(),
+    /** A spell glyph's stored spell, released on the creature that sets it off (Glyph of Warding). */
+    storedCast: StoredCastSchema.optional(),
+    /** The creature that set it off, for a spell glyph bursting with its stored spell. */
+    setOffBy: z.uuid().optional(),
     /** Dice its damage has gained so far (Delayed Blast Fireball: 1d6 whenever its caster's turn ends). */
     grown: z.number().int().nonnegative().max(100).optional(),
+    /** Where it stood as its caster's turn began, waiting for the caster to steer its drift (Incendiary Cloud). */
+    driftFrom: z
+      .object({
+        origin: z.object({ x: z.number(), y: z.number() }).strict(),
+        target: z.object({ x: z.number(), y: z.number() }).strict()
+      })
+      .strict()
+      .optional(),
+    /** The carried lights (`actorId:itemId`) whose protected flame has had its chance to go out in it (Gust of
+     *  Wind's 50 percent for a lantern). */
+    windTried: z.array(z.string().max(240)).max(200).optional(),
+    /** Dice its damage has lost and height it has lost so far (Tsunami: 1d10 and 50 feet each turn it moved), and
+     *  whether it drifted this turn. */
+    faded: z.number().int().nonnegative().max(100).optional(),
+    driftedThisTurn: z.literal(true).optional(),
+    /** The spell's turn it is on, counted at its caster's turn starts from the cast's 1 (Storm of Vengeance). */
+    stage: z.number().int().positive().max(1000).optional(),
+    /** A glyph set off and glowing (Symbol). */
+    glowing: z.literal(true).optional(),
+    /** It was made while its caster's Time Stop ran, so it ends the Time Stop when it affects another creature. */
+    inTimeStop: z.literal(true).optional(),
+    /** The grid cells (`column,row`) left out of it: what its caster spared (Plant Growth) or fire burned away (Web). */
+    cut: z.array(z.string().max(24)).max(4000).optional(),
+    /** The cells burning now (Web), until the turn of `actorId` in `untilRound` begins. */
+    burning: z
+      .array(
+        z
+          .object({
+            cells: z.array(z.string().max(24)).max(400),
+            untilRound: z.number().int().positive(),
+            actorId: z.uuid().nullable()
+          })
+          .strict()
+      )
+      .max(50)
+      .optional(),
+    /** Where Fire damage landed on a creature standing in it since the last settle (Web), for the cells it sets
+     *  burning. */
+    fireAt: z
+      .array(z.object({ x: z.number(), y: z.number(), sizeCells: z.number().int().min(1).max(20) }).strict())
+      .max(50)
+      .optional(),
+    /** It burns away when fire reaches it (Web). */
+    flammable: z.literal(true).optional(),
+    /** Its heal, rolled with its caster's numbers (Conjure Celestial's "4d12 + 4"). */
+    healing: z.string().min(1).max(60).optional(),
+    /** The creature it is round, which it moves with (Antipathy/Sympathy's target). */
+    targetId: z.uuid().optional(),
+    /** The creature type its caster picked for it to act on (Antipathy/Sympathy's "kind of creature"). */
+    types: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(14)
+      .optional(),
     /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
      *  has raised the saves. */
     burstsOnEnd: z.literal(true).optional(),
@@ -1428,7 +1544,18 @@ const sceneCombatShape = {
           parentId: z.string().max(120).optional(),
           replacements: z.record(z.string(), z.number().int().nonnegative()).optional(),
           /** How the spell whose rays it holds was shaped (Metamagic), which every later ray keeps. Never projected. */
-          shaping: z.array(CastShapingSchema).max(4).optional()
+          shaping: z.array(CastShapingSchema).max(4).optional(),
+          /** Chromatic Orb leaping: the creature it leaps from, those it struck this cast, the leaps left and its damage
+           *  type. Never projected. */
+          leap: z
+            .object({
+              fromId: z.uuid(),
+              struck: z.array(z.uuid()).max(10),
+              left: z.number().int().min(0).max(9),
+              damageType: z.string().min(1).max(40).optional()
+            })
+            .strict()
+            .optional()
         })
         .strict()
         .nullable()
@@ -1473,6 +1600,22 @@ const sceneCombatShape = {
       /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
        *  bookkeeping, never projected. */
       attackRolled: z.boolean().optional(),
+      /** What creatures did to each other this turn: who attacked whom, who hit whom with a Strength-based attack, and
+       *  who damaged whom (Horde Breaker, Frenzy, Superior Hunter's Prey). Engine bookkeeping, never projected. */
+      dealings: z
+        .array(
+          z.object({ by: z.uuid(), target: z.uuid(), kind: z.enum(["attacked", "strength-hit", "damaged"]) }).strict()
+        )
+        .max(200)
+        .optional(),
+      /** SRD Interacting with Things: the turn's actor has used its one free object interaction (a door opened, a
+       *  weapon drawn), so the next takes the Utilize action. Engine bookkeeping, never projected. */
+      objectInteractionUsed: z.boolean().optional(),
+      /** SRD Attack action: the attacks the turn's actor has made in its Attack action, and the weapons it drew or
+       *  stowed as part of them ("equip or unequip one weapon when you make an attack"). Engine bookkeeping, never
+       *  projected. */
+      attacksMade: z.number().int().min(0).max(50).optional(),
+      attackDraws: z.number().int().min(0).max(50).optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
        *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
        *  fire again in it. Engine bookkeeping, never projected. */
@@ -1492,7 +1635,13 @@ const sceneCombatShape = {
             .object({ actorId: z.uuid(), itemId: z.string().max(120), targetId: z.uuid() })
             .strict()
             .nullable()
-            .default(null)
+            .default(null),
+          /** Horde Breaker's opening: the weapon attack that opened it and its target. */
+          horde: z
+            .object({ actorId: z.uuid(), itemId: z.string().max(120), targetId: z.uuid() })
+            .strict()
+            .nullable()
+            .optional()
         })
         .strict()
         .optional(),
@@ -1681,6 +1830,22 @@ export const CombatStateSchema = z
       .strict()
       .nullable()
       .default(null),
+    /** Thief's Reflexes: the second turn of round 1 running now, at its creature's Initiative minus 10, and the turn
+     *  that comes after it (null at the round's end). Live table only; GM-only. */
+    secondTurn: z
+      .object({ actorId: z.uuid(), score: z.number().int(), resume: z.uuid().nullable() })
+      .strict()
+      .nullable()
+      .default(null),
+    /** The creatures that took their second turn of round 1. Live table only; GM-only. */
+    secondTurnsTaken: z.array(z.uuid()).max(200).default([]),
+    /** Alert's Initiative Swap offered by a character's player to a willing ally of another player, waiting for that
+     *  player to take it (`initiative.swap` naming the pair the other way round). Live table only; the two players see
+     *  the offers their characters are in. */
+    initiativeSwapOffers: z
+      .array(z.object({ actorId: z.uuid(), withActorId: z.uuid() }).strict())
+      .max(20)
+      .default([]),
     /** Creatures gone from the fight's plane (Banishment) or on the Border Ethereal over it (Blink), with the space each left and its
      *  height there, so it comes back to that space or the nearest unoccupied one (`off-plane.ts`). Live table only;
      *  GM-only, since a creature the party never saw leave would be placed by it. */
@@ -1978,6 +2143,26 @@ export const GameStateSchema = z.object({
   heldRolls: z.array(HeldRollSchema).max(100).default([]),
   /** Damage rolls looked at before they count (see HeldDamageSchema). GM-only. */
   heldDamage: z.array(HeldDamageSchema).max(40).default([]),
+  /** Each character's latest spend of Hit Point Dice, which Heroic Inspiration may reroll a die of while it is the
+   *  character's latest roll: the dice, what each adds, and the Hit Points before it healed. GM-only. */
+  heldHitDice: z
+    .array(
+      z
+        .object({
+          actorId: z.uuid(),
+          rollId: z.uuid(),
+          dice: z
+            .array(z.object({ sides: z.number().int().min(2).max(20), face: z.number().int().min(1).max(20) }).strict())
+            .min(1)
+            .max(40),
+          conModifier: z.number().int().min(-5).max(10),
+          doubled: z.boolean(),
+          before: z.number().int().min(0).max(100000)
+        })
+        .strict()
+    )
+    .max(50)
+    .default([]),
   /** The GM's open calls for a roll. A player reads only their own part of each. */
   rollCalls: z.array(RollCallSchema).max(20).default([]),
   /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */

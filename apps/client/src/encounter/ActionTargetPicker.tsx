@@ -14,12 +14,15 @@ import { revealInRegion } from "../lib/reveal";
 import { objectChoicesOf, weaponChoicesOf, type CarriedRow } from "./weapon-choices";
 import {
   clearTargeting,
+  pickedArea,
   placeAnotherTemplate,
   setBoundItem,
   setObjectItem,
   setChoiceOption,
   setCheckSkill,
   setChosenAbility,
+  setVitalityTo,
+  setAidTo,
   setConditionChoice,
   setDamageType,
   setEffectOption,
@@ -133,7 +136,7 @@ export function ActionTargetPicker({
         <>
           {/* The area keeps the action's own size: the drag only places and points it. */}
           <p className="action-targeting-head">
-            <strong>{name}</strong> · {picking.action.area ? areaWords(picking.action.area) : "area"}
+            <strong>{name}</strong> · {pickedArea(picking) ? areaWords(pickedArea(picking)!) : "area"}
           </p>
           <p className="action-targeting-hint">
             {picking.template?.placed
@@ -248,6 +251,38 @@ export function ActionTargetPicker({
             {(Object.keys(ABILITY_WORDS) as AbilityId[]).map((ability) => (
               <option key={ability} value={ability}>
                 {ABILITY_WORDS[ability]}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {picking.action.vitality && (
+        <label className="action-damage-type">
+          <span>Temporary Hit Points to</span>
+          <Select
+            value={picking.vitalityTo ?? picking.attackerId}
+            onChange={(event) => setVitalityTo(event.target.value)}
+          >
+            {[
+              { id: picking.attackerId, label: targets.find((row) => row.id === picking.attackerId)?.label ?? "You" },
+              ...targets.filter((row) => row.id !== picking.attackerId)
+            ].map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.label}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {/* Land's Aid: one creature in the area regains its own roll of Hit Points. */}
+      {picking.action.areaHeal && (
+        <label className="action-damage-type">
+          <span>Regains {picking.action.areaHeal.formula} Hit Points</span>
+          <Select value={picking.aidTo ?? ""} onChange={(event) => setAidTo(event.target.value)}>
+            <option value="">No one</option>
+            {targets.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.label}
               </option>
             ))}
           </Select>
@@ -385,7 +420,9 @@ export function ActionTargetPicker({
           )}
           {onLookAtDamage && (
             <Button type="button" variant="secondary" disabled={busy || !ready} onClick={onLookAtDamage}>
-              Roll damage first
+              {picking.action.damage.length === 0 && picking.action.healing
+                ? "Roll healing first"
+                : "Roll damage first"}
             </Button>
           )}
           <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
@@ -409,8 +446,8 @@ export function ActionTargetPicker({
 
 /**
  * What the action asks for as it resolves: one option (Fire Shield's warm or chill), one for each selected target
- * (Eyebite's effect on each), and the carried weapon a grant binds to (Magic Weapon). Each starts on the first, as the
- * server reads none.
+ * (Eyebite's effect on each), the carried weapon a grant binds to (Magic Weapon), and any carried item (Identify).
+ * Each starts on the first, as the server reads none; the item starts on none.
  */
 function ChoicePicks({
   picking,
@@ -459,7 +496,13 @@ function ChoicePicks({
         )}
       {choices.bindsWeapon && (
         <label className="action-damage-type">
-          <span>Weapon</span>
+          <span>
+            {choices.bindsWeapon.ammunition === "only"
+              ? "Ammunition"
+              : choices.bindsWeapon.ammunition === "also"
+                ? "Weapon or ammunition"
+                : "Weapon"}
+          </span>
           {weapons.length > 0 ? (
             <Select value={picking.itemId ?? weapons[0]!.id} onChange={(event) => setBoundItem(event.target.value)}>
               {weapons.map((row) => (
@@ -469,8 +512,27 @@ function ChoicePicks({
               ))}
             </Select>
           ) : (
-            <span>No weapon it can be cast on is carried.</span>
+            <span>
+              {choices.bindsWeapon.ammunition === "only"
+                ? "No ammunition is carried."
+                : "No weapon it can be used on is carried."}
+            </span>
           )}
+        </label>
+      )}
+      {choices.pickItem && (
+        <label className="action-damage-type">
+          <span>Item</span>
+          <Select value={picking.itemId ?? ""} onChange={(event) => setBoundItem(event.target.value || undefined)}>
+            <option value="">None</option>
+            {carried
+              .filter((row) => row.quantity > 0)
+              .map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+          </Select>
         </label>
       )}
       {choices.object && objects.length > 0 && (

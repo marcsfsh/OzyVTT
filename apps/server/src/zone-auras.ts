@@ -34,6 +34,29 @@ function wanted(
   const byActor = new Map<string, Map<string, EffectInstance>>();
   for (const zone of liveZones(state)) {
     const content = zoneContentOf(zone, deps.catalog);
+    // What its caster holds near its point (Conjure Animals: Advantage on Strength saves within 5 feet of the pack).
+    const own = content?.trigger.casterHolds;
+    if (content && own) {
+      const near = insideTest(state, zone, { on: [], around: "point", feet: own.feet }, content, deps.geometry);
+      const token = state.combat.tokens.find((candidate) => candidate.actorId === zone.casterId);
+      if (near && token?.position && near(token.position, token.sizeCells, token.altitudeFeet ?? 0)) {
+        const id = `${zone.id}:aura:${zone.casterId}:own`;
+        const effect = makeEffect({
+          id,
+          name: content.name,
+          tags: [ZONE_AURA_TAG],
+          sourceActorId: zone.casterId,
+          sourceName: state.actors.find((actor) => actor.id === zone.casterId)?.name ?? null,
+          startedRound: state.combat.round,
+          duration: { type: "manual" },
+          modifiers: structuredClone(own.modifiers),
+          ...(content.spell ? { spell: { id: content.spell.id, level: zone.level } } : {}),
+          ...(zone.castId !== null ? { castId: zone.castId } : {}),
+          magical: true
+        });
+        byActor.set(zone.casterId, new Map([...(byActor.get(zone.casterId) ?? []), [id, effect]]));
+      }
+    }
     const holds = content?.trigger.holds;
     if (!content || !holds) continue;
     const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
@@ -52,6 +75,7 @@ function wanted(
         startedRound: state.combat.round,
         duration: { type: "manual" },
         modifiers: structuredClone(holds.modifiers ?? []),
+        ...(holds.armorClassBonus !== undefined ? { armorClassBonus: holds.armorClassBonus } : {}),
         ...(holds.conditions ? { linkedConditionIds: [...holds.conditions] } : {}),
         ...(holds.struck ? { struck: struckAt(holds.struck, zone.dc) } : {}),
         ...(content.spell ? { spell: { id: content.spell.id, level: zone.level } } : {}),

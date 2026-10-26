@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ActionAreaSchema,
   ActionReactionSchema,
   CastShapingIdSchema,
   CharacterChoiceSchema,
@@ -174,6 +175,8 @@ export type HeldDamageLook = Readonly<{
   dice: ReadonlyArray<Readonly<{ sides: number; face: number; own: boolean }>>;
   answered: readonly RollAnswered[];
   answers: readonly DamageAnswerOffer[];
+  /** A heal's look (Cure Wounds, a potion): the Hit Points its roll restores, before what the healer's features add. */
+  healing?: number;
 }>;
 /** The damage an action with no attack roll and no save owes one target (Magic Missile, a smite resolved alone). */
 export type DamageTarget = Readonly<{
@@ -224,6 +227,13 @@ export type ActionResolution = Readonly<{
   }> | null;
   /** On a previewed hit, the push its weapon mastery offers (SRD "up to 10 feet"); the confirm says how far with `pushFeet`. */
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
+  /** Tactical Master: the weapon's own mastery, the properties that may take its place for this attack, and the one
+   *  this look took. */
+  masteryOptions?: Readonly<{
+    own: Readonly<{ id: string; name: string }>;
+    alternatives: ReadonlyArray<Readonly<{ id: "push" | "sap" | "slow"; name: string }>>;
+    picked?: "push" | "sap" | "slow";
+  }>;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer. */
   reactionPrompts?: ReadonlyArray<
     Readonly<{ actorId: string; actorName: string; actionName: string; holdsDamage?: true }>
@@ -539,7 +549,11 @@ export const ActionAvailabilitySchema = z.strictObject({
       options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
       optionsPerTarget: z.literal(true).optional(),
       bindsWeapon: z
-        .strictObject({ weaponIds: z.array(z.string()).optional(), melee: z.literal(true).optional() })
+        .strictObject({
+          weaponIds: z.array(z.string()).optional(),
+          melee: z.literal(true).optional(),
+          ammunition: z.enum(["only", "also"]).optional()
+        })
         .optional(),
       object: z
         .strictObject({ kinds: z.array(z.enum(["armor", "weapon"])), metal: z.literal(true).optional() })
@@ -547,7 +561,7 @@ export const ActionAvailabilitySchema = z.strictObject({
     })
     .optional()
     .describe(
-      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`), and `object`, the target's armor or weapon it acts on (sent as `objectItemId`; absent, the target's worn armor, else its weapon in hand)"
+      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`; `ammunition`: only a stack of ammunition (`only`), or one as well as a weapon (`also`)), and `object`, the target's armor or weapon it acts on (sent as `objectItemId`; absent, the target's worn armor, else its weapon in hand)"
     ),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple), and
    *  the tools its user may help with through Help with a Check, which carry their name. */
@@ -601,8 +615,9 @@ export const ActionAvailabilitySchema = z.strictObject({
     .describe(
       "The forms a shape-shift may take now, sent back as the resolve's `form` (or `targetForms`, one per target, when `perTarget`); `gearChoice` lets the user say whether its gear melds or is worn. For Wild Shape, the Beasts its user may learn (`learnable`), how many it knows (`knownLimit`) and whether one may be replaced now (`swapOpen`)"
     ),
-  /** The effects a use picks one of (Enlarge or Reduce), sent back as the resolve's `option`. */
-  options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
+  /** The effects a use picks one of (Enlarge or Reduce), or the form of the area a cast leaves (Wall of Fire's ring),
+   *  sent back as the resolve's `option`; an option with an `area` is placed as that area. */
+  options: z.array(z.strictObject({ id: z.string(), name: z.string(), area: ActionAreaSchema.optional() })).optional(),
   /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
    *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
    *  (a spell area's later save). */
@@ -801,18 +816,24 @@ const ActorDerivedSheetSchema = z.strictObject({
     .min(1)
     .max(10)
     .describe("How many items the character can attune to at once: 3, or 4 with Use Magic Device"),
-  /** What the character carries against what it can; over capacity its Speed is at most 5 feet. */
+  /** What the creature carries against what it can; over capacity its Speed is at most 5 feet, over twice it 0. */
   carrying: z
     .strictObject({
-      pounds: z.number().min(0).describe("What its rows and coins weigh, in pounds (fifty coins to the pound)"),
+      pounds: z
+        .number()
+        .min(0)
+        .describe(
+          "What its rows and coins weigh, in pounds (fifty coins to the pound), what its containers hold counted as they weigh it"
+        ),
       capacity: z
         .number()
         .min(0)
-        .describe("The most it can carry: Strength times 15 pounds for a Small or Medium creature, by size")
+        .describe("The most it can carry: Strength times 15 pounds for a Small or Medium creature, by size"),
+      dragLimit: z.number().min(0).describe("The most it can drag, lift or push: twice its capacity")
     })
     .nullable()
     .describe(
-      "What the character carries against its carrying capacity. Beyond it, its Speed is no more than 5 feet. Null for a stat block, which says nothing of what it carries"
+      "What the creature carries against its carrying capacity. Beyond it, its Speed is no more than 5 feet, and beyond twice it 0. Null for a creature with no sheet or stat block"
     ),
   /** The weapon kinds chosen under Weapon Mastery, in the order chosen, each with the property it grants and the SRD
    *  text of what that property does. Empty for a sheet that records no such choice. */
@@ -1009,10 +1030,15 @@ export const ActorMovementReplySchema = z.strictObject({
   /** The ground the spell areas the asker can see change for this mover, in grid cells near it, as the server charges
    *  it: Difficult Terrain (each cell), and where its footprint (named by its top-left cell) has its Speed halved,
    *  costs double again on the ground (Plant Growth), or pays double for a step toward an area's caster (Gust of
-   *  Wind's Line, the caster's position in image pixels). */
+   *  Wind's Line, the caster's position in image pixels). `cleared`: cells whose painted Difficult Terrain an area lifts
+   *  (Speak with Plants). */
   areaGround: z
     .strictObject({
       difficult: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      cleared: z
+        .array(z.strictObject({ column: z.number().int(), row: z.number().int() }))
+        .max(4000)
+        .optional(),
       halved: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
       costlyGround: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
       toward: z

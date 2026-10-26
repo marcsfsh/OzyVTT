@@ -318,7 +318,7 @@ describe("what holds a restrained creature", () => {
       name: "Net",
       armorClass: 10,
       hitPoints: 5,
-      immunities: ["bludgeoning"]
+      immunities: ["bludgeoning", "poison", "psychic"]
     });
   });
 });

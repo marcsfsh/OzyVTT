@@ -10,8 +10,7 @@ const ESCAPE = /escape from the corpse (?:by )?using (\d+) feet of movement/i;
 /**
  * A dead or departed swallower lets go of what it swallowed: each creature its swallow holds is no longer Restrained
  * or Blinded by it, and climbs out of the corpse with the movement the stat block names and lands Prone. On that
- * creature's own turn the movement comes out of the turn's; otherwise out of its next turn, as Speed lost until that
- * turn ends.
+ * creature's own turn the movement comes out of the turn's; otherwise out of its next turn's, spent as it starts.
  */
 export function releaseSwallowedBy(
   state: GameState,
@@ -51,7 +50,7 @@ export function releaseSwallowedBy(
           sourceName: prey.name,
           startedRound: state.combat.round,
           duration: { type: "until-bearer-turn-end", skipsCurrentTurn: false },
-          modifiers: [{ type: "speed", amount: -feet }]
+          movementOwedFeet: feet
         })
       );
     events.push({
@@ -63,6 +62,20 @@ export function releaseSwallowedBy(
     });
   }
   return events;
+}
+
+/** Movement a creature already spent of the turn it starts (climbing out of a corpse off its turn) is used: it moves
+ *  only the rest, and standing up still costs half its Speed. */
+export function chargeOwedMovement(state: GameState, actorId: string): void {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const owing = actor?.effects.filter((effect) => effect.movementOwedFeet !== undefined) ?? [];
+  if (!actor || owing.length === 0 || state.combat.turnActorId !== actorId) return;
+  const feet = owing.reduce((sum, effect) => sum + (effect.movementOwedFeet ?? 0), 0);
+  state.combat = {
+    ...state.combat,
+    turn: { ...state.combat.turn, movementUsedFeet: state.combat.turn.movementUsedFeet + feet }
+  };
+  actor.effects = actor.effects.filter((effect) => effect.movementOwedFeet === undefined);
 }
 
 /** The tag on a swallowed creature's effect, which its swallower sources. */

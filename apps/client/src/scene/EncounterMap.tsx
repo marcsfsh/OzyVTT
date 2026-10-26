@@ -334,7 +334,8 @@ export function EncounterMap({
           placedArea.placed,
           placedArea.widthFeet,
           tokens.filter((placed) => placed.actorId !== activeTargeting?.attackerId),
-          placedArea.sizeFeet
+          placedArea.sizeFeet,
+          placedArea.toTarget === true
         )
       : []
   );
@@ -603,7 +604,13 @@ export function EncounterMap({
   })();
   // Placing an area template, the drag places and points the area; its size is the action's own.
   const templateFeet = activeTargeting?.mode === "template" ? activeTargeting.template?.sizeFeet : undefined;
-  const preview = gesturePreview(calibration, gesture, annotationAt, templateFeet);
+  const preview = gesturePreview(
+    calibration,
+    gesture,
+    annotationAt,
+    templateFeet,
+    activeTargeting?.mode === "template" && activeTargeting.template?.toTarget === true
+  );
   const selected = selectedId ? annotationAt(selectedId) : null;
 
   const inspector =
@@ -999,9 +1006,10 @@ export function EncounterMap({
                         <MountControl
                           name={actor.name}
                           riding={riding ? (riding.sourceName ?? "its mount") : null}
+                          controls={riding?.tags.includes("controls-mount") ?? true}
                           mounts={mounts}
                           busy={busyActorId === actor.id}
-                          onMount={(mountId) => void commands.mount(actor.id, mountId)}
+                          onMount={(mountId, control) => void commands.mount(actor.id, mountId, control)}
                         />
                         <HeightControl
                           name={actor.name}

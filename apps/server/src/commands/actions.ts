@@ -1,3 +1,4 @@
+import { settleReincarnations } from "../reincarnation.js";
 import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, GameState, RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
@@ -20,16 +21,19 @@ import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { activeMoveGrant } from "../granted-moves.js";
-import { mapDistance, tokenCreatureDistance } from "../movement-narration.js";
+import { DISTANCE_TOLERANCE_FEET, mapDistance, tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
 import { looseRollPlan, routeForTap, slotsModeFor, spendLooseUses } from "../tap-routing.js";
-import { conditionChoicesOf, isItemActionId, upcastAction } from "../item-actions.js";
+import { conditionChoicesOf, isItemActionId, laterRowOf, upcastAction } from "../item-actions.js";
+import { checkAimInArea, leaveOut, markStageUse, stageRefusal, withAreaDice } from "../zone-later.js";
+import { igniteUnder } from "../zone-fire.js";
 import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
 import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
-import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
+import { lastChargeLine, lastChargeRollFor, regainOnTwenty } from "../item-charges.js";
+import { endItemMagic } from "../item-spent.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
 import { interruptRests } from "../rest-interruptions.js";
 import { ammunitionLabel, shotFrom, spendPiece } from "../ammunition.js";
@@ -37,15 +41,21 @@ import { checkPlan } from "../ability-checks.js";
 import { rollSettledCheck } from "../check-rolls.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
+import { castCheckFailedLine, castCheckLabel, castCheckSubject } from "../cast-check.js";
+import { breakableItemOf, looseBreak } from "../item-breaks.js";
 import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
 import { areaAtLevel } from "../spell-zone-state.js";
-import { zoneRowOf } from "../spell-zones.js";
+import { pickedZoneRow, zoneRowOf } from "../spell-zones.js";
+import { ringTest } from "../zone-shapes.js";
 import { spellWardedTargets } from "../zone-barriers.js";
+import { zoneForEachArea } from "../spell-zone-state.js";
+import { moveZoneToward } from "../zone-sphere.js";
+import { zonePointFeet } from "../zone-touch.js";
 import { deflectingWall, zoneCover } from "../zone-walls.js";
 import { enclosedFrom } from "../enclosures.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
-import { useCostOf, withChosenCost } from "../use-cost.js";
+import { useCostOf, withAreaCost, withChosenCost } from "../use-cost.js";
 import { withFastHands } from "../fast-hands.js";
 import { applyLooseHealing, looseHealTargets, partyMember } from "../loose-healing.js";
 import { countOptionUse } from "../option-uses.js";
@@ -53,8 +63,9 @@ import { castLine, castSpellOf } from "../cast-narration.js";
 import { castingMinutesOf } from "../resolution/long-casting.js";
 import { passTime } from "../rests.js";
 import { standsInSilence } from "../silence.js";
+import { startTimedPool } from "../clock-pools.js";
 import { bringSummons, familiarDelivery } from "../summons.js";
-import { distanceFromForce, settleForce, strikeOriginFor, struckFrom } from "../summon-strikes.js";
+import { distanceFromForce, settleForce, settleInterposing, strikeOriginFor, struckFrom } from "../summon-strikes.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -137,6 +148,8 @@ export const actionCommands = [
       // What the spell areas a push moves a creature through did to it.
       const pushedThrough: EffectNarration[] = [];
       let areaMoveNote: string | null = null;
+      // A bolt aimed outside its spell's cloud that a rules mode let through.
+      let areaAimNote: string | null = null;
       // The creatures a barrier against spells kept the cast from, for the GM.
       let wardNotes: string[] = [];
       const { state, duplicate } = await execute((draft) => {
@@ -155,10 +168,23 @@ export const actionCommands = [
         );
         const listed = statBlockAction ?? builtinActionFor(definition, actionId, attacker);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
-        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked; a Thief's Fast Hands takes
-        // an item's Utilize or Magic action as a Bonus Action.
-        const costed = withChosenCost(listed, request.spend, request.conditionIds);
-        const action = request.fastHands === true ? withFastHands(costed, attacker, definition) : costed;
+        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked, and one whose every area
+        // spends a use (Ring of Shooting Stars) at the areas placed; a Thief's Fast Hands takes an item's Utilize or
+        // Magic action as a Bonus Action.
+        const chosen = withChosenCost(
+          withAreaCost(listed, templates?.length ?? 1),
+          request.spend,
+          request.conditionIds
+        );
+        const costed = request.fastHands === true ? withFastHands(chosen, attacker, definition) : chosen;
+        // What the spell's area asks of it: a stage it waits for (Storm of Vengeance's bolts), and the dice a storm adds
+        // (Call Lightning).
+        const areaSpell = costed.spellId ? kit.equipmentCatalog().spellRecord?.(costed.spellId) : undefined;
+        const areaRow = areaSpell ? laterRowOf(areaSpell, costed.id) : undefined;
+        const waiting =
+          areaSpell && areaRow ? stageRefusal(draft, actorId, areaRow, areaSpell, kit.equipmentCatalog()) : null;
+        if (waiting) throw new CommandRejectedError(waiting);
+        const action = withAreaDice(draft, actorId, costed, areaSpell, request.option, kit.equipmentCatalog());
         // The GM may impose any condition; a player picks only among the ones the action lets its caster choose
         // (Blindness/Deafness), read from the spell too for a sheet built before the action carried them.
         const offered = conditionChoicesOf(
@@ -176,6 +202,7 @@ export const actionCommands = [
         // The area's point of origin, for the cover its Dexterity saves read.
         let areaOrigin: Readonly<{ x: number; y: number }> | undefined;
         let areaMove: AreaMove | null = null;
+        let areaMoveTerms: NonNullable<ReturnType<typeof areaMoveOf>>["terms"] | undefined;
         // An item's action that leaves an area to act later (spread Caltrops) catches no one as it is used.
         const leavesArea = action.zone !== undefined && action.spellId === undefined;
         // The template as the action's area makes it, which the table's drawn shape records.
@@ -199,7 +226,7 @@ export const actionCommands = [
             area,
             templates,
             rangeFeet: !range
-              ? null
+              ? (area.rangeFeet ?? null)
               : range.unit === "miles" && range.distance !== null
                 ? range.distance * 5280
                 : spellRangeFeet(range),
@@ -207,10 +234,11 @@ export const actionCommands = [
           });
           placed = many.placed[0] ?? null;
           morePlaced = many.placed.slice(1);
-          resolvedTargetIds = many.targetIds;
+          // Areas left to act later (a ring's lightning spheres) catch no one as they appear.
+          resolvedTargetIds = leavesArea && !action.zone?.atCast ? [] : many.targetIds;
           // Whether the areas hold anyone is judged on what the caster's player can see, as for one area.
           const unseen = isPlayer ? hiddenFromPlayer(draft) : new Set<string>();
-          if (!resolvedTargetIds.some((id) => !unseen.has(id)))
+          if (!leavesArea && !resolvedTargetIds.some((id) => !unseen.has(id)))
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside those areas." : "No combatants are inside those areas."
             );
@@ -222,7 +250,10 @@ export const actionCommands = [
           // The action's own area decides the shape and the size, grown with a cast's slot (Fog Cloud); the drag only
           // places and points it.
           const casting = castSpellOf(action, kit.equipmentCatalog().spellRecord);
-          const area = action.area && casting ? areaAtLevel(action.area, casting, request.slotLevel) : action.area;
+          // The form the cast picked is placed as its own area (Wall of Fire's ring).
+          const form = casting ? pickedZoneRow(casting, request.option) : undefined;
+          const ownArea = form?.area ?? action.area;
+          const area = ownArea && casting ? areaAtLevel(ownArea, casting, request.slotLevel) : ownArea;
           placed = area ? templateOfArea(calibration, template, area) : template;
           // Snap the template the same way the drawn annotation will, then find who is under it.
           const snapped = shapeGeometry(calibration, placed.shape, placed.origin, placed.target);
@@ -230,6 +261,14 @@ export const actionCommands = [
           const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
           originAtCaster = casterOutside;
           areaOrigin = areaOriginPoint(snapped, placed.shape);
+          // An action's own point range, as no spell's range covers it (Land's Aid: "a point within 60 feet").
+          const pointRange = spell ? undefined : action.area?.rangeFeet;
+          const userAt = draft.combat.tokens.find((token) => token.actorId === actorId)?.position;
+          if (pointRange !== undefined && userAt) {
+            const apart = mapDistance(geometry!, userAt, areaOrigin)?.value ?? null;
+            if (apart !== null && apart > pointRange + DISTANCE_TOLERANCE_FEET)
+              throw new CommandRejectedError(`${action.name}'s area centres on a point within ${pointRange} feet.`);
+          }
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
@@ -259,6 +298,14 @@ export const actionCommands = [
             },
             calibration.distancePerCell
           );
+          // A ringed wall catches the creatures on its edge, not those it rings.
+          if (form?.zone?.ring && placed.shape === "circle") {
+            const onRing = ringTest(calibration, snapped);
+            resolvedTargetIds = resolvedTargetIds.filter((id) => {
+              const token = draft.combat.tokens.find((candidate) => candidate.actorId === id);
+              return token?.position ? onRing(token.position, token.sizeCells) : false;
+            });
+          }
           // "Each creature on the ground in the area" (Earthquake): one in the air above it is spared.
           if (spell && zoneRowOf(spell)?.zone?.grounded)
             resolvedTargetIds = resolvedTargetIds.filter(
@@ -283,8 +330,9 @@ export const actionCommands = [
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
             );
-          // Caltrops spread under a creature catch it only as it moves in.
-          if (leavesArea) resolvedTargetIds = [];
+          // Caltrops spread under a creature catch it only as it moves in, though a djinni's whirlwind catches whoever
+          // it appears on; ground left out of a spell's area (Plant Growth) catches no one.
+          if ((leavesArea && !action.zone?.atCast) || areaRow?.cutsArea) resolvedTargetIds = [];
           // What moves the spell's area (Moonbeam's move, Flaming Sphere's ram) places that area there instead, and
           // its save falls on the creatures the area moves onto.
           const moving = areaMoveOf(action, kit.equipmentCatalog());
@@ -296,12 +344,14 @@ export const actionCommands = [
                 spell: moving.spell,
                 feet: moving.feet,
                 fromCaster: moving.fromCaster,
+                terms: moving.terms,
                 placed,
                 override: isPlayer ? null : (override ?? null),
                 widthFeet: action.area?.widthFeet ?? null
               },
               geometry!
             );
+            areaMoveTerms = moving.terms;
             resolvedTargetIds = action.save ? areaMove.movedOnto : [];
           }
         } else {
@@ -330,6 +380,21 @@ export const actionCommands = [
               throw new CommandRejectedError(OUTSIDE_FIGHT_TARGETS);
           }
         }
+        // A bolt from a spell's cloud strikes under it (Call Lightning, Storm of Vengeance).
+        if (areaSpell && geometry?.calibration && commit !== false)
+          areaAimNote = checkAimInArea(
+            draft,
+            {
+              casterId: actorId,
+              action,
+              spell: areaSpell,
+              point: placed?.origin ?? null,
+              targetIds: template || templates ? [] : resolvedTargetIds,
+              override: isPlayer ? null : (override ?? null),
+              option: request.option
+            },
+            kit.zoneDeps(draft, geometry)
+          );
         // An area's own rules leave some creatures under it out ("each enemy in a Sphere").
         if ((template || templates) && action.targets && resolvedTargetIds.length > 0) {
           const out = areaLeavesOut({
@@ -463,6 +528,9 @@ export const actionCommands = [
             ...(request.itemId !== undefined ? { itemId: request.itemId } : {}),
             ...(request.objectItemId !== undefined ? { objectItemId: request.objectItemId } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
+            ...(request.mastery !== undefined ? { mastery: request.mastery } : {}),
+            ...(request.vitalityTo !== undefined ? { vitalityTo: request.vitalityTo } : {}),
+            ...(request.aidTo !== undefined ? { aidTo: request.aidTo } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
@@ -528,15 +596,29 @@ export const actionCommands = [
                   zoneCover: (fromId: string, targetId: string) =>
                     zoneCover(draft, fromId, targetId, kit.zoneDeps(draft, geometry)),
                   deflectedBy: (fromId: string, targetId: string) =>
-                    deflectingWall(draft, fromId, targetId, kit.zoneDeps(draft, geometry))
+                    deflectingWall(draft, fromId, targetId, kit.zoneDeps(draft, geometry)),
+                  zoneFeet: (fromId: string, zoneId: string) => zonePointFeet(draft, fromId, zoneId, geometry),
+                  moveZone: (zoneId: string, towardActorId: string, feet: number) =>
+                    moveZoneToward(
+                      draft,
+                      { zoneId, towardActorId, feet, actor: { sessionId: gmSessionId, role: "gm" } },
+                      kit.zoneDeps(draft, geometry)
+                    )
                 }
               : {})
           }
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
         if (!resolution.preview) countOptionUse(draft, actorId, actionId);
+        if (!resolution.preview && areaSpell && areaRow?.atRow) markStageUse(draft, actorId, areaRow, areaSpell);
         // The force moved before it struck again.
-        if (force && geometry && !resolution.preview) settleForce(draft, force, geometry);
+        if (force && geometry && !resolution.preview) {
+          settleForce(draft, force, geometry);
+          // Interposing Hand leaves the hand between its caster and harm until it causes another effect.
+          const forceSpell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
+          const forceRow = forceSpell ? laterRowOf(forceSpell, action.id) : undefined;
+          if (forceRow) settleInterposing(draft, force, forceRow.interposes === true);
+        }
         if (force?.note) resolution = { ...resolution, warnings: [...(resolution.warnings ?? []), force.note] };
         // The familiar's Reaction delivered the touch.
         if (courier && !resolution.preview && draft.combat.active && !draft.combat.reactionsUsed.includes(courier))
@@ -570,6 +652,15 @@ export const actionCommands = [
               })
             : [])
         ];
+        // Reincarnate's new body: a character is rebuilt with the rolled species.
+        if (!resolution.preview)
+          restBroken.push(
+            ...settleReincarnations(draft, {
+              library: kit.playCatalog(),
+              policy: draft.builderPolicy,
+              catalog: kit.equipmentCatalog()
+            })
+          );
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)
@@ -593,8 +684,13 @@ export const actionCommands = [
         // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.
         const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
         // A nearly imperceptible glyph is drawn for the GM and its caster's player alone.
-        const unseenArea = spell ? zoneRowOf(spell)?.zone?.hidden === true : action.zone?.hidden === true;
-        if (placed && areaMove) {
+        const unseenArea = spell
+          ? (pickedZoneRow(spell, request.option) ?? zoneRowOf(spell))?.zone?.hidden === true
+          : action.zone?.hidden === true;
+        // The ground a caster leaves out of its spell's area (Plant Growth) is cut from the area, with nothing drawn.
+        if (placed && areaRow?.cutsArea && areaSpell && geometry && !resolution.preview)
+          areaEvents = leaveOut(draft, { casterId: actorId, spell: areaSpell, placed }, kit.zoneDeps(draft, geometry));
+        else if (placed && areaMove) {
           areaMoveNote = areaMove.note;
           areaEvents = moveArea(
             draft,
@@ -604,15 +700,17 @@ export const actionCommands = [
             {
               ...kit.zoneDeps(draft, geometry),
               geometry: geometry!
-            }
+            },
+            areaMoveTerms
           );
-        } else if (placed)
+        } else if (placed) {
           // The first area takes the command's id, which a lingering spell's zone reads; any others take their own.
+          const areaIds = [placed, ...morePlaced].map((_, index) => (index === 0 ? commandId : kit.context.newId()));
           [placed, ...morePlaced].forEach((shape, index) =>
             addAnnotation(
               draft,
               {
-                id: index === 0 ? commandId : kit.context.newId(),
+                id: areaIds[index]!,
                 kind: "shape",
                 shape: shape.shape,
                 origin: shape.origin,
@@ -626,6 +724,21 @@ export const actionCommands = [
               geometry!
             )
           );
+          // Each area an item's use leaves acts on its own (a Ring of Shooting Stars' lightning spheres).
+          if (leavesArea && !resolution.preview) zoneForEachArea(draft, commandId, areaIds.slice(1));
+        }
+        // A fire's area sets the webs it covers burning (Web).
+        const fiery = action.damage.some((part) => part.type === "fire") || request.damageType === "fire";
+        if (placed && !areaMove && !resolution.preview && fiery && geometry)
+          for (const shape of [placed, ...morePlaced])
+            areaEvents = [
+              ...areaEvents,
+              ...igniteUnder(
+                draft,
+                { ...shape, widthFeet: action.area?.widthFeet ?? null },
+                kit.zoneDeps(draft, geometry)
+              )
+            ];
       });
       if (duplicate || !resolution) return;
       // A player's reply names only the creatures they may see; the rest of an area's catch stays with the GM.
@@ -678,13 +791,14 @@ export const actionCommands = [
         kit.publishNarrations(pushedThrough);
         for (const note of wardNotes)
           kit.context.appendLog({ kind: "action", text: note, actorIds: [actorId], gmOnly: true });
-        if (areaMoveNote)
-          kit.context.appendLog({
-            kind: "action",
-            text: `Rules note: ${areaMoveNote}`,
-            actorIds: [actorId],
-            gmOnly: true
-          });
+        for (const note of [areaMoveNote, areaAimNote])
+          if (note)
+            kit.context.appendLog({
+              kind: "action",
+              text: `Rules note: ${note}`,
+              actorIds: [actorId],
+              gmOnly: true
+            });
         for (const { outcome, targetId, sourceActorId, label } of playerDamageApplied) {
           // Narrated like actor:apply-damage. Both actors ride actorIds so the line is gm-only if either is hidden.
           const detail = damageAdjustmentDetail(outcome.application);
@@ -785,7 +899,7 @@ export const actionCommands = [
       const named = targetIds && targetIds.length > 0 ? targetIds : !rollsOnTargets && aimed ? [actorId] : [];
       // A shape-shift outside a fight (Wild Shape to scout, a werewolf's change) takes its form the same way.
       const shapeShifts = listed.shapeShift !== undefined || listed.endsForm === true;
-      const itemGrant = isItemActionId(listed.id) && listed.grants !== undefined;
+      const itemGrant = isItemActionId(listed.id) && (listed.grants !== undefined || listed.rebindsRow !== undefined);
       if (
         !snapshot.combat.active &&
         (castSpellOf(listed, kit.equipmentCatalog().spellRecord) !== null || shapeShifts || itemGrant) &&
@@ -835,11 +949,13 @@ export const actionCommands = [
       });
       const initiator = initiatorOf(principal);
       const rollIds = plan.map(() => kit.context.newId());
-      const scrollCheckId = kit.context.newId();
-      let scrollChecked = false;
-      let scrollLost: string | null = null;
+      const checkId = kit.context.newId();
+      let checked = false;
+      let checkFailed: string | null = null;
       let spend: ReturnType<typeof spendLooseUses> = { usesLeft: null, spent: false };
       let lastCharge: string | null = null;
+      let timedLine: string | null = null;
+      let breakLine: string | null = null;
       let usedUp = false;
       let narrations: EffectNarration[] = [];
       let rulesNote: string | null = null;
@@ -858,8 +974,9 @@ export const actionCommands = [
         // A scroll outside a fight: one the reader can't read is refused, and a spell above their levels needs its
         // check first. A failure loses the scroll, and nothing else is rolled.
         const scroll = scrollOfAction(action, live.inventory, kit.equipmentCatalog());
-        scrollChecked = false;
-        scrollLost = null;
+        checked = false;
+        checkFailed = null;
+        breakLine = null;
         if (scroll) {
           const catalog = kit.equipmentCatalog();
           const reading = scrollReading(definition, scroll.spell, catalog);
@@ -877,7 +994,7 @@ export const actionCommands = [
               live,
               plan,
               {
-                id: scrollCheckId,
+                id: checkId,
                 commandId,
                 sessionId: sessionIdOf(principal),
                 role: initiator.role,
@@ -887,12 +1004,44 @@ export const actionCommands = [
               },
               (sides) => kit.context.random(sides)
             );
-            scrollChecked = true;
+            checked = true;
             if (rolled.total < reading.check.dc) {
-              scrollLost = scrollLostLine(live.name, scroll.spell.name);
+              checkFailed = scrollLostLine(live.name, scroll.spell.name);
               live.inventory = withOneUsedUp(live.inventory, scroll.row.id);
               return;
             }
+          }
+        }
+        // An item's cast that asks a check first (an Amulet of the Planes): a failure spends the use, and nothing else
+        // is rolled.
+        if (action.castCheck) {
+          const catalog = kit.equipmentCatalog();
+          const plan = checkPlan(
+            live,
+            definition,
+            deriveEquipment(live, definition, catalog),
+            castCheckSubject(action.castCheck)
+          );
+          const rolled = rollSettledCheck(
+            draft,
+            live,
+            plan,
+            {
+              id: checkId,
+              commandId,
+              sessionId: sessionIdOf(principal),
+              role: initiator.role,
+              label: castCheckLabel(action.castCheck, action.name),
+              visibility: live.visibility === "gm-only" ? "gm-only" : "public",
+              createdAt: new Date().toISOString()
+            },
+            (sides) => kit.context.random(sides)
+          );
+          checked = true;
+          if (rolled.total < action.castCheck.dc) {
+            spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
+            checkFailed = castCheckFailedLine(live.name, action.name);
+            return;
           }
         }
         // A shot outside a fight needs a piece to fire and spends it as in one; half come back when it is picked up.
@@ -929,7 +1078,60 @@ export const actionCommands = [
             throw new RulesBlockedError(UNTRAINED_ARMOR, armorBlock);
           if (mode !== "freeform") rulesNote = armorBlock;
         }
+        // An item that may break with use rolls its d100 (a Wind Fan before it works, a Horn of Blasting after).
+        const breakable = breakableItemOf(action, live.inventory, kit.equipmentCatalog());
+        const usesKey = action.uses ? (action.uses.pool ?? action.id) : null;
+        const breakRolls = {
+          d100: (label: string) => {
+            const face = kit.context.random(100);
+            recordRoll(draft, {
+              id: kit.context.newId(),
+              commandId,
+              initiatorSessionId: sessionIdOf(principal),
+              initiatorRole: initiator.role,
+              initiatorLabel: live.name,
+              label,
+              actorId,
+              purpose: "manual",
+              visibility: live.visibility === "gm-only" ? "gm-only" : "public",
+              formula: "1d100",
+              normalizedFormula: "1d100",
+              dice: [{ group: 0, sides: 100, face, kept: true, sign: 1 as const }],
+              modifiers: [],
+              total: face,
+              createdAt: new Date().toISOString()
+            });
+            return face;
+          },
+          damage: (formula: string) => rollDice(formula, (sides) => kit.context.random(sides)).total
+        };
+        if (breakable?.breaks.failsUse) {
+          const usesBefore = usesKey ? (live.actionUses[usesKey] ?? 0) : 0;
+          const broke = looseBreak(live, breakable, usesBefore, breakRolls, definition, kit.equipmentCatalog());
+          if (broke) {
+            checkFailed = broke;
+            return;
+          }
+        }
         spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
+        breakLine =
+          breakable && !breakable.breaks.failsUse
+            ? looseBreak(
+                live,
+                breakable,
+                usesKey ? Math.max(0, (live.actionUses[usesKey] ?? 0) - useCostOf(action)) : 0,
+                breakRolls,
+                definition,
+                kit.equipmentCatalog()
+              )
+            : null;
+        // A pool spent for a time starts its wait on its first use, outside a fight as in one (Well of Many Worlds).
+        timedLine =
+          action.uses?.per === "time" && action.uses.afterHours
+            ? startTimedPool(draft, live, action.uses.pool ?? action.id, action.name, action.uses.afterHours, (sides) =>
+                kit.context.random(sides)
+              )
+            : null;
         // Casting a spell other than a cantrip stops a Short Rest.
         if (spell && spell.level > 0)
           narrations = [
@@ -949,10 +1151,14 @@ export const actionCommands = [
             ...narrations,
             ...grantOutsideFight(draft, live, action, commandId, (sides) => kit.context.random(sides))
           ];
-        // SRD charged items: spending the last charge rolls a d20, whose 1 is the item's own text.
+        // SRD charged items: spending the last charge rolls a d20, whose 1 does what the item says; one that never
+        // comes back ends with no roll (a Chime of Opening cracks).
         const due = spend.usesLeft === 0 ? lastChargeRollFor(action, live.inventory, kit.equipmentCatalog()) : null;
         lastCharge = null;
-        if (due) {
+        const outcome = due?.record.charges?.lastCharge;
+        if (due && outcome && !due.record.charges?.lastChargeRoll)
+          lastCharge = `${due.item.name}'s last charge is spent. ${endItemMagic(live, due.item, outcome, definition, kit.equipmentCatalog())}`;
+        else if (due) {
           const face = kit.context.random(20);
           recordRoll(draft, {
             id: kit.context.newId(),
@@ -971,7 +1177,15 @@ export const actionCommands = [
             total: face,
             createdAt: new Date().toISOString()
           });
-          lastCharge = lastChargeLine(due.item.name, face);
+          const twenty = due.record.charges?.lastChargeTwenty;
+          lastCharge =
+            face === 1 && outcome
+              ? `${due.item.name}'s last charge is spent and the d20 shows 1. ${endItemMagic(live, due.item, outcome, definition, kit.equipmentCatalog())}`
+              : face === 20 && twenty && action.uses
+                ? regainOnTwenty(live, action.uses.pool ?? action.id, due.item.name, twenty, (sides) =>
+                    kit.context.random(sides)
+                  )
+                : lastChargeLine(due.item.name, face);
         }
         plan.forEach((entry, index) => {
           const resolution = rollDice(entry.formula, (sides) => kit.context.random(sides));
@@ -995,7 +1209,7 @@ export const actionCommands = [
         });
         healed = applyLooseHealing(draft, action, healTargets, healRoll, (sides) => kit.context.random(sides));
       });
-      const usedRollIds = scrollLost !== null ? [scrollCheckId] : scrollChecked ? [scrollCheckId, ...rollIds] : rollIds;
+      const usedRollIds = checkFailed !== null ? [checkId] : checked ? [checkId, ...rollIds] : rollIds;
       // Who regained what goes back to the one who used it, as the fight's resolution says it.
       const healedReply = healed.healing ? { healing: healed.healing } : {};
       if (duplicate) return { route: "loose", rollIds: usedRollIds };
@@ -1003,10 +1217,10 @@ export const actionCommands = [
       kit.publishNarrations(narrations);
       for (const line of healed.lines)
         kit.context.appendLog({ kind: "heal", text: line.text, actorIds: [line.actorId] });
-      if (scrollLost !== null) {
+      if (checkFailed !== null) {
         kit.context.appendLog({
           kind: "action",
-          text: scrollLost,
+          text: checkFailed,
           actorId,
           actorIds: [actorId],
           gmOnly: kit.actorHidden(actorId)
@@ -1022,14 +1236,15 @@ export const actionCommands = [
             actorIds: [actorId],
             gmOnly: true
           });
-      if (lastCharge !== null)
-        kit.context.appendLog({
-          kind: "action",
-          text: lastCharge,
-          actorId,
-          actorIds: [actorId],
-          gmOnly: kit.actorHidden(actorId)
-        });
+      for (const line of [lastCharge, timedLine, breakLine])
+        if (line !== null)
+          kit.context.appendLog({
+            kind: "action",
+            text: line,
+            actorId,
+            actorIds: [actorId],
+            gmOnly: kit.actorHidden(actorId)
+          });
       // Rolls narrate themselves; a use with nothing to roll, or one that cost a charge, says so.
       if (plan.length === 0 || spend.spent || usedUp) {
         const cost = useCostOf(action);

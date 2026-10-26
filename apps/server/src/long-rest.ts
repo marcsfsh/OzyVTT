@@ -5,6 +5,7 @@ import type { EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 import { clockMinutesOf, passGameTime } from "./game-time.js";
+import { holdsTrance, TRANCE_LONG_REST_MINUTES } from "./trance.js";
 
 /**
  * The party's Long Rest as a span of game time (SRD 5.2.1 Rules Glossary, Long Rest): it opens when the GM starts it and
@@ -130,8 +131,17 @@ export function interruptByGm(
   return interruptLongRest(state, new Set([actorId]), "spent an hour in physical exertion", apply);
 }
 
-/** The minutes from the rest's start each member still resting needs: 8 hours and 1 more per interruption. */
-const neededMinutes = (member: Member) => LONG_REST_MINUTES_SPAN + member.interruptions * 60;
+/** The minutes from the rest's start each member still resting needs: 8 hours (4 in an elf's Trance) and 1 more per
+ *  interruption. */
+function neededMinutes(
+  state: GameState,
+  member: Member,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): number {
+  const actor = state.actors.find((candidate) => candidate.id === member.actorId);
+  const definition = actor?.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  return (holdsTrance(definition) ? TRANCE_LONG_REST_MINUTES : LONG_REST_MINUTES_SPAN) + member.interruptions * 60;
+}
 
 /**
  * The GM ends the party's Long Rest. With `apply`, the clock moves on to the end of the longest rest still under way
@@ -158,7 +168,12 @@ export function finishLongRest(
     return { events, rested: [], hours: 0 };
   }
   const resting = rest.members.filter((member) => !member.interrupted);
-  const end = rest.startedAt + Math.max(LONG_REST_MINUTES_SPAN, ...resting.map(neededMinutes));
+  // The longest rest still under way: a party all in Trance is done in 4 hours.
+  const end =
+    rest.startedAt +
+    (resting.length === 0
+      ? LONG_REST_MINUTES_SPAN
+      : Math.max(...resting.map((member) => neededMinutes(state, member, deps.resolveDefinition))));
   const before = clockMinutesOf(state);
   const events = passGameTime(
     state,

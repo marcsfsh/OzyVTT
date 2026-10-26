@@ -62,6 +62,24 @@ function pushDestination(
   return null;
 }
 
+/** Pulls a token straight toward a point on the map (a whirlpool's middle), up to `distanceFeet`, and reports how far
+ *  it actually went; null when the map can't measure it or the token already stands there. */
+export function pullTokenToward(
+  state: GameState,
+  actorId: string,
+  point: EncounterTokenPosition,
+  distanceFeet: number,
+  geometry: TokenMapGeometry
+): Readonly<{ value: number; unit: string }> | null {
+  const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+  if (from === null) return null;
+  const destination = pushDestination(geometry, from, point, -distanceFeet);
+  if (destination === null) return null;
+  moveEncounterToken(state, actorId, destination, geometry);
+  const to = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+  return to === null ? null : mapDistance(geometry, from, to);
+}
+
 /** Pushes a token straight away from another combatant and reports how far it actually went, measured
  *  after the snap (a push into the map edge is clamped). Null means nothing moved and the GM should
  *  place the token by hand. */

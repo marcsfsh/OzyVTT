@@ -6,6 +6,7 @@ import { BuilderPolicySchema, GameStateSchema, type GameState } from "@vtt/domai
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies, type ResolveInput } from "../src/action-resolution.js";
 import { importActorDefinition, storedDefinition } from "../src/actor-roster.js";
+import { builtinActionFor } from "../src/builtin-actions.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
@@ -215,14 +216,18 @@ export function fight(table: Table, actorId: string): void {
   );
 }
 
-/** The effective action with this id, as the resolver would read it. */
+/** The effective action with this id, as the resolver would read it, else the generic action of that id. */
 export function actionOf(table: Table, actorId: string, actionId: string) {
-  const action = effectiveActions(table.definition(actorId), table.actor(actorId), catalog).find(
-    (entry) => entry.id === actionId
-  );
+  const action =
+    effectiveActions(table.definition(actorId), table.actor(actorId), catalog).find((entry) => entry.id === actionId) ??
+    builtinActionFor(table.definition(actorId), actionId, table.actor(actorId));
   if (!action) throw new Error(`no ${actionId} action`);
   return action;
 }
+
+/** Whether the action with this id is a generic one, which the resolver takes with its special cases. */
+const isBuiltin = (table: Table, actorId: string, actionId: string) =>
+  !effectiveActions(table.definition(actorId), table.actor(actorId), catalog).some((entry) => entry.id === actionId);
 
 let command = 0;
 /** Resolves one action at the foe with queued dice faces; `distanceFeet` puts every pair of combatants that far apart. */
@@ -257,6 +262,7 @@ export function resolveAt(
       actorId,
       targetIds: [IDS.foe],
       commandId: `50000000-0000-4000-8000-${String(command).padStart(12, "0")}`,
+      ...(isBuiltin(table, actorId, actionId) ? { builtin: true } : {}),
       ...input
     },
     deps

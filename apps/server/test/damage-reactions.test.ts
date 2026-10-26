@@ -158,15 +158,28 @@ function goblinUses(game: GameState, action: object, faces: number[], feet = 5) 
 }
 
 function answer(game: GameState, use: boolean, faces: number[] = []) {
-  return answerReaction(game, nextId(), game.combat.pendingReactions[0]!.id, use, undefined, GM, {
-    resolveDefinition: lookup(game),
-    catalog,
-    random: dice(faces),
-    newRollId: nextId,
-    gmSessionId: IDS.gm,
-    now: () => NOW,
-    distanceFeet: () => 5
-  });
+  return answerWith(game, use, faces);
+}
+
+function answerWith(game: GameState, use: boolean, faces: number[], options: { redirectTo?: string } = {}) {
+  return answerReaction(
+    game,
+    nextId(),
+    game.combat.pendingReactions[0]!.id,
+    use,
+    undefined,
+    GM,
+    {
+      resolveDefinition: lookup(game),
+      catalog,
+      random: dice(faces),
+      newRollId: nextId,
+      gmSessionId: IDS.gm,
+      now: () => NOW,
+      distanceFeet: () => 5
+    },
+    options
+  );
 }
 
 type Row = CharacterCreateRequestInput["choices"][number];
@@ -227,7 +240,12 @@ describe("Deflect Attacks", () => {
       }
     });
     const thirteenth = monk(13).actions.find((action) => action.id === "deflect-attacks");
-    expect(thirteenth?.reaction).toEqual({ trigger: "hit-by-attack", response: "reduce-damage", formula: "1d10 + 18" });
+    expect(thirteenth?.reaction).toEqual({
+      trigger: "hit-by-attack",
+      response: "reduce-damage",
+      formula: "1d10 + 18",
+      redirectsAtZero: true
+    });
   });
 
   it("takes the rolled amount off a slashing hit and spends the Reaction", () => {
@@ -262,6 +280,57 @@ describe("Deflect Attacks", () => {
     const before = hero(thirteenth).hp.current;
     answer(thirteenth, true, [1]);
     expect(hero(thirteenth).hp.current).toBe(before);
+  });
+
+  it("brought to 0, spends a Focus Point to redirect the force at a creature within 5 feet, which saves or takes it", () => {
+    const game = table(monk(3));
+    goblinUses(game, SCIMITAR, [15, 6]);
+    expect(game.combat.pendingReactions[0]?.redirectChoices).toEqual([{ actorId: IDS.goblin, name: "Goblin" }]);
+    // 7 + 6 = 13 off 8 Slashing, then 2d6 + 3 (Martial Arts d6 at Monk 3, Dex 17).
+    const used = answerWith(game, true, [7, 4, 5], { redirectTo: IDS.goblin });
+    expect(used).toMatchObject({ used: true, appliedDamage: 0 });
+    expect(hero(game).actionUses["focus-points"]).toBe(1);
+    // DC 8 + Wis 2 + Proficiency 2.
+    expect(game.combat.pendingSaves).toEqual([
+      expect.objectContaining({
+        targetActorId: IDS.goblin,
+        actionName: "Deflect Attacks (redirect)",
+        ability: "dex",
+        dc: 12,
+        proposedDamage: 12,
+        proposedDamageParts: [{ amount: 12, type: "slashing" }],
+        halfOnSuccess: false
+      })
+    ]);
+  });
+
+  it("redirects nothing when the roll leaves damage, or with no Focus Point left", () => {
+    const short = table(monk(3));
+    goblinUses(short, SCIMITAR, [15, 6]);
+    expect(answerWith(short, true, [1], { redirectTo: IDS.goblin })).toMatchObject({ appliedDamage: 1 });
+    expect(short.combat.pendingSaves).toEqual([]);
+    expect(hero(short).actionUses["focus-points"]).toBeUndefined();
+    const spent = table(monk(3));
+    hero(spent).actionUses = { "focus-points": 3 };
+    goblinUses(spent, SCIMITAR, [15, 6]);
+    expect(spent.combat.pendingReactions[0]?.redirectChoices).toBeUndefined();
+  });
+
+  it("from a ranged hit, offers creatures within 60 feet that aren't behind Total Cover", () => {
+    const open = table(monk(3));
+    goblinUses(open, SHORTBOW, [15, 6], 30);
+    expect(open.combat.pendingReactions[0]?.redirectChoices).toEqual([{ actorId: IDS.goblin, name: "Goblin" }]);
+    const covered = table(monk(3));
+    covered.actors
+      .find((actor) => actor.id === IDS.goblin)!
+      .effects.push(
+        makeEffect({ id: "cover", name: "Total Cover", tags: ["cover-total"], duration: { type: "manual" } })
+      );
+    goblinUses(covered, SHORTBOW, [15, 6], 30);
+    expect(covered.combat.pendingReactions[0]?.redirectChoices).toBeUndefined();
+    const far = table(monk(3));
+    goblinUses(far, SHORTBOW, [15, 6], 70);
+    expect(far.combat.pendingReactions[0]?.redirectChoices).toBeUndefined();
   });
 
   it("declined, the whole hit lands and the Reaction stays", () => {

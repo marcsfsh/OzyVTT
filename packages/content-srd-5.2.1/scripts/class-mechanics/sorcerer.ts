@@ -190,6 +190,7 @@ export const sorcerer: ClassMechanicsModule = {
                 type: "extra-damage" as const,
                 abilityModifier: "cha" as const,
                 damageType: id,
+                oncePerCast: true as const,
                 when: [
                   { type: "on-damage-roll" as const },
                   { type: "damage-type-is" as const, damageTypes: [id] },

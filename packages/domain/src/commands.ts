@@ -596,6 +596,15 @@ export const ActionResolveSchema = z
       .optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
+    /** Who the Temporary Hit Points of an action with `vitality` go to once its damage lands (Improved Potent
+     *  Spellcasting): the user, or a creature within the range it names. Absent, the user. */
+    vitalityTo: z.uuid().optional(),
+    /** The creature in an action's area that regains its `areaHeal` (Land's Aid), checked to stand in one area with
+     *  the creatures picked. Absent, nobody regains them. */
+    aidTo: z.uuid().optional(),
+    /** Tactical Master (Fighter 9): the Push, Sap or Slow property this attack takes in place of its weapon's own
+     *  mastery, sent with every look at the attack and its confirm. Refused for a swing that can't take it. */
+    mastery: z.enum(["push", "sap", "slow"]).optional(),
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
      *  above it with a slot left. */
     slotLevel: z.number().int().min(1).max(9).optional(),
@@ -744,8 +753,9 @@ export const ReactionAnswerSchema = z
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
-    /** Redirect Attack: the ally the attack turns to; Deflect Missile: the creature the force turns on if the damage is
-     *  reduced to 0. One of the prompt's `redirectChoices`. */
+    /** Redirect Attack: the ally the attack turns to; Deflect Missile and Deflect Attacks: the creature the force turns
+     *  on if the damage is reduced to 0 (Deflect Attacks spends a Focus Point on it). One of the prompt's
+     *  `redirectChoices`. */
     redirectTo: z.uuid().optional(),
     /** The spell slot a reaction spell is cast with (Shield, Hellish Rebuke, Counterspell): absent, its own level or the
      *  lowest above it with a slot left. A higher slot upcasts it as a cast on the caster's turn does. */
@@ -930,11 +940,18 @@ export const SaveRollSchema = z
     face: z.number().int().min(1).max(20).optional(),
     /** GM only: a hand-entered final total, used as given. */
     total: z.number().int().min(-50).max(100).optional(),
+    /** Throw the character's latest loose save of this ability again, while it is still the character's latest roll
+     *  (SRD Heroic Inspiration: "reroll any die immediately after rolling it"): a player spends Heroic Inspiration to
+     *  reroll one d20, the GM throws afresh; a typed save takes `face`. */
+    reroll: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
   .refine((payload) => payload.face === undefined || payload.total === undefined, {
     error: "Supply a typed d20 or a final total, and only one of the two."
+  })
+  .refine((payload) => payload.reroll !== true || payload.total === undefined, {
+    error: "A reroll throws the die again; a final total can't come with it."
   });
 
 const SkillOrToolIdSchema = z
@@ -1567,6 +1584,9 @@ export const ActorSpendHitDiceSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     count: z.number().int().min(1).max(40),
+    /** Reroll one die of the character's latest spend instead, while it is still the character's latest roll (SRD
+     *  Heroic Inspiration: "reroll any die immediately after rolling it"); `count` is ignored. */
+    reroll: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -2193,6 +2213,9 @@ export const ActorMountSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     mountId: z.uuid().nullable(),
+    /** SRD Mounted Combat: the rider controls the mount (it moves on the rider's Initiative and only Dashes, Disengages
+     *  or Dodges), or lets it act on its own (an intelligent mount, a wild one). Absent: controlled. */
+    control: z.enum(["controlled", "independent"]).optional(),
     /** GM-grade bypass of a movement-rule rejection (the half Speed it costs, a mount too small or too far). */
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()

@@ -1,3 +1,5 @@
+import { endCrossedBonds, WARDING_BOND_TAG } from "../warding-bond.js";
+import { openStoreWindow } from "../stored-casts.js";
 import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, type GameState } from "@vtt/domain";
 import { abilityModifier, rollDice } from "@vtt/rules-5e";
 import type { DamageType, EffectInstance, Modifier } from "@vtt/schemas";
@@ -25,6 +27,7 @@ import {
 import { refreshBaseArmorClass } from "../actor-roster.js";
 import { teleportsEachTurn } from "../granted-moves.js";
 import { planeTravelBarred, travelsPlanes } from "../ethereal.js";
+import { altitudeOf } from "../altitude.js";
 import { holdsFeature } from "../class-features.js";
 import { GIFT_OF_THE_PROTECTORS_TAG, refuseFullPage } from "../book-of-shadows.js";
 import { deriveEquipment } from "../equipment-derivation.js";
@@ -245,6 +248,14 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const rolledHours = grant.hoursRolled
     ? Math.max(1, resolveDice(parseDiceFormula(grant.hoursRolled), ctx.deps.random).total)
     : null;
+  // A use paid from a pool of time lasts what it spent (Boots of Speed's rounds left), and gives back what is left when
+  // it is ended early.
+  const paid = action.timePool && ctx.plan.spendUse ? ctx.plan.spendUse : null;
+  const timed: EffectInstance["duration"] | null = paid
+    ? action.timePool === "hours"
+      ? { type: "minutes", remaining: paid.amount * 60 }
+      : { type: "rounds", remaining: paid.amount }
+    : null;
   const spell = spellOf(ctx);
   const castLevel = spell ? (ctx.plan.castLevel ?? spell.level) : null;
   // The choice made as it is granted (Fire Shield's warm or chill), and the weapon it binds to (Magic Weapon).
@@ -280,7 +291,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       tags: [...new Set([...(rage ? rage.tags : grant.tags), ...parts.tags])].slice(0, 8),
       sourceActorId: attacker.id,
       sourceName: attacker.name,
-      sourceActionId: action.id,
+      // A cast that also shape-shifts its targets (Wind Walk) or keeps its spell up on its caster (Glyph of Warding)
+      // keeps its grant beside the form or the spell's own effect.
+      sourceActionId: action.shapeShift || grant.storeAwaits ? `${action.id}:grant` : action.id,
       startedRound: rage?.startedRound ?? state.combat.round,
       duration: rage?.duration
         ? rage.duration
@@ -288,17 +301,20 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
           : rolledHours !== null
             ? { type: "minutes", remaining: rolledHours * 60 }
-            : grantDuration(
-                state,
-                grant.duration,
-                attacker.id,
-                spell && castLevel !== null ? { spell, castLevel } : null
-              ),
+            : timed
+              ? timed
+              : grantDuration(
+                  state,
+                  grant.duration,
+                  attacker.id,
+                  spell && castLevel !== null ? { spell, castLevel } : null
+                ),
       // A spell's effect outlasts its caster's fall; only Concentration ends it early. A die given to another creature
       // (Bardic Inspiration) is its own once given.
       endsWhenSourceDefeated:
         action.spellId === undefined && grant.answer === undefined && !grant.tags.includes(ENDS_ON_DEATH_TAG),
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
+      ...(grant.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
       modifiers: [
         ...modifiers,
         ...hexDisadvantage,
@@ -331,7 +347,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...(grant.light ? { light: { ...grant.light } } : {}),
       // The creatures it lets its bearer sense (Divine Sense), drawn for its player alone (`vision/detect.ts`).
       ...(grant.detects ? { detects: { ...grant.detects, creatureTypes: [...grant.detects.creatureTypes] } } : {}),
-      ...(steadyAim ? { speedZero: true } : {}),
+      ...(steadyAim || grant.speedZero ? { speedZero: true } : {}),
       ...grantedMovement,
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
       ...(conditionImmunities.length > 0 ? { conditionImmunities: conditionImmunities.slice(0, 6) } : {}),
@@ -343,12 +359,20 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // Its size while it lasts (Large Form), from the size it had before any change.
       ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(recipient) } : {}),
       ...grantExtras(ctx, grant, recipient, option),
-      ...(bound?.fields ?? {})
+      // Every other way out the grant prints (bursting a Chain), beside its own end action.
+      ...(grant.endedBy ? { endedBy: structuredClone(grant.endedBy) } : {}),
+      ...anchorOf(state, recipient.id, grant.anchors),
+      ...(bound?.fields ?? {}),
+      ...(paid ? { refundsUses: { key: paid.key } } : {})
     }),
     replaced,
     deps
   );
   if (effect.sizeChange) refreshSize(state, recipient);
+  // Contingency, a spell glyph or a Ring of Spell Storing held out waits for the spell it will hold.
+  if (grant.storeAwaits) openStoreWindow(ctx, recipient, effect, grant.storeAwaits, castLevel);
+  if (effect.tags.includes(WARDING_BOND_TAG))
+    warnings.push(...endCrossedBonds(state, recipient.id, effect.id).map((event) => event.text));
   warnings.push(...replaced.map((event) => event.text));
   // A new way to work out AC counts at once.
   if (baseArmorClass !== undefined && recipientDefinition)
@@ -398,6 +422,19 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       conditionIds: [...linkedConditionIds]
     });
   else ctx.effectGranted = { name: effect.name, tags: effect.tags };
+}
+
+/** Where a Climber's Kit anchors its user: its token's place and height now. Nothing off the map. */
+function anchorOf(
+  state: GameState,
+  recipientId: string,
+  anchors: NonNullable<DefinitionAction["grants"]>["anchors"]
+): Partial<Pick<EffectInstance, "anchor">> {
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === recipientId);
+  if (!anchors || !token?.position) return {};
+  return {
+    anchor: { x: token.position.x, y: token.position.y, altitudeFeet: altitudeOf(token), feet: anchors.feet }
+  };
 }
 
 /** Takes the conditions an effect suppresses off its bearer and keeps them on the effect, as the table hears. */
@@ -491,6 +528,7 @@ export function grantOutsideFight(
           : grantDuration(state, grant.duration, actor.id, null),
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
+      ...(grant.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
       modifiers: grant.modifiers,
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
@@ -500,7 +538,9 @@ export function grantOutsideFight(
       ...(action.spellId !== undefined ? { stackKey: `spell:${action.spellId}` } : {}),
       ...(grant.armorClassBonus !== undefined ? { armorClassBonus: grant.armorClassBonus } : {}),
       // Its size while it lasts (a Potion of Growth).
-      ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(actor) } : {})
+      ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(actor) } : {}),
+      // A Climber's Kit anchored on the way down a cliff.
+      ...anchorOf(state, actor.id, grant.anchors)
     }),
     events
   );

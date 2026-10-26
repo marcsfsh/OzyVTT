@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { build, fight, fighterInput, FOE, HERO, wizardInput, WIZARD_SPELLS } from "./spell-casters.js";
+import {
+  ALLY,
+  build,
+  clericInput,
+  fight,
+  fighterInput,
+  FOE,
+  HERO,
+  wizardInput,
+  WIZARD_SPELLS
+} from "./spell-casters.js";
 
 // SRD 5.2.1 Heroic Inspiration: "If you have Heroic Inspiration, you can expend it to reroll any die immediately after
 // rolling it, and you must use the new roll." A damage roll is looked at before it counts: the server holds its dice,
@@ -116,6 +126,40 @@ describe("a look at a hit's damage", () => {
         )
       )
     ).toMatch(/Roll the damage first/);
+  });
+});
+
+describe("a look at a heal's dice", () => {
+  it("holds Cure Wounds' dice, rerolls one with Heroic Inspiration, and the confirm restores what was looked at", () => {
+    const table = fight(build(clericInput(["cure-wounds"])), { ally: true });
+    const ally = table.state.actors.find((actor) => actor.id === ALLY)!;
+    ally.hp = { ...ally.hp, current: 100 };
+    table.hero.heroicInspiration = true;
+    const look = table.resolve("spell-cure-wounds", { targetIds: [ALLY], commit: false, damageLook: true }, [1, 2]);
+    // A heal's dice aren't damage dice, which Empowered Spell would reroll.
+    expect(look.heldDamage?.dice).toEqual([
+      { sides: 8, face: 1, own: false },
+      { sides: 8, face: 2, own: false }
+    ]);
+    // 1 + 2 and the Wisdom modifier (+4).
+    expect(look.heldDamage?.healing).toBe(7);
+    expect(ally.hp.current).toBe(100);
+    const answered = table.resolve(
+      "spell-cure-wounds",
+      { targetIds: [ALLY], commit: false, damageLook: true, damageAnswer: { id: "heroic-inspiration", dice: [0] } },
+      [8]
+    );
+    expect(facesOf(answered)).toEqual([8, 2]);
+    expect(table.hero.heroicInspiration).toBe(false);
+    table.resolve("spell-cure-wounds", { targetIds: [ALLY] }, [1, 1]);
+    // 8 + 2 and the Wisdom modifier (+4), and Disciple of Life's 2 + the level 1 slot: 17.
+    expect(ally.hp.current).toBe(117);
+  });
+
+  it("offers no answer to a heal's dice without Heroic Inspiration", () => {
+    const table = fight(build(clericInput(["cure-wounds"])), { ally: true });
+    const look = table.resolve("spell-cure-wounds", { targetIds: [ALLY], commit: false, damageLook: true }, [1, 2]);
+    expect(look.heldDamage?.answers).toEqual([]);
   });
 });
 

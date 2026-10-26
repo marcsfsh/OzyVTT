@@ -639,6 +639,12 @@
             "piercing",
             "slashing"
           ]
+        },
+        {
+          "type": "extra-damage",
+          "abilityScore": "increased",
+          "doubleOnCritical": false,
+          "when": [{ "type": "on-natural-20" }]
         }
       ]
     }
