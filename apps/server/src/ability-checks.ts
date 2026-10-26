@@ -119,7 +119,18 @@ export type CheckVersus = Readonly<{
   humanoid: boolean;
   /** Feet between the two tokens; null when the map can't tell. */
   feet: number | null;
+  /** It is a dwarf or a duergar (a Belt of Dwarvenkind's "interact with dwarves and duergar"). */
+  dwarf?: boolean;
 }>;
+
+/** Whether a creature is a dwarf or a duergar: a character of the Dwarf species, or a stat block of that name. */
+export const isDwarf = (definition: ActorDefinition | undefined): boolean =>
+  definition?.character
+    ? definition.character.race?.id === "dwarf"
+    : /\b(dwarf|duergar)\b/i.test(definition?.name ?? "");
+
+/** The belt whose attuned wearer has Advantage on Persuasion checks to interact with dwarves and duergar. */
+const DWARVENKIND_BELT_ID = "belt-of-dwarvenkind";
 
 /** The tag on Perfume's hour, which gives Advantage on Persuasion to influence an Indifferent Humanoid within 5 feet. */
 export const PERFUME_TAG = "perfume";
@@ -154,6 +165,11 @@ function socialClaims(actor: Actor, subject: CheckSubject, versus: CheckVersus, 
     actor.effects.some((effect) => effect.tags.includes(PERFUME_TAG))
   )
     claims.advantage.push({ source: "perfume", label: "Perfume" });
+  const belt = actor.inventory.find(
+    (row) => row.equipped && row.attuned && row.quantity > 0 && catalogIdOf(row) === DWARVENKIND_BELT_ID
+  );
+  if (belt && subject.skill === "persuasion" && versus.dwarf === true)
+    claims.advantage.push({ source: "friend-of-dwarvenkind", label: belt.name });
 }
 
 /** The tag on a Hunter's Mark effect, which gives its caster Advantage on checks to find the marked creature. */

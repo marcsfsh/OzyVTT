@@ -2967,8 +2967,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "If you aren't a dwarf or duergar, you have Darkvision 60 feet, Resistance to Poison damage, and Advantage on
    *  saving throws to avoid or end the Poisoned condition": authored for every wearer, since a dwarf's own Darkvision
-   *  (120 feet) and Dwarven Resilience already give it as much. Dwarvish (item languages have no reader) and the
-   *  Persuasion Advantage with dwarves, a listener a check doesn't name, are the table's. */
+   *  (120 feet) and Dwarven Resilience already give it as much. The Persuasion Advantage with dwarves and duergar is
+   *  ability-checks.ts's, by the item id; knowing Dwarvish and the beard are the table's. */
   "belt-of-dwarvenkind": {
     grants: { damageResistances: ["poison"] },
     modifiers: [

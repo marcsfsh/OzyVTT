@@ -11,7 +11,8 @@ import {
   totalCheck,
   type CheckRoll,
   type CheckSubject,
-  type CheckVersus
+  type CheckVersus,
+  isDwarf
 } from "../ability-checks.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { areEnemies } from "../creature-sides.js";
@@ -386,7 +387,8 @@ function influence(ctx: ResolveContext): void {
     ? {
         actor: monster,
         humanoid: type === "humanoid",
-        feet: ctx.deps.distanceFeet?.(ctx.attacker.id, monster.id) ?? null
+        feet: ctx.deps.distanceFeet?.(ctx.attacker.id, monster.id) ?? null,
+        dwarf: isDwarf(monsterDefinition)
       }
     : undefined;
   rollCheck(ctx, subject, dc, undefined, [], versus);
