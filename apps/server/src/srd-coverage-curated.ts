@@ -256,8 +256,8 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   help: guided(
     "resolution/attack.ts gives the next attack roll by an ally against the distracted enemy Advantage. Help with a Check gives an ally Advantage on its next check with one of the helper's skill or tool proficiencies before the helper's next turn (help-assist.ts), in a fight or outside one from the sheet's Checks tab. Whether the ally is near enough to assist is the GM's."
   ),
-  "heroic-inspiration": guided(
-    "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown, initiative-reroll.ts an initiative die before the character's first turn, and resolution/held-damage.ts one die of an action's damage looked at before it counts. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). The dice of a hit's extras (Sneak Attack, a smite), a reaction's strike, healing and Hit Point Dice are the GM's to reroll."
+  "heroic-inspiration": enforced(
+    "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save (a pending one or a loose one from the sheet) or a death save while the roll is shown, initiative-reroll.ts an initiative die before the character's first turn, and resolution/held-damage.ts one die of an action's damage or healing looked at before it counts, a hit's extras (Sneak Attack, a smite) included. rests.ts rerolls the lowest die of a Hit Point Dice spend. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). The damage dice of a reaction's strike are the GM's to reroll."
   ),
   hide: enforced(
     "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it makes an attack roll or casts a spell with a Verbal component (resolution/release.ts), or an enemy's Search meets its total; a throw that asks for a save (a Net, a flask) keeps it hidden. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call."
@@ -1107,7 +1107,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "builtin-actions.ts offers Dash, Disengage and Hide as Bonus Actions, and each resolves as its action does."
   ),
   "feature:martial-arts": enforced(
-    "builtin-actions.ts offers an Unarmed Strike as a Bonus Action, and resolution/attack.ts rolls Unarmed Strikes and Monk weapons with the Martial Arts die and the better of Strength and Dexterity."
+    "builtin-actions.ts offers an Unarmed Strike as a Bonus Action, resolution/attack.ts rolls Unarmed Strikes and Monk weapons with the Martial Arts die and the better of Strength and Dexterity, and the Unarmed Strike's Grapple and Shove use the better of them for their DC (resolution/builtins.ts)."
   ),
   "feature:aura-of-protection": enforced(
     "saving-throws.ts adds the Paladin's Charisma modifier, at least 1, to its own saves and its allies' within 10 feet, while it isn't Incapacitated. A creature in two auras gets the better one."
@@ -1295,8 +1295,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:lay-on-hands": enforced(
     "The Bonus Action spends the points the Paladin picks to heal one creature it touches, within 5 feet (resolution/action-targets.ts), or 5 points to end Poisoned."
   ),
-  "feature:superior-hunters-prey": guided(
-    "The tap deals the mark's 1d6 Force (1d10 from Foe Slayer) to one other creature the Ranger can see, once a turn. That the marked creature took the Ranger's damage this turn, and the 30 feet from it, are the GM's."
+  "feature:superior-hunters-prey": enforced(
+    "Once a turn, after the Ranger's damage lands on the creature its Hunter's Mark marks, the mark's 1d6 Force (1d10 from Foe Slayer) goes to another creature the Ranger can see within 30 feet of the marked one (resolution/action-targets.ts, resolution/dealings.ts)."
   ),
   "feature:words-of-creation": enforced(
     "Power Word Heal and Power Word Kill are always prepared, and either may take a second creature within 10 feet of the first (resolution/action-targets.ts)."
@@ -1322,8 +1322,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:boon-of-fate": enforced(
     "The ability score increase is applied. roll-answers.ts offers Improve Fate on the holder's own D20 Test, and asks by a prompt about another creature's within 60 feet: 2d4 is added or taken off, and the use returns when Initiative is rolled or on a rest."
   ),
-  "feature:boon-of-irresistible-offense": guided(
-    "The ability score increase is applied, and its Bludgeoning, Piercing and Slashing damage ignores Resistance (hit-points.ts). The extra damage on a 20 is the GM's."
+  "feature:boon-of-irresistible-offense": enforced(
+    "The ability score increase is applied, Bludgeoning, Piercing and Slashing damage ignores Resistance (hit-points.ts), and a rolled 20 on an attack roll adds damage equal to the increased score, of the attack's type (resolution/damage.ts)."
   ),
   "feature:boon-of-spell-recall": enforced(
     "The ability score increase is applied, and resolution/spell-recall.ts rolls a d4 for a spell cast with a level 1 to 4 slot, keeping the slot when it matches the level."
@@ -1819,7 +1819,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A Fighter that misses a creature has Advantage on its next attack roll against it before the end of its next turn, which that roll spends (resolution/studied.ts)."
   ),
   "feature:survivor": enforced(
-    "A Champion 18 rolls death saves with Advantage (saving-throws.ts) and regains 5 plus its Constitution modifier at the start of each turn while Bloodied and above 0 (turn-boundaries.ts). An 18 or 19 on a death save counting as a 20 is the GM's."
+    "A Champion 18 rolls death saves with Advantage, an 18 or 19 counting as a 20 (death-saves.ts), and regains 5 plus its Constitution modifier at the start of each turn while Bloodied and above 0 (turn-boundaries.ts)."
   ),
   "spell:sleet-storm": guided(
     "spell-zones.ts asks for the Dexterity save when a creature enters the Cylinder or starts its turn there, and a failure leaves it Prone and ends its Concentration. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the Cylinder Difficult Terrain of ice, and it is Heavily Obscured for dynamic vision (vision/cast-sight.ts). Dousing the flames in it is the GM's."
@@ -2060,8 +2060,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:weapon-mastery": enforced(
     "equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue."
   ),
-  "feature:hunters-prey": guided(
-    "The option is picked at build and swapped after a Short or Long Rest (ledger-rechoice.ts). Colossus Slayer's extra 1d8 on a weapon hit against a creature missing any Hit Points is applied once a turn (resolution/damage.ts). Horde Breaker's attack is the GM's."
+  "feature:hunters-prey": enforced(
+    "The option is picked at build and swapped after a Short or Long Rest (ledger-rechoice.ts). Colossus Slayer's extra 1d8 on a weapon hit against a creature missing any Hit Points is applied once a turn (resolution/damage.ts). Horde Breaker opens one more attack with the same weapon once a turn, against a creature within 5 feet of the first target that it hasn't attacked this turn (resolution/extra-attacks.ts, resolution/economy.ts)."
   ),
   "feature:defensive-tactics": enforced(
     "Escape the Horde gives Opportunity Attacks against the Ranger Disadvantage, and Multiattack Defense marks a creature that hit it (resolution/struck.ts). The option is swapped after a Short or Long Rest (ledger-rechoice.ts)."
@@ -2075,11 +2075,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:potent-cantrip": enforced(
     "resolution/damage.ts deals half an Evoker's cantrip damage on a missed attack roll, and resolution/pending.ts halves it on a successful save, with no other effect."
   ),
-  "feature:empowered-evocation": guided(
-    "The Intelligence modifier is added to a Wizard Evocation spell's damage (resolution/damage.ts). A spell of several rolls (Scorching Ray's rays) gets it on each, which the GM trims to one."
+  "feature:empowered-evocation": enforced(
+    "The Intelligence modifier is added to one damage roll of a Wizard Evocation spell, the first a cast makes (resolution/damage.ts): Scorching Ray's first ray, not the others."
   ),
-  "feature:elemental-affinity": guided(
-    "Resistance to the chosen type is applied, and the Charisma modifier is added to a spell's damage of that type, never a weapon's (resolution/damage.ts). A spell of several rolls gets it on each, which the GM trims to one."
+  "feature:elemental-affinity": enforced(
+    "Resistance to the chosen type is applied, and the Charisma modifier is added to one damage roll of a spell that deals that type, the first a cast makes, never a weapon's (resolution/damage.ts)."
   ),
   "feature:overchannel": enforced(
     "The cast offers Overchannel beside Metamagic (resolution/metamagic.ts): it deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts)."
