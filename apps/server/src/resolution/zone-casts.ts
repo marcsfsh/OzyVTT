@@ -69,6 +69,42 @@ export function refuseStraddlers(ctx: ResolveContext, trigger: AreaTrigger): voi
   }
 }
 
+/** SRD Prismatic Wall: "If you position the wall in a space occupied by a creature, the spell ends instantly without
+ *  effect." A wall placed through any creature's space, along its Line or round its globe's surface, refuses the
+ *  cast. */
+export function refuseOccupied(ctx: ResolveContext, trigger: AreaTrigger): void {
+  const placed = ctx.input.placedArea;
+  const pixelsPerFoot = ctx.state.combat.vision.measure?.pixelsPerFoot;
+  if (!trigger.refusesOccupied || !placed || !pixelsPerFoot) return;
+  const halfWidth = ((ctx.action.area?.widthFeet ?? 1) * pixelsPerFoot) / 2;
+  const { origin, target } = placed;
+  const length = Math.hypot(target.x - origin.x, target.y - origin.y);
+  for (const token of ctx.state.combat.tokens) {
+    if (!token.position) continue;
+    const half = (5 * pixelsPerFoot * token.sizeCells) / 2 - 1;
+    const { x, y } = token.position;
+    let through = false;
+    if (placed.shape === "circle") through = Math.abs(Math.hypot(x - origin.x, y - origin.y) - length) < half;
+    else if (placed.shape === "line") {
+      const along =
+        length === 0 ? 0 : ((x - origin.x) * (target.x - origin.x) + (y - origin.y) * (target.y - origin.y)) / length;
+      const clamped = Math.max(0, Math.min(length, along));
+      const nearest =
+        length === 0
+          ? origin
+          : {
+              x: origin.x + ((target.x - origin.x) * clamped) / length,
+              y: origin.y + ((target.y - origin.y) * clamped) / length
+            };
+      through = Math.hypot(x - nearest.x, y - nearest.y) < halfWidth + half;
+    }
+    if (through) {
+      const name = ctx.state.actors.find((actor) => actor.id === token.actorId)?.name ?? "a creature";
+      throw new CommandRejectedError(`${ctx.action.name} fails: the wall can't stand in ${name}'s space.`);
+    }
+  }
+}
+
 /** SRD Hallow: "the spell fails if the radius includes an area already under the effect of Hallow". A circle placed
  *  over any of another standing area of the same spell refuses the cast. */
 export function refuseOverlap(ctx: ResolveContext, spellId: string, trigger: AreaTrigger): void {

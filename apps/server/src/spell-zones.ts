@@ -26,6 +26,8 @@ import { AURA_IMMUNE_TAG } from "./statblock-traits.js";
 import { breakTimeStop } from "./time-stop.js";
 import { applyCastSight } from "./vision/cast-sight.js";
 import { harmObjectsUnderZone } from "./resolution/object-targets.js";
+import { prismaticWallLayers } from "./resolution/prismatic.js";
+import { sceneSight } from "./vision/sight.js";
 import { spellWardOf } from "./resolution/spell-wards.js";
 import { planeOf } from "./ethereal.js";
 import { burnedOutAtTurnEnd } from "./zone-kindling.js";
@@ -332,8 +334,77 @@ function wholeAreaTest(
       if (span.high <= heights.low || span.low >= heights.high) return false;
     }
     if (onRing) return onRing(position, sizeCells);
+    if (trigger.nearFeet !== undefined)
+      return nearTemplate(calibration, area.geometry, shape, source.area?.widthFeet ?? null, trigger.nearFeet, {
+        position,
+        sizeCells
+      });
     return footprintInTemplate(calibration, area.geometry, shape, source.area?.widthFeet ?? null, position, sizeCells);
   };
+}
+
+/** Whether a creature's space comes within `nearFeet` of a placed template: of a Line's length and width, a circle's
+ *  edge, a square's sides. A Cone takes no reach. */
+function nearTemplate(
+  calibration: NonNullable<TokenMapGeometry["calibration"]>,
+  geometry: Parameters<typeof footprintInTemplate>[1],
+  shape: "circle" | "cone" | "line" | "square",
+  widthFeet: number | null,
+  nearFeet: number,
+  at: Readonly<{ position: Point; sizeCells: number }>
+): boolean {
+  const pixelsPerFoot = calibration.cellSizePx / calibration.distancePerCell;
+  const reach = (nearFeet + DISTANCE_TOLERANCE_FEET) * pixelsPerFoot + (calibration.cellSizePx * at.sizeCells) / 2;
+  const { origin, target } = geometry;
+  const { x, y } = at.position;
+  if (shape === "circle")
+    return Math.hypot(x - origin.x, y - origin.y) <= Math.hypot(target.x - origin.x, target.y - origin.y) + reach;
+  if (shape === "square")
+    return (
+      x >= Math.min(origin.x, target.x) - reach &&
+      x <= Math.max(origin.x, target.x) + reach &&
+      y >= Math.min(origin.y, target.y) - reach &&
+      y <= Math.max(origin.y, target.y) + reach
+    );
+  if (shape === "line") {
+    const length = Math.hypot(target.x - origin.x, target.y - origin.y);
+    const along =
+      length === 0 ? 0 : ((x - origin.x) * (target.x - origin.x) + (y - origin.y) * (target.y - origin.y)) / length;
+    const clamped = Math.max(0, Math.min(length, along));
+    const nearest =
+      length === 0
+        ? origin
+        : {
+            x: origin.x + ((target.x - origin.x) / length) * clamped,
+            y: origin.y + ((target.y - origin.y) / length) * clamped
+          };
+    return Math.hypot(x - nearest.x, y - nearest.y) <= ((widthFeet ?? 5) / 2) * pixelsPerFoot + reach;
+  }
+  return footprintInTemplate(calibration, geometry, shape, widthFeet, at.position, at.sizeCells);
+}
+
+/** Whether a creature can see a zone's placed area (Prismatic Wall's glare): not Blinded, and with dynamic vision on,
+ *  seeing one of its ends or its middle. */
+function seesArea(
+  state: GameState,
+  zone: SpellZone,
+  creature: Actor,
+  deps: Pick<ZoneDeps, "resolveDefinition" | "catalog">
+) {
+  if (creature.conditions.some((condition) => condition.id === "blinded")) return false;
+  const area = zone.annotationId
+    ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
+    : undefined;
+  if (!area) return true;
+  const sight = sceneSight(state, {
+    definition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  if (!sight.enabled) return true;
+  const { origin, target } = area.geometry;
+  return [origin, target, { x: (origin.x + target.x) / 2, y: (origin.y + target.y) / 2 }].some((point) =>
+    sight.seesPoint(creature.id, point)
+  );
 }
 
 /** The ground within reach of a wall's burning side (Wall of Fire: "each creature that ends its turn within 10 feet of
@@ -431,6 +502,7 @@ export function exposed(
     if (kind && movesFreelyOn(creature, kind, deps, true)) return [];
     // "Each creature on the ground in the area": one in the air above it is spared.
     if (trigger.grounded && altitudeOf(tokenOf(state, creature.id)) > 0) return [];
+    if (trigger.seenOnly && !seesArea(state, zone, creature, deps)) return [];
     // The kind its caster picked as it cast (Antipathy/Sympathy), else the types the spell names.
     const types = zone.types ?? trigger.types;
     if (types && !types.includes(typeOf(creature, deps) ?? "")) return [];
@@ -796,6 +868,7 @@ export function zonesAfterMove(
     const inside = insideTest(state, zone, trigger, content, deps.geometry);
     if (!inside) continue;
     const hits = path.map((point) => inside(point, moverToken.sizeCells, altitudeOf(moverToken)));
+    if (trigger.layers) events.push(...passesLayers(state, zone, content, mover, path, deps));
     if (trigger.on.includes("enter") && !hits[0] && hits.slice(1).some(Boolean))
       act(state, zone, mover, "enters", deps, events);
     if (trigger.on.includes("travel") && !input.teleported && deps.geometry) {
@@ -807,6 +880,32 @@ export function zonesAfterMove(
   }
   events.push(...warnings(state, mover, path, deps), ...leashedZones(state, deps));
   return events;
+}
+
+/** A creature moving into a wall of layers (Prismatic Wall) makes each layer's save, once a move. */
+function passesLayers(
+  state: GameState,
+  zone: SpellZone,
+  content: ZoneContent,
+  mover: Actor,
+  path: readonly Point[],
+  deps: ZoneDeps
+): EffectNarration[] {
+  const { nearFeet: _near, ...bare } = content.trigger;
+  const wall = insideTest(state, zone, bare, content, deps.geometry);
+  const token = tokenOf(state, mover.id);
+  const caster = state.actors.find((actor) => actor.id === zone.casterId);
+  if (!wall || !token || !caster) return [];
+  const on = path.map((point) => wall(point, token.sizeCells, altitudeOf(token)));
+  if (on[0] || !on.slice(1).some(Boolean)) return [];
+  return prismaticWallLayers(state, {
+    zone,
+    caster,
+    creature: mover,
+    random: deps.rollDie,
+    newId: deps.newId,
+    now: deps.now
+  });
 }
 
 /**

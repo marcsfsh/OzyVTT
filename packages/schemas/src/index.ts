@@ -4780,6 +4780,17 @@ const AreaTriggerFields = z
     exclusive: z.literal(true).optional(),
     /** The spell ends when its caster is outside it (Tiny Hut: "The spell ends early if you leave the Emanation"). */
     endsWhenCasterLeaves: z.literal(true).optional(),
+    /** It reaches this many feet past its placed area on every side (Prismatic Wall: "moves within 20 feet of it or
+     *  starts its turn there"). */
+    nearFeet: z.number().int().min(5).max(30).optional(),
+    /** Only a creature that can see its area is affected (Prismatic Wall: "another creature that can see the wall"). */
+    seenOnly: z.literal(true).optional(),
+    /** Its placed area is a wall of seven layers: a creature that passes into it makes each layer's Dexterity save
+     *  (Prismatic Wall). */
+    layers: z.literal(true).optional(),
+    /** The cast fails when its area takes in any creature's space (Prismatic Wall: "If you position the wall in a space
+     *  occupied by a creature, the spell ends instantly without effect"). */
+    refusesOccupied: z.literal(true).optional(),
     /** It ends when its user has the Incapacitated condition or dies (Nature's Sanctuary). */
     endsWhenUserIncapacitated: z.literal(true).optional(),
     /** The damage type its holds' `chosenDamage` reads is its user's current Nature's Ward Resistance, from the land the

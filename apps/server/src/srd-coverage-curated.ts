@@ -1925,7 +1925,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The 2d8 Hit Points are applied, each target gains a Short Rest's benefits, and a creature it healed is refused until it finishes a Long Rest (resolution/prayer-of-healing.ts)."
   ),
   "spell:prismatic-wall": guided(
-    "The save against Blinded for a creature near the wall is applied, and the wall on its placed Line blocks sight and sheds its Bright and Dim Light for dynamic vision (vision/cast-sight.ts). Each layer's save and effect, and breaking the layers, are the GM's."
+    "The wall on its placed Line blocks sight and sheds its Bright and Dim Light (vision/cast-sight.ts), and placed through a creature's space the cast fails. A creature other than the caster's allies that can see it and moves within 20 feet of it or starts its turn there makes the Constitution save against Blinded for 1 minute, and one passing into it makes the seven layers' Dexterity saves in order: 12d6 Fire, Acid, Lightning, Poison and Cold, half on a success, Indigo's Restrained with its tally toward Petrified, and Violet's Blinded with the trip to another plane (spell-zones.ts, resolution/prismatic.ts). Designating creatures other than allies, the globe, what each layer blocks, the wall's AC and destroying the layers are the GM's."
   ),
   "spell:protection-from-poison": enforced(
     "The cast ends Poisoned and leaves Resistance to Poison damage and Advantage on saves to avoid or end Poisoned, for an hour counted on the game clock (game-time.ts)."

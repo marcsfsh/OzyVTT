@@ -1585,6 +1585,33 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   // plants stay overgrown, so the area stays until the GM ends it.
   // "You can exclude one or more areas of any size within the spell's area from being affected": each 10-foot square
   // the caster leaves out as it casts.
+  // "If another creature that can see the wall moves within 20 feet of it or starts its turn there, the creature must
+  // succeed on a Constitution saving throw or have the Blinded condition for 1 minute", "You and creatures you designate
+  // ... can pass through and be near the wall without harm" (the caster and its allies here), and "When a creature
+  // reaches into or passes through the wall, it does so one layer at a time through all the layers" (`layers`,
+  // `resolution/prismatic.ts`). Placed through a creature's space, the spell fails (`refusesOccupied`).
+  "prismatic-wall": [
+    {
+      name: "glare",
+      activation: "other",
+      when: "A creature that can see the wall and moves within 20 feet of it or starts its turn there makes the save or is Blinded for 1 minute; one passing into the wall makes a Dexterity save for each of its seven layers.",
+      save: {
+        ability: "con",
+        successDamage: "none",
+        failureConditions: ["blinded"],
+        failureDuration: { type: "rounds", rounds: 10 }
+      },
+      damage: [],
+      zone: {
+        on: ["enter", "start-turn"],
+        affects: "enemies",
+        nearFeet: 20,
+        seenOnly: true,
+        layers: true,
+        refusesOccupied: true
+      }
+    }
+  ],
   // "All creatures and objects in that area that aren't anchored to the ground fall upward and reach the top of the
   // Cylinder", a creature that succeeds on the Dexterity save having caught hold of something fixed; one that comes into
   // the Cylinder later falls up the same way (`falling.ts` lifts and drops them).

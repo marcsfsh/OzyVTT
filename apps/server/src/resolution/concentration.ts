@@ -18,7 +18,7 @@ import { itemRowOfAction } from "../item-charges.js";
 import { castThisTurnKey, withCastKey } from "../lasting-spells.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { areaAtLevel, endZone, withParts } from "../spell-zone-state.js";
-import { placeZoneSight, refuseOverlap, refuseStraddlers, zoneChoicesOf } from "./zone-casts.js";
+import { placeZoneSight, refuseOccupied, refuseOverlap, refuseStraddlers, zoneChoicesOf } from "./zone-casts.js";
 import { actOnCast, pickedZoneRow, pickedZoneType, zoneRowOf } from "../spell-zones.js";
 import { abilityModifier, tableLineOf, type ResolveContext } from "./context.js";
 import { shapedZone, shapingOf } from "./metamagic.js";
@@ -270,6 +270,7 @@ export function openSpellZone(ctx: ResolveContext): void {
   // A dome that can't hold whole every creature in it fails (Tiny Hut), and so does a second Hallow over the first.
   refuseStraddlers(ctx, row.zone);
   refuseOverlap(ctx, spell.id, row.zone);
+  refuseOccupied(ctx, row.zone);
   const zone: SpellZone = {
     id: input.commandId,
     spellId: spell.id,
