@@ -403,6 +403,89 @@ function sharesWearerDamage(trait: Trait): TraitMechanic | null {
   return match ? { kind: "shares-wearer-damage", name: trait.name, withinFeet: Number(match[1]) } : null;
 }
 
+const DAMAGE_TYPE_LIST: readonly DamageType[] = [
+  "acid",
+  "bludgeoning",
+  "cold",
+  "fire",
+  "force",
+  "lightning",
+  "necrotic",
+  "piercing",
+  "poison",
+  "psychic",
+  "radiant",
+  "slashing",
+  "thunder"
+];
+
+/** "The hag has a soul bag. ... The bag has AC 15, HP 20, and Resistance to all damage", "The erinyes has a magic rope.
+ *  ... The rope has AC 20, HP 90, and Immunity to Poison and Psychic damage ... the erinyes can fully restore it when
+ *  finishing a Short or Long Rest", "The heart is a Tiny object that has AC 17, HP 10, and Immunity to all damage except
+ *  Fire", and a lich's spirit jar, which prints no statistics. */
+function carriedObject(trait: Trait): TraitMechanic | null {
+  const text = trait.description;
+  const has = /^The [\w -]+? has an? (soul bag|magic rope)\./.exec(text);
+  const heart =
+    /\bThe heart is a Tiny object that has AC (\d+), HP (\d+), and Immunity to all damage except ([A-Z][a-z]+)\b/.exec(
+      text
+    );
+  if (/\bif it has a spirit jar\b/.test(text)) return { kind: "carried-object", name: trait.name, tag: "spirit-jar" };
+  if (heart) {
+    const except = heart[3]!.toLowerCase();
+    return {
+      kind: "carried-object",
+      name: trait.name,
+      tag: "heart",
+      object: {
+        name: "Heart",
+        armorClass: Number(heart[1]),
+        hitPoints: Number(heart[2]),
+        immunities: DAMAGE_TYPE_LIST.filter((type) => type !== except)
+      }
+    };
+  }
+  if (!has) return null;
+  const stats =
+    /\bThe (?:bag|rope) has AC (\d+), HP (\d+), and (Resistance to all damage|Immunity to Poison and Psychic damage)\b/.exec(
+      text
+    );
+  if (!stats) return null;
+  const name = has[1] === "soul bag" ? "Soul Bag" : "Magic Rope";
+  return {
+    kind: "carried-object",
+    name: trait.name,
+    tag: has[1]!.replace(/ /g, "-"),
+    object: {
+      name,
+      armorClass: Number(stats[1]),
+      hitPoints: Number(stats[2]),
+      ...(stats[3] === "Resistance to all damage" ? { resistances: [...DAMAGE_TYPE_LIST] } : {})
+    },
+    ...(/\bcan fully restore it when finishing a Short or Long Rest\b/.test(text)
+      ? { restoresAtRest: true as const }
+      : {})
+  };
+}
+
+/** "If the limb isn't destroyed within 24 hours, roll 1d12. On a 12, the limb turns into a Troll." */
+function spawns(trait: Trait): TraitMechanic | null {
+  const match =
+    /\bIf the [\w -]+? isn[’']t destroyed within (\d+) hours, roll 1d(\d+)\. On an? (\d+), the [\w -]+? turns into an? ([A-Z][\w ]*?)\./.exec(
+      trait.description
+    );
+  return match
+    ? {
+        kind: "spawns",
+        name: trait.name,
+        afterHours: Number(match[1]),
+        die: Number(match[2]),
+        on: Number(match[3]),
+        monsterId: match[4]!.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+      }
+    : null;
+}
+
 /** "The ground in a 10-foot Emanation originating from the mouther is Difficult Terrain." */
 function difficultGround(trait: Trait): TraitMechanic | null {
   const match = /^The ground in a (\d+)-foot Emanation originating from the [\w -]+? is Difficult Terrain\.$/.exec(
@@ -485,7 +568,7 @@ function corrodesGear(trait: Trait): TraitMechanic | null {
 
 /** Readers that run beside the one a trait matches, for what a trait does besides it (Corrosive Form's acid on whoever
  *  hits the pudding, and on their gear). */
-const ALSO: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [corrodesGear];
+const ALSO: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [corrodesGear, carriedObject, spawns];
 
 /** Every trait the engine can run, in the stat block's order; the rest stay prose. */
 export function traitMechanicsOf(traits: readonly Trait[]): TraitMechanic[] {

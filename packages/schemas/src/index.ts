@@ -2170,7 +2170,32 @@ export const DeathRecordSchema = z
     /** Its head is gone (a Vorpal Sword): a revival that restores no missing body parts can't bring it back. */
     headLost: z.literal(true).optional(),
     /** Rounds of game time its body spent under Gentle Repose, which no revival's time limit counts. */
-    reposedRounds: z.number().int().min(0).max(CLOCK_ROUNDS_LIMIT).optional()
+    reposedRounds: z.number().int().min(0).max(CLOCK_ROUNDS_LIMIT).optional(),
+    /** It comes back to life by its own trait once the game clock reaches this round (Celestial Restoration), unless
+     *  something stops it first; `needs`: only while it still has the object its effect so tagged marks. */
+    returns: z
+      .object({
+        atClockRound: z.number().int().min(-CLOCK_ROUNDS_LIMIT).max(CLOCK_ROUNDS_LIMIT),
+        name: z.string().min(1).max(60),
+        needs: z.string().min(1).max(60).optional()
+      })
+      .strict()
+      .optional(),
+    /** A creature rises from its corpse once the game clock reaches this round (a Shadow, 1d4 hours after a shadow's
+     *  Draining Swipe slays a Humanoid). */
+    rises: z
+      .object({
+        atClockRound: z.number().int().min(-CLOCK_ROUNDS_LIMIT).max(CLOCK_ROUNDS_LIMIT),
+        monsterId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      })
+      .strict()
+      .optional(),
+    /** Its soul is held by another creature's object (a night hag's soul bag): it can't be raised until it is
+     *  released. */
+    soulTrappedBy: z.uuid().optional()
   })
   .strict();
 export type DeathRecord = z.infer<typeof DeathRecordSchema>;
@@ -4011,7 +4036,10 @@ export const DamageDrainSchema = z
           .string()
           .regex(/^[a-z0-9-]+$/)
           .max(31),
-        creatureTypes: z.array(RiderSlugSchema).min(1).max(4).optional()
+        creatureTypes: z.array(RiderSlugSchema).min(1).max(4).optional(),
+        /** It rises this many hours of game time later, on no one's side but its own (a shadow's Draining Swipe: "a
+         *  Shadow rises from the corpse 1d4 hours later"). */
+        afterHours: DiceFormulaSchema.optional()
       })
       .strict()
       .optional()
@@ -5826,6 +5854,12 @@ export const ActionSchema = z
       .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })
       .strict()
       .optional(),
+    /** It can be used only while its user still has the object it carries tagged so, whole (a night hag's Nightmare
+     *  Haunting needs its soul bag, an erinyes's Entangling Rope its magic rope); a hold the action leaves is that
+     *  object, with its Hit Points. */
+    needsObject: EffectTagSchema.optional().describe(
+      "It can be used only while its user still has the carried object tagged so, whole (a night hag's soul bag); a hold it leaves is that object"
+    ),
     /** What it does to light and sight while it lasts (a darkmantle's Darkness Aura, an octopus's ink). */
     sight: SightEffectSchema.optional(),
     /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
@@ -6401,8 +6435,60 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
    *  sunlight, where it can't shape-shift and is destroyed. */
   z.object({ kind: z.literal("misty-escape"), name: TraitNameSchema }).strict(),
   /** A creature that comes back after it dies (Diabolical Restoration, a lich's Spirit Jar): `bodyGoes` when its body
-   *  disappears as it dies. Where and when it returns are the GM's. */
-  z.object({ kind: z.literal("restoration"), name: TraitNameSchema, bodyGoes: z.literal(true).optional() }).strict(),
+   *  disappears as it dies. `returns`: it comes back to life where it died with all its Hit Points after the dice's
+   *  hours or days of game time ("returns to life in 1d6 days"), unless `preventedBy` stops it (Dispel Evil and Good
+   *  cast on its remains, a killer under Bless, Holy Water on its remains, or only Wish), and only while it still has
+   *  the object its effect tagged `needs` marks (a mummy lord's heart, a lich's spirit jar). Where it reappears is the
+   *  GM's. */
+  z
+    .object({
+      kind: z.literal("restoration"),
+      name: TraitNameSchema,
+      bodyGoes: z.literal(true).optional(),
+      returns: z
+        .object({
+          after: z.union([z.number().int().min(1).max(1000), DiceFormulaSchema]),
+          unit: z.enum(["hours", "days"]),
+          preventedBy: z
+            .array(z.enum(["dispel-evil-and-good", "blessed-killer", "holy-water", "wish"]))
+            .max(3)
+            .optional(),
+          needs: EffectTagSchema.optional(),
+          /** Only where it died there ("If the lemure dies in the Nine Hells"), which the GM knows. */
+          onlyIn: z.string().min(1).max(60).optional()
+        })
+        .strict()
+        .optional()
+    })
+    .strict(),
+  /** What a creature carries that has its own statistics (a night hag's Soul Bag, an erinyes's Magic Rope, a mummy
+   *  lord's heart, a lich's spirit jar): it joins the roster as an effect on the creature tagged `tag`, an object with
+   *  `object`'s Armor Class and Hit Points that can be attacked; at 0 Hit Points it is destroyed. `restoresAtRest`: its
+   *  creature restores it when it finishes a Short or Long Rest. */
+  z
+    .object({
+      kind: z.literal("carried-object"),
+      name: TraitNameSchema,
+      tag: EffectTagSchema,
+      object: ObjectPrintSchema.optional(),
+      restoresAtRest: z.literal(true).optional()
+    })
+    .strict(),
+  /** A troll limb's Troll Spawn: "If the limb isn't destroyed within 24 hours, roll 1d12. On a 12, the limb turns into a
+   *  Troll. Otherwise, the limb withers away." */
+  z
+    .object({
+      kind: z.literal("spawns"),
+      name: TraitNameSchema,
+      afterHours: z.number().int().min(1).max(720),
+      die: z.number().int().min(2).max(100),
+      on: z.number().int().min(1).max(100),
+      monsterId: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(80)
+    })
+    .strict(),
   /** A hydra's Multiple Heads: it starts with `heads`, loses one each turn it takes `damagePerHead` or more, dies with
    *  the last, and at the end of its turn grows two for each lost since its last turn, regaining `regrowHitPoints`,
    *  unless it took one of `stoppedBy` since then. Its Multiattack makes one `attackId` attack per head, and each head

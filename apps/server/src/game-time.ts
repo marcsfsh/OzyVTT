@@ -6,6 +6,7 @@ import { afterDays } from "./rest-triggers.js";
 import { breathOverTime } from "./breath.js";
 import { endOfDays } from "./survival.js";
 import { zoneHeld } from "./spell-zones.js";
+import { dueOnTheClock } from "./timed-revival.js";
 
 /**
  * The game clock (ADR-0029) and what lasts on it. A round is 6 seconds, so 10 rounds make a minute: in a fight, what
@@ -56,6 +57,8 @@ export function passGameTime(state: GameState, minutes: number, deps?: ClockDeps
   if (!state.combat.active) events.push(...breathOverTime(state, inTime, total - before));
   if (deps) {
     events.push(...afterDays(state, inTime, before, total, deps));
+    // The dead whose time has come back, rise or spawn (`timed-revival.ts`).
+    events.push(...dueOnTheClock(state, inTime, before, deps));
     // Each midnight the clock crosses ends a day of eating and drinking.
     events.push(...endOfDays(state, inTime, before, total, deps));
   }

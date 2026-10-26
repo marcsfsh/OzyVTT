@@ -235,7 +235,11 @@
    },
    {
     "kind": "restoration",
-    "name": "Eldritch Restoration"
+    "name": "Eldritch Restoration",
+    "returns": {
+     "after": "5d10",
+     "unit": "days"
+    }
    }
   ],
   "extensions": {
@@ -16087,7 +16091,11 @@
    {
     "kind": "restoration",
     "name": "Elemental Restoration",
-    "bodyGoes": true
+    "bodyGoes": true,
+    "returns": {
+     "after": "1d4",
+     "unit": "days"
+    }
    }
   ],
   "extensions": {
@@ -17903,7 +17911,11 @@
    {
     "kind": "restoration",
     "name": "Elemental Restoration",
-    "bodyGoes": true
+    "bodyGoes": true,
+    "returns": {
+     "after": "1d4",
+     "unit": "days"
+    }
    }
   ],
   "extensions": {
@@ -18304,7 +18316,8 @@
       "name": "Rope",
       "armorClass": 20,
       "hitPoints": 90
-     }
+     },
+     "endsWhenSourceDies": true
     },
     "damage": [
      {
@@ -18316,7 +18329,8 @@
      "count": 1,
      "rangeFeet": 120,
      "seen": true
-    }
+    },
+    "needsObject": "magic-rope"
    }
   ],
   "token": {
@@ -18337,6 +18351,17 @@
    "poisoned"
   ],
   "traitMechanics": [
+   {
+    "kind": "carried-object",
+    "name": "Magic Rope",
+    "tag": "magic-rope",
+    "object": {
+     "name": "Magic Rope",
+     "armorClass": 20,
+     "hitPoints": 90
+    },
+    "restoresAtRest": true
+   },
    {
     "kind": "restoration",
     "name": "Diabolical Restoration",
@@ -26639,7 +26664,14 @@
   "traitMechanics": [
    {
     "kind": "restoration",
-    "name": "Celestial Restoration"
+    "name": "Celestial Restoration",
+    "returns": {
+     "after": "1d6",
+     "unit": "days",
+     "preventedBy": [
+      "dispel-evil-and-good"
+     ]
+    }
    }
   ],
   "extensions": {
@@ -30915,7 +30947,16 @@
   "traitMechanics": [
    {
     "kind": "restoration",
-    "name": "Hellish Restoration"
+    "name": "Hellish Restoration",
+    "returns": {
+     "after": "1d10",
+     "unit": "days",
+     "preventedBy": [
+      "blessed-killer",
+      "holy-water"
+     ],
+     "onlyIn": "the Nine Hells"
+    }
    }
   ],
   "extensions": {
@@ -31294,8 +31335,18 @@
   },
   "traitMechanics": [
    {
+    "kind": "carried-object",
+    "name": "Spirit Jar",
+    "tag": "spirit-jar"
+   },
+   {
     "kind": "restoration",
-    "name": "Spirit Jar"
+    "name": "Spirit Jar",
+    "returns": {
+     "after": "1d10",
+     "unit": "days",
+     "needs": "spirit-jar"
+    }
    }
   ],
   "extensions": {
@@ -34252,8 +34303,37 @@
   },
   "traitMechanics": [
    {
+    "kind": "carried-object",
+    "name": "Undead Restoration",
+    "tag": "heart",
+    "object": {
+     "name": "Heart",
+     "armorClass": 17,
+     "hitPoints": 10,
+     "immunities": [
+      "acid",
+      "bludgeoning",
+      "cold",
+      "force",
+      "lightning",
+      "necrotic",
+      "piercing",
+      "poison",
+      "psychic",
+      "radiant",
+      "slashing",
+      "thunder"
+     ]
+    }
+   },
+   {
     "kind": "restoration",
-    "name": "Undead Restoration"
+    "name": "Undead Restoration",
+    "returns": {
+     "after": 24,
+     "unit": "hours",
+     "needs": "heart"
+    }
    }
   ],
   "extensions": {
@@ -34656,6 +34736,7 @@
      "limit": 1,
      "per": "long-rest"
     },
+    "needsObject": "soul-bag",
     "castsSpells": {
      "ability": "int",
      "saveDc": 14,
@@ -34684,6 +34765,33 @@
   "damageResistances": [
    "cold",
    "fire"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "carried-object",
+    "name": "Soul Bag",
+    "tag": "soul-bag",
+    "object": {
+     "name": "Soul Bag",
+     "armorClass": 15,
+     "hitPoints": 20,
+     "resistances": [
+      "acid",
+      "bludgeoning",
+      "cold",
+      "fire",
+      "force",
+      "lightning",
+      "necrotic",
+      "piercing",
+      "poison",
+      "psychic",
+      "radiant",
+      "slashing",
+      "thunder"
+     ]
+    }
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -41465,7 +41573,16 @@
        "killsAtZero": true
       }
      }
-    ]
+    ],
+    "drain": {
+     "slainRise": {
+      "monsterId": "shadow",
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "afterHours": "1d4"
+     }
+    }
    },
    {
     "id": "shadow-stealth",
@@ -43828,7 +43945,14 @@
   "traitMechanics": [
    {
     "kind": "restoration",
-    "name": "Fiendish Restoration"
+    "name": "Fiendish Restoration",
+    "returns": {
+     "after": "1d6",
+     "unit": "days",
+     "preventedBy": [
+      "wish"
+     ]
+    }
    }
   ],
   "extensions": {
@@ -47377,6 +47501,14 @@
      "fire"
     ],
     "deathWaitsForTurn": true
+   },
+   {
+    "kind": "spawns",
+    "name": "Troll Spawn",
+    "afterHours": 24,
+    "die": 12,
+    "on": 12,
+    "monsterId": "troll"
    }
   ],
   "extensions": {

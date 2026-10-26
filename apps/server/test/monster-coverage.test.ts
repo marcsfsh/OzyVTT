@@ -19,7 +19,8 @@ describe("the coverage of a monster's action", () => {
   });
 
   it("reads an attack whose printed rider the GM finishes as applied in part", () => {
-    expect(row("Allosaurus: Claws").state).toBe("guided");
+    expect(row("Allosaurus: Claws").state).toBe("enforced");
+    expect(row("Horned Devil: Hurl Flame").state).toBe("guided");
     expect(row("Barbed Devil: Hurl Flame").state).toBe("guided");
     expect(row("Balor: Flame Whip").state).toBe("enforced");
     expect(row("Elephant: Gore").state).toBe("enforced");

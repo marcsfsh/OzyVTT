@@ -7,6 +7,8 @@ import {
   type ObjectSubstance,
   type VisionWall
 } from "@vtt/domain";
+import { CARRIED_OBJECT_TAG } from "./timed-revival.js";
+import { syncCarried } from "./carried-objects.js";
 import { adjustDamageParts, normalizeDamageType, type DamagePart } from "@vtt/rules-5e";
 import type { ObjectPrint, ObjectStats } from "@vtt/schemas";
 import { endEffectIfPresent, type EffectNarration } from "./effects.js";
@@ -168,8 +170,20 @@ export function damageObject(
           : walls.map((wall) => (wall.id === found.wall!.id ? { ...wall, object: stats } : wall))
       }
     };
+  } else if (found.holding && found.holding.effect.tags.includes(CARRIED_OBJECT_TAG)) {
+    // A carried object stays on its creature at 0 Hit Points, so what needs it knows it is gone.
+    const { actor, effect } = found.holding;
+    actor.effects = actor.effects.map((candidate) =>
+      candidate.id === effect.id ? { ...candidate, heldBy: stats } : candidate
+    );
+    if (destroyed) {
+      events.push({ kind: "effect", text: `${actor.name}'s ${stats.name} is destroyed.`, actorId: actor.id });
+      events.push(...releaseSouls(state, actor.id, effect));
+    }
+    events.push(...syncCarried(state, { ...effect, heldBy: stats }, stats));
   } else if (found.holding) {
     const { actor, effect } = found.holding;
+    events.push(...syncCarried(state, effect, stats));
     if (destroyed) {
       events.push({
         kind: "effect",
@@ -207,4 +221,17 @@ export function setWallObject(state: GameState, wallId: string, object: ObjectSt
       walls: state.combat.vision.walls.map((candidate) => (candidate.id === wallId ? next : candidate))
     }
   };
+}
+
+/** "If the bag is destroyed, any souls the bag is holding are released": the dead its creature trapped can be raised. */
+function releaseSouls(state: GameState, carrierId: string, effect: EffectInstance): EffectNarration[] {
+  if (!effect.tags.includes("soul-bag")) return [];
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors) {
+    if (actor.death?.soulTrappedBy !== carrierId) continue;
+    const { soulTrappedBy: _freed, ...rest } = actor.death;
+    actor.death = rest;
+    events.push({ kind: "effect", text: `${actor.name}'s soul is released.`, actorId: actor.id });
+  }
+  return events;
 }

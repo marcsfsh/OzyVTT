@@ -172,6 +172,7 @@ import {
 import { CommandRejectedError } from "./game-store.js";
 import { checkDestination, landAtDestination } from "./resolution/destination.js";
 import { openFollowUps } from "./follow-ups.js";
+import { stopReturnsAtRemains } from "./resolution/remains.js";
 import { THEN_HIDE_TAG } from "./granted-moves.js";
 
 export type { ResolveDependencies, ResolveInput };
@@ -450,6 +451,8 @@ export function resolveDefinitionAction(
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
   reviveOnCast(ctx);
+  // Dispel Evil and Good or Holy Water on a dead creature's remains stops its return.
+  stopReturnsAtRemains(ctx);
   raiseOnAction(ctx);
   killOnCast(ctx);
   teleportOutcome(ctx);

@@ -732,6 +732,8 @@ const ACTION_ENRICHMENTS: Record<
       | "teleport"
       | "object"
       | "destination"
+      | "drain"
+      | "needsObject"
     >
   >
 > = {
@@ -744,6 +746,14 @@ const ACTION_ENRICHMENTS: Record<
   // "The bulette spends 5 feet of movement to jump to a space within 15 feet that contains one or more Large or smaller
   // creatures ... each creature in the bulette's destination space."
   "bulette/deadly-leap": { destination: { who: "user", feet: 15, costFeet: 5, onto: "large" } },
+  // "While bearing it, the erinyes can use the Entangling Rope action."
+  "erinyes/entangling-rope": { needsObject: "magic-rope" },
+  // "While holding or carrying the bag, the hag can use its Nightmare Haunting action."
+  "night-hag/nightmare-haunting": { needsObject: "soul-bag" },
+  // "If a Humanoid is slain by this attack, a Shadow rises from the corpse 1d4 hours later."
+  "shadow/draining-swipe": {
+    drain: { slainRise: { monsterId: "shadow", creatureTypes: ["humanoid"], afterHours: "1d4" } }
+  },
   // "The giant or one creature of its choice that can see or hear it gains 16 (2d10 + 5) Temporary Hit Points and has
   // Advantage on attack rolls until the start of the giant's next turn."
   "frost-giant/war-cry-recharge-5-6": {

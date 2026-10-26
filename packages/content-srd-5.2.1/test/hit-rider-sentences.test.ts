@@ -19,6 +19,10 @@ const riderTag = (action: ActorAction, tag: string) =>
 const READERS: readonly Check[] = [
   { pattern: /\bis suffocating\b/, read: (action) => riderTag(action, "smothering") },
   {
+    pattern: /\bis slain by this attack, an? [A-Z][a-z]+ rises from the corpse\b/,
+    read: (action) => action.drain?.slainRise?.afterHours !== undefined
+  },
+  {
     pattern: /\bcan smother only one creature at a time\b|\bcan[’']t take this action\b/,
     read: (action) => riderTag(action, "source-no-repeat")
   },
@@ -154,8 +158,6 @@ const READERS: readonly Check[] = [
 const NARRATIVE = [
   /^Hit or Miss: The (?:spear|sword) magically returns\b/,
   /^Being underwater doesn[\u2019']t grant Resistance to this Fire damage\.$/,
-  // A Shadow rising hours later is the story's.
-  /^If a Humanoid is slain by this attack, a Shadow rises from the corpse 1d4 hours later\.$/,
   /\bfrom (?:one of (?:two|four|ten) (?:tentacles|claws|pincers|chains|hands)|both (?:claws|talons|of the griffon[\u2019']s front claws)|all (?:four|eight) tentacles)\.$/
 ];
 

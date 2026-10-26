@@ -1,4 +1,5 @@
 import { WISH_LOST_TAG } from "./wish.js";
+import { carriedObjectViolation } from "../carried-objects.js";
 import { reactionSpent, spendReaction } from "../commanded-reactions.js";
 import { formViolations } from "../transform/rules.js";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
@@ -297,6 +298,10 @@ export function evaluateActionEconomy(
     ...attachmentViolations(state, attacker, action, targetIds),
     // A Rampage waits on damage to a creature already Bloodied.
     ...[bloodiedHitViolation(state, attacker, action)].filter((violation) => violation !== null),
+    // An action that needs what its user carries (a night hag's soul bag) waits on it whole.
+    ...[carriedObjectViolation(attacker, action)]
+      .filter((message) => message !== null)
+      .map((message) => ({ rule: "feature.requires-effect" as const, message: message! })),
     // A follow-up attack a hit opened goes only at that hit's target (an allosaurus's Bite).
     ...[followUpViolation(state, attacker, action, targetIds)].filter((violation) => violation !== null),
     ...raiseViolations({ state, attacker, action, targetIds })

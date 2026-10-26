@@ -1,4 +1,5 @@
 import { bondCasterOf } from "./warding-bond.js";
+import { markTimedRise } from "./timed-revival.js";
 import { damageShares } from "./shared-damage.js";
 import { formsAfterDamage } from "./transform/rules.js";
 import { lycanthropyAtZero } from "./transform/at-zero.js";
@@ -481,7 +482,8 @@ function fallToZero(
   overflow: number,
   deps: DamageDeps | undefined,
   events: EffectNarration[],
-  outright = false
+  outright = false,
+  killerId: string | null = null
 ): Readonly<{ instantDeath: boolean; defeated: boolean }> {
   let instantDeath = false;
   let defeated = false;
@@ -510,7 +512,11 @@ function fallToZero(
       !outright &&
       (holdOnAtZero(state, actor, definition, events) || mistyEscape(state, actor, definition, deps, events));
     if (!holds && deps) deathBurst(state, actor, definition, deps, events);
-    if (!holds) restorationAtDeath(state, actor, definition, events);
+    if (!holds)
+      restorationAtDeath(state, actor, definition, events, {
+        id: killerId,
+        ...(deps?.rollDie ? { rollDie: deps.rollDie } : {})
+      });
   }
   // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
   // concentration (SRD Concentration).
@@ -946,7 +952,16 @@ export function applyDamageDetailed(
   ) {
     // A lycanthrope's curse: it becomes the lycanthrope instead of dropping.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
-    const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
+    const fell = fallToZero(
+      state,
+      actor,
+      definition,
+      damageToHp - hpBefore,
+      deps,
+      events,
+      false,
+      input.sourceActorId ?? null
+    );
     instantDeath = fell.instantDeath;
     defeated = fell.defeated;
   }
@@ -977,7 +992,11 @@ export function applyDamageDetailed(
   if (totalAdjusted > 0) events.push(...formsAfterDamage(state, actor));
   // Finger of Death: a Humanoid it kills rises as a Zombie at the start of its caster's next turn.
   if (input.drain?.slainRise && totalAdjusted > 0 && !deadBefore && isDead(actor))
-    events.push(...markRising(state, actor, definition, input.drain.slainRise, input.sourceActorId));
+    events.push(
+      ...(input.drain.slainRise.afterHours
+        ? markTimedRise(state, actor, definition, input.drain.slainRise, deps?.rollDie)
+        : markRising(state, actor, definition, input.drain.slainRise, input.sourceActorId))
+    );
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
   // at 30, in a fight or out of one (a trap between fights). The prompt carries the effects a committed failure

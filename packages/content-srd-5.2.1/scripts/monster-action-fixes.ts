@@ -238,6 +238,12 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     },
     reminder: null
   },
+  "erinyes/entangling-rope": {
+    why: "the rope it throws is the erinyes's magic rope, which turns to dust when the erinyes dies",
+    // "While bearing it, the erinyes can use the Entangling Rope action ... The rope turns to dust ... if the erinyes
+    // dies."
+    save: { endsWhenSourceDies: true }
+  },
   "chain-devil/conjure-infernal-chain": {
     why: "the failure's pull toward the devil is printed after its conditions",
     // "If the target is Large or smaller, the devil moves the target up to 30 feet straight toward itself."

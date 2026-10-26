@@ -1,5 +1,6 @@
 import { ALIVE_AT_ZERO_TAG, type GameState } from "@vtt/domain";
-import { normalizeDamageType } from "@vtt/rules-5e";
+import { normalizeDamageType, type RandomSource } from "@vtt/rules-5e";
+import { scheduleRestoration } from "./timed-revival.js";
 import type { ActorAction, ActorDefinition, TraitMechanic } from "@vtt/schemas";
 import { setCondition } from "./actor-conditions.js";
 import { stampDeath } from "./death.js";
@@ -107,17 +108,23 @@ export function mistyEscape(
   return true;
 }
 
-/** What a creature that comes back after it dies does as it dies (Diabolical Restoration, a lich's Spirit Jar): the
- *  GM hears it, and a body that disappears is gone. */
+/** What a creature that comes back after it dies does as it dies (Diabolical Restoration, a lich's Spirit Jar): a body
+ *  that disappears is gone, and a return after a time is rolled and kept on the clock (`timed-revival.ts`); otherwise
+ *  the GM hears that it may come back. */
 export function restorationAtDeath(
   state: GameState,
   actor: Actor,
   definition: ActorDefinition | undefined,
-  events: EffectNarration[]
+  events: EffectNarration[],
+  killer: Readonly<{ id?: string | null; rollDie?: RandomSource }> = {}
 ): void {
   const trait = traitOf(definition, "restoration");
   if (!trait) return;
   if (trait.bodyGoes) stampDeath(state, actor, { cause: trait.name, bodyGone: true });
+  if (trait.returns) {
+    events.push(...scheduleRestoration(state, actor, trait, killer.id, killer.rollDie));
+    return;
+  }
   events.push({
     kind: "effect",
     text: `${actor.name} may come back (${trait.name}): when and where follow its stat block and are the GM's.`,
