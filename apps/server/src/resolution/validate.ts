@@ -95,7 +95,10 @@ function combatantsOf(
     throw new CommandRejectedError(`${attacker.name} has no creature Grappled to drop with ${action.name}.`);
   // A creature off the plane, or on the Border Ethereal, affects and is affected only by what is there with it
   // (Banishment, Etherealness, Blink).
-  const awayFrom = (target: LiveActor) => onOtherPlanes(attacker, target);
+  // A night hag's Nightmare Haunting reaches from the Border Ethereal to a creature on the Material Plane.
+  const reachesMaterial = action.castRiders?.fromEthereal === true && planeOf(attacker) === "ethereal";
+  const awayFrom = (target: LiveActor) =>
+    onOtherPlanes(attacker, target) && !(reachesMaterial && planeOf(target) === "material");
   // A target named twice is one target (a second dart is the only reason to name it again).
   const targets = [...new Set(input.targetIds)].map((targetId) => {
     const target = state.actors.find((item) => item.id === targetId);

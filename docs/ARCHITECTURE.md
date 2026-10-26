@@ -726,7 +726,8 @@ the item's (Circlet of Blasting's +5).
 A player only spends spell slots (`character.set-slot` refuses a raise from a player); everything that gives a
 resource back is its own checked command. `conversions.ts` is one table of the features that turn one resource
 into another or recover one (Font of Magic both ways, Arcane and Natural Recovery, Magical Cunning, restoring a
-use with a slot or points, Pearl of Power), each with its timing, its check and its pick, offered by
+use with a slot or points, Pearl of Power, an incubus's Succubus Form after a Long Rest), each with its timing, its
+check and its pick, offered by
 `actor:available-actions` and taken with `actor.convert`. Hit Point Dice are spent only during a Short Rest, a
 player's own or the party's (`rests.ts`), or by a member whose interrupted Long Rest gave it a Short Rest's benefits.
 The party's Long Rest is a span (`long-rest.ts`): it opens at the clock's time and lasts until the GM finishes it.
@@ -803,7 +804,9 @@ attack roll that hits it (Reflexive Antennae), a creature starting or ending its
 creature, or splits the reactor in two (`split.ts`).
 Players type die faces, never totals, and only while the table allows typed dice. On the client every roll prompt
 shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
-(`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`).
+(`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`). A call
+for a check can name the creature it is about (`aboutActorId`, never projected), whose traits weigh on the roll (a
+sphinx's Inscrutable).
 
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or
 off, with per-family exceptions (`rules-families.ts`). A player blocked by a rule can ask the GM

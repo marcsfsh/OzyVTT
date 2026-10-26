@@ -1,4 +1,6 @@
 import { rollDice } from "@vtt/rules-5e";
+import { checkCastRiders, wastedByWard } from "./resolution/cast-riders.js";
+import { reflectOffCarapace } from "./resolution/carapace.js";
 import {
   actionChoicesOf,
   owedDamageParts,
@@ -95,6 +97,7 @@ import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-o
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { endTargetMarks } from "./resolution/action-targets.js";
 import {
+  adhereOnHit,
   corrodeOnHit,
   markMultiattackDefense,
   offerReactionToHit,
@@ -225,6 +228,7 @@ export function resolveDefinitionAction(
   checkTower(ctx);
   checkLightTarget(ctx);
   checkDestination(ctx);
+  checkCastRiders(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent, and so is a full flask.
   checkShapeShift(ctx);
@@ -295,6 +299,12 @@ export function resolveDefinitionAction(
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // And a night hag's Dream at a creature warded by Protection from Evil and Good or a Magic Circle.
+  if (wastedByWard(ctx)) {
+    commitEconomy(ctx);
+    releaseHideAndReady(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // An item that breaks as it fails to work (a Wind Fan) is gone with its pool, and its action is spent.
   if (breaksBeforeUse(ctx)) {
     commitEconomy({ ...ctx, plan: { ...ctx.plan, spendUse: null } });
@@ -352,6 +362,15 @@ export function resolveDefinitionAction(
     spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // A tarrasque's Reflective Carapace rolls its d6 against the spell: unaffected, or the caster becomes the target.
+  if (reflectOffCarapace(ctx)) {
+    commitEconomy(ctx);
+    recallSpellSlot(ctx);
+    useUpConsumable(ctx);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // A leap or a throw sets its creature down before the save falls on those in its space.
   landAtDestination(ctx);
   rollAttack(ctx);
@@ -404,6 +423,7 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   strikeBackOnHit(ctx);
+  adhereOnHit(ctx);
   corrodeOnHit(ctx);
   strikeBackFromEffects(ctx);
   offerReactionToHit(ctx);

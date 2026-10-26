@@ -81,6 +81,8 @@ export type CheckRollInput = Readonly<{
   /** The GM's choice of roll mode; a player's is never passed. */
   forcedMode?: "advantage" | "disadvantage" | "normal";
   findActorId?: string;
+  /** The creature the check is about, whose traits can weigh on it (a sphinx's Inscrutable). */
+  aboutActorId?: string;
   /** The GM's call this check answers. */
   callId?: string;
   /** The situations the roller says the check fits (a Book's topic, prying with a Crowbar). */
@@ -136,8 +138,12 @@ function planFor(state: GameState, scope: Initiator, input: CheckRollInput, deps
     ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
     ...(deps.catalog ? { catalog: deps.catalog } : {})
   });
+  // What the check is about: a sphinx's Inscrutable weighs on Insight into its intentions.
+  const about = input.aboutActorId ? state.actors.find((candidate) => candidate.id === input.aboutActorId) : undefined;
+  const aboutDefinition = about?.definitionId ? deps.resolveDefinition(about.definitionId) : undefined;
   const plan = checkPlan(actor, definition, derivation, input.subject, {
     ...(deps.names ? { names: deps.names } : {}),
+    ...(about ? { about: { name: about.name, definition: aboutDefinition } } : {}),
     ...(finding ? { finding, versus: versusOf(actor, finding, deps) } : {}),
     ...(warded.length > 0 ? { warded } : {}),
     ...(input.situations !== undefined && input.situations.length > 0 ? { situations: input.situations } : {}),
@@ -549,6 +555,7 @@ export function startRollCall(
     dc: number | null;
     actorIds: readonly string[];
     blind: boolean;
+    aboutActorId?: string;
   }>,
   deps: Readonly<{
     newId: () => string;
@@ -608,6 +615,7 @@ export function startRollCall(
     subject: { ...input.subject },
     dc: input.dc,
     blind: input.blind,
+    ...(input.aboutActorId !== undefined && input.kind === "check" ? { aboutActorId: input.aboutActorId } : {}),
     entries,
     createdAt: deps.now()
   };
@@ -651,6 +659,7 @@ export function answerRollCall(
       dc: call.dc,
       visibility,
       callId: call.id,
+      ...(call.aboutActorId !== undefined ? { aboutActorId: call.aboutActorId } : {}),
       ...(input.face !== undefined ? { face: input.face } : {}),
       ...(situations.length > 0 ? { situations } : {})
     },

@@ -722,6 +722,8 @@ export const RollCallSchema = z
     subject: CheckSubjectSchema,
     dc: z.number().int().min(1).max(40).nullable(),
     blind: z.boolean().default(false),
+    /** The creature the check is about (Insight into a sphinx's intentions). GM bookkeeping, never projected. */
+    aboutActorId: z.uuid().optional(),
     entries: z.array(RollCallEntrySchema).min(1).max(20),
     createdAt: z.number().int().nonnegative()
   })

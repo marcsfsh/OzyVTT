@@ -23,7 +23,7 @@ const READERS: readonly Check[] = [
     read: (action) => action.drain?.slainRise?.afterHours !== undefined
   },
   {
-    pattern: /\bcan smother only one creature at a time\b|\bcan[’']t take this action\b/,
+    pattern: /\bcan smother only one creature at a time\b|\bcan[\u2019']t take this action\b/,
     read: (action) => riderTag(action, "source-no-repeat")
   },
   {

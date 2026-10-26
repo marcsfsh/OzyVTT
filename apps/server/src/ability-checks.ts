@@ -1,4 +1,5 @@
 import type { AbilityId, Actor } from "@vtt/domain";
+import { traitOf } from "./statblock-traits.js";
 import {
   abilityModifier,
   aggregateRollMode,
@@ -257,6 +258,8 @@ export type CheckContext = Readonly<{
   versus?: CheckVersus;
   /** The situations the roller says it fits (a Book's topic, prying with a Crowbar), for `situation-is` riders. */
   situations?: readonly string[];
+  /** The creature the check is about (Insight into its intentions), whose traits can weigh on it. */
+  about?: Readonly<{ name: string; definition: ActorDefinition | undefined }>;
 }>;
 
 /** The flat part of a skill check (SRD Skills, Expertise, Jack of All Trades): a GM-typed total, else the stat block's
@@ -353,6 +356,11 @@ function plainCheckPlan(
       : skilled;
   const claims = abilityCheckClaims(actor, derivation, narrow, context.warded, context.stakes, context.sight);
   if (trained) claims.advantage.push({ source: "training", label: "Training" });
+  // A sphinx's Inscrutable: "Wisdom (Insight) checks made to ascertain its intentions or sincerity are made with
+  // Disadvantage." The label reaches the roller, so it names the trait and not the creature, which may be hidden.
+  const inscrutable = context.about ? traitOf(context.about.definition, "inscrutable") : undefined;
+  if (inscrutable && subject.skill === inscrutable.skill)
+    claims.disadvantage.push({ source: "inscrutable", label: inscrutable.name });
   if (context.versus) socialClaims(actor, subject, context.versus, claims);
   // A Wisdom (Perception) check to find a creature relies on sight unless the GM says it listens: Disadvantage when
   // it is Lightly Obscured to the roller, and a failure whatever the roll when the roller is Blinded or it is Heavily

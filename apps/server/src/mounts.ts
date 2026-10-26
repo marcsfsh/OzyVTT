@@ -1,4 +1,5 @@
 import type { GameState } from "@vtt/domain";
+import { traitOf } from "./statblock-traits.js";
 import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
 import { altitudeOf, setAltitude } from "./altitude.js";
 import { applyCondition, makeEffect, type EffectNarration } from "./effects.js";
@@ -160,6 +161,7 @@ export function mountOrDismount(state: GameState, input: MountInput, geometry: T
   }
   const mount = state.actors.find((actor) => actor.id === input.mountId);
   const mountToken = state.combat.tokens.find((token) => token.actorId === input.mountId);
+  const definition = mount?.definitionId ? input.resolveDefinition(mount.definitionId) : undefined;
   if (!mount || !mountToken?.position || mount.id === rider.id)
     throw new CommandRejectedError("That mount isn't on the map.");
   if (current) throw new CommandRejectedError(`${rider.name} is already riding ${current.name}.`);
@@ -193,6 +195,8 @@ export function mountOrDismount(state: GameState, input: MountInput, geometry: T
   if (controlled && controllingRiderOf(state, mount.id))
     throw new CommandRejectedError(`Another rider already controls ${mount.name}.`);
   spendHalfSpeed(state, rider, input, notes);
+  // "The nightmare can grant Resistance to Fire damage to a rider while it is on the nightmare."
+  const confers = traitOf(definition, "confers-resistance");
   rider.effects = [
     ...rider.effects,
     makeEffect({
@@ -201,7 +205,8 @@ export function mountOrDismount(state: GameState, input: MountInput, geometry: T
       tags: controlled ? [RIDING_TAG, CONTROLS_MOUNT_TAG] : [RIDING_TAG],
       duration: { type: "manual" },
       sourceActorId: mount.id,
-      sourceName: mount.name
+      sourceName: mount.name,
+      ...(confers ? { modifiers: [{ type: "damage-resistance" as const, damageTypes: [confers.damageType] }] } : {})
     })
   ];
   moveEncounterToken(state, rider.id, mountToken.position, geometry);

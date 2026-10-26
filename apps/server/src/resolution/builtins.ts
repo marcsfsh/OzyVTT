@@ -35,7 +35,7 @@ import {
 } from "../effects.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
-import { endAnEffect, isNamedEnding, namedEnding } from "./endings.js";
+import { endAnEffect, isNamedEnding, namedEnding, stepOutOfHolder } from "./endings.js";
 import { CommandRejectedError } from "../game-store.js";
 import { touchBead } from "../zone-touch.js";
 import { holdsTalisman, SPHERE_CONTROL_TAG } from "../zone-sphere.js";
@@ -479,6 +479,7 @@ function escapeGrapple(ctx: ResolveContext): void {
   if (rollCheck(ctx, subject, escapable.escapeDc, undefined, escapable.linkedConditionIds, undefined, hindered)) {
     endEffect(state, attacker.id, escapable.id);
     ctx.effectsEnded.push(endedEffect(attacker, escapable));
+    stepOutOfHolder(ctx, attacker, escapable);
   }
 }
 

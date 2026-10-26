@@ -42,8 +42,9 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       // unoccupied space, the target fails the save instead."
       successMovesOut: { withinFeet: 5 }
     },
-    // A creature walking into the cube makes the save with Disadvantage (space-entry.ts).
-    reminder: "A creature that escapes or is pulled free enters the nearest unoccupied space: move its token there."
+    // A creature walking into the cube makes the save with Disadvantage (space-entry.ts), and one that escapes or is
+    // pulled free steps into the nearest unoccupied space (resolution/endings.ts).
+    reminder: null
   },
   "water-elemental/whelm": {
     why: "a creature outside can pull the whelmed one free, and the whelmed one holds its breath, which the save's text prints",

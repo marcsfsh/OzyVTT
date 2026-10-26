@@ -1,4 +1,5 @@
 import { WISH_LOST_TAG } from "./wish.js";
+import { spareOpportunityReactions } from "../reactive-heads.js";
 import { carriedObjectViolation } from "../carried-objects.js";
 import { reactionSpent, spendReaction } from "../commanded-reactions.js";
 import { formViolations } from "../transform/rules.js";
@@ -166,6 +167,8 @@ type Evaluation = Readonly<{
   proseMultiattack: boolean;
   /** Step of the Wind right after another Bonus Action takes no Bonus Action of its own (Fleet Step). */
   freeBonusAction?: boolean;
+  /** An Opportunity Attack, which a hydra's extra Reactions can take (Reactive Heads). */
+  opportunity?: boolean;
   violations: RuleViolation[];
   softViolations: RuleViolation[];
   notes: string[];
@@ -208,6 +211,7 @@ export function evaluateActionEconomy(
     silenced?: boolean;
     areaPlaced?: boolean;
     shaping?: readonly CastShaping[];
+    opportunity?: boolean;
   }> = {}
 ): EconomyEvaluation {
   // A Multiattack whose other plan waits on an action used this turn (a clay golem's Hasten) plans as it stands now.
@@ -227,6 +231,7 @@ export function evaluateActionEconomy(
     proseMultiattack: siblings.some((candidate) => candidate.untrackedMultiattack === true),
     // A weretiger's Prowl ends with a Hide that takes no action of its own.
     freeBonusAction: fleet.free || hidesFreely(attacker, action),
+    ...(cast.opportunity ? { opportunity: true } : {}),
     violations: [],
     softViolations: [],
     notes: []
@@ -1239,6 +1244,12 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
   // A released spell's later rays come with the Reaction its first ray took.
   if (readied && heldReadiedSpell(attacker, action.id)?.raysLeft !== undefined) return unchanged;
   if (action.activation === "reaction" || readied) {
+    // A hydra's heads beyond one each give it another Reaction for Opportunity Attacks (Reactive Heads).
+    const spareHead =
+      evaluation.opportunity === true &&
+      evaluation.resolveDefinition !== undefined &&
+      spareOpportunityReactions(attacker, evaluation.resolveDefinition) > 0;
+    if (spareHead) return { ...unchanged, markReaction: true };
     if (state.combat.reactionsUsed.includes(attacker.id))
       violations.push({
         rule: "economy.reaction-used",
@@ -1812,7 +1823,8 @@ export function planEconomy(
     {
       ...(input.silenced === true ? { silenced: true } : {}),
       ...(input.areaPlaced === true ? { areaPlaced: true } : {}),
-      ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping } : {})
+      ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping } : {}),
+      ...(input.attackKinds?.includes("opportunity") ? { opportunity: true } : {})
     }
   );
   warnings.push(...notes);

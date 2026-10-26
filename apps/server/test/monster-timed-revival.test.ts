@@ -7,6 +7,7 @@ import { applyRest, passTime } from "../src/rests.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import { actor, answer, damage, definitionOf, IDS, NOW, nextId, table, use, type Table } from "./monster-table.js";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
+import { itemActionId } from "../src/item-actions.js";
 
 // SRD 5.2.1 creatures that come back on the game clock: a guardian naga returns in 1d6 days unless Dispel Evil and Good
 // is cast on its remains, a lemure in 1d10 days unless its killer bore Bless or Holy Water touches its remains, a mummy
@@ -134,6 +135,32 @@ describe("a restoration on the game clock", () => {
     passTime(built.state, 24 * 7, 0, clock(built));
     expect(isDead(actor(built, IDS.monster))).toBe(true);
   });
+
+  it("stops a lemure's return when its remains are sprinkled with Holy Water", () => {
+    const built = table("lemure");
+    slay(built);
+    expect(actor(built, IDS.monster).death?.returns?.name).toBe("Hellish Restoration");
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.ally };
+    const sprinkle = {
+      id: itemActionId("holy-water"),
+      name: "Holy Water",
+      activation: "action" as const,
+      description: "The flask splashes the remains.",
+      attack: { bonus: 5, rangeFeet: 20 },
+      damage: [{ formula: "2d8", type: "radiant" }]
+    };
+    const done = resolveDefinitionAction(
+      built.state,
+      sprinkle,
+      { actorId: IDS.ally, targetIds: [IDS.monster], commandId: nextId() },
+      { random: () => 3, newRollId: nextId, gmSessionId: IDS.gm, now: NOW, resolveDefinition: built.resolveDefinition }
+    );
+    expect(done.tableNarration?.map((line) => line.text)).toContain(
+      "Lemure's remains won't return to life now (Hellish Restoration)."
+    );
+    passTime(built.state, 24 * 11, 0, clock(built));
+    expect(isDead(actor(built, IDS.monster))).toBe(true);
+  });
 });
 
 describe("a shadow's Draining Swipe", () => {
@@ -212,5 +239,29 @@ describe("carried objects", () => {
     built.state.combat = { ...built.state.combat, active: false };
     applyRest(built.state, IDS.monster, "short", built.resolveDefinition);
     expect(rope().heldBy?.hitPoints.current).toBe(90);
+  });
+
+  it("let an erinyes's rope turn to dust when the erinyes dies, freeing its target", () => {
+    const built = table("erinyes");
+    actor(built, IDS.monster).effects.push(...carriedObjectEffects(IDS.monster, "Erinyes", definitionOf("erinyes")));
+    use(built, "entangling-rope", [IDS.hero]);
+    answer(built, IDS.hero, 1);
+    expect(actor(built, IDS.hero).conditions.map((condition) => condition.id)).toContain("restrained");
+    slay(built, IDS.monster, IDS.hero);
+    expect(actor(built, IDS.hero).conditions.map((condition) => condition.id)).not.toContain("restrained");
+  });
+
+  it("release the souls a night hag's soul bag holds when it is destroyed", () => {
+    const built = table("night-hag");
+    actor(built, IDS.monster).effects.push(
+      ...carriedObjectEffects(IDS.monster, "Night Hag", definitionOf("night-hag"))
+    );
+    const ally = actor(built, IDS.ally);
+    ally.hp = { ...ally.hp, current: 0 };
+    ally.death = { clockRound: 0, soulTrappedBy: IDS.monster };
+    const ref = { actorId: IDS.monster, effectId: `${IDS.monster}:carried:soul-bag` };
+    const broken = damageObject(built.state, ref, [{ amount: 50, type: "fire" }]);
+    expect(broken.events.map((event) => event.text)).toContain("Ally's soul is released.");
+    expect(actor(built, IDS.ally).death?.soulTrappedBy).toBeUndefined();
   });
 });

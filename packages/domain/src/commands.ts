@@ -1074,6 +1074,9 @@ export const RollCallStartSchema = z
     /** What a check relies on: a Blinded character fails one that needs sight, a Deafened one one that needs
      *  hearing. */
     sense: z.enum(["sight", "hearing"]).optional(),
+    /** The creature a check is about (Insight into its intentions), whose traits can weigh on it: a sphinx's
+     *  Inscrutable gives the check Disadvantage. */
+    aboutActorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()

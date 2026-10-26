@@ -590,6 +590,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].needsObject",
+    types: ACTION_CARRIERS,
+    reason:
+      "the carried object an action needs whole (a night hag's soul bag, an erinyes's rope) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castRiders.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what a monster's spell holds to beyond the spell (a night hag's Dream from the Border Ethereal, wasted on a warded target) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].zone.**",
     types: ACTION_CARRIERS,
     reason:

@@ -120,7 +120,7 @@ describe("SRD monster save damage is what the failure deals at once", () => {
     expect(engulf.damage).toEqual([{ formula: "3d6", type: "acid" }]);
     expect(engulf.save?.ongoingDamage).toEqual({ damage: [{ formula: "3d6", type: "acid" }], at: "source-turn-start" });
     // The engine deals it, so the GM's reminder keeps only the rest.
-    expect(engulf.reminder).not.toMatch(/Acid damage/);
+    expect(engulf.reminder ?? "").not.toMatch(/Acid damage/);
     // Swallowed: nothing at once, the acid comes at the start of the swallower's turns.
     for (const monster of ["behir", "purple-worm", "remorhaz", "tarrasque"]) {
       expect(action(monster, "swallow").damage).toEqual([]);

@@ -13,7 +13,7 @@ import { objectsUnder } from "../resolution/object-targets.js";
 import { withPickedDamageTypes } from "../statblock-picks.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
-import { destinationAt, pushTokenAway } from "../forced-movement.js";
+import { destinationAt, openSpaceBeside, pushTokenAway } from "../forced-movement.js";
 import { moveEncounterToken } from "../token-placement.js";
 import { pushThroughZones } from "../pushed-through.js";
 import { placeTemplates } from "../multi-templates.js";
@@ -616,6 +616,10 @@ export const actionCommands = [
             placeToken: (moverId, at) => {
               if (geometry && draft.combat.mapAssetId === mapAssetId) moveEncounterToken(draft, moverId, at, geometry);
             },
+            openSpaceBeside: (moverId, besideId, withinFeet) =>
+              draft.combat.mapAssetId === mapAssetId
+                ? openSpaceBeside(draft, moverId, besideId, withinFeet, geometry)
+                : undefined,
             summon: (summonRequest) =>
               bringSummons(
                 draft,

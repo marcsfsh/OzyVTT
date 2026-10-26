@@ -160,7 +160,12 @@ describe("trait mechanics in the monster bundle", () => {
 
   it("reads the traits that cheat death: mist, a new body, heads and limbs", () => {
     expect(mechanicsOf("vampire")).toContainEqual({ kind: "misty-escape", name: "Misty Escape" });
-    expect(mechanicsOf("lich")).toContainEqual({ kind: "restoration", name: "Spirit Jar" });
+    expect(mechanicsOf("lich")).toContainEqual({
+      kind: "restoration",
+      name: "Spirit Jar",
+      returns: { after: "1d10", unit: "days", needs: "spirit-jar" }
+    });
+    expect(mechanicsOf("lich")).toContainEqual({ kind: "carried-object", name: "Spirit Jar", tag: "spirit-jar" });
     expect(mechanicsOf("hydra")).toEqual([
       {
         kind: "multiple-heads",
@@ -236,5 +241,47 @@ describe("trait mechanics in the monster bundle", () => {
       []
     );
     expect(mechanicsOf("goblin-warrior")).toEqual([]);
+  });
+
+  it("reads the traits that change who a creature is, what it sticks to and whom it commands", () => {
+    expect(mechanicsOf("incubus")).toContainEqual({
+      kind: "form-at-rest",
+      name: "Succubus Form",
+      monsterId: "succubus"
+    });
+    expect(mechanicsOf("mimic")).toContainEqual({
+      kind: "adhesive",
+      name: "Adhesive (Object Form Only)",
+      maxSize: "huge",
+      escapeDc: 13,
+      forms: ["object"]
+    });
+    expect(mechanicsOf("nightmare")).toContainEqual({
+      kind: "confers-resistance",
+      name: "Confer Fire Resistance",
+      damageType: "fire"
+    });
+    expect(mechanicsOf("sahuagin-warrior")).toContainEqual({
+      kind: "controls-kind",
+      name: "Shark Telepathy",
+      nameHas: "shark",
+      withinFeet: 120
+    });
+    expect(mechanicsOf("sphinx-of-lore")).toContainEqual({
+      kind: "inscrutable",
+      name: "Inscrutable",
+      skill: "insight"
+    });
+    expect(mechanicsOf("clay-golem")).toContainEqual({ kind: "immutable-form", name: "Immutable Form" });
+    expect(mechanicsOf("gelatinous-cube")).toContainEqual({ kind: "transparent", name: "Transparent", dc: 15 });
+    expect(mechanicsOf("tarrasque")).toContainEqual({ kind: "reflective-carapace", name: "Reflective Carapace" });
+    expect(mechanicsOf("troll-limb")).toContainEqual({
+      kind: "spawns",
+      name: "Troll Spawn",
+      afterHours: 24,
+      die: 12,
+      on: 12,
+      monsterId: "troll"
+    });
   });
 });

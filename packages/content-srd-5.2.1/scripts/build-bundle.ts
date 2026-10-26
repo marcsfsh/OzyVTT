@@ -734,6 +734,7 @@ const ACTION_ENRICHMENTS: Record<
       | "destination"
       | "drain"
       | "needsObject"
+      | "castRiders"
     >
   >
 > = {
@@ -748,8 +749,20 @@ const ACTION_ENRICHMENTS: Record<
   "bulette/deadly-leap": { destination: { who: "user", feet: 15, costFeet: 5, onto: "large" } },
   // "While bearing it, the erinyes can use the Entangling Rope action."
   "erinyes/entangling-rope": { needsObject: "magic-rope" },
-  // "While holding or carrying the bag, the hag can use its Nightmare Haunting action."
-  "night-hag/nightmare-haunting": { needsObject: "soul-bag" },
+  // "While holding or carrying the bag, the hag can use its Nightmare Haunting action." "While on the Ethereal Plane,
+  // the hag casts Dream ... The spell fails and is wasted if the target is under the effect of the Protection from Evil
+  // and Good spell or within a Magic Circle spell. If the target takes damage from the Dream spell, the target's Hit
+  // Point maximum decreases by an amount equal to that damage. If the spell kills the target, its soul is trapped in
+  // the hag's soul bag."
+  "night-hag/nightmare-haunting": {
+    needsObject: "soul-bag",
+    castRiders: {
+      fromEthereal: true,
+      failsUnder: ["protection-from-evil-and-good", "magic-circle"],
+      drainsMaximum: true,
+      trapsSoul: true
+    }
+  },
   // "If a Humanoid is slain by this attack, a Shadow rises from the corpse 1d4 hours later."
   "shadow/draining-swipe": {
     drain: { slainRise: { monsterId: "shadow", creatureTypes: ["humanoid"], afterHours: "1d4" } }

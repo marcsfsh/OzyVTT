@@ -1,4 +1,5 @@
 import { isDead, type GameState } from "@vtt/domain";
+import { telepathicControlAtTurnStart } from "./telepathic-control.js";
 import { abilityModifier, parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { calmAtTurnStart } from "./berserker-axe.js";
@@ -222,6 +223,8 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
   // A Berserker Axe's berserk ends on a turn that starts with no creature within 60 feet.
   const calm = calmAtTurnStart(state, actorId, deps.distanceFeet);
   if (calm) events.push(...endEffect(state, actorId, calm));
+  // A sahuagin takes up or lets go of the sharks within its telepathy's reach (Shark Telepathy).
+  events.push(...telepathicControlAtTurnStart(state, actorId, deps));
   const steps = startSteps(state, actorId, deps);
   if (deps.askOrder && deps.newId && askOrder(state, actorId, "start", steps, deps.newId))
     events.push(waitingNarration(state, state.combat.turnSteps!));

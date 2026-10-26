@@ -1,13 +1,14 @@
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
+import { currentFormId } from "../transform/forms.js";
 import { holdsFeature } from "../class-features.js";
 import { conditionLabel } from "../condition-rules.js";
-import { addEffect, makeEffect } from "../effects.js";
+import { addEffect, ESCAPE_DISADVANTAGE_TAG, makeEffect, type EffectNarration } from "../effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "../hit-points.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { createPendingSaves } from "../saving-throws.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { traitOf } from "../statblock-traits.js";
-import { tableLineOf, type ResolveContext } from "./context.js";
+import { sizeAtMost, tableLineOf, type ResolveContext } from "./context.js";
 import { shotFrom } from "../ammunition.js";
 import { isMagicRow, penalizeRow } from "../row-penalties.js";
 import { dealsDamage } from "./on-hit.js";
@@ -59,6 +60,50 @@ export function strikeBackOnHit(ctx: ResolveContext): void {
     actorIds: [attacker.id, target.id]
   });
   for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+}
+
+/**
+ * SRD 5.2.1 mimic, Adhesive (Object Form Only): "The mimic adheres to anything that touches it. A Huge or smaller
+ * creature adhered to the mimic has the Grappled condition (escape DC 13). Ability checks made to escape this grapple
+ * have Disadvantage." A creature that hits it with a melee attack while it is an object sticks to it.
+ */
+export function adhereOnHit(ctx: ResolveContext): void {
+  const { state, attack, attacker, targets, input, deps } = ctx;
+  if (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit") || input.commit === false) return;
+  if (!(ctx.riderFilters.attackKinds ?? []).includes("melee") || !deps.resolveDefinition) return;
+  const target = targets.find((candidate) => candidate.id === attack.targetId) ?? targets[0];
+  if (!target || target.id === attacker.id || target.hp.current <= 0) return;
+  const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
+  const trait = traitOf(definition, "adhesive");
+  const form = currentFormId(target);
+  if (!trait || !trait.forms.some((name) => form.includes(name)) || !sizeAtMost(attacker.size, trait.maxSize)) return;
+  if (attacker.effects.some((effect) => effect.sourceActorId === target.id && effect.tags.includes("grapple"))) return;
+  const gained: EffectNarration[] = [];
+  addEffect(
+    state,
+    attacker.id,
+    makeEffect({
+      id: `${input.commandId}:adhered:${attacker.id}`,
+      name: `Adhered to ${target.name} (${trait.name.replace(/\s*\(.*\)$/, "")})`,
+      tags: ["grapple", ESCAPE_DISADVANTAGE_TAG],
+      sourceActorId: target.id,
+      sourceName: target.name,
+      startedRound: state.combat.round,
+      duration: { type: "manual" },
+      endsWhenSourceDefeated: true,
+      linkedConditionIds: ["grappled"],
+      escapeDc: trait.escapeDc,
+      rangeFeet: 5
+    }),
+    gained,
+    deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : undefined
+  );
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${attacker.name} sticks to ${target.name} and is Grappled (escape DC ${trait.escapeDc}).`,
+    actorIds: [attacker.id, target.id]
+  });
+  for (const event of gained) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
 /**

@@ -215,6 +215,13 @@ export type ResolveDependencies = Readonly<{
   ) => Readonly<{ at: Readonly<{ x: number; y: number }>; feet: number; sharers: readonly string[] }> | null;
   /** Sets a creature's token at a snapped point on the live map, on the ground. */
   placeToken?: (actorId: string, at: Readonly<{ x: number; y: number }>) => void;
+  /** The nearest unoccupied space to a creature within `withinFeet` of another (`forced-movement.ts`): null when none
+   *  is, undefined when the map can't say. */
+  openSpaceBeside?: (
+    actorId: string,
+    besideId: string,
+    withinFeet: number
+  ) => Readonly<{ x: number; y: number }> | null | undefined;
   /** Brings an action's creatures onto the map (`bringSummons`), built by the operation layer, which has the grid and
    *  mints ids. Absent, a summon is left for the GM to place. */
   summon?: (request: SummonRequest) => SummonOutcome;

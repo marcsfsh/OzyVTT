@@ -128,3 +128,32 @@ describe("a darkmantle's Crush", () => {
     ).toThrow(RulesBlockedError);
   });
 });
+
+describe("a stirge's Proboscis", () => {
+  it("lets the stirge detach itself for 5 feet of its movement, and not on another's turn", () => {
+    const built = table("stirge");
+    use(built, "proboscis", [IDS.hero], [19, 3, 3]);
+    expect(actor(built, IDS.hero).effects.some((effect) => effect.sourceActorId === IDS.monster)).toBe(true);
+    const detach = builtinActionFor(built.definition, "detach-self", actor(built, IDS.monster))!;
+    const detachNow = () =>
+      resolveDefinitionAction(
+        built.state,
+        detach,
+        { actorId: IDS.monster, targetIds: [], commandId: nextId(), builtin: true },
+        {
+          random: () => 3,
+          newRollId: nextId,
+          gmSessionId: IDS.gm,
+          now: NOW,
+          definition: built.definition,
+          resolveDefinition: built.resolveDefinition
+        }
+      );
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.hero };
+    expect(detachNow).toThrow(/movement of its own turn/);
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.monster };
+    expect(detachNow().tableNarration?.map((line) => line.text)).toContain("Stirge detaches itself from Hero.");
+    expect(actor(built, IDS.hero).effects.some((effect) => effect.sourceActorId === IDS.monster)).toBe(false);
+    expect(built.state.combat.turn.movementUsedFeet).toBe(5);
+  });
+});

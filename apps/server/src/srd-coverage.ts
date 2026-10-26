@@ -257,7 +257,18 @@ export function monsterActionRow(
   if (action.castsSpells) {
     const stateOf = (spellId: string) => spellStates.get(spellId) ?? "reference";
     const spells = action.castsSpells.spells;
-    if (action.castsSpells.self) return { state: most([stateOf(spells[0]!.spellId), floor]) };
+    if (action.castsSpells.self) {
+      // A single cast names its spell when that spell's row leaves something to a person.
+      const entry = spells[0]!;
+      const state = most([stateOf(entry.spellId), floor]);
+      const name = spellNames.get(entry.spellId) ?? entry.name;
+      return state === "enforced" || NARRATIVE_SPELLS.has(entry.spellId)
+        ? { state }
+        : {
+            state,
+            note: `Casts ${name} at the stat block's numbers (monster-spells.ts); ${name} applies only as its own row says.`
+          };
+    }
     // A list's own uses (per day, at will) are counted on every cast, so a list is guided at least.
     const judged = spells.filter((entry) => !NARRATIVE_SPELLS.has(entry.spellId));
     const state = most([least(judged.map((entry) => stateOf(entry.spellId))), "guided"]);

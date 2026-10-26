@@ -1,4 +1,5 @@
 import { reactionSpenders, reactionSpent } from "./commanded-reactions.js";
+import { spareOpportunityReactions, spendSpareOpportunityReaction } from "./reactive-heads.js";
 import type { ActionResolution, DamageApplication, GameState, PendingReaction } from "@vtt/domain";
 import type { RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition, DamageType } from "@vtt/schemas";
@@ -147,8 +148,13 @@ export function answerReaction(
   const pending = state.combat.pendingReactions.find((entry) => entry.id === reactionId);
   if (!pending) throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
   const reactor = adjustableActor(state, pending.actorId, scope);
+  // A hydra whose own Reaction is spent makes an Opportunity Attack with one its heads give it (Reactive Heads).
+  const spareHead =
+    pending.kind === "leaves-reach" &&
+    reactionSpent(state, reactor.id) &&
+    spareOpportunityReactions(reactor, deps.resolveDefinition) > 0;
   // An answer to a roll checks its own cost (an Improve Fate takes no Reaction); every other prompt is a Reaction.
-  if (use && pending.kind !== "roll-answer" && reactionSpent(state, reactor.id)) {
+  if (use && pending.kind !== "roll-answer" && reactionSpent(state, reactor.id) && !spareHead) {
     throw new CommandRejectedError(
       state.combat.reactionsUsed.includes(reactor.id)
         ? `${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`
@@ -176,6 +182,7 @@ export function answerReaction(
       kind: pending.kind
     },
     clearPrompt: (markUsed) => {
+      if (markUsed && spareHead) spendSpareOpportunityReaction(reactor);
       state.combat = {
         ...state.combat,
         pendingReactions: state.combat.pendingReactions.filter((entry) => entry.id !== reactionId),

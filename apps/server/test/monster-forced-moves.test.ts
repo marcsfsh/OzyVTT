@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameState } from "@vtt/domain";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
+import { builtinAction } from "../src/builtin-actions.js";
 import { destinationAt, openSpaceBeside, pullIntoSpace, pushTokenAway } from "../src/forced-movement.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import { placeBeside } from "../src/mounts.js";
@@ -155,6 +156,50 @@ describe("a gelatinous cube's Engulf", () => {
     expect(texts(events)).toContain(
       "Hero has no unoccupied space within 5 feet of Gelatinous Cube and fails the save instead."
     );
+  });
+
+  /** `actorId` takes a generic action on its own turn, on the map. */
+  function generic(built: Table, actorId: string, actionId: string, input: Record<string, unknown>, faces: number[]) {
+    built.state.combat = {
+      ...built.state.combat,
+      turnActorId: actorId,
+      turn: { ...built.state.combat.turn, actionUsed: false }
+    };
+    return resolveDefinitionAction(
+      built.state,
+      builtinAction(actionId)!,
+      { actorId, targetIds: [], commandId: nextId(), builtin: true, ...input },
+      {
+        random: () => faces.shift() ?? 3,
+        newRollId: nextId,
+        gmSessionId: IDS.gm,
+        now: NOW,
+        definition: built.resolveDefinition(actor(built, actorId).definitionId!),
+        resolveDefinition: built.resolveDefinition,
+        distanceFeet: () => 5,
+        placeToken: (moverId, point) => moveEncounterToken(built.state, moverId, point, GRID),
+        openSpaceBeside: (moverId, besideId, withinFeet) =>
+          openSpaceBeside(built.state, moverId, besideId, withinFeet, GRID)
+      }
+    );
+  }
+
+  it("sets a creature that escapes in the nearest unoccupied space", () => {
+    const built = engulfing();
+    answer(built, IDS.hero, 1);
+    expect(conditionsOf(built, IDS.hero)).toContain("restrained");
+    const escaped = generic(built, IDS.hero, "escape-grapple", {}, [20]);
+    expect(conditionsOf(built, IDS.hero)).not.toContain("restrained");
+    expect(positionOf(built.state, IDS.hero)).not.toEqual(cell(5, 5));
+    expect(texts(escaped.tableNarration ?? [])).toContain("Hero enters the nearest unoccupied space.");
+  });
+
+  it("sets a creature pulled free in the nearest unoccupied space", () => {
+    const built = engulfing({ [IDS.ally]: cell(6, 5) });
+    answer(built, IDS.hero, 1);
+    generic(built, IDS.ally, "end-an-effect", { targetIds: [IDS.hero] }, [20, 3, 3, 3]);
+    expect(conditionsOf(built, IDS.hero)).not.toContain("restrained");
+    expect(positionOf(built.state, IDS.hero)).not.toEqual(cell(5, 5));
   });
 });
 

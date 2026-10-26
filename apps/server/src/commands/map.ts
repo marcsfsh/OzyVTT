@@ -10,6 +10,7 @@ import {
   templateOfArea,
   type AnnotationActor
 } from "../annotations.js";
+import { seenToAct } from "../transparent.js";
 import { carriedSourcesOf } from "../attachments.js";
 import type { GameState } from "@vtt/domain";
 import { pointInRects } from "@vtt/rules-5e";
@@ -533,6 +534,9 @@ export const mapCommands = [
         // weretiger's Prowl ends with a free Hide.
         if (outcome.dropsHeld) landing.push(...dropGrappled(state, actorId));
         if (outcome.thenHide) landing.push(...offerHideAfterMove(state, actorId, granted ?? "the move"));
+        // A transparent gelatinous cube seen to move is noticed.
+        if (from !== null && to !== null && (from.x !== to.x || from.y !== to.y))
+          landing.push(...seenToAct(state, actorId));
         // A mount carries its riders; one that teleports leaves them where they were, off it. One moved by force
         // carries them too, and each saves to stay on (SRD Mounted Combat).
         if (mode === "teleport") for (const riderId of ridersOf(state, actorId)) parted(state, riderId);

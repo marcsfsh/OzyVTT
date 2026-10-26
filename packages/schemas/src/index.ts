@@ -1493,11 +1493,16 @@ export const RestTriggerSchema = z
     damage: RepeatFailureDamageSchema.optional(),
     /** It acts once and ends (Dream: "the target gains no benefit from its rest, and it takes 3d6 Psychic damage when
      *  it wakes up"). */
-    once: z.literal(true).optional()
+    once: z.literal(true).optional(),
+    /** The damage it deals lowers the Hit Point maximum by as much (a night hag's Nightmare Haunting). */
+    drainsMaximum: z.literal(true).optional(),
+    /** A bearer the damage kills has its soul trapped by the effect's source, and can't be raised until the source's
+     *  soul bag is destroyed (a night hag's Nightmare Haunting). */
+    trapsSoul: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, a maximum a Long Rest doesn't restore, damage as it wakes, and whether it acts only once"
+    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, a maximum a Long Rest doesn't restore, damage as it wakes (lowering the maximum by as much, and trapping the soul of a bearer it kills), and whether it acts only once"
   );
 export type RestTrigger = z.infer<typeof RestTriggerSchema>;
 
@@ -5860,6 +5865,22 @@ export const ActionSchema = z
     needsObject: EffectTagSchema.optional().describe(
       "It can be used only while its user still has the carried object tagged so, whole (a night hag's soul bag); a hold it leaves is that object"
     ),
+    /** What a spell it casts holds to beyond the spell's own rules (a night hag's Nightmare Haunting casting Dream):
+     *  `fromEthereal`, cast only from the Border Ethereal at creatures on the Material Plane; `failsUnder`, the spells
+     *  (by id or effect tag) whose ward on a target makes the cast fail and be wasted; `drainsMaximum` and `trapsSoul`,
+     *  what its later damage does (`RestTriggerSchema`). Its later actions (Dream's terrifying message) carry them. */
+    castRiders: z
+      .object({
+        fromEthereal: z.literal(true).optional(),
+        failsUnder: z.array(EffectTagSchema).min(1).max(4).optional(),
+        drainsMaximum: z.literal(true).optional(),
+        trapsSoul: z.literal(true).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "What a spell it casts holds to beyond the spell's own rules: cast only from the Border Ethereal at creatures on the Material Plane, the wards on a target that make it fail and be wasted, and whether its later damage lowers the Hit Point maximum and traps the soul of a creature it kills"
+      ),
     /** What it does to light and sight while it lasts (a darkmantle's Darkness Aura, an octopus's ink). */
     sight: SightEffectSchema.optional(),
     /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
@@ -6474,6 +6495,52 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       restoresAtRest: z.literal(true).optional()
     })
     .strict(),
+  /** An incubus's Succubus Form: "When the incubus finishes a Long Rest, it can shape-shift into a Succubus, using that
+   *  stat block instead of this one." */
+  z
+    .object({
+      kind: z.literal("form-at-rest"),
+      name: TraitNameSchema,
+      monsterId: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(80)
+    })
+    .strict(),
+  /** A mimic's Adhesive (Object Form Only): "The mimic adheres to anything that touches it. A Huge or smaller creature
+   *  adhered to the mimic has the Grappled condition (escape DC 13). Ability checks made to escape this grapple have
+   *  Disadvantage." A creature that hits it with a melee attack while it is in one of `forms` is grappled so. */
+  z
+    .object({
+      kind: z.literal("adhesive"),
+      name: TraitNameSchema,
+      maxSize: SizeSchema,
+      escapeDc: z.number().int().min(1).max(40),
+      forms: z.array(RiderSlugSchema).min(1).max(3)
+    })
+    .strict(),
+  /** A nightmare's Confer Fire Resistance: its rider has Resistance to this damage type while it rides it. */
+  z.object({ kind: z.literal("confers-resistance"), name: TraitNameSchema, damageType: DamageTypeSchema }).strict(),
+  /** A sahuagin's Shark Telepathy: "can magically control sharks within 120 feet of itself": the creatures whose stat
+   *  block's name holds `nameHas` within `withinFeet` follow its orders and fight on its side. */
+  z
+    .object({
+      kind: z.literal("controls-kind"),
+      name: TraitNameSchema,
+      nameHas: z.string().min(1).max(40),
+      withinFeet: z.number().int().min(5).max(1000)
+    })
+    .strict(),
+  /** A sphinx's Inscrutable: a Wisdom (`skill`) check the GM calls about this creature has Disadvantage. */
+  z.object({ kind: z.literal("inscrutable"), name: TraitNameSchema, skill: RiderSlugSchema }).strict(),
+  /** A golem's Immutable Form: "The golem can't shape-shift." No form can be put on it. */
+  z.object({ kind: z.literal("immutable-form"), name: TraitNameSchema }).strict(),
+  /** A gelatinous cube's Transparent: unnoticed until it moves or acts, a creature finding it with a Wisdom (Perception)
+   *  check against `dc`. */
+  z.object({ kind: z.literal("transparent"), name: TraitNameSchema, dc: z.number().int().min(1).max(40) }).strict(),
+  /** A tarrasque's Reflective Carapace: Magic Missile or a spell with a ranged attack roll aimed at it rolls a d6; it is
+   *  unaffected on anything, and on a 6 the spell turns on its caster. */
+  z.object({ kind: z.literal("reflective-carapace"), name: TraitNameSchema }).strict(),
   /** A troll limb's Troll Spawn: "If the limb isn't destroyed within 24 hours, roll 1d12. On a 12, the limb turns into a
    *  Troll. Otherwise, the limb withers away." */
   z

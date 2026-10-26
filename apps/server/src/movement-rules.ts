@@ -1,4 +1,5 @@
 import { reactionSpent } from "./commanded-reactions.js";
+import { spareOpportunityReactions } from "./reactive-heads.js";
 import { riddenBearerOf } from "./attachments.js";
 import { formEffectOf } from "./transform/forms.js";
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
@@ -1094,7 +1095,8 @@ function openOpportunityAttacks(
       !enemy ||
       onOtherPlanes(mover, enemy) ||
       !areEnemies(mover, enemy, input.resolveDefinition) ||
-      reactionSpent(state, enemy.id) ||
+      // A hydra's heads beyond one each give it another Reaction for Opportunity Attacks.
+      (reactionSpent(state, enemy.id) && spareOpportunityReactions(enemy, input.resolveDefinition) === 0) ||
       isIncapacitated(enemy) ||
       // Shocking Grasp, or anything that takes away Reactions.
       enemy.effects.some(
