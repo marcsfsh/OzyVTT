@@ -108,6 +108,8 @@ function engulfEntrant(
     halfOnSuccess: save.successDamage === "half",
     conditionIds: save.failureConditions,
     ...(onFail ? { onFailEffect: onFail } : {}),
+    // A success sets the creature down outside, or fails with no room there.
+    ...(save.successMovesOut ? { successMovesOut: { ...save.successMovesOut } } : {}),
     disadvantage: { targetId: entrant.id, from: trait.name },
     newSaveId: deps.newId,
     createdAt: Date.parse(deps.now())

@@ -3228,12 +3228,17 @@ export const SaveConditionSchema = z.enum([
 export type SaveCondition = z.infer<typeof SaveConditionSchema>;
 
 /** Forced movement straight away from the creature that causes it (SRD): Thunderwave's 10 feet, a fire giant's Hammer
- *  Throw "up to 15 feet". `upTo` lets the source stop it short; `maxTargetSize` is the largest creature it moves. */
+ *  Throw "up to 15 feet". `upTo` lets the source stop it short; `maxTargetSize` is the largest creature it moves.
+ *  `toward` pulls it straight toward the source instead, stopping beside it (a chain devil's Conjure Infernal Chain:
+ *  "moves the target up to 30 feet straight toward itself"); `intoSpace` pulls it into the source's own space (a
+ *  shambling mound's Engulf: "The target is pulled into the shambling mound's space"). */
 export const ForcedPushSchema = z
   .object({
     feet: z.number().int().min(5).max(120),
     upTo: z.literal(true).optional(),
-    maxTargetSize: SizeSchema.optional()
+    maxTargetSize: SizeSchema.optional(),
+    toward: z.literal(true).optional(),
+    intoSpace: z.literal(true).optional()
   })
   .strict();
 export type ForcedPush = z.infer<typeof ForcedPushSchema>;
@@ -3381,6 +3386,20 @@ export const SaveOutcomeFields = {
   /** A failure also pushes the creature straight away from the source (Thunderwave: "is pushed 10 feet away from
    *  you"). */
   failurePush: ForcedPushSchema.optional(),
+  /** A success pushes the creature straight away from the source (a bulette's Deadly Leap: "Success: Half damage, and
+   *  the target is pushed 5 feet straight away from the bulette"). */
+  successPush: ForcedPushSchema.optional().describe(
+    "A success pushes the creature straight away from the source (a bulette's Deadly Leap: 5 feet)"
+  ),
+  /** A success moves the creature out to the nearest unoccupied space within `withinFeet` of the source, and with no
+   *  such space the save fails instead (a gelatinous cube's Engulf). */
+  successMovesOut: z
+    .object({ withinFeet: z.number().int().min(5).max(30) })
+    .strict()
+    .optional()
+    .describe(
+      "A success moves the creature to the nearest unoccupied space within `withinFeet` of the source; with none, the save fails instead (a gelatinous cube's Engulf)"
+    ),
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
   advantageAtSize: SizeSchema.optional(),

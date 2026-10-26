@@ -113,8 +113,19 @@ export type SaveAnswerDependencies = Readonly<{
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
   /** Moves a token straight away from another on the live map (a failure's push); null when the map can't. */
   pushToken?: (
-    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>
+    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number; toward?: boolean }>
   ) => Readonly<{ value: number; unit: string }> | null;
+  /** Pulls a token into another creature's space (a shambling mound's Engulf); false when the map can't. */
+  pullInto?: (actorId: string, intoId: string) => boolean;
+  /** The nearest unoccupied space within `withinFeet` of another creature that a success moves its creature to (a
+   *  gelatinous cube's Engulf): null when there is none, undefined when the map can't say. */
+  openSpaceBeside?: (
+    actorId: string,
+    besideId: string,
+    withinFeet: number
+  ) => Readonly<{ x: number; y: number }> | null | undefined;
+  /** Sets a token down at a point the server picked. */
+  placeToken?: (actorId: string, at: Readonly<{ x: number; y: number }>) => void;
   /** Sets a creature's token down in the nearest unoccupied space beside another's (a rider thrown from its mount);
    *  false when the map can't. */
   placeBeside?: (actorId: string, besideId: string) => boolean;
@@ -635,20 +646,34 @@ export function applyFailureEffect(
 export const DROPS_HELD_TAG = "drops-held";
 
 /**
- * A failure's push (Thunderwave's 10 feet, a dragon's Repulsion Breath "up to 60 feet"), the whole way, straight away
- * from the save's source on the live map. Too big a creature stays put; a map that can't place it asks the GM to move
+ * A save's forced move, the whole way, on the live map: a failure's push straight away from the save's source
+ * (Thunderwave's 10 feet, a dragon's Repulsion Breath "up to 60 feet") or pull straight toward it (a chain devil's
+ * Conjure Infernal Chain), a failure that pulls the creature into the source's space (a shambling mound's Engulf), or a
+ * success's push (a bulette's Deadly Leap). Too big a creature stays put; a map that can't place it asks the GM to move
  * the token.
  */
-function pushOnFailure(
+function forcedMoveOnSave(
   state: GameState,
   target: GameState["actors"][number],
   pending: PendingSave,
+  push: NonNullable<PendingSave["failurePush"]>,
   deps: SaveAnswerDependencies
 ): EffectNarration[] {
-  const push = pending.failurePush!;
   const sourceId = pending.sourceActorId;
   if (sourceId === null || sourceId === target.id) return [];
   if (push.maxTargetSize && !sizeAtMost(target.size, push.maxTargetSize)) return [];
+  const source = { actorId: sourceId, name: pending.sourceName };
+  if (push.intoSpace) {
+    const pulled = deps.pullInto?.(target.id, sourceId) ?? false;
+    return [
+      {
+        kind: "effect",
+        text: `${target.name} is pulled into ${pending.sourceName}'s space.${pulled ? "" : " Move the token."}`,
+        actorId: target.id,
+        source
+      }
+    ];
+  }
   // A spell's force pushes from where it stands and goes along (Arcane Hand's Forceful Hand).
   const before = state.combat.tokens.find((token) => token.actorId === target.id)?.position ?? null;
   const standing = pending.spell ? forceOf(state, sourceId, pending.spell.id) : undefined;
@@ -656,14 +681,21 @@ function pushOnFailure(
   // A force that moved into the creature's own space pushes it straight away from the caster.
   const force = forceAt && before && (forceAt.x !== before.x || forceAt.y !== before.y) ? standing : undefined;
   const moved =
-    deps.pushToken?.({ actorId: target.id, awayFromActorId: force?.id ?? sourceId, distanceFeet: push.feet }) ?? null;
+    deps.pushToken?.({
+      actorId: target.id,
+      awayFromActorId: force?.id ?? sourceId,
+      distanceFeet: push.feet,
+      ...(push.toward ? { toward: true } : {})
+    }) ?? null;
   const after = state.combat.tokens.find((token) => token.actorId === target.id)?.position ?? null;
   if (standing && before && after && moved !== null) followPushed(state, standing.id, before, after);
+  const way = push.toward ? "toward" : "away from";
+  const verb = push.toward ? "pulled" : "pushed";
   if (moved === null)
     return [
       {
         kind: "effect",
-        text: `${target.name} is pushed ${push.feet} feet straight away from ${pending.sourceName}. Move the token.`,
+        text: `${target.name} is ${verb} ${push.feet} feet straight ${way} ${pending.sourceName}. Move the token.`,
         actorId: target.id,
         gmOnly: true
       }
@@ -673,9 +705,30 @@ function pushOnFailure(
   return [
     {
       kind: "effect",
-      text: `${target.name} is pushed ${travelled} ${moved.unit} straight away from ${pending.sourceName}.`,
+      text: `${target.name} is ${verb} ${travelled} ${moved.unit} straight ${way} ${pending.sourceName}.`,
       actorId: target.id,
-      source: { actorId: sourceId, name: pending.sourceName }
+      source
+    }
+  ];
+}
+
+/** A success that moves the creature out beside the source (a gelatinous cube's Engulf: "the target moves to an
+ *  unoccupied space within 5 feet of the cube"). */
+function moveOutOnSuccess(
+  target: GameState["actors"][number],
+  pending: PendingSave,
+  at: Readonly<{ x: number; y: number }> | undefined,
+  deps: SaveAnswerDependencies
+): EffectNarration[] {
+  if (at) deps.placeToken?.(target.id, at);
+  const within = pending.successMovesOut?.withinFeet ?? 5;
+  const placed = at !== undefined && deps.placeToken !== undefined;
+  return [
+    {
+      kind: "effect",
+      text: `${target.name} moves to an unoccupied space within ${within} feet of ${pending.sourceName}.${placed ? "" : " Move the token."}`,
+      actorId: target.id,
+      ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
     }
   ];
 }
@@ -1080,6 +1133,13 @@ export function answerSave(
       legendaryNote = `${target.name} uses Legendary Resistance to succeed (${perDay - spentSoFar - 1} of ${perDay} remaining).`;
     }
   }
+  // "If there is no unoccupied space, the target fails the save instead" (a gelatinous cube's Engulf).
+  const roomOutside =
+    success && pending.successMovesOut && pending.sourceActorId
+      ? deps.openSpaceBeside?.(target.id, pending.sourceActorId, pending.successMovesOut.withinFeet)
+      : undefined;
+  const noRoom = roomOutside === null;
+  if (noRoom) success = false;
   // A hand-entered damage amendment, applied before the success halving. The proposal's damage types
   // are kept (`rescaleDamageParts`) so resistances still apply. Range is bounded by `SaveAnswerSchema`
   // and ownership by `adjustableActor` above.
@@ -1348,7 +1408,18 @@ export function answerSave(
       actorId: target.id,
       ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
     });
-  if (!success && pending.failurePush) events.push(...pushOnFailure(state, target, pending, deps));
+  if (!success && pending.failurePush)
+    events.push(...forcedMoveOnSave(state, target, pending, pending.failurePush, deps));
+  if (success && turnedBy === null && pending.successPush)
+    events.push(...forcedMoveOnSave(state, target, pending, pending.successPush, deps));
+  if (success && pending.successMovesOut)
+    events.push(...moveOutOnSuccess(target, pending, roomOutside ?? undefined, deps));
+  if (noRoom)
+    events.push({
+      kind: "effect",
+      text: `${target.name} has no unoccupied space within ${pending.successMovesOut!.withinFeet} feet of ${pending.sourceName} and fails the save instead.`,
+      actorId: target.id
+    });
   // SRD Mounted Combat: a rider that fails to stay on falls off, Prone beside its mount.
   if (!success && pending.unseats) events.push(...unseat(state, target.id, pending.unseats, deps.placeBeside));
   // Delayed Blast Fireball's bead: fumbled, it goes off where it is; caught, it goes off where it is thrown.

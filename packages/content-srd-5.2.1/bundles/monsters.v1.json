@@ -12326,7 +12326,10 @@
      "successDamage": "half",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "successPush": {
+      "feet": 5
+     }
     },
     "damage": [
      {
@@ -12854,6 +12857,12 @@
      ],
      "failureDuration": {
       "type": "until-source-turn-end"
+     },
+     "failurePush": {
+      "feet": 30,
+      "upTo": true,
+      "maxTargetSize": "large",
+      "toward": true
      }
     },
     "damage": [
@@ -12866,8 +12875,7 @@
      "count": 1,
      "rangeFeet": 60,
      "seen": true
-    },
-    "reminder": "If the target is Large or smaller, move it up to 30 feet straight toward the devil."
+    }
    }
   ],
   "token": {
@@ -19849,6 +19857,9 @@
         "type": "acid"
        }
       ]
+     },
+     "successMovesOut": {
+      "withinFeet": 5
      }
     },
     "damage": [
@@ -19857,7 +19868,7 @@
       "type": "acid"
      }
     ],
-    "reminder": "A creature that succeeds moves to an unoccupied space within 5 feet of the cube, or fails if there is none; one that escapes enters the nearest unoccupied space. A creature that enters the cube's space is subjected to Engulf with Disadvantage.",
+    "reminder": "A creature that escapes or is pulled free enters the nearest unoccupied space: move its token there.",
     "targets": {
      "entered": true
     },
@@ -41631,6 +41642,10 @@
        "carried-free"
       ],
       "modifiers": []
+     },
+     "failurePush": {
+      "feet": 5,
+      "intoSpace": true
      }
     },
     "damage": [],

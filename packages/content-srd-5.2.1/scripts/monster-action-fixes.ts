@@ -37,10 +37,13 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
         near: "source",
         check: { ability: "str", skill: "athletics", dc: 12 },
         takerDamage: [{ formula: "3d6", type: "acid" }]
-      }
+      },
+      // "Success: Half damage, and the target moves to an unoccupied space within 5 feet of the cube. If there is no
+      // unoccupied space, the target fails the save instead."
+      successMovesOut: { withinFeet: 5 }
     },
-    reminder:
-      "A creature that succeeds moves to an unoccupied space within 5 feet of the cube, or fails if there is none; one that escapes enters the nearest unoccupied space. A creature that enters the cube's space is subjected to Engulf with Disadvantage."
+    // A creature walking into the cube makes the save with Disadvantage (space-entry.ts).
+    reminder: "A creature that escapes or is pulled free enters the nearest unoccupied space: move its token there."
   },
   "water-elemental/whelm": {
     why: "a creature outside can pull the whelmed one free, and the whelmed one holds its breath, which the save's text prints",
@@ -206,12 +209,23 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
   "shambling-mound/engulf": {
     why: "the mound carries what it engulfs at no cost, which the save's text prints",
     // "When the shambling mound moves, the Grappled target moves with it, costing it no extra movement."
-    save: { failureEffect: { name: "Engulfed", tags: ["carried-free"], modifiers: [] } },
+    // "The target is pulled into the shambling mound's space."
+    save: {
+      failureEffect: { name: "Engulfed", tags: ["carried-free"], modifiers: [] },
+      failurePush: { feet: 5, intoSpace: true }
+    },
     reminder: null
   },
   "chain-devil/conjure-infernal-chain": {
-    why: "a failure's pull toward the devil is a forced move no save failure makes yet",
-    reminder: "If the target is Large or smaller, move it up to 30 feet straight toward the devil."
+    why: "the failure's pull toward the devil is printed after its conditions",
+    // "If the target is Large or smaller, the devil moves the target up to 30 feet straight toward itself."
+    save: { failurePush: { feet: 30, upTo: true, maxTargetSize: "large", toward: true } },
+    reminder: null
+  },
+  "bulette/deadly-leap": {
+    why: "the success's push is printed beside its half damage",
+    // "Success: Half damage, and the target is pushed 5 feet straight away from the bulette."
+    save: { successPush: { feet: 5 } }
   },
   "chain-devil/unnerving-gaze": {
     why: "the reaction prints its failure and success in italic labels the save reader doesn't take apart",
