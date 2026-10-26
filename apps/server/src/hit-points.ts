@@ -1282,7 +1282,8 @@ function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNa
   return events;
 }
 
-/** New temporary hit points replace the old ones and don't stack (choosing the higher is left to the table). */
+/** A hand-set value replaces the temporary hit points the creature has, as a correction; a grant from the rules keeps
+ *  the higher of the two instead (`resolution/heal.ts`). */
 export function setTemporaryHp(state: GameState, actorId: string, amount: number, scope: Initiator) {
   const actor = adjustableActor(state, actorId, scope);
   actor.hp.temporary = amount;

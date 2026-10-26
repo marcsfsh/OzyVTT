@@ -2318,7 +2318,10 @@
   "cursed": false,
   "casts": [],
   "grantsFeatIds": [],
-  "tags": [],
+  "tags": [
+   "cold-tolerant",
+   "winter-strider"
+  ],
   "actions": [],
   "effects": [],
   "grants": {
@@ -8579,7 +8582,12 @@
     "concentration": false
    }
   ],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "movement",
+    "rule": "walks-on-liquid"
+   }
+  ]
  },
  {
   "id": "horseshoes-of-speed",
@@ -14929,7 +14937,9 @@
   "cursed": false,
   "casts": [],
   "grantsFeatIds": [],
-  "tags": [],
+  "tags": [
+   "cold-tolerant"
+  ],
   "actions": [],
   "effects": [],
   "modifiers": [
@@ -15073,6 +15083,26 @@
     "type": "sense",
     "sense": "truesight",
     "feet": 120
+   },
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "skill-is",
+      "skills": [
+       "perception"
+      ]
+     },
+     {
+      "type": "situation-is",
+      "situation": "relying on sight"
+     }
+    ]
    }
   ]
  },

@@ -12,6 +12,7 @@ import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { offerableReaction } from "./reaction-offers.js";
 import { familyModeFor } from "./rules-families.js";
 import { specialSpeedsOf, travelBudgetFeet } from "./speed.js";
+import { waterAt } from "./water.js";
 
 /**
  * SRD 5.2.1 Falling: "A creature that falls takes 1d6 Bludgeoning damage at the end of the fall for every 10 feet it
@@ -123,11 +124,18 @@ export function startFall(state: GameState, input: FallInput, deps: FallDeps): E
   // SRD Climber's Kit: "you can't fall more than 25 feet from the anchor point". The climber hangs there.
   const anchor = faller.effects.find((effect) => effect.anchor !== undefined)?.anchor;
   const caught = anchor ? Math.min(landing + feet, Math.max(landing, anchor.altitudeFeet - anchor.feet)) : landing;
+  // A fall to the ground over the water painted on the map is a fall into water, unless the caller says otherwise.
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === faller.id);
+  const intoWater =
+    input.intoWater ??
+    (landing === 0 &&
+      token?.position != null &&
+      waterAt(state.combat.terrain, null, token.position, token.sizeCells) !== null);
   const fall: PendingFall = {
     id: deps.newId(),
     actorId: faller.id,
     feet: Math.max(0, feet - (caught - landing)),
-    intoWater: input.intoWater === true && caught === landing,
+    intoWater: intoWater && caught === landing,
     landingAltitudeFeet: caught,
     reduction: 0,
     createdAt: Date.parse(deps.now())

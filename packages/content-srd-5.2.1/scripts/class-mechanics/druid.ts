@@ -93,8 +93,8 @@ export const druid: ClassMechanicsModule = {
     },
 
     /**
-     * Magician raises the cantrip budget by one; Warden grants Martial weapons and Medium armor. Both
-     * roles' Wisdom-modifier check bonus stays prose (`check-bonus` is a flat integer).
+     * Magician raises the cantrip budget by one; Warden grants Martial weapons and Medium armor. Magician's
+     * Wisdom-modifier bonus on Arcana and Nature checks is read by its feature id (`ability-checks.ts`).
      */
     "primal-order": {
       choice: {
@@ -175,7 +175,7 @@ export const druid: ClassMechanicsModule = {
 
     /**
      * Primal Strike's damage grows via `damageByLevel` (covering Improved Elemental Fury's damage), with a
-     * once-per-turn pool. Potent Spellcasting's cantrip damage bonus stays prose.
+     * once-per-turn pool. Potent Spellcasting's cantrip damage bonus is read by its feature id (`effective-actions.ts`).
      */
     "elemental-fury": {
       choice: {

@@ -331,6 +331,19 @@ describe("a monster's attitude in an Influence check", () => {
     expect(rolled.outcome.rollMode?.advantage).toEqual(["Perfume"]);
   });
 
+  // SRD Belt of Dwarvenkind: "You have Advantage on Charisma (Persuasion) checks made to interact with dwarves and
+  // duergar."
+  it("gives an attuned Belt of Dwarvenkind's wearer Advantage on Persuasion with a duergar only", () => {
+    const belt = { id: "belt-of-dwarvenkind", name: "Belt of Dwarvenkind", equipped: true, attuned: true, quantity: 1 };
+    const built = table();
+    actor(built, IDS.cleric).inventory.push(belt as (typeof built.state.actors)[number]["inventory"][number]);
+    const bandit = check(built, IDS.cleric, { ability: "cha", skill: "persuasion" }, 10, IDS.bandit);
+    expect(bandit.outcome.rollMode?.advantage ?? []).not.toContain("Belt of Dwarvenkind");
+    built.state.definitions[0]!.definition = { ...built.state.definitions[0]!.definition, name: "Duergar" };
+    const duergar = check(built, IDS.cleric, { ability: "cha", skill: "persuasion" }, 10, IDS.bandit);
+    expect(duergar.outcome.rollMode?.advantage).toContain("Belt of Dwarvenkind");
+  });
+
   it("refuses Animal Handling on a creature that isn't a Beast or Monstrosity", () => {
     const built = table();
     expect(() => takeBuiltin(built, IDS.cleric, "influence", [IDS.bandit], [10], "animal-handling")).toThrow(

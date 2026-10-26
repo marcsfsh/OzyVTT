@@ -1617,8 +1617,7 @@
        "oncePerTurn": true,
        "sparesCreatureTypes": [
         "fiend"
-       ],
-       "reminder": "Hurl Through Hell: on a failed save the target leaves the map until the end of the Warlock's next turn, then returns to the space it left or the nearest unoccupied one."
+       ]
       }
      }
     ]

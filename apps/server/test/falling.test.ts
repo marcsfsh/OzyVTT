@@ -150,6 +150,17 @@ describe("a fall", () => {
     expect(state.combat.reactionsUsed).toContain(HERO);
   });
 
+  // SRD Falling into Water: the water painted under the falling creature is the water it falls into.
+  it("falls into the water painted where the creature comes down", () => {
+    const state = game();
+    state.actors.find((actor) => actor.id === MAGE)!.definitionId = "walker";
+    const at = state.combat.tokens.find((token) => token.actorId === HERO)!.position!;
+    state.combat.terrain.water = [{ x: at.x - 25, y: at.y - 25, width: 50, height: 50 }];
+    startFall(state, { actorId: HERO, feet: 40 }, deps(state, [6, 6, 6, 6, 20]));
+    expect(hp(state, HERO)).toBe(100 - 12);
+    expect(state.combat.reactionsUsed).toContain(HERO);
+  });
+
   it("lands a creature with a Ring of Feather Falling unharmed", () => {
     const library = new ContentLibrary().forAudience("gm");
     const state = game();

@@ -40,7 +40,7 @@ import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { jumpLimits, leapRider } from "./jumping.js";
 import { travelBudgetFeet, travelCostsExtra, walksOnLiquid, type TravelMode } from "./speed.js";
-import { movesFreelyOn } from "./spell-zones.js";
+import { crossesAtNoCost } from "./spell-zones.js";
 import { pitRefusal } from "./traps.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { DAZED_TAG } from "./resolution/economy.js";
@@ -992,7 +992,7 @@ function costOptions(
       ...(!travelCostsExtra(mover, moverDefinition, "swim", derivation, offTurn) ? { swimsFree: true } : {}),
       ...(walksOnLiquid(mover, derivation, offTurn) ? { walksOnWater: true } : {}),
       ...(formEffectOf(mover)?.form?.noLiquid ? { barredByWater: true } : {}),
-      ...(movesFreelyOn(mover, "ice", input) ? { freeOnIce: true } : {}),
+      ...(crossesAtNoCost(mover, "ice", input) ? { freeOnIce: true } : {}),
       carried: input.dragging?.actorIds ?? [],
       resolveDefinition: input.resolveDefinition,
       ...(input.perceives ? { perceives: input.perceives } : {}),

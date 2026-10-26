@@ -119,6 +119,17 @@ describe("casting a spell as a Ritual (SRD Rituals)", () => {
     );
   });
 
+  it("reads Rituals from a second copy of the spellbook, stored under its own row id", () => {
+    const { hero, state, resolve } = fight(wizard, { combat: false });
+    setPreparedSpell(state, HERO, "alarm", false, resolveDefinition);
+    const book = hero.inventory.find((item) => item.id === "spellbook")!;
+    hero.inventory = [
+      ...hero.inventory.filter((item) => item !== book),
+      { ...book, id: "spellbook-2", recordId: "spellbook" }
+    ];
+    expect(resolve("spell-alarm-ritual", { targetIds: [] }).actionName).toBe("Alarm (ritual)");
+  });
+
   it("gives a ritual recorded in the book beyond the sheet a Ritual cast, while the book is carried", () => {
     const { hero, resolve } = fight(wizard, { combat: false });
     hero.spellbook = [{ id: "detect-magic", copied: true }];

@@ -105,7 +105,8 @@ export const fighter: ClassMechanicsModule = {
       },
       /**
        * "You have Advantage on Initiative rolls and Strength (Athletics) checks." The check half fires via
-       * `ability-checks.ts` (e.g. Escape a Grapple with Athletics). The move-after-a-crit clause is prose.
+       * `ability-checks.ts` (e.g. Escape a Grapple with Athletics), and the move after a Critical Hit is
+       * `resolution/movement-grants.ts`'s.
        */
       // Defy Death: "You have Advantage on Death Saving Throws." Heroic Rally's hit points each turn while Bloodied
       // are turn-boundaries.ts's.

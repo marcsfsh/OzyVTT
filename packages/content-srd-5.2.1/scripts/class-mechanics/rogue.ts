@@ -211,7 +211,8 @@ export const rogue: ClassMechanicsModule = {
   },
   subclasses: {
     thief: {
-      // The fourth attunement is read when an item is attuned; the charge and Spell Scroll clauses stay prose.
+      // The fourth attunement is read when an item is attuned; the charge d6 is resolution/charges.ts's and reading any
+      // Spell Scroll is scrolls.ts's, both by the feature id.
       "use-magic-device": {
         modifiers: [{ type: "attunement-slots", amount: 1 }]
       },

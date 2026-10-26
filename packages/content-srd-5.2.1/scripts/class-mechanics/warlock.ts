@@ -398,7 +398,8 @@ export const warlock: ClassMechanicsModule = {
       /**
        * It rides any attack roll's hit, once per turn, and opens the Charisma save on that target: a failure deals
        * the 8d10 Psychic unless it is a Fiend, and the target is Incapacitated and gone (`off-plane`, which no action
-       * can target) until the end of the Warlock's next turn. Restoring the use with a Pact Magic slot stays prose.
+       * can target) until the end of the Warlock's next turn, when `off-plane.ts` sets it back in the space it left or
+       * the nearest unoccupied one. A Pact Magic slot restores the use (`conversions.ts`).
        */
       "hurl-through-hell": {
         uses: { limit: 1, per: "long-rest" },
@@ -421,9 +422,7 @@ export const warlock: ClassMechanicsModule = {
             ridesHit: {
               rides: "attack-roll",
               oncePerTurn: true,
-              sparesCreatureTypes: ["fiend"],
-              reminder:
-                "Hurl Through Hell: on a failed save the target leaves the map until the end of the Warlock's next turn, then returns to the space it left or the nearest unoccupied one."
+              sparesCreatureTypes: ["fiend"]
             }
           }
         ]

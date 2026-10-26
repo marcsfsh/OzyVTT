@@ -73,8 +73,8 @@ export const sorcerer: ClassMechanicsModule = {
       ]
     },
     /**
-     * The Sorcery Points pool, read off the printed column. Converting slots to points and points to
-     * slots stays prose (no rider refills another pool or costs several uses).
+     * The Sorcery Points pool, read off the printed column. Converting slots to points and points to slots is
+     * `conversions.ts`'s.
      */
     "font-of-magic": {
       uses: { scaling: { type: "class-resource", id: "sorcery-points" }, per: "long-rest", pool: "sorcery-points" }
@@ -112,12 +112,11 @@ export const sorcerer: ClassMechanicsModule = {
         "twinned-spell": ONE_SORCERY_POINT
       }
     },
-    // The once-per-Long-Rest permission only; the GM gives the points back from the sheet's Limited uses.
+    // Once per Long Rest; conversions.ts restores the points in the step a Short Rest opens.
     "sorcerous-restoration": { uses: { limit: 1, per: "long-rest" } },
     "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
     // Sorcery Incarnate's two Metamagic options per spell and Arcane Apotheosis's free option are read by the server
-    // while Innate Sorcery is active. Not modeled: Sorcery Incarnate's 2-point Innate Sorcery and the cantrip
-    // replacement clauses.
+    // while Innate Sorcery is active; conversions.ts spends 2 Sorcery Points for a use of Innate Sorcery.
   },
   subclassStages: {
     "draconic-sorcery": spellTableStages("draconic-spells", "Draconic Spells", "Sorcerer", [
@@ -201,7 +200,7 @@ export const sorcerer: ClassMechanicsModule = {
           }))
         }
       },
-      // Bonus Action, once per Long Rest, for an hour of game time. Restoring the use with Sorcery Points stays prose.
+      // Bonus Action, once per Long Rest, for an hour of game time; conversions.ts restores the use for 3 Sorcery Points.
       "dragon-wings": {
         uses: { limit: 1, per: "long-rest" },
         actions: [

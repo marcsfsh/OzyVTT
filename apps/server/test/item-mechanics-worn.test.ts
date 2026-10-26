@@ -843,9 +843,9 @@ describe("the worn items left as prose, by name", () => {
     }
   });
 
-  it("splits the eight 'Advantage on a check' rows 5 authored / 3 prose, and says why for each", () => {
-    // Of the eight "Advantage on ... checks" rows, only those whose clause the engine can express exactly
-    // are authored; authoring the rest would over-grant.
+  it("splits the eight 'Advantage on a check' rows 6 authored / 2 read by id, and says why for each", () => {
+    // Of the eight "Advantage on ... checks" rows, those whose clause a rider can express exactly are authored; the
+    // other two need a fact no rider names, so the server reads them by the item id.
     const advantageOnChecks = worn
       .filter((row) => /Advantage on [^.]*\bchecks?\b/i.test(row.description ?? ""))
       .map((row) => row.id)
@@ -878,28 +878,29 @@ describe("the worn items left as prose, by name", () => {
       });
     }
 
-    // The Eyes of the Eagle's "checks that rely on sight" and the Eyes of Minute Seeing's search within a foot are
-    // situations the roller names beside the check.
+    // The Eyes of the Eagle's and the Robe of Eyes' "checks that rely on sight" and the Eyes of Minute Seeing's search
+    // within a foot are situations the roller names beside the check.
     expect(view.equipmentRecord("eyes-of-the-eagle")!.modifiers[0]?.when).toContainEqual({
       type: "situation-is",
       situation: "relying on sight"
     });
+    const robe = view.equipmentRecord("robe-of-eyes")!.modifiers.find((modifier) => modifier.type === "roll-mode");
+    expect(robe?.when).toContainEqual({ type: "situation-is", situation: "relying on sight" });
     expect(view.equipmentRecord("eyes-of-minute-seeing")!.modifiers[0]?.when).toContainEqual({
       type: "situation-is",
       situation: "examining something within 1 foot"
     });
 
-    // Still prose (3), each for its own reason, which the failure message names.
+    // Read by the item id (2), each for its own reason, which the failure message names.
     for (const [id, why] of [
-      ["belt-of-dwarvenkind", "Persuasion narrowed to dwarves and duergar - no trigger names who you are influencing"],
-      ["robe-of-eyes", "Perception 'that rely on sight', on a robe whose own Drawbacks Blind you"],
-      ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation, which the engine does not hold"]
+      ["belt-of-dwarvenkind", "Persuasion with dwarves and duergar reads who is influenced (ability-checks.ts)"],
+      ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation is zone-sphere.ts's"]
     ] as const) {
       // A check's Advantage only: the belt's Advantage on saves against Poisoned is authored.
       const advantage = view
         .equipmentRecord(id)!
         .modifiers.filter((modifier) => modifier.type === "roll-mode" && modifier.roll === "check");
-      expect(advantage, `${id} must stay prose: ${why}`).toEqual([]);
+      expect(advantage, `${id} carries no check rider: ${why}`).toEqual([]);
     }
   });
 

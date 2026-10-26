@@ -1,6 +1,6 @@
 import type { Actor } from "@vtt/domain";
 import { abilityModifier } from "@vtt/rules-5e";
-import type { ActorAction, ActorDefinition } from "@vtt/schemas";
+import { catalogIdOf, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { castAreaOf, ritualSpellActionId, spellCastMechanics } from "./item-actions.js";
 
@@ -12,7 +12,7 @@ export const hasClassFeature = (definition: ActorDefinition | undefined, id: str
 
 /** Whether the character carries its spellbook, which Ritual Adept reads from. */
 export const carriesSpellbook = (actor: Pick<Actor, "inventory">): boolean =>
-  actor.inventory.some((item) => item.id === "spellbook" && item.quantity > 0);
+  actor.inventory.some((item) => catalogIdOf(item) === "spellbook" && item.quantity > 0);
 
 /**
  * SRD 5.2.1 Wizard, Ritual Adept: "You can cast any spell as a Ritual if that spell has the Ritual tag and the spell is

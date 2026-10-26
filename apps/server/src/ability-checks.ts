@@ -15,7 +15,7 @@ import {
   type ResolvedRider,
   type ThrownDie
 } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
 import { conditionLabel, exhaustionPenalty } from "./condition-rules.js";
 import { RAGING_TAG } from "./effects.js";
@@ -29,6 +29,9 @@ import {
   type EquipmentDerivation,
   type RollModeClaims
 } from "./equipment-derivation.js";
+
+/** The cloak that turns others' Wisdom (Perception) checks to perceive its attuned wearer to Disadvantage. */
+const ELVENKIND_CLOAK_ID = "cloak-of-elvenkind";
 
 // Ability checks (SRD 5.2.1 "Ability Checks", "Proficiency"): one plan for every check the sheet, the builtin actions,
 // the GM's calls for a roll and first aid roll, so their numbers and their Advantage never disagree.
@@ -116,7 +119,18 @@ export type CheckVersus = Readonly<{
   humanoid: boolean;
   /** Feet between the two tokens; null when the map can't tell. */
   feet: number | null;
+  /** It is a dwarf or a duergar (a Belt of Dwarvenkind's "interact with dwarves and duergar"). */
+  dwarf?: boolean;
 }>;
+
+/** Whether a creature is a dwarf or a duergar: a character of the Dwarf species, or a stat block of that name. */
+export const isDwarf = (definition: ActorDefinition | undefined): boolean =>
+  definition?.character
+    ? definition.character.race?.id === "dwarf"
+    : /\b(dwarf|duergar)\b/i.test(definition?.name ?? "");
+
+/** The belt whose attuned wearer has Advantage on Persuasion checks to interact with dwarves and duergar. */
+const DWARVENKIND_BELT_ID = "belt-of-dwarvenkind";
 
 /** The tag on Perfume's hour, which gives Advantage on Persuasion to influence an Indifferent Humanoid within 5 feet. */
 export const PERFUME_TAG = "perfume";
@@ -151,6 +165,11 @@ function socialClaims(actor: Actor, subject: CheckSubject, versus: CheckVersus, 
     actor.effects.some((effect) => effect.tags.includes(PERFUME_TAG))
   )
     claims.advantage.push({ source: "perfume", label: "Perfume" });
+  const belt = actor.inventory.find(
+    (row) => row.equipped && row.attuned && row.quantity > 0 && catalogIdOf(row) === DWARVENKIND_BELT_ID
+  );
+  if (belt && subject.skill === "persuasion" && versus.dwarf === true)
+    claims.advantage.push({ source: "friend-of-dwarvenkind", label: belt.name });
 }
 
 /** The tag on a Hunter's Mark effect, which gives its caster Advantage on checks to find the marked creature. */
@@ -373,6 +392,13 @@ function plainCheckPlan(
   const sight = context.sight ?? {};
   if (lookingFor && sight.findingObscured === "light" && !sight.findingByBlindsight)
     claims.disadvantage.push({ source: "lightly-obscured", label: `${context.finding!.name} is Lightly Obscured` });
+  // Cloak of Elvenkind: "Wisdom (Perception) checks made to perceive you have Disadvantage", by sight or hearing, while
+  // its attuned wearer has it on.
+  const cloaked = context.finding?.inventory.find(
+    (row) => row.equipped && row.attuned && row.quantity > 0 && catalogIdOf(row) === ELVENKIND_CLOAK_ID
+  );
+  if (cloaked && subject.ability === "wis" && subject.skill === "perception")
+    claims.disadvantage.push({ source: "cloak-of-elvenkind", label: cloaked.name });
   const blinded = actor.conditions.some((held) => held.id === "blinded");
   const deafened = actor.conditions.some((held) => held.id === "deafened");
   const findingFails =

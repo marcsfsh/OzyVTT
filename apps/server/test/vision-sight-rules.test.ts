@@ -405,6 +405,15 @@ describe("Blinded and Heavily Obscured on a check to find a creature", () => {
     expect(dim.autoFails).toBeUndefined();
     expect(dim.rollMode.disadvantage).toContain("Skulking Goblin is Lightly Obscured");
   });
+
+  // SRD Cloak of Elvenkind: "Wisdom (Perception) checks made to perceive you have Disadvantage."
+  it("has Disadvantage against a creature wearing an attuned Cloak of Elvenkind", () => {
+    const cloak = { id: "cloak-of-elvenkind", name: "Cloak of Elvenkind", quantity: 1, equipped: true };
+    const worn = plan(visionGame({ actors: { [GOBLIN]: { inventory: [{ ...cloak, attuned: true }] } } }));
+    expect(worn.rollMode.disadvantage).toContain("Cloak of Elvenkind");
+    const unattuned = plan(visionGame({ actors: { [GOBLIN]: { inventory: [{ ...cloak, attuned: false }] } } }));
+    expect(unattuned.rollMode.disadvantage).not.toContain("Cloak of Elvenkind");
+  });
 });
 
 describe("the light a creature stands in", () => {

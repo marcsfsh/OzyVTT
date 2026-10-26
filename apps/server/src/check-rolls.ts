@@ -17,6 +17,7 @@ import {
   type CheckPlan,
   type CheckSubject,
   type CheckVersus,
+  isDwarf,
   totalCheck
 } from "./ability-checks.js";
 import { creatureTypeOf } from "./statblock-facts.js";
@@ -119,7 +120,8 @@ function versusOf(actor: Actor, other: Actor, deps: CheckRollDependencies): Chec
   return {
     actor: other,
     humanoid: creatureTypeOf(other, definition, "true") === "humanoid",
-    feet: deps.distanceFeet?.(actor.id, other.id) ?? null
+    feet: deps.distanceFeet?.(actor.id, other.id) ?? null,
+    dwarf: isDwarf(definition)
   };
 }
 
