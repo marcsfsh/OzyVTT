@@ -26,6 +26,7 @@ import {
   setConditionChoice,
   setDamageType,
   setEffectOption,
+  toggleWardType,
   setHealingShare,
   setShapeForm,
   setShapeGear,
@@ -325,6 +326,7 @@ export function ActionTargetPicker({
         onForm={setShapeForm}
         onGear={setShapeGear}
         onOption={setEffectOption}
+        onWardType={toggleWardType}
       />
       <ShapingPicks
         picking={picking}

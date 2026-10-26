@@ -1,4 +1,4 @@
-import type { GameState, SceneVision, VisionWall } from "@vtt/domain";
+import type { GameState, SceneVision, VisionLight, VisionWall } from "@vtt/domain";
 import { halfSpaceOf, resolveAreas, sourceLive, templateCentre, type ResolvedArea } from "./areas.js";
 import {
   clearLine,
@@ -83,6 +83,8 @@ type Light = Readonly<{
   reveals: boolean;
   /** A Cone's direction in radians, or null for a sphere of light. */
   coneDirection: number | null;
+  /** The level of the spell that made it, or null for a light no spell made. */
+  spellLevel: number | null;
 }>;
 type Viewer = Readonly<{ actorId: string; at: Point; senses: Senses; blinded: boolean }>;
 
@@ -298,6 +300,10 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
   const liveAreas = (vision.areas ?? []).filter((area) => sourceLive(state, area.source));
   const areas = resolveAreas(liveAreas, { annotations, tokens: [...tokens.values()] }, pixelsPerFoot);
   const heavy = areas.filter((area) => area.kind === "heavily-obscured");
+  /** Whether fog hides what lies past it from this viewer: not the one creature it spares, nor one inside an edge it
+   *  sees out through (Tiny Hut). */
+  const veils = (area: ResolvedArea, viewerId: string, at: Point | null) =>
+    area.sparedActorId !== viewerId && !(at !== null && area.seenOutFrom?.(at) === true);
   const lightFog = areas.filter((area) => area.kind === "lightly-obscured");
   const magical = areas.filter((area) => area.kind === "magical-darkness");
   const levelAreas = areas.filter((area) => area.kind === "bright" || area.kind === "dim" || area.kind === "dark");
@@ -311,7 +317,13 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
   const lights: Light[] = [];
   const addLight = (
     at: Point,
-    light: Readonly<{ brightFeet: number; dimFeet: number; sunlight?: boolean; reveals?: boolean }>,
+    light: Readonly<{
+      brightFeet: number;
+      dimFeet: number;
+      sunlight?: boolean;
+      reveals?: boolean;
+      source?: VisionLight["source"];
+    }>,
     carrierId: string | null,
     coneFacingDegrees: number | null = null
   ) => {
@@ -324,7 +336,8 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
       carrierId,
       sunlight: light.sunlight === true,
       reveals: light.reveals === true,
-      coneDirection: coneFacingDegrees === null ? null : (coneFacingDegrees * Math.PI) / 180
+      coneDirection: coneFacingDegrees === null ? null : (coneFacingDegrees * Math.PI) / 180,
+      spellLevel: light.source?.spellId !== undefined ? (light.source.level ?? 0) : null
     });
   };
   for (const light of vision.lights) {
@@ -347,12 +360,13 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     !clearLine(from, to, walls) || magical.some((area) => area.touches(from, to));
 
   const ambient = vision.ambient as LightLevel;
-  const regionAt = (point: Point): { level: LightLevel; sunlight: boolean } => {
+  const regionAt = (point: Point): { level: LightLevel; sunlight: boolean; unlitBelow: number | null } => {
     for (let index = levelAreas.length - 1; index >= 0; index--) {
       const area = levelAreas[index]!;
-      if (area.contains(point)) return { level: area.kind as LightLevel, sunlight: area.sunlight };
+      if (area.contains(point))
+        return { level: area.kind as LightLevel, sunlight: area.sunlight, unlitBelow: area.unlitBelow };
     }
-    return { level: ambient, sunlight: ambient === "bright" && vision.sunlight === true };
+    return { level: ambient, sunlight: ambient === "bright" && vision.sunlight === true, unlitBelow: null };
   };
 
   const lightMemo = new Map<string, LightAt>();
@@ -363,10 +377,13 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     let result: LightAt;
     if (inMagical(point)) result = { level: "dark", sunlight: false, magical: true };
     else {
-      let { level, sunlight } = regionAt(point);
+      const region = regionAt(point);
+      let { level, sunlight } = region;
       for (const light of lights) {
         if (level === "bright" && sunlight) break;
         if (level === "bright" && !light.sunlight) continue;
+        // Hallow's Darkness: normal light and spell light of a lower level can't illuminate it.
+        if (region.unlitBelow !== null && (light.spellLevel ?? -1) < region.unlitBelow) continue;
         const gap = distance(light.at, point);
         if (gap > light.reachPx || !inCone(light, point) || lightBlocked(light.at, point)) continue;
         if (light.brightPx > 0 && gap <= light.brightPx) {
@@ -434,7 +451,7 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     if (within(feet, senses.blindsight)) return true;
     if (viewer.blinded) return false;
     // "You have the Blinded condition while trying to see something in a Heavily Obscured space."
-    if (heavy.some((area) => area.sparedActorId !== viewer.actorId && area.touches(viewer.at, point))) return false;
+    if (heavy.some((area) => veils(area, viewer.actorId, viewer.at) && area.touches(viewer.at, point))) return false;
     const pierces = within(feet, senses.truesight) || within(feet, senses.devilsSight);
     if (!pierces && magical.some((area) => area.touches(viewer.at, point))) return false;
     if (invisible && !within(feet, senses.truesight) && !within(feet, senses.seeInvisibility) && !revealedAt(point))
@@ -510,8 +527,9 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     );
   /** The blockers one viewer's sight meets: walls, the fog it isn't spared from, and magical Darkness. */
   const blockersFor = (viewerId: string) => {
-    const own = heavy.some((area) => area.sparedActorId === viewerId)
-      ? heavy.filter((area) => area.sparedActorId !== viewerId)
+    const at = viewerOf(viewerId)?.at ?? null;
+    const own = heavy.some((area) => !veils(area, viewerId, at))
+      ? heavy.filter((area) => veils(area, viewerId, at))
       : heavy;
     const edges = own === heavy ? heavyEdges : own.flatMap((area) => [...area.edges]);
     const key = own === heavy ? heavyKey : areasKey(own);

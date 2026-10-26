@@ -462,6 +462,16 @@ const ShapeChoiceFields = {
     .string()
     .regex(/^[a-z0-9-]+$/)
     .max(80)
+    .optional(),
+  creatureTypes: z
+    .array(
+      z
+        .string()
+        .regex(/^[a-z][a-z-]*$/)
+        .max(40)
+    )
+    .min(1)
+    .max(14)
     .optional()
 };
 export const ActionResolveSchema = z
@@ -661,6 +671,18 @@ export const ActionResolveSchema = z
       .optional(),
     /** Whether the user's gear melds into its new form or is worn by it, where the action lets it choose. */
     gear: z.enum(["merged", "worn"]).optional(),
+    /** The creature types a cast's barrier wards, among those its spell offers (Magic Circle, Hallow); absent, all of
+     *  them. */
+    creatureTypes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(14)
+      .optional(),
     /** The effect a use picks among those its action offers (Enlarge or Reduce); absent, the first. */
     option: z
       .string()

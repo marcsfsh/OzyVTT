@@ -86,6 +86,8 @@ export type ShapeChoice = Readonly<{
   targetForms?: Readonly<Record<string, string>>;
   gear?: "merged" | "worn";
   option?: string;
+  /** The creature types a barrier wards (Magic Circle); none picked wards them all. */
+  creatureTypes?: readonly string[];
 }>;
 
 /** The picks a shape-shift starts with: its one form when it has only one, gear melded, and the first effect. */
@@ -114,7 +116,8 @@ export function shapeChoicePayload(choice: ShapeChoice, targetIds: readonly stri
     ...(choice.form !== undefined ? { form: choice.form } : {}),
     ...(perTarget.length > 0 ? { targetForms: perTarget.map(([targetId, form]) => ({ targetId, form })) } : {}),
     ...(choice.gear !== undefined ? { gear: choice.gear } : {}),
-    ...(choice.option !== undefined ? { option: choice.option } : {})
+    ...(choice.option !== undefined ? { option: choice.option } : {}),
+    ...(choice.creatureTypes && choice.creatureTypes.length > 0 ? { creatureTypes: [...choice.creatureTypes] } : {})
   };
 }
 
@@ -369,6 +372,17 @@ export function setShapeGear(gear: "merged" | "worn") {
   session = { ...session, gear };
   emit();
 }
+/** Adds or takes away one of the creature types a barrier's cast wards (Magic Circle). */
+export function toggleWardType(type: string) {
+  if (!session?.action.wardTypes?.includes(type)) return;
+  const picked = session.creatureTypes ?? [];
+  session = {
+    ...session,
+    creatureTypes: picked.includes(type) ? picked.filter((entry) => entry !== type) : [...picked, type]
+  };
+  emit();
+}
+
 /** Picks which of its effects a use takes (Enlarge or Reduce), or the form of the area a cast leaves; a form with its
  *  own area (Wall of Fire's ring) is drawn as that area, placed afresh. */
 export function setEffectOption(option: string) {

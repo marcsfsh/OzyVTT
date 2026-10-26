@@ -4458,6 +4458,43 @@ const CreatureTypeIdSchema = z
   .regex(/^[a-z][a-z-]*$/)
   .max(40);
 
+/** What a creature it affects holds while it stands inside (Holy Aura's Advantage on saving throws, Pass without
+ *  Trace's +10 to Stealth checks, Silence's Deafened): one effect, added as the creature comes in and taken away as
+ *  it leaves. A struck save rolls against the cast's save DC. `keepsMaximum`: its Hit Point maximum can't be
+ *  reduced while there (Aura of Life). */
+export const AreaHoldsSchema = z
+  .object({
+    modifiers: EffectModifiersSchema.optional(),
+    conditions: z.array(ConditionSchema).min(1).max(2).optional(),
+    /** Conditions the holder can't gain while inside (Hallow's Courage: Frightened). */
+    conditionImmunities: z.array(ConditionSchema).min(1).max(4).optional(),
+    /** Conditions a creature of these types can't give the holder (Magic Circle: Charmed and Frightened); its types
+     *  follow the caster's choice where the area `choosesTypes`. With `suppresses`, those it already has from such a
+     *  creature are held off while it is inside (Hallowed Ward). */
+    conditionWards: ConditionWardSchema.optional(),
+    suppresses: z.literal(true).optional(),
+    /** Resistance or Vulnerability to the damage type its caster chose at the cast (Hallow). */
+    chosenDamage: z.enum(["resistance", "vulnerability"]).optional(),
+    /** Only the creatures of the types it wards hold it (`warded`: Hallow's Fear), or only the others (`others`:
+     *  Hallow's Courage). */
+    forTypes: z.enum(["warded", "others"]).optional(),
+    /** The creatures outside it hold it, not those inside (an inverted Magic Circle protects targets outside). */
+    outside: z.literal(true).optional(),
+    keepsMaximum: z.literal(true).optional(),
+    /** A bonus to Armor Class while inside (a planted Rod of Alertness's +1). */
+    armorClassBonus: z.number().int().min(1).max(5).optional(),
+    struck: StruckSchema.omit({ save: true })
+      .extend({
+        save: z
+          .object({ ability: AbilitySchema, conditions: z.array(ConditionSchema).min(1).max(3) })
+          .strict()
+          .optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+
 /**
  * Where and when an area that lasts acts on a creature (a spell's, an item's spread caltrops, a creature's whirlwind), so
  * the server raises the save or deals the damage: a creature entering it (or the area moving onto the creature),
@@ -4470,7 +4507,7 @@ const CreatureTypeIdSchema = z
  * Faith; spirits that harm the creatures the caster chooses); `damageCap` ends it once it has dealt that much
  * (Guardian of Faith's 60).
  */
-export const AreaTriggerSchema = z
+const AreaTriggerFields = z
   .object({
     /** When it acts; none for an area that only changes the ground (Entangle's plants, Ice Storm's hail). */
     on: z
@@ -4525,7 +4562,11 @@ export const AreaTriggerSchema = z
      *  smaller flying creatures"); with `insiders`, the creatures inside it when it was made pass freely (Tiny Hut). */
     bars: z
       .object({
-        way: z.enum(["in", "both"]),
+        /** `out`: the creatures it holds back can't leave it (an inverted Magic Circle). */
+        way: z.enum(["in", "out", "both"]),
+        /** A creature it holds back that teleports across it the barred way must first succeed on this save against
+         *  the cast's DC, or the teleport is wasted (Magic Circle's Charisma save). */
+        teleportSave: AbilitySchema.optional(),
         types: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
         except: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
         reach: z.literal(true).optional(),
@@ -4547,25 +4588,9 @@ export const AreaTriggerSchema = z
      *  Trace's +10 to Stealth checks, Silence's Deafened): one effect, added as the creature comes in and taken away as
      *  it leaves. A struck save rolls against the cast's save DC. `keepsMaximum`: its Hit Point maximum can't be
      *  reduced while there (Aura of Life). */
-    holds: z
-      .object({
-        modifiers: EffectModifiersSchema.optional(),
-        conditions: z.array(ConditionSchema).min(1).max(2).optional(),
-        keepsMaximum: z.literal(true).optional(),
-        /** A bonus to Armor Class while inside (a planted Rod of Alertness's +1). */
-        armorClassBonus: z.number().int().min(1).max(5).optional(),
-        struck: StruckSchema.omit({ save: true })
-          .extend({
-            save: z
-              .object({ ability: AbilitySchema, conditions: z.array(ConditionSchema).min(1).max(3) })
-              .strict()
-              .optional()
-          })
-          .strict()
-          .optional()
-      })
-      .strict()
-      .optional(),
+    holds: AreaHoldsSchema.optional(),
+    /** A second hold, for other creatures (Hallow's extra effect beside its ward). */
+    alsoHolds: AreaHoldsSchema.optional(),
     /** A creature it affects that starts its turn there at 0 Hit Points regains this many (Aura of Life's 1). */
     revives: z.number().int().min(1).max(10).optional(),
     /** Its area moves this many feet straight away from its caster at the start of each of the caster's turns
@@ -4737,9 +4762,69 @@ export const AreaTriggerSchema = z
     kindled: z
       .object({ rounds: z.number().int().min(1).max(10) })
       .strict()
-      .optional()
+      .optional(),
+    /** No creature can teleport out of it either (Private Sanctum: "Nothing can teleport into or out of the warded
+     *  area"); with `noTeleport`, both ways. */
+    noTeleportOut: z.literal(true).optional(),
+    /** Its bar on teleporting holds only the creature types it wards (`bars.types`, or those its caster chose): Hallow's
+     *  Extradimensional Interference. */
+    teleportWardsOnly: z.literal(true).optional(),
+    /** Its caster chooses, as it casts, one or more of the creature types its barrier names (Magic Circle: "Choose one
+     *  or more of the following types"; Hallow's ward); with no choice, every one of them. What it holds for or against
+     *  those types reads the choice. */
+    choosesTypes: z.literal(true).optional(),
+    /** The cast fails when its area takes in any of another standing area of the same spell (Hallow: "the spell fails
+     *  if the radius includes an area already under the effect of Hallow"). */
+    exclusive: z.literal(true).optional(),
+    /** The spell ends when its caster is outside it (Tiny Hut: "The spell ends early if you leave the Emanation"). */
+    endsWhenCasterLeaves: z.literal(true).optional(),
+    /** Its edge is a dark and foggy barrier that sight can't pass (Private Sanctum), or that only those inside see out
+     *  through (`oneWay`: Tiny Hut, "opaque from the outside ... transparent from the inside"). */
+    veil: z
+      .object({ oneWay: z.literal(true).optional() })
+      .strict()
+      .optional(),
+    /** The light inside it, while it stands (Tiny Hut's Dim Light or Darkness, Hallow's Daylight or Darkness). */
+    lighting: z.enum(["bright", "dim", "dark"]).optional(),
+    /** Its darkness can't be lit by normal light or by spell light of a lower level than the spell (Hallow's
+     *  Darkness). */
+    lightingFirm: z.literal(true).optional(),
+    /** An aura of antimagic (Antimagic Field): no spell, Magic action or magic item works inside it, spells cast from
+     *  outside can't reach in, ongoing spells and magic items' properties are suppressed for the creatures inside, a
+     *  summoned creature inside winks out, and no one teleports into or out of it. */
+    antimagic: z.literal(true).optional()
   })
   .strict();
+
+/** What a part of an area's trigger an option merges in (Private Sanctum's properties, Hallow's extra effect). */
+const AreaTriggerPartSchema = AreaTriggerFields.partial().strict();
+
+export const AreaTriggerSchema = AreaTriggerFields.extend({
+  /** The properties its caster picks as it casts: one of them (`one`: Hallow's extra effect) or any number of them
+   *  (`any`: Private Sanctum's), each a part of the trigger merged in while the area stands. Every pick is an option of
+   *  the cast. */
+  picks: z
+    .object({
+      pick: z.enum(["one", "any"]),
+      parts: z
+        .array(
+          z
+            .object({
+              id: z
+                .string()
+                .regex(/^[a-z0-9-]+$/)
+                .max(30),
+              name: z.string().min(1).max(60),
+              trigger: AreaTriggerPartSchema
+            })
+            .strict()
+        )
+        .min(1)
+        .max(10)
+    })
+    .strict()
+    .optional()
+}).strict();
 export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;
 /** A move an action grants beside the turn's own (SRD 5.2.1 stat blocks: "The dragon moves up to half its Speed, and
  *  it makes one Rend attack"). `speed`: half or all of the way's Speed, measured when it is taken; `mode`: the way it

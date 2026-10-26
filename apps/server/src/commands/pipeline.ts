@@ -17,7 +17,7 @@ import { planNextTurn } from "../combat-history.js";
 import { nextInitiativeTurn } from "../encounter.js";
 import { holdsSummons, needsSummonSettling, settleSummons, summonHoldingTurnLeaves } from "../summons.js";
 import { holdsBonds, needsBondSettling, settleBonds } from "../warding-bond.js";
-import { holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
+import { auraChangesAny, holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
 import { holdsZoneOutcomes, settleZoneOutcomes, zoneOutcomesPending } from "../zone-outcomes.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
@@ -354,7 +354,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     if (!holdsAuras(before) || before.combat.historyCursor !== null) return;
     const geometry = await kit.liveGeometry();
     const changes = zoneAuraChanges(before, kit.zoneDeps(before, geometry));
-    if (changes.leaving.length === 0 && changes.entering.length === 0) return;
+    if (!auraChangesAny(changes)) return;
     const result = await context.store.execute({ id: context.newId(), type: "spell-zone.auras" }, (draft) => {
       settleZoneAuras(draft, kit.zoneDeps(draft, geometry));
     });

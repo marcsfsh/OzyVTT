@@ -12,6 +12,13 @@ export function challengeWords(rating: number): string {
   return String(rating);
 }
 
+/** A creature type as a picker names the creatures of it ("Fiends", "Undead"). */
+export function typePlural(type: string): string {
+  const titled = type.charAt(0).toUpperCase() + type.slice(1);
+  if (type === "undead" || type === "fey") return titled;
+  return type.endsWith("y") ? `${titled.slice(0, -1)}ies` : `${titled}s`;
+}
+
 /** One form as a picker lists it: its name, Challenge Rating and size, and whether it flies. */
 export function formLabel(option: FormOption): string {
   const size = option.size.charAt(0).toUpperCase() + option.size.slice(1);
@@ -34,7 +41,8 @@ export function ShapeChoices({
   targets,
   onForm,
   onGear,
-  onOption
+  onOption,
+  onWardType
 }: Readonly<{
   action: ContentActionSummary;
   choice: ShapeChoice;
@@ -43,10 +51,13 @@ export function ShapeChoices({
   onForm: (form: string, targetId?: string) => void;
   onGear: (gear: "merged" | "worn") => void;
   onOption: (option: string) => void;
+  /** Adds or takes away a creature type a barrier wards. */
+  onWardType?: (type: string) => void;
 }>) {
   const forms = action.forms;
   const options = action.options ?? [];
-  if (!forms && options.length === 0) return null;
+  const wardTypes = onWardType ? (action.wardTypes ?? []) : [];
+  if (!forms && options.length === 0 && wardTypes.length === 0) return null;
   const formSelect = (value: string | undefined, label: string, targetId?: string) => (
     <label className="action-damage-type" key={targetId ?? "form"}>
       <span>{label}</span>
@@ -88,6 +99,24 @@ export function ShapeChoices({
             <option value="worn">Stays worn and works</option>
           </Select>
         </label>
+      )}
+      {wardTypes.length > 0 && (
+        <fieldset className="action-condition-picks">
+          <legend>Wards against{(choice.creatureTypes ?? []).length === 0 ? " every type below" : ""}</legend>
+          <ul className="action-target-list">
+            {wardTypes.map((type) => {
+              const picked = choice.creatureTypes?.includes(type) ?? false;
+              return (
+                <li key={type}>
+                  <label className={`action-target${picked ? " is-picked" : ""}`}>
+                    <input type="checkbox" checked={picked} onChange={() => onWardType!(type)} />
+                    <span>{typePlural(type)}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </fieldset>
       )}
       {options.length > 0 && (
         <label className="action-damage-type">

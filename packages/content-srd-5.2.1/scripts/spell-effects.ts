@@ -103,6 +103,22 @@ const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
   "glyph-of-warding": ["thunder", "acid", "cold", "fire", "lightning"],
   // The Resistance the touched creature gains: "one damage type of your choice".
   "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"],
+  // Hallow's Resistance or Vulnerability: "one damage type of your choice".
+  hallow: [
+    "acid",
+    "bludgeoning",
+    "cold",
+    "fire",
+    "force",
+    "lightning",
+    "necrotic",
+    "piercing",
+    "poison",
+    "psychic",
+    "radiant",
+    "slashing",
+    "thunder"
+  ],
   // Wish's Resistance: "one damage type you choose".
   wish: [...DamageTypeSchema.options]
 };
@@ -395,6 +411,51 @@ const lasting = (name: string, when: string, zone: Zone): Later => ({
   damage: [],
   zone
 });
+
+/** The creature types Magic Circle and Hallow's ward name. */
+const CIRCLE_TYPES = ["celestial", "elemental", "fey", "fiend", "undead"] as const;
+const HALLOW_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead"] as const;
+
+/** What a creature of these types can't do to whoever holds the ward: attack it without Disadvantage, or give it the
+ *  Charmed or Frightened condition. */
+const wardAgainst = (types: readonly string[]) => ({
+  modifiers: [
+    {
+      type: "roll-mode" as const,
+      roll: "incoming-attack" as const,
+      mode: "disadvantage" as const,
+      when: [
+        { type: "on-attack-roll" as const },
+        { type: "source-creature-type-is" as const, creatureTypes: [...types] }
+      ]
+    }
+  ],
+  conditionWards: { conditionIds: ["charmed" as const, "frightened" as const], creatureTypes: [...types] }
+});
+
+/** Magic Circle facing out (keeping the chosen types out and warding those inside) or reversed (holding them in and
+ *  warding those outside). */
+function magicCircleForms(): Later[] {
+  const form = (option: Readonly<{ id: string; name: string }>, reversed: boolean): Later => ({
+    ...lasting(
+      reversed ? "reversed" : "barrier",
+      reversed
+        ? "A creature of a chosen type can't leave the Cylinder, teleports out only after a Charisma save, and has Disadvantage on attacks against those outside it, who it can't charm or frighten."
+        : "A creature of a chosen type can't enter the Cylinder, teleports in only after a Charisma save, and has Disadvantage on attacks against those inside it, who it can't charm or frighten.",
+      {
+        on: [],
+        choosesTypes: true,
+        bars: { way: reversed ? "out" : "in", types: [...CIRCLE_TYPES], teleportSave: "cha" },
+        holds: { ...wardAgainst(CIRCLE_TYPES), ...(reversed ? { outside: true as const } : {}) }
+      }
+    ),
+    option
+  });
+  return [
+    form({ id: "facing-out", name: "Keeps them out, wards those inside" }, false),
+    form({ id: "reversed", name: "Holds them in, wards those outside" }, true)
+  ];
+}
 
 /** Wall of Fire's forms: a straight wall burning on its left or right as drawn, or a ring 20 feet across burning
  *  inside or outside, each 5d8 Fire damage to a creature entering the wall or ending its turn in it or within 10 feet
@@ -1086,9 +1147,94 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   "tiny-hut": [
     lasting(
       "hut",
-      "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside.",
-      { on: [], around: "caster", feet: 10, stays: true, wardsSpells: 3, bars: { way: "both", insiders: true } }
+      "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside. Those outside can't see in. It ends if you leave it.",
+      {
+        on: [],
+        around: "caster",
+        feet: 10,
+        stays: true,
+        wardsSpells: 3,
+        bars: { way: "both", insiders: true },
+        endsWhenCasterLeaves: true,
+        veil: { oneWay: true },
+        // "You can command the interior to have Dim Light or Darkness".
+        picks: {
+          pick: "one",
+          parts: [
+            { id: "as-it-is", name: "Light inside as it is", trigger: {} },
+            { id: "dim", name: "Dim Light inside", trigger: { lighting: "dim" } },
+            { id: "dark", name: "Darkness inside", trigger: { lighting: "dark" } }
+          ]
+        }
+      }
     )
+  ],
+  // "You decide what sort of security the spell provides, choosing any of the following properties": the dark and foggy
+  // edge sight can't pass, nothing teleporting in or out, and no Divination spell targeting the creatures inside. Sound
+  // across the edge, sensors and planar travel are the GM's.
+  "private-sanctum": [
+    lasting("sanctum", "The warded Cube holds the properties picked as it was cast.", {
+      on: [],
+      picks: {
+        pick: "any",
+        parts: [
+          { id: "fog", name: "Dark, foggy edge", trigger: { veil: {} } },
+          { id: "no-teleport", name: "No teleporting", trigger: { noTeleport: true, noTeleportOut: true } },
+          {
+            id: "no-divination",
+            name: "No Divination targeting",
+            trigger: { holds: { modifiers: [{ type: "spell-ward", schools: ["divination"] }] } }
+          }
+        ]
+      }
+    })
+  ],
+  // Hallowed Ward: "Creatures of the chosen types can't willingly enter the area, and any creature that is possessed by
+  // or that has the Charmed or Frightened condition from such creatures isn't possessed, Charmed, or Frightened by them
+  // while in the area." Its extra effect is picked as it is cast; the creatures an effect names are the warded types for
+  // Extradimensional Interference, Fear and Vulnerability, and every other creature for Courage and Resistance.
+  hallow: [
+    lasting("ward", "Creatures of the warded types can't enter the area, and can't charm or frighten those in it.", {
+      on: [],
+      choosesTypes: true,
+      exclusive: true,
+      bars: { way: "in", types: [...HALLOW_TYPES] },
+      holds: {
+        conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...HALLOW_TYPES] },
+        suppresses: true
+      },
+      picks: {
+        pick: "one",
+        parts: [
+          {
+            id: "courage",
+            name: "Courage",
+            trigger: { alsoHolds: { conditionImmunities: ["frightened"], forTypes: "others" } }
+          },
+          { id: "darkness", name: "Darkness", trigger: { lighting: "dark", lightingFirm: true } },
+          { id: "daylight", name: "Daylight", trigger: { lighting: "bright" } },
+          {
+            id: "extradimensional",
+            name: "Extradimensional Interference",
+            trigger: { noTeleport: true, noTeleportOut: true, teleportWardsOnly: true }
+          },
+          { id: "fear", name: "Fear", trigger: { alsoHolds: { conditions: ["frightened"], forTypes: "warded" } } },
+          { id: "peaceful-rest", name: "Peaceful Rest", trigger: {} },
+          {
+            id: "resistance",
+            name: "Resistance",
+            trigger: { alsoHolds: { chosenDamage: "resistance", forTypes: "others" } }
+          },
+          { id: "silence", name: "Silence", trigger: { alsoHolds: { conditions: ["deafened"] } } },
+          { id: "tongues", name: "Tongues", trigger: {} },
+          {
+            id: "vulnerability",
+            name: "Vulnerability",
+            trigger: { alsoHolds: { chosenDamage: "vulnerability", forTypes: "warded" } }
+          }
+        ]
+      }
+    })
   ],
   // Explosive Rune: a creature that sets the glyph off (stepping on it) makes it erupt in a "20-foot-radius Sphere
   // centered on the glyph", and "once a glyph is triggered, this spell ends". The glyph is nearly imperceptible.
@@ -1401,14 +1547,11 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       laterTurnsOnly: true
     }
   ],
-  // A creature of a chosen type "can't willingly enter the Cylinder by nonmagical means". Every type the spell names is
-  // chosen, and the circle faces outward.
-  "magic-circle": [
-    lasting("barrier", "Celestials, Elementals, Fey, Fiends and Undead can't willingly enter the Cylinder.", {
-      on: [],
-      bars: { way: "in", types: ["celestial", "elemental", "fey", "fiend", "undead"] }
-    })
-  ],
+  // Magic Circle: a creature of a chosen type "can't willingly enter the Cylinder by nonmagical means", teleports in only
+  // after a Charisma save, "has Disadvantage on attack rolls against targets within the Cylinder", and "Targets within
+  // the Cylinder can't be possessed by or gain the Charmed or Frightened condition from the creature"; or, reversed,
+  // the circle holds such creatures in and protects those outside (`magicCircleForms`).
+  "magic-circle": magicCircleForms(),
   // Overgrowth: "A creature moving through that area must spend 4 feet of movement for every 1 foot it moves." The
   // plants stay overgrown, so the area stays until the GM ends it.
   // "You can exclude one or more areas of any size within the spell's area from being affected": each 10-foot square
@@ -1780,7 +1923,13 @@ const PICKS_IN_AREA: ReadonlySet<string> = new Set([
 const CHAIN_FEET: Readonly<Record<string, number>> = { "chain-lightning": 30 };
 /** "Using a Higher-Level Spell Slot": the feet an area grows for each slot level above the spell's (Fog Cloud's radius by
  *  20 feet, Confusion's by 5, Create or Destroy Water's Cube by 5). */
-const AREA_PER_SLOT: Readonly<Record<string, number>> = { "fog-cloud": 20, confusion: 5, "create-or-destroy-water": 5 };
+const AREA_PER_SLOT: Readonly<Record<string, number>> = {
+  "fog-cloud": 20,
+  confusion: 5,
+  "create-or-destroy-water": 5,
+  // "You can increase the size of the Cube by 100 feet for each spell slot level above 4."
+  "private-sanctum": 100
+};
 
 /** Cantrips that light or snuff a flame (`resolution/cast-lights.ts`): Fire Play ("light or snuff out a candle, a
  *  torch, or a small campfire") within Druidcraft's 30 feet and Prestidigitation's 10, and Beckon Fire's embers that
@@ -3316,6 +3465,10 @@ const PERSISTS_WITHOUT_TARGETS: ReadonlySet<string> = new Set(["earthquake", "en
  *  the GM's to draw), and a sphere, guardian, pack or cloud as the circle it covers around its point. */
 const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "blade-barrier": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  // "The area can have a radius up to 60 feet" round the touched point.
+  hallow: { shape: "sphere", sizeFeet: 60, widthFeet: null },
+  // "A Cube that can be as small as 5 feet to as large as 100 feet on each side".
+  "private-sanctum": { shape: "cube", sizeFeet: 100, widthFeet: null },
   // The bolt's point and the 5 feet around it: "Each creature within 5 feet of that point".
   "call-lightning": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "conjure-animals": { shape: "sphere", sizeFeet: 10, widthFeet: null },

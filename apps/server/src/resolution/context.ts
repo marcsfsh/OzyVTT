@@ -178,6 +178,8 @@ export type ResolveInput = Readonly<{
   gear?: "merged" | "worn";
   /** The effect a use picks among its action's options (Enlarge or Reduce). */
   option?: string;
+  /** The creature types a cast's barrier wards, among those its spell offers (Magic Circle, Hallow). */
+  creatureTypes?: readonly string[];
 }>;
 
 export type ResolveDependencies = Readonly<{

@@ -16,7 +16,8 @@ import { CommandRejectedError } from "../game-store.js";
 import { itemRowOfAction } from "../item-charges.js";
 import { castThisTurnKey, withCastKey } from "../lasting-spells.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { areaAtLevel, endZone } from "../spell-zone-state.js";
+import { areaAtLevel, endZone, withParts } from "../spell-zone-state.js";
+import { placeZoneSight, refuseOverlap, refuseStraddlers, zoneChoicesOf } from "./zone-casts.js";
 import { actOnCast, pickedZoneRow, pickedZoneType, zoneRowOf } from "../spell-zones.js";
 import { abilityModifier, tableLineOf, type ResolveContext } from "./context.js";
 import { shapedZone, shapingOf } from "./metamagic.js";
@@ -265,6 +266,9 @@ export function openSpellZone(ctx: ResolveContext): void {
   const casterAt = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position ?? null;
   const spellUp =
     ctx.castId === null ? attacker.effects.find((effect) => effect.id === `${input.commandId}:spell`) : undefined;
+  // A dome that can't hold whole every creature in it fails (Tiny Hut), and so does a second Hallow over the first.
+  refuseStraddlers(ctx, row.zone);
+  refuseOverlap(ctx, spell.id, row.zone);
   const zone: SpellZone = {
     id: input.commandId,
     spellId: spell.id,
@@ -307,16 +311,21 @@ export function openSpellZone(ctx: ResolveContext): void {
       : {}),
     ...(anchorId ? { targetId: anchorId } : {}),
     ...(pickedType ? { types: [pickedType] } : {}),
+    // The types its barrier wards and the properties it takes, as its caster chose (Magic Circle, Private Sanctum).
+    ...zoneChoicesOf(ctx, spell, row.zone),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };
   // The same caster's earlier cast of this spell is gone ("The spell ends if you cast it again"; a new Concentration
   // ended the old one anyway).
   for (const existing of state.combat.spellZones)
-    if (existing.spellId === spell.id && existing.casterId === attacker.id) endZone(state, existing.id);
+    if (existing.spellId === spell.id && existing.casterId === attacker.id && !row.zone.exclusive)
+      endZone(state, existing.id);
   state.combat = { ...state.combat, spellZones: [...state.combat.spellZones, zone].slice(-20) };
   if (!aroundCaster && zone.annotationId === null)
     ctx.warnings.push(`Place ${spell.name}'s area on the map (Spell areas), and the server will run it.`);
+  // Its edge that sight can't pass and the light inside it (Private Sanctum, Tiny Hut).
+  placeZoneSight(ctx, zone, withParts(row.zone, zone.parts));
   // An area that acts as it is cast acts on the creatures the cast caught (Conjure Celestial's lights).
   if (row.zone.atCast) actAtCast(ctx, zone, "is bathed in");
 }

@@ -67,6 +67,8 @@ export type AvailabilityRow = Readonly<{
   forms?: ContentActionSummary["forms"];
   /** The effects a use picks one of (Enlarge or Reduce). */
   options?: ContentActionSummary["options"];
+  /** The creature types a barrier's cast may ward (Magic Circle). */
+  wardTypes?: ContentActionSummary["wardTypes"];
   /** A Thief's Fast Hands can take this item action as a Bonus Action: whether now, and why not. */
   fastHands?: Readonly<{ available: boolean; reason?: string }>;
 }>;
@@ -139,7 +141,9 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     ...(row.damageLook ? { damageLook: true as const } : {}),
     // A shape-shift picks its form (Wild Shape), and Enlarge/Reduce which of its effects.
     ...(row.forms ? { forms: row.forms } : {}),
-    ...(row.options ? { options: row.options } : {})
+    ...(row.options ? { options: row.options } : {}),
+    // A barrier's cast picks the creature types it wards (Magic Circle).
+    ...(row.wardTypes ? { wardTypes: row.wardTypes } : {})
   };
 }
 

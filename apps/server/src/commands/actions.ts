@@ -558,6 +558,7 @@ export const actionCommands = [
             ...(request.targetForms ? { targetForms: request.targetForms } : {}),
             ...(request.gear !== undefined ? { gear: request.gear } : {}),
             ...(request.option !== undefined ? { option: request.option } : {}),
+            ...(request.creatureTypes ? { creatureTypes: request.creatureTypes } : {}),
             ...(template || templates ? { areaPlaced: true } : {}),
             ...(areaOrigin ? { areaOrigin } : {}),
             // The template as the map draws it, for the walls a cast raises on it (Wall of Force).

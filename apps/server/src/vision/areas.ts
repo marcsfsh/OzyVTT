@@ -17,6 +17,10 @@ export type ResolvedArea = Readonly<{
   source: VisionSource | undefined;
   /** The one creature that sees through it. */
   sparedActorId: string | null;
+  /** For an edge seen through only from within (Tiny Hut), whether a viewer at a point is within it; null otherwise. */
+  seenOutFrom: ((point: Point) => boolean) | null;
+  /** For darkness that only spell light of this level or higher illuminates (Hallow), that level; null otherwise. */
+  unlitBelow: number | null;
   /** Whether a point lies inside. */
   contains: (point: Point) => boolean;
   /** Whether the segment from `a` to `b` touches the area: crosses it, or starts or ends inside it. */
@@ -68,6 +72,8 @@ function circleArea(area: VisionArea, center: Point, radius: number): ResolvedAr
     sunlight: area.sunlight === true,
     source: area.source,
     sparedActorId: area.sparedActorId ?? null,
+    unlitBelow: area.unlitBelow ?? null,
+    seenOutFrom: null,
     contains: (point) => distance(point, center) <= radius + 1e-6,
     touches: (a, b) => distanceToSegment(center, segment(a, b)) <= radius + 1e-6,
     edges: edgesOf(outline),
@@ -90,6 +96,8 @@ function ringArea(area: VisionArea, center: Point, radius: number, thickness: nu
     sunlight: area.sunlight === true,
     source: area.source,
     sparedActorId: area.sparedActorId ?? null,
+    unlitBelow: area.unlitBelow ?? null,
+    seenOutFrom: area.oneWay ? (point) => distance(point, center) <= inner : null,
     contains: (point) => {
       const apart = distance(point, center);
       return apart <= radius + 1e-6 && apart > inner;
@@ -104,6 +112,43 @@ function ringArea(area: VisionArea, center: Point, radius: number, thickness: nu
   };
 }
 
+/** A square's edge band (Private Sanctum's foggy edge): the band between the square and one `thickness` inside it,
+ *  drawn as the square with its middle left open. */
+function squareRingArea(
+  area: VisionArea,
+  box: Readonly<{ x: number; y: number; width: number; height: number }>,
+  thickness: number
+): ResolvedArea {
+  const inset = Math.min(thickness, box.width / 2, box.height / 2);
+  const outer = rectOutline(box.x, box.y, box.width, box.height);
+  const hole = rectOutline(box.x + inset, box.y + inset, box.width - 2 * inset, box.height - 2 * inset).reverse();
+  const within = (point: Point, inner: boolean) => {
+    const pad = inner ? inset : 0;
+    return (
+      point.x >= box.x + pad - 1e-6 &&
+      point.x <= box.x + box.width - pad + 1e-6 &&
+      point.y >= box.y + pad - 1e-6 &&
+      point.y <= box.y + box.height - pad + 1e-6
+    );
+  };
+  const contains = (point: Point) => within(point, false) && !within(point, true);
+  const edges = [...edgesOf(outer), ...edgesOf(hole)];
+  return {
+    id: area.id,
+    kind: area.kind,
+    sunlight: area.sunlight === true,
+    source: area.source,
+    sparedActorId: area.sparedActorId ?? null,
+    unlitBelow: area.unlitBelow ?? null,
+    seenOutFrom: area.oneWay ? (point) => within(point, true) : null,
+    contains,
+    touches: (a, b) => contains(a) || contains(b) || edges.some((edge) => segmentsCross(a, b, edge)),
+    edges,
+    outline: [...outer, outer[0]!, ...hole, hole[0]!],
+    rect: null
+  };
+}
+
 function polygonArea(area: VisionArea, outline: Polygon, rect: ResolvedArea["rect"]): ResolvedArea | null {
   if (outline.length < 3) return null;
   const edges = edgesOf(outline);
@@ -114,6 +159,8 @@ function polygonArea(area: VisionArea, outline: Polygon, rect: ResolvedArea["rec
     sunlight: area.sunlight === true,
     source: area.source,
     sparedActorId: area.sparedActorId ?? null,
+    unlitBelow: area.unlitBelow ?? null,
+    seenOutFrom: null,
     contains,
     touches: (a, b) => contains(a) || contains(b) || edges.some((edge) => segmentsCross(a, b, edge)),
     edges,
@@ -148,9 +195,10 @@ function templateArea(
       const y = Math.min(origin.y, target.y);
       const width = Math.abs(target.x - origin.x);
       const height = Math.abs(target.y - origin.y);
-      return width > 0 && height > 0
-        ? polygonArea(area, rectOutline(x, y, width, height), { x, y, width, height })
-        : null;
+      if (width <= 0 || height <= 0) return null;
+      return ringPx !== null
+        ? squareRingArea(area, { x, y, width, height }, ringPx)
+        : polygonArea(area, rectOutline(x, y, width, height), { x, y, width, height });
     }
     case "cone":
     case "line": {
@@ -192,7 +240,11 @@ export function resolveAreas(
         width: shape.width,
         height: shape.height
       });
-    else if (shape.type === "circle") piece = circleArea(area, shape, shape.radiusFeet * pixelsPerFoot);
+    else if (shape.type === "circle")
+      piece =
+        shape.ringFeet !== undefined
+          ? ringArea(area, shape, shape.radiusFeet * pixelsPerFoot, shape.ringFeet * pixelsPerFoot)
+          : circleArea(area, shape, shape.radiusFeet * pixelsPerFoot);
     else if (shape.type === "template") {
       const annotation = combat.annotations.find((candidate) => candidate.id === shape.annotationId);
       if (annotation)

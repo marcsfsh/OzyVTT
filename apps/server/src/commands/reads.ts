@@ -149,7 +149,7 @@ export const gameReads = [
                 action,
                 action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined
               );
-              if (!action.shapeShift && !action.endsForm && !picks.options) return summary;
+              if (!action.shapeShift && !action.endsForm && !picks.options && !picks.wardTypes) return summary;
               return {
                 ...summary,
                 ...(action.shapeShift

@@ -34,6 +34,7 @@ export type SaveOutcome = {
   ignoresCover?: true;
   failurePush?: ForcedPush;
   advantageAtSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+  disadvantageTypes?: string[];
   repeatOnce?: true;
   repeatAtTurnStart?: true;
   repeatOnDamage?: { advantage?: true; notFromSource?: true };

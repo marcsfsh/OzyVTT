@@ -1334,7 +1334,9 @@ export const VisionAreaSchema = z
           type: z.literal("circle"),
           x: z.number().min(0).max(100000),
           y: z.number().min(0).max(100000),
-          radiusFeet: z.number().positive().max(1000)
+          radiusFeet: z.number().positive().max(1000),
+          /** Only the circle's outer edge this many feet thick (Tiny Hut's dome). */
+          ringFeet: z.number().positive().max(100).optional()
         })
         .strict(),
       z
@@ -1342,7 +1344,8 @@ export const VisionAreaSchema = z
           type: z.literal("template"),
           annotationId: z.uuid(),
           widthFeet: z.number().positive().max(1000).nullable().default(null),
-          /** A ringed wall: only the circle's outer edge this many feet thick (Wall of Fire's ring). */
+          /** A ringed wall: only the circle's or square's outer edge this many feet thick (Wall of Fire's ring, Private
+           *  Sanctum's foggy edge). */
           ringFeet: z.number().positive().max(100).optional()
         })
         .strict(),
@@ -1352,6 +1355,10 @@ export const VisionAreaSchema = z
     ]),
     /** The one creature that sees through it (Insect Cloud: "Heavily Obscured for creatures other than you"). */
     sparedActorId: z.uuid().optional(),
+    /** An edge seen through only from within it (Tiny Hut: "opaque from the outside ... transparent from the inside"). */
+    oneWay: z.literal(true).optional(),
+    /** Darkness that normal light, and light from spells below this level, can't illuminate (Hallow's Darkness). */
+    unlitBelow: z.number().int().min(1).max(9).optional(),
     source: VisionSourceSchema.optional(),
     /** What clears it, ending the spell that made it: a strong wind (Gust of Wind) or water that destroys fog. */
     dispersedBy: z
@@ -1523,6 +1530,27 @@ export const SpellZoneSchema = z
     healing: z.string().min(1).max(60).optional(),
     /** The creature it is round, which it moves with (Antipathy/Sympathy's target). */
     targetId: z.uuid().optional(),
+    /** The creature types its caster chose for its barrier and ward (Magic Circle, Hallow); absent, every type it names. */
+    wardTypes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(14)
+      .optional(),
+    /** The properties its caster picked for it (Private Sanctum's, Hallow's extra effect), by part id. */
+    parts: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(30)
+      )
+      .max(10)
+      .optional(),
     /** The creature type its caster picked for it to act on (Antipathy/Sympathy's "kind of creature"). */
     types: z
       .array(

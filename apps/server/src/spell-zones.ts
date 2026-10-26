@@ -89,10 +89,11 @@ const pluralOf = (type: string) => TYPE_PLURALS[type] ?? `${type}s`;
 /** The zone rows a spell's cast picks among, with the creature type picked with it (`picksType`: Antipathy/Sympathy's
  *  "specify a kind of creature" makes one option per type). */
 type LaterRow = NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number];
-type ZonePick = Readonly<{ id: string; name: string; row: LaterRow; type?: string }>;
+type ZonePick = Readonly<{ id: string; name: string; row: LaterRow; type?: string; parts?: readonly string[] }>;
 function zoneRowPicks(spell: SpellReference): ZonePick[] {
   return (spell.effect?.laterActions ?? []).flatMap((row): ZonePick[] => {
     const option = row.option;
+    if (row.zone?.picks) return partPicks(row, row.zone.picks);
     if (!row.zone || !option) return [];
     if (!row.zone.picksType) return [{ id: option.id, name: option.name, row }];
     return CREATURE_TYPE_IDS.map((type) => ({
@@ -102,6 +103,34 @@ function zoneRowPicks(spell: SpellReference): ZonePick[] {
       type
     }));
   });
+}
+
+/** The options a zone row's picks make: each part (`one`: Hallow's extra effect), or every set of them, largest first
+ *  (`any`: Private Sanctum's properties, "Fog and no teleporting"). */
+function partPicks(row: LaterRow, picks: NonNullable<ZoneTrigger["picks"]>): ZonePick[] {
+  const parts = picks.parts;
+  if (picks.pick === "one") return parts.map((part) => ({ id: part.id, name: part.name, row, parts: [part.id] }));
+  const sets: Array<typeof parts> = [];
+  for (let mask = (1 << parts.length) - 1; mask > 0; mask--) sets.push(parts.filter((_, index) => mask & (1 << index)));
+  sets.sort((a, b) => b.length - a.length);
+  const listed = (names: readonly string[]) =>
+    names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]!.toLowerCase()}`;
+  return sets.map((set) => ({
+    id: set.map((part) => part.id).join("--"),
+    name: listed(set.map((part, index) => (index === 0 ? part.name : part.name.toLowerCase()))).slice(0, 60),
+    row,
+    parts: set.map((part) => part.id)
+  }));
+}
+
+/** The parts a cast's option picked for its zone (Private Sanctum's properties), or, with no option, every part of a
+ *  row that picks any of them and the first of one that picks one. */
+export function pickedZoneParts(spell: SpellReference, optionId: string | undefined): string[] | undefined {
+  const picked = optionId === undefined ? undefined : zoneRowPicks(spell).find((pick) => pick.id === optionId);
+  if (picked?.parts) return [...picked.parts];
+  const picks = zoneRowOf(spell)?.zone?.picks;
+  if (!picks) return undefined;
+  return picks.pick === "any" ? picks.parts.map((part) => part.id) : [picks.parts[0]!.id];
 }
 
 /** The later action whose zone this spell leaves, if any: the one its cast picked among the spell's options (Wall of
@@ -121,7 +150,11 @@ export const pickedZoneType = (spell: SpellReference, optionId: string | undefin
 export function zoneOptionsOf(
   spell: SpellReference
 ): Array<Readonly<{ id: string; name: string; area?: NonNullable<SpellReference["area"]> }>> {
-  return zoneRowPicks(spell).map(({ id, name, row }) => ({ id, name, ...(row.area ? { area: row.area } : {}) }));
+  return zoneRowPicks(spell).map(({ id, name, row }) => ({
+    id,
+    name,
+    ...(row.area && row.option ? { area: row.area } : {})
+  }));
 }
 
 /** What a use offers its user to pick, as the sheet lists it: the effects it picks one of (Enlarge or Reduce), or for a
@@ -129,12 +162,18 @@ export function zoneOptionsOf(
 export function castOptionsOf(
   action: Pick<ActorAction, "id" | "effectOptions" | "spellId">,
   spell: SpellReference | undefined
-): Readonly<{ options?: ReturnType<typeof zoneOptionsOf> }> {
+): Readonly<{ options?: ReturnType<typeof zoneOptionsOf>; wardTypes?: string[] }> {
   if (action.effectOptions)
     return { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) };
   if (!spell || action.spellId !== spell.id || laterRowOf(spell, action.id)) return {};
   const options = zoneOptionsOf(spell);
-  return options.length > 0 ? { options } : {};
+  // The types its barrier may ward, for the caster to pick among (Magic Circle, Hallow).
+  const row = zoneRowOf(spell);
+  const wardTypes = row?.zone?.choosesTypes ? row.zone.bars?.types : undefined;
+  return {
+    ...(options.length > 0 ? { options } : {}),
+    ...(wardTypes ? { wardTypes: [...wardTypes] } : {})
+  };
 }
 
 /** The zone row a cast's option names, refusing one the spell doesn't offer. Undefined for a spell with no options or

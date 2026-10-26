@@ -1076,6 +1076,7 @@ export type ContentActionSummary = Readonly<{
   /** The forms a shape-shift may take (Wild Shape, Polymorph), from the server's availability read; `action.resolve`'s
    *  `form`, or `targetForms` when each target takes its own. */ forms?: ActionAvailability["forms"];
   /** The effects a use picks one of (Enlarge or Reduce); `action.resolve`'s `option`. */ options?: ActionAvailability["options"];
+  /** The creature types its barrier may ward (Magic Circle); `action.resolve`'s `creatureTypes`. */ wardTypes?: ActionAvailability["wardTypes"];
 }>;
 export type ContentActionsResult = {
   ok: boolean;

@@ -116,11 +116,12 @@ export function withShapeOffer(
 ): ContentActionSummary {
   // The action a form adds to leave it early (its id is the server's).
   const leaving = action.id === "leave-form";
-  if (!row || (!row.forms && !row.options && !leaving)) return action;
+  if (!row || (!row.forms && !row.options && !row.wardTypes && !leaving)) return action;
   return {
     ...action,
     ...(row.forms ? { forms: row.forms } : {}),
     ...(row.options ? { options: row.options } : {}),
+    ...(row.wardTypes ? { wardTypes: row.wardTypes } : {}),
     ...(row.targeting && action.targeting === undefined ? { targeting: row.targeting } : {})
   };
 }
