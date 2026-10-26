@@ -831,6 +831,8 @@ export const ModifierSchema = z
         feet: z.number().int().min(5).max(300).optional(),
         equalToSpeed: z.boolean().optional(),
         hover: z.boolean().optional(),
+        /** Only on the bearer's own turn (Acrobatic Movement: "on your turn"). */
+        ownTurn: z.literal(true).optional(),
         ...riderGate
       })
       .strict(),
@@ -838,18 +840,20 @@ export const ModifierSchema = z
     z
       .object({
         type: z.literal("movement"),
-        rule: z.enum(["safe-fall", "leap", "jump-by-dexterity", "jump-multiplier"]),
+        rule: z.enum(["safe-fall", "leap", "jump-by-dexterity", "jump-multiplier", "walks-on-liquid"]),
         /** `leap`: how far the jump may go. */
         feet: z.number().int().min(5).max(120).optional(),
         /** `leap`: the movement it spends, whatever its length. */
         costFeet: z.number().int().min(0).max(60).optional(),
         /** `jump-multiplier`: what the jump's distance is multiplied by. */
         times: z.number().int().min(2).max(4).optional(),
+        /** Only on the bearer's own turn (Acrobatic Movement: "on your turn"). */
+        ownTurn: z.literal(true).optional(),
         ...riderGate
       })
       .strict()
       .describe(
-        'How the bearer falls and jumps (SRD Falling, Jumping): "safe-fall" takes no damage from a fall (Ring of Feather Falling); "leap" jumps up to `feet` for `costFeet` of movement once on each of its turns (Jump, Boots of Striding and Springing); "jump-by-dexterity" measures jumps with Dexterity in place of Strength (Second-Story Work); "jump-multiplier" multiplies the jump\'s distance by `times` (Step of the Wind). Read live by the movement rules, so it ends with its carrier.'
+        'How the bearer falls and jumps (SRD Falling, Jumping): "safe-fall" takes no damage from a fall (Ring of Feather Falling); "leap" jumps up to `feet` for `costFeet` of movement once on each of its turns (Jump, Boots of Striding and Springing); "jump-by-dexterity" measures jumps with Dexterity in place of Strength (Second-Story Work); "jump-multiplier" multiplies the jump\'s distance by `times` (Step of the Wind); "walks-on-liquid" moves across water painted on the map as if it were solid ground (Acrobatic Movement). `ownTurn` holds it only on the bearer\'s own turn. Read live by the movement rules, so it ends with its carrier.'
       ),
     /**
      * Flat AC. `whileArmored` (the Defense fighting style) predates `when: [{type: "while-armored"}]` and
@@ -1481,11 +1485,18 @@ export const endingsOf = (effect: Readonly<{ endedBy?: z.infer<typeof EndedByLis
  */
 export const RestTriggerSchema = z
   .object({
-    at: z.enum(["long-rest", "day"]).optional(),
+    at: z.enum(["long-rest", "day", "midnight"]).optional(),
     save: z
       .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
       .strict()
       .optional(),
+    /** Successes needed before the save ends it ("After seven successful saves": Pale Tincture), counted on the
+     *  effect; absent, one does. */
+    successesNeeded: z.number().int().min(2).max(10).optional(),
+    /** Successes counted so far. */
+    successes: z.number().int().min(0).max(10).optional(),
+    /** A success still takes half the damage, then ends it (Midnight Tears). */
+    halfOnSuccess: z.literal(true).optional(),
     maximumLoss: DiceFormulaSchema.optional(),
     noBenefit: z.enum(["short", "long", "both"]).optional(),
     holdsMaximum: z.literal(true).optional(),
@@ -1568,7 +1579,9 @@ export const RepeatSaveSchema = z
       .object({
         needed: z.number().int().min(2).max(5),
         successes: z.number().int().min(0).max(5).default(0),
-        failures: z.number().int().min(0).max(5).default(0)
+        failures: z.number().int().min(0).max(5).default(0),
+        /** Only successes are counted (Burnt Othur Fumes). */
+        successesOnly: z.literal(true).optional()
       })
       .strict()
       .optional(),
@@ -1705,6 +1718,11 @@ export const PrintedFormSchema = z
     noSpeech: z.literal(true).optional(),
     /** It can enter another creature's space and stop there (a vampire's mist). */
     sharesSpaces: z.literal(true).optional(),
+    /** It can't pass through liquid (a vampire's mist): painted water bars its way on the ground. */
+    noLiquid: z.literal(true).optional(),
+    /** Its modifiers' Resistance doesn't hold against the damage sunlight deals it (the mist: "Resistance to all damage,
+     *  except the damage it takes from sunlight"). */
+    sunlightPierces: z.literal(true).optional(),
     /** Conditions it is immune to while in the form (Gaseous Form: Prone). */
     conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional(),
     /** What the form has while it lasts (the mist's Resistance to all damage). */
@@ -1758,6 +1776,8 @@ export const FormSchema = z
     allowsActions: z.array(RiderSlugSchema).min(1).max(4).optional(),
     noAttacks: z.literal(true).optional(),
     sharesSpaces: z.literal(true).optional(),
+    noLiquid: z.literal(true).optional(),
+    sunlightPierces: z.literal(true).optional(),
     /** It ends once the bearer has no Temporary Hit Points left (Polymorph). */
     endsWithoutTemporaryHitPoints: z.literal(true).optional(),
     /** It ends when the bearer drops to 0 Hit Points (Gaseous Form). */
@@ -2741,6 +2761,20 @@ export const ActorSchema = z.object({
     })
     .strict()
     .optional(),
+  /** What the creature's surroundings have worn on it so far (SRD 5.2.1 Gameplay Toolbox, `environment.ts`): hours in
+   *  extreme heat in a row, rounds immersed in frigid water, minutes swum in deep water since its last save against
+   *  it, minutes out of water for a creature that must be submerged now and then (Limited Amphibiousness), and hours
+   *  travelled since its last Long Rest (Extended Travel). The server keeps it. GM-only in projections. */
+  exposure: z
+    .object({
+      heatHours: z.number().int().min(0).max(100_000).optional(),
+      frigidRounds: z.number().int().min(0).max(1_000_000).optional(),
+      deepMinutes: z.number().int().min(0).max(1_000_000).optional(),
+      dryMinutes: z.number().int().min(0).max(10_000_000).optional(),
+      travelHours: z.number().min(0).max(100_000).optional()
+    })
+    .strict()
+    .optional(),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown, so movement rules skip. */
   speedFeet: z.number().int().min(0).max(500).optional(),
   /** Legendary actions per round and Legendary Resistance per day (SRD 2024), at the lair's counts while `inLair` (the GM's
@@ -3185,7 +3219,9 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   hoursRolled: z
     .string()
     .regex(/^[1-4]d(?:4|6|8|10|12)$/, "Use dice such as 1d4.")
-    .optional()
+    .optional(),
+  /** What it does as its bearer rests or as days or midnights pass (Midnight Tears: a save at midnight). */
+  atRest: RestTriggerSchema.optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
@@ -3303,7 +3339,7 @@ export type HitPointBand = z.infer<typeof HitPointBandSchema>;
  */
 export const FailureMarginSchema = z
   .object({
-    by: z.number().int().min(2).max(20),
+    by: z.number().int().min(1).max(20),
     conditions: z.array(SaveConditionSchema).min(1).max(4).optional(),
     duration: SaveFailureDurationSchema.optional(),
     whileFailed: z
@@ -3483,6 +3519,18 @@ export const SaveOutcomeFields = {
     .describe(
       "Repeated saves counted apart until this many successes (ending it) or failures (bringing the second failure)"
     ),
+  /** Only successes are counted toward `repeatTally`: that many end it, and failures go on dealing their damage (Burnt
+   *  Othur Fumes: "After three successful saves, the poison ends"). */
+  repeatTallySuccessesOnly: z
+    .literal(true)
+    .optional()
+    .describe("Only successes count toward the tally; failures never bring a second failure"),
+  /** The failure lasts this many hours, rolled as it lands (Torpor: 4d6 hours), in place of `failureDuration`. */
+  failureHoursRolled: z
+    .string()
+    .regex(/^[1-4]d(?:4|6|8|10|12)$/, "Use dice such as 4d6.")
+    .optional()
+    .describe("The failure's hours, rolled as it lands (Torpor's 4d6), in place of failureDuration"),
   /** What a failed repeat (the last counted one, with a tally) leaves in place of the failure: "Second Failure: The
    *  target has the Unconscious condition for 10 minutes". */
   secondFailure: z
@@ -4507,6 +4555,8 @@ export const ShapeShiftSchema = z
     hoursPerTwoLevelsOf: RiderSlugSchema.optional(),
     /** It can't be used while its user stands in sunlight (a vampire's Shape-Shift). */
     notInSunlight: z.literal(true).optional(),
+    /** It can't be used while its user is in running water painted on the map (a vampire's Shape-Shift). */
+    notInRunningWater: z.literal(true).optional(),
     /** Dropping to 0 Hit Points takes this printed form with no action, and the creature lives on in it at 0 Hit
      *  Points for these hours or until the GM ends it (a vampire's Misty Escape). In sunlight it can't, and dies. */
     escapesAtZero: z
@@ -5688,6 +5738,12 @@ export const ActionSchema = z
       .describe(
         "What it does to the door it is aimed at: fix-rod (an Immovable Rod holds it shut, DC 30 to force), glue (Sovereign Glue, undone only by dissolve), dissolve (Universal Solvent), or force (a Strength check of d20 plus bonus against what holds it shut: a Ring of the Ram)"
       ),
+    /** Its user senses the traps within `feet` in its line of sight and their nature, not where they are (Find Traps). */
+    sensesTraps: z
+      .object({ feet: z.number().int().min(5).max(1000) })
+      .strict()
+      .optional()
+      .describe("Its user senses the traps within `feet` in its line of sight and their nature, not where (Find Traps)"),
     /** It points its user at the nearest secret door or hidden trap within `feet` (a Wand of Secrets). */
     pointsAtHidden: z
       .object({ feet: z.number().int().min(5).max(300) })
@@ -6453,8 +6509,24 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
   /** A vampire's Misty Escape: dropped to 0 Hit Points, it turns to mist and lives on at 0 unless it stands in
-   *  sunlight, where it can't shape-shift and is destroyed. */
+   *  sunlight or running water, where it can't shape-shift and is destroyed. */
   z.object({ kind: z.literal("misty-escape"), name: TraitNameSchema }).strict(),
+  /** Water painted on the map harms it: `moving` for every 5 feet it moves in water (a fire elemental's Water
+   *  Susceptibility), `endsTurnInRunning` when it ends its turn in running water (a vampire's Running Water). */
+  z
+    .object({
+      kind: z.literal("water-weakness"),
+      name: TraitNameSchema,
+      moving: z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict().optional(),
+      endsTurnInRunning: z
+        .object({ amount: z.number().int().min(1).max(100), type: DamageTypeSchema })
+        .strict()
+        .optional()
+    })
+    .strict(),
+  /** "It must be submerged at least once every 4 hours to avoid suffocating outside water" (Limited Amphibiousness):
+   *  after `hours` of game time out of water it starts to suffocate. */
+  z.object({ kind: z.literal("dries-out"), name: TraitNameSchema, hours: z.number().int().min(1).max(48) }).strict(),
   /** A creature that comes back after it dies (Diabolical Restoration, a lich's Spirit Jar): `bodyGoes` when its body
    *  disappears as it dies. `returns`: it comes back to life where it died with all its Hit Points after the dice's
    *  hours or days of game time ("returns to life in 1d6 days"), unless `preventedBy` stops it (Dispel Evil and Good

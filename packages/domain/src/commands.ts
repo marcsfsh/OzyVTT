@@ -13,6 +13,7 @@ import {
   RuleExceptionsSchema,
   RuleFamilySchema,
   RuleModeSchema,
+  SceneEnvironmentSchema,
   TableRollPurposeSchema
 } from "./state.js";
 import {
@@ -1294,11 +1295,85 @@ export const FogResetSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Difficult terrain (GM-only): mark a dragged area difficult, or clear it. `sceneId` targets a parked scene. */
+/** Traps (SRD 5.2.1 Gameplay Toolbox): the GM sets one of the toolbox's traps at a band of levels over a dragged area,
+ *  hidden from the players. `sceneId` targets a parked scene. */
+export const TrapPlaceSchema = z
+  .object({
+    commandId: z.uuid(),
+    trapId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    /** The band of levels it is scaled for: 1 for levels 1-4, 2 for 5-10, 3 for 11-16, 4 for 17-20. */
+    tier: z.number().int().min(1).max(4),
+    rect: PaintRectSchema,
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM changes a trap: its band, the area its blast falls on (null: its own area), whether the party has found it,
+ *  or arms or disarms it. */
+export const TrapEditSchema = z
+  .object({
+    commandId: z.uuid(),
+    trapId: z.uuid(),
+    tier: z.number().int().min(1).max(4).optional(),
+    blast: PaintRectSchema.nullable().optional(),
+    found: z.boolean().optional(),
+    state: z.enum(["armed", "disarmed"]).optional(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const TrapRemoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    trapId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM sets off a trap whose trigger the map can't see (a needle in a lock), on a creature or on its area. */
+export const TrapSpringSchema = z
+  .object({
+    commandId: z.uuid(),
+    trapId: z.uuid(),
+    actorId: z.uuid().nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature beside a found trap makes it safe one of the trap's ways (`disarmId`). */
+export const TrapDisarmSchema = z
+  .object({
+    commandId: z.uuid(),
+    trapId: z.uuid(),
+    actorId: z.uuid(),
+    disarmId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(40),
+    /** Fast Hands (Thief): it takes the Bonus Action. */
+    bonusAction: z.boolean().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM sets a scene's climate and weather (SRD 5.2.1 Gameplay Toolbox, Environmental Effects); what is left out
+ *  stays as it was. */
+export const EnvironmentSetSchema = z
+  .object({
+    commandId: z.uuid(),
+    environment: SceneEnvironmentSchema.partial(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** Painted ground (GM-only): mark a dragged area as difficult terrain, still or running water, or slippery ice, or clear
+ *  every kind from it. `sceneId` targets a parked scene. */
 export const TerrainPaintSchema = z
   .object({
     commandId: z.uuid(),
-    op: z.enum(["difficult", "clear"]),
+    op: z.enum(["difficult", "water", "running-water", "ice", "clear"]),
     rect: PaintRectSchema,
     sceneId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()

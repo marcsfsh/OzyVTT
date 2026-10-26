@@ -337,6 +337,11 @@ export const SpellEffectSchema = z
     teleportOutcome: z.literal(true).optional(),
     /** The cast names an item its caster carries and learns its properties (Identify). */
     identifiesItem: z.literal(true).optional(),
+    /** The caster senses the traps within `feet` in its line of sight, and their nature (Find Traps). */
+    sensesTraps: z
+      .object({ feet: z.number().int().min(5).max(1000) })
+      .strict()
+      .optional(),
     /** The cast picks one of Wish's uses, and every use but duplicating a spell stresses its caster (`wish.ts`). */
     wishUses: z.literal(true).optional(),
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
@@ -1269,6 +1274,21 @@ export const EquipmentReferenceSchema = z
       .optional()
       .describe("Populated for armor and shields only"),
 
+    /** A poison (SRD 5.2.1 Gameplay Toolbox, Sample Poisons): how it is delivered, and the save and damage a creature
+     *  exposed to it meets. An injury poison is coated on a weapon or a piece of ammunition, and the next hit with it
+     *  that deals Piercing or Slashing damage brings this on the creature hit. */
+    poison: z
+      .object({
+        kind: z.enum(["contact", "ingested", "inhaled", "injury"]),
+        save: ActionSchema.shape.save,
+        damage: ActionSchema.shape.damage
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A poison's delivery and what a creature exposed to it meets; an injury poison's coat brings it on the next Piercing or Slashing hit"
+      ),
+
     // ---- the magic-item vocabulary ---------------------------------------------------------------
 
     /** It serves as this kind of Spellcasting Focus while carried (a Talisman of Pure Good is a Holy Symbol). */
@@ -1596,6 +1616,111 @@ export const GlossaryEntrySchema = z.object({
   description: z.string().min(1).max(20000)
 });
 export type GlossaryEntry = z.infer<typeof GlossaryEntrySchema>;
+
+/** How a trap is found (SRD 5.2.1 Gameplay Toolbox, Detect and Disarm): a Search with Wisdom (Perception) or a Study
+ *  with Intelligence (Investigation) against `dc`, by a creature within `withinFeet` of the trapped area, finds `finds`
+ *  ("the trip wire"). */
+export const TrapDetectSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    action: z.enum(["search", "study"]),
+    skill: z.enum(["perception", "investigation"]),
+    dc: z.number().int().min(1).max(40),
+    finds: z.string().min(1).max(80),
+    withinFeet: z.number().int().min(5).max(60).optional()
+  })
+  .strict();
+export type TrapDetect = z.infer<typeof TrapDetectSchema>;
+
+/** A way to make a found trap safe, once `after` has found it: cutting a trip wire or plugging holes (no check), wedging
+ *  an Iron Spike under a plate or a lid (`spends` one), defacing a glyph with a sharp tool, or a check (`check`) that
+ *  sets the trap off on a failure where `failureSprings` says so. Each takes an action (the Utilize action). */
+export const TrapDisarmSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    name: z.string().min(1).max(60),
+    after: z.string().regex(/^[a-z0-9-]+$/),
+    spends: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .optional(),
+    check: z
+      .object({
+        ability: AbilitySchema,
+        skill: z.string().regex(/^[a-z-]+$/),
+        dc: z.number().int().min(1).max(40),
+        failureSprings: z.boolean()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type TrapDisarm = z.infer<typeof TrapDisarmSchema>;
+
+/** A trap at one band of character levels (the SRD's At Higher Levels table): its save and damage, the darts that each
+ *  failure takes (Poisoned Darts' 1d3), and a pit's depth, whose fall deals the Bludgeoning damage. */
+export const TrapTierSchema = z
+  .object({
+    levels: z.string().min(1).max(20),
+    save: ActionSchema.shape.save,
+    damage: ActionSchema.shape.damage,
+    darts: z.string().min(1).max(20).optional(),
+    pitFeet: z.number().int().min(5).max(500).optional(),
+    /** A Huge or larger creature succeeds on the save automatically (a falling Net). */
+    hugeSucceeds: z.literal(true).optional()
+  })
+  .strict();
+export type TrapTier = z.infer<typeof TrapTierSchema>;
+
+/**
+ * What a trap does on the map (`traps.ts`): what sets it off (`enter`: a creature moving onto its area, a pressure plate
+ * or a trip wire; `enter-or-start`: also a creature starting its turn there; `manual`: the GM, for a lock or a door),
+ * whom it acts on (the creature that set it off, or each creature in its blast), whether it resets at the start of the
+ * next turn and how often, and what it leaves (rubble that is Difficult Terrain, an open pit, a fallen Net).
+ */
+export const TrapMechanicsSchema = z
+  .object({
+    severity: z.enum(["nuisance", "deadly"]),
+    trigger: z.enum(["enter", "enter-or-start", "manual"]),
+    targets: z.enum(["triggerer", "area"]),
+    resets: z
+      .object({ maxActivations: z.number().int().min(1).max(100).optional() })
+      .strict()
+      .optional(),
+    rubble: z.literal(true).optional(),
+    pit: z.literal(true).optional(),
+    /** Once found, it is stepped over or avoided with no check (a trip wire), so it no longer goes off. */
+    avoidable: z.literal(true).optional(),
+    /** It acts somewhere other than where it is set off (a statue's Cone, the darts' path), which the GM marks. */
+    blast: z.literal(true).optional(),
+    /** It rolls Initiative and acts on its own turns once set off (Rolling Stone), which the GM runs. */
+    rolls: z.literal(true).optional(),
+    detect: z.array(TrapDetectSchema).min(1).max(3),
+    disarm: z.array(TrapDisarmSchema).max(3),
+    tiers: z.array(TrapTierSchema).min(1).max(4)
+  })
+  .strict();
+export type TrapMechanics = z.infer<typeof TrapMechanicsSchema>;
+
+/** One record of the SRD 5.2.1 Gameplay Toolbox (`toolbox.v1.json`): a trap, a poison, an environmental effect, a
+ *  contagion, a curse or one of the chapter's other sections, with its text from the vendored chapter. A trap carries
+ *  its mechanics; a poison names the consumable it is (`poisons.v1.json`). */
+export const ToolboxRecordSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    name: z.string().min(1).max(80),
+    kind: z.enum(["trap", "poison", "environment", "contagion", "curse", "section"]),
+    section: z.string().min(1).max(80),
+    subtitle: z.string().min(1).max(80).nullable(),
+    description: z.string().min(1).max(20000),
+    trap: TrapMechanicsSchema.optional(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .optional()
+  })
+  .strict();
+export type ToolboxRecord = z.infer<typeof ToolboxRecordSchema>;
 
 export const ContentAttributionSchema = z.object({
   license: z.literal("CC-BY-4.0"),

@@ -218,6 +218,8 @@ export type ActionResolution = Readonly<{
   warnings?: readonly string[];
   /** Lines for the whole table to read (an accomplished push, the save a Topple forced); see `ActionTableNarration`. */
   tableNarration?: readonly ActionTableNarration[];
+  /** What the action let its user sense, for whoever took it alone (Find Traps: a trap's nature, never where it is). */
+  sensed?: readonly string[];
   /** Present when the GM overrode a strict-mode rejection; the override is logged and journaled. */
   overridden?: Readonly<{ rule: string; reason: string }> | null;
   /** Hit points the action restored (Cure Wounds): the one roll, and what each target regained, capped at its maximum. */
@@ -1017,6 +1019,10 @@ export const ActorMovementReplySchema = z.strictObject({
   burrowsThroughWalls: z.enum(["free", "half"]).optional(),
   /** Difficult Terrain costs it nothing extra (Freedom of Movement). */
   ignoresDifficultTerrain: z.boolean().optional(),
+  /** It moves across painted water as if it were solid ground (Water Walk, a Monk's Acrobatic Movement on its turn). */
+  walksOnWater: z.boolean().optional(),
+  /** It can't pass through liquid (a vampire's mist), so painted water bars its way on the ground. */
+  barredByWater: z.boolean().optional(),
   /** It is on the Border Ethereal: the walls and creatures of the world it left are no obstacle, and it may rise or
    *  descend, each foot up or down costing an extra foot (Etherealness). */
   ethereal: z.boolean().optional(),
@@ -1162,6 +1168,8 @@ export type WallAddResult = MutationResult & { wallIds?: readonly string[] };
 export type LightAddResult = MutationResult & { lightId?: string };
 /** What working on a door came to: the line the table reads, and whether the door came open. */
 export type DoorUseResult = MutationResult & { text?: string; opened?: boolean };
+/** A disarm: what happened, as the table heard it. The trap's DC never reaches a player. */
+export type TrapDisarmResult = MutationResult & { text?: string };
 /** An attack on an object: hit or miss, and whether it broke. A player is told neither the object's Armor Class nor
  *  the Hit Points it has left. */
 export type ObjectAttackResult = MutationResult & {

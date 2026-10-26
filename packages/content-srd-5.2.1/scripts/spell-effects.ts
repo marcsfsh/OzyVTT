@@ -2515,6 +2515,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "targets",
     duration: { type: "manual" }
   }),
+  // "Move across any liquid surface ... as if it were harmless solid ground": painted water costs no swimming and its
+  // dangers don't reach the creature; a Bonus Action passes into the liquid and back (Pass the Surface).
+  "water-walk": spellGrant({
+    name: "Water Walk",
+    tags: ["water-walking"],
+    target: "targets",
+    duration: { type: "manual" }
+  }),
   // "Any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a Wisdom
   // saving throw or either choose a new target or lose the attack or spell", and it ends "if the warded creature
   // makes an attack roll, casts a spell, or deals damage".
@@ -3646,6 +3654,8 @@ export function spellEffectFor(
     ...(id === "sorcerous-burst" ? { explodingDice: true as const } : {}),
     ...(id === "teleport" ? { teleportOutcome: true as const } : {}),
     ...(id === "identify" ? { identifiesItem: true as const } : {}),
+    // "You sense any trap within range that is within line of sight": the traps the map holds, by their nature.
+    ...(id === "find-traps" ? { sensesTraps: { feet: 120 } } : {}),
     ...(id === "wish" ? { wishUses: true as const } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
