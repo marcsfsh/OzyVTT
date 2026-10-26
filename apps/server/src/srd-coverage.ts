@@ -594,9 +594,17 @@ function classify(): Readonly<{ rows: CoverageRow[]; ledger: ComputedLedger }> {
   // The toolbox's poisons are gear, above; its other records are curated.
   for (const record of loadToolbox().filter((entry) => entry.kind !== "poison"))
     rows.push(curatedRow("Gameplay Toolbox", record.id, record.name, TOOLBOX_COVERAGE[record.id]));
-  // A section's name repeats across chapters ("Ability Checks"), so the chapter is named with it.
+  // A section's name repeats across chapters ("Ability Checks"), so the chapter is named with it. The page keeps to
+  // straight quotes, and the SRD prints one heading with a curly apostrophe.
   for (const rule of loadRules())
-    rows.push(curatedRow("Rules chapters", rule.id, `${rule.name} (${rule.ruleset})`, RULES_COVERAGE[rule.id]));
+    rows.push(
+      curatedRow(
+        "Rules chapters",
+        rule.id,
+        `${rule.name.replace(/\u2019/g, "'")} (${rule.ruleset})`,
+        RULES_COVERAGE[rule.id]
+      )
+    );
   for (const skill of loadSkills())
     rows.push({
       group: "Skills",
