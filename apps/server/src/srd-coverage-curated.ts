@@ -1400,6 +1400,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:beast-spells": enforced(
     "transform/rules.ts lets a Druid 18 cast spells in a Wild Shape form, except one whose Material component has a cost or is consumed."
   ),
+  "feature:natures-sanctuary": guided(
+    "The Magic action spends a use of Wild Shape and leaves its 15-foot Cube for 1 minute, ending at once when the Druid has the Incapacitated condition or dies (zone-auras.ts). The Druid and its allies in the Cube have Half Cover there, the best of it and the map's cover counting, and the Resistance of the Druid's current Nature's Ward. The Bonus Action move of the Cube up to 60 feet is the GM's to drag."
+  ),
   "feature:lands-aid": enforced(
     "A use of Wild Shape is spent, and the Sphere centres within 60 feet of the Druid (commands/actions.ts for a placed area, resolution/action-targets.ts for picked creatures). Its creatures save against the spell save DC for the Necrotic damage, and the one creature picked in the area regains its own 2d6 Hit Points, 3d6 at Druid 10 and 4d6 at 14 (resolution/area-heal.ts). A placed area catches every creature under it, so leaving one out of the save is the GM's."
   ),
@@ -1929,6 +1932,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:remove-curse": enforced(
     "resolution/dispel.ts ends every effect marked a curse on the target (Hex, Bestow Curse, Geas), and breaks its Attunement to a cursed item so the item can be removed; the item's own curse stays. A curse the app doesn't track is the GM's."
+  ),
+  "spell:reverse-gravity": enforced(
+    "Each creature in the 50-foot Cylinder that fails the Dexterity save falls up to its top, 100 feet, and hangs there while the spell lasts (falling.ts); a creature that comes into the Cylinder later makes the save the same way (spell-zones.ts). When the spell ends they fall, taking the falling damage and landing Prone. A ceiling lower than the top, and the objects in the area, are the GM's."
   ),
   "spell:regenerate": enforced(
     "The 4d8 + 15 Hit Points are applied to one creature, which regains 1 Hit Point at the start of each of its turns for the hour (turn-boundaries.ts). Regrowing severed parts is the GM's."

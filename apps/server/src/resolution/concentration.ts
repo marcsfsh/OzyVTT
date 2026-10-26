@@ -1,7 +1,8 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { spellDurationAt, spellSpanOf } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { EffectInstance, SpellZone } from "@vtt/domain";
-import { catalogIdOf, MAX_EFFECT_MINUTES, type SaveFailureDuration } from "@vtt/schemas";
+import { catalogIdOf, MAX_EFFECT_MINUTES, type ActorDefinition, type SaveFailureDuration } from "@vtt/schemas";
+import { holdsFeature } from "../class-features.js";
 import {
   addEffect,
   CONCENTRATING_TAG,
@@ -361,11 +362,30 @@ function spellcastingModifier(ctx: ResolveContext): number {
   return ability ? abilityModifier(ctx.deps.definition, ability) : 0;
 }
 
+/** SRD Nature's Ward: "Resistance to a damage type associated with your current land choice": Fire for Arid, Cold for
+ *  Polar, Lightning for Temperate and Poison for Tropical. */
+const LAND_RESISTANCES: Readonly<Record<string, string>> = {
+  arid: "fire",
+  polar: "cold",
+  temperate: "lightning",
+  tropical: "poison"
+};
+
+/** The damage type a Circle of the Land Druid's Nature's Ward resists now, from its current land; undefined without
+ *  the feature or a land. */
+function naturesWardOf(definition: ActorDefinition | undefined): string | undefined {
+  if (!holdsFeature(definition, "natures-ward", "Nature's Ward")) return undefined;
+  const land = (definition?.character?.choices ?? []).find(
+    (choice) => choice.payload?.featureId === "circle-of-the-land-spells"
+  )?.id;
+  return land ? LAND_RESISTANCES[land] : undefined;
+}
+
 /**
- * An item's action that leaves an area acting on creatures later (spread Caltrops, spilled Ball Bearings, a set Hunting
+ * An item's or a feature's action that leaves an area acting on creatures later (spread Caltrops, spilled Ball Bearings, a set Hunting
  * Trap): its zone, carrying the action's own save and damage, on the area placed with it. Nothing is rolled as it is
- * set down, and it stays until the GM ends it (the items gathered up) or it goes off once. Returns whether it opened
- * one.
+ * set down, and it stays until the GM ends it (the items gathered up) or it goes off once; a feature's area (Nature's
+ * Sanctuary) lasts its rounds. Returns whether it opened one.
  */
 export function openActionZone(ctx: ResolveContext): boolean {
   const { state, attacker, input, action, deps } = ctx;
@@ -435,6 +455,10 @@ export function openActionZone(ctx: ResolveContext): boolean {
     ...(trigger.stays && casterAt ? { anchor: { x: casterAt.x, y: casterAt.y } } : {}),
     // Spilled oil waits for fire to reach it.
     ...(trigger.kindled ? { flammable: true as const } : {}),
+    // Nature's Sanctuary shares the Resistance its Druid's land gives.
+    ...(trigger.naturesWard && naturesWardOf(ctx.deps.definition)
+      ? { damageType: naturesWardOf(ctx.deps.definition)! }
+      : {}),
     ...(state.combat.timeStop?.actorId === attacker.id ? { inTimeStop: true as const } : {}),
     entered: [],
     affected: []

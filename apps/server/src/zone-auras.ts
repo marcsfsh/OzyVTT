@@ -1,5 +1,7 @@
 import type { GameState, SpellZone } from "@vtt/domain";
 import type { EffectInstance } from "@vtt/schemas";
+import { isIncapacitated } from "./condition-rules.js";
+import { COVER_TAGS } from "./cover.js";
 import { addEffect, endEffectIfPresent, KEEPS_MAXIMUM_TAG, makeEffect, NO_SPELLS_TAG } from "./effects.js";
 import { ANTIMAGIC_TAG, suppressedByAntimagic, underAntimagic, WINKED_OUT_TAG } from "./antimagic.js";
 import { refreshArmorClass } from "./held-items.js";
@@ -118,6 +120,7 @@ function wanted(state: GameState, deps: Deps): Map<string, Map<string, EffectIns
           tags: [
             ZONE_AURA_TAG,
             ...(holds.keepsMaximum ? [KEEPS_MAXIMUM_TAG] : []),
+            ...(holds.cover ? [COVER_TAGS[holds.cover]] : []),
             // No spell or Magic action inside an Antimagic Field, and its magic suppressed.
             ...(content.trigger.antimagic ? [ANTIMAGIC_TAG, NO_SPELLS_TAG] : [])
           ],
@@ -146,10 +149,15 @@ function wanted(state: GameState, deps: Deps): Map<string, Map<string, EffectIns
 }
 
 /** The areas that end now because their caster stands outside (Tiny Hut: "The spell ends early if you leave the
- *  Emanation"). */
+ *  Emanation"), or because their user is Incapacitated or dead (Nature's Sanctuary: "until you have the
+ *  Incapacitated condition or die"). */
 function casterLeft(state: GameState, deps: Deps): string[] {
   return liveZones(state).flatMap((zone) => {
     const content = zoneContentOf(zone, deps.catalog);
+    if (content?.trigger.endsWhenUserIncapacitated) {
+      const user = state.actors.find((actor) => actor.id === zone.casterId);
+      if (!user || user.hp.current <= 0 || isIncapacitated(user)) return [zone.id];
+    }
     if (!content?.trigger.endsWhenCasterLeaves) return [];
     const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     const token = state.combat.tokens.find((candidate) => candidate.actorId === zone.casterId);

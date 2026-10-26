@@ -4483,6 +4483,8 @@ export const AreaHoldsSchema = z
     keepsMaximum: z.literal(true).optional(),
     /** A bonus to Armor Class while inside (a planted Rod of Alertness's +1). */
     armorClassBonus: z.number().int().min(1).max(5).optional(),
+    /** Half Cover while inside, the best of it and the cover the map gives counting (Nature's Sanctuary). */
+    cover: z.literal("half").optional(),
     struck: StruckSchema.omit({ save: true })
       .extend({
         save: z
@@ -4778,6 +4780,11 @@ const AreaTriggerFields = z
     exclusive: z.literal(true).optional(),
     /** The spell ends when its caster is outside it (Tiny Hut: "The spell ends early if you leave the Emanation"). */
     endsWhenCasterLeaves: z.literal(true).optional(),
+    /** It ends when its user has the Incapacitated condition or dies (Nature's Sanctuary). */
+    endsWhenUserIncapacitated: z.literal(true).optional(),
+    /** The damage type its holds' `chosenDamage` reads is its user's current Nature's Ward Resistance, from the land the
+     *  Druid chose (Nature's Sanctuary: "your allies gain the current Resistance of your Nature's Ward there"). */
+    naturesWard: z.literal(true).optional(),
     /** Its edge is a dark and foggy barrier that sight can't pass (Private Sanctum), or that only those inside see out
      *  through (`oneWay`: Tiny Hut, "opaque from the outside ... transparent from the inside"). */
     veil: z

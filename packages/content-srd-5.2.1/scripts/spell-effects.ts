@@ -1585,6 +1585,24 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   // plants stay overgrown, so the area stays until the GM ends it.
   // "You can exclude one or more areas of any size within the spell's area from being affected": each 10-foot square
   // the caster leaves out as it casts.
+  // "All creatures and objects in that area that aren't anchored to the ground fall upward and reach the top of the
+  // Cylinder", a creature that succeeds on the Dexterity save having caught hold of something fixed; one that comes into
+  // the Cylinder later falls up the same way (`falling.ts` lifts and drops them).
+  "reverse-gravity": [
+    {
+      name: "pull",
+      activation: "other",
+      when: "A creature that enters the Cylinder makes the Dexterity save or falls upward to its top, staying there until the spell ends.",
+      save: {
+        ability: "dex",
+        successDamage: "none",
+        failureConditions: [],
+        failureEffect: { name: "Fallen upward", tags: ["gravity-reversed"], modifiers: [] }
+      },
+      damage: [],
+      zone: { on: ["enter"] }
+    }
+  ],
   "plant-growth": [
     lasting("ground", "A creature moving through the overgrown area spends 4 feet of movement for every foot.", {
       on: [],
@@ -3082,6 +3100,9 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   // "A shimmering sphere encloses a Large or smaller creature or object": nothing passes its wall, in or out, and
   // Disintegrate destroys it (`enclosures.ts`). Rolling the sphere along is the GM's.
   "resilient-sphere": { name: "Resilient Sphere", tags: ["enclosed"], modifiers: [] },
+  // "Fall upward and reach the top of the area ... it remains there, oscillating slightly, for the duration", and "When
+  // the spell ends, affected objects and creatures fall downward" (`falling.ts`).
+  "reverse-gravity": { name: "Fallen upward", tags: ["gravity-reversed"], modifiers: [] },
   // "Become cursed for the duration" with the curse the caster picks, which Remove Curse ends: Disadvantage on one
   // ability's checks and saves, Disadvantage on attack rolls against the caster, the Wisdom save each turn (the GM's to
   // ask), or an extra 1d8 Necrotic when the caster's attack hits it.
@@ -3492,9 +3513,14 @@ const CAST_DISPELS: Readonly<Record<string, NonNullable<SpellEffect["dispel"]>>>
 const CAST_ENDS_CURSES: ReadonlySet<string> = new Set(["remove-curse"]);
 
 /** Concentration spells that keep a part of their own besides what they leave on creatures, so they don't end when no
- *  creature is affected any more: Entangle's tangled ground, an earthquake's shaking ground and fissures, and the storm
- *  cloud of Storm of Vengeance. */
-const PERSISTS_WITHOUT_TARGETS: ReadonlySet<string> = new Set(["earthquake", "entangle", "storm-of-vengeance"]);
+ *  creature is affected any more: Entangle's tangled ground, an earthquake's shaking ground and fissures, Reverse
+ *  Gravity's Cylinder, and the storm cloud of Storm of Vengeance. */
+const PERSISTS_WITHOUT_TARGETS: ReadonlySet<string> = new Set([
+  "earthquake",
+  "entangle",
+  "reverse-gravity",
+  "storm-of-vengeance"
+]);
 
 /** Areas the text gives no template shape for (a wall, a thing placed at a point), so the GM can place them on the
  *  map: a straight wall as a Line as long and thick as the text's (5 feet wide when thinner; a ringed or bent one is
