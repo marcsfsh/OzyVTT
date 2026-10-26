@@ -8961,7 +8961,13 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "grease",
+    "consumesSpellSlot": false,
+    "lastsMinutes": 480
+   }
+  ],
   "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],

@@ -17441,6 +17441,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "identifiesItem": true,
    "healing": null
   },
   "classes": [
@@ -28623,6 +28624,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "teleportOutcome": true,
    "targets": {
     "count": 9
    },
@@ -29458,7 +29460,46 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "True Strike",
+    "tags": [
+     "true-strike"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "until-source-turn-end"
+    },
+    "bindsWeapon": {
+     "needsProficiency": true,
+     "attacksNow": true,
+     "ability": "spellcasting",
+     "damageTypes": [
+      "radiant"
+     ],
+     "extraDamage": {
+      "type": "radiant",
+      "dice": [
+       {
+        "level": 5,
+        "formula": "1d6"
+       },
+       {
+        "level": 11,
+        "formula": "2d6"
+       },
+       {
+        "level": 17,
+        "formula": "3d6"
+       }
+      ]
+     }
+    }
+   }
   },
   "classes": [
    "bard",
@@ -31202,6 +31243,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "acid",
+    "bludgeoning",
+    "cold",
+    "fire",
+    "force",
+    "lightning",
+    "necrotic",
+    "piercing",
+    "poison",
+    "psychic",
+    "radiant",
+    "slashing",
+    "thunder"
+   ],
+   "wishUses": true,
+   "targets": {
+    "count": 20
+   },
    "healing": null
   },
   "classes": [
