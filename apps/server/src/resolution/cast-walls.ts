@@ -233,7 +233,8 @@ export function applyCastWalls(ctx: ResolveContext): void {
             ...(keeper.castId ? { castId: keeper.castId } : {}),
             ...(keeper.effectId ? { effectId: keeper.effectId } : {})
           }
-        : undefined
+        : undefined,
+      state.combat.tokens.find((token) => token.actorId === attacker.id)?.position ?? undefined
     );
     told(`A passage opens through the wall.`);
   }

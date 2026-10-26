@@ -2415,8 +2415,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:arcane-lock": enforced(
     "Aimed at a door on the map the caster touches, it locks the door against everyone but the caster and the creatures named as the cast's targets (doors.ts). Thieves' Tools can't pick it, a Strength check can't force it, and Knock holds it off for 10 minutes. The password and the higher DC to break it are the GM's."
   ),
-  "spell:passwall": guided(
-    "Aimed at a wall on the map within 30 feet that the caster sees, it cuts a 5-foot passage that sight and movement pass through for the hour (spell-walls.ts). Moving the creatures still in the passage when it closes is the GM's."
+  "spell:passwall": enforced(
+    "Aimed at a wall on the map within 30 feet that the caster sees, it cuts a 5-foot passage that sight and movement pass through for the hour (spell-walls.ts). When it closes, a creature still in the passage is moved out to the nearest unoccupied space on the side it was cut from. Whether a surface is wood, plaster or stone is the GM's, since the map's walls carry no material."
   ),
   "spell:stone-shape": guided(
     "Aimed at a door on the map the caster touches, it seals the door shut so that no check opens it; aimed at a wall, it cuts a lasting 5-foot passage through it (spell-walls.ts, doors.ts). The other shapes it makes are the GM's."

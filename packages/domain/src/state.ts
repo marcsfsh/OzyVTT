@@ -1200,12 +1200,14 @@ export const DoorStateSchema = z
 export type DoorState = z.infer<typeof DoorStateSchema>;
 
 /** A gap cut in a wall (Passwall's passage, a tunnel): the part from `from` to `to` along it, as fractions of its length
- *  from `a`, lets sight and movement through. With a `source` it closes again when that ends. */
+ *  from `a`, lets sight and movement through. With a `source` it closes again when that ends, and a creature still in
+ *  it then goes out to the side of `entry`, the point it was cut from. */
 export const WallOpeningSchema = z
   .object({
     from: z.number().min(0).max(1),
     to: z.number().min(0).max(1),
-    source: VisionSourceSchema.optional()
+    source: VisionSourceSchema.optional(),
+    entry: VisionPointSchema.optional()
   })
   .strict();
 export type WallOpening = z.infer<typeof WallOpeningSchema>;
