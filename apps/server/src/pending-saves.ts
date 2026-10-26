@@ -49,7 +49,7 @@ export function createPendingSaves(
     >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
-    /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
+    /** A success makes the target immune to this trait of its source (a ghast's Stench). */
     immuneOnSuccess?: boolean;
     /** How long that immunity lasts on the game clock, in minutes; absent, the fight. */
     immuneMinutes?: number;

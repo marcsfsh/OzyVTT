@@ -378,6 +378,16 @@ of a hidden thing. When in doubt, leave it out.
   farther from the source (`compelledMoves`); a levitation (`levitating`) lifts its creature 20 feet,
   which then moves only as if climbing; and a creature that ends its turn in another's space, unless
   Tiny or larger, falls Prone (`occupied-space.ts`).
+- Compelled moves on the creature's own turns (`compelled-moves.ts`): an effect's `compelled` rule (Fear,
+  Command's Flee, Eyebite's Panicked, Antipathy/Sympathy, a Symbol of Fear, Turn Undead, a Mace of Terror,
+  Compulsion, Confusion's and Gibbering's wander) binds each of its bearer's moves away from or toward its
+  source or a point, or along a heading, with all its movement, at least so far, or after a Dash
+  (`movement.compelled`). A player's End Turn waits until the move is made; the GM passes the turn of a
+  creature with nowhere to move. A heading is named later (Compulsion's Bonus Action, `setsHeading`) or rolled
+  as the turn starts (`random-outcomes.ts`, which also rolls the creature within reach a forced attack must
+  swing at, `forcedAttack`). A failed save can also carry the space it moves its creature to and the height it
+  lifts it (`failureMovesTo`, Telekinesis), checked against the move's reach and the action's range before
+  anything rolls.
 - Off the plane (`off-plane.ts`): an effect tagged `off-plane` (Banishment, Maze, Imprisonment, Hurl
   Through Hell, Rope Trick, Meld into Stone, a Robe of Stars, a Portable Hole folded shut, an Iron Flask)
   takes its creature off the map in the settle step, keeping its place in the initiative and the space it
@@ -607,6 +617,20 @@ only affects creatures ends once no living creature keeps any of it and no save 
 (`endIdleConcentration` in `effects.ts`). A spell area's step can also come at its caster's turn start
 (Faithful Hound's bite) or when the spell ends (Delayed Blast Fireball's bead): the command that ends
 such a spell leaves its area bursting, and the pipeline runs the burst right after it commits.
+
+Curses, possession and the spells that cure them read tags on the effect. An effect tagged `curse` (Hex, Bestow
+Curse, Geas, a lycanthrope's bite, a lamia's touch) is ended by Remove Curse, and a content test holds every text
+that curses its target to the tag. Greater Restoration's pick (`resolution/restoration.ts`) ends one harm: an
+Exhaustion level, Charmed or Petrified, one curse with a cursed Attunement, an `ability-drain`, a `drained` Hit Point
+maximum, or an effect tagged `restorable` whose own text names it; `cured-by-<spell>` lets another spell end one by
+name (Heal and Befuddlement), and Wish's Instant Health ends all of them. An effect tagged `possessed` (a ghost's
+Possession) is kept off a creature by a `conditionWards` with `possession` (Protection from Evil and Good, Magic
+Circle, Hallow), which also gives Advantage on a new save against such a creature's held effect; Dispel Evil and
+Good's Break Enchantment ends what those types charmed, frightened or possessed the creature with
+(`resolution/break-enchantment.ts`). A creature a lycanthrope's curse turns at 0 Hit Points is tagged
+`gm-controlled`: it fights against the party and only the GM commands it. The immunity a successful save earns
+(`immuneOnSuccess`) lasts its printed `immuneMinutes` on the game clock, or the fight when the text names no time
+(`save-immunity.ts`).
 
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
 `packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and
