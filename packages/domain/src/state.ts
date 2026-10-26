@@ -1210,6 +1210,8 @@ export const DoorStateSchema = z
       .object({
         casterId: z.uuid(),
         allowedIds: z.array(z.uuid()).max(20).default([]),
+        /** The spell that keeps it, when it lasts only as long as that does (Guards and Wards' 24 hours). */
+        source: VisionSourceSchema.optional(),
         /** Knock suppresses it for 10 minutes: through this round of the fight, and to this game-clock minute. */
         suppressed: z
           .object({

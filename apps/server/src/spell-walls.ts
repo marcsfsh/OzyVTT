@@ -228,12 +228,24 @@ function wallStays(state: GameState, wall: VisionWall): VisionWall | null {
  *  table reads. */
 export function pruneEndedWalls(state: GameState): EffectNarration[] {
   const vision = state.combat.vision;
-  if (!vision.walls.some((wall) => wall.source !== undefined || wall.openings?.some((gap) => gap.source))) return [];
+  if (
+    !vision.walls.some(
+      (wall) => wall.source !== undefined || wall.openings?.some((gap) => gap.source) || wall.door?.arcaneLock?.source
+    )
+  )
+    return [];
   let changed = false;
   const closing: Array<readonly [VisionWall, WallOpening]> = [];
   const walls = vision.walls.flatMap((wall) => {
     let next: VisionWall | null = wall.source ? wallStays(state, wall) : wall;
     if (next !== wall) changed = true;
+    // A lock kept by a spell that has ended (Guards and Wards) opens.
+    const lock = next?.door?.arcaneLock;
+    if (next?.door && lock?.source && !sourceLive(state, lock.source)) {
+      const { arcaneLock: _lock, ...door } = next.door;
+      next = { ...next, door };
+      changed = true;
+    }
     if (next?.openings?.some((gap) => !sourceLive(state, gap.source))) {
       const openings = next.openings.filter((gap) => sourceLive(state, gap.source));
       for (const gap of next.openings) if (!openings.includes(gap)) closing.push([next, gap]);

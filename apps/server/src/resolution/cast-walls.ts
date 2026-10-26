@@ -1,5 +1,6 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { VisionWall } from "@vtt/domain";
+import { areAllies } from "../creature-sides.js";
 import { arcaneLock, heldShutAgainst, isHiddenDoor, knockOn } from "../doors.js";
 import { addEffect, makeEffect } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
@@ -177,6 +178,42 @@ export function applyCastWalls(ctx: ResolveContext): void {
       ...(ctx.deps.resolveDefinition ? { resolveDefinition: ctx.deps.resolveDefinition } : {})
     });
     for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+  }
+
+  if (walls.locksDoorsInArea && input.placedArea?.shape === "square") {
+    const keeper = keeperOf(ctx, spell);
+    const source = {
+      casterId: attacker.id,
+      spellId: spell.id,
+      level,
+      ...(keeper.castId ? { castId: keeper.castId } : {}),
+      ...(keeper.effectId ? { effectId: keeper.effectId } : {})
+    };
+    const { origin, target } = input.placedArea;
+    const within = (point: Point) =>
+      point.x >= Math.min(origin.x, target.x) &&
+      point.x <= Math.max(origin.x, target.x) &&
+      point.y >= Math.min(origin.y, target.y) &&
+      point.y <= Math.max(origin.y, target.y);
+    const allies = state.actors.filter(
+      (actor) => actor.id !== attacker.id && areAllies(attacker, actor, ctx.deps.resolveDefinition)
+    );
+    const doors = state.combat.vision.walls.filter(
+      (candidate) =>
+        candidate.kind === "door" &&
+        candidate.open !== true &&
+        within({ x: (candidate.a.x + candidate.b.x) / 2, y: (candidate.a.y + candidate.b.y) / 2 })
+    );
+    for (const door of doors)
+      arcaneLock(
+        state,
+        door.id,
+        attacker.id,
+        allies.map((actor) => actor.id),
+        source
+      );
+    if (doors.length > 0)
+      told(`${spell.name} locks ${doors.length === 1 ? "the door" : `the ${doors.length} doors`} in the warded area.`);
   }
 
   if (input.wallId === undefined) return;

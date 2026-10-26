@@ -1,4 +1,4 @@
-import type { DoorFastening, DoorState, GameState, RollVisibility, VisionWall } from "@vtt/domain";
+import type { DoorFastening, DoorState, GameState, RollVisibility, VisionSource, VisionWall } from "@vtt/domain";
 import type { RandomSource } from "@vtt/rules-5e";
 import { catalogIdOf, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { checkPlan, type CheckNames, type CheckPlan } from "./ability-checks.js";
@@ -599,14 +599,20 @@ export function knockOn(state: GameState, wallId: string): string {
 
 /** SRD Arcane Lock: the touched closed door "is locked for the duration", and only the caster and the creatures it
  *  designates open it. */
-export function arcaneLock(state: GameState, wallId: string, casterId: string, allowedIds: readonly string[]): void {
+export function arcaneLock(
+  state: GameState,
+  wallId: string,
+  casterId: string,
+  allowedIds: readonly string[],
+  source?: VisionSource
+): void {
   const wall = requireDoor(state, wallId);
   if (wall.open === true) throw new CommandRejectedError("Arcane Lock takes a closed door. Close it first.");
   writeDoor(state, wallId, (current) => ({
     ...current,
     door: {
       ...(current.door ?? { fastenings: [] }),
-      arcaneLock: { casterId, allowedIds: [...new Set(allowedIds)].slice(0, 20) }
+      arcaneLock: { casterId, allowedIds: [...new Set(allowedIds)].slice(0, 20), ...(source ? { source } : {}) }
     }
   }));
 }

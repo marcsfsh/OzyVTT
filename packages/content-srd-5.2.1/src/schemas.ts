@@ -152,7 +152,11 @@ export const SpellWallsSchema = z
       .object({ feet: z.number().int().min(1).max(20), lasting: z.boolean() })
       .strict()
       .optional(),
-    disintegrates: z.literal(true).optional()
+    disintegrates: z.literal(true).optional(),
+    /** Every door in its placed area is locked as by Arcane Lock for as long as the spell lasts, for its caster and its
+     *  allies (Guards and Wards: "All doors in the warded area are magically locked, as if sealed by the Arcane Lock
+     *  spell"). */
+    locksDoorsInArea: z.literal(true).optional()
   })
   .strict();
 export type SpellWalls = z.infer<typeof SpellWallsSchema>;

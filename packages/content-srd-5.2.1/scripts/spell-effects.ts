@@ -3569,6 +3569,8 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "fire-storm": { shape: "cube", sizeFeet: 10, widthFeet: null, count: 10, contiguous: true },
   // "Four different points ... Each creature in a 40-foot-radius Sphere centered on each of those points."
   "meteor-swarm": { shape: "sphere", sizeFeet: 40, widthFeet: null, count: 4 },
+  // "Up to 2,500 square feet ... (the area of a 50-foot square)".
+  "guards-and-wards": { shape: "cube", sizeFeet: 50, widthFeet: null },
   // "Up to 40,000 square feet of floor space": a 200-foot square.
   forbiddance: { shape: "cube", sizeFeet: 200, widthFeet: null },
   // The hound and the 5 feet it bites in.

@@ -46,6 +46,9 @@ const SPELL_WALLS: Readonly<Record<string, SpellWalls>> = {
   knock: { door: "knock" },
   // "You touch a closed door ... and magically lock it."
   "arcane-lock": { door: "arcane-lock" },
+  // "All doors in the warded area are magically locked, as if sealed by the Arcane Lock spell", for the caster and the
+  // creatures it names (its allies here), until the 24 hours are up.
+  "guards-and-wards": { locksDoorsInArea: true },
   // "open an unlocked door or container".
   "mage-hand": { door: "open-or-close" },
   // Invisible Hand: "an unlocked door or window to fly open or slam shut".
