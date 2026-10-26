@@ -129,7 +129,8 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     }
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
     for (const term of rolled.terms)
-      if (term.kind === "dice") for (const die of term.dice) if (die.kept && die.face === term.sides) maxed.push(term.sides);
+      if (term.kind === "dice")
+        for (const die of term.dice) if (die.kept && die.face === term.sides) maxed.push(term.sides);
   });
   explodeDice(ctx, dice, maxed);
 }
@@ -386,7 +387,11 @@ export function spendDamageUses(ctx: ResolveContext): void {
 export const RIDER_TYPE_PREFIX = "rider-type:";
 
 /** The type picked on this hit for an effect's extra damage, when the effect lets it be picked. */
-export function pickedRiderType(ctx: ResolveContext, effectId: string | undefined, types: readonly string[] | undefined) {
+export function pickedRiderType(
+  ctx: ResolveContext,
+  effectId: string | undefined,
+  types: readonly string[] | undefined
+) {
   if (effectId === undefined || !types) return undefined;
   const choice = (ctx.input.hitOptions ?? []).find((entry) => entry.id === `${RIDER_TYPE_PREFIX}${effectId}`);
   return choice?.damageType && types.includes(choice.damageType) ? choice.damageType : undefined;

@@ -290,7 +290,11 @@ export function settleEndingSave(
   const bearer = state.actors.find((actor) => actor.id === reference.actorId);
   const effect = bearer?.effects.find((candidate) => candidate.id === reference.effectId);
   if (!bearer || !effect) return [];
-  const repeat = reference.repeat ? effect.repeatSave : (effect.repeatSave?.timing === "source-turn-start" ? effect.repeatSave : undefined);
+  const repeat = reference.repeat
+    ? effect.repeatSave
+    : effect.repeatSave?.timing === "source-turn-start"
+      ? effect.repeatSave
+      : undefined;
   if (repeat?.failureTurnTags) return success ? [] : compelledTurn(state, bearer, effect, repeat.failureTurnTags, id);
   if (!repeat) return success ? endEffectIfPresent(state, bearer.id, effect.id) : [];
   const tally = repeat.tally;
@@ -394,7 +398,12 @@ function compelledTurn(
     events
   );
   return [
-    { kind: "condition", text: `${bearer.name} fails: ${effect.name} holds it this turn.`, actorId: bearer.id, ...sourceOf(effect) },
+    {
+      kind: "condition",
+      text: `${bearer.name} fails: ${effect.name} holds it this turn.`,
+      actorId: bearer.id,
+      ...sourceOf(effect)
+    },
     ...events
   ];
 }

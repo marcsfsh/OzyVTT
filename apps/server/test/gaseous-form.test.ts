@@ -157,7 +157,10 @@ describe("Wind Walk", () => {
     expect(formOf(fight, HERO)?.form?.printedId).toBe("cloud");
     expect(formOf(fight, HERO)?.duration).toEqual(spell.duration);
     const transforming = fight.actor(HERO).effects.find((effect) => effect.name === "Transforming into Cloud")!;
-    expect(transforming).toMatchObject({ duration: { type: "rounds", remaining: 10 }, linkedConditionIds: ["stunned"] });
+    expect(transforming).toMatchObject({
+      duration: { type: "rounds", remaining: 10 },
+      linkedConditionIds: ["stunned"]
+    });
   });
 
   it("lowers a cloud still aloft when its form ends, landing it safely within 600 feet and dropping it the rest", () => {

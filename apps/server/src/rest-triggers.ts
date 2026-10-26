@@ -128,7 +128,11 @@ function triggerOnce(
       actor.id,
       { amount, parts, sourceActorId: effect.sourceActorId, sourceName: effect.sourceName ?? effect.name },
       { role: "gm" },
-      { resolveDefinition: deps.resolveDefinition, rollDie: deps.random, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
+      {
+        resolveDefinition: deps.resolveDefinition,
+        rollDie: deps.random,
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      }
     );
     events.push(
       {

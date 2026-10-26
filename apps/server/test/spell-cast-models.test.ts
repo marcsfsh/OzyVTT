@@ -58,20 +58,34 @@ describe("Heat Metal's object", () => {
     foe.inventory = rows.map((row) => ({ quantity: 1, attuned: false, ...row })) as typeof foe.inventory;
     table.resolve("spell-heat-metal", {}, [4, 4]);
     const save = table.state.combat.pendingSaves[0]!;
-    answerSave(table.state, "cmd-heat", save.id, "manual", 1, true, { role: "gm" }, {
-      random: () => 3,
-      newRollId: () => crypto.randomUUID(),
-      sessionId: "30000000-0000-4000-8000-00000000000a",
-      role: "gm",
-      now: () => "2026-10-16T00:00:00.000Z",
-      resolveDefinition: () => undefined
-    });
+    answerSave(
+      table.state,
+      "cmd-heat",
+      save.id,
+      "manual",
+      1,
+      true,
+      { role: "gm" },
+      {
+        random: () => 3,
+        newRollId: () => crypto.randomUUID(),
+        sessionId: "30000000-0000-4000-8000-00000000000a",
+        role: "gm",
+        now: () => "2026-10-16T00:00:00.000Z",
+        resolveDefinition: () => undefined
+      }
+    );
     return table.state.actors.find((actor) => actor.id === FOE)!;
   };
 
   it("is dropped from the hand on a failed save, still carried", () => {
     const foe = heated([
-      { id: "scimitar", name: "Scimitar", equipped: true, weapon: { damageDice: "1d6", damageType: "slashing", properties: [] } }
+      {
+        id: "scimitar",
+        name: "Scimitar",
+        equipped: true,
+        weapon: { damageDice: "1d6", damageType: "slashing", properties: [] }
+      }
     ]);
     expect(foe.inventory).toEqual([expect.objectContaining({ id: "scimitar", equipped: false, quantity: 1 })]);
   });
@@ -82,12 +96,21 @@ describe("Heat Metal's object", () => {
         id: "plate-armor",
         name: "Plate Armor",
         equipped: true,
-        armor: { acBase: 18, addDexModifier: false, dexModifierCap: null, stealthDisadvantage: true, strengthRequired: 15 }
+        armor: {
+          acBase: 18,
+          addDexModifier: false,
+          dexModifierCap: null,
+          stealthDisadvantage: true,
+          strengthRequired: 15
+        }
       }
     ]);
     expect(foe.inventory[0]).toMatchObject({ equipped: true });
     expect(foe.effects).toEqual([
-      expect.objectContaining({ name: "Heat Metal: wearing the red-hot object", duration: expect.objectContaining({ type: "until-source-next-turn" }) })
+      expect.objectContaining({
+        name: "Heat Metal: wearing the red-hot object",
+        duration: expect.objectContaining({ type: "until-source-next-turn" })
+      })
     ]);
   });
 });

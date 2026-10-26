@@ -1,13 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { prismaticSpray } from "./prismatic.js";
 import type { PendingReaction, PendingSave } from "@vtt/domain";
-import {
-  catalogIdOf,
-  DamageTypeSchema,
-  type ActionReaction,
-  type GrantOption,
-  type InventoryItem
-} from "@vtt/schemas";
+import { catalogIdOf, DamageTypeSchema, type ActionReaction, type GrantOption, type InventoryItem } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { commanderOf } from "../authorization.js";
 import { holdsFeature } from "../class-features.js";
@@ -1085,7 +1079,9 @@ export function parkHeldObjectSave(ctx: ResolveContext): void {
       conditionIds: [],
       // A save against a spell, which Magic Resistance meets with Advantage.
       magical: true,
-      ...(heated?.kind === "worn" ? { onFailEffect: { ...keepHold, name: `${name}: wearing the red-hot object` } } : {}),
+      ...(heated?.kind === "worn"
+        ? { onFailEffect: { ...keepHold, name: `${name}: wearing the red-hot object` } }
+        : {}),
       extra: { onSuccessEffect: keepHold, ...failure },
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())

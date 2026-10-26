@@ -240,4 +240,3 @@ describe("Dream", () => {
     expect(actorOf(table.state, FOE).effects.some((effect) => effect.name === "Dream's nightmare")).toBe(false);
   });
 });
-
