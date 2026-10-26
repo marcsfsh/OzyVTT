@@ -7461,7 +7461,22 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "fix",
+    "name": "Fix against a door",
+    "activation": "action",
+    "description": "Press the button with the rod against a closed door within reach: the rod is fixed in place and holds the door shut until a creature pushes the button again or moves it with a DC 30 Strength (Athletics) check.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "doorWork": {
+     "does": "fix-rod"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7487,7 +7502,50 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "grow",
+    "name": "Grow the Tower",
+    "activation": "action",
+    "description": "Place the statuette on the ground and speak its command word: it grows into a 20-foot-square adamantine tower, 30 feet high, pushing each creature in its area to a space just outside it. Its single door, on the side facing you, opens only at your command (a Bonus Action) and is immune to Knock. The walls and door have AC 20, 100 Hit Points, Immunity to Bludgeoning, Piercing and Slashing damage except from siege equipment, and Resistance to all other damage.",
+    "damage": [],
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 20,
+     "widthFeet": null
+    },
+    "raisesTower": {
+     "panel": {
+      "name": "Tower wall",
+      "armorClass": 20,
+      "hitPoints": 100,
+      "immunities": [
+       "bludgeoning",
+       "piercing",
+       "slashing"
+      ],
+      "resistances": [
+       "acid",
+       "cold",
+       "fire",
+       "force",
+       "lightning",
+       "necrotic",
+       "radiant",
+       "thunder"
+      ]
+     }
+    }
+   },
+   {
+    "id": "shrink",
+    "name": "Shrink the Tower",
+    "activation": "action",
+    "description": "Repeat the command word: the tower shrinks back to a statuette, which works only if it is empty.",
+    "damage": [],
+    "dismissesTower": true
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -12731,6 +12789,71 @@
      "rangeFeet": 60,
      "bonus": 7
     }
+   },
+   {
+    "id": "break-1",
+    "name": "Break a door (1 charge)",
+    "activation": "action",
+    "description": "Expend 1 charge: the ring makes a Strength check with a +5 bonus to break open a door you can see within 60 feet.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "ring-of-the-ram-charges"
+    },
+    "doorWork": {
+     "does": "force",
+     "bonus": 5
+    }
+   },
+   {
+    "id": "break-2",
+    "name": "Break a door (2 charges)",
+    "activation": "action",
+    "description": "Expend 2 charges: the ring makes a Strength check with a +10 bonus to break open a door you can see within 60 feet.",
+    "damage": [],
+    "useCost": 2,
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "ring-of-the-ram-charges"
+    },
+    "doorWork": {
+     "does": "force",
+     "bonus": 10
+    }
+   },
+   {
+    "id": "break-3",
+    "name": "Break a door (3 charges)",
+    "activation": "action",
+    "description": "Expend 3 charges: the ring makes a Strength check with a +15 bonus to break open a door you can see within 60 feet.",
+    "damage": [],
+    "useCost": 3,
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "ring-of-the-ram-charges"
+    },
+    "doorWork": {
+     "does": "force",
+     "bonus": 15
+    }
    }
   ],
   "effects": [],
@@ -14361,9 +14484,33 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "starting": "1d6 + 1"
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "glue",
+    "name": "Glue a door shut",
+    "activation": "action",
+    "description": "Apply an ounce to a closed door within reach. In a minute the glue sets, and nothing but Universal Solvent, Oil of Etherealness or a Wish undoes the bond.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "uses": {
+     "limit": 7,
+     "per": "never",
+     "pool": "sovereign-glue-ounces"
+    },
+    "doorWork": {
+     "does": "glue"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -16505,6 +16652,12 @@
      "sizeFeet": 30,
      "widthFeet": null
     },
+    "objectDamage": [
+     {
+      "formula": "3d8",
+      "type": "thunder"
+     }
+    ],
     "save": {
      "ability": "str",
      "dc": 15,
@@ -16529,6 +16682,17 @@
      "sizeFeet": 50,
      "widthFeet": null
     },
+    "objectDamage": [
+     {
+      "formula": "50",
+      "type": "bludgeoning"
+     }
+    ],
+    "concentrationSave": {
+     "ability": "con",
+     "dc": 20
+    },
+    "grounded": true,
     "save": {
      "ability": "dex",
      "dc": 20,
@@ -16731,9 +16895,33 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "starting": "1d6 + 1"
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "dissolve",
+    "name": "Dissolve glue on a door",
+    "activation": "action",
+    "description": "Pour an ounce onto a door within reach: it dissolves the glue that holds it, Sovereign Glue included.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "uses": {
+     "limit": 7,
+     "per": "never",
+     "pool": "universal-solvent-ounces"
+    },
+    "doorWork": {
+     "does": "dissolve"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -17364,6 +17552,9 @@
      "limit": 3,
      "per": "long-rest",
      "pool": "wand-of-secrets-charges"
+    },
+    "pointsAtHidden": {
+     "feet": 60
     }
    }
   ],

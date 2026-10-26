@@ -1194,6 +1194,37 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "field",
+     "activation": "other",
+     "when": "No spell, Magic action or magic item works in the aura, and nothing magical reaches into it.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 10,
+      "antimagic": true,
+      "holds": {
+       "modifiers": [
+        {
+         "type": "spell-ward",
+         "schools": [
+          "abjuration",
+          "conjuration",
+          "divination",
+          "enchantment",
+          "evocation",
+          "illusion",
+          "necromancy",
+          "transmutation"
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -10061,7 +10092,13 @@
     }
    ],
    "healing": null,
-   "persistsWithoutTargets": true
+   "persistsWithoutTargets": true,
+   "objectDamage": [
+    {
+     "formula": "50",
+     "type": "bludgeoning"
+    }
+   ]
   },
   "classes": [
    "cleric",
@@ -14863,6 +14900,9 @@
    "damage": [],
    "healing": null
   },
+  "walls": {
+   "locksDoorsInArea": true
+  },
   "classes": [
    "bard",
    "wizard"
@@ -15631,10 +15671,164 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 60,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "acid",
+    "bludgeoning",
+    "cold",
+    "fire",
+    "force",
+    "lightning",
+    "necrotic",
+    "piercing",
+    "poison",
+    "psychic",
+    "radiant",
+    "slashing",
+    "thunder"
+   ],
+   "laterActions": [
+    {
+     "name": "ward",
+     "activation": "other",
+     "when": "Creatures of the warded types can't enter the area, and can't charm or frighten those in it.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "choosesTypes": true,
+      "exclusive": true,
+      "bars": {
+       "way": "in",
+       "types": [
+        "aberration",
+        "celestial",
+        "elemental",
+        "fey",
+        "fiend",
+        "undead"
+       ]
+      },
+      "holds": {
+       "conditionWards": {
+        "conditionIds": [
+         "charmed",
+         "frightened"
+        ],
+        "creatureTypes": [
+         "aberration",
+         "celestial",
+         "elemental",
+         "fey",
+         "fiend",
+         "undead"
+        ]
+       },
+       "suppresses": true
+      },
+      "picks": {
+       "pick": "one",
+       "parts": [
+        {
+         "id": "courage",
+         "name": "Courage",
+         "trigger": {
+          "alsoHolds": {
+           "conditionImmunities": [
+            "frightened"
+           ],
+           "forTypes": "others"
+          }
+         }
+        },
+        {
+         "id": "darkness",
+         "name": "Darkness",
+         "trigger": {
+          "lighting": "dark",
+          "lightingFirm": true
+         }
+        },
+        {
+         "id": "daylight",
+         "name": "Daylight",
+         "trigger": {
+          "lighting": "bright"
+         }
+        },
+        {
+         "id": "extradimensional",
+         "name": "Extradimensional Interference",
+         "trigger": {
+          "noTeleport": true,
+          "noTeleportOut": true,
+          "teleportWardsOnly": true
+         }
+        },
+        {
+         "id": "fear",
+         "name": "Fear",
+         "trigger": {
+          "alsoHolds": {
+           "conditions": [
+            "frightened"
+           ],
+           "forTypes": "warded"
+          }
+         }
+        },
+        {
+         "id": "peaceful-rest",
+         "name": "Peaceful Rest",
+         "trigger": {}
+        },
+        {
+         "id": "resistance",
+         "name": "Resistance",
+         "trigger": {
+          "alsoHolds": {
+           "chosenDamage": "resistance",
+           "forTypes": "others"
+          }
+         }
+        },
+        {
+         "id": "silence",
+         "name": "Silence",
+         "trigger": {
+          "alsoHolds": {
+           "conditions": [
+            "deafened"
+           ]
+          }
+         }
+        },
+        {
+         "id": "tongues",
+         "name": "Tongues",
+         "trigger": {}
+        },
+        {
+         "id": "vulnerability",
+         "name": "Vulnerability",
+         "trigger": {
+          "alsoHolds": {
+           "chosenDamage": "vulnerability",
+           "forTypes": "warded"
+          }
+         }
+        }
+       ]
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -19421,10 +19615,11 @@
     {
      "name": "barrier",
      "activation": "other",
-     "when": "Celestials, Elementals, Fey, Fiends and Undead can't willingly enter the Cylinder.",
+     "when": "A creature of a chosen type can't enter the Cylinder, teleports in only after a Charisma save, and has Disadvantage on attacks against those inside it, who it can't charm or frighten.",
      "damage": [],
      "zone": {
       "on": [],
+      "choosesTypes": true,
       "bars": {
        "way": "in",
        "types": [
@@ -19433,8 +19628,113 @@
         "fey",
         "fiend",
         "undead"
-       ]
+       ],
+       "teleportSave": "cha"
+      },
+      "holds": {
+       "modifiers": [
+        {
+         "type": "roll-mode",
+         "roll": "incoming-attack",
+         "mode": "disadvantage",
+         "when": [
+          {
+           "type": "on-attack-roll"
+          },
+          {
+           "type": "source-creature-type-is",
+           "creatureTypes": [
+            "celestial",
+            "elemental",
+            "fey",
+            "fiend",
+            "undead"
+           ]
+          }
+         ]
+        }
+       ],
+       "conditionWards": {
+        "conditionIds": [
+         "charmed",
+         "frightened"
+        ],
+        "creatureTypes": [
+         "celestial",
+         "elemental",
+         "fey",
+         "fiend",
+         "undead"
+        ]
+       }
       }
+     },
+     "option": {
+      "id": "facing-out",
+      "name": "Keeps them out, wards those inside"
+     }
+    },
+    {
+     "name": "reversed",
+     "activation": "other",
+     "when": "A creature of a chosen type can't leave the Cylinder, teleports out only after a Charisma save, and has Disadvantage on attacks against those outside it, who it can't charm or frighten.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "choosesTypes": true,
+      "bars": {
+       "way": "out",
+       "types": [
+        "celestial",
+        "elemental",
+        "fey",
+        "fiend",
+        "undead"
+       ],
+       "teleportSave": "cha"
+      },
+      "holds": {
+       "modifiers": [
+        {
+         "type": "roll-mode",
+         "roll": "incoming-attack",
+         "mode": "disadvantage",
+         "when": [
+          {
+           "type": "on-attack-roll"
+          },
+          {
+           "type": "source-creature-type-is",
+           "creatureTypes": [
+            "celestial",
+            "elemental",
+            "fey",
+            "fiend",
+            "undead"
+           ]
+          }
+         ]
+        }
+       ],
+       "conditionWards": {
+        "conditionIds": [
+         "charmed",
+         "frightened"
+        ],
+        "creatureTypes": [
+         "celestial",
+         "elemental",
+         "fey",
+         "fiend",
+         "undead"
+        ]
+       },
+       "outside": true
+      }
+     },
+     "option": {
+      "id": "reversed",
+      "name": "Holds them in, wards those outside"
      }
     }
    ],
@@ -20678,7 +20978,8 @@
      "type": "bludgeoning"
     }
    ],
-   "healing": null
+   "healing": null,
+   "harmsObjects": true
   },
   "classes": [
    "sorcerer",
@@ -22893,6 +23194,36 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "glare",
+     "activation": "other",
+     "when": "A creature that can see the wall and moves within 20 feet of it or starts its turn there makes the save or is Blinded for 1 minute; one passing into the wall makes a Dexterity save for each of its seven layers.",
+     "save": {
+      "ability": "con",
+      "successDamage": "none",
+      "failureConditions": [
+       "blinded"
+      ],
+      "failureDuration": {
+       "type": "rounds",
+       "rounds": 10
+      }
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "start-turn"
+      ],
+      "affects": "enemies",
+      "nearFeet": 20,
+      "seenOnly": true,
+      "layers": true,
+      "refusesOccupied": true
+     }
+    }
+   ],
    "healing": null
   },
   "sight": {
@@ -22946,11 +23277,63 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 100,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "sanctum",
+     "activation": "other",
+     "when": "The warded Cube holds the properties picked as it was cast.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "picks": {
+       "pick": "any",
+       "parts": [
+        {
+         "id": "fog",
+         "name": "Dark, foggy edge",
+         "trigger": {
+          "veil": {}
+         }
+        },
+        {
+         "id": "no-teleport",
+         "name": "No teleporting",
+         "trigger": {
+          "noTeleport": true,
+          "noTeleportOut": true
+         }
+        },
+        {
+         "id": "no-divination",
+         "name": "No Divination targeting",
+         "trigger": {
+          "holds": {
+           "modifiers": [
+            {
+             "type": "spell-ward",
+             "schools": [
+              "divination"
+             ]
+            }
+           ]
+          }
+         }
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "healing": null,
+   "areaPerSlot": 100
   },
   "classes": [
    "wizard"
@@ -24679,7 +25062,40 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "pull",
+     "activation": "other",
+     "when": "A creature that enters the Cylinder makes the Dexterity save or falls upward to its top, staying there until the spell ends.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [],
+      "failureEffect": {
+       "name": "Fallen upward",
+       "tags": [
+        "gravity-reversed"
+       ],
+       "modifiers": []
+      }
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter"
+      ]
+     }
+    }
+   ],
+   "healing": null,
+   "failureEffect": {
+    "name": "Fallen upward",
+    "tags": [
+     "gravity-reversed"
+    ],
+    "modifiers": []
+   },
+   "persistsWithoutTargets": true
   },
   "classes": [
    "druid",
@@ -25697,7 +26113,10 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureConditions": []
+   "failureConditions": [],
+   "disadvantageTypes": [
+    "construct"
+   ]
   },
   "target": {
    "type": "creature",
@@ -25721,7 +26140,8 @@
      "type": "thunder"
     }
    ],
-   "healing": null
+   "healing": null,
+   "harmsObjects": true
   },
   "classes": [
    "bard",
@@ -29224,7 +29644,7 @@
     {
      "name": "hut",
      "activation": "other",
-     "when": "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside.",
+     "when": "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside. Those outside can't see in. It ends if you leave it.",
      "damage": [],
      "zone": {
       "on": [],
@@ -29235,6 +29655,34 @@
       "bars": {
        "way": "both",
        "insiders": true
+      },
+      "endsWhenCasterLeaves": true,
+      "veil": {
+       "oneWay": true
+      },
+      "picks": {
+       "pick": "one",
+       "parts": [
+        {
+         "id": "as-it-is",
+         "name": "Light inside as it is",
+         "trigger": {}
+        },
+        {
+         "id": "dim",
+         "name": "Dim Light inside",
+         "trigger": {
+          "lighting": "dim"
+         }
+        },
+        {
+         "id": "dark",
+         "name": "Darkness inside",
+         "trigger": {
+          "lighting": "dark"
+         }
+        }
+       ]
       }
      }
     }
@@ -30487,6 +30935,39 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "wall",
+     "activation": "other",
+     "when": "The wall stands where it was placed while the spell lasts.",
+     "damage": [],
+     "zone": {
+      "on": []
+     },
+     "option": {
+      "id": "flat",
+      "name": "Flat, ten 10-foot panels"
+     }
+    },
+    {
+     "name": "globe",
+     "activation": "other",
+     "when": "The dome or globe stands round the point it was placed on while the spell lasts.",
+     "damage": [],
+     "zone": {
+      "on": []
+     },
+     "area": {
+      "shape": "sphere",
+      "sizeFeet": 10,
+      "widthFeet": null
+     },
+     "option": {
+      "id": "globe",
+      "name": "Dome or globe, 10-foot radius"
+     }
+    }
+   ],
    "healing": null
   },
   "walls": {
@@ -30651,6 +31132,39 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "wall",
+     "activation": "other",
+     "when": "The wall stands where it was placed while the spell lasts.",
+     "damage": [],
+     "zone": {
+      "on": []
+     },
+     "option": {
+      "id": "thick",
+      "name": "Ten 10-foot panels, 6 inches thick"
+     }
+    },
+    {
+     "name": "thin wall",
+     "activation": "other",
+     "when": "The wall stands where it was placed while the spell lasts.",
+     "damage": [],
+     "zone": {
+      "on": []
+     },
+     "area": {
+      "shape": "line",
+      "sizeFeet": 200,
+      "widthFeet": 5
+     },
+     "option": {
+      "id": "thin",
+      "name": "Ten 10-by-20-foot panels, 3 inches thick"
+     }
+    }
+   ],
    "healing": null
   },
   "walls": {
@@ -30660,10 +31174,29 @@
     "panel": {
      "name": "Stone panel",
      "armorClass": 15,
-     "hitPoints": 180
+     "hitPoints": 180,
+     "immunities": [
+      "poison",
+      "psychic"
+     ]
     },
     "pushes": true,
-    "permanentAfterFull": true
+    "permanentAfterFull": true,
+    "forms": [
+     {
+      "option": "thin",
+      "panelFeet": 20,
+      "panel": {
+       "name": "Thin stone panel",
+       "armorClass": 15,
+       "hitPoints": 90,
+       "immunities": [
+        "poison",
+        "psychic"
+       ]
+      }
+     }
+    ]
    }
   },
   "classes": [
