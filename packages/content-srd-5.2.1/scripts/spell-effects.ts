@@ -2722,16 +2722,16 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [{ type: "speed", amount: 10 }]
   }),
-  // "The target also has a Swim Speed equal to its Speed." Its other protections stay with the GM.
+  // "Spells and other magical effects can neither reduce the target's Speed nor cause the target to have the Paralyzed
+  // or Restrained conditions. The target also has a Swim Speed equal to its Speed ... the target can spend 5 feet of
+  // movement to automatically escape from nonmagical restraints": the tags the engine reads (effects.ts, speed.ts,
+  // resolution/builtins.ts), so a Net or a constrictor still holds it until it slips free.
   "freedom-of-movement": spellGrant({
     name: "Freedom of Movement",
-    tags: ["freedom-of-movement"],
+    tags: ["freedom-of-movement", "slips-restraints"],
     target: "targets",
     duration: { type: "manual" },
-    modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }],
-    // "Spells and other magical effects can neither reduce its Speed nor cause it to have the Paralyzed or Restrained
-    // conditions"; a nonmagical restraint it escapes for 5 feet of movement, so it is kept off whatever its source.
-    conditionImmunities: ["paralyzed", "restrained"]
+    modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
   }),
   // "Until the spell ends, the target can take a Magic action to exhale", the type chosen at the cast: the touched
   // creature's own action, at the caster's numbers.
@@ -3189,7 +3189,7 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   },
   // "Can't cast spells or take the Magic action", until a repeated save every 30 days or a spell ends it.
   // "The effect can also be ended by the Greater Restoration, Heal, or Wish spell."
-  befuddlement: { name: "Befuddlement", tags: ["no-spells", "restorable", "ended-by-heal"], modifiers: [] },
+  befuddlement: { name: "Befuddlement", tags: ["no-spells", "restorable", "cured-by-heal"], modifiers: [] },
   // "A Greater Restoration spell cast on you ends this effect."
   "contact-other-plane": { name: "Contact Other Plane", tags: ["restorable"], modifiers: [] },
   // "Another 5d4 Acid damage at the end of its next turn" (the save carries the damage).

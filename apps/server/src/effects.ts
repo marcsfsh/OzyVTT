@@ -13,6 +13,7 @@ import { restoreSuppressed } from "./suppressed-conditions.js";
 import { refreshArmorClass } from "./held-items.js";
 import { doesntSleep } from "./trance.js";
 import { knockedProneWhileMounted } from "./mounts.js";
+import { FREEDOM_OF_MOVEMENT_TAG } from "./speed.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -204,14 +205,27 @@ export type ConditionImmunitySource = Readonly<{
   catalog?: EquipmentCatalog;
   state?: GameState;
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** The condition comes from a spell or another magical effect, which Freedom of Movement keeps off. */
+  magical?: boolean;
 }>;
 
+const MAGIC_CANT_IMPOSE: ReadonlySet<string> = new Set(["paralyzed", "restrained"]);
+
+/** Whether a live effect or a worn item's own effect keeps magic from holding the creature (`FREEDOM_OF_MOVEMENT_TAG`). */
+function freeOfMagicalHolds(actor: Actor, source: ConditionImmunitySource | undefined): boolean {
+  if (actor.effects.some((effect) => effect.tags.includes(FREEDOM_OF_MOVEMENT_TAG))) return true;
+  if (!source?.catalog) return false;
+  const definition = actor.definitionId ? source.resolveDefinition?.(actor.definitionId) : undefined;
+  return (deriveEquipment(actor, definition, source.catalog).context.effectTags ?? []).includes(FREEDOM_OF_MOVEMENT_TAG);
+}
+
 /** SRD condition immunity: innate, granted by what the actor carries when a catalog is supplied, Petrified's own
- *  immunity to the Poisoned condition, or a Paladin's aura it stands in. */
+ *  immunity to the Poisoned condition, a Paladin's aura it stands in, or Freedom of Movement against magic. */
 export function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
   if (actor.conditionImmunities.includes(conditionId)) return true;
   // An effect's own immunity while it lasts (Heroism: Frightened).
   if (actor.effects.some((effect) => effect.conditionImmunities?.includes(conditionId))) return true;
+  if (source?.magical === true && MAGIC_CANT_IMPOSE.has(conditionId) && freeOfMagicalHolds(actor, source)) return true;
   if (conditionId === "poisoned" && hasCondition(actor, "petrified")) return true;
   if (
     source?.state &&
@@ -548,7 +562,8 @@ export function addEffect(
       if (!present.standalone && !heldBefore.has(conditionId)) writeCondition(actor, { ...present, standalone: true });
       continue;
     }
-    if (immuneToCondition(actor, conditionId, { ...immunities, state })) continue;
+    const magical = immunities?.magical === true || effect.magical === true || effect.spell !== undefined;
+    if (immuneToCondition(actor, conditionId, { ...immunities, state, magical })) continue;
     // A ward against the kind of creature that imposes it (Protection from Evil and Good).
     if (wardedFrom(state, actor, conditionId, effect.sourceActorId, immunities?.resolveDefinition)) continue;
     if (actor.conditions.length >= 20) continue;

@@ -1219,9 +1219,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling." */
   "ring-of-feather-falling": { modifiers: [{ type: "movement", rule: "safe-fall" }] },
 
-  // "Difficult Terrain doesn't cost you extra movement": the Freedom of Movement tag the movement rules read. Magic
-  // neither reducing its Speeds nor Paralyzing or Restraining its wearer wait on a magical-source immunity, which an
-  // absolute one would overreach (a net would no longer restrain).
+  // "Difficult Terrain doesn't cost you extra movement. In addition, magic can't reduce any of your speeds or cause you
+  // to have the Paralyzed or Restrained condition": the Freedom of Movement tag, which the movement rules, speed.ts and
+  // the condition immunity read (effects.ts), so a net still restrains its wearer.
   "ring-of-free-action": {
     effects: [
       {
@@ -5118,11 +5118,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         targets: { count: 1, rangeFeet: 5 },
         grants: {
           name: "Freedom of Movement (Oil of Slipperiness)",
-          tags: ["freedom-of-movement"],
+          tags: ["freedom-of-movement", "slips-restraints"],
           target: "target",
           duration: { type: "minutes", minutes: 480 },
-          modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }],
-          conditionImmunities: ["paralyzed", "restrained"]
+          modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
         }
       }
     ]

@@ -23,8 +23,8 @@ import { ABILITY_DRAIN_TAG } from "./score-drain.js";
 /** On an effect, Greater Restoration ends it by its own text ("The effect can also be ended by the Greater Restoration,
  *  Heal, or Wish spell"). */
 export const RESTORABLE_TAG = "restorable";
-/** On an effect, a spell that ends it by name when cast on its bearer: `ended-by-heal` (Befuddlement). */
-export const ENDED_BY_PREFIX = "ended-by-";
+/** On an effect, a spell that ends it by name when cast on its bearer: `cured-by-heal` (Befuddlement). */
+export const CURED_BY_PREFIX = "cured-by-";
 
 type Actor = GameState["actors"][number];
 type Harm = (typeof RESTORATION_PICKS)[number]["id"];
@@ -195,7 +195,7 @@ export function restoreEverything(state: GameState, target: Actor, deps: Restore
 export function endNamedEffects(ctx: ResolveContext): void {
   const { action, input } = ctx;
   if (!action.spellId || input.commit === false) return;
-  const tag = `${ENDED_BY_PREFIX}${action.spellId}`;
+  const tag = `${CURED_BY_PREFIX}${action.spellId}`;
   for (const target of ctx.targets)
     for (const effect of target.effects.filter((candidate) => candidate.tags.includes(tag))) {
       ctx.effectsEnded.push(endedEffect(target, effect));

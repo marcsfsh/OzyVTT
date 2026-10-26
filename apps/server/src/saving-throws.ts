@@ -1337,7 +1337,9 @@ export function answerSave(
   const immunities = {
     resolveDefinition: (definitionId: string) => deps.resolveDefinition(definitionId),
     ...(deps.catalog ? { catalog: deps.catalog } : {}),
-    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+    // Against a spell or a magic item's effect, which Freedom of Movement keeps from Paralyzing or Restraining.
+    magical: pending.magical === true || pending.spell !== undefined
   };
   if (outcomeCondition) {
     // What the failure's effect links lands with the effect below; the rest (Prone, Exhaustion) stands alone.
