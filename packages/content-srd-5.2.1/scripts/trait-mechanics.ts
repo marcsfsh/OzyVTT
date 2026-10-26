@@ -654,9 +654,41 @@ function corrodesGear(trait: Trait): TraitMechanic | null {
     : null;
 }
 
+/** "The elemental takes 3 (1d6) Cold damage for every 5 feet the elemental moves in water" (Water Susceptibility); "The
+ *  vampire takes 20 Acid damage if it ends its turn in running water" (Vampire Weakness's Running Water). */
+function waterWeakness(trait: Trait): TraitMechanic | null {
+  const moving = /takes \d+ \((\d+d\d+)\) ([A-Z][a-z]+) damage for every 5 feet the [\w' -]+? moves in water/.exec(
+    trait.description
+  );
+  const running = /takes (\d+) ([A-Z][a-z]+) damage if it ends its turn in running water/.exec(trait.description);
+  const movingType = moving ? damageTypeOf(moving[2]!) : null;
+  const runningType = running ? damageTypeOf(running[2]!) : null;
+  if (!movingType && !runningType) return null;
+  return {
+    kind: "water-weakness",
+    name: trait.name,
+    ...(moving && movingType ? { moving: { formula: moving[1]!, type: movingType } } : {}),
+    ...(running && runningType ? { endsTurnInRunning: { amount: Number(running[1]), type: runningType } } : {})
+  };
+}
+
+/** "It must be submerged at least once every 4 hours to avoid suffocating outside water." */
+function driesOut(trait: Trait): TraitMechanic | null {
+  const match = /must be submerged at least once every (\d+) hours to avoid suffocating outside water/.exec(
+    trait.description
+  );
+  return match ? { kind: "dries-out", name: trait.name, hours: Number(match[1]) } : null;
+}
+
 /** Readers that run beside the one a trait matches, for what a trait does besides it (Corrosive Form's acid on whoever
- *  hits the pudding, and on their gear). */
-const ALSO: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [corrodesGear, carriedObject, spawns];
+ *  hits the pudding, and on their gear; a vampire's running water beside its sunlight). */
+const ALSO: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
+  corrodesGear,
+  carriedObject,
+  spawns,
+  waterWeakness,
+  driesOut
+];
 
 /** Every trait the engine can run, in the stat block's order; the rest stay prose. */
 export function traitMechanicsOf(traits: readonly Trait[]): TraitMechanic[] {

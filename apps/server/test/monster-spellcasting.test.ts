@@ -270,4 +270,14 @@ describe("what a stat block's spells let it do later", () => {
     });
     expect(actionOf("djinni", "spell-wind-walk-then-cloud-form").shapeShift).toMatchObject({ takesRounds: 10 });
   });
+
+  it("gives an ancient bronze dragon Control Water's whirlpool at its DC 22, pulling what swims near it", () => {
+    expect(actionOf("ancient-bronze-dragon", "spell-control-water-then-whirlpool")).toMatchObject({
+      save: { ability: "str", dc: 22, successDamage: "half" },
+      damage: [{ formula: "2d8", type: "bludgeoning" }]
+    });
+    const state = fight("ancient-bronze-dragon");
+    cast(state, "ancient-bronze-dragon", actionOf("ancient-bronze-dragon", "spellcasting-control-water"), []);
+    expect(state.combat.spellZones).toMatchObject([{ spellId: "control-water", dc: 22 }]);
+  });
 });

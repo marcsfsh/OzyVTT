@@ -292,8 +292,8 @@ export const sceneCommands = [
     type: "terrain.paint",
     operationId: "paintTerrain",
     description:
-      "Marks a dragged area as difficult terrain, or clears it (GM-grade only). The server snaps to whole grid cells on calibrated unrotated maps and clamps to the map bounds; a map needs a calibrated grid. Entering a cell whose centre lies in difficult terrain costs double. `sceneId` targets a prepared scene.",
-    summary: "Mark or clear difficult terrain over a grid-snapped area (GM).",
+      "Marks a dragged area as difficult terrain, still water, running water or slippery ice, or clears every kind from it (GM-grade only). The server snaps to whole grid cells on calibrated unrotated maps and clamps to the map bounds; a map needs a calibrated grid. Entering a cell whose centre lies in difficult terrain costs double. In water a creature swims (SRD Swimming: a foot more for each foot unless it has a Swim Speed and swims with it), and running water is what a vampire's Running Water reads. Slippery ice (SRD Gameplay Toolbox) is Difficult Terrain where a creature that moves onto it for the first time on a turn or starts its turn there makes a DC 10 Dexterity save or falls Prone. Water and ice replace each other where they are painted over. `sceneId` targets a prepared scene.",
+    summary: "Mark or clear difficult terrain, water or ice over a grid-snapped area (GM).",
     schema: TerrainPaintSchema,
     malformed: "The terrain stroke is malformed.",
     gmOnly: "Only the GM marks terrain.",
@@ -314,8 +314,8 @@ export const sceneCommands = [
     type: "terrain.reset",
     operationId: "resetTerrain",
     description:
-      "Clears all difficult terrain from the live table or, with `sceneId`, a prepared scene (GM-grade only).",
-    summary: "Clear all difficult terrain (GM).",
+      "Clears all painted terrain (difficult terrain, water and ice) from the live table or, with `sceneId`, a prepared scene (GM-grade only).",
+    summary: "Clear all painted terrain (GM).",
     schema: TerrainResetSchema,
     malformed: "The terrain command is malformed.",
     gmOnly: "Only the GM marks terrain.",

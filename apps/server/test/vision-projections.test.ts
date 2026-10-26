@@ -150,7 +150,10 @@ describe("dynamic vision in the player projection", () => {
       difficult: [
         { x: 100, y: 100, width: 50, height: 50 },
         { x: 600, y: 100, width: 50, height: 50 }
-      ]
+      ],
+      water: [],
+      runningWater: [],
+      ice: []
     };
     rememberExplored(state, {});
     expect(asPlayer(frozen(state), SESSION_A).combat.terrain.difficult).toEqual([

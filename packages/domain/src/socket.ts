@@ -47,6 +47,7 @@ import type {
   StabilizeResult,
   LightAddResult,
   DoorUseResult,
+  TrapDisarmResult,
   ObjectAttackResult,
   VisionPreviewResult,
   ScenePreviewResult,
@@ -131,6 +132,12 @@ import type {
   FogSetEnabledSchema,
   TerrainPaintSchema,
   TerrainResetSchema,
+  TrapPlaceSchema,
+  TrapEditSchema,
+  TrapRemoveSchema,
+  TrapSpringSchema,
+  TrapDisarmSchema,
+  EnvironmentSetSchema,
   HpAmountSchema,
   InitiativeNextSchema,
   InitiativePreviousSchema,
@@ -992,6 +999,30 @@ export interface ClientToServerEvents {
   ) => void;
   "terrain:reset": (
     payload: CommandPayload<typeof TerrainResetSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:place": (
+    payload: CommandPayload<typeof TrapPlaceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:edit": (
+    payload: CommandPayload<typeof TrapEditSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:remove": (
+    payload: CommandPayload<typeof TrapRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:spring": (
+    payload: CommandPayload<typeof TrapSpringSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:disarm": (
+    payload: CommandPayload<typeof TrapDisarmSchema>,
+    acknowledgement: (result: TrapDisarmResult) => void
+  ) => void;
+  "environment:set": (
+    payload: CommandPayload<typeof EnvironmentSetSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "vision:set-enabled": (

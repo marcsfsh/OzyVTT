@@ -6,14 +6,15 @@ import type {
   EncounterTokenPosition,
   MutationResult,
   ObjectStats,
-  RulesBlocked
+  RulesBlocked,
+  SceneEnvironment
 } from "@vtt/domain";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
 import { resolveAtLight, resolveAtWall } from "../encounter/targeting";
 import type { MoveMode } from "./movePreview";
 import type { Point } from "./useMapView";
-import type { AreaKindId } from "./mapTools";
+import type { AreaKindId, GroundOp } from "./mapTools";
 
 /**
  * Everything the map sends: token moves, annotations, fog, terrain and vision. Each family has its own busy flag, and
@@ -43,7 +44,8 @@ export function useMapCommands({
   moveModeFor = () => undefined,
   drawing,
   onShapeAdded,
-  waitingAsks = 0
+  waitingAsks = 0,
+  trapChoice = null
 }: Readonly<{
   revision: number;
   sceneId?: string;
@@ -57,6 +59,8 @@ export function useMapCommands({
   onShapeAdded: (annotationId: string | null) => void;
   /** How many of this viewer's questions wait on the GM; one fewer means the GM answered. */
   waitingAsks?: number;
+  /** The trap a drag sets, and its band of levels. */
+  trapChoice?: Readonly<{ trapId: string; tier: number }> | null;
 }>) {
   const [message, setMessage] = useState("");
   // Once the GM answers (the token moves, or stays), the line no longer says the question is waiting.
@@ -315,7 +319,7 @@ export function useMapCommands({
       if (!result.ok) setMessage(result.message ?? failure);
     });
   };
-  const paintTerrain = (op: "difficult" | "clear", a: Point, b: Point) => {
+  const paintTerrain = (op: GroundOp, a: Point, b: Point) => {
     const rect = {
       x: Math.min(a.x, b.x),
       y: Math.min(a.y, b.y),
@@ -323,7 +327,7 @@ export function useMapCommands({
       height: Math.abs(a.y - b.y)
     };
     if (rect.width < 2 || rect.height < 2) {
-      setMessage(op === "difficult" ? "Drag an area to mark it difficult." : "Drag an area to clear it.");
+      setMessage(op === "clear" ? "Drag an area to clear it." : "Drag an area to paint it.");
       return;
     }
     runTerrain(
@@ -336,6 +340,49 @@ export function useMapCommands({
       () => command("terrain:reset", { ...scene, expectedRevision: revision }),
       "The terrain could not be cleared."
     );
+  // Traps and the weather are the live table's, set by the GM.
+  const placeTrap = (a: Point, b: Point) => {
+    const rect = {
+      x: Math.min(a.x, b.x),
+      y: Math.min(a.y, b.y),
+      width: Math.abs(a.x - b.x),
+      height: Math.abs(a.y - b.y)
+    };
+    if (!trapChoice) return;
+    if (rect.width < 2 || rect.height < 2) {
+      setMessage("Drag the trapped area to set the trap.");
+      return;
+    }
+    runTerrain(
+      () =>
+        command("trap:place", { trapId: trapChoice.trapId, tier: trapChoice.tier, rect, expectedRevision: revision }),
+      "The trap could not be set."
+    );
+  };
+  const editTrap = (trapId: string, change: Readonly<{ found?: boolean; state?: "armed" | "disarmed" }>) =>
+    runTerrain(
+      () => command("trap:edit", { trapId, ...change, expectedRevision: revision }),
+      "The trap could not be changed."
+    );
+  const removeTrap = (trapId: string) =>
+    runTerrain(() => command("trap:remove", { trapId, expectedRevision: revision }), "The trap could not be removed.");
+  const springTrap = (trapId: string) =>
+    runTerrain(
+      () => command("trap:spring", { trapId, actorId: null, expectedRevision: revision }),
+      "The trap could not be set off."
+    );
+  const setEnvironment = (environment: Partial<SceneEnvironment>) =>
+    runTerrain(
+      () => command("environment:set", { environment, expectedRevision: revision }),
+      "The weather could not be changed."
+    );
+  /** A creature beside a found trap makes it safe one of its ways; the server rolls any check and says how it went. */
+  const disarmTrap = (trapId: string, actorId: string, disarmId: string) =>
+    runTerrain(async () => {
+      const result = await command("trap:disarm", { trapId, actorId, disarmId, expectedRevision: revision });
+      if (result.ok && result.text) setMessage(result.text);
+      return result.ok ? { ok: true } : result;
+    }, "The trap could not be made safe.");
 
   const runVision = (run: () => Promise<MutationResult>, failure: string, done?: string) => {
     setVisionBusy(true);
@@ -489,6 +536,12 @@ export function useMapCommands({
     terrainBusy,
     paintTerrain,
     clearAllTerrain,
+    placeTrap,
+    editTrap,
+    removeTrap,
+    springTrap,
+    setEnvironment,
+    disarmTrap,
     visionBusy,
     setVisionEnabled,
     setAmbient,

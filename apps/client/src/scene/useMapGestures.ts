@@ -16,7 +16,14 @@ import {
 } from "../encounter/targeting";
 import type { GridCalibration } from "./gridPreview";
 import { imagePointFromClient } from "./mapImage";
-import { isVisionTool, type AreaKindId, type MapTool } from "./mapTools";
+import { GROUND_TOOLS, isVisionTool, type AreaKindId, type GroundOp, type MapTool } from "./mapTools";
+
+/** What a drag paints with this tool: a kind of ground, a clearing, or a trap's area; null for any other tool. */
+function groundOpOf(tool: MapTool): GroundOp | "trap" | null {
+  if (tool === "terrain-clear") return "clear";
+  if (tool === "trap-place") return "trap";
+  return GROUND_TOOLS.find((entry) => entry.tool === tool)?.op ?? null;
+}
 import type { MapCommands } from "./useMapCommands";
 import {
   anchoredCamera,
@@ -45,7 +52,7 @@ export type Gesture =
   | Readonly<{ kind: "pan"; startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
-  | Readonly<{ kind: "terrain"; op: "difficult" | "clear"; origin: Point; current: Point }>
+  | Readonly<{ kind: "terrain"; op: GroundOp | "trap"; origin: Point; current: Point }>
   | Readonly<{ kind: "wall"; wallKind: "wall" | "door" | "window"; origin: Point; current: Point }>
   | Readonly<{ kind: "vision-area"; origin: Point; current: Point }>
   | Readonly<{ kind: "annotation-move"; id: string; grab: Point; geometry: Readonly<{ origin: Point; target: Point }> }>
@@ -492,7 +499,8 @@ export function useMapGestures({
       return;
     }
     // Terrain lives in grid cells, so it needs a calibrated map.
-    if ((tool === "terrain-difficult" || tool === "terrain-clear") && role === "gm" && calibration) {
+    const groundOp = groundOpOf(tool);
+    if (groundOp && role === "gm" && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY);
       if (!point) return;
       event.preventDefault();
@@ -500,19 +508,13 @@ export function useMapGestures({
       setMessage("");
       setGesture({
         kind: "terrain",
-        op: tool === "terrain-difficult" ? "difficult" : "clear",
+        op: groundOp,
         origin: point,
         current: point
       });
       return;
     }
-    if (
-      tool !== "select" &&
-      tool !== "terrain-difficult" &&
-      tool !== "terrain-clear" &&
-      !isVisionTool(tool) &&
-      calibration
-    ) {
+    if (tool !== "select" && groundOpOf(tool) === null && !isVisionTool(tool) && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY);
       if (!point) return;
       event.preventDefault();
@@ -668,7 +670,8 @@ export function useMapGestures({
     if (gesture.kind === "terrain") {
       const { op, origin, current } = gesture;
       setGesture(null);
-      commands.paintTerrain(op, origin, current);
+      if (op === "trap") commands.placeTrap(origin, current);
+      else commands.paintTerrain(op, origin, current);
       return;
     }
     if (gesture.kind === "wall") {

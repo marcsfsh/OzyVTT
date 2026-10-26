@@ -252,6 +252,11 @@ export function ActionResultCard({
           {line.text}
         </p>
       ))}
+      {result.sensed?.map((line) => (
+        <p key={line} className="action-narration">
+          {line}
+        </p>
+      ))}
       {result.save &&
         (() => {
           // The live count of unanswered saves for this action, so the note clears as each is answered.

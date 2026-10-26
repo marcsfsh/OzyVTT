@@ -100,10 +100,15 @@ const SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
         noActions: true,
         noSpeech: true,
         sharesSpaces: true,
+        // "If air can pass through a space, the mist can do so, but it can't pass through liquid. It has Resistance to
+        // all damage, except the damage it takes from sunlight."
+        noLiquid: true,
+        sunlightPierces: true,
         modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_DAMAGE] }]
       }
     ]),
     notInSunlight: true,
+    notInRunningWater: true,
     escapesAtZero: { form: "mist", hours: 2 }
   },
   werebear: printedShift([sized("hybrid", "Hybrid", "large"), sized("bear", "Bear", "large")]),

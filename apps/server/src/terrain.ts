@@ -29,45 +29,74 @@ import { intersectRegions, subtractRect, unionRect, type Rect } from "./rect-reg
 import type { TokenMapGeometry } from "./token-placement.js";
 import { blocksMovement, wallPieces } from "./vision/sight.js";
 
-/** Difficult terrain (SRD 5.2.1): the GM paints it per scene; entering a cell whose centre lies in it costs
- *  double. Stored as disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
+/** Painted ground (SRD 5.2.1): the GM paints it per scene. Entering a cell whose centre lies in difficult terrain costs
+ *  double, a creature in water swims, and slippery ice is difficult too (`water.ts`, `ice.ts`). Each kind is stored as
+ *  disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
 
 const MAX_TERRAIN_RECTS = 1000;
 const LIVE_REFUSAL = "That scene is live. Edit its terrain on the table.";
+
+type Terrain = CombatState["terrain"];
+export type TerrainPaintOp = "difficult" | "water" | "running-water" | "ice" | "clear";
+/** The kinds of ground that exclude one another: a square is still water, running water or ice, never two. */
+const SURFACES = ["water", "runningWater", "ice"] as const;
+const SURFACE_OF: Readonly<Partial<Record<TerrainPaintOp, (typeof SURFACES)[number]>>> = {
+  water: "water",
+  "running-water": "runningWater",
+  ice: "ice"
+};
 
 export function paintTerrain(
   state: GameState,
   sceneId: string | undefined,
   geometry: LayerMapGeometry,
-  input: Readonly<{ op: "difficult" | "clear"; rect: PaintRectInput }>
+  input: Readonly<{ op: TerrainPaintOp; rect: PaintRectInput }>
 ) {
   // Terrain lives in cells, so a map without a grid has nowhere to put it.
   if (!geometry.calibration) throw new CommandRejectedError("Calibrate the map's grid before marking terrain.");
   const slice = layerSlice(state, sceneId, "terrain", LIVE_REFUSAL);
   const rect = normalizedRect(geometry, input.rect, "Drag a larger area to mark terrain.");
-  const difficult =
-    input.op === "difficult" ? unionRect(slice.layer.difficult, rect) : subtractRect(slice.layer.difficult, rect);
-  if (difficult.length > MAX_TERRAIN_RECTS)
+  const layer = slice.layer;
+  const surface = SURFACE_OF[input.op];
+  const next: Terrain = {
+    ...layer,
+    difficult:
+      input.op === "difficult"
+        ? unionRect(layer.difficult, rect)
+        : input.op === "clear"
+          ? subtractRect(layer.difficult, rect)
+          : layer.difficult
+  };
+  for (const kind of SURFACES)
+    if (input.op === "clear" || (surface !== undefined && kind !== surface))
+      next[kind] = subtractRect(layer[kind], rect);
+    else if (kind === surface) next[kind] = unionRect(layer[kind], rect);
+  if ([next.difficult, ...SURFACES.map((kind) => next[kind])].some((rects) => rects.length > MAX_TERRAIN_RECTS))
     throw new CommandRejectedError("The terrain is too finely cut up. Clear it and mark it again in larger areas.");
-  slice.write({ difficult });
+  slice.write(next);
 }
 
 export function resetTerrain(state: GameState, sceneId: string | undefined) {
   const slice = layerSlice(state, sceneId, "terrain", LIVE_REFUSAL);
-  slice.write({ difficult: [] });
+  slice.write({ difficult: [], water: [], runningWater: [], ice: [] });
 }
 
 /** Terrain as players and the table screen get it: only what the fog reveals, and with dynamic vision only what the
- *  party has seen (`seen`, disjoint rects), so unrevealed ground keeps its layout. Difficult terrain out of sight is
- *  still charged when someone walks into it. */
-export function visibleTerrain(
-  combat: Pick<CombatState, "fog" | "terrain">,
-  seen?: readonly Rect[]
-): CombatState["terrain"] {
+ *  party has seen (`seen`, disjoint rects), so unrevealed ground keeps its layout. Ground out of sight is still charged
+ *  when someone walks into it. */
+export function visibleTerrain(combat: Pick<CombatState, "fog" | "terrain">, seen?: readonly Rect[]): Terrain {
   const revealed = revealedRegion(combat.fog);
-  const difficult = combat.terrain.difficult.map((rect) => ({ ...rect }));
-  const unfogged = revealed === "everything" ? difficult : intersectRegions(difficult, revealed);
-  return { difficult: seen === undefined ? unfogged : intersectRegions(unfogged, seen) };
+  const visible = (rects: readonly Rect[]) => {
+    const copied = rects.map((rect) => ({ ...rect }));
+    const unfogged = revealed === "everything" ? copied : intersectRegions(copied, revealed);
+    return seen === undefined ? unfogged : intersectRegions(unfogged, seen);
+  };
+  return {
+    difficult: visible(combat.terrain.difficult),
+    water: visible(combat.terrain.water),
+    runningWater: visible(combat.terrain.runningWater),
+    ice: visible(combat.terrain.ice)
+  };
 }
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -126,6 +155,15 @@ export type MovementCostOptions = Readonly<{
   costlyStep?: (from: Point, to: Point, sizeCells: number) => boolean;
   /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
   altitude?: Readonly<{ fromFeet: number; toFeet: number }>;
+  /** It swims with its Swim Speed, so a foot in water costs no more (SRD Swimming); a foot in water costs 1 extra
+   *  otherwise. */
+  swimsFree?: boolean;
+  /** It moves across water as if it were solid ground (Water Walk, a Monk's Acrobatic Movement). */
+  walksOnWater?: boolean;
+  /** It can't pass through liquid (a vampire's mist), so water bars its way. */
+  barredByWater?: boolean;
+  /** Slippery ice costs it nothing extra (Ice Walk). */
+  freeOnIce?: boolean;
 }>;
 
 /** The movement-blocking walls of the live scene (walls, closed doors, windows) in grid units, while its dynamic
@@ -242,6 +280,9 @@ export function movementCost(
     ) /
       lineLength <=
       0.75;
+  // Water a mover walks across is ground to it; one that can't pass through liquid finds it closed.
+  const water = options.walksOnWater === true || aloft ? [] : waterRects(state.combat.terrain);
+  const ice = options.freeOnIce === true ? [] : state.combat.terrain.ice;
   const path = movementPath({
     from: fromCell,
     to: toCell,
@@ -253,13 +294,22 @@ export function movementCost(
         (!aloft &&
           ((pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain) &&
             options.clearedAt?.(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 })) !== true) ||
+            pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), ice) ||
             options.difficultAt?.(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 })) === true))),
     // A path can't leave the map to walk round something, nor pass a creature that bars the way.
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
       const center = gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
+      if (options.barredByWater === true && pointInRects(center, water)) return false;
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
+    ...(water.length > 0
+      ? {
+          isWater: (column: number, row: number) =>
+            pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), water),
+          swimExtra: options.swimsFree === true ? 0 : 1
+        }
+      : {}),
     isStepOpen: (stepFrom, stepTo) =>
       (options.alongLine !== true || nearLine(stepTo)) &&
       (passesWalls
@@ -319,6 +369,11 @@ export function movementCost(
     difficultFeet: path.difficultSteps * calibration.distancePerCell,
     path: path.steps.map((step) => gridToImage(calibration, footprintCenter(step, sizeCells)))
   };
+}
+
+/** Every painted water rect, still and running. */
+export function waterRects(terrain: Pick<CombatState["terrain"], "water" | "runningWater">): Rect[] {
+  return [...terrain.water, ...terrain.runningWater];
 }
 
 function straightThroughWall(state: GameState, from: Point, to: Point): boolean {

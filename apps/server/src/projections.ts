@@ -28,6 +28,7 @@ import { healthBandOf } from "./hit-points.js";
 import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 import { OFF_PLANE_TAG } from "./off-plane.js";
 import { visibleTerrain } from "./terrain.js";
+import { playerTraps } from "./traps.js";
 import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
 import { sensedBy } from "./vision/detect.js";
 import { huntersLoreOf } from "./hunters-lore.js";
@@ -321,7 +322,9 @@ const ON_FAIL_EFFECT_FIELDS = {
   // The form a failure gives is the caster's pick, named in the effect's `name`; its stat block and terms stay the GM's.
   form: "never",
   // The size a failure changes is the spell's own text (Enlarge/Reduce).
-  sizeChange: "player"
+  sizeChange: "player",
+  // The dice of its hours (Torpor's 4d6) are rolled as it lands; the landed effect shows what came of them.
+  hoursRolled: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -505,6 +508,8 @@ export function projectPlayerCombat(
     fog: { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) },
     // Only the revealed part: terrain under the fog would show the layout of ground players haven't seen.
     terrain: visibleTerrain(state.combat, sight.enabled ? exploredRectsOf(state) : undefined),
+    // The traps the party has found, by name and area; a hidden one leaves no trace, and no DC reaches anyone.
+    traps: playerTraps(state.combat.traps),
     // Where their own characters see now and what the party has seen; computed on the server whenever the map reaches
     // them, before a fight as in one.
     vision:
@@ -830,6 +835,8 @@ const PLAYER_ACTOR_FIELDS = {
   choiceOverrides: "derived",
   hitDice: "derived",
   nourishment: "derived",
+  // How long its surroundings have worn on it (heat, frigid water, time out of water) is the server's bookkeeping.
+  exposure: "never",
   lastLongRestAt: "never",
   spellSlots: "derived",
   pactSlots: "derived",

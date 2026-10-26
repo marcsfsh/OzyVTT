@@ -55,6 +55,15 @@ export function holdMove(
   setAltitude(state, input.actorId, input.altitudeFeet, input.altitudeFeet > 0 ? input.airborne : undefined);
 }
 
+/** Gives back movement a move didn't go on to spend, on the mover's own turn. */
+export function refundMovement(state: GameState, actorId: string, feet: number): void {
+  if (state.combat.turnActorId !== actorId || feet <= 0) return;
+  state.combat = {
+    ...state.combat,
+    turn: { ...state.combat.turn, movementUsedFeet: Math.max(0, state.combat.turn.movementUsedFeet - feet) }
+  };
+}
+
 /** Whether a held move's prompts and saves are all answered, so it can finish or stop. */
 export function heldMoveReady(state: GameState): boolean {
   const held = state.combat.heldMove;
@@ -86,14 +95,7 @@ export function settleHeldMove(state: GameState, geometry: TokenMapGeometry, dep
     mover.conditions.some((condition) => condition.id === "prone");
   if (stopped) {
     // Its own turn's movement the rest of the way would have spent is its again.
-    if (state.combat.turnActorId === mover.id && held.refundFeet > 0)
-      state.combat = {
-        ...state.combat,
-        turn: {
-          ...state.combat.turn,
-          movementUsedFeet: Math.max(0, state.combat.turn.movementUsedFeet - held.refundFeet)
-        }
-      };
+    refundMovement(state, mover.id, held.refundFeet);
     return [{ kind: "effect", text: `${mover.name} stops where it is.`, actorId: mover.id }];
   }
   const from = token.position;
@@ -110,6 +112,11 @@ export function settleHeldMove(state: GameState, geometry: TokenMapGeometry, dep
   const arrived = state.combat.tokens.find((candidate) => candidate.actorId === mover.id)?.position;
   if (arrived) dragAlong(state, held.dragged, from, arrived, geometry);
   if (walk) events.push(...walk.events);
+  if (stop !== null && walk?.ends) {
+    // It fell into a pit on the way: the move ends there.
+    refundMovement(state, mover.id, deps?.costFeet(way[stop]!, held.to) ?? 0);
+    return events;
+  }
   if (stop !== null && walk && arrived) {
     const onward = way.slice(stop);
     holdMove(state, geometry, {

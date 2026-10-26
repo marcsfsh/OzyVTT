@@ -47,9 +47,20 @@ export type ViewerFog = Readonly<{
   }>[];
 }>;
 
-/** Difficult terrain the fog has revealed, as image-pixel rects. */
+/** Painted ground the fog has revealed, as image-pixel rects: difficult terrain, and water and ice where painted. */
 export type ViewerTerrain = Readonly<{
   difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
+  water?: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
+  runningWater?: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
+  ice?: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
+}>;
+
+/** A trap the party has found: its name, area and whether it is still dangerous. */
+export type ViewerTrap = Readonly<{
+  id: string;
+  name: string;
+  area: Readonly<{ x: number; y: number; width: number; height: number }>;
+  state: "armed" | "sprung" | "disarmed";
 }>;
 
 /** Dynamic vision as the shared screen gets it: where the party sees now (polygons as flat `[x0, y0, ...]` pairs)
@@ -106,6 +117,8 @@ export type ViewerEncounterScene = Readonly<{
   fog?: ViewerFog;
   /** Absent on a presentation stored before terrain existed. */
   terrain?: ViewerTerrain;
+  /** The traps the party has found; absent when there are none. */
+  traps?: readonly ViewerTrap[];
   /** Present while the scene's dynamic vision is on; the viewer darkens all but this. */
   vision?: ViewerVision;
 }>;
@@ -318,6 +331,7 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     throw new InvalidRequestError("Viewer annotations require an active encounter map.");
   const fog = value.fog === undefined ? undefined : sanitizedFog(value.fog);
   const terrain = value.terrain === undefined ? undefined : sanitizedTerrain(value.terrain);
+  const traps = value.traps === undefined ? undefined : sanitizedTraps(value.traps);
   const vision = value.vision === undefined ? undefined : sanitizedVision(value.vision);
   return {
     mapAssetId,
@@ -325,6 +339,7 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     annotations,
     ...(fog ? { fog } : {}),
     ...(terrain ? { terrain } : {}),
+    ...(traps && traps.length > 0 ? { traps } : {}),
     ...(vision ? { vision } : {})
   };
 }
@@ -351,18 +366,46 @@ function sanitizedVision(value: ViewerVision): ViewerVision {
   };
 }
 
-function sanitizedTerrain(value: ViewerTerrain): ViewerTerrain {
-  const rects = value.difficult ?? [];
+function sanitizedRects(value: unknown): Array<{ x: number; y: number; width: number; height: number }> {
+  const rects = (value ?? []) as ViewerTerrain["difficult"];
   if (!Array.isArray(rects) || rects.length > 1000)
     throw new InvalidRequestError("Viewer terrain cannot exceed 1000 areas.");
+  return rects.map((rect) => sanitizedRect(rect));
+}
+
+function sanitizedRect(rect: Readonly<{ x: number; y: number; width: number; height: number }>) {
+  for (const bound of [rect.x, rect.y, rect.width, rect.height])
+    if (!Number.isFinite(bound) || bound < 0 || bound > 1_000_000)
+      throw new InvalidRequestError("Viewer terrain geometry is invalid.");
+  return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+}
+
+function sanitizedTerrain(value: ViewerTerrain): ViewerTerrain {
+  const water = sanitizedRects(value.water);
+  const runningWater = sanitizedRects(value.runningWater);
+  const ice = sanitizedRects(value.ice);
   return {
-    difficult: rects.map((rect) => {
-      for (const bound of [rect.x, rect.y, rect.width, rect.height])
-        if (!Number.isFinite(bound) || bound < 0 || bound > 1_000_000)
-          throw new InvalidRequestError("Viewer terrain geometry is invalid.");
-      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-    })
+    difficult: sanitizedRects(value.difficult),
+    ...(water.length > 0 ? { water } : {}),
+    ...(runningWater.length > 0 ? { runningWater } : {}),
+    ...(ice.length > 0 ? { ice } : {})
   };
+}
+
+const TRAP_STATES: ReadonlySet<string> = new Set(["armed", "sprung", "disarmed"]);
+
+function sanitizedTraps(value: readonly ViewerTrap[]): ViewerTrap[] {
+  if (!Array.isArray(value) || value.length > 50) throw new InvalidRequestError("Viewer traps cannot exceed 50.");
+  return value.map((trap) => {
+    if (typeof trap.id !== "string" || !TRAP_STATES.has(trap.state))
+      throw new InvalidRequestError("Viewer trap is invalid.");
+    return {
+      id: trap.id.slice(0, 80),
+      name: safeText(trap.name, "Viewer trap name", 80),
+      area: sanitizedRect(trap.area),
+      state: trap.state
+    };
+  });
 }
 
 function sanitizedFog(value: ViewerFog): ViewerFog {

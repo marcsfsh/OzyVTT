@@ -29,7 +29,8 @@ import {
 } from "../rests.js";
 import { interruptByGm, resumeLongRest } from "../long-rest.js";
 import { restApplier } from "../rest-interruptions.js";
-import { setTravelPace } from "../travel.js";
+import { setTravelPace, TRAVEL_TAG } from "../travel.js";
+import { travelHoursPass } from "../environment.js";
 import { workDuringDowntime } from "../crafting.js";
 import { clockMinutesOf } from "../game-time.js";
 import { craftingDeps } from "./crafting.js";
@@ -378,6 +379,22 @@ export const restingCommands = [
             });
             // The party stays on the road at this pace, which its checks read, until time passes without one.
             setTravelPace(state, pace ?? null);
+            // A day's road past 8 hours tires its travellers (Extended Travel), twice as fast at high altitude.
+            if (pace)
+              events.push(
+                ...travelHoursPass(
+                  state,
+                  state.actors
+                    .filter((actor) => actor.effects.some((effect) => effect.tags.includes(TRAVEL_TAG)))
+                    .map((actor) => actor.id),
+                  minutes / 60,
+                  {
+                    resolveDefinition: kit.resolveDefinition,
+                    catalog: kit.equipmentCatalog(),
+                    random: (sides) => kit.context.random(sides)
+                  }
+                )
+              );
             // Downtime: the crafters work through it.
             if (request.downtime === true)
               events.push(

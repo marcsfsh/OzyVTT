@@ -35,6 +35,8 @@ import {
 } from "../effects.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
+import { BELOW_SURFACE_TAG, WATER_WALKING_TAG } from "../speed.js";
+import { findTraps, noticeGlyphs } from "../traps.js";
 import { endAnEffect, isNamedEnding, namedEnding, stepOutOfHolder } from "./endings.js";
 import { CommandRejectedError } from "../game-store.js";
 import { touchBead } from "../zone-touch.js";
@@ -291,6 +293,19 @@ const searchOrStudy = (ability: CheckSubject["ability"]) => (ctx: ResolveContext
   const subject = chosenSubject(ctx, ability);
   const rolled = rolledCheck(ctx, subject, null);
   if (ctx.action.id === "search" && subject.skill === "perception") findHidden(ctx, subject, rolled);
+  // The hidden traps and glyphs the check finds (SRD 5.2.1 Gameplay Toolbox, Detect and Disarm; Glyph of Warding,
+  // Symbol), for the party.
+  const found = {
+    action: ctx.action.id as "search" | "study",
+    skill: subject.skill,
+    total: rolled.roll.total,
+    ...(ctx.deps.pixelsPerFoot ? { pixelsPerFoot: ctx.deps.pixelsPerFoot } : {})
+  };
+  for (const event of [
+    ...findTraps(ctx.state, ctx.attacker.id, found),
+    ...noticeGlyphs(ctx.state, ctx.attacker.id, found)
+  ])
+    ctx.tableNarration.push(tableLineOf(ctx, event));
 };
 
 /** How a roll's mode reads in the GM's line. */
@@ -739,7 +754,43 @@ export function openUnarmedSave(
   ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
 }
 
+/** SRD Water Walk: "An affected target must take a Bonus Action to pass from the liquid's surface into the liquid itself
+ *  and vice versa." Below the surface it swims; the mark ends with the spell. */
+function passTheSurface(ctx: ResolveContext): void {
+  const { state, attacker } = ctx;
+  const below = attacker.effects.find((effect) => effect.tags.includes(BELOW_SURFACE_TAG));
+  if (below) {
+    for (const event of endEffect(state, attacker.id, below.id)) ctx.tableNarration.push(tableLineOf(ctx, event));
+    ctx.tableNarration.push({
+      kind: "effect",
+      text: `${attacker.name} rises onto the liquid's surface.`,
+      actorIds: [attacker.id]
+    });
+    return;
+  }
+  addEffect(
+    state,
+    attacker.id,
+    makeEffect({
+      id: `${ctx.input.commandId}:below-the-surface`,
+      name: "Below the surface",
+      tags: [BELOW_SURFACE_TAG],
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      startedRound: state.combat.round,
+      duration: { type: "manual" },
+      endsWithTag: WATER_WALKING_TAG
+    })
+  );
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${attacker.name} passes below the liquid's surface.`,
+    actorIds: [attacker.id]
+  });
+}
+
 const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
+  "pass-the-surface": { apply: passTheSurface },
   hide: { check: hide },
   influence: { check: influence },
   search: { check: searchOrStudy("wis") },

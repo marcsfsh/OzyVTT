@@ -559,6 +559,67 @@ test("the GM paints darkness over part of the live map, and bright light that is
   await expectPageFits(gm);
 });
 
+test("the GM paints water on a gridded map, sets a hidden trap and turns the weather cold", async ({
+  open,
+  request
+}) => {
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+
+  // A scene on a new map with its grid set, so ground and traps snap to its squares.
+  await openGmSection(gm, "Scenes");
+  await press(gm.getByRole("button", { name: /^New( scene)?$/ }).first());
+  const chooser = gm.waitForEvent("filechooser");
+  await press(gm.getByRole("button", { name: /Upload a map/ }));
+  await (await chooser).setFiles({ name: "Smoke grotto.png", mimeType: "image/png", buffer: battleMap(700, 546) });
+  await expect(gm.getByText("Map uploaded.")).toBeVisible();
+  await press(gm.getByRole("button", { name: "Set the grid" }).first());
+  await expect(gm.getByRole("heading", { name: "Grid", exact: true })).toBeVisible();
+  await press(gm.getByRole("button", { name: "Continue" }));
+  const from = await onPreview(gm, { x: 64, y: 64 });
+  const to = await onPreview(gm, { x: 256, y: 256 });
+  await drag(gm, gm.locator(".map-preview"), { x: to.x - from.x, y: to.y - from.y }, from);
+  await press(gm.getByRole("button", { name: "Measure this area" }));
+  await press(gm.getByRole("button", { name: "Looks right" }));
+  await press(gm.getByRole("button", { name: "Confirm grid" }));
+  await press(gm.getByRole("button", { name: "Back to the scene" }));
+  const continueStep = gm.getByRole("button", { name: "Continue" });
+  if (await continueStep.isDisabled()) await press(gm.getByRole("button", { name: /^Smoke grotto/ }));
+  await press(continueStep);
+  await makeLiveFromSteps(gm, ["Light", "Sound", "Review"]);
+
+  const rail = gm.getByRole("toolbar", { name: "Map tools" });
+  const map = gm.getByRole("group", { name: /Interactive tokens are layered above this map/ });
+  await press(rail.getByRole("button", { name: "Terrain" }));
+  await press(gm.getByRole("group", { name: "Terrain" }).getByRole("button", { name: "Water", exact: true }));
+  await expectPageFits(gm);
+  await gm.keyboard.press("Escape");
+  await drag(gm, map, { x: 90, y: 60 });
+  await expect(gm.locator(".terrain-water")).toHaveCount(1);
+
+  await press(rail.getByRole("button", { name: "Traps" }));
+  const traps = gm.getByRole("group", { name: "Traps" });
+  await traps.getByLabel("Trap", { exact: true }).selectOption("spiked-pit");
+  await press(traps.getByRole("button", { name: "Set a trap" }));
+  await gm.keyboard.press("Escape");
+  await drag(gm, map, { x: 40, y: 40 });
+  await expect(gm.locator(".terrain-trap-hidden")).toHaveCount(1);
+  await press(rail.getByRole("button", { name: "Traps" }));
+  const row = gm.getByRole("list", { name: "Traps on this map" }).getByRole("listitem");
+  await expect(row).toContainText("Spiked Pit");
+  await expect(row).toContainText("Hidden");
+  await press(row.getByRole("button", { name: "Reveal" }));
+  await expect(row).toContainText("Found");
+  await expectPageFits(gm);
+
+  await press(rail.getByRole("button", { name: "Weather" }));
+  const weather = gm.getByRole("group", { name: "Weather" });
+  await press(weather.getByRole("switch", { name: "Extreme cold" }));
+  await expect(weather.getByRole("switch", { name: "Extreme cold" })).toBeChecked();
+  await expectPageFits(gm);
+});
+
 test("the GM draws a door on the live map and locks it from the door's menu", async ({ open, request, hasTouch }) => {
   await ensureGmPassword(request);
   const gm = await open("/");

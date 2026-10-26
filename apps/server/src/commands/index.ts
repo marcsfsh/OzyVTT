@@ -23,6 +23,7 @@ import { soundCommands } from "./sound.js";
 import { summonCommands } from "./summons.js";
 import { tableSettingCommands } from "./table-settings.js";
 import { objectCommands } from "./objects.js";
+import { hazardCommands } from "./hazards.js";
 import { visionCommands } from "./vision.js";
 
 export { describeFailure, failureReply, NOT_JOINED_REPLY, SESSION_ENDED_REPLY } from "./failures.js";
@@ -52,7 +53,8 @@ export const gameCommands: readonly AnyCommand[] = [
   ...summonCommands,
   ...soundCommands,
   ...visionCommands,
-  ...objectCommands
+  ...objectCommands,
+  ...hazardCommands
 ];
 export { gameReads };
 

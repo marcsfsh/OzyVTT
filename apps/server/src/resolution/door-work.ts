@@ -93,7 +93,7 @@ export function findSecrets(ctx: ResolveContext): void {
   if (!finds || ctx.input.commit === false) return;
   const { state, attacker, deps } = ctx;
   const at = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position;
-  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot ?? deps.pixelsPerFoot;
   const told = (text: string, gmOnly = false) =>
     ctx.tableNarration.push(
       tableLineOf(ctx, { kind: "effect", text, actorId: attacker.id, ...(gmOnly ? { gmOnly: true as const } : {}) })
@@ -111,7 +111,14 @@ export function findSecrets(ctx: ResolveContext): void {
     const area = state.combat.annotations.find((annotation) => annotation.id === zone.annotationId);
     return area ? [{ name: zone.name, point: area.geometry.origin }] : [];
   });
-  const nearest = [...doors, ...traps]
+  // The traps set on the map (`traps.ts`), still dangerous.
+  const setTraps = (state.combat.traps ?? [])
+    .filter((trap) => trap.state !== "disarmed")
+    .map((trap) => ({
+      name: trap.name,
+      point: { x: trap.area.x + trap.area.width / 2, y: trap.area.y + trap.area.height / 2 }
+    }));
+  const nearest = [...doors, ...traps, ...setTraps]
     .map((found) => ({ ...found, feet: distance(at, found.point) / pixelsPerFoot }))
     .filter((found) => found.feet <= finds.feet + 2.5)
     .sort((a, b) => a.feet - b.feet)[0];

@@ -18898,6 +18898,14 @@
     "name": "Illumination",
     "brightFeet": 30,
     "dimFeet": 30
+   },
+   {
+    "kind": "water-weakness",
+    "name": "Water Susceptibility",
+    "moving": {
+     "formula": "1d6",
+     "type": "cold"
+    }
    }
   ],
   "extensions": {
@@ -40712,6 +40720,11 @@
   ],
   "traitMechanics": [
    {
+    "kind": "dries-out",
+    "name": "Limited Amphibiousness",
+    "hours": 4
+   },
+   {
     "kind": "controls-kind",
     "name": "Shark Telepathy",
     "nameHas": "shark",
@@ -48217,6 +48230,8 @@
        "noActions": true,
        "noSpeech": true,
        "sharesSpaces": true,
+       "noLiquid": true,
+       "sunlightPierces": true,
        "modifiers": [
         {
          "type": "damage-resistance",
@@ -48242,6 +48257,7 @@
      "keeps": [],
      "gear": "worn",
      "notInSunlight": true,
+     "notInRunningWater": true,
      "escapesAtZero": {
       "form": "mist",
       "hours": 2
@@ -48401,6 +48417,14 @@
     "damageAtTurnStart": {
      "amount": 20,
      "type": "radiant"
+    }
+   },
+   {
+    "kind": "water-weakness",
+    "name": "Vampire Weakness",
+    "endsTurnInRunning": {
+     "amount": 20,
+     "type": "acid"
     }
    },
    {
@@ -48743,6 +48767,14 @@
     "damageAtTurnStart": {
      "amount": 20,
      "type": "radiant"
+    }
+   },
+   {
+    "kind": "water-weakness",
+    "name": "Vampire Weakness",
+    "endsTurnInRunning": {
+     "amount": 20,
+     "type": "acid"
     }
    }
   ],

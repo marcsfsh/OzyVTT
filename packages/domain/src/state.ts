@@ -227,6 +227,11 @@ const PendingSaveEffectSchema = z
     sourceName: z.string().max(120).nullable().default(null),
     /** How long it lasts, as the text prints it; absent is until ended. */
     duration: SaveFailureDurationSchema.optional(),
+    /** Hours rolled as it lands (Torpor: 4d6), in place of `duration`. */
+    hoursRolled: z
+      .string()
+      .regex(/^[1-4]d(?:4|6|8|10|12)$/)
+      .optional(),
     /** The save the target repeats at the end of each of its turns, a success ending the effect. */
     repeatSave: EffectInstanceSchema.shape.repeatSave,
     endsOnDamage: z.boolean().optional(),
@@ -593,8 +598,13 @@ export const HeldRollSchema = z
         /** What the use leaves on a creature while the check succeeds (Cobbler's Tools' footwear), settled again after a
          *  reroll or an answer. */
         onSuccess: z
-          .object({ kind: z.literal("next-acrobatics-advantage"), actorId: z.uuid() })
-          .strict()
+          .discriminatedUnion("kind", [
+            z.object({ kind: z.literal("next-acrobatics-advantage"), actorId: z.uuid() }).strict(),
+            /** A disarm check (`traps.ts`): a success makes the trap safe, and a failure sets it off where `springs`. */
+            z
+              .object({ kind: z.literal("disarm-trap"), actorId: z.uuid(), trapId: z.uuid(), springs: z.boolean() })
+              .strict()
+          ])
           .optional()
       })
       .strict()
@@ -1393,6 +1403,92 @@ export const VisionAreaSchema = z
   .strict();
 export type VisionArea = z.infer<typeof VisionAreaSchema>;
 
+/** A scene's climate and weather (SRD 5.2.1 Gameplay Toolbox, Environmental Effects), which the GM sets. The creatures
+ * placed on its map are exposed to it: extreme cold and heat ask their saves at the end of each hour on the game clock,
+ * heavy precipitation and strong wind act on sight, flames and flight, and the painted water is frigid or deep as set
+ * (`environment.ts`). GM-only. */
+export const SceneEnvironmentSchema = z
+  .object({
+    /** 0 degrees Fahrenheit or lower. */
+    cold: z.boolean().default(false),
+    /** 100 degrees Fahrenheit or higher. */
+    heat: z.boolean().default(false),
+    /** 10,000 feet or more above sea level: each hour travelled counts as 2. */
+    highAltitude: z.boolean().default(false),
+    /** Heavy rain or heavy snowfall: Lightly Obscured, Disadvantage on Wisdom (Perception) checks; rain puts out open
+     *  flames. */
+    precipitation: z.enum(["none", "rain", "snow"]).default("none"),
+    /** A strong wind, or one raising a sandstorm in a desert. */
+    wind: z.enum(["none", "strong", "sandstorm"]).default("none"),
+    /** The painted water is frigid: a creature in it saves each minute past its Constitution score. */
+    frigidWater: z.boolean().default(false),
+    /** The painted water is more than 100 feet deep: each hour swum there without a Swim Speed asks a save. */
+    deepWater: z.boolean().default(false)
+  })
+  .strict();
+export type SceneEnvironment = z.infer<typeof SceneEnvironmentSchema>;
+export const CALM_ENVIRONMENT: SceneEnvironment = {
+  cold: false,
+  heat: false,
+  highAltitude: false,
+  precipitation: "none",
+  wind: "none",
+  frigidWater: false,
+  deepWater: false
+};
+
+/**
+ * A trap the GM set on the map (SRD 5.2.1 Gameplay Toolbox, Traps): one of the toolbox's traps at a band of levels
+ * (`tier` 1: levels 1-4, 2: 5-10, 3: 11-16, 4: 17-20), over the trapped area it is set off from, and the area its blast
+ * falls on when that is elsewhere (a statue's Cone, the darts' path). It stays hidden until the party finds it (`found`),
+ * a creature sets it off (`sprung`), or it is made safe (`disarmed`). GM-only: players and the table screen get only a
+ * found trap's name, area and state (`traps.ts`), never its DC or tier.
+ */
+export const MapTrapSchema = z
+  .object({
+    id: z.uuid(),
+    trapId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    name: z.string().min(1).max(80),
+    tier: z.number().int().min(1).max(4),
+    area: z
+      .object({
+        x: z.number().min(0).max(100000),
+        y: z.number().min(0).max(100000),
+        width: z.number().positive().max(100000),
+        height: z.number().positive().max(100000)
+      })
+      .strict(),
+    blast: z
+      .object({
+        x: z.number().min(0).max(100000),
+        y: z.number().min(0).max(100000),
+        width: z.number().positive().max(100000),
+        height: z.number().positive().max(100000)
+      })
+      .strict()
+      .optional(),
+    state: z.enum(["armed", "sprung", "disarmed"]).default("armed"),
+    found: z.boolean().default(false),
+    activations: z.number().int().nonnegative().max(1000).default(0),
+    /** The turn it last went off, as `round:actorId`; one that resets is armed again once another turn starts. */
+    sprungTurn: z.string().max(80).optional()
+  })
+  .strict();
+export type MapTrap = z.infer<typeof MapTrapSchema>;
+
+/** A painted area of ground, in image pixels (`combat.terrain`). */
+const TerrainRectSchema = z
+  .object({
+    x: z.number().min(0).max(100000),
+    y: z.number().min(0).max(100000),
+    width: z.number().positive().max(100000),
+    height: z.number().positive().max(100000)
+  })
+  .strict();
+
 /** The scene's dynamic vision (ADR-0023). Off by default, so a scene without it behaves as before. `measure` is the
  * map's size and scale, written by the server whenever the GM edits it, so feet convert to pixels without the map
  * catalog (a replay of the fight reads it too). `explored` is what the party has seen in this scene: a bitmap over the
@@ -1793,27 +1889,25 @@ const sceneCombatShape = {
     })
     .strict()
     .prefault({ enabled: false, shapes: [] }),
-  /** GM-painted difficult terrain: disjoint image-pixel rects, snapped to whole cells on an unrotated grid.
-   * Entering a cell whose centre lies in one costs double (SRD Difficult Terrain). Players and the table screen
-   * receive only the parts the fog has revealed. */
+  /** GM-painted ground: disjoint image-pixel rects per kind, snapped to whole cells on an unrotated grid. Entering a
+   * cell whose centre lies in difficult terrain costs double (SRD Difficult Terrain); in water, a creature swims (SRD
+   * Swimming), and running water is the river or stream that some creatures fear (a vampire's Running Water); slippery
+   * ice is Difficult Terrain where a creature that moves onto it or starts its turn there saves or falls Prone (SRD
+   * Gameplay Toolbox). Water and ice are disjoint from each other: painting one kind over another replaces it. Players
+   * and the table screen receive only the parts the fog has revealed. */
   terrain: z
     .object({
-      difficult: z
-        .array(
-          z
-            .object({
-              x: z.number().min(0).max(100000),
-              y: z.number().min(0).max(100000),
-              width: z.number().positive().max(100000),
-              height: z.number().positive().max(100000)
-            })
-            .strict()
-        )
-        .max(1000)
-        .default([])
+      difficult: z.array(TerrainRectSchema).max(1000).default([]),
+      water: z.array(TerrainRectSchema).max(1000).default([]),
+      runningWater: z.array(TerrainRectSchema).max(1000).default([]),
+      ice: z.array(TerrainRectSchema).max(1000).default([])
     })
     .strict()
-    .prefault({ difficult: [] }),
+    .prefault({ difficult: [], water: [], runningWater: [], ice: [] }),
+  /** The scene's climate and weather (see SceneEnvironmentSchema). GM-only. */
+  environment: SceneEnvironmentSchema.prefault({}),
+  /** The traps set on the map (see MapTrapSchema). GM-only; players get the found ones' names and areas. */
+  traps: z.array(MapTrapSchema).max(50).default([]),
   /** Walls, doors, lights and what the party has seen (ADR-0023). With `enabled`, the server sends each player only
    * what their characters can see; scene dressing like fog, so a rewind keeps it. */
   vision: SceneVisionSchema.prefault({}),
@@ -1998,6 +2092,10 @@ export const CombatStateSchema = z
         active.combat.fog.enabled ||
         active.combat.fog.shapes.length > 0 ||
         active.combat.terrain.difficult.length > 0 ||
+        active.combat.terrain.water.length > 0 ||
+        active.combat.terrain.runningWater.length > 0 ||
+        active.combat.terrain.ice.length > 0 ||
+        active.combat.traps.length > 0 ||
         active.combat.vision.enabled ||
         active.combat.vision.walls.length > 0 ||
         active.combat.vision.lights.length > 0 ||

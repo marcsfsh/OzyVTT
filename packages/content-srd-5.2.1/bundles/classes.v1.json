@@ -6202,7 +6202,30 @@
     "id": "acrobatic-movement",
     "name": "Acrobatic Movement",
     "level": 9,
-    "description": "While you aren't wearing armor or wielding a Shield, you gain the ability to move along vertical surfaces and across liquids on your turn without falling during the movement."
+    "description": "While you aren't wearing armor or wielding a Shield, you gain the ability to move along vertical surfaces and across liquids on your turn without falling during the movement.",
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "climb",
+      "equalToSpeed": true,
+      "ownTurn": true,
+      "when": [
+       {
+        "type": "while-unarmored"
+       }
+      ]
+     },
+     {
+      "type": "movement",
+      "rule": "walks-on-liquid",
+      "ownTurn": true,
+      "when": [
+       {
+        "type": "while-unarmored"
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "heightened-focus",

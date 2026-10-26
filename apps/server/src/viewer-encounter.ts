@@ -2,6 +2,7 @@ import type { GameState } from "@vtt/domain";
 import { healthBandOf } from "./hit-points.js";
 import { conditionLabels, projectPublicInitiative } from "./projections.js";
 import { visibleTerrain } from "./terrain.js";
+import { visibleTraps } from "./traps.js";
 import {
   exploredRectsOf,
   partySight,
@@ -117,6 +118,8 @@ export function projectViewerEncounterScene(
     ),
     fog,
     terrain,
+    // The traps the party has found, as players see them.
+    ...(visibleTraps(state.combat.traps).length > 0 ? { traps: visibleTraps(state.combat.traps) } : {}),
     ...vision
   };
 }

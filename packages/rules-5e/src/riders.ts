@@ -153,6 +153,8 @@ export type RiderModifier = Readonly<{
   movement?: "fly" | "swim" | "climb" | "burrow";
   equalToSpeed?: boolean;
   hover?: boolean;
+  /** `special-speed` / `movement`: only on the bearer's own turn. */
+  ownTurn?: boolean;
   /** `movement`: how the bearer falls and jumps ("safe-fall", "leap"), with a leap's `costFeet` and a multiplier's
    *  `times`. */
   rule?: string;

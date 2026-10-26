@@ -39,6 +39,11 @@ function inDaylight(fight: ReturnType<typeof table>) {
   });
 }
 
+/** Running water painted over the whole map. */
+function inRunningWater(fight: ReturnType<typeof table>) {
+  fight.state.combat.terrain.runningWater = [{ x: 0, y: 0, width: 5000, height: 5000 }];
+}
+
 /** The next turn of `actorId`, so its Bonus Action is fresh. */
 function nextTurnOf(fight: ReturnType<typeof table>, actorId: string) {
   fight.nextTurn();
@@ -175,6 +180,49 @@ describe("a vampire's Shape-Shift", () => {
     inDaylight(fight);
     damage(fight, FOE, 500);
     expect(isDead(fight.actor(FOE))).toBe(true);
+  });
+
+  it("can't shape-shift in running water painted on the map, and Misty Escape fails there", () => {
+    const fight = table(goliathFighter(1), { [FOE]: "vampire" });
+    inRunningWater(fight);
+    turnOf(fight, FOE);
+    expect(refusal(() => fight.resolve(FOE, "shape-shift", { form: "mist" }))).toBe(
+      "Vampire can't shape-shift in running water."
+    );
+    const result = damage(fight, FOE, 500);
+    expect(isDead(fight.actor(FOE))).toBe(true);
+    expect(result.events.map((event) => event.text)).toContain(
+      "Vampire can't turn to mist in running water and is destroyed (Misty Escape)."
+    );
+  });
+
+  it("as mist, takes sunlight's damage in full through its Resistance", () => {
+    const fight = table(goliathFighter(1), { [FOE]: "vampire" });
+    turnOf(fight, FOE);
+    fight.resolve(FOE, "shape-shift", { form: "mist" });
+    const before = fight.actor(FOE).hp.current;
+    applyDamageDetailed(
+      fight.state,
+      FOE,
+      { amount: 20, parts: [{ amount: 20, type: "radiant" }], sourceActorId: null, sourceName: "Sunlight" },
+      { role: "gm" },
+      { resolveDefinition: resolverOf(fight.state), catalog, newId: () => crypto.randomUUID() }
+    );
+    expect(fight.actor(FOE).hp.current).toBe(before - 10);
+    applyDamageDetailed(
+      fight.state,
+      FOE,
+      {
+        amount: 20,
+        parts: [{ amount: 20, type: "radiant" }],
+        sourceActorId: null,
+        sourceName: "Sunlight",
+        fromSunlight: true
+      },
+      { role: "gm" },
+      { resolveDefinition: resolverOf(fight.state), catalog, newId: () => crypto.randomUUID() }
+    );
+    expect(fight.actor(FOE).hp.current).toBe(before - 30);
   });
 });
 

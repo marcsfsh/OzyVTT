@@ -13,7 +13,9 @@ import { previewDamage } from "../hit-points.js";
 import { masteryHitEffects } from "../weapon-mastery.js";
 import { endedEffect, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { damagePartsOf } from "./damage.js";
-import { spellCastOf } from "./pending.js";
+import { failureEffectFor, spellCastOf } from "./pending.js";
+import { shotFrom } from "../ammunition.js";
+import { createPendingSaves } from "../pending-saves.js";
 import { forceMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { effectNameOf } from "../effect-names.js";
 import { applyKillingHit } from "./kill.js";
@@ -38,6 +40,7 @@ export function dealsDamage(ctx: ResolveContext): boolean {
  *  effects (Sap, Slow, Vex). */
 export function applyOnHitEffects(ctx: ResolveContext): void {
   applyDeclaredRiders(ctx);
+  exposeToPoisonCoat(ctx);
   // `addEffect` is idempotent by id, so its return is what gets narrated.
   for (const applied of masteryHitEffects(ctx.masterySwing, ctx.masterySwing ? dealsDamage(ctx) : true)) {
     const effect = addEffect(ctx.state, applied.targetId, makeEffect(applied.effect), undefined, ctx.deps);
@@ -48,6 +51,78 @@ export function applyOnHitEffects(ctx: ResolveContext): void {
       conditionIds: effect.linkedConditionIds
     });
   }
+}
+
+/** The tag every injury poison's coat carries; `coat-<poison id>` names the poison. */
+export const POISON_COAT_TAG = "poison-coat";
+const COAT_PREFIX = "coat-";
+
+/**
+ * SRD 5.2.1 Gameplay Toolbox, Injury poison: "The poison remains potent until delivered through a wound or washed off. A
+ * creature that takes Piercing or Slashing damage from an object coated with the poison is exposed to its effects." A
+ * hit with the weapon, or a shot drawing from the ammunition, that the attacker's coat is bound to, dealing Piercing or
+ * Slashing damage the target takes, spends the coat and opens the poison's save on the target, its damage rolled now.
+ */
+function exposeToPoisonCoat(ctx: ResolveContext): void {
+  const { state, attacker, attack, targets, deps, riderItemId } = ctx;
+  if (attack === null || (attack.outcome !== "crit" && attack.outcome !== "hit")) return;
+  const target = targets[0];
+  if (!target || riderItemId === null) return;
+  const ammoRowId = shotFrom(attacker, riderItemId, deps.catalog)?.ammo?.row.id;
+  const coat = attacker.effects.find(
+    (effect) =>
+      effect.tags.includes(POISON_COAT_TAG) &&
+      effect.itemId !== undefined &&
+      (effect.itemId === riderItemId || effect.itemId === ammoRowId)
+  );
+  if (!coat) return;
+  const piercing = damagePartsOf(ctx).some((part) => part.type === "piercing" || part.type === "slashing");
+  if (!piercing || !dealsDamage(ctx)) return;
+  const poisonId = coat.tags.find((tag) => tag.startsWith(COAT_PREFIX))?.slice(COAT_PREFIX.length);
+  const poison = poisonId ? deps.catalog?.equipmentRecord(poisonId) : undefined;
+  if (!poison?.poison?.save) return;
+  for (const event of endEffect(state, attacker.id, coat.id)) ctx.tableNarration.push(tableLineOf(ctx, event));
+  ctx.effectsEnded.push(endedEffect(attacker, coat));
+  const action = {
+    id: `poison-${poison.id}`,
+    name: poison.name,
+    activation: "other" as const,
+    description: poison.name,
+    damage: structuredClone(poison.poison.damage),
+    save: structuredClone(poison.poison.save)
+  };
+  const parts = action.damage.map((part) => rollPlain(ctx, part.formula, part.type, poison.name));
+  const onFail = failureEffectFor(
+    { action, attacker, riderItemId: null, deps: { catalog: deps.catalog }, castId: null },
+    action.save.failureConditions
+  );
+  createPendingSaves(state, {
+    sourceActorId: attacker.id,
+    sourceName: attacker.name,
+    actionName: poison.name,
+    ability: action.save.ability,
+    dc: action.save.dc,
+    targetIds: [target.id],
+    proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
+    proposedDamageParts: parts,
+    halfOnSuccess: action.save.successDamage === "half",
+    conditionIds: [...action.save.failureConditions],
+    ...(onFail ? { onFailEffect: onFail } : {}),
+    ...(action.save.failureByMargin
+      ? { extra: { failureByMargin: structuredClone(action.save.failureByMargin) } }
+      : {}),
+    replaceExisting: false,
+    newSaveId: deps.newRollId,
+    createdAt: Date.parse(deps.now())
+  });
+  ctx.tableNarration.push(
+    tableLineOf(ctx, {
+      kind: "effect",
+      text: `The ${poison.name} on the wound: ${target.name} makes a DC ${action.save.dc} ${action.save.ability.toUpperCase()} save.`,
+      actorId: target.id,
+      source: { actorId: attacker.id, name: attacker.name }
+    })
+  );
 }
 
 /** Declared on-hit riders apply as one source-linked effect each (ADR-0020 condition carve-out); a rider

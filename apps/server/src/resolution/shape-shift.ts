@@ -10,6 +10,7 @@ import { laterRowOf } from "../item-actions.js";
 import { classLevelOf, formChoice, formRecord } from "../transform/options.js";
 import { NO_SHAPE_SHIFT_TAG } from "../transform/rules.js";
 import { inSunlight } from "../transform/at-zero.js";
+import { waterOf } from "../water.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
 import { tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -75,6 +76,18 @@ export function checkShapeShift(ctx: ResolveContext): void {
     })
   )
     throw new CommandRejectedError(`${ctx.attacker.name} can't shape-shift in sunlight.`);
+  if (
+    shift.notInRunningWater &&
+    waterOf(
+      ctx.state,
+      ctx.attacker.id,
+      null,
+      ctx.deps.resolveDefinition
+        ? { resolveDefinition: ctx.deps.resolveDefinition, ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {}) }
+        : undefined
+    ) === "running"
+  )
+    throw new CommandRejectedError(`${ctx.attacker.name} can't shape-shift in running water.`);
   if (shift.from === "known" && (ctx.attacker.knownForms?.ids ?? []).length === 0)
     throw new CommandRejectedError(
       `${ctx.attacker.name} knows no forms yet. Choose the known forms on the sheet first.`

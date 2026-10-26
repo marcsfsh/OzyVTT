@@ -610,6 +610,39 @@ function symbolGlyphs(): Later[] {
  * that moment; the rest stay with the GM, whom the cast reminds.
  */
 const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
+  // Each effect is an option of the cast. The whirlpool is its vortex: "Any creature in the water and within 25 feet
+  // of the whirlpool is pulled 10 feet toward it. When a creature enters the whirlpool for the first time on a turn or
+  // ends its turn there, it makes a Strength saving throw ... 2d8 Bludgeoning damage ... half as much damage." The
+  // flood, the trench and the redirected flow change the water the GM paints; swimming away and choosing another
+  // effect on a later turn are the GM's.
+  "control-water": [
+    {
+      name: "whirlpool",
+      activation: "other",
+      when: `A creature in the water within 25 feet is pulled 10 feet toward the vortex as its turn starts; one entering it or ending its turn there makes the save, once a turn. Swimming away takes an action and a Strength (Athletics) check against your spell save DC.`,
+      save: save("str"),
+      damage: [{ formula: "2d8", type: "bludgeoning" }],
+      area: { shape: "cube", sizeFeet: 5, widthFeet: null },
+      zone: { ...ENTER_OR_END_ONCE, pulls: { withinFeet: 25, feet: 10 } },
+      option: { id: "whirlpool", name: "Whirlpool" }
+    },
+    {
+      ...lasting("flood", "The standing water in the Cube rises by up to 20 feet, or a 20-foot wave crosses it.", {
+        on: []
+      }),
+      option: { id: "flood", name: "Flood" }
+    },
+    {
+      ...lasting("part water", "A trench crosses the Cube, the water walled to either side, until the spell ends.", {
+        on: []
+      }),
+      option: { id: "part-water", name: "Part Water" }
+    },
+    {
+      ...lasting("redirect flow", "The flowing water in the Cube moves the way you choose.", { on: [] }),
+      option: { id: "redirect-flow", name: "Redirect Flow" }
+    }
+  ],
   "animal-shapes": [
     {
       name: "transform again",
@@ -2515,6 +2548,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "targets",
     duration: { type: "manual" }
   }),
+  // "Move across any liquid surface ... as if it were harmless solid ground": painted water costs no swimming and its
+  // dangers don't reach the creature; a Bonus Action passes into the liquid and back (Pass the Surface).
+  "water-walk": spellGrant({
+    name: "Water Walk",
+    tags: ["water-walking"],
+    target: "targets",
+    duration: { type: "manual" }
+  }),
   // "Any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a Wisdom
   // saving throw or either choose a new target or lose the attack or spell", and it ends "if the warded creature
   // makes an attack roll, casts a spell, or deals damage".
@@ -3646,6 +3687,8 @@ export function spellEffectFor(
     ...(id === "sorcerous-burst" ? { explodingDice: true as const } : {}),
     ...(id === "teleport" ? { teleportOutcome: true as const } : {}),
     ...(id === "identify" ? { identifiesItem: true as const } : {}),
+    // "You sense any trap within range that is within line of sight": the traps the map holds, by their nature.
+    ...(id === "find-traps" ? { sensesTraps: { feet: 120 } } : {}),
     ...(id === "wish" ? { wishUses: true as const } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),

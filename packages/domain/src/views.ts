@@ -283,7 +283,9 @@ export type PlayerCombatView = Readonly<{
   underwater: boolean;
   reactionsUsed: readonly string[];
   /** The fog mask verbatim (geometry only; hidden things are stripped by their own filters). */ fog: CombatState["fog"];
-  /** Difficult terrain, clipped to what the fog reveals so unrevealed ground keeps its layout. */ terrain: CombatState["terrain"];
+  /** Painted ground (difficult terrain, water, ice), clipped to what the fog reveals so unrevealed ground keeps its layout. */ terrain: CombatState["terrain"];
+  /** The traps the party has found: each one's name, area and whether it is still dangerous. Never a DC, a band of
+   *  levels or a trap no one has found. */ traps: readonly PlayerTrap[];
   /** Dynamic vision: with it on, `tokens` holds only the creatures your characters perceive. */ vision: PlayerVision;
   pendingSaves: readonly PlayerPendingSave[];
   pendingReactions: readonly PlayerPendingReaction[];
@@ -293,6 +295,15 @@ export type PlayerCombatView = Readonly<{
     Readonly<{ actorId: string; withActorId: string }>
   >;
   /** True while the GM has the table viewing an earlier turn (no labels, since those can name hidden combatants). */ rewound: boolean;
+}>;
+/** A trap the party has found, as players and the table screen see it. */
+export type PlayerTrap = Readonly<{
+  id: string;
+  name: string;
+  area: Readonly<{ x: number; y: number; width: number; height: number }>;
+  state: "armed" | "sprung" | "disarmed";
+  /** While it is armed, the ways its text gives to make it safe, by name (`trap:disarm`'s `disarmId`). */
+  ways: ReadonlyArray<Readonly<{ id: string; name: string }>>;
 }>;
 /** The steps of a turn's start or end a player orders: each named, with the creature it lands on when they see it. */
 export type PlayerTurnSteps = Readonly<{

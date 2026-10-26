@@ -34,6 +34,7 @@ import { holdsTrance, TRANCE_LONG_REST_MINUTES } from "./trance.js";
 import { conjureBookOfShadows } from "./book-of-shadows.js";
 import { finishLongRest, openLongRest, type RestApplier } from "./long-rest.js";
 import { endTravelFor } from "./travel.js";
+import { restFromTravel } from "./environment.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
@@ -353,6 +354,8 @@ export function applyRest(
   } else actor.actionUses = { ...neverRegained(actor, longRestDefinition, catalog), ...waiting };
   reduceExhaustion(actor);
   actor.lastLongRestAt = state.rest.clockHours;
+  // A day's travel counts from its rest (Extended Travel).
+  restFromTravel(actor);
   // Rested, by whatever path: nothing left to ask the GM for.
   state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
   // SRD Long Rest: spell slots (and Pact Magic) refill.

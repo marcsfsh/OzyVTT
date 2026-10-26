@@ -361,6 +361,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...grantExtras(ctx, grant, recipient, option),
       // Every other way out the grant prints (bursting a Chain), beside its own end action.
       ...(grant.endedBy ? { endedBy: structuredClone(grant.endedBy) } : {}),
+      // What it does as days or midnights pass (Midnight Tears' save at midnight).
+      ...(grant.atRest ? { atRest: structuredClone(grant.atRest) } : {}),
       ...anchorOf(state, recipient.id, grant.anchors),
       ...(bound?.fields ?? {}),
       ...(paid ? { refundsUses: { key: paid.key } } : {})

@@ -455,6 +455,8 @@ export function failureEffectFor(
     sourceActorId: attacker.id,
     sourceName: attacker.name,
     ...(duration ? { duration } : {}),
+    // Torpor's 4d6 hours, rolled as the failure lands.
+    ...(save.failureHoursRolled ? { hoursRolled: save.failureHoursRolled } : {}),
     ...(repeat ? { repeatSave: repeat } : {}),
     // Bestow Curse's forced Dodge: a save at the start of each of the bearer's turns that compels it that turn.
     ...(!repeat && option?.turnStartSave

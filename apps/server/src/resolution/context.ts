@@ -230,6 +230,8 @@ export type ResolveDependencies = Readonly<{
   zoneCover?: (fromActorId: string, targetId: string) => "half" | "three-quarters" | "total" | null;
   /** The wall that deflects an ordinary projectile from the first combatant at the second (Wind Wall), or null. */
   deflectedBy?: (fromActorId: string, targetId: string) => string | null;
+  /** The live map's scale, for distances to what isn't a creature (a trap's area); absent when the grid is not set. */
+  pixelsPerFoot?: number;
   /** Feet from a combatant to the point a spell area was placed at (Delayed Blast Fireball's bead), or null. */
   zoneFeet?: (actorId: string, zoneId: string) => number | null;
   /** Moves an area straight toward a combatant, up to these feet, and reports what it met (a Sphere of Annihilation). */
@@ -335,6 +337,8 @@ export type ResolveContext = {
   /** Narration for the whole table, for riders that changed the board; `warnings` is the GM-only channel.
    *  A sentence goes in exactly one of the two. */
   readonly tableNarration: ActionTableNarration[];
+  /** What the action lets its user sense, told to its own player alone (Find Traps: a trap's nature, not where). */
+  readonly sensed: string[];
   rollMode: ActionRollMode | undefined;
   check: NonNullable<ActionResolution["check"]> | null;
   attack: ActionResolutionAttack | null;

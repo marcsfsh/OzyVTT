@@ -617,8 +617,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "resolution/attack.ts gives the cloaker Disadvantage on attack rolls while it stands in Bright Light (vision/rules.ts). With dynamic vision off, the light is the GM's."
   ),
   "Lightning Absorption": absorbs("Lightning"),
-  "Limited Amphibiousness": guided(
-    "breath.ts lets it breathe water. Its four hours out of water before it starts to suffocate are the GM's to count."
+  "Limited Amphibiousness": enforced(
+    "breath.ts lets it breathe water. water.ts counts its time out of the water painted on the map (or out of an underwater fight) on the game clock; after 4 hours it starts to hold its breath and suffocate as breath.ts runs it, and being submerged again lets it breathe and starts the count over."
   ),
   "Loathsome Limbs": enforced(
     "death-traits.ts severs a limb when the troll ends any turn Bloodied after taking 15 Slashing damage or more in it, four times a day. The limb joins the fight as a Troll Limb under the troll's command and on its side in its space, and acts right after the troll (summons.ts). The troll has 1 Exhaustion level for each missing limb until it next regains Hit Points, when they grow back."
@@ -631,7 +631,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   Mimicry: senses,
   "Misty Escape": enforced(
-    "death-traits.ts keeps the vampire alive at 0 Hit Points as mist that can't take actions or speak; in sunlight, read with dynamic vision on, it is destroyed instead. The mist is its Shape-Shift's printed form (transform/at-zero.ts): Medium, flying 20 feet with hover, with Resistance to all damage, and no change of form at 0 Hit Points. It lasts the 2 hours it has to reach its resting place, after which it is destroyed, and regaining Hit Points ends it. Running water and the Paralyzed condition at its resting place are the GM's."
+    "death-traits.ts keeps the vampire alive at 0 Hit Points as mist that can't take actions or speak; in sunlight, read with dynamic vision on, it is destroyed instead. The mist is its Shape-Shift's printed form (transform/at-zero.ts): Medium, flying 20 feet with hover, with Resistance to all damage, and no change of form at 0 Hit Points. It lasts the 2 hours it has to reach its resting place, after which it is destroyed, and regaining Hit Points ends it. In running water painted on the map it can't turn to mist and is destroyed (water.ts), and the mist can't pass through the painted water (terrain.ts). The Paralyzed condition at its resting place is the GM's."
   ),
   "Mucus Cloud": enforced(
     "trait-turns.ts asks the Constitution save of each creature within 5 feet at the end of the aboleth's turn while the fight is underwater, and a failure curses it: it breathes water, and it regains no Hit Points out of water (hit-points.ts, rests.ts). The acid out of water every 10 minutes is the GM's."
@@ -715,8 +715,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Undead Restoration": returnsOnClock(
     " while its heart is whole: an object it carries, AC 17, 10 Hit Points and Immunity to all damage but Fire, that an attack can destroy (carried-objects.ts, objects.ts)"
   ),
-  "Vampire Weakness": guided(
-    "trait-turns.ts deals the vampire 20 Radiant damage when it starts its turn in sunlight, where resolution/attack.ts and ability-checks.ts give it Disadvantage on attack rolls and ability checks (vision/rules.ts). Running water, invitations and the stake are the GM's."
+  "Vampire Weakness": enforced(
+    "trait-turns.ts deals the vampire 20 Radiant damage when it starts its turn in sunlight, where resolution/attack.ts and ability-checks.ts give it Disadvantage on attack rolls and ability checks (vision/rules.ts); the mist's Resistance doesn't meet it (hit-points.ts). water.ts deals 20 Acid damage when it ends its turn in running water painted on the map. Invitations and the stake through the heart are the GM's."
   ),
   "Vampiric Connection": senses,
   "Vile Appearance": enforced(
@@ -726,7 +726,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Water Form": enforced(
     "movement-rules.ts lets the water elemental end a move only in an enemy's space, and terrain.ts lets it through any gap in the walls an inch wide at no extra cost (wall-passage.ts). The map's drag preview (movePreview.ts) charges the same path."
   ),
-  "Water Susceptibility": reference("Water on the map isn't tracked, so the Cold damage is the GM's to deal."),
+  "Water Susceptibility": enforced(
+    "water.ts deals the elemental 1d6 Cold damage for every 5 feet of its move that lies in water painted on the map, as the move ends. Water splashed on it by the gallon is the GM's."
+  ),
   "Web Walker": enforced(
     "Web's webs cost the creature nothing extra (zone-ground.ts), and spell-zones.ts asks it for no save there. Webs the GM paints as Difficult Terrain still cost it, so the GM waives that cost."
   ),
@@ -1194,10 +1196,12 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:perfume": enforced(
     "Applying it, in a fight or out of one, uses up the vial and gives its bearer the Perfume effect for an hour. ability-checks.ts then gives Advantage on a Persuasion check against an Indifferent Humanoid within 5 feet on the map, in Influence or a check the GM calls naming it."
   ),
-  "item:bedroll": reference(
-    "Its help against extreme cold and the Long Rest in light armor come from rules outside the SRD, so nothing applies them."
+  "item:bedroll": enforced(
+    "Equipped, it is the Bedroll its owner sleeps in: environment.ts passes its Constitution save against extreme cold at the end of each hour on the game clock. Sleeping in light armor is the GM's."
   ),
-  "item:blanket": reference("Its help against extreme cold comes from rules outside the SRD, so nothing applies it."),
+  "item:blanket": enforced(
+    "Equipped, it is wrapped round its owner: environment.ts gives Advantage on the Constitution save against extreme cold at the end of each hour on the game clock."
+  ),
   "item:book": enforced(
     'While it is equipped, the sheet offers "consulting an accurate Book about its topic" beside the checks (check-situations.ts), and an Intelligence (Arcana, History, Nature or Religion) check that names it gains +5 (ability-checks.ts). Whether the Book is accurate and on topic is the GM\'s.'
   ),
@@ -2116,7 +2120,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The pack holds the 10 feet round its point (spell-zones.ts): an enemy of the caster's that the pack moves within 10 feet of, or that comes within 10 feet of it or ends its turn there, makes the Dexterity save against 3d10 Slashing damage, once a turn, at the cast's slot level. Its caster has Advantage on Strength saves within 5 feet of it (zone-auras.ts), and when the caster moves on its turn the pack can move 30 feet to an unoccupied space (zone-moves.ts)."
   ),
   "spell:symbol": enforced(
-    "The cast picks the glyph, which waits hidden at its point, drawn for the GM and its caster (spell-zones.ts). A creature that comes onto it sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes the glyph's save (Death's 10d10 Necrotic, Discord, Fear, Pain, Sleep or Stunning). Noticing the glyph with a search, and a frightened creature's move away, are the GM's."
+    "The cast picks the glyph, which waits hidden at its point, drawn for the GM and its caster (spell-zones.ts). A creature that comes onto it sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes the glyph's save (Death's 10d10 Necrotic, Discord, Fear, Pain, Sleep or Stunning). A Search whose Wisdom (Perception) check meets the spell save DC within 10 feet notices the glyph and draws it for everyone (traps.ts). A frightened creature's move away is the GM's."
   ),
   "spell:speak-with-plants": guided(
     "The cast picks what the plants do with the ground of its 30-foot Emanation, which stays where it was cast: the plants clear the painted Difficult Terrain to ordinary ground, or overgrow it into Difficult Terrain (zone-ground.ts). Talking with the plants is the GM's."
@@ -2170,7 +2174,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The 10-foot Emanation stays where its caster stood (spell-zones.ts). zone-barriers.ts keeps a spell of level 5 or lower cast from outside from affecting the creatures within, one level higher for each slot level above 6."
   ),
   "spell:glyph-of-warding": guided(
-    "The glyph lasts until it goes off, in a fight or out of one, drawn for the GM and the caster's player alone. As an explosive rune, the first creature that steps onto it sets it off: each creature in the 20-foot Sphere makes the Dexterity save against 5d8 damage of the type chosen at the cast, 1d8 more a slot level above 3, and the spell ends (spell-zones.ts). A spell of the glyph's level or lower that its caster casts within the minute is stored in it instead, and when the glyph is set off it takes effect at its caster's numbers on that creature, or on the creatures within its area around that creature (stored-casts.ts, stored-cast-release.ts). Refining the trigger (creature kinds, passwords, an opened book) and noticing the glyph with a Wisdom (Perception) check are the GM's."
+    "The glyph lasts until it goes off, in a fight or out of one, drawn for the GM and the caster's player alone. As an explosive rune, the first creature that steps onto it sets it off: each creature in the 20-foot Sphere makes the Dexterity save against 5d8 damage of the type chosen at the cast, 1d8 more a slot level above 3, and the spell ends (spell-zones.ts). A spell of the glyph's level or lower that its caster casts within the minute is stored in it instead, and when the glyph is set off it takes effect at its caster's numbers on that creature, or on the creatures within its area around that creature (stored-casts.ts, stored-cast-release.ts). A Study whose Intelligence (Investigation) check meets the spell save DC within 10 feet notices the glyph and draws it for everyone (traps.ts). Refining the trigger (creature kinds, passwords, an opened book) is the GM's."
   ),
   "spell:grease": enforced(
     "spell-zones.ts asks for the Dexterity save when a creature enters the square or ends its turn there, and a failure leaves it Prone. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the square Difficult Terrain."
@@ -2294,8 +2298,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Mimic/shape-shift": enforced(
     `${printedForms("a Medium or Small object")} In object form a creature that hits it in melee sticks to it (Adhesive, resolution/struck.ts).`
   ),
-  "action:Vampire/shape-shift": guided(
-    "transform/assume.ts takes the Tiny bat (no speech) or the Medium mist (no actions or speech, Resistance to all damage, and it can share a space), each with its speeds, and returns to the vampire form. It is refused in sunlight with dynamic vision on, and its Multiattack and Grave Strike work only in the vampire form. Running water, and the sunlight's own damage getting through the mist's Resistance, are the GM's."
+  "action:Vampire/shape-shift": enforced(
+    "transform/assume.ts takes the Tiny bat (no speech) or the Medium mist (no actions or speech, Resistance to all damage, and it can share a space), each with its speeds, and returns to the vampire form. It is refused in sunlight with dynamic vision on and in running water painted on the map (resolution/shape-shift.ts), and its Multiattack and Grave Strike work only in the vampire form. The mist can't pass through painted water (terrain.ts), and sunlight's damage gets through its Resistance (hit-points.ts)."
   ),
   "action:Werebear/shape-shift": enforced(printedForms("the Large hybrid or the Large bear")),
   "action:Wereboar/shape-shift": enforced(printedForms("the Medium hybrid or the Small boar")),
@@ -2558,7 +2562,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Thrown in place of an attack at a Large or smaller creature the thrower sees within 15 feet, a failed Dexterity save leaves it Restrained, escaped with a DC 10 Strength (Athletics) check by it or by a creature within 5 feet of it, as that creature's action (resolution/endings.ts). The Net is an object with AC 10 and 5 Hit Points, immune to Bludgeoning, Poison and Psychic damage, and an attack that breaks it frees the creature (objects.ts)."
   ),
   "item:thieves-tools": guided(
-    "door.use's pick rolls a Dexterity (Sleight of Hand) check with the tools against a lock on a door of the map, DC 15 unless the GM sets another, and unlocks it on a success (doors.ts). Its Utilize uses roll from the sheet at their DCs (tool-uses.ts), and every use takes the Utilize action in a fight. Picking Manacles' lock is an action of the creature holding the tools beside the bound one (resolution/endings.ts). Disarming a trap is the GM's, rolled as the sheet's check."
+    "door.use's pick rolls a Dexterity (Sleight of Hand) check with the tools against a lock on a door of the map, DC 15 unless the GM sets another, and unlocks it on a success (doors.ts). Its Utilize uses roll from the sheet at their DCs (tool-uses.ts), and every use takes the Utilize action in a fight. Picking Manacles' lock is an action of the creature holding the tools beside the bound one (resolution/endings.ts). A trap the party has found on the map is disarmed with them where its text names a check: the Poisoned Needle's DC 15 Dexterity (Sleight of Hand) check, a failure setting it off, with a Thief's Fast Hands as a Bonus Action (traps.ts). A trap the app doesn't hold is the GM's, rolled as the sheet's check."
   ),
   "item:carpenters-tools": guided(
     "door.use pries a door on the map open, or seals a closed one, with a DC 20 Strength check with the tools, taking the Utilize action in a fight (doors.ts). A sealed door is forced open at DC 20. Its sheet use takes the Utilize action too (tool-uses.ts), and crafting.ts makes what its Craft line lists in downtime. Prying a container open is the GM's, rolled as the sheet's check: no container has a lid to pry."
@@ -2701,5 +2705,110 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:disguise-self": guided(
     "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. The disguise is an effect on the caster for the hour. How it looks, and who sees through it with a Study action, are the GM's."
+  ),
+  // Water, traps and the toolbox's poisons (water.ts, traps.ts, resolution/sense-traps.ts, resolution/on-hit.ts).
+  "item:pale-tincture": guided(
+    "Fed to a creature within 5 feet, it opens the DC 16 Constitution save: a failure deals 1d6 Poison damage and leaves the creature Poisoned. rest-triggers.ts repeats the save every 24 hours of game time, a failure dealing 1d6 Poison damage that lowers its Hit Point maximum, until seven successes end the poison. That the first dose's damage can't be healed, and when the lowered maximum comes back, are the GM's."
+  ),
+  "item:truth-serum": guided(
+    "Fed to a creature within 5 feet, it opens the DC 11 Constitution save, a failure leaving it Poisoned for an hour. That it can't knowingly lie is the GM's."
+  ),
+  "spell:find-traps": guided(
+    "The cast tells its caster's player, by nature alone, each trap the app holds within 120 feet whose middle the caster sees (resolution/sense-traps.ts): the traps set on the map, hidden glyphs, alarms and set item traps. Where each lies is never told to the player; the GM hears it. A trap the app doesn't hold is the GM's."
+  ),
+  "spell:control-water": guided(
+    "The cast offers its four effects as options. The Whirlpool leaves its vortex on the map (spell-zones.ts): as its turn starts, a creature in the painted water within 25 feet is pulled 10 feet toward it, and a creature entering it or ending its turn there makes the Strength save against 2d8 Bludgeoning damage, half on a success, once a turn. Flood, Part Water and Redirect Flow are drawn as the Cube, and the GM repaints the water. Swimming away (an action and a Strength (Athletics) check) and choosing another effect on a later turn are the GM's."
+  ),
+  "spell:water-walk": enforced(
+    "Each target moves across the water painted on the map as on solid ground (speed.ts, terrain.ts), so swimming costs it nothing and nothing in the water reaches it (water.ts). Its Pass the Surface Bonus Action takes it below the surface and back up (resolution/builtins.ts). Rising to the surface when cast on a submerged creature is the GM's."
+  ),
+  "feature:acrobatic-movement": enforced(
+    "On its own turn, while it wears no armor and wields no Shield, the Monk climbs at its Speed (speed.ts) and moves across the water painted on the map as on solid ground (terrain.ts, water.ts). Off its turn neither holds, so a Monk that ends its move on water is in it."
+  ),
+  "action:Ancient Bronze Dragon/spellcasting": enforced(
+    "Each spell is a cast action at the dragon's DC 22 and +14 (resolution/), its 1/Day spells counted. Control Water's Whirlpool pulls and batters what swims near it as the spell's own row does (spell-zones.ts), and Guiding Bolt, Shapechange and Water Breathing resolve. What Detect Magic, Detect Thoughts, Scrying, Speak with Animals and Thaumaturgy reveal is the story's."
   )
+};
+
+/**
+ * The Gameplay Toolbox's records (SRD 5.2.1), but its poisons, which are gear: its traps, environmental effects,
+ * contagions, curse and the sections of guidance.
+ */
+export const TOOLBOX_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
+  "collapsing-roof": enforced(
+    "traps.ts: the GM sets it over a trapped area, hidden from the players. A creature moving onto it sets it off: each creature under it makes the Dexterity save at its band's DC against its damage, half on a success, and the area becomes Difficult Terrain. A Search (Perception) within 10 feet at DC 11 finds the trip wire, which is then stepped over or cut."
+  ),
+  "falling-net": enforced(
+    "traps.ts: the creature that crosses the trip wire makes the Dexterity save or is Restrained by a Net with AC 10 and 5 Hit Points, escaped with a DC 10 Strength (Athletics) check by it or a creature beside it; a Huge or larger creature succeeds. A found wire is stepped over or cut."
+  ),
+  "fire-casting-statue": enforced(
+    "traps.ts: a creature moving onto the pressure plate or starting its turn there sets it off, and each creature in its blast (its trapped area, or the Cone the GM marks with trap.edit) makes the DC 15 Dexterity save against its Fire damage, half on a success. It resets each turn. The glyph (DC 10, within 5 feet) and the plate (DC 15) are found with a Search, and defaced or wedged with an Iron Spike. Its Arcana Study is the GM's."
+  ),
+  "hidden-pit": enforced(
+    "traps.ts: a creature moving onto the lid falls in, its move ending at the bottom, takes the fall's damage at the band's depth and can't climb out without a Climb Speed or climbing gear (movement-rules.ts). The lid stays open. A Study (Investigation) at DC 15 finds it, and a wedged Iron Spike makes it safe. Arcane Lock holding it shut is the GM's."
+  ),
+  "poisoned-darts": enforced(
+    "traps.ts: each creature in the darts' path (the trapped area, or the line the GM marks with trap.edit) makes the DC 13 Dexterity save, and on a failure is struck by its own 1d3 darts of Poison damage. It resets each turn up to three times. The holes and the plate are found with a Search at DC 15, then plugged or wedged."
+  ),
+  "poisoned-needle": enforced(
+    "The GM sets it off when a lock is opened without its key (trap.spring): its victim makes the Constitution save against its Poison damage, half on a success, and is Poisoned for an hour on a failure. A Search at DC 15 finds it, and a DC 15 Dexterity (Sleight of Hand) check with Thieves' Tools disarms it, a failure setting it off (traps.ts)."
+  ),
+  "rolling-stone": guided(
+    "traps.ts sets it off when a creature moves onto its plate and tells the GM the stone rolls; the stone's Initiative, its moves and the saves of the creatures it rolls over are the GM's to run. A Study at DC 15 finds the plate, and an Iron Spike wedges it."
+  ),
+  "spiked-pit": enforced(
+    "traps.ts: as the Hidden Pit, and the spikes at the bottom deal their Piercing damage at the band's dice."
+  ),
+  "extreme-cold": enforced(
+    "environment.ts asks each creature on the scene's map the DC 10 Constitution save at the end of each hour of game time, a failure a level of Exhaustion. Cold Resistance or Immunity, and a Bedroll it is in, succeed; a Blanket gives Advantage."
+  ),
+  "extreme-heat": enforced(
+    "environment.ts asks each creature on the scene's map without a Waterskin with water left the Constitution save at the end of each hour, DC 5 and 1 more each hour after, with Disadvantage in Medium or Heavy armor, a failure a level of Exhaustion. Fire Resistance or Immunity succeeds."
+  ),
+  "frigid-water": enforced(
+    "environment.ts counts each creature's time in the painted water, by the minute on the game clock and by the round in a fight. Past minutes equal to its Constitution score, each minute asks the DC 10 Constitution save, a failure a level of Exhaustion. Cold Resistance or Immunity succeeds."
+  ),
+  "deep-water": enforced(
+    "environment.ts asks a creature without a Swim Speed the DC 10 Constitution save after each hour in the painted water, a failure a level of Exhaustion."
+  ),
+  "high-altitude": enforced(
+    "environment.ts counts each hour on the road as 2 toward Extended Travel's 8 hours (time.pass with a travel pace), past which each hour asks the Constitution save. Acclimatizing over 30 days is the GM's."
+  ),
+  "heavy-precipitation": enforced(
+    "Everything is Lightly Obscured (vision/sight.ts), each creature on the map has Disadvantage on Wisdom (Perception) checks (environment.ts), and heavy rain puts out the open flames it carries."
+  ),
+  "strong-wind": enforced(
+    "environment.ts gives each creature on the map Disadvantage on ranged weapon attack rolls, puts out the open flames it carries, disperses the fog a wind ends, and brings down a flier that ends its turn aloft. A sandstorm's Disadvantage on Perception checks is applied too."
+  ),
+  "slippery-ice": enforced(
+    "The GM paints it (terrain.ts): it is Difficult Terrain, and ice.ts asks the DC 10 Dexterity save against Prone of a creature that moves onto it for the first time on a turn or starts its turn there. Ice Walk spares the creature."
+  ),
+  "thin-ice": reference(
+    "Creatures carry no weights in the app, so when thin ice breaks under them is the GM's; the GM paints the hole as water."
+  ),
+  "cackle-fever": reference("Its incubation, outbreaks of laughter and recovery are the GM's to run."),
+  "sewer-plague": reference("Its incubation, Exhaustion and recovery are the GM's to run."),
+  "sight-rot": reference("Drinking tainted water, the Blinded condition it leaves and its cure are the GM's to run."),
+  "demonic-possession": reference(
+    "Possession, the demon's control and the ways to end it are the GM's to run. The Charmed and Frightened conditions it can leave are set by the GM."
+  ),
+  "section-travel-pace": guided(
+    "time.pass takes the party's pace: its checks read the pace, and environment.ts counts Extended Travel's hours past 8. Terrain, encounters and navigation are the GM's."
+  ),
+  "section-creating-a-background": reference("Guidance for making a background; the builder offers the SRD's."),
+  "section-curses": reference("Guidance on curses; Bestow Curse and cursed items run as their own records."),
+  "section-magical-contagions": reference("Guidance for running contagions."),
+  "section-fear-and-mental-stress": reference(
+    "Guidance on fear and mental stress: the saves it suggests are the GM's to call, and the Frightened condition runs as a condition."
+  ),
+  "section-poison": enforced(
+    "Each sample poison is a consumable (`poisons.v1.json`): a contact or ingested dose is brought to a creature within 5 feet, an inhaled one fills a 5-foot Cube, and an injury poison coats a weapon or ammunition as a Bonus Action, its save opened by the next Piercing or Slashing hit (resolution/on-hit.ts). Harvesting poison from a creature is the GM's."
+  ),
+  "section-traps": enforced(
+    "traps.ts holds the toolbox's traps on the map, hidden until found, with their triggers, saves, damage and ways to make them safe. Designing a new trap is the GM's."
+  ),
+  "section-combat-encounters": reference(
+    "Guidance for building fights; elevation, terrain and hazards run as their own rules."
+  ),
+  "section-troubleshooting": reference("Guidance for running fights.")
 };

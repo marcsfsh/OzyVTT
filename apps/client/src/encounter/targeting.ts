@@ -586,7 +586,8 @@ export type ResolveOptions = Readonly<{
 
 export function resolveTargeting(
   revision: number | undefined,
-  onResult: (ok: boolean, message?: string) => void,
+  /** With what the action sensed for its user's player alone (Find Traps), told on a success. */
+  onResult: (ok: boolean, message?: string, sensed?: readonly string[]) => void,
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
@@ -743,7 +744,11 @@ export function resolveTargeting(
         asked: { type: "action.resolve", payload: { commandId: newId(), ...payload, commit: true } }
       };
     emit();
-    onResult(response.ok, response.blocked ? undefined : response.message);
+    onResult(
+      response.ok,
+      response.blocked ? undefined : response.message,
+      response.ok ? response.resolution?.sensed : undefined
+    );
   });
 }
 
@@ -752,7 +757,7 @@ export function resolveActionDirect(
   attackerId: string,
   actionId: string,
   revision: number | undefined,
-  onResult: (ok: boolean, message?: string) => void,
+  onResult: (ok: boolean, message?: string, sensed?: readonly string[]) => void,
   override?: { reason: string },
   /** A spell readied to cast later, at a chosen slot level. */
   readied?: Readonly<{ slotLevel?: number }>,
@@ -782,7 +787,11 @@ export function resolveActionDirect(
         asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId, ...extra } }
       };
     emit();
-    onResult(response.ok, response.blocked ? undefined : response.message);
+    onResult(
+      response.ok,
+      response.blocked ? undefined : response.message,
+      response.ok ? response.resolution?.sensed : undefined
+    );
   });
 }
 
@@ -892,7 +901,7 @@ export function resolveAtHeld(
 
 /** Take the targeted action's own move before the rest of it (Pounce): the server spends the action and grants the
  *  move now; the action picked again after the move makes the rest at no further cost. */
-export function takeMoveFirst(onResult: (ok: boolean, message?: string) => void) {
+export function takeMoveFirst(onResult: (ok: boolean, message?: string, sensed?: readonly string[]) => void) {
   if (!session || busy) return;
   const { attackerId, action } = session;
   busy = true;
@@ -921,7 +930,11 @@ export function takeMoveFirst(onResult: (ok: boolean, message?: string) => void)
         }
       };
     emit();
-    onResult(response.ok, response.blocked ? undefined : response.message);
+    onResult(
+      response.ok,
+      response.blocked ? undefined : response.message,
+      response.ok ? response.resolution?.sensed : undefined
+    );
   });
 }
 

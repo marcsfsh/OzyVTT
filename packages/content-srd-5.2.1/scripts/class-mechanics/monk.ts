@@ -124,6 +124,21 @@ export const monk: ClassMechanicsModule = {
     "unarmored-movement": {
       modifiers: [{ type: "speed", amount: 10, when: [{ type: "while-unarmored" }] }]
     },
+    // "While you aren't wearing armor or wielding a Shield, you gain the ability to move along vertical surfaces and
+    // across liquids on your turn without falling during the movement": a Climb Speed equal to its Speed, and water as
+    // ground, on its own turn.
+    "acrobatic-movement": {
+      modifiers: [
+        {
+          type: "special-speed",
+          movement: "climb",
+          equalToSpeed: true,
+          ownTurn: true,
+          when: [{ type: "while-unarmored" }]
+        },
+        { type: "movement", rule: "walks-on-liquid", ownTurn: true, when: [{ type: "while-unarmored" }] }
+      ]
+    },
     // `effective-actions` folds it onto every weapon swing and the Martial Arts strike.
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]

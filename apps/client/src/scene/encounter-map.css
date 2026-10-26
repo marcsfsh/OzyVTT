@@ -550,6 +550,125 @@
   fill: var(--surface-3);
   stroke: var(--text-muted);
 }
+/* Water: an indigo wash with ripples (still) or flow arrows (running). Ice: a pale cyan wash, cross-hatched. */
+.terrain-water {
+  fill: var(--indigo);
+  fill-opacity: 0.28;
+  stroke: var(--indigo);
+  stroke-opacity: 0.7;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-running {
+  stroke-dasharray: 8 4;
+}
+.terrain-ripple,
+.terrain-flow {
+  stroke: var(--cyan-hi);
+  stroke-opacity: 0.6;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-ice {
+  fill: var(--cyan-hi);
+  fill-opacity: 0.22;
+  stroke: var(--cyan-hi);
+  stroke-opacity: 0.75;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-frost {
+  stroke: var(--cyan-hi);
+  stroke-opacity: 0.45;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-stroke-water,
+.terrain-stroke-running-water {
+  fill: var(--indigo);
+  stroke: var(--indigo);
+}
+.terrain-stroke-ice {
+  fill: var(--cyan-hi);
+  stroke: var(--cyan-hi);
+}
+.terrain-stroke-trap {
+  fill: var(--danger);
+  stroke: var(--danger);
+}
+/* Traps: a dashed danger outline with a warning mark; one the party hasn't found is fainter on the GM's map, and one
+   made safe is muted. */
+.terrain-trap rect {
+  fill: var(--danger);
+  fill-opacity: 0.16;
+  stroke: var(--danger);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-trap text {
+  fill: var(--danger-hi);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.terrain-trap-hidden rect {
+  fill-opacity: 0.08;
+  stroke-opacity: 0.6;
+}
+.terrain-trap-disarmed rect {
+  fill: var(--text-muted);
+  stroke: var(--text-muted);
+}
+.terrain-trap-disarmed text {
+  fill: var(--text-muted);
+}
+/* The ground buttons show a swatch of what they paint. */
+.map-ground-swatch {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: var(--radius-sm);
+}
+.map-ground-water {
+  background: color-mix(in srgb, var(--indigo) 55%, transparent);
+}
+.map-ground-running-water {
+  background: repeating-linear-gradient(90deg, var(--indigo) 0 4px, var(--cyan-hi) 4px 6px);
+}
+.map-ground-ice {
+  background: color-mix(in srgb, var(--cyan-hi) 45%, transparent);
+}
+/* The GM's trap list: each trap's name over its buttons, which wrap at a phone's width. */
+.map-trap-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.map-trap-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.map-trap-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.map-trap-meta {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.map-trap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.map-trap-actions .nh-btn {
+  flex: 1 1 auto;
+}
 
 .token-condition circle {
   fill: color-mix(in srgb, var(--surface-3) 65%, var(--violet));

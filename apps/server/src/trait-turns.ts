@@ -144,7 +144,11 @@ function burnInSunlight(
   if (sightRules(state, sightContentOf(deps), deps.distanceFeet).lightAt(actor.id)?.sunlight !== true) return;
   for (const trait of burning)
     if (trait.kind === "light-sensitivity" && trait.damageAtTurnStart)
-      events.push(...dealTraitDamage(state, actor, actor, trait.name, [{ ...trait.damageAtTurnStart }], deps));
+      events.push(
+        ...dealTraitDamage(state, actor, actor, trait.name, [{ ...trait.damageAtTurnStart }], deps, {
+          fromSunlight: true
+        })
+      );
 }
 
 /** The end of `actorId`'s turn: its auras that burn what is near it, or ask a save of it (Mucus Cloud). */
@@ -384,7 +388,8 @@ function dealTraitDamage(
   target: Actor,
   traitName: string,
   parts: ReadonlyArray<{ amount: number; type: string }>,
-  deps: TraitTurnDeps
+  deps: TraitTurnDeps,
+  extra: Readonly<{ fromSunlight?: true }> = {}
 ): EffectNarration[] {
   const { application, events } = applyDamageDetailed(
     state,
@@ -393,7 +398,8 @@ function dealTraitDamage(
       amount: parts.reduce((sum, part) => sum + part.amount, 0),
       parts,
       sourceName: bearer.name,
-      sourceActorId: bearer.id
+      sourceActorId: bearer.id,
+      ...extra
     },
     { role: "gm" },
     {

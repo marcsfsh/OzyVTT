@@ -7,6 +7,8 @@ import { breathOverTime } from "./breath.js";
 import { endOfDays } from "./survival.js";
 import { zoneHeld } from "./spell-zones.js";
 import { dueOnTheClock } from "./timed-revival.js";
+import { drynessOverTime } from "./water.js";
+import { environmentOverTime } from "./environment.js";
 
 /**
  * The game clock (ADR-0029) and what lasts on it. A round is 6 seconds, so 10 rounds make a minute: in a fight, what
@@ -61,6 +63,10 @@ export function passGameTime(state: GameState, minutes: number, deps?: ClockDeps
     events.push(...dueOnTheClock(state, inTime, before, deps));
     // Each midnight the clock crosses ends a day of eating and drinking.
     events.push(...endOfDays(state, inTime, before, total, deps));
+    // A creature that must be submerged now and then counts its time out of water.
+    events.push(...drynessOverTime(state, inTime, total - before, deps));
+    // The scene's weather and water wear on the creatures placed in it, hour by hour and minute by minute.
+    events.push(...environmentOverTime(state, inTime, before, total, deps));
   }
   for (const zone of [...state.combat.spellZones]) {
     const ends =

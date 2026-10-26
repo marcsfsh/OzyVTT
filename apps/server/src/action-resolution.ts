@@ -127,6 +127,7 @@ import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
 import { checkObjectTarget, harmObjectsInArea, strikeObjectTarget } from "./resolution/object-targets.js";
 import { applyDoorWork, checkDoorWork, findSecrets } from "./resolution/door-work.js";
+import { senseTraps } from "./resolution/sense-traps.js";
 import { applyTower, checkTower } from "./resolution/tower.js";
 import {
   applyAdjustsLight,
@@ -452,6 +453,7 @@ export function resolveDefinitionAction(
   applyDoorWork(ctx);
   applyTower(ctx);
   findSecrets(ctx);
+  senseTraps(ctx);
   applyKindles(ctx);
   applyDouses(ctx);
   applyLightsArea(ctx);
@@ -669,6 +671,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
         : null,
     ...(warnings.length > 0 ? { warnings } : {}),
     ...(ctx.tableNarration.length > 0 ? { tableNarration: ctx.tableNarration } : {}),
+    ...(ctx.sensed.length > 0 ? { sensed: [...ctx.sensed] } : {}),
     overridden: ctx.overridden,
     ...(ctx.reactionPrompts.length > 0 ? { reactionPrompts: ctx.reactionPrompts } : {}),
     ...(ctx.check ? { check: ctx.check } : {}),

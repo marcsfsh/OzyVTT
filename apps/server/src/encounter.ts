@@ -45,6 +45,9 @@ import { endTravelFor } from "./travel.js";
 import { chargeOwedMovement, releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, playStartSteps, startOfTurn } from "./turn-boundaries.js";
 import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
+import { runningWaterAtTurnEnd, submergedAtTurnEnd } from "./water.js";
+import { environmentAtTurnEnd } from "./environment.js";
+import { groundAtTurnStart } from "./map-hazards.js";
 import { wavesAtTurnEnd, wavesAtTurnStart } from "./zone-waves.js";
 import { fireAtTurnStart } from "./zone-fire.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
@@ -989,6 +992,29 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
   // A wave that moved this turn sinks and weakens (Tsunami).
   if (zones && outgoingId) ending.push(...wavesAtTurnEnd(state, outgoingId, zones));
+  // The water it ends its turn in (a vampire's running water, a sahuagin wet again) and the scene's weather (frigid
+  // water's rounds, a strong wind bringing a flier down).
+  if (deps && outgoingId) {
+    const waterDeps = {
+      resolveDefinition: deps.resolveDefinition,
+      rollDie: deps.rollDie,
+      ...(deps.catalog ? { catalog: deps.catalog } : {}),
+      ...(deps.newId ? { newId: deps.newId } : {}),
+      ...(deps.now ? { now: deps.now } : {})
+    };
+    ending.push(...runningWaterAtTurnEnd(state, outgoingId, calibration, waterDeps));
+    ending.push(...submergedAtTurnEnd(state, outgoingId, calibration, waterDeps));
+    if (deps.newId)
+      ending.push(
+        ...environmentAtTurnEnd(state, outgoingId, calibration, {
+          resolveDefinition: deps.resolveDefinition,
+          ...(deps.catalog ? { catalog: deps.catalog } : {}),
+          random: deps.rollDie,
+          newId: deps.newId,
+          now: deps.now ?? (() => new Date().toISOString())
+        })
+      );
+  }
   events?.push(...ending);
   // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
@@ -1045,6 +1071,18 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   if (zones) starting.push(...wavesAtTurnStart(state, nextActorId, zones));
   // Burning webs burn out, and burn a creature starting its turn in them (Web).
   if (zones) starting.push(...fireAtTurnStart(state, nextActorId, zones));
+  // A creature starting its turn on slippery ice saves or falls Prone, and one on a statue's plate sets it off.
+  if (deps.newId)
+    starting.push(
+      ...groundAtTurnStart(state, nextActorId, {
+        resolveDefinition: deps.resolveDefinition,
+        ...(deps.catalog ? { catalog: deps.catalog } : {}),
+        rollDie: deps.rollDie,
+        newId: deps.newId,
+        now: deps.now ?? (() => new Date().toISOString()),
+        geometry: deps.geometry ?? null
+      })
+    );
   events?.push(...starting);
   rollRecharges(state, nextActorId, deps, events);
   refreshOwnTurnUses(state, nextActorId, deps);

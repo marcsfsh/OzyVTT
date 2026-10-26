@@ -146,8 +146,10 @@ export function ActionRunner({
 
   // A blocked resolve keeps its session and shows the override dialog via the store; only genuine
   // failures (revision conflicts, network) need a feedback line.
-  const onOutcome = (ok: boolean, message?: string) => {
+  const onOutcome = (ok: boolean, message?: string, sensed?: readonly string[]) => {
     if (!ok && message) onFeedback(message);
+    // What a sense found (Find Traps) is told to whoever took the action.
+    if (ok && sensed && sensed.length > 0) onFeedback(sensed.join(" "));
   };
 
   const applyDamage = (

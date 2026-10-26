@@ -17,7 +17,7 @@ import { evaluateActionEconomy } from "../src/resolution/economy.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../src/item-actions.js";
 import { applyDamageDetailed, RELENTLESS_RAGE_KEY } from "../src/hit-points.js";
 import { applyRest } from "../src/rests.js";
-import { currentSpeedFeet } from "../src/speed.js";
+import { currentSpeedFeet, specialSpeedsOf, walksOnLiquid } from "../src/speed.js";
 import { carriedAlongBy, dragCostsExtra } from "../src/movement-rules.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
@@ -1397,6 +1397,18 @@ describe("Monk: the sheet's own numbers", () => {
     expect(speedAt(2)).toBe(40);
     expect(speedAt(6)).toBe(45);
     expect(speedAt(20)).toBe(60);
+  });
+
+  it("Acrobatic Movement climbs at its Speed and crosses liquid on its own turn while it wears no armor", () => {
+    const built = onTheTable(build(monkInput(9)), { fight: false });
+    const derivation = derivationOf(built);
+    expect(specialSpeedsOf(built.hero, built.definition, derivation).climb).toBe(30);
+    expect(walksOnLiquid(built.hero, derivation)).toBe(true);
+    // Off its turn neither holds ("on your turn").
+    expect(specialSpeedsOf(built.hero, built.definition, derivation, true).climb).toBeUndefined();
+    expect(walksOnLiquid(built.hero, derivation, true)).toBe(false);
+    const eight = onTheTable(build(monkInput(8)), { fight: false });
+    expect(walksOnLiquid(eight.hero, derivationOf(eight))).toBe(false);
   });
 
   it("Body and Mind passes 20, and Disciplined Survivor makes every save proficient", () => {

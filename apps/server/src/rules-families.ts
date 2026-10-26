@@ -32,6 +32,8 @@ const RULE_FAMILIES = {
   "movement.mount": "movement",
   // A Climber's Kit anchor holds its user within 25 feet of the anchor point.
   "movement.tether": "movement",
+  // A pit's smooth walls hold a creature with no Climb Speed, climbing gear or magic.
+  "movement.pit": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",

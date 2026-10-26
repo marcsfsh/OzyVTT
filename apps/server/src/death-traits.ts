@@ -18,6 +18,7 @@ import { raiseCreature } from "./summons.js";
 import { traitMechanicsOf, traitOf } from "./statblock-traits.js";
 import { escapeIntoForm } from "./transform/at-zero.js";
 import { sightRules } from "./vision/rules.js";
+import { waterOf } from "./water.js";
 
 /**
  * The stat block traits that cheat death or come apart as they take damage (SRD 5.2.1 monsters): a vampire's Misty
@@ -57,7 +58,8 @@ const definitionOf = (actor: Actor, deps: Pick<TraitDeps, "resolveDefinition"> |
  * Shape-Shift to become mist (no action required). If it can't use Shape-Shift, it is destroyed." It lives on at 0 Hit
  * Points as mist, which can't take actions or speak; in sunlight, read with dynamic vision on, it can't shape-shift and
  * is destroyed. Where its Shape-Shift prints the mist, it takes that form (its size, speeds and Resistance) for the 2
- * hours it has to reach its resting place (`escapeIntoForm`); running water is the GM's. True when it escaped.
+ * hours it has to reach its resting place (`escapeIntoForm`). In running water painted on the map it is destroyed too. True
+ * when it escaped.
  */
 export function mistyEscape(
   state: GameState,
@@ -78,6 +80,15 @@ export function mistyEscape(
     events.push({
       kind: "condition",
       text: `${actor.name} can't turn to mist in sunlight and is destroyed (${trait.name}).`,
+      actorId: actor.id
+    });
+    return false;
+  }
+  // Shape-Shift works only "if the vampire isn't in sunlight or running water".
+  if (waterOf(state, actor.id, null, deps) === "running") {
+    events.push({
+      kind: "condition",
+      text: `${actor.name} can't turn to mist in running water and is destroyed (${trait.name}).`,
       actorId: actor.id
     });
     return false;

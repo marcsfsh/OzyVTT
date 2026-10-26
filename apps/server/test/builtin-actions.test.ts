@@ -43,6 +43,7 @@ describe("builtin action catalog", () => {
       "magic",
       "move-sphere",
       "move-sphere-far",
+      "pass-the-surface",
       "ready",
       "search",
       "shake-awake",

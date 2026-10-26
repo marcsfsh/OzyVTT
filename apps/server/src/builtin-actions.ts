@@ -313,6 +313,15 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
       "As an action, you can extinguish fire on yourself by giving yourself the Prone condition and rolling on the ground. The fire also goes out if it is doused, submerged, or suffocated; the GM ends it then. (SRD 5.2.1, Burning [Hazard])",
     damage: [],
     requiresEffectTag: "burning"
+  },
+  {
+    id: "pass-the-surface",
+    name: "Pass the Surface",
+    activation: "bonus-action",
+    description:
+      "Under Water Walk, pass from the liquid's surface into the liquid itself, or back up onto the surface. Below it, you swim as anyone in the water does. (SRD 5.2.1 Water Walk)",
+    damage: [],
+    requiresEffectTag: "water-walking"
   }
 ] as const;
 

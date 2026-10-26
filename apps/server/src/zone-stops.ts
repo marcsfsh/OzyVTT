@@ -2,6 +2,7 @@ import type { GameState, SpellZone } from "@vtt/domain";
 import type { EffectNarration } from "./effects.js";
 import { zoneContentOf, type ZoneContent } from "./spell-zone-state.js";
 import { exposed, insideTest, liveZones, zoneAction, zonesAfterMove, type ZoneDeps } from "./spell-zones.js";
+import { groundEntry } from "./map-hazards.js";
 
 type Point = Readonly<{ x: number; y: number }>;
 
@@ -67,8 +68,9 @@ export function stoppingEntry(
 }
 
 /** A walk through the areas on a mover's way: where it stops (the index of the point it entered a stopping area at,
- *  or null when it went the whole way), what the areas did, and the saves it now waits on. */
-export type ZoneWalk = Readonly<{ stop: number | null; events: EffectNarration[]; saveIds: string[] }>;
+ *  or null when it went the whole way), what the areas did, and the saves it now waits on. `ends`: the move ends at the
+ *  stop whatever the saves come to (it fell into a pit), and the rest of the way's movement comes back. */
+export type ZoneWalk = Readonly<{ stop: number | null; events: EffectNarration[]; saveIds: string[]; ends?: true }>;
 
 /**
  * Walks a mover along `path` through the standing areas: up to the first area that stops it, whose save it now owes,
@@ -76,6 +78,27 @@ export type ZoneWalk = Readonly<{ stop: number | null; events: EffectNarration[]
  */
 export function walkThroughZones(state: GameState, moverId: string, path: readonly Point[], deps: ZoneDeps): ZoneWalk {
   const stop = stoppingEntry(state, moverId, path, deps);
+  // Slippery ice or a hidden trap on the way, met before any such area: the move goes that far and meets it there.
+  const ground = groundEntry(state, moverId, path, deps);
+  if (ground !== null && (stop === null || ground.index <= stop)) {
+    const events = zonesAfterMove(state, { moverId, path: path.slice(0, ground.index + 1) }, deps);
+    const met = ground.meet();
+    if (met.saveIds.length === 0 && !met.stops) {
+      const rest = walkThroughZones(state, moverId, path.slice(ground.index), deps);
+      return {
+        stop: rest.stop === null ? null : ground.index + rest.stop,
+        events: [...events, ...met.events, ...rest.events],
+        saveIds: rest.saveIds,
+        ...(rest.ends ? { ends: true as const } : {})
+      };
+    }
+    return {
+      stop: ground.index,
+      events: [...events, ...met.events],
+      saveIds: met.saveIds,
+      ...(met.stops ? { ends: true as const } : {})
+    };
+  }
   const walked = stop === null ? path : path.slice(0, stop + 1);
   const before = new Set(state.combat.pendingSaves.map((save) => save.id));
   const events = zonesAfterMove(state, { moverId, path: walked }, deps);
@@ -88,7 +111,8 @@ export function walkThroughZones(state: GameState, moverId: string, path: readon
     return {
       stop: rest.stop === null ? null : stop + rest.stop,
       events: [...events, ...rest.events],
-      saveIds: rest.saveIds
+      saveIds: rest.saveIds,
+      ...(rest.ends ? { ends: true as const } : {})
     };
   }
   return { stop, events, saveIds };

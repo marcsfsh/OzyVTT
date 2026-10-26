@@ -634,6 +634,7 @@ export const actionCommands = [
                   deflectedBy: (fromId: string, targetId: string) =>
                     deflectingWall(draft, fromId, targetId, kit.zoneDeps(draft, geometry)),
                   zoneFeet: (fromId: string, zoneId: string) => zonePointFeet(draft, fromId, zoneId, geometry),
+                  pixelsPerFoot: geometry.calibration.cellSizePx / geometry.calibration.distancePerCell,
                   moveZone: (zoneId: string, towardActorId: string, feet: number) =>
                     moveZoneToward(
                       draft,

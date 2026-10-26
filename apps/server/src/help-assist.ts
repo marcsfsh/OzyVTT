@@ -75,7 +75,7 @@ export const FOOTWEAR_TAG = "modified-footwear";
 export function settleUseOutcome(
   state: GameState,
   roller: Actor,
-  outcome: NonNullable<NonNullable<HeldRoll["check"]>["onSuccess"]>,
+  outcome: Extract<NonNullable<NonNullable<HeldRoll["check"]>["onSuccess"]>, { kind: "next-acrobatics-advantage" }>,
   success: boolean
 ): EffectNarration[] {
   const wearer = state.actors.find((actor) => actor.id === outcome.actorId);

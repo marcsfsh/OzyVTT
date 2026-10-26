@@ -241,6 +241,8 @@ export function formRecord(
     ...(printed?.allowsActions ? { allowsActions: [...printed.allowsActions] } : {}),
     ...(printed?.noAttacks ? { noAttacks: true as const } : {}),
     ...(printed?.sharesSpaces ? { sharesSpaces: true as const } : {}),
+    ...(printed?.noLiquid ? { noLiquid: true as const } : {}),
+    ...(printed?.sunlightPierces ? { sunlightPierces: true as const } : {}),
     ...(shift.endsWithoutTemporaryHitPoints ? { endsWithoutTemporaryHitPoints: true as const } : {}),
     ...(shift.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
     ...(shift.endsAtZeroHitPoints ? { endsAtZeroHitPoints: true as const } : {}),

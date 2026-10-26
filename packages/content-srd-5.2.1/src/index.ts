@@ -33,6 +33,7 @@ import {
   SkillReferenceSchema,
   SpellReferenceSchema,
   SRD_SKILL_ABILITY,
+  ToolboxRecordSchema,
   WeaponPropertyReferenceSchema,
   WeaponReferenceSchema,
   type ArmorReference,
@@ -44,6 +45,7 @@ import {
   type RuleReference,
   type SkillReference,
   type SpellReference,
+  type ToolboxRecord,
   type WeaponPropertyReference,
   type WeaponReference
 } from "./schemas.js";
@@ -196,7 +198,25 @@ export function loadEquipment(): readonly EquipmentReference[] {
     weapon: item.weapon ?? null,
     armor: item.armor ?? null
   }));
-  return [...gear, ...weapons, ...armor, ...magic].sort((left, right) => left.name.localeCompare(right.name));
+  const poisons: EquipmentReference[] = loadPoisons().map((item) => ({
+    ...item,
+    weapon: item.weapon ?? null,
+    armor: item.armor ?? null
+  }));
+  return [...gear, ...weapons, ...armor, ...magic, ...poisons].sort((left, right) =>
+    left.name.localeCompare(right.name)
+  );
+}
+
+/** The SRD 5.2.1 Gameplay Toolbox's records: traps with their mechanics, poisons, environmental effects, contagions,
+ *  curses and the chapter's other sections. */
+export function loadToolbox(): readonly ToolboxRecord[] {
+  return loadBundle("toolbox.v1.json", z.array(ToolboxRecordSchema));
+}
+
+/** The Gameplay Toolbox's sample poisons as consumables, with their effects. Also folded into `loadEquipment()`. */
+export function loadPoisons(): readonly EquipmentReference[] {
+  return loadBundle("poisons.v1.json", z.array(EquipmentReferenceSchema));
 }
 
 /** The 13 SRD 5.2.1 damage-type descriptions. */

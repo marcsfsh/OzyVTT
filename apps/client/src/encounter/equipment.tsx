@@ -83,7 +83,7 @@ const FILTERS: ReadonlyArray<{ id: string; label: string; categories: readonly s
   { id: "gear", label: "Gear", categories: ["adventuring-gear"] },
   { id: "tool", label: "Tools", categories: ["tool"] },
   { id: "focus", label: "Focuses", categories: ["focus"] },
-  { id: "consumable", label: "Consumables", categories: ["consumable"] },
+  { id: "consumable", label: "Consumables", categories: ["consumable", "poison"] },
   { id: "pack", label: "Packs", categories: ["equipment-pack"] },
   { id: "ammunition", label: "Ammo", categories: ["ammunition"] },
   { id: "wondrous", label: "Wondrous", categories: ["wondrous-item"] },

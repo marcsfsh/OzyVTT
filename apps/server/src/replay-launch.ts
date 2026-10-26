@@ -1,4 +1,4 @@
-import { EMPTY_SCENE_VISION, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
+import { CALM_ENVIRONMENT, EMPTY_SCENE_VISION, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import { activateNewScene, sceneHeadroom, sceneSlotsNeededToGoLive, SCENE_ROOM_REFUSAL } from "./scenes.js";
@@ -76,7 +76,15 @@ function sceneCombatFrom(combat: GameState["combat"]): SceneCombat {
     reactionsUsed: combat.reactionsUsed,
     legendaryUsed: combat.legendaryUsed,
     fog: combat.fog,
-    terrain: combat.terrain,
+    // A recording made before painted water and ice, or the weather, has none.
+    terrain: {
+      difficult: combat.terrain.difficult,
+      water: (combat.terrain.water as SceneCombat["terrain"]["water"] | undefined) ?? [],
+      runningWater: (combat.terrain.runningWater as SceneCombat["terrain"]["runningWater"] | undefined) ?? [],
+      ice: (combat.terrain.ice as SceneCombat["terrain"]["ice"] | undefined) ?? []
+    },
+    environment: (combat.environment as SceneCombat["environment"] | undefined) ?? { ...CALM_ENVIRONMENT },
+    traps: (combat.traps as SceneCombat["traps"] | undefined) ?? [],
     // A recording made before dynamic vision has none.
     vision: (combat.vision as SceneCombat["vision"] | undefined) ?? { ...EMPTY_SCENE_VISION },
     pendingSaves: combat.pendingSaves,

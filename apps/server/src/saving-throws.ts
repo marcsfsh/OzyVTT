@@ -485,6 +485,10 @@ export function rollSaveAtOnce(
     rollDie: RandomSource;
     /** Against a spell, which Magic Resistance meets with Advantage. */
     magical?: boolean;
+    /** What gives this save Advantage or Disadvantage beside the creature's own riders (a Blanket against the cold,
+     *  Heavy armor in the heat). */
+    advantageFrom?: string;
+    disadvantageFrom?: string;
   }>
 ): Readonly<{ natural: number; total: number; rollMode: AggregatedRollMode }> {
   const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
@@ -496,6 +500,8 @@ export function rollSaveAtOnce(
   });
   if (deps.magical === true && magicResistanceOf(definition) !== null)
     sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
+  if (deps.advantageFrom) sources.advantage.push({ source: "situation", label: deps.advantageFrom });
+  if (deps.disadvantageFrom) sources.disadvantage.push({ source: "situation", label: deps.disadvantageFrom });
   const rollMode = aggregateRollMode(sources.advantage, sources.disadvantage);
   const resolution = resolveDice(
     parseDiceFormula(d20TestFormula(rollMode.mode, modifier) + saveRiderDiceTerms(derivation, ability)),
@@ -1382,7 +1388,17 @@ export function answerSave(
   // "Failure by 5 or More": the band's conditions and duration stand in for the failure's, with what lasts while they do.
   const margin = !success && band === null ? marginBandOf(pending, total) : null;
   if (!success && band === null && pending.onFailEffect) {
-    const onFail = margin ? withMarginBand(pending.onFailEffect, margin) : pending.onFailEffect;
+    const banded = margin ? withMarginBand(pending.onFailEffect, margin) : pending.onFailEffect;
+    // A failure whose hours are rolled as it lands (Torpor: 4d6 hours).
+    const onFail = banded.hoursRolled
+      ? {
+          ...banded,
+          duration: {
+            type: "minutes" as const,
+            minutes: Math.max(1, resolveDice(parseDiceFormula(banded.hoursRolled), deps.random).total) * 60
+          }
+        }
+      : banded;
     events.push(...applyFailureEffect(state, target.id, onFail, `${commandId}:${saveId}:fail`, immunities));
     if (margin)
       events.push(

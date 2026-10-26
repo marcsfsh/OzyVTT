@@ -4,7 +4,9 @@ import { useDragSurface } from "@vtt/ui";
 import { ApiError, apiRequest } from "../lib/api";
 import { probeImageDimensions } from "../scene/mapImage";
 import { FogOverlay, type VisionMask } from "../scene/FogOverlay";
-import { TerrainOverlay } from "../scene/TerrainOverlay";
+import { TerrainOverlay, type OverlayTrap } from "../scene/TerrainOverlay";
+
+type ViewerRect = Readonly<{ x: number; y: number; width: number; height: number }>;
 import { bandFraction, TokenAltitudeBadge, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
@@ -75,8 +77,15 @@ export type Presentation = Readonly<{
         height: number;
       }>[];
     }>;
-    /** Difficult terrain the fog reveals. */
-    terrain?: Readonly<{ difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[] }>;
+    /** Painted ground the fog reveals: difficult terrain, still and running water, and ice. */
+    terrain?: Readonly<{
+      difficult: readonly ViewerRect[];
+      water?: readonly ViewerRect[];
+      runningWater?: readonly ViewerRect[];
+      ice?: readonly ViewerRect[];
+    }>;
+    /** The traps the party has found. */
+    traps?: readonly OverlayTrap[];
     /** Dynamic vision: where the party sees now and what it has seen. */
     vision?: VisionMask;
   }>;
@@ -310,9 +319,13 @@ export function MapStage({
               .catch(() => {});
           }}
         />
-        {onActiveMap && presentation.encounter.terrain && (
+        {onActiveMap && (presentation.encounter.terrain || presentation.encounter.traps) && (
           <TerrainOverlay
-            difficult={presentation.encounter.terrain.difficult}
+            difficult={presentation.encounter.terrain?.difficult ?? []}
+            water={presentation.encounter.terrain?.water ?? []}
+            runningWater={presentation.encounter.terrain?.runningWater ?? []}
+            ice={presentation.encounter.terrain?.ice ?? []}
+            traps={presentation.encounter.traps ?? []}
             cellSizePx={Math.min(size.width, size.height) / 20}
           />
         )}

@@ -6,6 +6,7 @@ import {
   loadEquipment,
   loadFeats,
   loadGlossary,
+  loadToolbox,
   loadMagicItems,
   loadMonsterDefinitions,
   loadSpecies,
@@ -24,6 +25,7 @@ import { modifierDisposition } from "./character-build.js";
 import {
   CONDITION_COVERAGE,
   GLOSSARY_COVERAGE,
+  TOOLBOX_COVERAGE,
   MONSTER_TRAIT_COVERAGE,
   RECORD_OVERRIDES,
   type CoverageState,
@@ -522,6 +524,9 @@ export function srdCoverageRows(): CoverageRow[] {
     rows.push(curatedRow("Conditions", condition.id, condition.name, CONDITION_COVERAGE[condition.id]));
   for (const entry of loadGlossary())
     rows.push(curatedRow("Rules glossary", entry.id, entry.name, GLOSSARY_COVERAGE[entry.id]));
+  // The toolbox's poisons are gear, above; its other records are curated.
+  for (const record of loadToolbox().filter((entry) => entry.kind !== "poison"))
+    rows.push(curatedRow("Gameplay Toolbox", record.id, record.name, TOOLBOX_COVERAGE[record.id]));
   return rows;
 }
 
@@ -530,7 +535,7 @@ const byName = (a: CoverageRow, b: CoverageRow) => a.name.localeCompare(b.name, 
 const capitalized = (state: CoverageState) => `${state[0]!.toUpperCase()}${state.slice(1)}`;
 
 /** Groups whose every row is curated: they print as one table with the notes. */
-const TABLE_GROUPS = new Set(["Monster traits", "Conditions", "Rules glossary"]);
+const TABLE_GROUPS = new Set(["Monster traits", "Conditions", "Rules glossary", "Gameplay Toolbox"]);
 
 /** How the rows of each kind of group get their state, for the page's opening. */
 const CLASSIFICATION = [
@@ -557,7 +562,7 @@ const CLASSIFICATION = [
   "  guided too: the server rolls their checks, and the GM sets what they achieve.",
   "- **Backgrounds, weapons and armor:** enforced. The builder applies a background, and every weapon and armor",
   "  statistic reaches the rolls.",
-  "- **Monster traits, conditions and the rules glossary:** curated by hand, each with a note.",
+  "- **Monster traits, conditions, the rules glossary and the Gameplay Toolbox:** curated by hand, each with a note.",
   "",
   "Records the data can't classify, because the engine handles them in code or their data applies only part of",
   "what they do, are curated too (`RECORD_OVERRIDES`). Each group lists their notes after its records."
