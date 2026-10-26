@@ -5779,6 +5779,27 @@ export const ActionSchema = z
       .min(1)
       .max(3)
       .optional(),
+    /** A space on the map its use picks, where the action sets a creature down before anything rolls: its user (a
+     *  bulette's Deadly Leap: "spends 5 feet of movement to jump to a space within 15 feet that contains one or more
+     *  Large or smaller creatures") or its one target (a kraken's Fling: "throws a Large or smaller creature Grappled by
+     *  it to a space it can see within 60 feet of itself that isn't in the air"). The space is within `feet` of the user,
+     *  one it sees with `seen`, on the ground with `ground`, holding a creature of `onto` size or smaller where it says
+     *  so, and costs the user `costFeet` of movement. The creature set down and each creature in that space then make
+     *  the action's save; a thrown creature is let go. */
+    destination: z
+      .object({
+        who: z.enum(["user", "target"]),
+        feet: z.number().int().min(5).max(300),
+        costFeet: z.number().int().min(5).max(60).optional(),
+        seen: z.literal(true).optional(),
+        ground: z.literal(true).optional(),
+        onto: SizeSchema.optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A space its use picks, where it sets down its user (a bulette's Deadly Leap) or its one target (a kraken's Fling) before anything rolls: within `feet` of the user, seen with `seen`, on the ground with `ground`, holding a creature of `onto` size or smaller, costing the user `costFeet` of movement. The creature set down and each creature in that space make the save"
+      ),
     /** A jump the action allows this turn ("jumps up to 30 feet by spending 10 feet of movement"). */
     leap: z
       .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })

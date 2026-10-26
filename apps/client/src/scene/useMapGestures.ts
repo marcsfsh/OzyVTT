@@ -7,7 +7,13 @@ import type {
   PlayerActor,
   PlayerAnnotation
 } from "@vtt/domain";
-import { setTemplatePlacement, toggleTarget, type TargetingSession } from "../encounter/targeting";
+import {
+  picksDestination,
+  setDestination,
+  setTemplatePlacement,
+  toggleTarget,
+  type TargetingSession
+} from "../encounter/targeting";
 import type { GridCalibration } from "./gridPreview";
 import { imagePointFromClient } from "./mapImage";
 import { isVisionTool, type AreaKindId, type MapTool } from "./mapTools";
@@ -329,6 +335,14 @@ export function useMapGestures({
       capturePointer(event);
       onSelect(null);
       setGesture({ kind: activeTargeting.template.shape, origin: point, current: point });
+      return;
+    }
+    // A leap or a throw takes the tap as the space it lands in, creatures there included (a bulette lands on them).
+    if (tool === "select" && picksDestination(activeTargeting)) {
+      const point = pointFromScreen(event.clientX, event.clientY);
+      if (!point) return;
+      event.preventDefault();
+      setDestination(point);
       return;
     }
     // While an action is aimed, a flame set on the map takes the tap as its target (Fire Play).

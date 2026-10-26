@@ -691,6 +691,20 @@ function forcedMoveOnSave(
   if (standing && before && after && moved !== null) followPushed(state, standing.id, before, after);
   const way = push.toward ? "toward" : "away from";
   const verb = push.toward ? "pulled" : "pushed";
+  // A creature in the source's own space (a bulette landed on it) has no straight way out: it goes to the nearest
+  // unoccupied space beside the source.
+  const sourceAt = state.combat.tokens.find((token) => token.actorId === sourceId)?.position;
+  const stacked =
+    !push.toward && before !== null && sourceAt !== undefined && sourceAt.x === before.x && sourceAt.y === before.y;
+  if (moved === null && stacked && deps.placeBeside?.(target.id, sourceId))
+    return [
+      {
+        kind: "effect",
+        text: `${target.name} is pushed out of ${pending.sourceName}'s space.`,
+        actorId: target.id,
+        source
+      }
+    ];
   if (moved === null)
     return [
       {

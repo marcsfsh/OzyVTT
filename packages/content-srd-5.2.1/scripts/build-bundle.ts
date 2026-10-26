@@ -731,9 +731,19 @@ const ACTION_ENRICHMENTS: Record<
       | "largeFillsHold"
       | "teleport"
       | "object"
+      | "destination"
     >
   >
 > = {
+  // "The kraken throws a Large or smaller creature Grappled by it to a space it can see within 60 feet of itself that
+  // isn't in the air ... the creature thrown and each creature in the destination space."
+  "kraken/fling": {
+    targets: { count: 1, grappledBySource: true, maxSize: "large" },
+    destination: { who: "target", feet: 60, seen: true, ground: true }
+  },
+  // "The bulette spends 5 feet of movement to jump to a space within 15 feet that contains one or more Large or smaller
+  // creatures ... each creature in the bulette's destination space."
+  "bulette/deadly-leap": { destination: { who: "user", feet: 15, costFeet: 5, onto: "large" } },
   // "The giant or one creature of its choice that can see or hear it gains 16 (2d10 + 5) Temporary Hit Points and has
   // Advantage on attack rolls until the start of the giant's next turn."
   "frost-giant/war-cry-recharge-5-6": {

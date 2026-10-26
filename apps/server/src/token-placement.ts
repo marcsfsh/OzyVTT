@@ -82,6 +82,15 @@ function fits(point: EncounterTokenPosition, radius: number, geometry: TokenMapG
   );
 }
 
+/** Where a creature's token would stand dropped at a point, snapped as `moveEncounterToken` snaps it. */
+export function snappedTokenPosition(
+  token: Readonly<{ sizePx: number; sizeCells?: number }>,
+  point: EncounterTokenPosition,
+  geometry: TokenMapGeometry
+): EncounterTokenPosition {
+  return snappedPosition(point, token.sizePx / 2, geometry, token.sizeCells);
+}
+
 function snappedPosition(point: EncounterTokenPosition, radius: number, geometry: TokenMapGeometry, sizeCells = 1) {
   const requested = bounded(point, radius, geometry);
   if (!geometry.calibration) return { x: rounded(requested.x), y: rounded(requested.y) };

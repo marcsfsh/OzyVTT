@@ -278,6 +278,7 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     ...(action.legendary ? { legendaryCost: action.legendary.cost } : {}),
     ...(action.legendary?.oncePerRound ? { legendaryOncePerRound: true as const } : {}),
     ...(action.move?.first ? { moveFirst: true as const } : {}),
+    ...(action.destination ? { destination: { who: action.destination.who, feet: action.destination.feet } } : {}),
     ...(action.replacesAttack ? { replacesAttack: true as const } : {}),
     ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
     ...(action.darts !== undefined ? { darts: action.darts } : {}),

@@ -522,6 +522,9 @@ export const ActionResolveSchema = z
      *  Rend attack"): the action's cost is spent and the move granted now, with no target; the action taken again
      *  afterwards makes the rest at no further cost. */
     moveFirst: z.boolean().optional(),
+    /** The space an action with a `destination` sets its creature down in (a bulette's Deadly Leap, a kraken's Fling),
+     *  as a point on the live map; the server snaps it and checks its reach, sight and occupants. */
+    destination: AnnotationPointSchema.optional(),
     /** GM only: the spell area a cast that ends spells is aimed at (Dispel Magic on a Moonbeam), from
      *  `combat.spellZones`. */
     zoneId: z.string().min(1).max(120).optional(),

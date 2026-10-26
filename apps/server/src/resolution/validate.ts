@@ -165,6 +165,8 @@ function combatantsOf(
     action.move !== undefined ||
     action.leap !== undefined ||
     action.teleport !== undefined ||
+    // A leap onto a space finds its creatures there (a bulette's Deadly Leap).
+    action.destination?.who === "user" ||
     // Opening a flask frees the creature it holds; a drawn Frost Brand's cold and a Sun Blade's light act round it.
     action.releases !== undefined ||
     action.douses !== undefined ||

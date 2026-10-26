@@ -138,6 +138,8 @@ export type ResolveInput = Readonly<{
   moveFirst?: boolean;
   /** The rest of an action whose move was taken first: its cost was spent then, so it is neither checked nor spent. */
   owedPaid?: boolean;
+  /** The space an action's `destination` sets its creature down in (a bulette's Deadly Leap, a kraken's Fling). */
+  destination?: Readonly<{ x: number; y: number }>;
   /** The spell area a cast that ends spells is aimed at (Dispel Magic on a Spirit Guardians); the GM's to name. */
   zoneId?: string;
   /** The door or wall on the live map a cast is aimed at (Knock, Arcane Lock, Passwall). */
@@ -203,6 +205,16 @@ export type ResolveDependencies = Readonly<{
   pushToken?: (
     input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number; toward?: boolean }>
   ) => Readonly<{ value: number; unit: string }> | null;
+  /** Where a creature would stand set down at a point on the live map (`destination`), snapped as a GM drag is: the
+   *  point, how far it is from `fromActorId` (the way it moves for that creature itself, edge to edge for another),
+   *  and the creatures whose spaces it would share there. Null when the map can't place it. */
+  destinationAt?: (
+    actorId: string,
+    at: Readonly<{ x: number; y: number }>,
+    fromActorId: string
+  ) => Readonly<{ at: Readonly<{ x: number; y: number }>; feet: number; sharers: readonly string[] }> | null;
+  /** Sets a creature's token at a snapped point on the live map, on the ground. */
+  placeToken?: (actorId: string, at: Readonly<{ x: number; y: number }>) => void;
   /** Brings an action's creatures onto the map (`bringSummons`), built by the operation layer, which has the grid and
    *  mints ids. Absent, a summon is left for the GM to place. */
   summon?: (request: SummonRequest) => SummonOutcome;

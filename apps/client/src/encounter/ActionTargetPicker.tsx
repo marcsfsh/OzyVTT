@@ -122,8 +122,18 @@ export function ActionTargetPicker({
     picking.action.damage.length === 0;
   const verb = rollsNothing(picking.action) || summoning ? "Use" : "Roll";
   const where = onMap ? " on the map or in the list" : "";
+  const destination = picking.action.destination;
   return (
     <div className="action-targeting" role="group" aria-label={`Targets for ${name}`} ref={groupRef}>
+      {destination && (
+        <p className="action-targeting-hint">
+          {destination.who === "target" && picking.selected.length !== 1
+            ? "Choose the creature to throw, then tap the space it lands in."
+            : picking.destination
+              ? `Tap again to move the space. It must be within ${destination.feet} ft.`
+              : `Tap the space on the map to land in, within ${destination.feet} ft.`}
+        </p>
+      )}
       {picking.mode === "none" ? (
         <p className="action-targeting-head">
           <strong>{name}</strong> ·{" "}

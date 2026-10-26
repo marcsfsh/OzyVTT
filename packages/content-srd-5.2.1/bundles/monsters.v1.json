@@ -12336,7 +12336,13 @@
       "formula": "3d12",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "destination": {
+     "who": "user",
+     "feet": 15,
+     "costFeet": 5,
+     "onto": "large"
+    }
    }
   ],
   "token": {
@@ -30453,7 +30459,18 @@
       "formula": "4d8",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "grappledBySource": true,
+     "maxSize": "large"
+    },
+    "destination": {
+     "who": "target",
+     "feet": 60,
+     "seen": true,
+     "ground": true
+    }
    },
    {
     "id": "lightning-strike",

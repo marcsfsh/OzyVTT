@@ -8,7 +8,7 @@ import {
   tokenCreatureDistance
 } from "./movement-narration.js";
 import { nearestOpenSpace } from "./off-plane.js";
-import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
+import { moveEncounterToken, snappedTokenPosition, type TokenMapGeometry } from "./token-placement.js";
 
 /**
  * SRD forced movement (push, pull, slide): a direction the server derives from two token positions and
@@ -164,4 +164,38 @@ function filledStill(
     const apart = creatureDistance(geometry, footprintOf(token, position, 0), footprintOf(other, other.position!, 0));
     return apart !== null && apart.value <= 0;
   });
+}
+
+/**
+ * Where a creature would stand set down at a point (a bulette's Deadly Leap, a kraken's Fling), snapped as a GM drag
+ * is and on the ground: how far that is from `fromActorId` (for the creature itself, how far it moves; for another,
+ * edge to edge from it), and the living creatures whose spaces it would share there. Null when the map can't measure.
+ */
+export function destinationAt(
+  state: GameState,
+  actorId: string,
+  point: EncounterTokenPosition,
+  fromActorId: string,
+  geometry: TokenMapGeometry | null
+): Readonly<{ at: EncounterTokenPosition; feet: number; sharers: readonly string[] }> | null {
+  const token = state.combat.tokens.find((entry) => entry.actorId === actorId);
+  const from = state.combat.tokens.find((entry) => entry.actorId === fromActorId);
+  if (!geometry || !token?.position || !from?.position) return null;
+  const at = snappedTokenPosition(token, point, geometry);
+  const there = footprintOf(token, at, 0);
+  const feet =
+    actorId === fromActorId
+      ? mapDistance(geometry, from.position, at)?.value
+      : creatureDistance(geometry, footprintOf(from, from.position), there)?.value;
+  if (feet === undefined) return null;
+  const sharers = state.combat.tokens
+    .filter((other) => other.actorId !== actorId && other.actorId !== fromActorId && other.position)
+    .filter((other) => {
+      const creature = state.actors.find((candidate) => candidate.id === other.actorId);
+      if (!creature || creature.hp.current <= 0 || creature.summon?.intangible) return false;
+      const apart = creatureDistance(geometry, there, footprintOf(other, other.position!));
+      return apart !== null && apart.value <= 0;
+    })
+    .map((other) => other.actorId);
+  return { at, feet, sharers };
 }

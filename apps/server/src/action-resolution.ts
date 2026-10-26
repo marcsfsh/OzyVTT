@@ -170,6 +170,7 @@ import {
   type DamageTape
 } from "./resolution/held-damage.js";
 import { CommandRejectedError } from "./game-store.js";
+import { checkDestination, landAtDestination } from "./resolution/destination.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -220,6 +221,7 @@ export function resolveDefinitionAction(
   checkDoorWork(ctx);
   checkTower(ctx);
   checkLightTarget(ctx);
+  checkDestination(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent, and so is a full flask.
   checkShapeShift(ctx);
@@ -347,6 +349,8 @@ export function resolveDefinitionAction(
     spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // A leap or a throw sets its creature down before the save falls on those in its space.
+  landAtDestination(ctx);
   rollAttack(ctx);
   checkKnockOut(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an

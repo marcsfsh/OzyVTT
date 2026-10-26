@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { GameState } from "@vtt/domain";
-import { openSpaceBeside, pullIntoSpace, pushTokenAway } from "../src/forced-movement.js";
+import { resolveDefinitionAction } from "../src/action-resolution.js";
+import { destinationAt, openSpaceBeside, pullIntoSpace, pushTokenAway } from "../src/forced-movement.js";
+import { RulesBlockedError } from "../src/game-store.js";
+import { placeBeside } from "../src/mounts.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { moveEncounterToken, type TokenMapGeometry } from "../src/token-placement.js";
 import { actor, conditionsOf, GM, IDS, nextId, NOW, table, use, type Table } from "./monster-table.js";
@@ -35,7 +38,8 @@ const deps = (built: Table): SaveAnswerDependencies => ({
   pushToken: (input) => pushTokenAway(built.state, input, GRID),
   pullInto: (actorId, intoId) => pullIntoSpace(built.state, actorId, intoId, GRID),
   openSpaceBeside: (actorId, besideId, withinFeet) => openSpaceBeside(built.state, actorId, besideId, withinFeet, GRID),
-  placeToken: (actorId, point) => moveEncounterToken(built.state, actorId, point, GRID)
+  placeToken: (actorId, point) => moveEncounterToken(built.state, actorId, point, GRID),
+  placeBeside: (actorId, besideId) => placeBeside(built.state, actorId, besideId, GRID)
 });
 function answer(built: Table, targetId: string, total: number) {
   const pending = built.state.combat.pendingSaves.find((save) => save.targetActorId === targetId)!;
@@ -156,11 +160,80 @@ describe("a gelatinous cube's Engulf", () => {
 
 describe("a bulette's Deadly Leap", () => {
   it("pushes a creature that succeeds 5 feet straight away from the bulette", () => {
-    const built = placed("bulette", { [IDS.monster]: cell(2, 2), [IDS.hero]: cell(3, 2), [IDS.ally]: cell(9, 9) });
-    use(built, "deadly-leap", [IDS.hero]);
+    const built = placed("bulette", { [IDS.monster]: cell(2, 2), [IDS.hero]: cell(5, 2), [IDS.ally]: cell(9, 9) });
+    landing(built, "deadly-leap", [], cell(5, 2));
     const { events } = answer(built, IDS.hero, 30);
-    expect(positionOf(built.state, IDS.hero)).toEqual(cell(4, 2));
-    expect(texts(events)).toContain("Hero is pushed 5 ft straight away from Bulette.");
+    const at = positionOf(built.state, IDS.hero)!;
+    expect(at).not.toEqual(cell(5, 2));
+    expect(Math.max(Math.abs(at.x - cell(5, 2).x), Math.abs(at.y - cell(5, 2).y))).toBe(50);
+    expect(texts(events)).toContain("Hero is pushed out of Bulette's space.");
     expect(conditionsOf(built, IDS.hero)).not.toContain("prone");
+  });
+
+  it("jumps onto a creature's space for 5 feet of movement, and the save falls on the creatures there", () => {
+    const built = placed("bulette", { [IDS.monster]: cell(2, 2), [IDS.hero]: cell(4, 2), [IDS.ally]: cell(12, 12) });
+    landing(built, "deadly-leap", [], cell(4, 2));
+    expect(positionOf(built.state, IDS.monster)).toEqual(positionOf(built.state, IDS.hero));
+    expect(savers(built)).toEqual([IDS.hero]);
+    expect(built.state.combat.turn.movementUsedFeet).toBe(5);
+  });
+
+  it("refuses an empty space and one beyond 15 feet", () => {
+    const empty = placed("bulette", { [IDS.monster]: cell(2, 2), [IDS.hero]: cell(4, 2), [IDS.ally]: cell(12, 12) });
+    expect(() => landing(empty, "deadly-leap", [], cell(2, 5))).toThrow(RulesBlockedError);
+    const far = placed("bulette", { [IDS.monster]: cell(2, 2), [IDS.hero]: cell(8, 2), [IDS.ally]: cell(12, 12) });
+    expect(() => landing(far, "deadly-leap", [], cell(8, 2))).toThrow(RulesBlockedError);
+  });
+});
+
+/** The monster uses an action that sets a creature down in a space, on the grid. */
+function landing(
+  built: Table,
+  actionId: string,
+  targetIds: string[],
+  at: { x: number; y: number },
+  faces: number[] = []
+) {
+  const action = built.definition.actions.find((entry) => entry.id === actionId)!;
+  return resolveDefinitionAction(
+    built.state,
+    action,
+    { actorId: IDS.monster, targetIds, commandId: nextId(), destination: at },
+    {
+      random: () => faces.shift() ?? 3,
+      newRollId: nextId,
+      gmSessionId: IDS.gm,
+      now: NOW,
+      definition: built.definition,
+      resolveDefinition: built.resolveDefinition,
+      destinationAt: (moverId, point, fromId) => destinationAt(built.state, moverId, point, fromId, GRID),
+      placeToken: (moverId, point) => moveEncounterToken(built.state, moverId, point, GRID)
+    }
+  );
+}
+const savers = (built: Table) => built.state.combat.pendingSaves.map((save) => save.targetActorId).sort();
+
+describe("a kraken's Fling", () => {
+  function grappling() {
+    const built = placed("kraken", { [IDS.monster]: cell(2, 2), [IDS.hero]: cell(6, 2), [IDS.ally]: cell(14, 2) });
+    use(built, "tentacle", [IDS.hero], [19]);
+    expect(conditionsOf(built, IDS.hero)).toContain("grappled");
+    built.state.combat = { ...built.state.combat, turn: { ...built.state.combat.turn, actionUsed: false } };
+    return built;
+  }
+
+  it("throws the creature it grapples to the space picked, and the save falls on it and each creature there", () => {
+    const built = grappling();
+    landing(built, "fling", [IDS.hero], cell(14, 2));
+    expect(positionOf(built.state, IDS.hero)).toEqual(cell(14, 2));
+    expect(conditionsOf(built, IDS.hero)).not.toContain("grappled");
+    expect(savers(built)).toEqual([IDS.hero, IDS.ally].sort());
+  });
+
+  it("refuses a space beyond 60 feet, and a creature it doesn't grapple", () => {
+    const far = grappling();
+    expect(() => landing(far, "fling", [IDS.hero], cell(19, 19))).toThrow(RulesBlockedError);
+    const loose = placed("kraken", { [IDS.monster]: cell(2, 2), [IDS.hero]: cell(6, 2), [IDS.ally]: cell(14, 2) });
+    expect(() => landing(loose, "fling", [IDS.hero], cell(10, 2))).toThrow(RulesBlockedError);
   });
 });

@@ -146,6 +146,19 @@ export function ShapeLayer({
           );
         })()}
 
+      {/* The space a leap or a throw lands in. */}
+      {activeTargeting?.destination && (
+        <circle
+          className="destination-marker"
+          cx={activeTargeting.destination.x}
+          cy={activeTargeting.destination.y}
+          r={(calibration?.cellSizePx ?? 50) * 0.45}
+          fill="none"
+          stroke="#ff2e9a"
+          strokeWidth={Math.max(2, (calibration?.cellSizePx ?? 50) / 12)}
+          strokeDasharray="6 4"
+        />
+      )}
       {/* GM fog: dimmed, above the map and shapes but below tokens; the GM always sees everything. */}
     </>
   );
