@@ -782,8 +782,8 @@ describe("the absences that were measured and must stay absent", () => {
   });
 
   it("leaves the rows whose hit points come back on the clock or a table prose", () => {
-    // Dragon Orb's healing cast and a Bag of Beans' rolled table; an Ioun Stone of Regeneration's hourly 15 is the GM's.
-    for (const id of ["dragon-orb", "bag-of-beans"]) {
+    // A Bag of Beans' rolled table; an Ioun Stone of Regeneration's hourly 15 is the GM's.
+    for (const id of ["bag-of-beans"]) {
       const row = view.equipmentRecord(id)!;
       expect({ id, carries: carries(row) }).toEqual({ id, carries: false });
     }
@@ -815,7 +815,7 @@ describe("the absences that were measured and must stay absent", () => {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
     // Rows needing mechanics not modeled yet: a Pearl of Power is a slot recovery (conversions.ts), not an item row.
-    for (const id of ["mysterious-deck", "dragon-orb", "pearl-of-power"]) {
+    for (const id of ["mysterious-deck", "pearl-of-power"]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
   });

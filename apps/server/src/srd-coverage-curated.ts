@@ -2353,7 +2353,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A lit Torch swings as a Simple Melee weapon for 1 Fire damage (equipment-derivation.ts), and its light is item-light.ts's."
   ),
   "item:basic-poison": enforced(
-    "Its Bonus Action coats one carried weapon, or one stack of ammunition, that the user picks (resolution/grant-extras.ts): for 1 minute a hit with that weapon or ammunition alone deals the extra 1d4 Poison damage."
+    "Its Bonus Action coats one carried weapon, or three pieces of one stack of ammunition, that the user picks (resolution/grant-extras.ts): for 1 minute a Piercing or Slashing hit with that weapon or ammunition alone deals the extra 1d4 Poison damage, which spends the coat."
   ),
   "item:saddle-exotic": enforced(
     "A mount that flies or swims needs one to be ridden: mounts.ts refuses a rider without it."
