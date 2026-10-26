@@ -14,6 +14,7 @@ import {
   loadEquipment,
   loadGlossary,
   loadMagicItems,
+  loadPoisons,
   loadMonsterDefinitions,
   loadRules,
   loadSkills,
@@ -536,7 +537,9 @@ describe("SRD 5.2.1 reference bundles", () => {
     expect(loadMagicItems().length).toBe(270);
     // 144 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets, two gaming sets, the
     // two Spell Scrolls the gear table sells (Cantrip and Level 1) and the three Saddles (Exotic, Military, Riding).
-    expect(equipment.length).toBe(144 + nonImprovisedWeapons + loadArmor().length + 270);
+    // The Gameplay Toolbox's 14 sample poisons join them.
+    expect(loadPoisons()).toHaveLength(14);
+    expect(equipment.length).toBe(144 + nonImprovisedWeapons + loadArmor().length + 270 + 14);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).

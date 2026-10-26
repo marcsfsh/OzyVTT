@@ -75,14 +75,15 @@ export const WEAPON_MASTERY_IDS: readonly string[] = Object.freeze([
   "vex"
 ]);
 
-/** The 6 hand-authored gear categories in `equipment.v1.json`. `category` is an open slug: a
-    homebrew "relic" needs no schema change, so these are suggestions and never a closed list. */
+/** The gear categories: the 6 hand-authored in `equipment.v1.json` and the Gameplay Toolbox's poisons. `category` is an
+    open slug: a homebrew "relic" needs no schema change, so these are suggestions and never a closed list. */
 export const GEAR_CATEGORY_IDS: readonly string[] = Object.freeze([
   "adventuring-gear",
   "ammunition",
   "consumable",
   "equipment-pack",
   "focus",
+  "poison",
   "tool"
 ]);
 

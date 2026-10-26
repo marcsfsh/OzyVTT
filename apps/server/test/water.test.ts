@@ -8,7 +8,11 @@ import { makeEffect } from "../src/effects.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { passGameTime } from "../src/game-time.js";
 import { applyMovementRules, movementStatus } from "../src/movement-rules.js";
-import { WATER_WALKING_TAG } from "../src/speed.js";
+import { resolveDefinitionAction } from "../src/action-resolution.js";
+import { builtinAction } from "../src/builtin-actions.js";
+import { WATER_WALKING_TAG, walksOnLiquid } from "../src/speed.js";
+import { fight, HERO as HERO_OF_FIGHT } from "./spell-casters.js";
+import { clericAt } from "./zone-fixtures.js";
 import { movementCost, paintTerrain } from "../src/terrain.js";
 import type { TokenMapGeometry } from "../src/token-placement.js";
 import { OUT_OF_WATER_TAG, runningWaterAtTurnEnd, waterAlongMove, waterOf } from "../src/water.js";
@@ -158,5 +162,35 @@ describe("Limited Amphibiousness", () => {
     passGameTime(state, 1, { resolveDefinition, catalog, random: () => 10 });
     expect(state.actors[0]!.effects.some((effect) => effect.tags.includes(OUT_OF_WATER_TAG))).toBe(false);
     expect(state.actors[0]!.exposure?.dryMinutes ?? 0).toBe(0);
+  });
+});
+
+describe("Water Walk", () => {
+  it("lets its target walk on the water, and pass below the surface and back up as a Bonus Action", () => {
+    const caster = fight(clericAt(5, ["water-walk"]));
+    caster.resolve("spell-water-walk", { targetIds: [HERO_OF_FIGHT] });
+    const hero = () => caster.state.actors.find((actor) => actor.id === HERO_OF_FIGHT)!;
+    expect(hero().effects.some((effect) => effect.tags.includes(WATER_WALKING_TAG))).toBe(true);
+    expect(walksOnLiquid(hero())).toBe(true);
+    const surface = builtinAction("pass-the-surface")!;
+    const pass = () =>
+      resolveDefinitionAction(
+        caster.state,
+        surface,
+        { actorId: HERO_OF_FIGHT, targetIds: [], commandId: crypto.randomUUID(), builtin: true },
+        {
+          random: () => 10,
+          newRollId: () => crypto.randomUUID(),
+          gmSessionId: "30000000-0000-4000-8000-00000000000a",
+          now: () => "2026-10-26T00:00:00.000Z",
+          definition: caster.definition,
+          catalog
+        }
+      );
+    pass();
+    expect(walksOnLiquid(hero())).toBe(false);
+    caster.state.combat.turn = { ...caster.state.combat.turn, bonusActionUsed: false };
+    pass();
+    expect(walksOnLiquid(hero())).toBe(true);
   });
 });

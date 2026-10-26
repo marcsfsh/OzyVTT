@@ -106,6 +106,14 @@ const savesOf = (state: GameState, actorId: string) =>
   state.combat.pendingSaves.filter((save) => save.targetActorId === actorId);
 
 describe("the toolbox's traps", () => {
+  it("builds the chapter's records: its traps, poisons, environmental effects, contagions, curse and sections", () => {
+    const kinds = loadToolbox().reduce<Record<string, number>>((counts, record) => {
+      counts[record.kind] = (counts[record.kind] ?? 0) + 1;
+      return counts;
+    }, {});
+    expect(kinds).toEqual({ trap: 8, poison: 14, environment: 9, contagion: 3, curse: 1, section: 9 });
+  });
+
   it("builds the eight sample traps with each band's numbers", () => {
     const traps = loadToolbox().filter((record) => record.kind === "trap");
     expect(traps.map((record) => record.id).sort()).toEqual([
@@ -368,7 +376,11 @@ describe("a hidden pit on the table", () => {
 
     const refused = await post(GAME_PATHS.trapPlace, player, { trapId: "hidden-pit", tier: 1, rect: cells(3, 2) });
     expect(refused.status).toBe(403);
-    const placed = await post(GAME_PATHS.trapPlace, gmToken, { trapId: "spiked-pit", tier: 1, rect: cells(3, 2, 4, 2) });
+    const placed = await post(GAME_PATHS.trapPlace, gmToken, {
+      trapId: "spiked-pit",
+      tier: 1,
+      rect: cells(3, 2, 4, 2)
+    });
     expect(placed.status, await placed.clone().text()).toBe(200);
     const trap = server.store.snapshot.combat.traps[0]!;
     const playerView = () => projectPlayerView(server.store.snapshot, sessionId, () => null);
