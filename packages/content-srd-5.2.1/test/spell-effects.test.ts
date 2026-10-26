@@ -206,8 +206,10 @@ describe("what one cast of an SRD spell does", () => {
     });
     expect(effectOf("forbiddance")!.laterActions?.[0]!.save).toBeUndefined();
     expect(zoneOf("antilife-shell")?.bars).toEqual({ way: "both", except: ["construct", "undead"], reach: true });
+    // "it must first succeed on a Charisma saving throw" to teleport across.
     expect(zoneOf("magic-circle")?.bars).toEqual({
       way: "in",
+      teleportSave: "cha",
       types: ["celestial", "elemental", "fey", "fiend", "undead"]
     });
   });

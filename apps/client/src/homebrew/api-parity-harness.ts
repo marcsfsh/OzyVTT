@@ -623,6 +623,62 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].doorWork.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action does to the door it is aimed at (an Immovable Rod, Sovereign Glue, Universal Solvent, a Ring of the Ram) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].pointsAtHidden.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "how far an action points its user at a secret door or hidden trap (a Wand of Secrets) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].lightsArea.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spilled oil an action lights round its user (a Tinderbox) - authored in the equipment table; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].raisesTower.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the tower an action raises on its placed square, with its walls' print (an Instant Fortress) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].dismissesTower",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that shrinks its user's tower again (an Instant Fortress) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].objectDamage[].**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the damage the objects under an action's area take (a Thunderous Greatclub's Clap of Thunder and Earthquake) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].concentrationSave.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the save a concentrating creature in an action's area also makes (a Thunderous Greatclub's Earthquake) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].grounded",
+    types: ACTION_CARRIERS,
+    reason:
+      "an area that spares the creatures off the ground (a Thunderous Greatclub's Earthquake) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].castsAtOnce",
     types: ACTION_CARRIERS,
     reason:
@@ -1237,6 +1293,19 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "save.failureEndsForm",
     types: ["spell"],
     reason: "one SRD author (Moonbeam), a reviewed override in the content build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.disadvantageTypes",
+    types: "*",
+    reason:
+      "the creature types that have Disadvantage on a save (Shatter's Constructs), copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.disadvantageTypes",
+    types: ["spell"],
+    reason: "one SRD author (Shatter), a reviewed override in the content build; no editor control yet",
     status: "gap"
   },
   {
