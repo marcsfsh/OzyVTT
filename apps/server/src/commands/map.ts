@@ -56,7 +56,7 @@ import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
 import { spaceEntryAfterMove } from "../space-entry.js";
 import { isNimble, passesCreatures } from "../space-sharing.js";
-import { fireFormBurns } from "../wall-passage.js";
+import { fireFormBurns, tunnelBehind } from "../wall-passage.js";
 import { teleportOutOfCage } from "../forcecage.js";
 import { carryPassenger, leaveSmoke } from "../teleport-company.js";
 import { zoneContentOf } from "../spell-zone-state.js";
@@ -472,6 +472,14 @@ export const mapCommands = [
                 rollDie: (sides) => kit.context.random(sides),
                 squarePx: geometry.calibration.cellSizePx
               })
+            );
+          // Tunneler leaves a tunnel through the walls it burrowed through.
+          const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+          if (mover && outcome.path && mode === "burrow" && pixelsPerFoot)
+            zoneEvents.push(
+              ...tunnelBehind(state, mover, travelled(outcome.path), pixelsPerFoot, (definitionId) =>
+                kit.resolveDefinitionIn(state, definitionId)
+              )
             );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.

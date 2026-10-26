@@ -147,7 +147,7 @@ export function raiseSpellWalls(state: GameState, input: RaiseInput): EffectNarr
 }
 
 /** Whether a wall crosses a token's square, kept a pixel inside its edges. */
-function cuts(token: Token, wall: Pick<VisionWall, "a" | "b">, squarePx: number): boolean {
+export function cuts(token: Token, wall: Pick<VisionWall, "a" | "b">, squarePx: number): boolean {
   if (!token.position) return false;
   const half = (squarePx * token.sizeCells) / 2 - 1;
   if (half <= 0) return false;

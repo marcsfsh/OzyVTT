@@ -6,7 +6,14 @@ import { RulesBlockedError } from "../src/game-store.js";
 import { applyMovementRules } from "../src/movement-rules.js";
 import { mapDistance } from "../src/movement-narration.js";
 import { movementCost } from "../src/terrain.js";
-import { burrowsThroughWalls, fireFormBurns, openingPassage, stopsOnlyInEnemySpace } from "../src/wall-passage.js";
+import {
+  burrowsThroughWalls,
+  fireFormBurns,
+  insideAnObject,
+  openingPassage,
+  stopsOnlyInEnemySpace,
+  tunnelBehind
+} from "../src/wall-passage.js";
 import { catalog, fight, FOE, HERO as HERO_CASTER } from "./spell-casters.js";
 import { cell, GEOMETRY, GOBLIN, HERO, ORC, visionGame, wall } from "./vision-fixtures.js";
 import { clericAt } from "./zone-fixtures.js";
@@ -131,6 +138,38 @@ describe("burrowing through walls", () => {
     mover(state, "purple-worm");
     move(state, cell(6, 5), "burrow");
     expect(state.combat.turn.movementUsedFeet).toBe(15);
+  });
+
+  it("Tunneler: the purple worm leaves a 10-foot tunnel through the wall that others then walk through", () => {
+    const state = visionGame({ walls: [wall({ x: 250, y: 0 }, { x: 250, y: 600 })] });
+    mover(state, "purple-worm");
+    const worm = state.actors.find((actor) => actor.id === GOBLIN)!;
+    const events = tunnelBehind(state, worm, [cell(4, 5), cell(5, 5), cell(6, 5)], 10, resolveDefinition);
+    expect(events.map((event) => event.text)).toEqual([expect.stringMatching(/leaves a tunnel through the rock/)]);
+    expect(state.combat.vision.walls[0]!.openings).toEqual([expect.objectContaining({ from: expect.any(Number) })]);
+    expect(state.combat.vision.walls[0]!.openings![0]!.source).toBeUndefined();
+    // Another creature walks through where the worm burrowed.
+    mover(state, "ogre");
+    expect(movementCost(state, GEOMETRY, GOBLIN, cell(4, 5), cell(6, 5))?.blocked).toBeUndefined();
+    // A creature without the trait leaves no tunnel.
+    const plain = visionGame({ walls: [wall({ x: 250, y: 0 }, { x: 250, y: 600 })] });
+    mover(plain, "xorn");
+    const xorn = plain.actors.find((actor) => actor.id === GOBLIN)!;
+    expect(tunnelBehind(plain, xorn, [cell(4, 5), cell(6, 5)], 10, resolveDefinition)).toEqual([]);
+  });
+
+  it("Incorporeal Movement: a ghost ending its turn inside a wall takes 1d10 Force damage, and clear of it none", () => {
+    const state = visionGame({ walls: [wall({ x: 250, y: 0 }, { x: 250, y: 600 })] });
+    // Straddling the wall: its centre on the wall's line.
+    mover(state, "ghost", { x: 250, y: 275 });
+    const ghost = state.actors.find((actor) => actor.id === GOBLIN)!;
+    const before = ghost.hp.current;
+    const deps = { resolveDefinition, rollDie: () => 6 };
+    const inside = insideAnObject(state, GOBLIN, deps);
+    expect(inside[0]?.text).toMatch(/ends its turn inside an object and takes \d+ Force damage/);
+    expect(ghost.hp.current).toBeLessThan(before);
+    mover(state, "ghost", cell(4, 5));
+    expect(insideAnObject(state, GOBLIN, deps)).toEqual([]);
   });
 
   it("can't burrow through a wall a spell raised", () => {

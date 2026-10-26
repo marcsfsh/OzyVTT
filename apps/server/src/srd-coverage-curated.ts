@@ -581,8 +581,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   Illumination: sheds,
   "Immutable Form": reference("Shape-changing isn't modeled, so there is nothing to refuse."),
-  "Incorporeal Movement": guided(
-    "terrain.ts passes it through walls and creatures as Difficult Terrain, and a wall a spell raised (Wall of Force) still stops it. The Force damage for ending a turn inside an object is the GM's, since walls are lines with no inside."
+  "Incorporeal Movement": enforced(
+    "terrain.ts passes it through walls and creatures as Difficult Terrain, and a wall a spell raised (Wall of Force) still stops it. A creature whose space a wall, a closed door or a window crosses as its turn ends is inside an object and takes 1d10 Force damage, rolled by the server (wall-passage.ts)."
   ),
   "Incubus Form": changesForm,
   Inscrutable: reference("The Disadvantage on Insight checks about it is the GM's to apply."),
@@ -671,8 +671,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   Transparent: reference("Noticing the cube is the GM's call, with the DC the trait prints."),
   "Treasure Sense": senses,
   "Troll Spawn": reference("What becomes of a severed limb is the GM's to run."),
-  Tunneler: guided(
-    "A burrowing move passes it through the map's walls at double cost, as through solid rock (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. The tunnel it leaves is the GM's to draw."
+  Tunneler: enforced(
+    "A burrowing move passes it through the map's walls at double cost, as through solid rock (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. Where it burrowed through a wall, a lasting 10-foot gap is left that sight and movement pass (wall-passage.ts)."
   ),
   "Undead Fortitude": enforced(
     "statblock-traits.ts rolls the Constitution save of DC 5 plus the damage when damage drops it to 0, and leaves it at 1 Hit Point on a success. Radiant damage and Critical Hits get no save."
