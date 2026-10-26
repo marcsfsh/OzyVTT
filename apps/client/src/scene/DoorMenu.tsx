@@ -27,7 +27,10 @@ const FASTENING_NAMES: Readonly<Record<string, string>> = {
   stuck: "Stuck",
   barred: "Barred",
   jammed: "Jammed",
-  sealed: "Sealed"
+  sealed: "Sealed",
+  rod: "Immovable Rod",
+  glued: "Glued",
+  command: "Opens at its owner's command"
 };
 
 /** What the GM reads of a door at a glance: what holds it, whether players see it, its Armor Class and hit points. */
@@ -104,7 +107,8 @@ export function DoorMenu({
         ["force", "Force it open"],
         ["pry", "Pry it open with tools"],
         ["jam", "Jam it with an Iron Spike"],
-        ["seal", "Seal it with Carpenter's Tools"]
+        ["seal", "Seal it with Carpenter's Tools"],
+        ["release", "Push an Immovable Rod's button"]
       ];
   return createPortal(
     <div ref={ref} className="token-context-menu anim-popover scroll-y" role="menu" style={style} aria-label="Door">

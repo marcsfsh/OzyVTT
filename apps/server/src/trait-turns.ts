@@ -10,6 +10,7 @@ import { HAZARDS } from "./hazards.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor } from "./hit-points.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { applyFailureEffect, createPendingSaves } from "./saving-throws.js";
+import { insideAnObject } from "./wall-passage.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import type { SightContent } from "./vision/senses.js";
 import { sightRules } from "./vision/rules.js";
@@ -150,7 +151,15 @@ function burnInSunlight(
 export function traitsAtTurnEnd(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
   return [
     ...aurasSavingAtTurnEnd(state, actorId, deps),
-    ...burningTraitsAtTurnEnd(state, actorId, deps).flatMap((trait) => trait.run())
+    ...burningTraitsAtTurnEnd(state, actorId, deps).flatMap((trait) => trait.run()),
+    // A ghost that ends its turn in a wall (Incorporeal Movement).
+    ...insideAnObject(state, actorId, {
+      resolveDefinition: deps.resolveDefinition,
+      rollDie: deps.rollDie,
+      ...(deps.catalog ? { catalog: deps.catalog } : {}),
+      ...(deps.newId ? { newId: deps.newId } : {}),
+      ...(deps.now ? { now: deps.now } : {})
+    })
   ];
 }
 

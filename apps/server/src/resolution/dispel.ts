@@ -4,6 +4,7 @@ import { ABILITY_NAMES, checkPlan, totalCheck } from "../ability-checks.js";
 import { CURSE_TAG, type EffectNarration } from "../effects.js";
 import { breakCursedAttunement } from "../inventory.js";
 import { endCursesOn, endSpellOn, endSpellZone, spellsOn } from "../spell-endings.js";
+import { zoneContentOf } from "../spell-zone-state.js";
 import { endedEffect, recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
 
 /**
@@ -64,6 +65,11 @@ function dispel(ctx: ResolveContext, printed: number, target: LiveActor | undefi
   if (input.zoneId !== undefined && !zone) ctx.warnings.push("That spell's area has already ended.");
   if (zone?.rule) {
     ctx.warnings.push(`${zone.name} is no spell, so ${action.name} leaves it.`);
+    return;
+  }
+  // SRD Antimagic Field: "Dispel Magic has no effect on the aura".
+  if (zone && zoneContentOf(zone, ctx.deps.catalog)?.trigger.antimagic) {
+    ctx.warnings.push(`${action.name} has no effect on ${zone.name}.`);
     return;
   }
   if (zone) {

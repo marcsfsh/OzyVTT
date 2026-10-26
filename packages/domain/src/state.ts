@@ -13,6 +13,7 @@ import {
   FailureMarginSchema,
   HealthDisplaySchema,
   HitPointBandSchema,
+  InventoryItemSchema,
   ObjectStatsSchema,
   SaveFailureDurationSchema,
   StoredCastSchema
@@ -382,6 +383,18 @@ export const PendingSaveSchema = z
     unseats: z.uuid().optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** A creature of these types has Disadvantage on the save (Shatter's Constructs). GM bookkeeping, never projected:
+     *  the roll card names the Disadvantage. */
+    disadvantageTypes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(6)
+      .optional(),
     /** What gives the save Advantage beyond the target's own riders, as the roll card names it: the damage that opened
      *  it (Hideous Laughter), or a fight with its source's side (Charm Person). */
     advantageFrom: z.string().min(1).max(120).optional(),
@@ -1161,14 +1174,28 @@ export type VisionSource = z.infer<typeof VisionSourceSchema>;
 /** What keeps a door shut (SRD 5.2.1 Lock, Iron Spikes, Knock): a `lock` picked with Thieves' Tools (`dc` is the
  *  Dexterity (Sleight of Hand) check, 15 for the SRD Lock; `forceDc` the Strength check that breaks it, absent when no
  *  check does) and opened by those who hold its key; a door `stuck`, `barred` or `jammed` shut with a spike, forced
- *  with a Strength (Athletics) check against `dc` (15 when the GM sets none); `sealed` by Stone Shape, which no check
+ *  with a Strength (Athletics) check against `dc` (15 when the GM sets none); held by an Immovable Rod (`rod`, DC 30);
+ *  `glued` with Sovereign Glue, which only Universal Solvent undoes; `sealed` by Stone Shape, which no check
  *  opens. */
 export const DoorFasteningSchema = z
   .object({
-    kind: z.enum(["lock", "stuck", "barred", "jammed", "sealed"]),
+    kind: z.enum(["lock", "stuck", "barred", "jammed", "sealed", "rod", "glued", "command"]),
     dc: z.number().int().min(1).max(40).optional(),
     forceDc: z.number().int().min(1).max(40).optional(),
-    keyHolderIds: z.array(z.uuid()).max(20).optional()
+    keyHolderIds: z.array(z.uuid()).max(20).optional(),
+    /** The Immovable Rod fixed against it (`rod`) and the creature that fixed it, which gets it back when it is moved; or
+     *  the one creature whose command opens it (`command`: an Instant Fortress's door). */
+    item: InventoryItemSchema.optional(),
+    ownerId: z.uuid().optional(),
+    /** Sovereign Glue (`glued`) holds once it has set, a minute on: through this round of the fight, or to this
+     *  game-clock minute. */
+    setsAt: z
+      .object({
+        round: z.number().int().positive().optional(),
+        minute: z.number().int().min(0).max(1_000_000_000).optional()
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type DoorFastening = z.infer<typeof DoorFasteningSchema>;
@@ -1183,6 +1210,8 @@ export const DoorStateSchema = z
       .object({
         casterId: z.uuid(),
         allowedIds: z.array(z.uuid()).max(20).default([]),
+        /** The spell that keeps it, when it lasts only as long as that does (Guards and Wards' 24 hours). */
+        source: VisionSourceSchema.optional(),
         /** Knock suppresses it for 10 minutes: through this round of the fight, and to this game-clock minute. */
         suppressed: z
           .object({
@@ -1200,12 +1229,14 @@ export const DoorStateSchema = z
 export type DoorState = z.infer<typeof DoorStateSchema>;
 
 /** A gap cut in a wall (Passwall's passage, a tunnel): the part from `from` to `to` along it, as fractions of its length
- *  from `a`, lets sight and movement through. With a `source` it closes again when that ends. */
+ *  from `a`, lets sight and movement through. With a `source` it closes again when that ends, and a creature still in
+ *  it then goes out to the side of `entry`, the point it was cut from. */
 export const WallOpeningSchema = z
   .object({
     from: z.number().min(0).max(1),
     to: z.number().min(0).max(1),
-    source: VisionSourceSchema.optional()
+    source: VisionSourceSchema.optional(),
+    entry: VisionPointSchema.optional()
   })
   .strict();
 export type WallOpening = z.infer<typeof WallOpeningSchema>;
@@ -1224,6 +1255,18 @@ export const VisionWallSchema = z
     door: DoorStateSchema.optional(),
     object: ObjectStatsSchema.optional(),
     openings: z.array(WallOpeningSchema).max(8).optional(),
+    /** The item and the creature whose use raised it (an Instant Fortress's tower), so the same use shrinks it. */
+    raisedBy: z
+      .object({
+        ownerId: z.uuid(),
+        itemId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(120),
+        towerId: z.string().min(1).max(120)
+      })
+      .strict()
+      .optional(),
     source: VisionSourceSchema.optional(),
     /** Bars that no creature passes and sight, attacks and spells go between (Forcecage's cage): a window that gives no
      *  cover and stops no area. */
@@ -1306,7 +1349,9 @@ export const VisionAreaSchema = z
           type: z.literal("circle"),
           x: z.number().min(0).max(100000),
           y: z.number().min(0).max(100000),
-          radiusFeet: z.number().positive().max(1000)
+          radiusFeet: z.number().positive().max(1000),
+          /** Only the circle's outer edge this many feet thick (Tiny Hut's dome). */
+          ringFeet: z.number().positive().max(100).optional()
         })
         .strict(),
       z
@@ -1314,7 +1359,8 @@ export const VisionAreaSchema = z
           type: z.literal("template"),
           annotationId: z.uuid(),
           widthFeet: z.number().positive().max(1000).nullable().default(null),
-          /** A ringed wall: only the circle's outer edge this many feet thick (Wall of Fire's ring). */
+          /** A ringed wall: only the circle's or square's outer edge this many feet thick (Wall of Fire's ring, Private
+           *  Sanctum's foggy edge). */
           ringFeet: z.number().positive().max(100).optional()
         })
         .strict(),
@@ -1324,6 +1370,10 @@ export const VisionAreaSchema = z
     ]),
     /** The one creature that sees through it (Insect Cloud: "Heavily Obscured for creatures other than you"). */
     sparedActorId: z.uuid().optional(),
+    /** An edge seen through only from within it (Tiny Hut: "opaque from the outside ... transparent from the inside"). */
+    oneWay: z.literal(true).optional(),
+    /** Darkness that normal light, and light from spells below this level, can't illuminate (Hallow's Darkness). */
+    unlitBelow: z.number().int().min(1).max(9).optional(),
     source: VisionSourceSchema.optional(),
     /** What clears it, ending the spell that made it: a strong wind (Gust of Wind) or water that destroys fog. */
     dispersedBy: z
@@ -1489,10 +1539,33 @@ export const SpellZoneSchema = z
       .optional(),
     /** It burns away when fire reaches it (Web). */
     flammable: z.literal(true).optional(),
+    /** Lit and burning (spilled Oil) until the end of the turn of `actorId` in `untilRound`. */
+    litUntil: z.object({ untilRound: z.number().int().positive(), actorId: z.uuid().nullable() }).strict().optional(),
     /** Its heal, rolled with its caster's numbers (Conjure Celestial's "4d12 + 4"). */
     healing: z.string().min(1).max(60).optional(),
     /** The creature it is round, which it moves with (Antipathy/Sympathy's target). */
     targetId: z.uuid().optional(),
+    /** The creature types its caster chose for its barrier and ward (Magic Circle, Hallow); absent, every type it names. */
+    wardTypes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(14)
+      .optional(),
+    /** The properties its caster picked for it (Private Sanctum's, Hallow's extra effect), by part id. */
+    parts: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(30)
+      )
+      .max(10)
+      .optional(),
     /** The creature type its caster picked for it to act on (Antipathy/Sympathy's "kind of creature"). */
     types: z
       .array(

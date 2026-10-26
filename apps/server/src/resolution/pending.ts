@@ -829,6 +829,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
+      ...(action.save.disadvantageTypes ? { disadvantageTypes: action.save.disadvantageTypes } : {}),
       ...(against ? { spell: against } : {}),
       ...(advantageFrom !== "" ? { advantageFrom } : {}),
       ...(autoSucceeds !== "" ? { autoSucceeds } : {}),
@@ -1013,6 +1014,36 @@ export function parkBurstSave(ctx: ResolveContext): void {
     halfOnSuccess: false,
     conditionIds: [],
     magical: isMagicalAction(ctx),
+    newSaveId: deps.newRollId,
+    createdAt: Date.parse(deps.now())
+  });
+}
+
+/** A concentrating creature caught in the area makes one more save, its Concentration broken on a failure (a Thunderous
+ *  Greatclub's Earthquake: "A creature concentrating ... must also succeed on a DC 20 Constitution saving throw or its
+ *  Concentration is broken"). */
+export function parkConcentrationSave(ctx: ResolveContext): void {
+  const { state, action, attacker, targets, deps, input } = ctx;
+  const save = action.concentrationSave;
+  if (!save || input.commit === false) return;
+  const concentrating = targets.filter((target) =>
+    state.actors.some((bearer) =>
+      bearer.effects.some((effect) => effect.concentration && effect.sourceActorId === target.id)
+    )
+  );
+  if (concentrating.length === 0) return;
+  createPendingSaves(state, {
+    sourceActorId: attacker.id,
+    sourceName: attacker.name,
+    actionName: `${action.name}: Concentration`,
+    ability: save.ability,
+    dc: save.dc,
+    targetIds: concentrating.map((target) => target.id),
+    proposedDamage: 0,
+    halfOnSuccess: false,
+    conditionIds: [],
+    magical: isMagicalAction(ctx),
+    extra: { breaksConcentration: true },
     newSaveId: deps.newRollId,
     createdAt: Date.parse(deps.now())
   });

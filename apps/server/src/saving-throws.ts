@@ -903,6 +903,10 @@ export function answerSave(
     // "A Large or larger creature has Advantage on this save" (Ensnaring Strike).
     if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
       sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
+    // "A Construct has Disadvantage on the save" (Shatter).
+    const type = creatureTypeOf(target, definition);
+    if (type !== null && pending.disadvantageTypes?.includes(type))
+      sources.disadvantage.push({ source: "creature-type", label: `${pending.actionName}: its creature type` });
     // Heightened Spell's target, on the cast's save and each it repeats.
     if (pending.disadvantageFrom)
       sources.disadvantage.push({ source: "disadvantage-from", label: pending.disadvantageFrom });

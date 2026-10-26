@@ -58,6 +58,8 @@ export function createPendingSaves(
     unseats?: string;
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize?: PendingSave["advantageAtSize"];
+    /** Creatures of these types have Disadvantage on the save (Shatter's Constructs). */
+    disadvantageTypes?: PendingSave["disadvantageTypes"];
     /** The spell the save is against, for what answers a save against a spell. */
     spell?: PendingSave["spell"];
     /** What gives the save Advantage beyond the target's riders (the damage that opened it). */
@@ -128,6 +130,7 @@ export function createPendingSaves(
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
     ...(input.unseats ? { unseats: input.unseats } : {}),
     ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
+    ...(input.disadvantageTypes ? { disadvantageTypes: [...input.disadvantageTypes] } : {}),
     ...(input.spell ? { spell: { ...input.spell } } : {}),
     ...(input.advantageFrom ? { advantageFrom: input.advantageFrom.slice(0, 120) } : {}),
     ...(input.failureKills ? { failureKills: { ...input.failureKills } } : {}),

@@ -462,6 +462,16 @@ const ShapeChoiceFields = {
     .string()
     .regex(/^[a-z0-9-]+$/)
     .max(80)
+    .optional(),
+  creatureTypes: z
+    .array(
+      z
+        .string()
+        .regex(/^[a-z][a-z-]*$/)
+        .max(40)
+    )
+    .min(1)
+    .max(14)
     .optional()
 };
 export const ActionResolveSchema = z
@@ -661,6 +671,18 @@ export const ActionResolveSchema = z
       .optional(),
     /** Whether the user's gear melds into its new form or is worn by it, where the action lets it choose. */
     gear: z.enum(["merged", "worn"]).optional(),
+    /** The creature types a cast's barrier wards, among those its spell offers (Magic Circle, Hallow); absent, all of
+     *  them. */
+    creatureTypes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(14)
+      .optional(),
     /** The effect a use picks among those its action offers (Enlarge or Reduce); absent, the first. */
     option: z
       .string()
@@ -1454,8 +1476,8 @@ export const DoorUseSchema = z
     wallId: z.uuid(),
     actorId: z.uuid(),
     /** Pick its lock (Thieves' Tools), force it, jam it with an Iron Spike, pry it open (Carpenter's or Smith's
-     *  Tools) or seal it (Carpenter's Tools). */
-    how: z.enum(["pick", "force", "jam", "pry", "seal"]),
+     *  Tools), seal it (Carpenter's Tools), or push the button of the Immovable Rod that holds it (`release`). */
+    how: z.enum(["pick", "force", "jam", "pry", "seal", "release"]),
     /** Another character helping with a Portable Ram (Advantage on the check). */
     helperId: z.uuid().optional(),
     /** Fast Hands (Thief): the use takes the Bonus Action. */

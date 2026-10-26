@@ -123,7 +123,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/economy.ts allows one Bonus Action on a turn, and only from a feature, spell or item that offers one."
   ),
   "breaking-objects": enforced(
-    "A door or wall on the map, and what holds a creature (a Net, a web, a rope), can be an object with an Armor Class, Hit Points and a damage threshold (objects.ts); the GM's door editor sets them from the substance and size tables. object.attack rolls a creature's attack against it (object-strikes.ts) and object.damage deals the GM's damage. Poison and Psychic damage do nothing, and at 0 Hit Points a wall or door is gone and a held creature is freed."
+    "A door or wall on the map, and what holds a creature (a Net, a web, a rope), can be an object with an Armor Class, Hit Points and a damage threshold (objects.ts); the GM's door editor sets them from the substance and size tables. object.attack rolls a creature's attack against it (object-strikes.ts), an action that targets a creature or object (Acid, Alchemist's Fire, Oil) can be aimed at it, and a spell whose area harms objects (Shatter, Meteor Swarm) deals its damage to each one under the area; the object fails the save and takes all of it (resolution/object-targets.ts). object.damage deals the GM's damage. Poison and Psychic damage do nothing, and at 0 Hit Points a wall or door is gone and a held creature is freed. Objects the map doesn't hold (furniture, chests) and an object left burning are the GM's."
   ),
   "bright-light": enforced(
     "With dynamic vision on, vision/sight.ts gives Bright Light under the scene's bright ambient light, in a painted bright area and within a light's bright radius, and a creature sees normally there."
@@ -323,7 +323,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   monster: reference("A definition; there is nothing to apply."),
   "nonplayer-character": reference("A definition; there is nothing to apply."),
   object: enforced(
-    "Doors and walls on the map, and the nets, webs and ropes that hold creatures, can carry an object's Armor Class and Hit Points (objects.ts). An object takes damage from attacks (object.attack). It fails every saving throw, so an area's full damage on one is the GM's to deal with object.damage."
+    "Doors and walls on the map, and the nets, webs and ropes that hold creatures, can carry an object's Armor Class and Hit Points (objects.ts). An object takes damage from attacks (object.attack), and it fails every saving throw: an action aimed at it, or the area of a spell that harms objects, deals it the whole of its damage (resolution/object-targets.ts)."
   ),
   "occupied-space": enforced(
     "movement-rules.ts refuses a move that ends in another creature's space, unless one of them can share it, and occupied-space.ts leaves a creature that ends its turn in another's space Prone unless it is Tiny or larger than the other."
@@ -581,8 +581,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   Illumination: sheds,
   "Immutable Form": reference("Shape-changing isn't modeled, so there is nothing to refuse."),
-  "Incorporeal Movement": guided(
-    "terrain.ts passes it through walls and creatures as Difficult Terrain, and a wall a spell raised (Wall of Force) still stops it. The Force damage for ending a turn inside an object is the GM's, since walls are lines with no inside."
+  "Incorporeal Movement": enforced(
+    "terrain.ts passes it through walls and creatures as Difficult Terrain, and a wall a spell raised (Wall of Force) still stops it. A creature whose space a wall, a closed door or a window crosses as its turn ends is inside an object and takes 1d10 Force damage, rolled by the server (wall-passage.ts)."
   ),
   "Incubus Form": changesForm,
   Inscrutable: reference("The Disadvantage on Insight checks about it is the GM's to apply."),
@@ -671,8 +671,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   Transparent: reference("Noticing the cube is the GM's call, with the DC the trait prints."),
   "Treasure Sense": senses,
   "Troll Spawn": reference("What becomes of a severed limb is the GM's to run."),
-  Tunneler: guided(
-    "A burrowing move passes it through the map's walls at double cost, as through solid rock (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. The tunnel it leaves is the GM's to draw."
+  Tunneler: enforced(
+    "A burrowing move passes it through the map's walls at double cost, as through solid rock (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. Where it burrowed through a wall, a lasting 10-foot gap is left that sight and movement pass (wall-passage.ts)."
   ),
   "Undead Fortitude": enforced(
     "statblock-traits.ts rolls the Constitution save of DC 5 plus the damage when damage drops it to 0, and leaves it at 1 Hit Point on a success. Radiant damage and Critical Hits get no save."
@@ -1027,7 +1027,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The cast makes a creature at 0 Hit Points Stable with no check (resolution/stabilize.ts), within 15 feet, 30 at level 5, 60 at level 11 and 120 at level 17 (resolution/spell-targets.ts)."
   ),
   "item:tinderbox": enforced(
-    "item-light.ts lights a Candle, Lamp, Lantern or Torch in hand only when its bearer holds a Tinderbox or another flame, spending its Bonus Action in a fight. Lighting any other fire is the GM's."
+    "item-light.ts lights a Candle, Lamp, Lantern or Torch in hand only when its bearer holds a Tinderbox or another flame, spending its Bonus Action in a fight, and its Bonus Action lights oil spilled within 5 feet (zone-kindling.ts). Lighting any other fire, which takes a minute, is the GM's."
+  ),
+  "item:oil": enforced(
+    "Thrown in place of an attack at a creature or object within 20 feet: a creature makes the Dexterity save or is covered in oil, and Fire damage it takes in the next minute is 5 more (hazards.ts); a door or a wall on the map that is an object is covered with no save, and so takes 5 more from Fire (resolution/object-targets.ts, objects.ts). Poured as the Utilize action over a 5-foot square within 5 feet, it lies unlit until Fire damage or a fire's area reaches it, a burning creature stands in it, or a Tinderbox lights it; then it deals 5 Fire damage to a creature that enters it or ends its turn there, once a turn, and burns out at the end of the turn 2 rounds later (zone-kindling.ts, zone-fire.ts). Its 6 hours as fuel in a Lamp or Lantern burn down on the game clock (item-light.ts)."
   ),
   "item:healers-kit": enforced(
     "stabilize.ts spends one of the kit's ten uses to make a creature at 0 Hit Points Stable with no check, and spending the tenth takes the kit. The Gear tab shows the uses left in it."
@@ -1397,6 +1400,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:beast-spells": enforced(
     "transform/rules.ts lets a Druid 18 cast spells in a Wild Shape form, except one whose Material component has a cost or is consumed."
   ),
+  "feature:natures-sanctuary": guided(
+    "The Magic action spends a use of Wild Shape and leaves its 15-foot Cube for 1 minute, ending at once when the Druid has the Incapacitated condition or dies (zone-auras.ts). The Druid and its allies in the Cube have Half Cover there, the best of it and the map's cover counting, and the Resistance of the Druid's current Nature's Ward. The Bonus Action move of the Cube up to 60 feet is the GM's to drag."
+  ),
   "feature:lands-aid": enforced(
     "A use of Wild Shape is spent, and the Sphere centres within 60 feet of the Druid (commands/actions.ts for a placed area, resolution/action-targets.ts for picked creatures). Its creatures save against the spell save DC for the Necrotic damage, and the one creature picked in the area regains its own 2d6 Hit Points, 3d6 at Druid 10 and 4d6 at 14 (resolution/area-heal.ts). A placed area catches every creature under it, so leaving one out of the save is the GM's."
   ),
@@ -1547,6 +1553,12 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:brooch-of-shielding": guided("Resistance to Force damage is applied. Immunity to Magic Missile is the GM's."),
   "item:cloak-of-arachnida": enforced(
     "Resistance to Poison damage and a Climb Speed equal to its wearer's Speed are applied. The webs of a Web spell can't hold the wearer (spell-zones.ts), and its Web cast is DC 13 over a 40-foot Cube once a Long Rest. Climbing upside down on ceilings is the GM's to allow."
+  ),
+  "item:acid": enforced(
+    "Thrown in place of an attack at a creature or object the thrower sees within 20 feet: a creature makes the Dexterity save (DC 8 plus the thrower's Dexterity modifier and Proficiency Bonus) or takes 2d6 Acid damage, and a door or a wall on the map that is an object fails it and takes the damage (resolution/object-targets.ts, objects.ts)."
+  ),
+  "item:alchemists-fire": enforced(
+    "Thrown in place of an attack at a creature or object the thrower sees within 20 feet: a creature makes the Dexterity save or takes 1d4 Fire damage and starts burning, 1d4 Fire damage at the start of each of its turns until it puts the fire out (hazards.ts). A door or a wall on the map that is an object fails the save and takes the 1d4 Fire (resolution/object-targets.ts); an object has no turns, so its burning after that is the GM's."
   ),
   "item:caltrops": enforced(
     "Spreading them from the pack places a 5-foot square that rolls nothing as it lands (resolution/concentration.ts). spell-zones.ts asks a creature that enters it for the DC 15 Dexterity save, once a turn: 1 Piercing damage and a Speed of 0 until the start of its next turn on a failure. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). The square stays until the GM ends it, which is gathering them up."
@@ -1726,8 +1738,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:boots-of-speed": enforced(
     "A Bonus Action doubles its wearer's Speed (speed.ts) and gives Opportunity Attacks against it Disadvantage. Its 10 minutes a Long Rest are 100 rounds: a click lasts all that is left, and ending it early gives the rest back (use-cost.ts, effects.ts)."
   ),
-  "item:thunderous-greatclub": guided(
-    "Its wearer's Strength is at least 20 (live-abilities.ts), a hit deals 1d8 Thunder more, Clap of Thunder's 30-foot Cone asks for the DC 15 Strength save against Prone, and Earthquake's once-a-day DC 20 Dexterity save against Prone is applied. Earthquake's Concentration save, its fissure and the damage to objects are the GM's."
+  "item:instant-fortress": guided(
+    "Its Magic action raises the tower on the 20-foot square it places (resolution/tower.ts): four walls that are objects with AC 20, 100 Hit Points, Immunity to Bludgeoning, Piercing and Slashing damage and Resistance to the rest, and a door on the side facing its user that opens only for that user and that Knock leaves shut (doors.ts). The creatures in the square are pushed to the nearest free space next to it, and the command again shrinks it only while no creature stands inside. The Bonus Action the door's command costs, the damage the tower keeps once shrunk, siege equipment, its floors and battlement, and repair by Wish are the GM's."
+  ),
+  "item:thunderous-greatclub": enforced(
+    "Its wearer's Strength is at least 20 (live-abilities.ts), a hit deals 1d8 Thunder more and 3d8 more to an object (object-strikes.ts), and Clap of Thunder's 30-foot Cone asks the DC 15 Strength save against Prone and deals 3d8 Thunder to the doors and walls that are objects in it. Earthquake, once a day, asks each creature on the ground in its 50-foot circle for the DC 20 Dexterity save against Prone and a concentrating one for the DC 20 Constitution save against its Concentration (resolution/pending.ts), and deals 50 Bludgeoning to the objects there. The fissure is the GM's."
   ),
   "item:oathbow": guided(
     "Naming a sworn enemy marks it for 7 days, once a day, and the bow's ranged attacks against it have Advantage, set Half and Three-Quarters Cover aside and deal 3d6 Piercing more. Ignoring long range's Disadvantage, and the Disadvantage with other weapons while it lives, are the GM's."
@@ -1855,8 +1870,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:dominate-person": enforced(
     "Only a Humanoid can be the target. A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). It puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns, and its Reaction is offered only while the caster has one, spending both (commanded-reactions.ts). What the orders say, and how it acts when left alone, are the table's."
   ),
-  "spell:earthquake": guided(
-    "The cast places the 100-foot circle, and its Dexterity save leaves a creature Prone with its Concentration broken on a failure. spell-zones.ts repeats the save for each creature on the ground in the circle at the end of each of the caster's turns, sparing one in the air, as the cast does, and zone-ground.ts makes the circle Difficult Terrain. The fissures, and the 50 Bludgeoning damage to structures, which the GM deals to the walls and doors that are objects with object.damage (objects.ts), are the GM's."
+  "spell:earthquake": enforced(
+    "The cast places the 100-foot circle; each creature on the ground there makes the Dexterity save at the cast and at the end of each of the caster's turns, Prone with its Concentration broken on a failure, one in the air spared (spell-zones.ts), and the circle is Difficult Terrain (zone-ground.ts). The walls and doors there that are objects take 50 Bludgeoning damage at the cast and as each of the caster's turns ends (objects.ts). The fissures, and which structures touch the ground and what collapses, are the GM's."
   ),
   "spell:fear": guided(
     "A failed save imposes Frightened and drops what the creature holds (effects.ts), and a creature that ends its turn out of the caster's sight repeats the save (save-stages.ts, with dynamic vision on). The Dash away on each of its turns is the GM's."
@@ -1912,14 +1927,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:prayer-of-healing": enforced(
     "The 2d8 Hit Points are applied, each target gains a Short Rest's benefits, and a creature it healed is refused until it finishes a Long Rest (resolution/prayer-of-healing.ts)."
   ),
+  "spell:guards-and-wards": guided(
+    "The cast places its 50-foot square for 24 hours, and every closed door in it is locked as by Arcane Lock against all but the caster and its allies until the spell ends (resolution/cast-walls.ts, doors.ts). The fogged corridors and their confusion, the webbed stairs, the illusory walls, the extra spell effect, sparing creatures the caster names who aren't its allies, and Dispel Magic ending one part at a time are the GM's."
+  ),
   "spell:prismatic-wall": guided(
-    "The save against Blinded for a creature near the wall is applied, and the wall on its placed Line blocks sight and sheds its Bright and Dim Light for dynamic vision (vision/cast-sight.ts). Each layer's save and effect, and breaking the layers, are the GM's."
+    "The wall on its placed Line blocks sight and sheds its Bright and Dim Light (vision/cast-sight.ts), and placed through a creature's space the cast fails. A creature other than the caster's allies that can see it and moves within 20 feet of it or starts its turn there makes the Constitution save against Blinded for 1 minute, and one passing into it makes the seven layers' Dexterity saves in order: 12d6 Fire, Acid, Lightning, Poison and Cold, half on a success, Indigo's Restrained with its tally toward Petrified, and Violet's Blinded with the trip to another plane (spell-zones.ts, resolution/prismatic.ts). Designating creatures other than allies, the globe, what each layer blocks, the wall's AC and destroying the layers are the GM's."
   ),
   "spell:protection-from-poison": enforced(
     "The cast ends Poisoned and leaves Resistance to Poison damage and Advantage on saves to avoid or end Poisoned, for an hour counted on the game clock (game-time.ts)."
   ),
   "spell:remove-curse": enforced(
     "resolution/dispel.ts ends every effect marked a curse on the target (Hex, Bestow Curse, Geas), and breaks its Attunement to a cursed item so the item can be removed; the item's own curse stays. A curse the app doesn't track is the GM's."
+  ),
+  "spell:reverse-gravity": enforced(
+    "Each creature in the 50-foot Cylinder that fails the Dexterity save falls up to its top, 100 feet, and hangs there while the spell lasts (falling.ts); a creature that comes into the Cylinder later makes the save the same way (spell-zones.ts). When the spell ends they fall, taking the falling damage and landing Prone. A ceiling lower than the top, and the objects in the area, are the GM's."
   ),
   "spell:regenerate": enforced(
     "The 4d8 + 15 Hit Points are applied to one creature, which regains 1 Hit Point at the start of each of its turns for the hour (turn-boundaries.ts). Regrowing severed parts is the GM's."
@@ -2067,7 +2088,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The cast places up to ten 10-foot Cubes, each touching another and within 150 feet of the caster (multi-templates.ts), and each creature under any of them makes the Dexterity save once against 7d10 Fire damage, half on a success. Setting flammable objects alight is the GM's."
   ),
   "spell:meteor-swarm": enforced(
-    "The cast places up to four 40-foot-radius Spheres at different points within range (multi-templates.ts), and a creature in more than one makes the Dexterity save once, against 20d6 Fire and 20d6 Bludgeoning damage, half on a success. Setting objects alight is the GM's."
+    "The cast places up to four 40-foot-radius Spheres at different points within range (multi-templates.ts), and a creature in more than one makes the Dexterity save once, against 20d6 Fire and 20d6 Bludgeoning damage, half on a success. A door or a wall on the map that is an object under the Spheres takes the whole of it, once (resolution/object-targets.ts). Setting objects alight is the GM's."
+  ),
+  "spell:shatter": enforced(
+    "The cast's Constitution save against 3d8 Thunder damage, half on a success, is asked of each creature in the 10-foot-radius Sphere, a Construct making it with Disadvantage (saving-throws.ts). A door or a wall on the map that is an object under the Sphere takes the whole of the damage (resolution/object-targets.ts)."
   ),
   "spell:flaming-sphere": enforced(
     "spell-zones.ts asks for the Dexterity save against 2d6 Fire damage when a creature ends its turn within 5 feet of the sphere. The Bonus Action moves the sphere up to 30 feet (zone-moves.ts), and a creature it rams makes the save. It sheds its light for dynamic vision (vision/cast-sight.ts)."
@@ -2099,11 +2123,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:insect-plague": enforced(
     "spell-zones.ts asks for the Constitution save against 4d10 Piercing damage on the cast and when a creature enters the Sphere or ends its turn there, once a turn. zone-ground.ts makes the Sphere Difficult Terrain, and it is Lightly Obscured for dynamic vision (vision/cast-sight.ts)."
   ),
-  "spell:magic-circle": guided(
-    "zone-barriers.ts keeps Celestials, Elementals, Fey, Fiends and Undead from walking into the Cylinder, and strict rules refuse their move across its edge. Their Disadvantage on attacks into it, their teleport save and the inverted circle are the GM's."
+  "spell:magic-circle": enforced(
+    "The cast picks the types it wards among Celestials, Elementals, Fey, Fiends and Undead (all of them when none is named) and whether it faces out or is reversed. Facing out, zone-barriers.ts keeps a creature of those types from walking into the Cylinder and makes one that teleports in succeed on a Charisma save against the cast's DC first, a failure wasting the teleport; reversed, the same holds it in. The creatures it protects, inside the Cylinder or, reversed, outside it, hold its ward while there (zone-auras.ts): those types attack them with Disadvantage and can't give them the Charmed or Frightened condition. Possession, which the app doesn't model, is the GM's."
+  ),
+  "spell:private-sanctum": guided(
+    "The cast places the Cube, 100 feet a side and 100 more for each slot level above 4, and picks any of its properties (spell-zones.ts): a dark and foggy edge that sight, Darkvision included, can't pass either way (resolution/zone-casts.ts, vision/areas.ts); no teleporting into or out of it (zone-barriers.ts); and no Divination spell targeting, or catching in its area, a creature inside (zone-auras.ts, resolution/spell-wards.ts). It lasts 24 hours on the game clock. A Cube smaller than the spell's size is the GM's to redraw, and sound across the edge, Divination sensors, planar travel and the year of castings that makes it permanent are the GM's."
+  ),
+  "spell:antimagic-field": guided(
+    "The 10-foot Emanation goes with its caster while it concentrates, and every creature in it, the caster too, holds the field (zone-auras.ts): it can't cast a spell or take the Magic action (resolution/economy.ts); no spell can target it, catch it in an area or a lasting area, or reach it with a later effect (resolution/spell-wards.ts); its magic items give nothing, a magic weapon swinging as its base and a magic item's action refused, and a magic item swung or used from outside works on it as a plain one (equipment-derivation.ts, resolution/validate.ts); an ongoing spell's modifiers, Armor Class bonus and conditions on it are suppressed while their time still runs; and a creature a spell summoned winks out of the map until its space is outside the field (off-plane.ts). No one teleports into or out of it (zone-barriers.ts), and Dispel Magic aimed at it does nothing (resolution/dispel.ts). Lights, fog and Darkness a spell placed over the field still shine and obscure inside it, and spells cast by an Artifact or a deity, portals and planar travel are the GM's."
+  ),
+  "spell:hallow": guided(
+    "The cast places the 60-foot-radius area round the touched point until dispelled and picks the types its ward names among Aberrations, Celestials, Elementals, Fey, Fiends and Undead (all of them when none is named). zone-barriers.ts keeps a creature of those types from walking in, and a creature inside can't be charmed or frightened by one, a Charmed or Frightened condition it already has from one being held off while it is inside (zone-auras.ts). The cast picks its extra effect: Courage (every other creature inside immune to Frightened), Darkness (dark inside, which normal light and lower spells' light don't brighten), Daylight (Bright Light), Extradimensional Interference (the warded types can't teleport in or out), Fear (a warded creature inside is Frightened), Resistance (every other creature inside resists the type picked), Silence (Deafened inside) or Vulnerability (a warded creature inside is vulnerable to the type picked). The extra effect's creatures follow the ward's types, so naming other types for it is the GM's, as are Peaceful Rest, Tongues, possession and a lower spell's magical Darkness inside its Daylight. A Hallow placed over ground already under one fails (resolution/zone-casts.ts)."
   ),
   "spell:moonbeam": enforced(
-    "spell-zones.ts asks for the Constitution save against 2d10 Radiant damage on the cast and when a creature enters the Cylinder or ends its turn there, once a turn. On the caster's later turns a Magic action moves the Cylinder up to 60 feet (zone-moves.ts), and a creature it moves onto makes the save. Its Dim Light is placed for dynamic vision (vision/cast-sight.ts). A shape-shifted creature that fails returns to its true form and can't shape-shift while the spell lasts (transform/rules.ts); the GM ends that sooner when it leaves the Cylinder."
+    "spell-zones.ts asks for the Constitution save against 2d10 Radiant damage on the cast and when a creature enters the Cylinder or ends its turn there, once a turn. On the caster's later turns a Magic action moves the Cylinder up to 60 feet (zone-moves.ts), and a creature it moves onto makes the save. Its Dim Light is placed for dynamic vision (vision/cast-sight.ts). A shape-shifted creature that fails returns to its true form and can't shape-shift until it leaves the Cylinder or the spell ends (transform/rules.ts, zone-auras.ts)."
   ),
   "spell:pass-without-trace": enforced(
     "zone-auras.ts gives the caster and its allies +10 to Dexterity (Stealth) checks while they stand in the 30-foot Emanation. Leaving no tracks is the GM's to narrate."
@@ -2365,8 +2398,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:amulet-of-the-planes": guided(
     "Its Plane Shift is cast only after a DC 15 Intelligence (Arcana) check, which the server rolls in a fight and outside one; a failure spends the action and casts nothing (cast-check.ts). Where a failure sends its wearer and those within 15 feet, on the d100 table, is the GM's."
   ),
-  "item:ring-of-the-ram": guided(
-    "Each of its three actions spends 1 to 3 of its 3 charges (1d3 back at dawn) on a ranged spell attack at its printed +7 against a creature within 60 feet, dealing 2d10 Force and pushing it 5 feet for each charge. Its Strength check at +5 a charge to break an object is the GM's."
+  "item:ring-of-the-ram": enforced(
+    "Each of its three actions spends 1 to 3 of its 3 charges (1d3 back at dawn) on a ranged spell attack at its printed +7 against a creature within 60 feet, dealing 2d10 Force and pushing it 5 feet for each charge. Aimed at a door on the map it sees within 60 feet, the same charges make a Strength check at +5 a charge against the highest DC of what holds the door shut (10 more under an Arcane Lock), and a success breaks it open; Sovereign Glue and Stone Shape's seal don't give (resolution/door-work.ts, doors.ts). The DC to break any other object, which the SRD doesn't print, is the GM's."
+  ),
+  "item:immovable-rod": guided(
+    "Its Utilize action fixes the rod against a closed door on the map within reach, which it holds shut: the rod leaves its bearer's hands, a DC 30 Strength (Athletics) check forcing the door moves it back to whoever fixed it, and a creature beside the door can push its button with a Utilize action and take it (resolution/door-work.ts, doors.ts). The rod fixed anywhere else, as a ladder rung, a bar or a weight holding 8,000 pounds, is open-ended use the GM rules on."
+  ),
+  "item:sovereign-glue": guided(
+    "Its 1d6 + 1 ounces are rolled when it is added and counted. A Utilize action spends an ounce to glue a closed door on the map within reach shut; a minute later the glue has set, and then no check, tool, Knock or Ring of the Ram opens it until Universal Solvent dissolves it (resolution/door-work.ts, doors.ts). Bonding any other two objects, and Oil of Etherealness or Wish breaking the bond, are the GM's."
+  ),
+  "item:universal-solvent": guided(
+    "Its 1d6 + 1 ounces are rolled when it is added and counted. A Utilize action spends an ounce on a door on the map within reach and dissolves the Sovereign Glue that holds it (resolution/door-work.ts, doors.ts). Dissolving any other adhesive is the GM's."
+  ),
+  "item:wand-of-secrets": enforced(
+    "Its Magic action spends 1 of its 3 charges (1d3 back at dawn): if a secret door on the map or a hidden trap or glyph lies within 60 feet of its holder, the table hears which way the wand points at the nearest, and the GM what it is and how far (resolution/door-work.ts)."
   ),
   "item:dragon-orb": guided(
     "Peering into it is a DC 15 Charisma save its user makes: a success gives control of the orb, and a failure leaves the user Charmed by it while attuned, and a player can't end that attunement (attunement.ts); the GM ending the attunement ends either. Only a user who controls it casts its spells, at their printed charges from 7 (1d4 + 3 back at dawn): Cure Wounds at level 9 for 4, Daylight for 1, Death Ward for 2, Detect Magic for none, Scrying at DC 18 for 3; and Call Dragons waits an hour of game time (clock-pools.ts). The Suggestion it casts on a charmed user and its AC 20 are the GM's."
@@ -2398,10 +2443,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
 
   // Walls, doors and objects on the map (spell-walls.ts, doors.ts, objects.ts, enclosures.ts, zone-walls.ts).
   "spell:wall-of-force": enforced(
-    "The cast raises the wall on its placed Line as walls that stop movement and leave sight through (spell-walls.ts). A creature in its space is moved out of it, the caster's allies to the caster's side and the rest to the far side. Nothing damages it, Disintegrate destroys it whole and ends the spell, and it goes when the Concentration ends. Its hemisphere and globe forms are the GM's to draw."
+    "The cast raises the wall on its placed Line as walls that stop movement and leave sight through (spell-walls.ts). A creature in its space is moved out of it, the caster's allies to the caster's side and the rest to the far side. Nothing damages it, Disintegrate destroys it whole and ends the spell, and it goes when the Concentration ends. Picked as a dome or globe, it is raised round the 10-foot circle the cast places, holding in or out the creatures it rings (resolution/cast-walls.ts). Its angle off the ground and its reach into the Ethereal Plane are the GM's."
   ),
   "spell:wall-of-stone": enforced(
-    "The cast raises the wall on its placed Line as 10-foot stone panels that stop movement and sight, each an object with AC 15 and 180 Hit Points that is gone at 0 Hit Points (spell-walls.ts, objects.ts). A creature in its space is moved out of it. The wall stays for good once the caster holds Concentration for the full 10 minutes, and goes if the Concentration ends sooner. Its other shapes, and the save of a creature it would shut in, are the GM's."
+    "The cast raises the wall on its placed Line as 10-foot stone panels that stop movement and sight, each an object with AC 15, 180 Hit Points and Immunity to Poison and Psychic damage that is gone at 0 Hit Points (spell-walls.ts, objects.ts); picked as the thin form, it raises 20-foot panels of 90 Hit Points along a Line twice as long. A creature in its space is moved out of it. The wall stays for good once the caster holds Concentration for the full 10 minutes, and goes if the Concentration ends sooner. Its bridges, ramps and battlements, the panels that fall with a broken one, and the save of a creature it would shut in against the map's other walls are the GM's."
   ),
   "spell:forcecage": enforced(
     "The cast raises the 20-foot cage on its placed Cube as bars that stop movement and leave sight, attacks and spells through (spell-walls.ts), and moves a creature standing in the bars out of them. A creature that teleports out first makes a Charisma save against the caster's spell save DC, which the server rolls, and a failure keeps it in and wastes the teleport (forcecage.ts). Disintegrate destroys the cage, and it goes when the spell ends. The solid 10-foot box and its reach into the Ethereal Plane are the GM's."
@@ -2415,8 +2460,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:arcane-lock": enforced(
     "Aimed at a door on the map the caster touches, it locks the door against everyone but the caster and the creatures named as the cast's targets (doors.ts). Thieves' Tools can't pick it, a Strength check can't force it, and Knock holds it off for 10 minutes. The password and the higher DC to break it are the GM's."
   ),
-  "spell:passwall": guided(
-    "Aimed at a wall on the map within 30 feet that the caster sees, it cuts a 5-foot passage that sight and movement pass through for the hour (spell-walls.ts). Moving the creatures still in the passage when it closes is the GM's."
+  "spell:passwall": enforced(
+    "Aimed at a wall on the map within 30 feet that the caster sees, it cuts a 5-foot passage that sight and movement pass through for the hour (spell-walls.ts). When it closes, a creature still in the passage is moved out to the nearest unoccupied space on the side it was cut from. Whether a surface is wood, plaster or stone is the GM's, since the map's walls carry no material."
   ),
   "spell:stone-shape": guided(
     "Aimed at a door on the map the caster touches, it seals the door shut so that no check opens it; aimed at a wall, it cuts a lasting 5-foot passage through it (spell-walls.ts, doors.ts). The other shapes it makes are the GM's."
@@ -2427,8 +2472,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:resilient-sphere": enforced(
     "A failed Dexterity save shuts the target in the sphere while the caster concentrates (enclosures.ts). An attack or spell on it from outside, or from it on anything outside, meets Total Cover's refusal, and an area leaves it out. Disintegrate aimed at it destroys the sphere, harms nothing inside and ends the spell. Rolling the sphere along, and a willing target, are the GM's."
   ),
-  "spell:tiny-hut": guided(
-    "The dome stays where it was cast (zone-barriers.ts): only the creatures inside it at the cast pass through it, and a spell of level 3 or lower cast from outside can't reach inside. Its light, its one-way sight and its end when the caster leaves are the GM's."
+  "spell:tiny-hut": enforced(
+    "The dome stays where it was cast (zone-barriers.ts): only the creatures inside it at the cast pass through it, and a spell of level 3 or lower cast from outside can't reach inside. The cast fails while a creature's space lies partly in the dome. Those outside can't see in while those inside see out (resolution/zone-casts.ts, vision/sight.ts), the cast commands Dim Light or Darkness inside, and the spell ends when its caster leaves the dome (zone-auras.ts). Commanding the light again after the cast, the dome's colour and the weather inside are the GM's."
   ),
   "item:bead-of-force": enforced(
     "Throwing a bead uses it up: each creature in the 10-foot-radius Sphere makes the DC 15 Dexterity save or takes 5d4 Force damage, and one that fails is shut in the sphere for a minute, which no attack or effect passes (enclosures.ts). Pushing out the creatures that saved, and rolling the sphere, are the GM's."

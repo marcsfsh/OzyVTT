@@ -33,7 +33,7 @@ export type BlockedMove = Readonly<{
 const ASKED = "Asked the GM. Waiting for their call.";
 
 /** How a creature works on a door (`door:use`). */
-export type DoorWork = "pick" | "force" | "jam" | "pry" | "seal";
+export type DoorWork = "pick" | "force" | "jam" | "pry" | "seal" | "release";
 
 export function useMapCommands({
   revision,

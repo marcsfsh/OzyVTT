@@ -1,4 +1,4 @@
-import type { DoorFastening, DoorState, GameState, RollVisibility, VisionWall } from "@vtt/domain";
+import type { DoorFastening, DoorState, GameState, RollVisibility, VisionSource, VisionWall } from "@vtt/domain";
 import type { RandomSource } from "@vtt/rules-5e";
 import { catalogIdOf, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { checkPlan, type CheckNames, type CheckPlan } from "./ability-checks.js";
@@ -11,8 +11,9 @@ import { carriedRow as carried, requireFastHands, spendUtilize } from "./utilize
 import { doorWithinReach } from "./vision/edit.js";
 
 /**
- * Doors that stay shut (SRD 5.2.1 Lock, Thieves' Tools, Ram Portable, Spikes Iron, Knock, Arcane Lock): a closed door
- * may be locked, stuck, barred, jammed with a spike or sealed by Stone Shape, and may hold an Arcane Lock. A creature
+ * Doors that stay shut (SRD 5.2.1 Lock, Thieves' Tools, Ram Portable, Spikes Iron, Knock, Arcane Lock, Immovable Rod,
+ * Sovereign Glue): a closed door may be locked, stuck, barred, jammed with a spike, held by an Immovable Rod, glued or
+ * sealed by Stone Shape, and may hold an Arcane Lock. A creature
  * opens it only when nothing holds it shut against that creature: a lock's key holder, and the creatures an Arcane Lock
  * names, pass. Thieves' Tools pick a lock, a Strength (Athletics) check forces the rest, and an Iron Spike jams a door.
  * The server keeps every fastening; a player learns of one by trying the door.
@@ -45,8 +46,29 @@ const SHUT: Readonly<Record<DoorFastening["kind"], string>> = {
   stuck: "The door is stuck.",
   barred: "The door is barred.",
   jammed: "The door is jammed shut.",
-  sealed: "The door is sealed shut."
+  sealed: "The door is sealed shut.",
+  rod: "An Immovable Rod holds the door shut.",
+  glued: "The door is glued shut.",
+  command: "The door opens only at its owner's command."
 };
+
+/** SRD Immovable Rod: "A creature can take a Utilize action to make a DC 30 Strength (Athletics) check, moving the fixed
+ *  rod up to 10 feet on a successful check." */
+export const ROD_DC = 30;
+
+/** Whether a fastening holds now: Sovereign Glue only once it has set ("the applied glue takes 1 minute to set"). */
+export function fasteningHolds(state: GameState, fastening: DoorFastening): boolean {
+  const sets = fastening.setsAt;
+  if (!sets) return true;
+  if (state.combat.active && sets.round !== undefined) return state.combat.round >= sets.round;
+  return sets.minute === undefined || clockMinutesOf(state) >= sets.minute;
+}
+
+/** What only magic undoes, which no check forces, pries or picks: Stone Shape's seal and Sovereign Glue that has set. */
+const onlyMagicUndoes = (state: GameState, fastening: DoorFastening) =>
+  fastening.kind === "sealed" ||
+  fastening.kind === "command" ||
+  (fastening.kind === "glued" && fasteningHolds(state, fastening));
 
 /** Whether Knock still holds an Arcane Lock off: through its round in this fight, or its minute on the game clock. */
 export function arcaneLockSuppressed(state: GameState, lock: NonNullable<DoorState["arcaneLock"]>): boolean {
@@ -65,10 +87,14 @@ function arcaneLockBars(state: GameState, door: DoorState, openerId: string | nu
   return openerId === null || (openerId !== lock.casterId && !lock.allowedIds.includes(openerId));
 }
 
-/** The fastenings that keep the door shut against this creature: all but a lock whose key it holds. */
-function fasteningsAgainst(door: DoorState, openerId: string | null): DoorFastening[] {
+/** The fastenings that keep the door shut against this creature: all but a lock whose key it holds and glue that
+ *  hasn't set. */
+function fasteningsAgainst(state: GameState, door: DoorState, openerId: string | null): DoorFastening[] {
   return door.fastenings.filter(
-    (fastening) => !(fastening.kind === "lock" && openerId !== null && fastening.keyHolderIds?.includes(openerId))
+    (fastening) =>
+      fasteningHolds(state, fastening) &&
+      !(fastening.kind === "lock" && openerId !== null && fastening.keyHolderIds?.includes(openerId)) &&
+      !(fastening.kind === "command" && openerId !== null && fastening.ownerId === openerId)
   );
 }
 
@@ -78,7 +104,7 @@ export function heldShutAgainst(state: GameState, wall: VisionWall, openerId: st
   const door = wall.door;
   if (!door) return null;
   if (arcaneLockBars(state, door, openerId)) return SHUT.lock;
-  const first = fasteningsAgainst(door, openerId)[0];
+  const first = fasteningsAgainst(state, door, openerId)[0];
   return first ? SHUT[first.kind] : null;
 }
 
@@ -112,7 +138,7 @@ export function setDoorState(state: GameState, wallId: string, door: DoorState |
   });
 }
 
-export type DoorUse = "pick" | "force" | "jam" | "pry" | "seal";
+export type DoorUse = "pick" | "force" | "jam" | "pry" | "seal" | "release";
 
 export type DoorUseDeps = Readonly<{
   random: RandomSource;
@@ -171,6 +197,7 @@ export function useDoor(
     spendUtilize(state, actor, initiator, what, { bonusAction: input.bonusAction === true, definition });
   };
   if (input.how === "jam") return jamDoor(state, wall, actor, spend);
+  if (input.how === "release") return releaseRod(state, wall, actor, spend);
   if (input.how === "seal") return sealDoor(state, wall, actor, definition, input.visibility, initiator, deps, spend);
   if (wall.open === true) throw new CommandRejectedError("The door is already open.");
   if (input.how === "pry") return pryDoor(state, wall, actor, definition, input.visibility, initiator, deps, spend);
@@ -221,7 +248,9 @@ function pickLock(
   const tools = carried(actor, THIEVES_TOOLS);
   if (!tools) throw new CommandRejectedError(`${actor.name} needs Thieves' Tools to pick a lock.`);
   const door = wall.door;
-  const lock = door ? fasteningsAgainst(door, actor.id).find((fastening) => fastening.kind === "lock") : undefined;
+  const lock = door
+    ? fasteningsAgainst(state, door, actor.id).find((fastening) => fastening.kind === "lock")
+    : undefined;
   // SRD Arcane Lock: "This lock can't be unlocked by any nonmagical means."
   if (!lock && door && arcaneLockBars(state, door, actor.id))
     throw new CommandRejectedError("The lock doesn't yield to Thieves' Tools.");
@@ -252,11 +281,10 @@ function forceDoor(
   spend: Spend
 ): DoorUseResult {
   const door = wall.door;
-  if (door?.fastenings.some((fastening) => fastening.kind === "sealed"))
-    throw new CommandRejectedError("The door is sealed shut. Break it down or shape the stone again.");
+  refuseUnforceable(state, door);
   if (door && arcaneLockBars(state, door, actor.id))
     throw new CommandRejectedError("The door won't move: magic holds it shut. Break it down or dispel the magic.");
-  const holding = door ? fasteningsAgainst(door, actor.id) : [];
+  const holding = door ? fasteningsAgainst(state, door, actor.id) : [];
   // A lock with no force DC is picked or broken, never forced with a check.
   const unforceable = holding.find((fastening) => fastening.kind === "lock" && fastening.forceDc === undefined);
   if (unforceable) throw new CommandRejectedError("The door is locked. Pick the lock or break the door down.");
@@ -294,6 +322,7 @@ function forceDoor(
   if (holding.length > 0 && roll.total < dc)
     return { text: `${actor.name} fails to force the door.`, opened: false, total: roll.total };
   writeDoor(state, wall.id, (current) => ({ ...withoutFastenings(current, holding), open: true }));
+  returnRods(state, holding);
   return { text: `${actor.name} forces the door open.`, opened: true, total: roll.total };
 }
 
@@ -333,15 +362,18 @@ function pryDoor(
   const tools = carried(actor, CARPENTERS_TOOLS) ?? carried(actor, SMITHS_TOOLS);
   if (!tools) throw new CommandRejectedError(`${actor.name} needs Carpenter's or Smith's Tools to pry a door open.`);
   const door = wall.door;
-  if (door?.fastenings.some((fastening) => fastening.kind === "sealed"))
-    throw new CommandRejectedError("The door is sealed shut. Break it down or shape the stone again.");
+  refuseUnforceable(state, door);
+  if (door?.fastenings.some((fastening) => fastening.kind === "rod"))
+    throw new CommandRejectedError(
+      "An Immovable Rod holds the door shut: no tool pries it. Force the door or push the rod's button."
+    );
   if (door && arcaneLockBars(state, door, actor.id))
     throw new CommandRejectedError("The door won't move: magic holds it shut. Break it down or dispel the magic.");
   spend("Pry the door open");
   const roll = toolCheck(state, actor, definition, catalogIdOf(tools), "Pry a door open", visibility, initiator, deps);
   if (roll.total < TOOL_DOOR_DC)
     return { text: `${actor.name} fails to pry the door open.`, opened: false, total: roll.total };
-  const holding = door ? fasteningsAgainst(door, actor.id) : [];
+  const holding = door ? fasteningsAgainst(state, door, actor.id) : [];
   writeDoor(state, wall.id, (current) => ({ ...withoutFastenings(current, holding), open: true }));
   return { text: `${actor.name} pries the door open.`, opened: true, total: roll.total };
 }
@@ -406,9 +438,119 @@ function useOneSpike(actor: Actor, row: InventoryItem): void {
   });
 }
 
-/** The Strength (Athletics) check that forces a fastening: a lock's `forceDc`, the others' own DC. */
-const forceDcOf = (fastening: DoorFastening) =>
-  fastening.kind === "lock" ? (fastening.forceDc ?? 0) : (fastening.dc ?? FORCE_DC);
+/** The Strength (Athletics) check that forces a fastening: a lock's `forceDc`, an Immovable Rod's 30, the others' own
+ *  DC. */
+export const forceDcOf = (fastening: DoorFastening) =>
+  fastening.kind === "lock"
+    ? (fastening.forceDc ?? 0)
+    : fastening.kind === "rod"
+      ? (fastening.dc ?? ROD_DC)
+      : (fastening.dc ?? FORCE_DC);
+
+/** Refuses a check against a door Stone Shape sealed or Sovereign Glue holds. */
+function refuseUnforceable(state: GameState, door: DoorState | undefined): void {
+  const fast = door?.fastenings.find((fastening) => onlyMagicUndoes(state, fastening));
+  if (fast?.kind === "sealed")
+    throw new CommandRejectedError("The door is sealed shut. Break it down or shape the stone again.");
+  if (fast?.kind === "glued")
+    throw new CommandRejectedError("The door is glued shut. Only Universal Solvent frees it, or breaking it down.");
+  if (fast?.kind === "command")
+    throw new CommandRejectedError("The door opens only at its owner's command. Break it down instead.");
+}
+
+/** An Immovable Rod moved off a door goes back to the creature that fixed it. */
+function returnRods(state: GameState, gone: readonly DoorFastening[]): void {
+  for (const fastening of gone) {
+    if (fastening.kind !== "rod" || !fastening.item) continue;
+    const owner = state.actors.find((actor) => actor.id === fastening.ownerId);
+    if (owner) owner.inventory = [...owner.inventory, fastening.item];
+  }
+}
+
+/** SRD Immovable Rod: "Until you or another creature takes a Utilize action to push the button again, the rod doesn't
+ *  move." Pushing the button frees the door, and the rod comes away in that creature's hand. */
+function releaseRod(state: GameState, wall: VisionWall, actor: Actor, spend: Spend): DoorUseResult {
+  const rod = wall.door?.fastenings.find((fastening) => fastening.kind === "rod");
+  if (!rod) throw new CommandRejectedError("No Immovable Rod holds this door.");
+  spend("Push the rod's button");
+  writeDoor(state, wall.id, (current) => withoutFastenings(current, [rod]));
+  if (rod.item) actor.inventory = [...actor.inventory, rod.item];
+  return { text: `${actor.name} pushes the Immovable Rod's button and takes it from the door.`, opened: false };
+}
+
+/** SRD Immovable Rod: a Utilize action fixes it in place against the closed door, which it holds shut. The rod leaves
+ *  its bearer's hands. */
+export function fixRod(state: GameState, wallId: string, actor: Actor, rowId: string): void {
+  const wall = requireDoor(state, wallId);
+  if (wall.open === true) throw new CommandRejectedError("Close the door before fixing the rod against it.");
+  const row = actor.inventory.find((item) => item.id === rowId);
+  if (!row) throw new CommandRejectedError(`${actor.name} isn't carrying the rod.`);
+  actor.inventory = actor.inventory.filter((item) => item !== row);
+  writeDoor(state, wallId, (current) => ({
+    ...current,
+    door: {
+      ...(current.door ?? { fastenings: [] }),
+      fastenings: [
+        ...(current.door?.fastenings ?? []),
+        { kind: "rod" as const, dc: ROD_DC, item: { ...row, quantity: 1 }, ownerId: actor.id }
+      ].slice(-6)
+    }
+  }));
+}
+
+/** SRD Sovereign Glue: an ounce glues the closed door shut; "the applied glue takes 1 minute to set". */
+export function glueDoor(state: GameState, wallId: string): void {
+  const wall = requireDoor(state, wallId);
+  if (wall.open === true) throw new CommandRejectedError("Close the door before gluing it shut.");
+  const setsAt = {
+    ...(state.combat.active ? { round: state.combat.round + 10 } : {}),
+    minute: clockMinutesOf(state) + 1
+  };
+  writeDoor(state, wallId, (current) => ({
+    ...current,
+    door: {
+      ...(current.door ?? { fastenings: [] }),
+      fastenings: [...(current.door?.fastenings ?? []), { kind: "glued" as const, setsAt }].slice(-6)
+    }
+  }));
+}
+
+/** SRD Universal Solvent: "Each ounce instantly dissolves up to 1 square foot of adhesive it touches, including Sovereign
+ *  Glue." Returns whether there was glue to dissolve. */
+export function dissolveGlue(state: GameState, wallId: string): boolean {
+  const wall = requireDoor(state, wallId);
+  const glue = wall.door?.fastenings.filter((fastening) => fastening.kind === "glued") ?? [];
+  if (glue.length === 0) return false;
+  writeDoor(state, wallId, (current) => withoutFastenings(current, glue));
+  return true;
+}
+
+/** A Strength check that breaks a door open (a Ring of the Ram): against the highest DC of what holds it shut, 10 more
+ *  under an Arcane Lock ("the DC to break it ... increases by 10"); nothing but magic undoes Sovereign Glue or Stone
+ *  Shape's seal. The DC the check meets, or a refusal. */
+export function breakOpenDc(state: GameState, wallId: string, openerId: string): number {
+  const wall = requireDoor(state, wallId);
+  const door = wall.door;
+  refuseUnforceable(state, door);
+  const holding = door ? fasteningsAgainst(state, door, openerId) : [];
+  const arcane = door?.arcaneLock && !arcaneLockSuppressed(state, door.arcaneLock) ? 10 : 0;
+  return Math.max(FORCE_DC, ...holding.map((fastening) => forceDcOf(fastening) || FORCE_DC)) + arcane;
+}
+
+/** The door bursts open: everything that held it is broken. */
+export function burstOpen(state: GameState, wallId: string): void {
+  const wall = requireDoor(state, wallId);
+  const gone = wall.door?.fastenings ?? [];
+  writeDoor(state, wallId, (current) => {
+    const next: VisionWall = { ...withoutFastenings(current, gone), open: true };
+    if (next.door) {
+      const { arcaneLock: _lock, ...rest } = next.door;
+      next.door = rest;
+    }
+    return next;
+  });
+  returnRods(state, gone);
+}
 
 function withoutFastenings(wall: VisionWall, gone: readonly DoorFastening[]): VisionWall {
   const door = wall.door;
@@ -425,7 +567,9 @@ function withoutFastenings(wall: VisionWall, gone: readonly DoorFastening[]): Vi
 export function knockOn(state: GameState, wallId: string): string {
   const wall = requireDoor(state, wallId);
   const door = wall.door;
-  const opened = door?.fastenings.find((fastening) => fastening.kind !== "sealed");
+  // Stone Shape's seal, Sovereign Glue, an Immovable Rod's magic and an Instant Fortress's door ("immune to the Knock
+  // spell") aren't a lock, a stuck door or a bar.
+  const opened = door?.fastenings.find((fastening) => !["sealed", "glued", "rod", "command"].includes(fastening.kind));
   const lock = door?.arcaneLock;
   const minute = clockMinutesOf(state) + KNOCK_MINUTES;
   writeDoor(state, wallId, (current) => {
@@ -455,14 +599,20 @@ export function knockOn(state: GameState, wallId: string): string {
 
 /** SRD Arcane Lock: the touched closed door "is locked for the duration", and only the caster and the creatures it
  *  designates open it. */
-export function arcaneLock(state: GameState, wallId: string, casterId: string, allowedIds: readonly string[]): void {
+export function arcaneLock(
+  state: GameState,
+  wallId: string,
+  casterId: string,
+  allowedIds: readonly string[],
+  source?: VisionSource
+): void {
   const wall = requireDoor(state, wallId);
   if (wall.open === true) throw new CommandRejectedError("Arcane Lock takes a closed door. Close it first.");
   writeDoor(state, wallId, (current) => ({
     ...current,
     door: {
       ...(current.door ?? { fastenings: [] }),
-      arcaneLock: { casterId, allowedIds: [...new Set(allowedIds)].slice(0, 20) }
+      arcaneLock: { casterId, allowedIds: [...new Set(allowedIds)].slice(0, 20), ...(source ? { source } : {}) }
     }
   }));
 }

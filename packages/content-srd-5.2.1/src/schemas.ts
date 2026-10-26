@@ -125,7 +125,25 @@ export const SpellWallsSchema = z
         /** It stays for good once its caster's Concentration lasts the spell's full duration (Wall of Stone). */
         permanentAfterFull: z.literal(true).optional(),
         /** A creation of magical force, which Disintegrate destroys whole (Wall of Force). */
-        force: z.literal(true).optional()
+        force: z.literal(true).optional(),
+        /** The panels a form its cast picks raises instead (Wall of Stone's 10-by-20-foot panels, 3 inches thick), by
+         *  the option of the spell's zone row that names the form. */
+        forms: z
+          .array(
+            z
+              .object({
+                option: z
+                  .string()
+                  .regex(/^[a-z0-9-]+$/)
+                  .max(60),
+                panelFeet: z.number().int().min(5).max(100).optional(),
+                panel: ObjectPrintSchema.optional()
+              })
+              .strict()
+          )
+          .min(1)
+          .max(4)
+          .optional()
       })
       .strict()
       .optional(),
@@ -134,7 +152,11 @@ export const SpellWallsSchema = z
       .object({ feet: z.number().int().min(1).max(20), lasting: z.boolean() })
       .strict()
       .optional(),
-    disintegrates: z.literal(true).optional()
+    disintegrates: z.literal(true).optional(),
+    /** Every door in its placed area is locked as by Arcane Lock for as long as the spell lasts, for its caster and its
+     *  allies (Guards and Wards: "All doors in the warded area are magically locked, as if sealed by the Arcane Lock
+     *  spell"). */
+    locksDoorsInArea: z.literal(true).optional()
   })
   .strict();
 export type SpellWalls = z.infer<typeof SpellWallsSchema>;
@@ -443,7 +465,18 @@ export const SpellEffectSchema = z
      *  a higher slot: "The creatures must be within 10 feet of you"). */
     companionFeet: z.number().int().min(5).max(60).optional(),
     /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
-    areaPerSlot: z.number().int().min(5).max(100).optional()
+    areaPerSlot: z.number().int().min(5).max(100).optional(),
+    /** "A nonmagical object that isn't being worn or carried also takes the damage if it's in the spell's area"
+     *  (Shatter, Meteor Swarm): the doors and walls on the map that are objects under its area take its full damage. */
+    harmsObjects: z.literal(true).optional(),
+    /** The damage the doors and walls on the map that are objects under its area take at the cast, and as its caster's
+     *  turns end while a lasting area stays (Earthquake: "50 Bludgeoning damage to any structure in contact with the
+     *  ground in the area when you cast the spell and at the end of each of your turns"). */
+    objectDamage: z
+      .array(z.object({ formula: z.string().min(1).max(40), type: z.string().min(1).max(40) }).strict())
+      .min(1)
+      .max(2)
+      .optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;

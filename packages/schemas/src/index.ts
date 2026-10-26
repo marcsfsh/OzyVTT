@@ -174,7 +174,16 @@ export const ObjectStatsSchema = ObjectPrintSchema.extend({
       current: z.number().int().min(0).max(100000),
       maximum: z.number().int().min(1).max(100000)
     })
+    .strict(),
+  /** Covered in oil from a thrown flask until the oil dries: through this round of the fight, or to this game-clock
+   *  minute. Fire damage to it meanwhile burns for 5 more. */
+  oiledUntil: z
+    .object({
+      round: z.number().int().positive().optional(),
+      minute: z.number().int().min(0).max(1_000_000_000).optional()
+    })
     .strict()
+    .optional()
 }).strict();
 export type ObjectStats = z.infer<typeof ObjectStatsSchema>;
 
@@ -3375,6 +3384,8 @@ export const SaveOutcomeFields = {
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
   advantageAtSize: SizeSchema.optional(),
+  /** A creature of these types has Disadvantage on the save (Shatter: "A Construct has Disadvantage on the save"). */
+  disadvantageTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
   /** "Repeats the save at the end of its next turn", once (a basilisk's gaze, Sleep): the failure holds until then, a
    *  success ends it, and a failure brings `secondFailure`. */
   repeatOnce: z
@@ -4314,11 +4325,14 @@ export const ActionTargetsSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(120)
-      .optional()
+      .optional(),
+    /** "Target one creature or object": it may be aimed at a door or a wall on the map that is an object instead,
+     *  which fails its save and takes the damage (Acid, Alchemist's Fire); its area catches such objects too. */
+    objects: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions (or conditions from the user's own effect), in the user's space, enemies, allies, others or only the user itself, a creature the user marked, one at 0 Hit Points, a Bloodied one, one with a special speed, or one that can see or hear the user."
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions (or conditions from the user's own effect), in the user's space, enemies, allies, others or only the user itself, a creature the user marked, one at 0 Hit Points, a Bloodied one, one with a special speed, or one that can see or hear the user. `objects`: a door or a wall on the map that is an object may be its target instead, failing its save."
   );
 export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 
@@ -4444,6 +4458,45 @@ const CreatureTypeIdSchema = z
   .regex(/^[a-z][a-z-]*$/)
   .max(40);
 
+/** What a creature it affects holds while it stands inside (Holy Aura's Advantage on saving throws, Pass without
+ *  Trace's +10 to Stealth checks, Silence's Deafened): one effect, added as the creature comes in and taken away as
+ *  it leaves. A struck save rolls against the cast's save DC. `keepsMaximum`: its Hit Point maximum can't be
+ *  reduced while there (Aura of Life). */
+export const AreaHoldsSchema = z
+  .object({
+    modifiers: EffectModifiersSchema.optional(),
+    conditions: z.array(ConditionSchema).min(1).max(2).optional(),
+    /** Conditions the holder can't gain while inside (Hallow's Courage: Frightened). */
+    conditionImmunities: z.array(ConditionSchema).min(1).max(4).optional(),
+    /** Conditions a creature of these types can't give the holder (Magic Circle: Charmed and Frightened); its types
+     *  follow the caster's choice where the area `choosesTypes`. With `suppresses`, those it already has from such a
+     *  creature are held off while it is inside (Hallowed Ward). */
+    conditionWards: ConditionWardSchema.optional(),
+    suppresses: z.literal(true).optional(),
+    /** Resistance or Vulnerability to the damage type its caster chose at the cast (Hallow). */
+    chosenDamage: z.enum(["resistance", "vulnerability"]).optional(),
+    /** Only the creatures of the types it wards hold it (`warded`: Hallow's Fear), or only the others (`others`:
+     *  Hallow's Courage). */
+    forTypes: z.enum(["warded", "others"]).optional(),
+    /** The creatures outside it hold it, not those inside (an inverted Magic Circle protects targets outside). */
+    outside: z.literal(true).optional(),
+    keepsMaximum: z.literal(true).optional(),
+    /** A bonus to Armor Class while inside (a planted Rod of Alertness's +1). */
+    armorClassBonus: z.number().int().min(1).max(5).optional(),
+    /** Half Cover while inside, the best of it and the cover the map gives counting (Nature's Sanctuary). */
+    cover: z.literal("half").optional(),
+    struck: StruckSchema.omit({ save: true })
+      .extend({
+        save: z
+          .object({ ability: AbilitySchema, conditions: z.array(ConditionSchema).min(1).max(3) })
+          .strict()
+          .optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+
 /**
  * Where and when an area that lasts acts on a creature (a spell's, an item's spread caltrops, a creature's whirlwind), so
  * the server raises the save or deals the damage: a creature entering it (or the area moving onto the creature),
@@ -4456,7 +4509,7 @@ const CreatureTypeIdSchema = z
  * Faith; spirits that harm the creatures the caster chooses); `damageCap` ends it once it has dealt that much
  * (Guardian of Faith's 60).
  */
-export const AreaTriggerSchema = z
+const AreaTriggerFields = z
   .object({
     /** When it acts; none for an area that only changes the ground (Entangle's plants, Ice Storm's hail). */
     on: z
@@ -4511,7 +4564,11 @@ export const AreaTriggerSchema = z
      *  smaller flying creatures"); with `insiders`, the creatures inside it when it was made pass freely (Tiny Hut). */
     bars: z
       .object({
-        way: z.enum(["in", "both"]),
+        /** `out`: the creatures it holds back can't leave it (an inverted Magic Circle). */
+        way: z.enum(["in", "out", "both"]),
+        /** A creature it holds back that teleports across it the barred way must first succeed on this save against
+         *  the cast's DC, or the teleport is wasted (Magic Circle's Charisma save). */
+        teleportSave: AbilitySchema.optional(),
         types: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
         except: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
         reach: z.literal(true).optional(),
@@ -4533,25 +4590,9 @@ export const AreaTriggerSchema = z
      *  Trace's +10 to Stealth checks, Silence's Deafened): one effect, added as the creature comes in and taken away as
      *  it leaves. A struck save rolls against the cast's save DC. `keepsMaximum`: its Hit Point maximum can't be
      *  reduced while there (Aura of Life). */
-    holds: z
-      .object({
-        modifiers: EffectModifiersSchema.optional(),
-        conditions: z.array(ConditionSchema).min(1).max(2).optional(),
-        keepsMaximum: z.literal(true).optional(),
-        /** A bonus to Armor Class while inside (a planted Rod of Alertness's +1). */
-        armorClassBonus: z.number().int().min(1).max(5).optional(),
-        struck: StruckSchema.omit({ save: true })
-          .extend({
-            save: z
-              .object({ ability: AbilitySchema, conditions: z.array(ConditionSchema).min(1).max(3) })
-              .strict()
-              .optional()
-          })
-          .strict()
-          .optional()
-      })
-      .strict()
-      .optional(),
+    holds: AreaHoldsSchema.optional(),
+    /** A second hold, for other creatures (Hallow's extra effect beside its ward). */
+    alsoHolds: AreaHoldsSchema.optional(),
     /** A creature it affects that starts its turn there at 0 Hit Points regains this many (Aura of Life's 1). */
     revives: z.number().int().min(1).max(10).optional(),
     /** Its area moves this many feet straight away from its caster at the start of each of the caster's turns
@@ -4716,9 +4757,92 @@ export const AreaTriggerSchema = z
       .optional(),
     /** It lifts the Difficult Terrain painted in it while it stands (Speak with Plants: "turn Difficult Terrain caused
      *  by plant growth ... into ordinary terrain"). */
-    clearsTerrain: z.literal(true).optional()
+    clearsTerrain: z.literal(true).optional(),
+    /** It waits unlit and acts only once fire lights it (spilled Oil: "If lit, the oil burns until the end of the turn 2
+     *  rounds from when the oil was lit"): Fire damage or a fire's area reaching it, a burning creature in it, or a
+     *  Tinderbox beside it lights it, and it burns out at the end of the turn `rounds` rounds later. */
+    kindled: z
+      .object({ rounds: z.number().int().min(1).max(10) })
+      .strict()
+      .optional(),
+    /** No creature can teleport out of it either (Private Sanctum: "Nothing can teleport into or out of the warded
+     *  area"); with `noTeleport`, both ways. */
+    noTeleportOut: z.literal(true).optional(),
+    /** Its bar on teleporting holds only the creature types it wards (`bars.types`, or those its caster chose): Hallow's
+     *  Extradimensional Interference. */
+    teleportWardsOnly: z.literal(true).optional(),
+    /** Its caster chooses, as it casts, one or more of the creature types its barrier names (Magic Circle: "Choose one
+     *  or more of the following types"; Hallow's ward); with no choice, every one of them. What it holds for or against
+     *  those types reads the choice. */
+    choosesTypes: z.literal(true).optional(),
+    /** The cast fails when its area takes in any of another standing area of the same spell (Hallow: "the spell fails
+     *  if the radius includes an area already under the effect of Hallow"). */
+    exclusive: z.literal(true).optional(),
+    /** The spell ends when its caster is outside it (Tiny Hut: "The spell ends early if you leave the Emanation"). */
+    endsWhenCasterLeaves: z.literal(true).optional(),
+    /** It reaches this many feet past its placed area on every side (Prismatic Wall: "moves within 20 feet of it or
+     *  starts its turn there"). */
+    nearFeet: z.number().int().min(5).max(30).optional(),
+    /** Only a creature that can see its area is affected (Prismatic Wall: "another creature that can see the wall"). */
+    seenOnly: z.literal(true).optional(),
+    /** Its placed area is a wall of seven layers: a creature that passes into it makes each layer's Dexterity save
+     *  (Prismatic Wall). */
+    layers: z.literal(true).optional(),
+    /** The cast fails when its area takes in any creature's space (Prismatic Wall: "If you position the wall in a space
+     *  occupied by a creature, the spell ends instantly without effect"). */
+    refusesOccupied: z.literal(true).optional(),
+    /** It ends when its user has the Incapacitated condition or dies (Nature's Sanctuary). */
+    endsWhenUserIncapacitated: z.literal(true).optional(),
+    /** The damage type its holds' `chosenDamage` reads is its user's current Nature's Ward Resistance, from the land the
+     *  Druid chose (Nature's Sanctuary: "your allies gain the current Resistance of your Nature's Ward there"). */
+    naturesWard: z.literal(true).optional(),
+    /** Its edge is a dark and foggy barrier that sight can't pass (Private Sanctum), or that only those inside see out
+     *  through (`oneWay`: Tiny Hut, "opaque from the outside ... transparent from the inside"). */
+    veil: z
+      .object({ oneWay: z.literal(true).optional() })
+      .strict()
+      .optional(),
+    /** The light inside it, while it stands (Tiny Hut's Dim Light or Darkness, Hallow's Daylight or Darkness). */
+    lighting: z.enum(["bright", "dim", "dark"]).optional(),
+    /** Its darkness can't be lit by normal light or by spell light of a lower level than the spell (Hallow's
+     *  Darkness). */
+    lightingFirm: z.literal(true).optional(),
+    /** An aura of antimagic (Antimagic Field): no spell, Magic action or magic item works inside it, spells cast from
+     *  outside can't reach in, ongoing spells and magic items' properties are suppressed for the creatures inside, a
+     *  summoned creature inside winks out, and no one teleports into or out of it. */
+    antimagic: z.literal(true).optional()
   })
   .strict();
+
+/** What a part of an area's trigger an option merges in (Private Sanctum's properties, Hallow's extra effect). */
+const AreaTriggerPartSchema = AreaTriggerFields.partial().strict();
+
+export const AreaTriggerSchema = AreaTriggerFields.extend({
+  /** The properties its caster picks as it casts: one of them (`one`: Hallow's extra effect) or any number of them
+   *  (`any`: Private Sanctum's), each a part of the trigger merged in while the area stands. Every pick is an option of
+   *  the cast. */
+  picks: z
+    .object({
+      pick: z.enum(["one", "any"]),
+      parts: z
+        .array(
+          z
+            .object({
+              id: z
+                .string()
+                .regex(/^[a-z0-9-]+$/)
+                .max(30),
+              name: z.string().min(1).max(60),
+              trigger: AreaTriggerPartSchema
+            })
+            .strict()
+        )
+        .min(1)
+        .max(10)
+    })
+    .strict()
+    .optional()
+}).strict();
 export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;
 /** A move an action grants beside the turn's own (SRD 5.2.1 stat blocks: "The dragon moves up to half its Speed, and
  *  it makes one Rend attack"). `speed`: half or all of the way's Speed, measured when it is taken; `mode`: the way it
@@ -5477,6 +5601,70 @@ export const ActionSchema = z
       .describe(
         "It puts out every nonmagical flame within `feet` of its user: lights set on the map that no spell made, and the burning lights creatures carry (a Frost Brand drawn)"
       ),
+    /** What it does to the door on the map it is aimed at (`wallId`): fixes an Immovable Rod against it (`fix-rod`,
+     *  held shut until the rod's button is pushed or a DC 30 Strength (Athletics) check moves it), glues it shut with
+     *  Sovereign Glue (`glue`, which only Universal Solvent undoes), dissolves that glue (`dissolve`), or makes a Strength
+     *  check of d20 plus `bonus` to break it open against what holds it shut (`force`: a Ring of the Ram). */
+    doorWork: z
+      .object({
+        does: z.enum(["fix-rod", "glue", "dissolve", "force"]),
+        bonus: z.number().int().min(0).max(30).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "What it does to the door it is aimed at: fix-rod (an Immovable Rod holds it shut, DC 30 to force), glue (Sovereign Glue, undone only by dissolve), dissolve (Universal Solvent), or force (a Strength check of d20 plus bonus against what holds it shut: a Ring of the Ram)"
+      ),
+    /** It points its user at the nearest secret door or hidden trap within `feet` (a Wand of Secrets). */
+    pointsAtHidden: z
+      .object({ feet: z.number().int().min(5).max(300) })
+      .strict()
+      .optional()
+      .describe("It points its user at the nearest secret door or hidden trap within `feet` (a Wand of Secrets)"),
+    /** It raises a square tower on the square its area places: four walls that are objects with this print and a door
+     *  on the side facing its user that opens only at the user's command (an Instant Fortress). */
+    raisesTower: z
+      .object({ panel: ObjectPrintSchema })
+      .strict()
+      .optional()
+      .describe(
+        "It raises a tower on its placed square: four walls that are objects with this print, and a door facing the user that opens only at the user's command"
+      ),
+    /** It shrinks the tower its user raised with the same item, only while no creature stands inside. */
+    dismissesTower: z
+      .literal(true)
+      .optional()
+      .describe("It shrinks the tower its user raised with the same item, only while no creature stands inside"),
+    /** It lights the spilled oil within `feet` of its user, an area that waits for fire (a Tinderbox: "Using it to light
+     *  ... anything else with exposed fuel takes a Bonus Action"). */
+    lightsArea: z
+      .object({ feet: z.number().int().min(5).max(30) })
+      .strict()
+      .optional()
+      .describe("It lights the spilled oil within `feet` of its user, an area that waits for fire (a Tinderbox)"),
+    /** The damage the doors and walls on the map that are objects under its area take, rolled once, where the creatures
+     *  in it take none (a Thunderous Greatclub's Clap of Thunder: "Nonmagical objects in it that aren't worn or carried
+     *  take 3d8 Thunder damage"; its Earthquake's 50 Bludgeoning to structures). */
+    objectDamage: z
+      .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }).strict())
+      .min(1)
+      .max(2)
+      .optional()
+      .describe(
+        "The damage the doors and walls that are objects under its area take, rolled once; the creatures in it take none of it"
+      ),
+    /** A creature in its area that is concentrating makes this save too, losing its Concentration on a failure (a
+     *  Thunderous Greatclub's Earthquake: DC 20 Constitution). */
+    concentrationSave: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional()
+      .describe("A concentrating creature in its area also makes this save, its Concentration broken on a failure"),
+    /** Only the creatures on the ground in its area are caught; one in the air above it is spared (Earthquake). */
+    grounded: z
+      .literal(true)
+      .optional()
+      .describe("Only the creatures on the ground in its area are caught; one in the air above it is spared"),
     /** It widens (or, negative, narrows) the light of the item it is on by `stepFeet`, its Bright Light kept between
      *  `minFeet` and `maxFeet` (a Sun Blade: 5 feet at a time, 10 to 30). */
     adjustsLight: z

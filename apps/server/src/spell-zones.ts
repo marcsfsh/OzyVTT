@@ -25,8 +25,12 @@ import { pullTokenToward } from "./forced-movement.js";
 import { AURA_IMMUNE_TAG } from "./statblock-traits.js";
 import { breakTimeStop } from "./time-stop.js";
 import { applyCastSight } from "./vision/cast-sight.js";
+import { harmObjectsUnderZone } from "./resolution/object-targets.js";
+import { prismaticWallLayers } from "./resolution/prismatic.js";
+import { sceneSight } from "./vision/sight.js";
 import { spellWardOf } from "./resolution/spell-wards.js";
 import { planeOf } from "./ethereal.js";
+import { burnedOutAtTurnEnd } from "./zone-kindling.js";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -88,10 +92,11 @@ const pluralOf = (type: string) => TYPE_PLURALS[type] ?? `${type}s`;
 /** The zone rows a spell's cast picks among, with the creature type picked with it (`picksType`: Antipathy/Sympathy's
  *  "specify a kind of creature" makes one option per type). */
 type LaterRow = NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number];
-type ZonePick = Readonly<{ id: string; name: string; row: LaterRow; type?: string }>;
+type ZonePick = Readonly<{ id: string; name: string; row: LaterRow; type?: string; parts?: readonly string[] }>;
 function zoneRowPicks(spell: SpellReference): ZonePick[] {
   return (spell.effect?.laterActions ?? []).flatMap((row): ZonePick[] => {
     const option = row.option;
+    if (row.zone?.picks) return partPicks(row, row.zone.picks);
     if (!row.zone || !option) return [];
     if (!row.zone.picksType) return [{ id: option.id, name: option.name, row }];
     return CREATURE_TYPE_IDS.map((type) => ({
@@ -101,6 +106,34 @@ function zoneRowPicks(spell: SpellReference): ZonePick[] {
       type
     }));
   });
+}
+
+/** The options a zone row's picks make: each part (`one`: Hallow's extra effect), or every set of them, largest first
+ *  (`any`: Private Sanctum's properties, "Fog and no teleporting"). */
+function partPicks(row: LaterRow, picks: NonNullable<ZoneTrigger["picks"]>): ZonePick[] {
+  const parts = picks.parts;
+  if (picks.pick === "one") return parts.map((part) => ({ id: part.id, name: part.name, row, parts: [part.id] }));
+  const sets: Array<typeof parts> = [];
+  for (let mask = (1 << parts.length) - 1; mask > 0; mask--) sets.push(parts.filter((_, index) => mask & (1 << index)));
+  sets.sort((a, b) => b.length - a.length);
+  const listed = (names: readonly string[]) =>
+    names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]!.toLowerCase()}`;
+  return sets.map((set) => ({
+    id: set.map((part) => part.id).join("--"),
+    name: listed(set.map((part, index) => (index === 0 ? part.name : part.name.toLowerCase()))).slice(0, 60),
+    row,
+    parts: set.map((part) => part.id)
+  }));
+}
+
+/** The parts a cast's option picked for its zone (Private Sanctum's properties), or, with no option, every part of a
+ *  row that picks any of them and the first of one that picks one. */
+export function pickedZoneParts(spell: SpellReference, optionId: string | undefined): string[] | undefined {
+  const picked = optionId === undefined ? undefined : zoneRowPicks(spell).find((pick) => pick.id === optionId);
+  if (picked?.parts) return [...picked.parts];
+  const picks = zoneRowOf(spell)?.zone?.picks;
+  if (!picks) return undefined;
+  return picks.pick === "any" ? picks.parts.map((part) => part.id) : [picks.parts[0]!.id];
 }
 
 /** The later action whose zone this spell leaves, if any: the one its cast picked among the spell's options (Wall of
@@ -120,7 +153,11 @@ export const pickedZoneType = (spell: SpellReference, optionId: string | undefin
 export function zoneOptionsOf(
   spell: SpellReference
 ): Array<Readonly<{ id: string; name: string; area?: NonNullable<SpellReference["area"]> }>> {
-  return zoneRowPicks(spell).map(({ id, name, row }) => ({ id, name, ...(row.area ? { area: row.area } : {}) }));
+  return zoneRowPicks(spell).map(({ id, name, row }) => ({
+    id,
+    name,
+    ...(row.area && row.option ? { area: row.area } : {})
+  }));
 }
 
 /** What a use offers its user to pick, as the sheet lists it: the effects it picks one of (Enlarge or Reduce), or for a
@@ -128,12 +165,18 @@ export function zoneOptionsOf(
 export function castOptionsOf(
   action: Pick<ActorAction, "id" | "effectOptions" | "spellId">,
   spell: SpellReference | undefined
-): Readonly<{ options?: ReturnType<typeof zoneOptionsOf> }> {
+): Readonly<{ options?: ReturnType<typeof zoneOptionsOf>; wardTypes?: string[] }> {
   if (action.effectOptions)
     return { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) };
   if (!spell || action.spellId !== spell.id || laterRowOf(spell, action.id)) return {};
   const options = zoneOptionsOf(spell);
-  return options.length > 0 ? { options } : {};
+  // The types its barrier may ward, for the caster to pick among (Magic Circle, Hallow).
+  const row = zoneRowOf(spell);
+  const wardTypes = row?.zone?.choosesTypes ? row.zone.bars?.types : undefined;
+  return {
+    ...(options.length > 0 ? { options } : {}),
+    ...(wardTypes ? { wardTypes: [...wardTypes] } : {})
+  };
 }
 
 /** The zone row a cast's option names, refusing one the spell doesn't offer. Undefined for a spell with no options or
@@ -291,8 +334,77 @@ function wholeAreaTest(
       if (span.high <= heights.low || span.low >= heights.high) return false;
     }
     if (onRing) return onRing(position, sizeCells);
+    if (trigger.nearFeet !== undefined)
+      return nearTemplate(calibration, area.geometry, shape, source.area?.widthFeet ?? null, trigger.nearFeet, {
+        position,
+        sizeCells
+      });
     return footprintInTemplate(calibration, area.geometry, shape, source.area?.widthFeet ?? null, position, sizeCells);
   };
+}
+
+/** Whether a creature's space comes within `nearFeet` of a placed template: of a Line's length and width, a circle's
+ *  edge, a square's sides. A Cone takes no reach. */
+function nearTemplate(
+  calibration: NonNullable<TokenMapGeometry["calibration"]>,
+  geometry: Parameters<typeof footprintInTemplate>[1],
+  shape: "circle" | "cone" | "line" | "square",
+  widthFeet: number | null,
+  nearFeet: number,
+  at: Readonly<{ position: Point; sizeCells: number }>
+): boolean {
+  const pixelsPerFoot = calibration.cellSizePx / calibration.distancePerCell;
+  const reach = (nearFeet + DISTANCE_TOLERANCE_FEET) * pixelsPerFoot + (calibration.cellSizePx * at.sizeCells) / 2;
+  const { origin, target } = geometry;
+  const { x, y } = at.position;
+  if (shape === "circle")
+    return Math.hypot(x - origin.x, y - origin.y) <= Math.hypot(target.x - origin.x, target.y - origin.y) + reach;
+  if (shape === "square")
+    return (
+      x >= Math.min(origin.x, target.x) - reach &&
+      x <= Math.max(origin.x, target.x) + reach &&
+      y >= Math.min(origin.y, target.y) - reach &&
+      y <= Math.max(origin.y, target.y) + reach
+    );
+  if (shape === "line") {
+    const length = Math.hypot(target.x - origin.x, target.y - origin.y);
+    const along =
+      length === 0 ? 0 : ((x - origin.x) * (target.x - origin.x) + (y - origin.y) * (target.y - origin.y)) / length;
+    const clamped = Math.max(0, Math.min(length, along));
+    const nearest =
+      length === 0
+        ? origin
+        : {
+            x: origin.x + ((target.x - origin.x) / length) * clamped,
+            y: origin.y + ((target.y - origin.y) / length) * clamped
+          };
+    return Math.hypot(x - nearest.x, y - nearest.y) <= ((widthFeet ?? 5) / 2) * pixelsPerFoot + reach;
+  }
+  return footprintInTemplate(calibration, geometry, shape, widthFeet, at.position, at.sizeCells);
+}
+
+/** Whether a creature can see a zone's placed area (Prismatic Wall's glare): not Blinded, and with dynamic vision on,
+ *  seeing one of its ends or its middle. */
+function seesArea(
+  state: GameState,
+  zone: SpellZone,
+  creature: Actor,
+  deps: Pick<ZoneDeps, "resolveDefinition" | "catalog">
+) {
+  if (creature.conditions.some((condition) => condition.id === "blinded")) return false;
+  const area = zone.annotationId
+    ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
+    : undefined;
+  if (!area) return true;
+  const sight = sceneSight(state, {
+    definition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  if (!sight.enabled) return true;
+  const { origin, target } = area.geometry;
+  return [origin, target, { x: (origin.x + target.x) / 2, y: (origin.y + target.y) / 2 }].some((point) =>
+    sight.seesPoint(creature.id, point)
+  );
 }
 
 /** The ground within reach of a wall's burning side (Wall of Fire: "each creature that ends its turn within 10 feet of
@@ -374,10 +486,12 @@ export function exposed(
 ): Actor[] {
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
   const kind = trigger.terrain?.kind;
+  // Spilled oil harms no one until it is lit.
+  if (trigger.kindled && !zone.litUntil) return [];
   return creaturesOnMap(state).flatMap((creature) => {
     // "You and your allies": an aura its caster carries reaches the caster too.
     const own = creature.id === zone.casterId;
-    if (trigger.around === "caster" && own && trigger.affects !== "allies") return [];
+    if (trigger.around === "caster" && own && trigger.affects !== "allies" && !trigger.antimagic) return [];
     // A Line that blasts from its caster (Gust of Wind) starts beside it, and a djinni's whirlwind spares the djinni.
     if (own && (trigger.towardCaster || trigger.sparesUser)) return [];
     // The creature an area is round (Antipathy/Sympathy's target) is the one it keeps others from or draws them to.
@@ -388,12 +502,14 @@ export function exposed(
     if (kind && movesFreelyOn(creature, kind, deps, true)) return [];
     // "Each creature on the ground in the area": one in the air above it is spared.
     if (trigger.grounded && altitudeOf(tokenOf(state, creature.id)) > 0) return [];
+    if (trigger.seenOnly && !seesArea(state, zone, creature, deps)) return [];
     // The kind its caster picked as it cast (Antipathy/Sympathy), else the types the spell names.
     const types = zone.types ?? trigger.types;
     if (types && !types.includes(typeOf(creature, deps) ?? "")) return [];
     if (trigger.sizes && !trigger.sizes.includes(creature.size ?? "medium")) return [];
     // A spell that can't reach the creature leaves it out (a Ring of Mind Shielding in Zone of Truth).
-    const spell = zone.rule === undefined ? deps.catalog?.spellRecord?.(zone.spellId) : undefined;
+    // An Antimagic Field's own aura is no spell reaching in.
+    const spell = zone.rule === undefined && !trigger.antimagic ? deps.catalog?.spellRecord?.(zone.spellId) : undefined;
     if (spell && spellWardOf(state, creature, spell, zone.casterId, deps) !== null) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
     if (creature.hp.current <= 0 && (creature.kind !== "player-character" || (creature.deathSaves?.failures ?? 0) >= 3))
@@ -752,6 +868,7 @@ export function zonesAfterMove(
     const inside = insideTest(state, zone, trigger, content, deps.geometry);
     if (!inside) continue;
     const hits = path.map((point) => inside(point, moverToken.sizeCells, altitudeOf(moverToken)));
+    if (trigger.layers) events.push(...passesLayers(state, zone, content, mover, path, deps));
     if (trigger.on.includes("enter") && !hits[0] && hits.slice(1).some(Boolean))
       act(state, zone, mover, "enters", deps, events);
     if (trigger.on.includes("travel") && !input.teleported && deps.geometry) {
@@ -763,6 +880,32 @@ export function zonesAfterMove(
   }
   events.push(...warnings(state, mover, path, deps), ...leashedZones(state, deps));
   return events;
+}
+
+/** A creature moving into a wall of layers (Prismatic Wall) makes each layer's save, once a move. */
+function passesLayers(
+  state: GameState,
+  zone: SpellZone,
+  content: ZoneContent,
+  mover: Actor,
+  path: readonly Point[],
+  deps: ZoneDeps
+): EffectNarration[] {
+  const { nearFeet: _near, ...bare } = content.trigger;
+  const wall = insideTest(state, zone, bare, content, deps.geometry);
+  const token = tokenOf(state, mover.id);
+  const caster = state.actors.find((actor) => actor.id === zone.casterId);
+  if (!wall || !token || !caster) return [];
+  const on = path.map((point) => wall(point, token.sizeCells, altitudeOf(token)));
+  if (on[0] || !on.slice(1).some(Boolean)) return [];
+  return prismaticWallLayers(state, {
+    zone,
+    caster,
+    creature: mover,
+    random: deps.rollDie,
+    newId: deps.newId,
+    now: deps.now
+  });
 }
 
 /**
@@ -973,7 +1116,9 @@ export function zonesAtTurnEnd(state: GameState, actorId: string, deps: ZoneDeps
   return [
     ...unsteered,
     ...zonesWhereItStands(state, actorId, "end-turn", deps),
-    ...zonesAtCasterTurnEnd(state, actorId, deps)
+    ...zonesAtCasterTurnEnd(state, actorId, deps),
+    // Lit oil whose rounds are up burns out once this turn's end has burned whoever stood in it.
+    ...burnedOutAtTurnEnd(state, actorId)
   ];
 }
 
@@ -986,6 +1131,8 @@ function zonesAtCasterTurnEnd(state: GameState, casterId: string, deps: ZoneDeps
     if (zone.casterId !== casterId) continue;
     const content = zoneContentOf(zone, deps.catalog);
     if (!content || !content.trigger.on.includes("caster-turn-end")) continue;
+    const objectDamage = deps.catalog?.spellRecord?.(zone.spellId)?.effect?.objectDamage;
+    if (objectDamage) events.push(...harmObjectsUnderZone(state, zone, objectDamage, deps.rollDie));
     const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     if (!inside) continue;
     for (const creature of exposed(state, zone, content.trigger, deps)) {

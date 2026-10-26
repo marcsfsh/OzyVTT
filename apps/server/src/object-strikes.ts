@@ -33,7 +33,7 @@ import { isHiddenDoor } from "./doors.js";
  * rolled against the object's Armor Class as against a creature's, a natural 20 a Critical Hit that doubles the damage
  * dice and a natural 1 a miss, its damage through the object's defences. It spends what the attack spends (one attack
  * of the Attack action, its action) and must reach the object. A Siege Monster deals double damage to objects, and a
- * Sword of Sharpness deals its dice's maximum to one.
+ * Sword of Sharpness deals its dice's maximum to one, and a Thunderous Greatclub 3d8 Thunder more.
  */
 
 type Actor = GameState["actors"][number];
@@ -41,6 +41,12 @@ type Actor = GameState["actors"][number];
 /** SRD Sword of Sharpness: "When you attack an object with this magic sword and hit, maximize your weapon damage dice
  *  against the target." */
 const MAXIMIZES_AGAINST_OBJECTS = new Set(["sword-of-sharpness"]);
+
+/** SRD Thunderous Greatclub: "The weapon deals an extra 1d8 Thunder damage to any creature it hits and an extra 3d8
+ *  Thunder damage to objects it hits that aren't being worn or carried." */
+const EXTRA_AGAINST_OBJECTS: Readonly<Record<string, Readonly<{ formula: string; type: string }>>> = {
+  "thunderous-greatclub": { formula: "3d8", type: "thunder" }
+};
 
 export type ObjectStrikeInput = Readonly<{
   actorId: string;
@@ -208,7 +214,8 @@ export function strikeObject(
   const row = itemId ? attacker.inventory.find((candidate) => candidate.id === itemId) : undefined;
   const maximized = row !== undefined && MAXIMIZES_AGAINST_OBJECTS.has(catalogIdOf(row));
   const dice: RandomSource = maximized ? (sides) => sides : deps.random;
-  const parts = action.damage.map((part) => {
+  const extra = row ? EXTRA_AGAINST_OBJECTS[catalogIdOf(row)] : undefined;
+  const parts = [...action.damage, ...(extra ? [extra] : [])].map((part) => {
     const expression = parseDiceFormula(part.formula);
     const rolled = resolveDice(outcome === "crit" ? criticalExpression(expression) : expression, dice);
     record(state, attacker, rolled, "damage", `${action.name} damage`, initiator, input, deps);

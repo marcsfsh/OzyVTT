@@ -1,5 +1,7 @@
-import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
+import type { Actor, PendingSave, SpellZone } from "@vtt/domain";
+import { parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
 import { conditionLabel } from "../condition-rules.js";
+import type { EffectNarration } from "../effects.js";
 import { OFF_PLANE_TAG } from "../off-plane.js";
 import { createPendingSaves } from "../saving-throws.js";
 import { recordRoll, type ResolveContext } from "./context.js";
@@ -138,4 +140,100 @@ export function prismaticSpray(ctx: ResolveContext, saving: readonly LiveTarget[
     }
   }
   return true;
+}
+
+/** SRD Prismatic Wall's layers, Red to Violet, in the order a creature passes them. */
+const LAYERS = RAYS;
+
+type WallState = Parameters<typeof createPendingSaves>[0];
+
+/**
+ * SRD Prismatic Wall: "When a creature reaches into or passes through the wall, it does so one layer at a time through
+ * all the layers. Each layer forces the creature to make a Dexterity saving throw or be affected by that layer's
+ * properties." Red to Blue deal 12d6 Fire, Acid, Lightning, Poison and Cold, half on a success; Indigo Restrains, with
+ * the Constitution tally Prismatic Spray's ray has; Violet Blinds, with the Wisdom save at the start of the caster's
+ * next turn that sends the creature to another plane. Each layer is a save of its own, owed at once.
+ */
+export function prismaticWallLayers(
+  state: WallState,
+  input: Readonly<{
+    zone: Pick<SpellZone, "id" | "dc" | "name">;
+    caster: Pick<Actor, "id" | "name">;
+    creature: Pick<Actor, "id" | "name">;
+    random: RandomSource;
+    newId: () => string;
+    now: () => string;
+  }>
+): EffectNarration[] {
+  const { zone, caster, creature } = input;
+  for (const layer of LAYERS) {
+    const named = `${zone.name} (${layer.colour} layer)`;
+    const base = {
+      sourceActorId: caster.id,
+      sourceName: caster.name,
+      actionName: named,
+      ability: "dex" as const,
+      dc: zone.dc,
+      targetIds: [creature.id],
+      replaceExisting: false,
+      magical: true,
+      extra: { zoneId: zone.id },
+      newSaveId: input.newId,
+      createdAt: Date.parse(input.now())
+    };
+    if ("damageType" in layer) {
+      const rolled = Math.max(0, resolveDice(parseDiceFormula(RAY_DAMAGE), input.random).total);
+      createPendingSaves(state, {
+        ...base,
+        proposedDamage: rolled,
+        proposedDamageParts: [{ amount: rolled, type: layer.damageType }],
+        halfOnSuccess: true,
+        conditionIds: []
+      });
+      continue;
+    }
+    const conditionId = layer.colour === "Indigo" ? "restrained" : "blinded";
+    const effect: NonNullable<PendingSave["onFailEffect"]> = {
+      name: `${conditionLabel(conditionId)} by ${caster.name} (${named})`.slice(0, 120),
+      tags: [],
+      linkedConditionIds: [conditionId],
+      escapeDc: null,
+      sourceActorId: caster.id,
+      sourceName: caster.name,
+      modifiers: [],
+      repeatSave:
+        layer.colour === "Indigo"
+          ? {
+              ability: "con",
+              dc: zone.dc,
+              tally: { needed: 3, successes: 0, failures: 0 },
+              next: { name: `Petrified by ${caster.name} (${named})`.slice(0, 120), linkedConditionIds: ["petrified"] }
+            }
+          : {
+              ability: "wis",
+              dc: zone.dc,
+              timing: "source-turn-start",
+              once: true,
+              next: {
+                name: `Sent to another plane by ${caster.name} (${named})`.slice(0, 120),
+                linkedConditionIds: [],
+                tags: [OFF_PLANE_TAG]
+              }
+            }
+    };
+    createPendingSaves(state, {
+      ...base,
+      proposedDamage: 0,
+      halfOnSuccess: false,
+      conditionIds: [conditionId],
+      onFailEffect: effect
+    });
+  }
+  return [
+    {
+      kind: "effect",
+      text: `${creature.name} passes into ${zone.name} and makes a Dexterity save (DC ${zone.dc}) for each of its seven layers.`,
+      actorId: creature.id
+    }
+  ];
 }

@@ -392,7 +392,9 @@ export const druid: ClassMechanicsModule = {
         }
       },
 
-      // Spends the shared Wild Shape pool. The Cube, cover, movement and sharing Nature's Ward's resistance stay prose.
+      // Spends the shared Wild Shape pool and leaves the 15-foot Cube for 1 minute, ending when the Druid is
+      // Incapacitated or dies: the Druid and its allies there have Half Cover and the Resistance of its current Nature's
+      // Ward (`zone-auras.ts`). The Bonus Action move of the Cube is the GM's drag.
       "natures-sanctuary": {
         actions: [
           {
@@ -402,7 +404,15 @@ export const druid: ClassMechanicsModule = {
             area: { shape: "cube", sizeFeet: 15, widthFeet: null },
             description:
               "As a Magic action, expend a use of your Wild Shape to make spectral trees and vines appear in a 15-foot Cube on the ground within 120 feet of yourself. They last 1 minute or until you have the Incapacitated condition or die. You and your allies have Half Cover while in that area, and your allies gain the current Resistance of your Nature's Ward there. As a Bonus Action you can move the Cube up to 60 feet to ground within 120 feet of yourself.",
-            damage: []
+            damage: [],
+            zone: {
+              on: [],
+              affects: "allies",
+              lastsRounds: 10,
+              endsWhenUserIncapacitated: true,
+              naturesWard: true,
+              holds: { cover: "half", chosenDamage: "resistance" }
+            }
           }
         ],
         uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest", pool: "wild-shape" }

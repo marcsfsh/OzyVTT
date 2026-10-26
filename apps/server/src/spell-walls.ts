@@ -1,5 +1,5 @@
 import type { SpellWalls } from "@vtt/content-srd-5.2.1";
-import type { AnnotationShapeKind, GameState, VisionSource, VisionWall } from "@vtt/domain";
+import type { AnnotationShapeKind, GameState, VisionSource, VisionWall, WallOpening } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { areAllies } from "./creature-sides.js";
 import { CONCENTRATING_TAG, endEffectIfPresent, type EffectNarration } from "./effects.js";
@@ -147,7 +147,7 @@ export function raiseSpellWalls(state: GameState, input: RaiseInput): EffectNarr
 }
 
 /** Whether a wall crosses a token's square, kept a pixel inside its edges. */
-function cuts(token: Token, wall: Pick<VisionWall, "a" | "b">, squarePx: number): boolean {
+export function cuts(token: Token, wall: Pick<VisionWall, "a" | "b">, squarePx: number): boolean {
   if (!token.position) return false;
   const half = (squarePx * token.sizeCells) / 2 - 1;
   if (half <= 0) return false;
@@ -224,16 +224,31 @@ function wallStays(state: GameState, wall: VisionWall): VisionWall | null {
 }
 
 /** Drops the live scene's spell walls whose spell has ended, keeps a wall that has become permanent, and closes the
- *  gaps whose spell has ended. Runs after every command. */
-export function pruneEndedWalls(state: GameState): void {
+ *  gaps whose spell has ended, moving out the creatures still in them. Runs after every command; returns the lines the
+ *  table reads. */
+export function pruneEndedWalls(state: GameState): EffectNarration[] {
   const vision = state.combat.vision;
-  if (!vision.walls.some((wall) => wall.source !== undefined || wall.openings?.some((gap) => gap.source))) return;
+  if (
+    !vision.walls.some(
+      (wall) => wall.source !== undefined || wall.openings?.some((gap) => gap.source) || wall.door?.arcaneLock?.source
+    )
+  )
+    return [];
   let changed = false;
+  const closing: Array<readonly [VisionWall, WallOpening]> = [];
   const walls = vision.walls.flatMap((wall) => {
     let next: VisionWall | null = wall.source ? wallStays(state, wall) : wall;
     if (next !== wall) changed = true;
+    // A lock kept by a spell that has ended (Guards and Wards) opens.
+    const lock = next?.door?.arcaneLock;
+    if (next?.door && lock?.source && !sourceLive(state, lock.source)) {
+      const { arcaneLock: _lock, ...door } = next.door;
+      next = { ...next, door };
+      changed = true;
+    }
     if (next?.openings?.some((gap) => !sourceLive(state, gap.source))) {
       const openings = next.openings.filter((gap) => sourceLive(state, gap.source));
+      for (const gap of next.openings) if (!openings.includes(gap)) closing.push([next, gap]);
       const { openings: _openings, ...rest } = next;
       next = openings.length > 0 ? { ...rest, openings } : rest;
       changed = true;
@@ -241,6 +256,47 @@ export function pruneEndedWalls(state: GameState): void {
     return next ? [next] : [];
   });
   if (changed) state.combat = { ...state.combat, vision: { ...vision, walls } };
+  const pixelsPerFoot = vision.measure?.pixelsPerFoot;
+  return pixelsPerFoot ? closing.flatMap(([wall, gap]) => ejectFromGap(state, wall, gap, pixelsPerFoot)) : [];
+}
+
+/** SRD Passwall: "When the opening disappears, any creatures or objects still in the passage created by the spell are
+ *  safely ejected to an unoccupied space nearest to the surface on which you cast the spell": a creature whose square
+ *  the closing gap crosses steps out, a square at a time, to the side the passage was cut from. */
+function ejectFromGap(state: GameState, wall: VisionWall, gap: WallOpening, pixelsPerFoot: number): EffectNarration[] {
+  const piece = { a: lerp(wall.a, wall.b, gap.from), b: lerp(wall.a, wall.b, gap.to) };
+  const length = distance(piece.a, piece.b);
+  if (length === 0) return [];
+  const cell = 5 * pixelsPerFoot;
+  const normal = { x: -(piece.b.y - piece.a.y) / length, y: (piece.b.x - piece.a.x) / length };
+  const sideOf = (point: Point) => (point.x - piece.a.x) * normal.x + (point.y - piece.a.y) * normal.y;
+  const events: EffectNarration[] = [];
+  for (const token of state.combat.tokens) {
+    if (!token.position || !cuts(token, piece, cell)) continue;
+    const sign = gap.entry ? Math.sign(sideOf(gap.entry)) || 1 : Math.sign(sideOf(token.position)) || 1;
+    const step =
+      Math.abs(normal.x) >= Math.abs(normal.y)
+        ? { x: Math.sign(normal.x * sign) * cell, y: 0 }
+        : { x: 0, y: Math.sign(normal.y * sign) * cell };
+    const taken = (position: Point) =>
+      state.combat.tokens.some(
+        (other) => other !== token && other.position?.x === position.x && other.position?.y === position.y
+      );
+    for (let squares = 1; squares <= token.sizeCells + 4; squares++) {
+      const position = { x: token.position.x + step.x * squares, y: token.position.y + step.y * squares };
+      if (position.x < 0 || position.y < 0) break;
+      if (cuts({ ...token, position }, piece, cell) || taken(position)) continue;
+      state.combat = {
+        ...state.combat,
+        tokens: state.combat.tokens.map((candidate) => (candidate === token ? { ...token, position } : candidate))
+      };
+      const actor = state.actors.find((candidate) => candidate.id === token.actorId);
+      if (actor)
+        events.push({ kind: "effect", text: `${actor.name} is ejected as the passage closes.`, actorId: actor.id });
+      break;
+    }
+  }
+  return events;
 }
 
 /** Where on a wall a creature works on it: the point nearest its token. */
@@ -250,14 +306,15 @@ export function nearestPointOf(state: GameState, wall: VisionWall, actorId: stri
 }
 
 /** Cuts a gap `feet` wide in a wall, centred on `at`: Passwall's passage, which closes when `source` ends, or Stone
- *  Shape's, which stays. */
+ *  Shape's, which stays. `entry` is where it was cut from, the side a creature left in it goes out to. */
 export function cutWall(
   state: GameState,
   wallId: string,
   at: Point,
   feet: number,
   pixelsPerFoot: number,
-  source: VisionSource | undefined
+  source: VisionSource | undefined,
+  entry?: Point
 ): void {
   const vision = state.combat.vision;
   state.combat = {
@@ -270,7 +327,12 @@ export function cutWall(
         if (length === 0) return wall;
         const centre = distance(wall.a, nearestOnSegment(at, segmentOf(wall))) / length;
         const half = (feet * pixelsPerFoot) / 2 / length;
-        const gap = { from: Math.max(0, centre - half), to: Math.min(1, centre + half), ...(source ? { source } : {}) };
+        const gap = {
+          from: Math.max(0, centre - half),
+          to: Math.min(1, centre + half),
+          ...(source ? { source } : {}),
+          ...(source && entry ? { entry: { x: rounded(Math.max(0, entry.x)), y: rounded(Math.max(0, entry.y)) } } : {})
+        };
         return { ...wall, openings: [...(wall.openings ?? []), gap].slice(-8) };
       })
     }

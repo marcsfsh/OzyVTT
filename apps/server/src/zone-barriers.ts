@@ -1,5 +1,6 @@
 import type { SpellZone as ZoneTrigger } from "@vtt/content-srd-5.2.1";
-import type { GameState } from "@vtt/domain";
+import type { GameState, SpellZone } from "@vtt/domain";
+import { rollSaveAtOnce } from "./saving-throws.js";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { CONCENTRATING_TAG, endEffectIfPresent, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
@@ -42,6 +43,17 @@ function heldBack(
   return true;
 }
 
+/** A barrier's bar with the types its caster chose to ward in place of every type it names (Magic Circle). */
+export function barsOf(zone: SpellZone, trigger: ZoneTrigger | undefined): Bars | undefined {
+  const bars = trigger?.bars;
+  if (!bars) return undefined;
+  return zone.wardTypes && bars.types ? { ...bars, types: [...zone.wardTypes] as Bars["types"] } : bars;
+}
+
+/** Whether a step from inside (`was`) or outside to inside (`is`) or outside crosses a barrier the way it bars. */
+const crossesBarredWay = (way: Bars["way"], was: boolean, is: boolean) =>
+  way === "both" ? was !== is : way === "in" ? !was && is : was && !is;
+
 /** The standing barriers and the inside test of each, for this creature. */
 function barriersFor(
   state: GameState,
@@ -53,7 +65,7 @@ function barriersFor(
   const body = { size: creature.size, flying: token?.airborne !== undefined };
   return liveZones(state).flatMap((zone) => {
     const content = zoneContentOf(zone, deps.catalog);
-    const bars = content?.trigger.bars;
+    const bars = barsOf(zone, content?.trigger);
     // The caster of an Emanation carries it; its own shell doesn't hold it.
     if (!content || !bars || !heldBack(bars, type, body)) return [];
     if (content.trigger.around === "caster" && zone.casterId === creature.id) return [];
@@ -78,7 +90,7 @@ export function barredStepFor(
     barriers.some(({ bars, inside }) => {
       const was = inside(from, sizeCells);
       const is = inside(to, sizeCells);
-      return bars.way === "both" ? was !== is : !was && is;
+      return crossesBarredWay(bars.way, was, is);
     });
 }
 
@@ -126,6 +138,92 @@ export function spellWardedTargets(
   }
   return warded;
 }
+
+/**
+ * The way and the area that bar this creature's teleport from `from` to `to` ("into Forbiddance"), or null: no teleporting into Forbiddance,
+ * into or out of Private Sanctum or an Antimagic Field, and for the types it wards into or out of Hallow's
+ * Extradimensional Interference.
+ */
+export function teleportBarredFor(
+  state: GameState,
+  moverId: string,
+  from: Point,
+  to: Point,
+  sizeCells: number,
+  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
+): string | null {
+  const mover = state.actors.find((actor) => actor.id === moverId);
+  const type = mover ? typeOf(mover, deps) : null;
+  for (const zone of liveZones(state)) {
+    const trigger = zoneContentOf(zone, deps.catalog)?.trigger;
+    if (!trigger) continue;
+    const into = trigger.noTeleport === true || trigger.antimagic === true;
+    const outOf = trigger.noTeleportOut === true || trigger.antimagic === true;
+    if (!into && !outOf) continue;
+    if (trigger.teleportWardsOnly) {
+      const warded = zone.wardTypes ?? trigger.bars?.types ?? [];
+      if (type === null || !warded.includes(type as never)) continue;
+    }
+    const inside = insideTest(state, zone, trigger, zoneContentOf(zone, deps.catalog)!, deps.geometry);
+    if (!inside) continue;
+    const was = inside(from, sizeCells);
+    const is = inside(to, sizeCells);
+    if (into && !was && is) return `into ${zone.name}`;
+    if (outOf && was && !is) return `out of ${zone.name}`;
+  }
+  return null;
+}
+
+/**
+ * SRD Magic Circle: a creature of a chosen type "can't willingly enter the Cylinder by nonmagical means. If the creature
+ * tries to use teleportation or interplanar travel to do so, it must first succeed on a Charisma saving throw." A
+ * teleport across a barrier the way it holds the creature back rolls that save against the cast's DC; a failure keeps
+ * the creature where it was and wastes the teleport. Null when no such barrier lies across its way.
+ */
+export function teleportAcrossBarrier(
+  state: GameState,
+  moverId: string,
+  from: Point,
+  to: Point,
+  sizeCells: number,
+  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog"> & Readonly<{ rollDie: (sides: number) => number }>
+): Readonly<{ held: boolean; events: EffectNarration[] }> | null {
+  const mover = state.actors.find((actor) => actor.id === moverId);
+  if (!mover) return null;
+  const type = typeOf(mover, deps);
+  for (const zone of liveZones(state)) {
+    const content = zoneContentOf(zone, deps.catalog);
+    const bars = barsOf(zone, content?.trigger);
+    if (!content || !bars?.teleportSave || !heldBack(bars, type)) continue;
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
+    if (!inside || !crossesBarredWay(bars.way, inside(from, sizeCells), inside(to, sizeCells))) continue;
+    const save = rollSaveAtOnce(state, mover, bars.teleportSave, { ...deps, magical: true });
+    const held = save.total < zone.dc;
+    const ability = ABILITY_NAMES[bars.teleportSave];
+    return {
+      held,
+      events: [
+        {
+          kind: "effect",
+          text: held
+            ? `${mover.name} fails a DC ${zone.dc} ${ability} saving throw (${save.total}) against ${zone.name}. The teleport is wasted.`
+            : `${mover.name} succeeds on a DC ${zone.dc} ${ability} saving throw (${save.total}) and teleports across ${zone.name}.`,
+          actorId: moverId
+        }
+      ]
+    };
+  }
+  return null;
+}
+
+const ABILITY_NAMES: Readonly<Record<string, string>> = {
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
+  cha: "Charisma"
+};
 
 /** The area a teleport may not end in (Forbiddance), by name, or null. */
 export function teleportBarredAt(

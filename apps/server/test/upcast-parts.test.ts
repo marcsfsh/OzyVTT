@@ -69,6 +69,8 @@ const READ_ELSEWHERE: Readonly<Record<string, (record: SpellReference) => boolea
   "glyph-of-warding": () => true,
   // The Cube grows 5 feet a slot level (`areaPerSlot`); the gallons are the GM's.
   "create-or-destroy-water": (record) => record.effect?.areaPerSlot !== undefined,
+  // The Cube grows 100 feet a side a slot level (`areaPerSlot`).
+  "private-sanctum": (record) => record.effect?.areaPerSlot === 100,
   // From a level 4 slot it lasts until dispelled with no Concentration (`spellDurationAt`).
   "major-image": () => true
 };

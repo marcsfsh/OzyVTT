@@ -5,6 +5,7 @@ import { setRowFlame } from "../item-light.js";
 import { rowRecord } from "../item-records.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { distance } from "../vision/geometry.js";
+import { lightZone, waitsUnlit } from "../zone-kindling.js";
 import { spellOf } from "./concentration.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
 
@@ -126,6 +127,24 @@ export function applyDouses(ctx: ResolveContext): void {
         actorId: attacker.id
       })
     );
+}
+
+/** A Tinderbox lights the spilled oil within its reach (SRD Tinderbox: lighting "anything else with exposed fuel" takes
+ *  a Bonus Action). */
+export function applyLightsArea(ctx: ResolveContext): void {
+  const lights = ctx.action.lightsArea;
+  if (!lights || ctx.input.commit === false) return;
+  const { state, attacker, deps } = ctx;
+  const near = state.combat.spellZones.filter((zone) => {
+    if (!waitsUnlit(zone, deps.catalog)) return false;
+    const area = state.combat.annotations.find((annotation) => annotation.id === zone.annotationId);
+    const feet = deps.zoneFeet?.(attacker.id, zone.id) ?? (area ? feetTo(ctx, area.geometry.origin) : null);
+    return feet !== null && feet <= lights.feet + DISTANCE_TOLERANCE_FEET;
+  });
+  if (near.length === 0)
+    throw new CommandRejectedError(`There is no spilled oil within ${lights.feet} feet of ${attacker.name} to light.`);
+  for (const zone of near)
+    for (const event of lightZone(state, zone, deps.catalog)) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
 /** A Sun Blade's Magic action: its light 5 feet wider or narrower, its Bright Light kept between the bounds. */

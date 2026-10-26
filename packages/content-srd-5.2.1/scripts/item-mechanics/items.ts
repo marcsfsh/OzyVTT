@@ -790,9 +790,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "While you are attuned ... your Strength is 20 unless your Strength is already equal to or greater", 1d8 Thunder
-  // more on a hit, and Clap of Thunder's 30-foot Cone (a Magic action, DC 15 Strength or Prone). Earthquake, once a
-  // dawn: a 50-foot-radius circle around the point it strikes, DC 20 Dexterity or Prone; its Concentration save, the
-  // fissure and the damage to structures are the GM's.
+  // more on a hit (3d8 against an object, object-strikes.ts), and Clap of Thunder's 30-foot Cone (a Magic action, DC 15
+  // Strength or Prone, 3d8 Thunder to the objects in it). Earthquake, once a dawn: a 50-foot-radius circle around the
+  // point it strikes, DC 20 Dexterity or Prone for the creatures on the ground, DC 20 Constitution for a concentrating
+  // one, and 50 Bludgeoning to the structures in it. The fissure is the GM's.
   "thunderous-greatclub": {
     modifiers: [
       { type: "ability-score-minimum", ability: "str", score: 20 },
@@ -813,7 +814,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Strike the weapon against a hard surface: a clap audible out to 300 feet, and a 30-foot Cone of thunderous energy. Each creature in the Cone makes a DC 15 Strength saving throw or has the Prone condition. Nonmagical objects in it that aren't worn or carried take 3d8 Thunder damage.",
         damage: [],
         save: { ability: "str", dc: 15, successDamage: "none", failureConditions: ["prone"] },
-        area: { shape: "cone", sizeFeet: 30, widthFeet: null }
+        area: { shape: "cone", sizeFeet: 30, widthFeet: null },
+        objectDamage: [{ formula: "3d8", type: "thunder" }]
       },
       {
         id: "earthquake",
@@ -824,6 +826,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         damage: [],
         save: { ability: "dex", dc: 20, successDamage: "none", failureConditions: ["prone"] },
         area: { shape: "emanation", sizeFeet: 50, widthFeet: null },
+        objectDamage: [{ formula: "50", type: "bludgeoning" }],
+        concentrationSave: { ability: "con", dc: 20 },
+        grounded: true,
         uses: { limit: 1, per: "long-rest" }
       }
     ]
@@ -1372,22 +1377,35 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "ring-of-telekinesis": { casts: [{ spellId: "telekinesis" }] },
 
   // One action for each number of charges spent: a ranged spell attack at +7 against a creature it sees within 60 feet,
-  // 2d10 Force and a 5-foot push for each charge. 3 charges, 1d3 back at dawn. Breaking an object with its Strength
-  // check is the GM's.
+  // 2d10 Force and a 5-foot push for each charge, or "a Strength check with a +5 bonus for each charge you spend" to
+  // break a door it sees within 60 feet open. 3 charges, 1d3 back at dawn.
   "ring-of-the-ram": {
     charges: { regain: "1d3" },
-    actions: ([1, 2, 3] as const).map((spent) => ({
-      id: `ram-${spent}`,
-      name: `Ram (${spent} charge${spent === 1 ? "" : "s"})`,
-      activation: "action" as const,
-      description: `Expend ${spent} charge${spent === 1 ? "" : "s"}: a spectral ram's head makes a ranged spell attack with a +7 bonus against one creature you can see within 60 feet. On a hit, it takes ${2 * spent}d10 Force damage and is pushed ${5 * spent} feet away from you.`,
-      attack: { ability: "spellcasting" as const, bonus: 7, rangeFeet: 60 },
-      damage: [{ formula: `${2 * spent}d10`, type: "force" as const }],
-      onHitPush: { feet: 5 * spent },
-      targets: { count: 1, rangeFeet: 60, seen: true as const },
-      uses: { limit: 3, per: "long-rest" as const, pool: "ring-of-the-ram-charges" },
-      ...(spent > 1 ? { useCost: spent } : {})
-    }))
+    actions: [
+      ...([1, 2, 3] as const).map((spent) => ({
+        id: `ram-${spent}`,
+        name: `Ram (${spent} charge${spent === 1 ? "" : "s"})`,
+        activation: "action" as const,
+        description: `Expend ${spent} charge${spent === 1 ? "" : "s"}: a spectral ram's head makes a ranged spell attack with a +7 bonus against one creature you can see within 60 feet. On a hit, it takes ${2 * spent}d10 Force damage and is pushed ${5 * spent} feet away from you.`,
+        attack: { ability: "spellcasting" as const, bonus: 7, rangeFeet: 60 },
+        damage: [{ formula: `${2 * spent}d10`, type: "force" as const }],
+        onHitPush: { feet: 5 * spent },
+        targets: { count: 1, rangeFeet: 60, seen: true as const },
+        uses: { limit: 3, per: "long-rest" as const, pool: "ring-of-the-ram-charges" },
+        ...(spent > 1 ? { useCost: spent } : {})
+      })),
+      ...([1, 2, 3] as const).map((spent) => ({
+        id: `break-${spent}`,
+        name: `Break a door (${spent} charge${spent === 1 ? "" : "s"})`,
+        activation: "action" as const,
+        description: `Expend ${spent} charge${spent === 1 ? "" : "s"}: the ring makes a Strength check with a +${5 * spent} bonus to break open a door you can see within 60 feet.`,
+        damage: [],
+        doorWork: { does: "force" as const, bonus: 5 * spent },
+        targets: { count: 1, rangeFeet: 60, seen: true as const },
+        uses: { limit: 3, per: "long-rest" as const, pool: "ring-of-the-ram-charges" },
+        ...(spent > 1 ? { useCost: spent } : {})
+      }))
+    ]
   },
   /** "you can expend 1 of its 3 charges to cast Wish from it": three Wishes in all, which never come back, and "the
    *  ring becomes nonmagical when you use the last charge". */
@@ -2301,7 +2319,64 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge. If a secret door or trap is within 60 feet of you, the wand pulses and points at the one nearest to you.",
+        pointsAtHidden: { feet: 60 },
         uses: { limit: 3, per: "long-rest", pool: "wand-of-secrets-charges" }
+      }
+    ]
+  },
+
+  // "You can take a Utilize action to press the button, which causes the rod to become magically fixed in place": fixed
+  // against a door on the map, it holds the door shut until a creature pushes the button again or makes the DC 30
+  // Strength (Athletics) check (doors.ts).
+  "immovable-rod": {
+    actions: [
+      {
+        id: "fix",
+        name: "Fix against a door",
+        activation: "action",
+        description:
+          "Press the button with the rod against a closed door within reach: the rod is fixed in place and holds the door shut until a creature pushes the button again or moves it with a DC 30 Strength (Athletics) check.",
+        damage: [],
+        doorWork: { does: "fix-rod" },
+        targets: { count: 1, rangeFeet: 5 }
+      }
+    ]
+  },
+
+  // "When found, a container contains 1d6 + 1 ounces", and "Applying an ounce of Sovereign Glue takes a Utilize action,
+  // and the applied glue takes 1 minute to set": a door glued shut, which only Universal Solvent undoes (doors.ts).
+  "sovereign-glue": {
+    charges: { starting: "1d6 + 1" },
+    actions: [
+      {
+        id: "glue",
+        name: "Glue a door shut",
+        activation: "action",
+        description:
+          "Apply an ounce to a closed door within reach. In a minute the glue sets, and nothing but Universal Solvent, Oil of Etherealness or a Wish undoes the bond.",
+        damage: [],
+        doorWork: { does: "glue" },
+        targets: { count: 1, rangeFeet: 5 },
+        uses: { limit: 7, per: "never", pool: "sovereign-glue-ounces" }
+      }
+    ]
+  },
+
+  // "When found, a tube contains 1d6 + 1 ounces", and "Each ounce instantly dissolves up to 1 square foot of adhesive it
+  // touches, including Sovereign Glue" (doors.ts).
+  "universal-solvent": {
+    charges: { starting: "1d6 + 1" },
+    actions: [
+      {
+        id: "dissolve",
+        name: "Dissolve glue on a door",
+        activation: "action",
+        description:
+          "Pour an ounce onto a door within reach: it dissolves the glue that holds it, Sovereign Glue included.",
+        damage: [],
+        doorWork: { does: "dissolve" },
+        targets: { count: 1, rangeFeet: 5 },
+        uses: { limit: 7, per: "never", pool: "universal-solvent-ounces" }
       }
     ]
   },
@@ -4271,7 +4346,41 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // "While all four horseshoes are attached to the same creature, its Speed is increased by 30 feet": the horse carries
   // them, worn, on its own token.
   "horseshoes-of-speed": { modifiers: [{ type: "speed", amount: 30 }] },
-  // `instant-fortress` - a building.
+  // "Cause it to grow rapidly into a square adamantine tower", "20 feet on a side", its door "on the side facing you"
+  // opening "only at your command", and "Repeating the command word causes the tower to revert to statuette form,
+  // which works only if the tower is empty" (`resolution/tower.ts`). The walls and door: "AC 20; HP 100; Immunity to
+  // Bludgeoning, Piercing, and Slashing damage except that which is dealt by siege equipment; and Resistance to all
+  // other damage". Its floors, battlement, siege equipment and repair by Wish are the GM's.
+  "instant-fortress": {
+    actions: [
+      {
+        id: "grow",
+        name: "Grow the Tower",
+        activation: "action",
+        description:
+          "Place the statuette on the ground and speak its command word: it grows into a 20-foot-square adamantine tower, 30 feet high, pushing each creature in its area to a space just outside it. Its single door, on the side facing you, opens only at your command (a Bonus Action) and is immune to Knock. The walls and door have AC 20, 100 Hit Points, Immunity to Bludgeoning, Piercing and Slashing damage except from siege equipment, and Resistance to all other damage.",
+        damage: [],
+        area: { shape: "cube", sizeFeet: 20, widthFeet: null },
+        raisesTower: {
+          panel: {
+            name: "Tower wall",
+            armorClass: 20,
+            hitPoints: 100,
+            immunities: ["bludgeoning", "piercing", "slashing"],
+            resistances: ["acid", "cold", "fire", "force", "lightning", "necrotic", "radiant", "thunder"]
+          }
+        }
+      },
+      {
+        id: "shrink",
+        name: "Shrink the Tower",
+        activation: "action",
+        description: "Repeat the command word: the tower shrinks back to a statuette, which works only if it is empty.",
+        damage: [],
+        dismissesTower: true
+      }
+    ]
+  },
   // "Many types of Ioun Stones exist": the GM says which a found stone is, and its benefit holds while it orbits its
   // attuned owner's head (worn). Absorption and Greater Absorption (cancelling a spell), Mastery (the Proficiency
   // Bonus), Regeneration (healing each hour), Reserve (stored spells) and Sustenance (food) stay the GM's.

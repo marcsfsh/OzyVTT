@@ -3,6 +3,8 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { areEnemies } from "./creature-sides.js";
 import type { EffectNarration } from "./effects.js";
 import { applyDamageDetailed, type DamageDeps } from "./hit-points.js";
+import { holdsFeature } from "./class-features.js";
+import { cutWall, cuts } from "./spell-walls.js";
 
 /**
  * How a creature's traits let it past walls and through other creatures' spaces (SRD 5.2.1 stat blocks): Amorphous,
@@ -56,6 +58,83 @@ export function burrowsThroughWalls(definition: ActorDefinition | undefined): "f
   if (traitText(definition, "Earth Glide") !== null) return "free";
   if (traitText(definition, "Tunneler") !== null) return "half";
   return null;
+}
+
+/** Where a path's steps cross a wall, as points on the wall. */
+function crossings(wall: Readonly<{ a: Point; b: Point }>, path: readonly Point[]): Point[] {
+  const points: Point[] = [];
+  const cross = (o: Point, p: Point, q: Point) => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  for (let index = 1; index < path.length; index++) {
+    const from = path[index - 1]!;
+    const to = path[index]!;
+    const d1 = cross(wall.a, wall.b, from);
+    const d2 = cross(wall.a, wall.b, to);
+    const d3 = cross(from, to, wall.a);
+    const d4 = cross(from, to, wall.b);
+    if (d1 * d2 >= 0 || d3 * d4 >= 0) continue;
+    const t = d1 / (d1 - d2);
+    points.push({ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t });
+  }
+  return points;
+}
+
+/** SRD Tunneler: the creature "leaves a 10-foot-diameter tunnel in its wake". A burrowing move through the map's walls
+ *  cuts a lasting 10-foot gap where it crossed each one; a wall a spell raised stops it, so it is never crossed. */
+export function tunnelBehind(
+  state: GameState,
+  mover: Actor,
+  path: readonly Point[],
+  pixelsPerFoot: number,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): EffectNarration[] {
+  const definition = mover.definitionId ? resolveDefinition(mover.definitionId) : undefined;
+  if (traitText(definition, "Tunneler") === null || path.length < 2) return [];
+  let tunnels = 0;
+  for (const wall of state.combat.vision.walls) {
+    if (wall.kind !== "wall" || wall.source !== undefined) continue;
+    for (const at of crossings(wall, path)) {
+      cutWall(state, wall.id, at, 10, pixelsPerFoot, undefined);
+      tunnels += 1;
+    }
+  }
+  return tunnels > 0
+    ? [{ kind: "effect", text: `${mover.name} leaves a tunnel through the rock behind it.`, actorId: mover.id }]
+    : [];
+}
+
+/** SRD Incorporeal Movement: "It takes 5 (1d10) Force damage if it ends its turn inside an object." Walls are lines, so
+ *  a creature whose space a wall, a closed door or a window crosses as its turn ends is inside it. */
+export function insideAnObject(
+  state: GameState,
+  actorId: string,
+  deps: DamageDeps & Readonly<{ rollDie: (sides: number) => number }>
+): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const definition = actor?.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId && candidate.position !== null);
+  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+  if (!actor || !token || !pixelsPerFoot || !holdsFeature(definition, "incorporeal-movement", "Incorporeal Movement"))
+    return [];
+  const inside = state.combat.vision.walls.some(
+    (wall) => (wall.kind !== "door" || wall.open !== true) && cuts(token, wall, 5 * pixelsPerFoot)
+  );
+  if (!inside) return [];
+  const amount = deps.rollDie(10);
+  const outcome = applyDamageDetailed(
+    state,
+    actor.id,
+    { amount, parts: [{ amount, type: "force" }], sourceName: "Incorporeal Movement" },
+    { role: "gm" },
+    deps
+  );
+  return [
+    {
+      kind: "damage",
+      text: `${actor.name} ends its turn inside an object and takes ${outcome.application.totalApplied} Force damage.`,
+      actorId: actor.id
+    },
+    ...outcome.events
+  ];
 }
 
 /** Air Form and Water Form as some stat blocks print them: "can enter an enemy's space and stop there". */

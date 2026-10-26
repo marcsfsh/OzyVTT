@@ -1,7 +1,8 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { spellDurationAt, spellSpanOf } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { EffectInstance, SpellZone } from "@vtt/domain";
-import { catalogIdOf, MAX_EFFECT_MINUTES, type SaveFailureDuration } from "@vtt/schemas";
+import { catalogIdOf, MAX_EFFECT_MINUTES, type ActorDefinition, type SaveFailureDuration } from "@vtt/schemas";
+import { holdsFeature } from "../class-features.js";
 import {
   addEffect,
   CONCENTRATING_TAG,
@@ -16,7 +17,8 @@ import { CommandRejectedError } from "../game-store.js";
 import { itemRowOfAction } from "../item-charges.js";
 import { castThisTurnKey, withCastKey } from "../lasting-spells.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { areaAtLevel, endZone } from "../spell-zone-state.js";
+import { areaAtLevel, endZone, withParts } from "../spell-zone-state.js";
+import { placeZoneSight, refuseOccupied, refuseOverlap, refuseStraddlers, zoneChoicesOf } from "./zone-casts.js";
 import { actOnCast, pickedZoneRow, pickedZoneType, zoneRowOf } from "../spell-zones.js";
 import { abilityModifier, tableLineOf, type ResolveContext } from "./context.js";
 import { shapedZone, shapingOf } from "./metamagic.js";
@@ -265,6 +267,10 @@ export function openSpellZone(ctx: ResolveContext): void {
   const casterAt = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position ?? null;
   const spellUp =
     ctx.castId === null ? attacker.effects.find((effect) => effect.id === `${input.commandId}:spell`) : undefined;
+  // A dome that can't hold whole every creature in it fails (Tiny Hut), and so does a second Hallow over the first.
+  refuseStraddlers(ctx, row.zone);
+  refuseOverlap(ctx, spell.id, row.zone);
+  refuseOccupied(ctx, row.zone);
   const zone: SpellZone = {
     id: input.commandId,
     spellId: spell.id,
@@ -307,16 +313,21 @@ export function openSpellZone(ctx: ResolveContext): void {
       : {}),
     ...(anchorId ? { targetId: anchorId } : {}),
     ...(pickedType ? { types: [pickedType] } : {}),
+    // The types its barrier wards and the properties it takes, as its caster chose (Magic Circle, Private Sanctum).
+    ...zoneChoicesOf(ctx, spell, row.zone),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };
   // The same caster's earlier cast of this spell is gone ("The spell ends if you cast it again"; a new Concentration
   // ended the old one anyway).
   for (const existing of state.combat.spellZones)
-    if (existing.spellId === spell.id && existing.casterId === attacker.id) endZone(state, existing.id);
+    if (existing.spellId === spell.id && existing.casterId === attacker.id && !row.zone.exclusive)
+      endZone(state, existing.id);
   state.combat = { ...state.combat, spellZones: [...state.combat.spellZones, zone].slice(-20) };
   if (!aroundCaster && zone.annotationId === null)
     ctx.warnings.push(`Place ${spell.name}'s area on the map (Spell areas), and the server will run it.`);
+  // Its edge that sight can't pass and the light inside it (Private Sanctum, Tiny Hut).
+  placeZoneSight(ctx, zone, withParts(row.zone, zone.parts));
   // An area that acts as it is cast acts on the creatures the cast caught (Conjure Celestial's lights).
   if (row.zone.atCast) actAtCast(ctx, zone, "is bathed in");
 }
@@ -352,11 +363,30 @@ function spellcastingModifier(ctx: ResolveContext): number {
   return ability ? abilityModifier(ctx.deps.definition, ability) : 0;
 }
 
+/** SRD Nature's Ward: "Resistance to a damage type associated with your current land choice": Fire for Arid, Cold for
+ *  Polar, Lightning for Temperate and Poison for Tropical. */
+const LAND_RESISTANCES: Readonly<Record<string, string>> = {
+  arid: "fire",
+  polar: "cold",
+  temperate: "lightning",
+  tropical: "poison"
+};
+
+/** The damage type a Circle of the Land Druid's Nature's Ward resists now, from its current land; undefined without
+ *  the feature or a land. */
+function naturesWardOf(definition: ActorDefinition | undefined): string | undefined {
+  if (!holdsFeature(definition, "natures-ward", "Nature's Ward")) return undefined;
+  const land = (definition?.character?.choices ?? []).find(
+    (choice) => choice.payload?.featureId === "circle-of-the-land-spells"
+  )?.id;
+  return land ? LAND_RESISTANCES[land] : undefined;
+}
+
 /**
- * An item's action that leaves an area acting on creatures later (spread Caltrops, spilled Ball Bearings, a set Hunting
+ * An item's or a feature's action that leaves an area acting on creatures later (spread Caltrops, spilled Ball Bearings, a set Hunting
  * Trap): its zone, carrying the action's own save and damage, on the area placed with it. Nothing is rolled as it is
- * set down, and it stays until the GM ends it (the items gathered up) or it goes off once. Returns whether it opened
- * one.
+ * set down, and it stays until the GM ends it (the items gathered up) or it goes off once; a feature's area (Nature's
+ * Sanctuary) lasts its rounds. Returns whether it opened one.
  */
 export function openActionZone(ctx: ResolveContext): boolean {
   const { state, attacker, input, action, deps } = ctx;
@@ -372,7 +402,8 @@ export function openActionZone(ctx: ResolveContext): boolean {
   const down = state.combat.spellZones.filter(
     (zone) => zone.rule && zone.casterId === attacker.id && zone.laterActionId === action.id
   ).length;
-  if (row && down >= row.quantity)
+  // A flask poured out is used up as it goes, so only gear that stays on the map (Caltrops) counts what is down.
+  if (row && !record?.consumedOnUse && down >= row.quantity)
     throw new CommandRejectedError(
       `${name}: ${attacker.name} has none left to set down. Gather up the ones on the map first.`
     );
@@ -423,6 +454,12 @@ export function openActionZone(ctx: ResolveContext): boolean {
     damageDealt: 0,
     // It stays where its user stood (the rod planted in the ground).
     ...(trigger.stays && casterAt ? { anchor: { x: casterAt.x, y: casterAt.y } } : {}),
+    // Spilled oil waits for fire to reach it.
+    ...(trigger.kindled ? { flammable: true as const } : {}),
+    // Nature's Sanctuary shares the Resistance its Druid's land gives.
+    ...(trigger.naturesWard && naturesWardOf(ctx.deps.definition)
+      ? { damageType: naturesWardOf(ctx.deps.definition)! }
+      : {}),
     ...(state.combat.timeStop?.actorId === attacker.id ? { inTimeStop: true as const } : {}),
     entered: [],
     affected: []

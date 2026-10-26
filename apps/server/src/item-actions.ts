@@ -13,6 +13,7 @@ import {
   MAX_ACTION_USES,
   type ActorAction,
   type ActorDefinition,
+  type AreaTrigger,
   type DamageType,
   type EffectInstance,
   type InventoryItem,
@@ -353,6 +354,12 @@ function castGrant(
  *  attacks, its save, its damage and its healing. `scaled.roll` (an upcast row, a cantrip's tier) replaces only dice
  *  the source's own roll gave, so a reviewed whole-cast roll (Magic Missile's three darts) stands. An attack
  *  spell's save is left to the GM (Ice Knife's burst). */
+/** Whether an area holds Resistance or Vulnerability to a type its caster picks (Hallow), in itself or a part of it. */
+const zoneChoosesDamage = (zone: AreaTrigger): boolean =>
+  [zone, ...(zone.picks?.parts.map((part) => part.trigger) ?? [])].some(
+    (trigger) => trigger.holds?.chosenDamage !== undefined || trigger.alsoHolds?.chosenDamage !== undefined
+  );
+
 export function spellCastMechanics(
   spell: SpellReference,
   numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
@@ -411,7 +418,9 @@ export function spellCastMechanics(
     (damage.length > 0 ||
       effect.grant !== undefined ||
       effect.wishUses ||
-      (effect.laterActions ?? []).some((row) => row.zone !== undefined && row.damage.length > 0))
+      (effect.laterActions ?? []).some(
+        (row) => row.zone !== undefined && (row.damage.length > 0 || zoneChoosesDamage(row.zone))
+      ))
       ? { damageTypes: [...effect.damageTypes] }
       : {}),
     ...(attacks > 0

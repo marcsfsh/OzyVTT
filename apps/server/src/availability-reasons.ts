@@ -278,6 +278,9 @@ const structured = (action: DefinitionAction): boolean =>
   action.legendary !== undefined ||
   action.endsConditions !== undefined ||
   action.douses !== undefined ||
+  action.lightsArea !== undefined ||
+  action.doorWork !== undefined ||
+  action.pointsAtHidden !== undefined ||
   action.replacesAttack === true;
 
 /**

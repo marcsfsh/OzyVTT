@@ -31,6 +31,11 @@ type Actor = GameState["actors"][number];
 export const FEATHER_FALL_TAG = "feather-fall";
 /** A levitation holds the creature up (Levitate): it floats down gently when the levitation ends. */
 export const LEVITATING_TAG = "levitating";
+/** Reverse Gravity holds the creature at the top of its Cylinder; it falls when the spell ends. */
+export const GRAVITY_REVERSED_TAG = "gravity-reversed";
+/** SRD Reverse Gravity: "a 50-foot-radius, 100-foot high Cylinder", whose top a creature falls up to. A ceiling lower
+ *  than that is the GM's. */
+const REVERSED_TOP_FEET = 100;
 
 export type FallDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -66,6 +71,7 @@ const definitionOf = (actor: Actor, deps: Pick<FallDeps, "resolveDefinition">) =
 export function staysAloft(actor: Actor, deps: Pick<FallDeps, "resolveDefinition" | "catalog">): boolean {
   const definition = definitionOf(actor, deps);
   const derivation = deriveEquipment(actor, definition, deps.catalog);
+  if (actor.effects.some((effect) => effect.tags.includes(GRAVITY_REVERSED_TAG))) return true;
   const speeds = specialSpeedsOf(actor, definition, derivation);
   if (speeds.fly === undefined) return false;
   const grounded =
@@ -334,6 +340,17 @@ export function settleFalls(state: GameState, deps: FallDeps): EffectNarration[]
   const events: EffectNarration[] = [];
   for (const token of state.combat.tokens) {
     const height = altitudeOf(token);
+    // Reverse Gravity: "fall upward and reach the top of the area".
+    if (token.position && height < REVERSED_TOP_FEET && reversed(state, token.actorId)) {
+      const actor = reversed(state, token.actorId)!;
+      setAltitude(state, actor.id, REVERSED_TOP_FEET, "fly");
+      events.push({
+        kind: "effect",
+        text: `${actor.name} falls ${REVERSED_TOP_FEET - height} ft upward and hangs at the top of the area.`,
+        actorId: actor.id
+      });
+      continue;
+    }
     // A levitation just begun lifts its creature: Levitate's "rises vertically up to 20 feet".
     const rising = token.position && token.airborne !== "levitate" ? levitated(state, token.actorId) : undefined;
     if (rising) {
@@ -387,11 +404,18 @@ function levitated(state: GameState, actorId: string): Actor | undefined {
   return actor?.effects.some((effect) => effect.tags.includes(LEVITATING_TAG)) ? actor : undefined;
 }
 
+/** The creature, when Reverse Gravity holds it up. */
+function reversed(state: GameState, actorId: string): Actor | undefined {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  return actor?.effects.some((effect) => effect.tags.includes(GRAVITY_REVERSED_TAG)) ? actor : undefined;
+}
+
 /** Whether any creature must rise or come down now; cheap enough to ask after every command. */
 export function needsSettling(state: GameState, deps: Pick<FallDeps, "resolveDefinition" | "catalog">): boolean {
   if (familyModeFor(state.combat, "movement") === "freeform") return false;
   return state.combat.tokens.some((token) => {
     if (token.position && token.airborne !== "levitate" && levitated(state, token.actorId)) return true;
+    if (token.position && altitudeOf(token) < REVERSED_TOP_FEET && reversed(state, token.actorId)) return true;
     if (!token.position || altitudeOf(token) <= 0 || token.airborne === undefined) return false;
     if (state.combat.pendingFalls.some((fall) => fall.actorId === token.actorId)) return false;
     const actor = state.actors.find((candidate) => candidate.id === token.actorId);

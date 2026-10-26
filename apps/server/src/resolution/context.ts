@@ -150,6 +150,14 @@ export type ResolveInput = Readonly<{
     origin: Readonly<{ x: number; y: number }>;
     target: Readonly<{ x: number; y: number }>;
   }>;
+  /** The other templates of a use that places several (Meteor Swarm's Spheres), as the map draws them. */
+  morePlacedAreas?: ReadonlyArray<
+    Readonly<{
+      shape: "circle" | "cone" | "line" | "square";
+      origin: Readonly<{ x: number; y: number }>;
+      target: Readonly<{ x: number; y: number }>;
+    }>
+  >;
   /** The caster stands where no sound can be made (Silence's sphere), measured on the map by the server. */
   silenced?: boolean;
   /** A parked attack finishing: the declared rider (Brutal Strike) its roll forwent Advantage for, whose hit it may
@@ -170,6 +178,8 @@ export type ResolveInput = Readonly<{
   gear?: "merged" | "worn";
   /** The effect a use picks among its action's options (Enlarge or Reduce). */
   option?: string;
+  /** The creature types a cast's barrier wards, among those its spell offers (Magic Circle, Hallow). */
+  creatureTypes?: readonly string[];
 }>;
 
 export type ResolveDependencies = Readonly<{

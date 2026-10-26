@@ -1,5 +1,6 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { VisionWall } from "@vtt/domain";
+import { areAllies } from "../creature-sides.js";
 import { arcaneLock, heldShutAgainst, isHiddenDoor, knockOn } from "../doors.js";
 import { addEffect, makeEffect } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
@@ -7,6 +8,8 @@ import { laterRowOf } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { cutWall, disintegrateWall, nearestPointOf, raiseSpellWalls } from "../spell-walls.js";
 import { policeBarrier } from "../zone-barriers.js";
+import { pickedZoneRow } from "../spell-zones.js";
+import { aimsAtObject } from "./object-targets.js";
 import { distance, type Point } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
@@ -47,7 +50,8 @@ function wallsOf(ctx: ResolveContext): { spell: SpellReference; walls: Walls; la
  *  is spent. */
 export function checkWallTarget(ctx: ResolveContext): void {
   const { input, state, attacker } = ctx;
-  if (input.wallId === undefined) return;
+  // An action that takes an object as its target checks it itself (`object-targets.ts`).
+  if (input.wallId === undefined || aimsAtObject(ctx) || ctx.action.doorWork) return;
   const cast = wallsOf(ctx);
   if (!cast || (!cast.walls.door && !cast.walls.cuts && !cast.walls.disintegrates))
     throw new CommandRejectedError(`${ctx.action.name} doesn't act on a door or a wall.`);
@@ -149,14 +153,21 @@ export function applyCastWalls(ctx: ResolveContext): void {
   if (walls.raises && input.placedArea && pixelsPerFoot && !cast.later) {
     const keeper = keeperOf(ctx, spell);
     const full = spellEffectDuration(spell, level);
+    // The form the cast picked (Wall of Stone's thin panels, Wall of Force's globe) and the panels it prints.
+    const row = pickedZoneRow(spell, input.option);
+    const form = walls.raises.forms?.find((candidate) => candidate.option === input.option);
     const events = raiseSpellWalls(state, {
       commandId: input.commandId,
       casterId: attacker.id,
       spellId: spell.id,
       level,
-      raises: walls.raises,
+      raises: {
+        ...walls.raises,
+        ...(form?.panelFeet !== undefined ? { panelFeet: form.panelFeet } : {}),
+        ...(form?.panel ? { panel: form.panel } : {})
+      },
       area: input.placedArea,
-      widthFeet: spell.area?.widthFeet ?? null,
+      widthFeet: (row?.area ?? spell.area)?.widthFeet ?? null,
       pixelsPerFoot,
       ...keeper,
       ...(full.type === "rounds"
@@ -167,6 +178,42 @@ export function applyCastWalls(ctx: ResolveContext): void {
       ...(ctx.deps.resolveDefinition ? { resolveDefinition: ctx.deps.resolveDefinition } : {})
     });
     for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+  }
+
+  if (walls.locksDoorsInArea && input.placedArea?.shape === "square") {
+    const keeper = keeperOf(ctx, spell);
+    const source = {
+      casterId: attacker.id,
+      spellId: spell.id,
+      level,
+      ...(keeper.castId ? { castId: keeper.castId } : {}),
+      ...(keeper.effectId ? { effectId: keeper.effectId } : {})
+    };
+    const { origin, target } = input.placedArea;
+    const within = (point: Point) =>
+      point.x >= Math.min(origin.x, target.x) &&
+      point.x <= Math.max(origin.x, target.x) &&
+      point.y >= Math.min(origin.y, target.y) &&
+      point.y <= Math.max(origin.y, target.y);
+    const allies = state.actors.filter(
+      (actor) => actor.id !== attacker.id && areAllies(attacker, actor, ctx.deps.resolveDefinition)
+    );
+    const doors = state.combat.vision.walls.filter(
+      (candidate) =>
+        candidate.kind === "door" &&
+        candidate.open !== true &&
+        within({ x: (candidate.a.x + candidate.b.x) / 2, y: (candidate.a.y + candidate.b.y) / 2 })
+    );
+    for (const door of doors)
+      arcaneLock(
+        state,
+        door.id,
+        attacker.id,
+        allies.map((actor) => actor.id),
+        source
+      );
+    if (doors.length > 0)
+      told(`${spell.name} locks ${doors.length === 1 ? "the door" : `the ${doors.length} doors`} in the warded area.`);
   }
 
   if (input.wallId === undefined) return;
@@ -225,7 +272,8 @@ export function applyCastWalls(ctx: ResolveContext): void {
             ...(keeper.castId ? { castId: keeper.castId } : {}),
             ...(keeper.effectId ? { effectId: keeper.effectId } : {})
           }
-        : undefined
+        : undefined,
+      state.combat.tokens.find((token) => token.actorId === attacker.id)?.position ?? undefined
     );
     told(`A passage opens through the wall.`);
   }

@@ -56,11 +56,11 @@ import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
 import { spaceEntryAfterMove } from "../space-entry.js";
 import { isNimble, passesCreatures } from "../space-sharing.js";
-import { fireFormBurns } from "../wall-passage.js";
+import { fireFormBurns, tunnelBehind } from "../wall-passage.js";
 import { teleportOutOfCage } from "../forcecage.js";
 import { carryPassenger, leaveSmoke } from "../teleport-company.js";
 import { zoneContentOf } from "../spell-zone-state.js";
-import { policeBarrier, shellsForcedBy, teleportBarredAt } from "../zone-barriers.js";
+import { policeBarrier, shellsForcedBy, teleportAcrossBarrier, teleportBarredFor } from "../zone-barriers.js";
 import { zoneMovementOptions } from "../zone-ground.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
@@ -343,11 +343,17 @@ export const mapCommands = [
         // A teleport out of a Forcecage takes a Charisma save first; a failure keeps the creature in and wastes it.
         const landed = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         if (mode === "teleport" && from !== null && landed !== null && !outcome.teleportFails) {
-          const caged = teleportOutOfCage(state, actorId, from, landed, {
-            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
-            catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides)
-          });
+          const caged =
+            teleportOutOfCage(state, actorId, from, landed, {
+              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+              catalog: kit.equipmentCatalog(),
+              rollDie: (sides) => kit.context.random(sides)
+            }) ??
+            // A Magic Circle's Charisma save for a creature of a warded type teleporting across it.
+            teleportAcrossBarrier(state, actorId, from, landed, moverToken?.sizeCells ?? 1, {
+              ...kit.zoneDeps(state, geometry),
+              rollDie: (sides) => kit.context.random(sides)
+            });
           if (caged) landing.push(...caged.events);
           if (caged?.held) {
             moveEncounterToken(state, actorId, from, geometry);
@@ -396,15 +402,18 @@ export const mapCommands = [
         const arrived = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         if (from !== null && arrived !== null) {
           const zoneDeps = kit.zoneDeps(state, geometry);
-          // SRD Forbiddance: "creatures can't teleport into the area".
+          // SRD Forbiddance: "creatures can't teleport into the area"; Private Sanctum and an Antimagic Field bar it
+          // either way.
           const ward =
-            mode === "teleport" ? teleportBarredAt(state, arrived, moverToken?.sizeCells ?? 1, zoneDeps) : null;
+            mode === "teleport"
+              ? teleportBarredFor(state, actorId, from, arrived, moverToken?.sizeCells ?? 1, zoneDeps)
+              : null;
           if (ward) {
             const note = policeBarrier(
               state,
               request.override ?? null,
               "movement.teleport",
-              `${kit.actorName(actorId)} can't teleport into ${ward}.`
+              `${kit.actorName(actorId)} can't teleport ${ward}.`
             );
             if (note) movementWarning = movementWarning ? `${movementWarning} ${note}` : note;
           }
@@ -472,6 +481,14 @@ export const mapCommands = [
                 rollDie: (sides) => kit.context.random(sides),
                 squarePx: geometry.calibration.cellSizePx
               })
+            );
+          // Tunneler leaves a tunnel through the walls it burrowed through.
+          const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+          if (mover && outcome.path && mode === "burrow" && pixelsPerFoot)
+            zoneEvents.push(
+              ...tunnelBehind(state, mover, travelled(outcome.path), pixelsPerFoot, (definitionId) =>
+                kit.resolveDefinitionIn(state, definitionId)
+              )
             );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.

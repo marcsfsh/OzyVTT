@@ -1,5 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { onOtherPlanes, planeOf } from "../ethereal.js";
+import { underAntimagic } from "../antimagic.js";
+import { catalogIdOf } from "@vtt/schemas";
 import type { GameState } from "@vtt/domain";
 import { checkChoices } from "./grant-extras.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -166,6 +168,7 @@ function combatantsOf(
     // Opening a flask frees the creature it holds; a drawn Frost Brand's cold and a Sun Blade's light act round it.
     action.releases !== undefined ||
     action.douses !== undefined ||
+    action.lightsArea !== undefined ||
     action.adjustsLight !== undefined ||
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
@@ -173,6 +176,15 @@ function combatantsOf(
     action.sight !== undefined ||
     // A door or a wall is what it acts on (Knock, Passwall, Disintegrate aimed at a wall of force).
     (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined)) ||
+    // An object on the map in place of a creature (Acid thrown at a door).
+    (input.wallId !== undefined && (action.targets?.objects === true || action.doorWork !== undefined)) ||
+    // An area that harms the objects under it may catch no creature (Clap of Thunder against a door).
+    (action.objectDamage !== undefined && input.placedArea !== undefined) ||
+    // Pointing at what is hidden (a Wand of Secrets) is something done.
+    action.pointsAtHidden !== undefined ||
+    // Raising or shrinking a tower is something done (an Instant Fortress).
+    action.raisesTower !== undefined ||
+    action.dismissesTower === true ||
     // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).
     action.summons !== undefined ||
     // An item's command releases whoever it holds (Iron Bands), and an oil remakes a carried row.
@@ -208,6 +220,11 @@ function combatantsOf(
     action.teleport === undefined &&
     action.releases === undefined &&
     action.douses === undefined &&
+    action.lightsArea === undefined &&
+    action.doorWork === undefined &&
+    action.pointsAtHidden === undefined &&
+    action.raisesTower === undefined &&
+    action.dismissesTower !== true &&
     action.adjustsLight === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&
@@ -318,9 +335,22 @@ export function openResolve(
   checkStoredRelease(attacker, action.id, input.targetIds);
   // An option or a weapon the action doesn't offer is refused before anything rolls.
   checkChoices(action, input, attacker, deps.catalog, deps.definition);
-  const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
+  // A target in an Antimagic Field: "Magical properties of magic items don't work ... on anything inside it", and a
+  // magic item's own action can't reach it (a spell's is kept off by the field's ward).
+  const antimagicTarget = targets.find(underAntimagic);
+  const derived = deriveEquipment(attacker, deps.definition, deps.catalog, {
+    suppressMagic: antimagicTarget !== undefined
+  });
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derived, attacker.inventory);
+  if (antimagicTarget && action.spellId === undefined && riderItemId) {
+    const row = attacker.inventory.find((item) => item.id === riderItemId);
+    const record = row ? deps.catalog?.equipmentRecord(catalogIdOf(row)) : undefined;
+    if (record?.isMagic && isItemActionId(action.id))
+      throw new CommandRejectedError(
+        `${hiddenFromInitiator(antimagicTarget.id) ? "That creature" : antimagicTarget.name} stands in an Antimagic Field, where ${record.name} can't reach it.`
+      );
+  }
   const derivation = withShotAmmunitionOnly(derived, attacker, riderItemId, deps.catalog);
   // Magic Missile: each dart at a creature of the caster's choice, the targets listed dart by dart.
   if (action.darts !== undefined && input.targetIds.length > action.darts)

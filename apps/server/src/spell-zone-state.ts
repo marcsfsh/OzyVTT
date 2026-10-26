@@ -32,12 +32,38 @@ export type ZoneContent = Readonly<{
 /** What a live zone acts by: an item's or a creature's area carries its rule, a spell's area names its spell and zone
  *  row; undefined when the catalog no longer has them. */
 export function zoneContentOf(zone: SpellZone, catalog: EquipmentCatalog | undefined): ZoneContent | undefined {
-  if (zone.rule) return { trigger: zone.rule.trigger, name: zone.name, area: zone.area };
+  if (zone.rule) return { trigger: withParts(zone.rule.trigger, zone.parts), name: zone.name, area: zone.area };
   const spell = catalog?.spellRecord?.(zone.spellId);
   const row = spell ? laterRowOf(spell, zone.laterActionId) : undefined;
   return spell && row?.zone
-    ? { spell, row, trigger: row.zone, name: spell.name, area: zone.area ?? spell.area }
+    ? { spell, row, trigger: withParts(row.zone, zone.parts), name: spell.name, area: zone.area ?? spell.area }
     : undefined;
+}
+
+/** A trigger with the parts its caster picked merged in (Private Sanctum's properties, Hallow's extra effect): each
+ *  part's fields over the trigger's, what an area holds added together. */
+export function withParts(trigger: AreaTrigger, picked: readonly string[] | undefined): AreaTrigger {
+  const parts = trigger.picks?.parts.filter((part) => picked?.includes(part.id)) ?? [];
+  if (parts.length === 0) return trigger;
+  let merged: AreaTrigger = { ...trigger };
+  for (const part of parts) {
+    const { holds, ...rest } = part.trigger;
+    merged = { ...merged, ...rest } as AreaTrigger;
+    if (holds) {
+      const before = merged.holds ?? {};
+      merged.holds = {
+        ...before,
+        ...holds,
+        ...(before.modifiers || holds.modifiers
+          ? { modifiers: [...(before.modifiers ?? []), ...(holds.modifiers ?? [])] }
+          : {}),
+        ...(before.conditions || holds.conditions
+          ? { conditions: [...(before.conditions ?? []), ...(holds.conditions ?? [])] }
+          : {})
+      } as AreaTrigger["holds"];
+    }
+  }
+  return merged;
 }
 
 /** Removes a spell's zone (`combat.spellZones`) and the area it placed on the map. A zone that acts as its spell ends

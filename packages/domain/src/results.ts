@@ -618,6 +618,9 @@ export const ActionAvailabilitySchema = z.strictObject({
   /** The effects a use picks one of (Enlarge or Reduce), or the form of the area a cast leaves (Wall of Fire's ring),
    *  sent back as the resolve's `option`; an option with an `area` is placed as that area. */
   options: z.array(z.strictObject({ id: z.string(), name: z.string(), area: ActionAreaSchema.optional() })).optional(),
+  /** The creature types a cast's barrier may ward, for its user to pick one or more of (Magic Circle, Hallow); sent
+   *  back as the resolve's `creatureTypes`, all of them when none is picked. */
+  wardTypes: z.array(z.string()).optional(),
   /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
    *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
    *  (a spell area's later save). */

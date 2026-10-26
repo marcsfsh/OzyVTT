@@ -104,6 +104,7 @@ import {
 import {
   parkActionSave,
   parkBurstSave,
+  parkConcentrationSave,
   parkForAcReaction,
   parkForRollAnswer,
   parkHeldObjectSave,
@@ -121,7 +122,16 @@ import {
 import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
-import { applyAdjustsLight, applyDouses, applyKindles, checkLightTarget } from "./resolution/cast-lights.js";
+import { checkObjectTarget, harmObjectsInArea, strikeObjectTarget } from "./resolution/object-targets.js";
+import { applyDoorWork, checkDoorWork, findSecrets } from "./resolution/door-work.js";
+import { applyTower, checkTower } from "./resolution/tower.js";
+import {
+  applyAdjustsLight,
+  applyDouses,
+  applyKindles,
+  applyLightsArea,
+  checkLightTarget
+} from "./resolution/cast-lights.js";
 import { revealSense } from "./resolution/sense-reveal.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
@@ -206,6 +216,9 @@ export function resolveDefinitionAction(
   vitalityRecipient(ctx);
   areaHealRecipient(ctx);
   checkWallTarget(ctx);
+  checkObjectTarget(ctx);
+  checkDoorWork(ctx);
+  checkTower(ctx);
   checkLightTarget(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent, and so is a full flask.
@@ -407,8 +420,14 @@ export function resolveDefinitionAction(
   layOutProvisions(ctx);
   placeCastSight(ctx);
   applyCastWalls(ctx);
+  strikeObjectTarget(ctx);
+  harmObjectsInArea(ctx);
+  applyDoorWork(ctx);
+  applyTower(ctx);
+  findSecrets(ctx);
   applyKindles(ctx);
   applyDouses(ctx);
+  applyLightsArea(ctx);
   applyAdjustsLight(ctx);
   revealSense(ctx);
   refuseThePrayedFor(ctx);
@@ -437,6 +456,7 @@ export function resolveDefinitionAction(
   parkActionSave(ctx);
   endTargetMarks(ctx);
   parkBurstSave(ctx);
+  parkConcentrationSave(ctx);
   parkHeldObjectSave(ctx);
   applyRageRules(ctx);
 

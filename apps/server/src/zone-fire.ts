@@ -8,6 +8,7 @@ import { applyDamageDetailed } from "./hit-points.js";
 import { endSpellZone } from "./spell-endings.js";
 import { zoneContentOf } from "./spell-zone-state.js";
 import { insideTest, liveZones, zoneAction, type ZoneDeps } from "./spell-zones.js";
+import { lightZone } from "./zone-kindling.js";
 
 /**
  * Webs burning (SRD 5.2.1 Web: "The webs are flammable. Any 5-foot Cube of webs exposed to fire burns away in 1 round,
@@ -43,8 +44,13 @@ function areaCells(state: GameState, zone: SpellZone, deps: Deps): Cell[] {
   return cells;
 }
 
-/** Sets these cells of a flammable area burning; out of a fight they burn away at once. */
-function ignite(state: GameState, zone: SpellZone, cells: readonly Cell[]): boolean {
+/** Sets these cells of a flammable area burning; out of a fight they burn away at once. Spilled oil lights whole. */
+function ignite(state: GameState, zone: SpellZone, cells: readonly Cell[], deps: Deps): boolean {
+  if (zoneContentOf(zone, deps.catalog)?.trigger.kindled) {
+    if (cells.length === 0 || zone.litUntil) return false;
+    lightZone(state, zone, deps.catalog);
+    return true;
+  }
   const burning = new Set((zone.burning ?? []).flatMap((entry) => entry.cells));
   const fresh = cells.map(keyOf).filter((key) => !burning.has(key) && !(zone.cut ?? []).includes(key));
   if (fresh.length === 0) return false;
@@ -91,7 +97,7 @@ export function igniteUnder(
         1
       )
     );
-    if (ignite(state, zone, reached))
+    if (ignite(state, zone, reached, deps))
       events.push({ kind: "effect", text: `Fire catches ${zone.name}, and it burns.`, actorId: zone.casterId });
     events.push(...burnedOut(state, zone, deps));
   }
@@ -109,7 +115,9 @@ export function settleFire(state: GameState, deps: Deps): EffectNarration[] {
   const fires = liveZones(state).flatMap((zone) => {
     const content = zoneContentOf(zone, deps.catalog);
     const action = content ? zoneAction(zone, content) : undefined;
-    const burns = action?.damage.some((part) => part.type === "fire") === true;
+    // Spilled oil is no fire until it is lit.
+    const burns =
+      action?.damage.some((part) => part.type === "fire") === true && !(content?.trigger.kindled && !zone.litUntil);
     const inside = burns && content ? insideTest(state, zone, content.trigger, content, deps.geometry) : null;
     return inside ? [inside] : [];
   });
@@ -127,7 +135,7 @@ export function settleFire(state: GameState, deps: Deps): EffectNarration[] {
         under.has(keyOf(cell)) ||
         fires.some((inside) => inside(gridToImage(calibration, { column: cell.column + 0.5, row: cell.row + 0.5 }), 1))
     );
-    if (ignite(state, zone, reached))
+    if (ignite(state, zone, reached, deps))
       events.push({ kind: "effect", text: `Fire catches ${zone.name}, and it burns.`, actorId: zone.casterId });
     events.push(...burnedOut(state, zone, deps));
   }
@@ -147,6 +155,24 @@ export function fireAtTurnStart(state: GameState, actorId: string, deps: Deps): 
   for (const zone of liveZones(state)) {
     if (!zone.flammable) continue;
     const content = zoneContentOf(zone, deps.catalog);
+    // A burning creature standing in spilled oil lights it.
+    if (
+      content?.trigger.kindled &&
+      !zone.litUntil &&
+      creature?.effects.some((effect) => effect.tags.includes(BURNING_TAG))
+    ) {
+      const feet = token ? footprintCellCenters(calibration, token.position!, token.sizeCells).map(cellOf) : [];
+      const standing = new Set(areaCells(state, zone, deps).map(keyOf));
+      if (
+        ignite(
+          state,
+          zone,
+          feet.filter((cell) => standing.has(keyOf(cell))),
+          deps
+        )
+      )
+        events.push({ kind: "effect", text: `${creature.name}'s fire catches ${zone.name}.`, actorId: creature.id });
+    }
     if (!content?.trigger.burns) continue;
     // A round on from when it caught: from the turn of the creature whose turn it was then, or any later in the order.
     const round = state.combat.round;
@@ -196,7 +222,8 @@ export function fireAtTurnStart(state: GameState, actorId: string, deps: Deps): 
         ignite(
           state,
           zone,
-          feet.filter((cell) => standing.has(keyOf(cell)))
+          feet.filter((cell) => standing.has(keyOf(cell))),
+          deps
         )
       )
         events.push({ kind: "effect", text: `${creature.name}'s fire catches ${zone.name}.`, actorId: creature.id });

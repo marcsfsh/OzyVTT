@@ -8,14 +8,25 @@
 export function armorClassInPlay(
   actor: Readonly<{
     armorClass?: number;
-    effects?: ReadonlyArray<Readonly<{ armorClassBonus?: number; armorClassFloor?: number; stackKey?: string }>>;
+    effects?: ReadonlyArray<
+      Readonly<{
+        armorClassBonus?: number;
+        armorClassFloor?: number;
+        stackKey?: string;
+        spell?: unknown;
+        tags?: readonly string[];
+      }>
+    >;
   }>
 ): number | undefined {
   if (actor.armorClass === undefined) return undefined;
   let bonus = 0;
   let floor = 0;
   const stacked = new Map<string, number>();
+  // In an Antimagic Field an ongoing spell's bonus is suppressed (Shield of Faith, Barkskin).
+  const antimagic = (actor.effects ?? []).some((effect) => effect.tags?.includes("antimagic"));
   for (const effect of actor.effects ?? []) {
+    if (antimagic && effect.spell !== undefined && !effect.tags?.includes("antimagic")) continue;
     floor = Math.max(floor, effect.armorClassFloor ?? 0);
     const amount = effect.armorClassBonus ?? 0;
     if (effect.stackKey === undefined) bonus += amount;

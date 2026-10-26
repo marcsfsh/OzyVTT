@@ -9,6 +9,7 @@ import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { requireStartOrdered } from "../simultaneous-effects.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
 import { areaLeavesOut } from "../resolution/action-targets.js";
+import { objectsUnder } from "../resolution/object-targets.js";
 import { withPickedDamageTypes } from "../statblock-picks.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -307,7 +308,7 @@ export const actionCommands = [
             });
           }
           // "Each creature on the ground in the area" (Earthquake): one in the air above it is spared.
-          if (spell && zoneRowOf(spell)?.zone?.grounded)
+          if ((spell && zoneRowOf(spell)?.zone?.grounded) || action.grounded)
             resolvedTargetIds = resolvedTargetIds.filter(
               (id) => (draft.combat.tokens.find((token) => token.actorId === id)?.altitudeFeet ?? 0) <= 0
             );
@@ -322,10 +323,23 @@ export const actionCommands = [
             action.healing !== undefined ||
             action.grants !== undefined ||
             action.endsConditions !== undefined;
+          // An area that harms objects may be placed over a door alone (Shatter).
+          const harmsAnObject =
+            (spell?.effect?.harmsObjects === true ||
+              action.targets?.objects === true ||
+              action.objectDamage !== undefined) &&
+            objectsUnder(
+              draft,
+              { shape: placed.shape, origin: snapped.origin, target: snapped.target },
+              action.area?.widthFeet ?? null
+            ).length > 0;
           if (
             !resolvedTargetIds.some((id) => !unseen.has(id)) &&
             !(spell && (zoneRowOf(spell) || !catches)) &&
-            !leavesArea
+            !leavesArea &&
+            !harmsAnObject &&
+            // A tower may rise where no one stands (an Instant Fortress).
+            action.raisesTower === undefined
           )
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
@@ -548,6 +562,7 @@ export const actionCommands = [
             ...(request.targetForms ? { targetForms: request.targetForms } : {}),
             ...(request.gear !== undefined ? { gear: request.gear } : {}),
             ...(request.option !== undefined ? { option: request.option } : {}),
+            ...(request.creatureTypes ? { creatureTypes: request.creatureTypes } : {}),
             ...(template || templates ? { areaPlaced: true } : {}),
             ...(areaOrigin ? { areaOrigin } : {}),
             // The template as the map draws it, for the walls a cast raises on it (Wall of Force).
@@ -555,6 +570,15 @@ export const actionCommands = [
               ? {
                   placedArea: (({ origin, target }) => ({ shape: placed.shape, origin, target }))(
                     shapeGeometry(geometry.calibration, placed.shape, placed.origin, placed.target)
+                  )
+                }
+              : {}),
+            ...(morePlaced.length > 0 && geometry?.calibration
+              ? {
+                  morePlacedAreas: morePlaced.map((more) =>
+                    (({ origin, target }) => ({ shape: more.shape, origin, target }))(
+                      shapeGeometry(geometry.calibration!, more.shape, more.origin, more.target)
+                    )
                   )
                 }
               : {}),
@@ -727,9 +751,9 @@ export const actionCommands = [
           // Each area an item's use leaves acts on its own (a Ring of Shooting Stars' lightning spheres).
           if (leavesArea && !resolution.preview) zoneForEachArea(draft, commandId, areaIds.slice(1));
         }
-        // A fire's area sets the webs it covers burning (Web).
+        // A fire's area sets the webs it covers burning (Web); poured oil waits to be lit.
         const fiery = action.damage.some((part) => part.type === "fire") || request.damageType === "fire";
-        if (placed && !areaMove && !resolution.preview && fiery && geometry)
+        if (placed && !areaMove && !resolution.preview && fiery && !leavesArea && geometry)
           for (const shape of [placed, ...morePlaced])
             areaEvents = [
               ...areaEvents,
