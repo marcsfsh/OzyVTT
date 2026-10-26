@@ -572,7 +572,7 @@ test("the GM paints water on a gridded map, sets a hidden trap and turns the wea
   await press(gm.getByRole("button", { name: /^New( scene)?$/ }).first());
   const chooser = gm.waitForEvent("filechooser");
   await press(gm.getByRole("button", { name: /Upload a map/ }));
-  await (await chooser).setFiles({ name: "Smoke grotto.png", mimeType: "image/png", buffer: battleMap() });
+  await (await chooser).setFiles({ name: "Smoke grotto.png", mimeType: "image/png", buffer: battleMap(700, 546) });
   await expect(gm.getByText("Map uploaded.")).toBeVisible();
   await press(gm.getByRole("button", { name: "Set the grid" }).first());
   await expect(gm.getByRole("heading", { name: "Grid", exact: true })).toBeVisible();
