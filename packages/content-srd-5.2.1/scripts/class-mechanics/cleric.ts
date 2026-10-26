@@ -54,7 +54,8 @@ export const cleric: ClassMechanicsModule = {
     /**
      * "The option you chose for Blessed Strikes grows more powerful." Each option `requires` the
      * matching level-7 pick, so exactly one survives and is adopted without a prompt. Divine Strike's
-     * 2d8 is already on the record via `damageByLevel`; Potent Spellcasting's temporary HP stay prose.
+     * 2d8 is already on the record via `damageByLevel`; Potent Spellcasting's Temporary Hit Points are read by its
+     * feature id (`class-features.ts`).
      */
     "improved-blessed-strikes": {
       choice: {

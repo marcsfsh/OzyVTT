@@ -94,7 +94,7 @@ export const ranger: ClassMechanicsModule = {
       ]
     },
 
-    // Display-only: senses are not modeled on `ActorDefinition` yet.
+    // Dynamic vision reads the Blindsight (`vision/senses.ts`).
     "feral-senses": {
       modifiers: [{ type: "sense", sense: "blindsight", feet: 30 }]
     },
@@ -104,8 +104,8 @@ export const ranger: ClassMechanicsModule = {
     },
 
     /**
-     * The Fighting Style feat catalog plus the inline Druidic Warrior option. Its replace-a-cantrip
-     * clause stays prose.
+     * The Fighting Style feat catalog plus the inline Druidic Warrior option, whose cantrips swap on a Ranger level
+     * up (`replaces`).
      */
     "fighting-style": {
       choice: {
@@ -129,7 +129,7 @@ export const ranger: ClassMechanicsModule = {
     hunter: {
       /**
        * Colossus Slayer's 1d8 lands once a turn on a weapon hit against a creature missing hit points. Horde Breaker's
-       * extra attack must target a different creature, which stays prose. "Whenever you finish a Short or Long Rest,
+       * extra attack must target a different creature (`resolution/extra-attacks.ts`). "Whenever you finish a Short or Long Rest,
        * you can replace the chosen option with the other one."
        */
       "hunters-prey": {

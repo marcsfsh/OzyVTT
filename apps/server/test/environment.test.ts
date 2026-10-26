@@ -13,6 +13,7 @@ import {
   WEATHER_TAG
 } from "../src/environment.js";
 import { iceAtTurnStart, iceEntry } from "../src/ice.js";
+import { crossesAtNoCost } from "../src/spell-zones.js";
 import type { TokenMapGeometry } from "../src/token-placement.js";
 
 // The scene's climate and weather (SRD 5.2.1 Gameplay Toolbox, Environmental Effects): extreme cold with a Bedroll or a
@@ -96,6 +97,17 @@ describe("extreme cold", () => {
     setEnvironment(state, undefined, { cold: true }, GM);
     expect(hours(state, 3, [1, 1, 1])).toEqual([]);
     expect(exhaustionLevel(hero(state))).toBe(0);
+  });
+
+  // SRD Ring of Warmth: "you and everything you wear and carry are unharmed by temperatures of 0 degrees Fahrenheit or
+  // lower".
+  it("spares a creature wearing an attuned Ring of Warmth, and not one that hasn't attuned to it", () => {
+    const state = scene([{ ...gear("ring-of-warmth"), attuned: true }]);
+    setEnvironment(state, undefined, { cold: true }, GM);
+    expect(hours(state, 2, [1, 1])).toEqual([]);
+    const unattuned = scene([gear("ring-of-warmth")]);
+    setEnvironment(unattuned, undefined, { cold: true }, GM);
+    expect(hours(unattuned, 1, [1]).length).toBeGreaterThan(0);
   });
 
   it("gives a creature wrapped in a Blanket Advantage on the save", () => {
@@ -214,6 +226,16 @@ describe("heavy precipitation and strong wind", () => {
 });
 
 describe("slippery ice", () => {
+  // SRD Boots of the Winterlands, Winter Strider: "You ignore Difficult Terrain created by ice or snow."
+  it("costs no extra movement for a creature in attuned Boots of the Winterlands", () => {
+    const content = { resolveDefinition: () => undefined, catalog };
+    expect(crossesAtNoCost(hero(scene([{ ...gear("boots-of-the-winterlands"), attuned: true }])), "ice", content)).toBe(
+      true
+    );
+    expect(crossesAtNoCost(hero(scene([gear("boots-of-the-winterlands")])), "ice", content)).toBe(false);
+    expect(crossesAtNoCost(hero(scene()), "ice", content)).toBe(false);
+  });
+
   it("asks a DC 10 Dexterity save against Prone where a creature first steps onto it, once a turn", () => {
     const state = scene([], true);
     state.combat.terrain.ice = [rect(4, 2, 6, 2)];

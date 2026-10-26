@@ -15,7 +15,7 @@ import {
   type ResolvedRider,
   type ThrownDie
 } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
 import { conditionLabel, exhaustionPenalty } from "./condition-rules.js";
 import { RAGING_TAG } from "./effects.js";
@@ -29,6 +29,9 @@ import {
   type EquipmentDerivation,
   type RollModeClaims
 } from "./equipment-derivation.js";
+
+/** The cloak that turns others' Wisdom (Perception) checks to perceive its attuned wearer to Disadvantage. */
+const ELVENKIND_CLOAK_ID = "cloak-of-elvenkind";
 
 // Ability checks (SRD 5.2.1 "Ability Checks", "Proficiency"): one plan for every check the sheet, the builtin actions,
 // the GM's calls for a roll and first aid roll, so their numbers and their Advantage never disagree.
@@ -373,6 +376,13 @@ function plainCheckPlan(
   const sight = context.sight ?? {};
   if (lookingFor && sight.findingObscured === "light" && !sight.findingByBlindsight)
     claims.disadvantage.push({ source: "lightly-obscured", label: `${context.finding!.name} is Lightly Obscured` });
+  // Cloak of Elvenkind: "Wisdom (Perception) checks made to perceive you have Disadvantage", by sight or hearing, while
+  // its attuned wearer has it on.
+  const cloaked = context.finding?.inventory.find(
+    (row) => row.equipped && row.attuned && row.quantity > 0 && catalogIdOf(row) === ELVENKIND_CLOAK_ID
+  );
+  if (cloaked && subject.ability === "wis" && subject.skill === "perception")
+    claims.disadvantage.push({ source: "cloak-of-elvenkind", label: cloaked.name });
   const blinded = actor.conditions.some((held) => held.id === "blinded");
   const deafened = actor.conditions.some((held) => held.id === "deafened");
   const findingFails =

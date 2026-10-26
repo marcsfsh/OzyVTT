@@ -112,7 +112,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "shield-2": { modifiers: [{ type: "armor-class", amount: 2 }] },
   "shield-3": { modifiers: [{ type: "armor-class", amount: 3 }] },
 
-  // Not modeled: the Reaction reducing forced movement.
+  // The Reaction that shortens a push or pull by 10 feet is forced-movement.ts's, by the item id.
   "dwarven-plate": { modifiers: [{ type: "armor-class", amount: 2 }] },
 
   // "You are considered trained with this armor even if you lack training with Medium or Heavy armor": training with
@@ -409,7 +409,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: the light in freezing temperatures and extinguishing flames once per hour.
   "frost-brand": {
     grants: { damageResistances: ["fire"] },
     modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "cold", doubleOnCritical: true }],
@@ -1684,9 +1683,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "ring-of-three-wishes-charges" } }]
   },
 
-  // "If you take Cold damage while wearing this ring, the ring reduces the damage you take by 2d8." Extreme cold is the
-  // GM's.
+  // "If you take Cold damage while wearing this ring, the ring reduces the damage you take by 2d8." Its wearer is
+  // "unharmed by temperatures of 0 degrees Fahrenheit or lower", so the extreme cold's save is spared (environment.ts).
   "ring-of-warmth": {
+    tags: ["cold-tolerant"],
     modifiers: [
       {
         type: "damage-reduction",
@@ -2967,8 +2967,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "If you aren't a dwarf or duergar, you have Darkvision 60 feet, Resistance to Poison damage, and Advantage on
    *  saving throws to avoid or end the Poisoned condition": authored for every wearer, since a dwarf's own Darkvision
-   *  (120 feet) and Dwarven Resilience already give it as much. Not modeled: Constitution +2 (`ability-score`,
-   *  refused), Dwarvish (item languages have no reader), and the Persuasion Advantage with dwarves. */
+   *  (120 feet) and Dwarven Resilience already give it as much. Dwarvish (item languages have no reader) and the
+   *  Persuasion Advantage with dwarves, a listener a check doesn't name, are the table's. */
   "belt-of-dwarvenkind": {
     grants: { damageResistances: ["poison"] },
     modifiers: [
@@ -3078,8 +3078,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "You have a Climb Speed equal to your Speed." Walls, ceilings and slippery surfaces are the GM's. */
   "slippers-of-spider-climbing": { modifiers: [{ type: "special-speed", movement: "climb", equalToSpeed: true }] },
 
-  // Ungated in the SRD. Cold tolerance and ignoring ice or snow difficult terrain are not modeled.
-  "boots-of-the-winterlands": { grants: { damageResistances: ["cold"] } },
+  // Ungated in the SRD. Tolerating 0 degrees Fahrenheit spares the extreme cold's save (environment.ts), and Winter
+  // Strider crosses painted ice at no extra cost (spell-zones.ts); the ice's slip save still reaches the wearer.
+  "boots-of-the-winterlands": {
+    grants: { damageResistances: ["cold"] },
+    tags: ["cold-tolerant", "winter-strider"]
+  },
 
   // 4 charges exact; the Fly Speed lasts an hour of game time.
   "winged-boots": {
@@ -3458,10 +3462,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `cloak-of-displacement` - attack disadvantage that switches off after damage or at Speed 0; no
-  //     self-suppressing rider exists, so it would be permanent.
-
-  // Requires attunement, so it applies only once attuned. Disadvantage on others' Perception against the wearer is not expressible.
+  // Requires attunement, so it applies only once attuned. Others' Perception checks to perceive the wearer have
+  // Disadvantage (ability-checks.ts, by the item id).
   "cloak-of-elvenkind": {
     modifiers: [
       {
@@ -3477,7 +3479,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Charge-alone: 3 charges exact; the GM applies the Invisible condition.
   "cloak-of-invisibility": {
     charges: { regain: "1d3" },
     actions: [
@@ -3565,13 +3566,23 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "cloak-of-the-manta-ray": { modifiers: [{ type: "special-speed", movement: "swim", feet: 60 }] },
   /** "You have Advantage on saving throws against spells while you wear this cloak." */
   "mantle-of-spell-resistance": { modifiers: [spellSaves()] },
-  /** Darkvision and Truesight out to 120 feet, which dynamic vision reads. Not modeled: Advantage on Wisdom
-   *  (Perception) checks "that rely on sight" (a check doesn't say what it relies on), and the Light or Daylight
-   *  drawback that Blinds the wearer. */
+  /** Darkvision and Truesight out to 120 feet, which dynamic vision reads, and Advantage on Wisdom (Perception) checks
+   *  "that rely on sight", a situation the roller names. The Light or Daylight drawback that Blinds the wearer has no
+   *  trigger on a cast aimed at the robe. */
   "robe-of-eyes": {
     modifiers: [
       { type: "darkvision", feet: 120 },
-      { type: "sense", sense: "truesight", feet: 120 }
+      { type: "sense", sense: "truesight", feet: 120 },
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "advantage",
+        when: [
+          { type: "on-ability-check" },
+          { type: "skill-is", skills: ["perception"] },
+          { type: "situation-is", situation: "relying on sight" }
+        ]
+      }
     ]
   },
 

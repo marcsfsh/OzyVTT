@@ -115,7 +115,7 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
-    // The once-per-Long-Rest permission only; the GM gives the Focus Points back from the sheet's Limited uses.
+    // Once per Long Rest; initiative-hooks.ts offers it when the Monk rolls Initiative, and conversions.ts restores the points.
     "uncanny-metabolism": {
       uses: { limit: 1, per: "long-rest" }
     },
@@ -194,7 +194,7 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
-    // "At the start of your turn, you can expend 3 Focus Points"; the Incapacitated end condition stays prose.
+    // "At the start of your turn, you can expend 3 Focus Points"; the grant ends on the Incapacitated condition.
     "superior-defense": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
       actions: [
@@ -254,7 +254,7 @@ export const monk: ClassMechanicsModule = {
       ]
     }
     // Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`), and Evasion is read by the save
-    // outcome (`hasEvasion` in the server) from the held feature. Acrobatic Movement stays prose.
+    // outcome (`hasEvasion` in the server) from the held feature. Acrobatic Movement is read by its feature id (`speed.ts`, `terrain.ts`).
   },
   // The Unarmored Movement column's steps (+15 at 6, +20 at 10, +25 at 14, +30 at 18), each replacing the last.
   stages: [6, 10, 14, 18].map((level, index, levels) => ({

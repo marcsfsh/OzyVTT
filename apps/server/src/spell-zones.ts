@@ -472,6 +472,27 @@ export function movesFreelyOn(
   );
 }
 
+/** The tag a worn item carries to spare its wearer a kind of ground's extra cost alone (Boots of the Winterlands' Winter
+ *  Strider: "You ignore Difficult Terrain created by ice or snow"); the ground's other hazards still reach it. */
+const WORN_SPARES_COST: Readonly<Record<string, string>> = { ice: "winter-strider" };
+
+/** Whether the creature crosses this kind of ground at no extra cost: by its trait, or by a worn item's. */
+export function crossesAtNoCost(
+  creature: Actor,
+  kind: string,
+  deps: Pick<ZoneDeps, "resolveDefinition"> & Readonly<{ catalog?: EquipmentCatalog }>
+): boolean {
+  if (movesFreelyOn(creature, kind, deps)) return true;
+  const tag = WORN_SPARES_COST[kind];
+  return (
+    tag !== undefined &&
+    creature.inventory.some((row) => {
+      const record = deps.catalog?.equipmentRecord(catalogIdOf(row));
+      return record?.tags.includes(tag) === true && itemIsActive(row, record);
+    })
+  );
+}
+
 /** A creature's type, as its stat block prints it ("humanoid" for a character). */
 export const typeOf = (creature: Actor, deps: Pick<ZoneDeps, "resolveDefinition">): string | null =>
   creatureTypeOf(creature, creature.definitionId ? deps.resolveDefinition(creature.definitionId) : undefined);

@@ -22,7 +22,7 @@ export const bard: ClassMechanicsModule = {
     /**
      * Uses scale off the Charisma modifier. The printed Bardic Die column is the die the inspired creature holds
      * (`answerAmountByLevel`), so it stays display-only and is not in `liveResources`. Cutting Words and Peerless Skill
-     * spend the same pool. Superior Inspiration stays prose.
+     * spend the same pool. Superior Inspiration tops it up on Initiative (`initiative-hooks.ts`).
      */
     "bardic-inspiration": {
       tags: ["bardic-inspiration"],
@@ -110,7 +110,6 @@ export const bard: ClassMechanicsModule = {
     "magical-secrets": { extraSpellLists: ["cleric", "druid", "wizard"] }
 
     // Jack of All Trades is applied by the server's check plan (`ability-checks.ts`), by its feature id.
-    // Not modeled: Superior Inspiration.
   },
 
   subclasses: {

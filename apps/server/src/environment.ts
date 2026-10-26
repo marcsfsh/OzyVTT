@@ -1,5 +1,5 @@
 import { CALM_ENVIRONMENT, isDead, type GameState, type SceneEnvironment } from "@vtt/domain";
-import type { ActorDefinition, Modifier } from "@vtt/schemas";
+import { catalogIdOf, type ActorDefinition, type Modifier } from "@vtt/schemas";
 import { requireGm, type Initiator } from "./authorization.js";
 import { exhaustionLevel } from "./condition-rules.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -11,7 +11,7 @@ import {
   makeEffect,
   type EffectNarration
 } from "./effects.js";
-import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { startFall, type FallDeps } from "./falling.js";
 import { douseFire } from "./hazards.js";
 import { previewDamage } from "./hit-points.js";
@@ -28,7 +28,8 @@ import { waterOf } from "./water.js";
  * The scene's climate and weather (SRD 5.2.1 Gameplay Toolbox, Environmental Effects), set by the GM per scene
  * (`combat.environment`). The creatures placed on the live scene's map are exposed to it:
  * - Extreme cold: a DC 10 Constitution save at the end of each hour or a level of Exhaustion; Resistance or Immunity to
- *   Cold damage succeeds, so does a creature in a Bedroll (an equipped row), and one wrapped in a Blanket has Advantage.
+ *   Cold damage succeeds, so do a creature in a Bedroll (an equipped row) and one wearing a cold-tolerant item (a Ring
+ *   of Warmth), and one wrapped in a Blanket has Advantage.
  * - Extreme heat: for a creature with no drinkable water (no Waterskin with water left), a Constitution save at the end
  *   of each hour, DC 5 the first hour and 1 more each hour after, with Disadvantage in Medium or Heavy armor; Fire
  *   Resistance or Immunity succeeds.
@@ -180,9 +181,21 @@ function enduranceSave(
   if (!kept) gainLevel(state, actor, input.why, events);
 }
 
+/** The tag of a worn item that keeps its wearer unharmed by freezing cold (a Ring of Warmth: "unharmed by temperatures
+ *  of 0 degrees Fahrenheit or lower"; Boots of the Winterlands). */
+export const COLD_TOLERANT_TAG = "cold-tolerant";
+
+/** Whether an active item it carries bears this tag. */
+const wearsTagged = (actor: Actor, tag: string, deps: Pick<EnvironmentDeps, "catalog">) =>
+  actor.inventory.some((row) => {
+    const record = deps.catalog?.equipmentRecord(catalogIdOf(row));
+    return record?.tags.includes(tag) === true && itemIsActive(row, record);
+  });
+
 /** The end of an hour of extreme cold for one creature. */
 function coldHour(state: GameState, actor: Actor, deps: EnvironmentDeps, events: EffectNarration[]): void {
-  if (shrugsOff(state, actor, "cold", deps) || using(actor, BEDROLL_ID)) return;
+  if (shrugsOff(state, actor, "cold", deps) || using(actor, BEDROLL_ID) || wearsTagged(actor, COLD_TOLERANT_TAG, deps))
+    return;
   enduranceSave(
     state,
     actor,
