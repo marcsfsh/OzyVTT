@@ -1,5 +1,6 @@
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import { conditionLabel } from "../condition-rules.js";
+import { OFF_PLANE_TAG } from "../off-plane.js";
 import { createPendingSaves } from "../saving-throws.js";
 import { recordRoll, type ResolveContext } from "./context.js";
 import { failureEffectFor, isMagicalAction, spellCastOf } from "./pending.js";
@@ -47,7 +48,7 @@ function raysFor(ctx: ResolveContext, target: LiveTarget): Ray[] {
  * SRD Prismatic Spray: "Roll 1d8 for each target to determine which color ray affects it." 1-5 deal 12d6 Fire, Acid,
  * Lightning, Poison or Cold, half on a success; 6 (Indigo) Restrains on a failure, with a Constitution save at the end
  * of each of its turns until three successes end it or three failures Petrify it; 7 (Violet) Blinds on a failure until
- * the start of the caster's next turn, when a Wisdom save decides whether it is sent to another plane (the GM's); 8
+ * the start of the caster's next turn, when a Wisdom save ends it or sends the creature off the map to another plane; 8
  * strikes with two rays. Each ray is a save of its own. Returns true when it handled the cast.
  */
 export function prismaticSpray(ctx: ResolveContext, saving: readonly LiveTarget[]): boolean {
@@ -115,14 +116,24 @@ export function prismaticSpray(ctx: ResolveContext, saving: readonly LiveTarget[
                   }
                 }
               }
-            : { ...effect, name, duration: { type: "until-source-next-turn" } },
-        ...(ray.colour === "Violet"
-          ? {
-              extra: {
-                failureNote: `At the start of ${attacker.name}'s next turn, ${target.name} makes a DC ${save.dc} Wisdom save. On a failure it is sent to another plane of the GM's choice.`
+            : {
+                // "The target has the Blinded condition and makes a Wisdom saving throw at the start of your next turn.
+                // On a successful save, the condition ends. On a failed save, the condition ends, and the creature
+                // teleports to another plane": off the map until the GM brings it back (off-plane.ts).
+                ...withoutDuration(effect),
+                name,
+                repeatSave: {
+                  ability: "wis",
+                  dc: save.dc,
+                  timing: "source-turn-start",
+                  once: true,
+                  next: {
+                    name: `Sent to another plane by ${attacker.name} (${named})`.slice(0, 120),
+                    linkedConditionIds: [],
+                    tags: [OFF_PLANE_TAG]
+                  }
+                }
               }
-            }
-          : {})
       });
     }
   }

@@ -190,11 +190,17 @@ export function creatureAtPoint(
 export const DESCENDS_SAFELY_TAG = "descends-safely";
 
 /** Its flight ended gently: a creature in the air drifts down instead of falling. It is held up as by a levitation
- *  until the next settle lands it, or keeps flying if it still can. */
-export function descendSafely(state: GameState, actorId: string): void {
+ *  until the next settle lands it, or keeps flying if it still can. A descent that lands safely within `withinFeet`
+ *  leaves a creature higher than that in the air that much lower, to fall the rest. */
+export function descendSafely(state: GameState, actorId: string, withinFeet?: number): void {
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!token?.position || token.airborne !== "fly" || altitudeOf(token) <= 0) return;
-  setAltitude(state, actorId, altitudeOf(token), "levitate");
+  const height = altitudeOf(token);
+  if (withinFeet !== undefined && height > withinFeet) {
+    setAltitude(state, actorId, height - withinFeet, "fly");
+    return;
+  }
+  setAltitude(state, actorId, height, "levitate");
 }
 
 /** The mover's height at each point of its path, rising or falling evenly from start to end. */

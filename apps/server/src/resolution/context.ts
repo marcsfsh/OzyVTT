@@ -342,6 +342,8 @@ export type ResolveContext = {
   summoned?: ReadonlyArray<Readonly<{ actorId: string; name: string }>>;
   /** A look at the damage records no roll: the roller alone sees its dice until the confirm deals them. */
   silentRolls?: boolean;
+  /** This later action comes with its spell's cast at no further cost (`takenWithCast`), and spends that free use. */
+  withCast?: boolean;
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die

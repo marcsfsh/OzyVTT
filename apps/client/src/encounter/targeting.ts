@@ -326,9 +326,10 @@ export function setChoiceOption(optionId: string, targetId?: string) {
       : { ...session, targetOptions: { ...session.targetOptions, [targetId]: optionId } };
   emit();
 }
-/** Picks the carried weapon a grant binds to; undefined leaves it to the server (the first that fits). */
+/** Picks the carried weapon a grant binds to, or the item a cast is on (Identify); undefined leaves it to the server
+ *  (the first weapon that fits, or no item). */
 export function setBoundItem(itemId: string | undefined) {
-  if (!session?.action.choices?.bindsWeapon) return;
+  if (!session?.action.choices?.bindsWeapon && !session?.action.choices?.pickItem) return;
   const { itemId: _previous, ...rest } = session;
   session = itemId === undefined ? rest : { ...rest, itemId };
   emit();

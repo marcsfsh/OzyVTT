@@ -44,6 +44,8 @@ export const NO_BONUS_ACTIONS_TAG = "no-bonus-actions";
 export const CANT_ATTACK_TAG = "cant-attack";
 /** The bearer's only actions are Dash and the Magic action that ends this (Wind Walk's cloud form). */
 export const DASH_ONLY_TAG = "dash-only";
+/** The bearer's action this turn is the Dodge action (Bestow Curse: "be forced to take the Dodge action on that turn"). */
+export const DODGE_ONLY_TAG = "dodge-only";
 /** The bearer can't end the Prone condition on itself while this lasts (Hideous Laughter). */
 export const CANT_STAND_TAG = "cant-stand";
 /** An Unconscious bearer another creature can shake awake with an action (Sleep, Eyebite's Asleep). */
@@ -345,6 +347,15 @@ export function dropHeldItems(actor: Actor, source?: ConditionImmunitySource): E
   return [{ kind: "condition", text: `${actor.name} drops ${list}.`, actorId: actor.id }];
 }
 
+/** One held row dropped (Heat Metal's object): still carried, out of the creature's hands. Nothing when it isn't held. */
+export function dropHeldRow(actor: Actor, rowId: string, source?: ConditionImmunitySource): EffectNarration[] {
+  const row = actor.inventory.find((entry) => entry.id === rowId && entry.equipped && entry.armor === undefined);
+  if (!row) return [];
+  actor.inventory = actor.inventory.map((entry) => (entry.id === rowId ? { ...entry, equipped: false } : entry));
+  refreshArmorClass(actor, source);
+  return [{ kind: "condition", text: `${actor.name} drops ${row.name}.`, actorId: actor.id }];
+}
+
 /**
  * What gaining a condition does beyond itself, shared by every path that can impose one (a GM chip, a failed save,
  * an on-hit rider, an effect's linked conditions): an Incapacitated creature's grapples release and its
@@ -644,8 +655,10 @@ function endEffectInternal(
       events.push(...applyExhaustionDeath(state, actor));
   }
   if (effect.tags.includes(HASTED_TAG) && !sweeping) addLethargy(state, actor, effect, events);
-  // A flight that lowers its creature when it ends (Winged Boots: "you descend ... until you land") drifts it down.
+  // A flight that lowers its creature when it ends (Winged Boots: "you descend ... until you land") drifts it down;
+  // Wind Walk's cloud "descends 60 feet per round for 1 minute until it lands", and falls the rest.
   if (effect.tags.includes(DESCENDS_SAFELY_TAG)) descendSafely(state, actor.id);
+  else if (effect.form?.descendsSafely) descendSafely(state, actor.id, 600);
   // The caster's "Concentrating on X" ending ends everything that cast made, on every creature, and the area it left.
   if (effect.tags.includes(CONCENTRATING_TAG) && effect.castId !== undefined) {
     for (const bearer of state.actors) {

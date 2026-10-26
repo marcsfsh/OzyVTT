@@ -32,6 +32,9 @@ import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { reachBarredBy } from "../zone-barriers.js";
+import { bearsCastOf, levitatedBy, takenWithCast } from "../lasting-spells.js";
+import { checkStoredRelease } from "../stored-casts.js";
+import { checkOrbLeap } from "./orb-leap.js";
 import { swallowCover } from "../swallow.js";
 import { enclosureBlocks } from "../enclosures.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -69,7 +72,13 @@ function combatantsOf(
   const itemGrant = isItemActionId(action.id) && (action.grants !== undefined || action.rebindsRow !== undefined);
   // So is helping an ally with a check (picking a lock, calming a horse), which needs no turn.
   const helps = action.id === "help-check";
-  if (outsideFight && !castsASpell && !shapeShifts && !itemGrant && !helps)
+  // And what a lasting spell does by its caster's hand away from a fight (Dream's message to a sleeper, Geas's harm
+  // to a defiant creature, Levitate's lift), so long as the spell is up.
+  const lasting =
+    spell !== undefined &&
+    laterRowOf(spell, action.id) !== undefined &&
+    laterRowOf(spell, action.id)!.zone === undefined;
+  if (outsideFight && !castsASpell && !shapeShifts && !itemGrant && !helps && !lasting)
     throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) =>
     outsideFight
@@ -124,7 +133,12 @@ function combatantsOf(
   // A spell that lasts and acts again later (Produce Flame, a lingering area) starts with no creature under it yet.
   const startsALastingSpell = castsASpell && (spell?.effect?.laterActions ?? []).length > 0;
   // Moving a spell's area (Moonbeam, Flaming Sphere's ram) is something done, whoever it moves onto.
-  const movesAnArea = spell !== undefined && laterRowOf(spell, action.id)?.movesArea !== undefined;
+  // So is moving a spell's force between its caster and harm (Arcane Hand's Interposing Hand).
+  const movesAnArea =
+    spell !== undefined &&
+    (laterRowOf(spell, action.id)?.movesArea !== undefined ||
+      laterRowOf(spell, action.id)?.interposes === true ||
+      laterRowOf(spell, action.id)?.liftFeet !== undefined);
   // Spreading Caltrops leaves an area that acts on whoever meets it later.
   const leavesAnArea = action.zone !== undefined && !castsASpell;
   const rollsOnTargets =
@@ -266,13 +280,32 @@ export function openResolve(
       ? upcastAction(reaching, spell, castLevel)
       : reaching;
   // A part of the creature's picked type (a half-dragon's Draconic Origin) deals that type.
-  const action = withPickedDamageTypes(
+  const chosen = withPickedDamageTypes(
     withChosenDamageType(upcast, input.damageType ?? null),
     attacker,
     deps.definition
   );
+  // The cast's own free use of a later action costs nothing more (Arcane Hand's first effect).
+  const withCast = spell !== undefined && takenWithCast(state, attacker.id, spell, chosen.id);
+  // Levitating itself, the caster rises or sinks as part of its move (Levitate: "If you are the target, you can move
+  // up or down as part of your move").
+  const laterRow = spell ? laterRowOf(spell, chosen.id) : undefined;
+  const ownLift = laterRow?.liftFeet !== undefined && levitatedBy(state, attacker.id)?.id === attacker.id;
+  const action = withCast || ownLift ? { ...chosen, activation: "other" as const } : chosen;
+  // What the GM alone judges has happened (Geas's defiance) is the GM's to take.
+  if (laterRow?.gmOnly && deps.initiatorRole === "player")
+    throw new CommandRejectedError(`The GM takes ${action.name} when the spell's trigger happens.`);
+  // A later action that takes only a creature bearing the caster's spell (Arcane Hand's crush) refuses any other.
+  if (spell && laterRow?.bearerOnly)
+    for (const target of targets)
+      if (!bearsCastOf(target, attacker.id, spell.id))
+        throw new CommandRejectedError(
+          `${hiddenFromInitiator(target.id) ? "That creature" : target.name} isn't under ${attacker.name}'s ${spell.name}, so ${action.name} can't take it.`
+        );
+  // Contingency's spell takes effect on its caster alone, while the statuette is carried.
+  checkStoredRelease(attacker, action.id, input.targetIds);
   // An option or a weapon the action doesn't offer is refused before anything rolls.
-  checkChoices(action, input, attacker, deps.catalog);
+  checkChoices(action, input, attacker, deps.catalog, deps.definition);
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derived, attacker.inventory);
@@ -483,9 +516,12 @@ export function openResolve(
     hitRiders: [],
     damageEffectIds: [],
     forgoneAdvantageBy: input.forgoneAdvantageBy ?? null,
-    keepsHidden: false
+    keepsHidden: false,
+    ...(withCast ? { withCast: true } : {})
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
+  // A leaping Chromatic Orb: a new creature within 30 feet of the last, of the cast's type.
+  ctx.action = checkOrbLeap(ctx);
   if (!input.economyPaid) warnings.push(...laterActionReminders(spell, action));
   return ctx;
 }

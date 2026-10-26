@@ -387,6 +387,12 @@ function engulfsEntrants(trait: Trait): TraitMechanic | null {
     : null;
 }
 
+/** "A spellcaster who wears the guardian's amulet can cause the guardian to store one spell of level 4 or lower." */
+function spellStoring(trait: Trait): TraitMechanic | null {
+  const match = /\bcan cause the [\w -]+? to store one spell of level (\d) or lower\b/.exec(trait.description);
+  return match ? { kind: "spell-storing", name: trait.name, maxLevel: Number(match[1]) } : null;
+}
+
 /** "The ground in a 10-foot Emanation originating from the mouther is Difficult Terrain." */
 function difficultGround(trait: Trait): TraitMechanic | null {
   const match = /^The ground in a (\d+)-foot Emanation originating from the [\w -]+? is Difficult Terrain\.$/.exec(
@@ -429,6 +435,7 @@ function skillPick(trait: Trait): TraitMechanic | null {
 }
 
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
+  spellStoring,
   damageTypePick,
   skillPick,
   regeneration,

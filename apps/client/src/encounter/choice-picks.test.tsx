@@ -141,6 +141,33 @@ describe("the weapon a grant binds to", () => {
   });
 });
 
+describe("the item a cast is on", () => {
+  const IDENTIFY = {
+    ...base,
+    id: "spell-identify",
+    name: "Identify",
+    targeting: "none",
+    choices: { pickItem: true }
+  } as unknown as ContentActionSummary;
+
+  it("offers every carried item, starts on none, and sends the one picked", async () => {
+    beginTargeting(IDENTIFY, CASTER);
+    render(<Picker />);
+    const select = screen.getByRole("combobox", { name: "Item" }) as HTMLSelectElement;
+    expect(select.value).toBe("");
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "None",
+      "Longbow",
+      "Quarterstaff",
+      "Club",
+      "Rope"
+    ]);
+    fireEvent.change(select, { target: { value: "rope" } });
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({ actionId: "spell-identify", itemId: "rope" });
+  });
+});
+
 const ANTENNAE = {
   ...base,
   id: "antennae",

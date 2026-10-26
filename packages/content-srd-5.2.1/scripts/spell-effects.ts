@@ -102,7 +102,9 @@ const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
   // The explosive rune's "Acid, Cold, Fire, Lightning, or Thunder damage (your choice when you create the glyph)".
   "glyph-of-warding": ["thunder", "acid", "cold", "fire", "lightning"],
   // The Resistance the touched creature gains: "one damage type of your choice".
-  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"]
+  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"],
+  // Wish's Resistance: "one damage type you choose".
+  wish: [...DamageTypeSchema.options]
 };
 
 /** Spell attack rolls one cast makes, where the text's wording misleads the reader. */
@@ -239,6 +241,8 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   telekinesis: { count: 1 },
   "telepathic-bond": { count: 8 },
   teleport: { count: 9 },
+  // Instant Health: "you and up to twenty other creatures"; Resistance and Spell Immunity take up to ten.
+  wish: { count: 20 },
   tongues: { count: 1 },
   "true-polymorph": { count: 1 },
   "true-resurrection": { count: 1 },
@@ -338,6 +342,8 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "conjure-elemental",
   "conjure-woodland-beings",
   "delayed-blast-fireball",
+  // The Wisdom save belongs to probing deeper on a later turn (`LATER_ACTIONS`).
+  "detect-thoughts",
   "dragons-breath",
   "dream",
   "faithful-hound",
@@ -647,28 +653,54 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     }
   ],
   // "When you cast the spell and as a Bonus Action on your later turns, you can move the hand up to 60 feet and then
-  // cause one of the following effects": each reaches from the hand (`spell-summons.ts`). Forceful Hand's push and
-  // Interposing Hand's cover are the table's.
+  // cause one of the following effects": each reaches from the hand (`spell-summons.ts`), and the cast takes one free.
   "arcane-hand": [
     {
       name: "clenched fist",
       activation: "bonus-action",
+      withCast: true,
       when: "The hand moves up to 60 feet and strikes a target within 5 feet of it with a melee spell attack.",
       attackRange: melee(125),
-      damage: [{ formula: "5d8", type: "force" }]
+      // "The damage of the Clenched Fist increases by 2d8 ... for each spell slot level above 5."
+      damage: [{ formula: "5d8", type: "force", perSlot: "2d8" }]
+    },
+    {
+      name: "forceful hand",
+      activation: "bonus-action",
+      withCast: true,
+      when: "The hand moves up to 60 feet and pushes a Huge or smaller creature within 5 feet of it that fails a Strength save up to 5 feet plus five times your spellcasting ability modifier, following it.",
+      save: {
+        ability: "str",
+        successDamage: "none",
+        failureConditions: [],
+        failurePush: { feet: 5, upTo: true, maxTargetSize: "huge" }
+      },
+      pushPerModifier: 5,
+      damage: []
     },
     {
       name: "grasping hand",
       activation: "bonus-action",
+      withCast: true,
       when: "The hand moves up to 60 feet and grapples a Huge or smaller creature within 5 feet of it that fails a Dexterity save.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["grappled"] },
+      save: { ability: "dex", successDamage: "none", failureConditions: ["grappled"], failureMaxSize: "huge" },
       damage: []
     },
     {
       name: "crush",
       activation: "bonus-action",
+      bearerOnly: true,
       when: "While the hand grapples a creature, a Bonus Action crushes it.",
-      damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true }]
+      // "... and the damage of the Grasping Hand increases by 2d6 for each spell slot level above 5."
+      damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true, perSlot: "2d6" }]
+    },
+    {
+      name: "interposing hand",
+      activation: "bonus-action",
+      withCast: true,
+      interposes: true,
+      when: "The hand moves up to 60 feet and grants you Half Cover against attacks and other effects from or through its space, which is Difficult Terrain for your enemies.",
+      damage: []
     }
   ],
   "arcane-sword": [
@@ -1062,7 +1094,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: "A creature that steps onto the glyph sets it off: each creature in the 20-foot-radius Sphere makes the save, and the spell ends.",
       save: save("dex"),
-      damage: [{ formula: "5d8", type: "thunder" }],
+      // "The damage of an explosive rune increases by 1d8 for each spell slot level above 3."
+      damage: [{ formula: "5d8", type: "thunder", perSlot: "1d8" }],
       zone: { on: ["enter", "spell-end"], around: "point", feet: 5, once: true, hidden: true }
     }
   ],
@@ -1074,6 +1107,131 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: save("dex"),
       damage: [{ formula: "20", type: "radiant" }],
       zone: { on: ["enter", "start-turn"], around: "point", feet: 10, affects: "enemies", damageCap: 60 }
+    }
+  ],
+  // "You can make the messenger terrifying to the target. If you do so, the messenger can deliver a message of no more
+  // than ten words, and then the target makes a Wisdom saving throw. On a failed save, the target gains no benefit from
+  // its rest, and it takes 3d6 Psychic damage when it wakes up."
+  dream: [
+    {
+      name: "terrifying message",
+      activation: "other",
+      when: "The messenger turns terrifying: after its message of ten words or fewer, the target makes the Wisdom save, and a failure denies it the benefit of its rest and deals it 3d6 Psychic damage as it wakes.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: [],
+        // It waits for the sleeper's next rest, past the 8 hours the spell lasts.
+        failureDuration: { type: "minutes", minutes: 1440 },
+        atRest: { at: "long-rest", noBenefit: "long", damage: [{ formula: "3d6", type: "psychic" }], once: true }
+      },
+      failureEffect: { name: "Dream's nightmare", tags: [], modifiers: [] },
+      damage: []
+    }
+  ],
+  // "As a Magic action on your next turn, you can try to probe deeper into the target's mind. If you probe deeper, the
+  // target makes a Wisdom saving throw. ... On a successful save, the spell ends. Either way, the target knows that you
+  // are probing into its mind, and ... the target can take an action on its turn to make an Intelligence (Arcana) check
+  // against your spell save DC, ending the spell on a success." What the caster learns is the GM's.
+  "detect-thoughts": [
+    {
+      name: "probe",
+      activation: "action",
+      laterTurnsOnly: true,
+      when: "On a later turn, a Magic action probes the target's mind: it makes the Wisdom save, a success ending the spell, and may then take an action for an Intelligence (Arcana) check that ends it.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: [],
+        successEndsSpell: true,
+        endedBy: {
+          name: "Push the probe out",
+          by: "bearer",
+          check: { ability: "int", skill: "arcana" },
+          endsSpell: true
+        }
+      },
+      failureEffect: { name: "Detect Thoughts", tags: [], modifiers: [] },
+      damage: []
+    }
+  ],
+  // "While Charmed, the creature takes 5d10 Psychic damage if it acts in a manner directly counter to your command. It
+  // takes this damage no more than once each day." The GM judges the defiance.
+  geas: [
+    {
+      name: "defiance",
+      activation: "other",
+      bearerOnly: true,
+      gmOnly: true,
+      uses: { limit: 1, per: "time", afterHours: "24" },
+      when: "When the charmed creature acts directly counter to the command, the GM deals it 5d10 Psychic damage, once a day at most.",
+      damage: [{ formula: "5d10", type: "psychic" }]
+    }
+  ],
+  // "If you are the target, you can move up or down as part of your move. Otherwise, you can take a Magic action to
+  // move the target, which must remain within the spell's range."
+  levitate: [
+    {
+      name: "raise",
+      activation: "action",
+      liftFeet: 20,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn", pool: "levitate-height" },
+      when: "On your turn, a Magic action raises the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you rise as part of your move.",
+      damage: []
+    },
+    {
+      name: "lower",
+      activation: "action",
+      liftFeet: -20,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn", pool: "levitate-height" },
+      when: "On your turn, a Magic action lowers the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you sink as part of your move.",
+      damage: []
+    }
+  ],
+  // "On each of your turns, such a phantasm can deal 2d8 Psychic damage to the target if it is in the phantasm's area
+  // or within 5 feet of the phantasm." Where the phantasm is, and whether the target is near it, are the caster's to
+  // say and the GM's to refuse.
+  "phantasmal-force": [
+    {
+      name: "harm",
+      activation: "other",
+      bearerOnly: true,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn" },
+      when: "On each of your turns, the phantasm can deal 2d8 Psychic damage to the creature that perceives it, if it is in the phantasm's area or within 5 feet of it.",
+      damage: [{ formula: "2d8", type: "psychic" }]
+    }
+  ],
+  // "Until the spell ends, the target can revert to cloud form, which also requires a Magic action followed by a
+  // 1-minute transformation."
+  "wind-walk": [
+    {
+      name: "cloud form",
+      activation: "action",
+      when: "Until the spell ends, a target in its normal form takes a Magic action to become a cloud again, with the Stunned condition for the minute of its transformation.",
+      shapeShift: {
+        from: "printed",
+        printed: [
+          {
+            id: "cloud",
+            name: "Cloud",
+            speeds: { walk: 0, fly: 300, hover: true },
+            noActions: true,
+            allowsActions: ["dash"],
+            conditionImmunities: ["prone"],
+            modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+          }
+        ],
+        keeps: [],
+        gear: "worn",
+        leaveAs: "action",
+        revertRounds: 10,
+        descendsSafely: true,
+        takesRounds: 10
+      },
+      damage: []
     }
   ],
   // "If the target drops to 0 Hit Points before this spell ends, you can take a Bonus Action on a later turn to curse a
@@ -2140,6 +2298,44 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   }),
   // "Until the spell ends, the target can take a Magic action to exhale", the type chosen at the cast: the touched
   // creature's own action, at the caster's numbers.
+  // "Choose a spell of level 5 or lower that you can cast, that has a casting time of an action, and that can target
+  // you. You cast that spell, called the contingent spell, as part of casting Contingency." The next such spell its
+  // caster casts within a minute is held for the 10 days (`stored-casts.ts`); casting Contingency again replaces it.
+  contingency: spellGrant({
+    name: "Contingency",
+    tags: ["contingency"],
+    target: "self",
+    duration: { type: "minutes", minutes: 14_400 },
+    storeAwaits: { via: "contingency", maxLevel: 5 }
+  }),
+  // "Spell Glyph. You can store a prepared spell of level 3 or lower in the glyph by casting it as part of creating the
+  // glyph", up to the slot's level: the next such spell its caster casts within a minute makes the glyph a spell glyph.
+  "glyph-of-warding": spellGrant({
+    name: "Glyph of Warding",
+    tags: ["glyph-of-warding"],
+    target: "self",
+    duration: rounds(10),
+    storeAwaits: { via: "glyph", maxLevel: 3 }
+  }),
+  // "You or a willing creature you touch enters a trance state to act as a dream messenger. While in the trance, the
+  // messenger is Incapacitated and has a Speed of 0." Ending the effect is emerging from the trance, which ends the spell.
+  dream: spellGrant({
+    name: "Dream messenger's trance",
+    tags: ["dream-trance"],
+    target: "self",
+    duration: { type: "manual" },
+    conditions: ["incapacitated"],
+    speedZero: true
+  }),
+  // "Until the spell ends, the target can revert to cloud form": each target keeps the spell, and its action to become
+  // a cloud again, for the spell's duration.
+  "wind-walk": spellGrant({
+    name: "Wind Walk",
+    tags: ["wind-walk"],
+    target: "targets",
+    duration: { type: "manual" },
+    grantsLaterAction: "cloud form"
+  }),
   "dragons-breath": spellGrant({
     name: "Dragon's Breath",
     tags: ["dragons-breath"],
@@ -2349,6 +2545,30 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
       damageTypes: ["force"]
     }
   }),
+  // "Guided by a flash of magical insight, you make one attack with the weapon used in the spell's casting. The attack
+  // uses your spellcasting ability for the attack and damage rolls instead of using Strength or Dexterity. If the attack
+  // deals damage, it can be Radiant damage or the weapon's normal damage type (your choice)." Extra Radiant at levels 5,
+  // 11 and 17. The weapon must be one the caster is proficient with.
+  "true-strike": spellGrant({
+    name: "True Strike",
+    tags: ["true-strike"],
+    target: "self",
+    duration: { type: "until-source-turn-end" },
+    bindsWeapon: {
+      needsProficiency: true,
+      attacksNow: true,
+      ability: "spellcasting",
+      damageTypes: ["radiant"],
+      extraDamage: {
+        type: "radiant",
+        dice: [
+          { level: 5, formula: "1d6" },
+          { level: 11, formula: "2d6" },
+          { level: 17, formula: "3d6" }
+        ]
+      }
+    }
+  }),
   // "You take the Dash action, and until the spell ends, you can take that action again as a Bonus Action."
   "expeditious-retreat": spellGrant({
     name: "Expeditious Retreat",
@@ -2367,12 +2587,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     bonusActions: ["disengage"]
   }),
   // "Any attack you make deals an extra 2d8 damage when you hit a creature within 15 feet of yourself. This damage is
-  // Acid, Cold, Fire, or Lightning", picked at the cast.
+  // Acid, Cold, Fire, or Lightning (your choice when you make the attack)": the cast picks a default, each hit another.
   "conjure-minor-elementals": spellGrant({
     name: "Conjure Minor Elementals",
     tags: ["conjure-minor-elementals"],
     target: "self",
     duration: rounds(100),
+    // "The damage increases by 1d8 for each spell slot level above 4."
+    extraDamagePerSlot: "1d8",
     options: (["acid", "cold", "fire", "lightning"] as const).map((type) =>
       option(type, titled(type), {
         modifiers: [
@@ -2380,6 +2602,8 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
             type: "extra-damage",
             formula: "2d8",
             damageType: type,
+            // The type picked at the cast is the default; each attack may pick another.
+            damageTypes: ["acid", "cold", "fire", "lightning"],
             doubleOnCritical: true,
             when: [{ type: "on-hit" }, { type: "versus-within", feet: 15 }]
           }
@@ -2404,8 +2628,8 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
       naturalWeapon("hooves", "Hooves", "bludgeoning")
     ]
   }),
-  // "Until the spell ends, the target has a +1 bonus to AC and saving throws, and it has Resistance to all damage."
-  // The caster's share of its damage is the GM's.
+  // "Until the spell ends, the target has a +1 bonus to AC and saving throws, and it has Resistance to all damage." The
+  // tag shares its damage with the caster and ends the bond at 60 feet apart (warding-bond.ts).
   "warding-bond": spellGrant({
     name: "Warding Bond",
     tags: ["warding-bond"],
@@ -2566,7 +2790,12 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
           }
         ]
       }),
-      option("dodge", "Forced to Dodge", { tags: ["curse-dodge"] }),
+      // "In combat, the target must succeed on a Wisdom saving throw at the start of each of its turns or be forced to
+      // take the Dodge action on that turn."
+      option("dodge", "Forced to Dodge", {
+        tags: ["curse-dodge"],
+        turnStartSave: { ability: "wis", failureTags: ["dodge-only"] }
+      }),
       option("necrotic", "Extra Necrotic damage", {
         modifiers: [
           {
@@ -2822,7 +3051,8 @@ const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
   // "You and up to ten willing creatures ... assume gaseous forms ... a Fly Speed of 300 feet and can hover ... Immunity
   // to the Prone condition ... Resistance to Bludgeoning, Piercing, and Slashing damage. The only actions a target can
   // take in this form are the Dash action or a Magic action to begin reverting ... Reverting takes 1 minute, during
-  // which the target has the Stunned condition." Turning back into a cloud, and the descent when it ends, are the GM's.
+  // which the target has the Stunned condition." "If a target is in cloud form and flying when the effect ends, the
+  // target descends 60 feet per round for 1 minute until it lands, which it does safely."
   "wind-walk": {
     from: "printed",
     onTargets: true,
@@ -2840,7 +3070,8 @@ const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
     keeps: [],
     gear: "worn",
     leaveAs: "action",
-    revertRounds: 10
+    revertRounds: 10,
+    descendsSafely: true
   }
 };
 
@@ -3033,6 +3264,11 @@ export function spellEffectFor(
     ...(burst ? { burst: structuredClone(burst) } : {}),
     damage: castDamage(id, roll, types, healing !== null),
     ...(choices ? { damageTypes: [...choices] } : {}),
+    // "If you roll an 8 on a d8 for this spell, you can roll another d8, and add it to the damage."
+    ...(id === "sorcerous-burst" ? { explodingDice: true as const } : {}),
+    ...(id === "teleport" ? { teleportOutcome: true as const } : {}),
+    ...(id === "identify" ? { identifiesItem: true as const } : {}),
+    ...(id === "wish" ? { wishUses: true as const } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
     ...(darts ? { darts } : {}),

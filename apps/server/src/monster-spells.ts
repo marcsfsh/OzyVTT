@@ -1,7 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { abilityModifier } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
-import { castAreaOf, spellCastMechanics, upcastAction } from "./item-actions.js";
+import { castAreaOf, laterSpellAction, spellCastMechanics, upcastAction } from "./item-actions.js";
 
 type CastsSpells = NonNullable<ActorAction["castsSpells"]>;
 type Entry = CastsSpells["spells"][number];
@@ -32,9 +32,36 @@ export function withMonsterSpells(
     const children = casts.spells
       .filter((entry) => !taken.has(entry.id))
       .map((entry) => childCast(action, entry, casts, spellRecord(entry.spellId), definition));
-    return [action, ...children];
+    return [action, ...children, ...laterCasts(action, casts, spellRecord, definition, taken)];
   });
   return { ...definition, actions };
+}
+
+/** What the list's spells let the caster do once they are up (Dream's terrifying message, Spiritual Weapon's later
+ *  attack), at the stat block's numbers and each spell's printed level, printed inside the list. */
+function laterCasts(
+  parent: ActorAction,
+  casts: CastsSpells,
+  spellRecord: (spellId: string) => SpellReference | undefined,
+  definition: ActorDefinition,
+  taken: Set<string>
+): ActorAction[] {
+  const numbers = {
+    attackBonus: casts.attackBonus,
+    saveDc: casts.saveDc,
+    bearersDc: false,
+    modifier: abilityModifier(definition.abilityScores[casts.ability])
+  };
+  return casts.spells.flatMap((entry) => {
+    const spell = spellRecord(entry.spellId);
+    return (spell?.effect?.laterActions ?? []).flatMap((row) => {
+      const built = laterSpellAction(spell!, row, numbers);
+      if (taken.has(built.id)) return [];
+      taken.add(built.id);
+      const level = entry.atLevel ?? spell!.level;
+      return [{ ...(level > spell!.level ? upcastAction(built, spell!, level) : built), partOf: parent.id }];
+    });
+  });
 }
 
 /** The name a cast of an entry goes by: the spell's, and the level when it isn't the spell's own ("Acid Arrow (level

@@ -1,3 +1,4 @@
+import { bondCasterOf } from "./warding-bond.js";
 import { formsAfterDamage } from "./transform/rules.js";
 import { lycanthropyAtZero } from "./transform/at-zero.js";
 import {
@@ -110,6 +111,8 @@ export type DamageInput = Readonly<{
   nonlethal?: boolean;
   /** What the damage drains as it lands (a Life Drain's lower Hit Point maximum, Vampiric Touch's healing). */
   drain?: DamageDrain;
+  /** A Warding Bond caster's share of its ward's damage, which is not shared on again. */
+  bondShare?: true;
 }>;
 export type DamageDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -1012,6 +1015,28 @@ export function applyDamageDetailed(
         actorId: actor.id
       });
     }
+  }
+
+  // Warding Bond: "Each time the target takes damage, you take the same amount of damage." Its Resistance has already
+  // halved what the target takes; the caster's share is that amount, untyped.
+  const bondCaster = totalAdjusted > 0 && input.bondShare !== true ? bondCasterOf(state, actor.id) : null;
+  if (bondCaster !== null) {
+    const shared = applyDamageDetailed(
+      state,
+      bondCaster,
+      { amount: totalAdjusted, sourceName: "Warding Bond", bondShare: true },
+      { role: "gm" },
+      deps
+    );
+    const casterName = state.actors.find((candidate) => candidate.id === bondCaster)?.name ?? "The caster";
+    events.push(
+      {
+        kind: "damage",
+        text: `${casterName} takes ${shared.application.totalApplied} damage through Warding Bond.`,
+        actorId: bondCaster
+      },
+      ...shared.events
+    );
   }
 
   // Damage from a creature can open the target's strike-back reaction (Hellish Rebuke). Skipped without an id-minter.

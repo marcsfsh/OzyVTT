@@ -1,3 +1,4 @@
+import { reactionSpent } from "./commanded-reactions.js";
 import { formEffectOf } from "./transform/forms.js";
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
@@ -980,7 +981,7 @@ function openOpportunityAttacks(
     if (
       !enemy ||
       !areEnemies(mover, enemy, input.resolveDefinition) ||
-      state.combat.reactionsUsed.includes(enemy.id) ||
+      reactionSpent(state, enemy.id) ||
       isIncapacitated(enemy) ||
       // Shocking Grasp, or anything that takes away Reactions.
       enemy.effects.some(

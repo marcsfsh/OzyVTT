@@ -81,7 +81,20 @@ const SpellAttackRangeSchema = z
  *  ability modifier (Spiritual Weapon's 1d8 + it). */
 const SpellDamageSchema = z
   .array(
-    z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema, addsModifier: z.boolean().optional() }).strict()
+    z
+      .object({
+        formula: DamageFormulaSchema,
+        type: DamageTypeSchema,
+        addsModifier: z.boolean().optional(),
+        /** The dice it gains for each slot level above the spell's, where its own scaling clause names this part
+         *  (Arcane Hand's Clenched Fist: 2d8; Glyph of Warding's explosive rune: 1d8). Without it, a part scales only
+         *  when it is the spell's own roll. */
+        perSlot: z
+          .string()
+          .regex(/^\d{1,2}d(?:4|6|8|10|12)$/)
+          .optional()
+      })
+      .strict()
   )
   .max(4);
 
@@ -156,6 +169,31 @@ export const SpellLaterActionSchema = z
     /** It is taken only on the caster's turns after the one it cast the spell on ("As a Bonus Action on your later
      *  turns": Spiritual Weapon, Heat Metal). */
     laterTurnsOnly: z.literal(true).optional(),
+    /** The cast itself takes one of the rows that say this, at no further cost, on the turn it is cast ("When you cast
+     *  the spell and as a Bonus Action on your later turns": Arcane Hand). */
+    withCast: z.literal(true).optional(),
+    /** It takes only a creature that bears an effect of this caster's spell (Arcane Hand's crush: the creature the
+     *  hand grapples; Phantasmal Force's harm: the creature that perceives the phantasm). */
+    bearerOnly: z.literal(true).optional(),
+    /** Its failure's push goes this many feet farther for each point of the caster's spellcasting ability modifier
+     *  (Arcane Hand's Forceful Hand: 5 feet plus five times the modifier). */
+    pushPerModifier: z.number().int().min(5).max(10).optional(),
+    /** The hand stands between the caster and harm: Half Cover from its space, which is Difficult Terrain for the
+     *  caster's enemies, until another of its effects (Arcane Hand's Interposing Hand). */
+    interposes: z.literal(true).optional(),
+    /** How often it can be taken (Phantasmal Force's harm: once a turn; Geas's 5d10: once a day of game time). */
+    uses: ActionSchema.shape.uses,
+    /** It is taken only on the caster's own turn ("On each of your turns": Phantasmal Force). */
+    ownTurnOnly: z.literal(true).optional(),
+    /** Only the GM takes it, judging when the text's trigger has happened (Geas: "if it acts in a manner directly
+     *  counter to your command"). */
+    gmOnly: z.literal(true).optional(),
+    /** What its save's failure leaves on the creature (Detect Thoughts' probe: the mind it can push out). */
+    failureEffect: SaveFailureEffectSchema.optional(),
+    /** It raises (more than 0) or lowers the creature this caster's levitation holds by this many feet, never below
+     *  the ground (Levitate: "You can change the target's altitude by up to 20 feet in either direction on your
+     *  turn"). The caster's own levitation moves as part of its move, with no action. */
+    liftFeet: z.number().int().min(-60).max(60).optional(),
     /** What its damage drains as it lands (Vampiric Touch's later touches). */
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
@@ -264,7 +302,18 @@ export const SpellEffectSchema = z
     /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
     damage: SpellDamageSchema,
     /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */
-    damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    damageTypes: z.array(DamageTypeSchema).min(2).max(13).optional(),
+    /** Each of its damage dice that rolls its highest face adds another such die, up to the caster's spellcasting
+     *  ability modifier in dice for the cast (Sorcerous Burst: "If you roll an 8 on a d8 for this spell, you can roll
+     *  another d8"). */
+    explodingDice: z.literal(true).optional(),
+    /** The caster picks how familiar the destination is and the d100 is rolled on the Teleportation Outcome table
+     *  (Teleport). */
+    teleportOutcome: z.literal(true).optional(),
+    /** The cast names an item its caster carries and learns its properties (Identify). */
+    identifiesItem: z.literal(true).optional(),
+    /** The cast picks one of Wish's uses, and every use but duplicating a spell stresses its caster (`wish.ts`). */
+    wishUses: z.literal(true).optional(),
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),
@@ -763,6 +812,17 @@ export const ItemSpellCastSchema = z
       .optional()
       .describe(
         "It can be cast only while its user has an effect with this tag (a Dragon Orb's spells, for the one who controls it)"
+      ),
+    /** What it leaves lasts this many minutes, whatever the spell's own duration (Oil of Slipperiness' Grease: 8
+     *  hours). */
+    lastsMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(14400)
+      .optional()
+      .describe(
+        "What it leaves lasts this many minutes, whatever the spell's own duration (Oil of Slipperiness' Grease)"
       )
   })
   .strict()

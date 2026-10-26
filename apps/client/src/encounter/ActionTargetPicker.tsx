@@ -410,8 +410,8 @@ export function ActionTargetPicker({
 
 /**
  * What the action asks for as it resolves: one option (Fire Shield's warm or chill), one for each selected target
- * (Eyebite's effect on each), and the carried weapon a grant binds to (Magic Weapon). Each starts on the first, as the
- * server reads none.
+ * (Eyebite's effect on each), the carried weapon a grant binds to (Magic Weapon), and any carried item (Identify).
+ * Each starts on the first, as the server reads none; the item starts on none.
  */
 function ChoicePicks({
   picking,
@@ -482,6 +482,21 @@ function ChoicePicks({
                 : "No weapon it can be used on is carried."}
             </span>
           )}
+        </label>
+      )}
+      {choices.pickItem && (
+        <label className="action-damage-type">
+          <span>Item</span>
+          <Select value={picking.itemId ?? ""} onChange={(event) => setBoundItem(event.target.value || undefined)}>
+            <option value="">None</option>
+            {carried
+              .filter((row) => row.quantity > 0)
+              .map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+          </Select>
         </label>
       )}
       {choices.object && objects.length > 0 && (

@@ -1274,7 +1274,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `ring-of-spell-storing` - needs per-copy storage and the original caster's numbers.
+  // "Any creature can cast a spell of level 1 through 5 into the ring by touching the ring as the spell is cast": held
+  // out, the next spell cast at its wearer or by it within a minute is stored on the copy (`stored-casts.ts`), and the
+  // attuned wearer casts each at its caster's numbers.
+  "ring-of-spell-storing": {
+    actions: [
+      {
+        id: "hold-out",
+        name: "Hold Out to a Spell",
+        activation: "other",
+        description:
+          "Touch the ring to a spell as it is cast: the next spell of level 1 through 5 cast at you or by you within a minute is stored in the ring if there is room, and lost if there isn't.",
+        damage: [],
+        grants: {
+          name: "Ring of Spell Storing held out",
+          tags: ["ring-held-out"],
+          duration: { type: "rounds", rounds: 10 },
+          storeAwaits: { via: "ring", maxLevel: 5 }
+        }
+      }
+    ]
+  },
   // "You have Advantage on saving throws against spells", and a success against a spell of level 7 or lower leaves it
   // no effect on the wearer. Turning a spell back on its caster is the GM's.
   "ring-of-spell-turning": {
@@ -4723,9 +4743,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Applied over 10 minutes, Freedom of Movement's effect for 8 hours: a Swim Speed equal to its Speed, and no
-  // Paralyzed or Restrained. Pouring it as a Grease for 8 hours is the GM's, since a cast lasts the spell's minute.
+  // Paralyzed or Restrained. Poured on the ground as a Magic action, the Grease spell's 10-foot square for 8 hours.
   "oil-of-slipperiness": {
     consumedOnUse: true,
+    casts: [{ spellId: "grease", lastsMinutes: 480 }],
     actions: [
       {
         id: "apply",

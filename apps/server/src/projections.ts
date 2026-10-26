@@ -227,6 +227,9 @@ const PENDING_SAVE_FIELDS = {
   onSuccessEffect: "never",
   failureNote: "never",
   breaksConcentration: "never",
+  // What a success ends, and what a failure drops, are narrated when they land.
+  successEndsSpell: "never",
+  dropsRowId: "never",
   zoneId: "never",
   touchedZone: "never",
   // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
@@ -619,6 +622,9 @@ function playerEffect(
     optionId: _optionId,
     bonusActions: _bonusActions,
     grantedSpellAction: _grantedSpellAction,
+    // A held spell's numbers and its caster are the GM's; the owner's sheet reads the action that releases it.
+    storedCast: _storedCast,
+    storeAwaits: _storeAwaits,
     endAction: _endAction,
     usedOnTurn: _usedOnTurn,
     // The pool it was paid from is its source's sheet, an exact quantity.
@@ -847,12 +853,15 @@ const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filte
  *  the item's properties are learned (and the resistance starts to apply); so does which kind an item that needs
  *  attunement is (an Ioun Stone's). */
 function playerInventoryRow(item: Actor["inventory"][number]): Actor["inventory"][number] {
-  const { chosenDamageType, variantId, ...row } = item;
-  const learned = item.attuned || item.magic?.attunementRequired !== true;
+  const { chosenDamageType, variantId, storedCasts, ...row } = item;
+  // Identify tells its caster what attuning would: the copy's kind and the type the GM picked.
+  const learned = item.attuned || item.identified === true || item.magic?.attunementRequired !== true;
   return {
     ...row,
-    ...(chosenDamageType !== undefined && item.attuned ? { chosenDamageType } : {}),
-    ...(variantId !== undefined && learned ? { variantId } : {})
+    ...(chosenDamageType !== undefined && (item.attuned || item.identified === true) ? { chosenDamageType } : {}),
+    ...(variantId !== undefined && learned ? { variantId } : {}),
+    // The spells a Ring of Spell Storing holds are known to the creature attuned to it, which casts them.
+    ...(storedCasts !== undefined && item.attuned ? { storedCasts } : {})
   };
 }
 

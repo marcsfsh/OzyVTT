@@ -1,3 +1,5 @@
+import { endCrossedBonds, WARDING_BOND_TAG } from "../warding-bond.js";
+import { openStoreWindow } from "../stored-casts.js";
 import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, type GameState } from "@vtt/domain";
 import { abilityModifier, rollDice } from "@vtt/rules-5e";
 import type { DamageType, EffectInstance, Modifier } from "@vtt/schemas";
@@ -270,7 +272,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       tags: [...new Set([...(rage ? rage.tags : grant.tags), ...parts.tags])].slice(0, 8),
       sourceActorId: attacker.id,
       sourceName: attacker.name,
-      sourceActionId: action.id,
+      // A cast that also shape-shifts its targets (Wind Walk) or keeps its spell up on its caster (Glyph of Warding)
+      // keeps its grant beside the form or the spell's own effect.
+      sourceActionId: action.shapeShift || grant.storeAwaits ? `${action.id}:grant` : action.id,
       startedRound: rage?.startedRound ?? state.combat.round,
       duration: rage?.duration
         ? rage.duration
@@ -323,7 +327,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...(grant.light ? { light: { ...grant.light } } : {}),
       // The creatures it lets its bearer sense (Divine Sense), drawn for its player alone (`vision/detect.ts`).
       ...(grant.detects ? { detects: { ...grant.detects, creatureTypes: [...grant.detects.creatureTypes] } } : {}),
-      ...(steadyAim ? { speedZero: true } : {}),
+      ...(steadyAim || grant.speedZero ? { speedZero: true } : {}),
       ...grantedMovement,
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
       ...(conditionImmunities.length > 0 ? { conditionImmunities: conditionImmunities.slice(0, 6) } : {}),
@@ -344,6 +348,10 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     deps
   );
   if (effect.sizeChange) refreshSize(state, recipient);
+  // Contingency, a spell glyph or a Ring of Spell Storing held out waits for the spell it will hold.
+  if (grant.storeAwaits) openStoreWindow(ctx, recipient, effect, grant.storeAwaits, castLevel);
+  if (effect.tags.includes(WARDING_BOND_TAG))
+    warnings.push(...endCrossedBonds(state, recipient.id, effect.id).map((event) => event.text));
   warnings.push(...replaced.map((event) => event.text));
   // A new way to work out AC counts at once.
   if (baseArmorClass !== undefined && recipientDefinition)

@@ -1,3 +1,5 @@
+import { WISH_LOST_TAG } from "./wish.js";
+import { reactionSpent, spendReaction } from "../commanded-reactions.js";
 import { formViolations } from "../transform/rules.js";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
@@ -12,6 +14,7 @@ import { areAllies } from "../creature-sides.js";
 import {
   CANT_ATTACK_TAG,
   DASH_ONLY_TAG,
+  DODGE_ONLY_TAG,
   HASTED_TAG,
   concentrationOn,
   hasEffectTag,
@@ -89,6 +92,7 @@ export type EconomyPlan = Readonly<{
     parentId?: string;
     replacements?: Record<string, number>;
     shaping?: readonly CastShaping[];
+    leap?: Readonly<{ fromId: string; struck: readonly string[]; left: number; damageType?: string }>;
   }> | null;
   /** The same for a compound Bonus Action (Flurry of Blows), or a spell's rays cast as one (Quickened Spell). */
   bonusInstance: Readonly<{
@@ -418,6 +422,14 @@ function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, sp
  *  turn after the one its caster cast it on. */
 function checkLaterTurn({ state, attacker, action, violations }: Evaluation, spell: SpellReference): void {
   const row = laterRowOf(spell, action.id);
+  // "On each of your turns" (Phantasmal Force): only on its caster's own turn in a fight.
+  if (row?.ownTurnOnly && state.combat.active && state.combat.turnActorId !== attacker.id) {
+    violations.push({
+      rule: "spell.later-turn",
+      message: `${action.name} comes only on ${attacker.name}'s own turn.`
+    });
+    return;
+  }
   if (!row?.laterTurnsOnly || state.combat.turnActorId !== attacker.id) return;
   if ((state.combat.turn.turnUses[castThisTurnKey(attacker.id, spell.id)] ?? 0) === 0) return;
   violations.push({
@@ -548,7 +560,9 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
   "orc-relentless-endurance",
   "relentless-endurance",
   "dark-ones-own-luck",
-  "boon-of-fate"
+  "boon-of-fate",
+  // Dream's messenger delivers its terrifying message from the trance that leaves it Incapacitated.
+  "spell-dream-then-terrifying-message"
 ]);
 
 /** What a creature limited to Dash may still do (Wind Walk): the Dash action, as an action or a Bonus Action, and the
@@ -626,6 +640,14 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
       rule: "condition.dash-only",
       message: `${attacker.name} can take only the Dash action or end ${shownEffectName(state, dashOnly, resolveDefinition)} while it lasts.`
     });
+  // SRD Bestow Curse: a failed Wisdom save at the start of its turn means it is "forced to take the Dodge action on
+  // that turn".
+  const dodgeOnly = attacker.effects.find((effect) => effect.tags.includes(DODGE_ONLY_TAG));
+  if (dodgeOnly && action.activation === "action" && builtinBaseId(action.id) !== "dodge")
+    violations.push({
+      rule: "condition.dash-only",
+      message: `${attacker.name} must take the Dodge action this turn while ${shownEffectName(state, dodgeOnly, resolveDefinition)} lasts.`
+    });
   // SRD Mounted Combat: a controlled mount "has only three action options during that turn: Dash, Disengage, and Dodge".
   const rider = controllingRiderOf(state, attacker.id);
   if (
@@ -650,6 +672,13 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
     violations.push({
       rule: "condition.no-spells",
       message: `${attacker.name} can't cast spells until ${shownEffectName(state, taxed, resolveDefinition)} ends with a Long Rest.`
+    });
+  // Wish's stress: "there is a 33 percent chance that you are unable to cast Wish ever again".
+  const wishLost = attacker.effects.find((effect) => effect.tags.includes(WISH_LOST_TAG));
+  if (wishLost && action.spellId === "wish")
+    violations.push({
+      rule: "condition.no-spells",
+      message: `${attacker.name} can never cast Wish again.`
     });
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
@@ -1170,6 +1199,12 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
           ? `${attacker.name} has no reaction left to take the readied action with.`
           : `${attacker.name} has already used a reaction this round.`
       });
+    // Dominate Person: "You can command the target to take a Reaction but must take your own Reaction to do so."
+    else if (reactionSpent(state, attacker.id))
+      violations.push({
+        rule: "economy.reaction-used",
+        message: `${attacker.name}'s Reaction takes its commander's, which is spent this round.`
+      });
     return { ...unchanged, markReaction: true };
   }
   return unchanged;
@@ -1298,6 +1333,8 @@ function checkActionSlot(evaluation: Evaluation): SlotPlan {
       components: open.components,
       ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {}),
       ...(active.shaping !== undefined ? { shaping: active.shaping } : {}),
+      // A leaping Chromatic Orb keeps who it struck (`orb-leap.ts`).
+      ...(active.leap !== undefined ? { leap: active.leap } : {}),
       ...(active.parentId !== undefined ? planRecord(active.parentId, open.replacements) : {})
     }
   });
@@ -1759,6 +1796,9 @@ export function commitEconomy({
         ...(plan.instance.shaping !== undefined
           ? { shaping: plan.instance.shaping.map((entry) => ({ ...entry })) }
           : {}),
+        ...(plan.instance.leap !== undefined
+          ? { leap: { ...plan.instance.leap, struck: [...plan.instance.leap.struck] } }
+          : {}),
         ...(plan.instance.parentId !== undefined
           ? planRecord(plan.instance.parentId, plan.instance.replacements ?? {})
           : {})
@@ -1790,12 +1830,8 @@ export function commitEconomy({
       : null;
     state.combat = { ...state.combat, turn: { ...state.combat.turn, bonusActionInstance: bonusInstance } };
   }
-  if (plan.markReaction) {
-    state.combat = {
-      ...state.combat,
-      reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id]
-    };
-  }
+  // A dominated creature's Reaction takes its commander's too.
+  if (plan.markReaction) spendReaction(state, attacker.id);
   // Actions beyond the one (Action Surge, Haste) and the Magic actions taken, for the turn's own creature.
   if ((plan.extraAction !== null || plan.magicAction || plan.surge) && state.combat.turnActorId === attacker.id) {
     const before = state.combat.turn.extraActions;

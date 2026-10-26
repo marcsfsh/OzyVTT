@@ -1,3 +1,4 @@
+import { dropHeldRow } from "./effects.js";
 import { ownSizeOf, takeForm } from "./transform/assume.js";
 import { revertOnFailure } from "./transform/rules.js";
 import { refreshSize } from "./transform/forms.js";
@@ -87,6 +88,8 @@ import {
   type RollModeClaims
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
+import { followPushed, forceOf } from "./summon-strikes.js";
+import { endCasterSpell } from "./spell-endings.js";
 import { armedRepeat, durationUntilRepeat, settleEndingSave } from "./save-stages.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { suppressConditions } from "./suppressed-conditions.js";
@@ -635,6 +638,7 @@ export const DROPS_HELD_TAG = "drops-held";
  * the token.
  */
 function pushOnFailure(
+  state: GameState,
   target: GameState["actors"][number],
   pending: PendingSave,
   deps: SaveAnswerDependencies
@@ -643,7 +647,16 @@ function pushOnFailure(
   const sourceId = pending.sourceActorId;
   if (sourceId === null || sourceId === target.id) return [];
   if (push.maxTargetSize && !sizeAtMost(target.size, push.maxTargetSize)) return [];
-  const moved = deps.pushToken?.({ actorId: target.id, awayFromActorId: sourceId, distanceFeet: push.feet }) ?? null;
+  // A spell's force pushes from where it stands and goes along (Arcane Hand's Forceful Hand).
+  const before = state.combat.tokens.find((token) => token.actorId === target.id)?.position ?? null;
+  const standing = pending.spell ? forceOf(state, sourceId, pending.spell.id) : undefined;
+  const forceAt = standing && state.combat.tokens.find((token) => token.actorId === standing.id)?.position;
+  // A force that moved into the creature's own space pushes it straight away from the caster.
+  const force = forceAt && before && (forceAt.x !== before.x || forceAt.y !== before.y) ? standing : undefined;
+  const moved =
+    deps.pushToken?.({ actorId: target.id, awayFromActorId: force?.id ?? sourceId, distanceFeet: push.feet }) ?? null;
+  const after = state.combat.tokens.find((token) => token.actorId === target.id)?.position ?? null;
+  if (standing && before && after && moved !== null) followPushed(state, standing.id, before, after);
   if (moved === null)
     return [
       {
@@ -1327,7 +1340,7 @@ export function answerSave(
       actorId: target.id,
       ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
     });
-  if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
+  if (!success && pending.failurePush) events.push(...pushOnFailure(state, target, pending, deps));
   // SRD Mounted Combat: a rider that fails to stay on falls off, Prone beside its mount.
   if (!success && pending.unseats) events.push(...unseat(state, target.id, pending.unseats, deps.placeBeside));
   // Delayed Blast Fireball's bead: fumbled, it goes off where it is; caught, it goes off where it is thrown.
@@ -1338,6 +1351,11 @@ export function answerSave(
   if (!success && pending.regurgitates) events.push(...regurgitate(state, target.id, pending.regurgitates.withinFeet));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
+  // Heat Metal: "the target must succeed on a Constitution saving throw or drop the object if it can".
+  if (!success && pending.dropsRowId) events.push(...dropHeldRow(target, pending.dropsRowId, immunities));
+  // "On a successful save, the spell ends" (Detect Thoughts' probe).
+  if (success && pending.successEndsSpell && pending.sourceActorId && pending.spell)
+    events.push(...endCasterSpell(state, pending.sourceActorId, pending.spell.id));
   // SRD Moonbeam: a shape-shifted creature that fails "reverts to its true form and can't shape-shift until it leaves".
   if (!success && pending.endsForm) {
     const zone = state.combat.spellZones.find((entry) => entry.id === pending.zoneId);

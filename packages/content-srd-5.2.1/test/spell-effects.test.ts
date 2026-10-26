@@ -57,6 +57,8 @@ describe("what one cast of an SRD spell does", () => {
       "animal-shapes",
       "arcane-sword",
       "conjure-fey",
+      // "As a Magic action on your next turn, you can try to probe deeper into the target's mind."
+      "detect-thoughts",
       // "On your later turns, you can take a Magic action to move the hound up to 30 feet."
       "faithful-hound",
       "gust-of-wind",

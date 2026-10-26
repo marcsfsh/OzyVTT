@@ -483,6 +483,14 @@ function act(
       actorId: creature.id,
       source: { actorId: caster.id, name: caster.name }
     });
+    // A spell glyph releases its spell on the creature that set it off (`stored-cast-release.ts`).
+    if (zone.storedCast)
+      state.combat = {
+        ...state.combat,
+        spellZones: state.combat.spellZones.map((entry) =>
+          entry.id === zone.id ? { ...entry, setOffBy: creature.id } : entry
+        )
+      };
     events.push(...endZoneAndItsSpell(state, zone.id));
     return;
   }

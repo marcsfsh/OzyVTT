@@ -642,7 +642,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Soul Bag": reference("The bag and its statistics are the GM's to run."),
   "Speak with Beasts and Plants": senses,
-  "Spell Storing": reference("Storing and casting the spell is the GM's to run."),
+  "Spell Storing": enforced(
+    "stored-casts.ts stores a spell of the printed level or lower that the creature commanding it casts on it from within 5 feet, losing any spell stored before; the spell has no other effect. The guardian's sheet then casts it once at the caster's spell save DC, attack bonus and modifier, with no components."
+  ),
   "Spider Climb": enforced(
     "speed.ts moves it at its Climb Speed with no extra cost and no check, and a climb may change its height on the map (altitude.ts). Which surfaces it climbs is the GM's, as walls have no height."
   ),
@@ -726,8 +728,38 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:arcane-eye": enforced(
     "An Invisible, invulnerable eye appears within 30 feet (summons.ts) with Darkvision 30 feet, and the caster's player sees what it sees (vision/audience.ts). A Bonus Action moves it up to 30 feet (summon-orders.ts). Gaps an inch wide are the GM's."
   ),
-  "spell:arcane-hand": guided(
-    "The hand appears within 120 feet with AC 20 and the caster's Hit Point maximum, and the spell ends when it drops to 0 (summons.ts). Clenched Fist's attack and Grasping Hand's Dexterity save reach a creature within 5 feet of the hand, which moves up to 60 feet first (summon-strikes.ts), and the crush deals its damage. Forceful Hand's push, Interposing Hand's cover, the grapple's escape DC and the size limits are the GM's."
+  "spell:geas": enforced(
+    "A failed Wisdom save leaves the target Charmed for the spell's duration at its slot (resolution/pending.ts). When it acts directly counter to the command, the GM deals it the 5d10 Psychic damage, which a player can't take, at most once a day of game time (lasting-spells.ts, use-pools.ts). Remove Curse ends it, and Greater Restoration ends it as that spell's own row says. Whether the creature defies or understands the command is the GM's."
+  ),
+  "spell:detect-thoughts": guided(
+    "The cast holds Concentration and opens no save. On a later turn a Magic action probes the target's mind: it makes the Wisdom save, and a success ends the spell; on a failure it may take an action for an Intelligence (Arcana) check against the spell save DC, which ends the spell (lasting-spells.ts, ending-actions.ts, spell-endings.ts). Sensing the thinking creatures within 30 feet is the GM's until detection reads more than creature types, and what the caster reads in a mind is the GM's."
+  ),
+  "spell:ensnaring-strike": enforced(
+    "The hit's target makes the Strength save, with Advantage if Large or larger, or is Restrained while the caster concentrates, taking 1d6 Piercing, 1d6 more a slot level, at the start of each of its turns (resolution/pending.ts, turn-boundaries.ts). It, or a creature within reach of it with End an Effect, breaks free with a Strength (Athletics) check against the spell save DC (ending-actions.ts)."
+  ),
+  "spell:contingency": enforced(
+    "The cast takes 10 minutes and needs the 1,500 GP statuette (resolution/components.ts). The next spell of level 5 or lower with a casting time of an action that can target its caster, cast within the minute, is held for the 10 days at its slot and its caster's numbers, both slots spent (stored-casts.ts); casting Contingency again replaces it. When the trigger happens its sheet releases it on the caster alone with no action, which ends Contingency, and the release is refused once the statuette isn't carried. Judging whether the described trigger has happened is the caster's player's or the GM's."
+  ),
+  "item:ring-of-spell-storing": enforced(
+    "Held out (no action), the ring takes the next spell of level 1 through 5 cast at its wearer or by it within a minute, at its caster's slot level, spell save DC, attack bonus and modifier, if the levels it holds stay at 5 or fewer; a spell that doesn't fit is lost. The attuned wearer casts each held spell from its sheet at those numbers, freeing its space (stored-casts.ts). The GM sets what a found ring holds on its row; a player sees the held spells once attuned (projections.ts)."
+  ),
+  "spell:dream": guided(
+    "The caster, as the messenger, is Incapacitated with Speed 0 in its trance for the 8 hours, and ending that effect ends the spell (resolution/grant.ts). A terrifying messenger's message has the target make the Wisdom save, in a fight or out of one; a failure denies it the benefit of its next Long Rest and deals 3d6 Psychic damage as it wakes (lasting-spells.ts, rest-triggers.ts). A willing creature touched as the messenger in the caster's place, the dream itself and the conversation are the table's, and the target is often off the map."
+  ),
+  "spell:heat-metal": enforced(
+    "The cast and each later Bonus Action deal 2d8 Fire, 1d8 more a slot level above 2, to the creature holding or wearing the heated object, which then makes the Constitution save to keep hold (resolution/pending.ts). The object is the metal weapon it holds, else the metal armor it wears: a failure drops a held weapon, still carried (effects.ts), and one that can't drop its armor has Disadvantage on attack rolls and ability checks until the start of the caster's next turn, as a creature that keeps hold does. An unattended metal object, and who else touches it, are the GM's."
+  ),
+  "spell:teleport": guided(
+    "The caster picks how familiar the destination is as it casts, and the server rolls the d100 on the Teleportation Outcome table (resolution/teleport-outcome.ts): a Mishap deals 3d10 Force damage to the caster and each creature it takes and rolls again, Off Target rolls the 2d12 miles and the d8 direction, and Similar Area and On Target are told to the table. Where the destination is, the travellers leaving the map and the scene they arrive in are the GM's."
+  ),
+  "spell:identify": guided(
+    "The cast or its Ritual takes a minute and needs a 100 GP pearl (resolution/components.ts). Cast on an item its caster carries, it marks the copy identified (resolution/identify.ts), so its player's sheet shows the kind and the type the GM set without attuning (projections.ts), and no sheet write can set or clear the mark (inventory.ts). A creature's ongoing spells, and objects off the sheet, are the GM's to tell."
+  ),
+  "spell:wish": guided(
+    "The cast picks its use (resolution/wish.ts). Instant Health restores the caster and the creatures it picks to all their Hit Points; Resistance gives up to ten creatures it picks lasting Resistance to the type chosen; Spell Immunity marks up to ten for 8 hours. Any use but duplicating a spell stresses the caster: each spell it casts until a Long Rest deals it 1d10 per spell level that nothing reduces, the 2d4 days of Strength 3 are marked, and the server rolls the 33 percent chance, after which a Wish cast is refused (resolution/economy.ts). Which spell a Wish duplicates and its cast, the conditions Instant Health ends, the spell Spell Immunity names, the Strength score itself, Sudden Learning's feat, Roll Redo, Object Creation and Reshape Reality are the GM's."
+  ),
+  "spell:arcane-hand": enforced(
+    "The hand appears within 120 feet with AC 20 and the caster's Hit Point maximum, and the spell ends when it drops to 0 (summons.ts). The cast and each later Bonus Action move it up to 60 feet and cause one effect, the cast's at no further cost (lasting-spells.ts): Clenched Fist's attack (5d8 Force, 2d8 more a slot level above 5) and the saves reach from the hand (summon-strikes.ts); Forceful Hand pushes a Huge or smaller creature that fails its Strength save 5 feet plus five times the spellcasting modifier, the hand following (saving-throws.ts); Grasping Hand grapples a Huge or smaller creature that fails its Dexterity save, escaped against the spell save DC, and only that creature can be crushed (4d6 plus the modifier, 2d6 more a slot level above 5); Interposing Hand gives the caster Half Cover from or through its space, which is Difficult Terrain for the caster's enemies (cover.ts, zone-ground.ts)."
   ),
   "spell:arcane-sword": enforced(
     "The sword appears within 90 feet (summons.ts) and the cast's attack reaches a creature within 5 feet of it; each later Bonus Action moves it up to 30 feet first and strikes from there (summon-strikes.ts)."
@@ -829,8 +861,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:jump": enforced(
     "Each target can leap up to 30 feet for 10 feet of movement once on each of its turns for 1 minute (jumping.ts)."
   ),
-  "spell:levitate": guided(
-    "A creature on the caster's side rises 20 feet with no save, and any other creature only on a failed Constitution save (falling.ts); while levitating it moves only as if climbing (altitude.ts), and it floats gently down when the spell ends. Raising or lowering it on the caster's turn, and an object, are the GM's, who sets its height."
+  "spell:levitate": enforced(
+    "A creature on the caster's side rises 20 feet with no save, and any other creature only on a failed Constitution save (falling.ts); while levitating it moves only as if climbing (altitude.ts), and it floats gently down when the spell ends. On the caster's turn a Magic action raises or lowers it 20 feet, kept within 60 feet of the caster, and a caster levitating itself rises or sinks as part of its move with no action (resolution/later-steps.ts). A smaller change of height is set with the GM's height control, and a levitated object has no token, so it is the GM's."
   ),
   "spell:banishment": guided(
     "A failed save Incapacitates the target and takes it off the map while the caster concentrates (off-plane.ts); it can't be targeted, and it returns to the space it left or the nearest unoccupied one. An extraplanar creature that stays gone after the full minute is the GM's."
@@ -986,8 +1018,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:thaumaturgy": enforced(
     "The cast keeps the wonder picked for a minute (resolution/grant-extras.ts), and Booming Voice gives Advantage on Intimidation checks (ability-checks.ts). Aimed at a door on the map within 30 feet, Invisible Hand flings an unlocked door open or slams it shut (resolution/cast-walls.ts). What the other wonders look and sound like is the GM's."
   ),
-  "spell:true-strike": castOnly(
-    "The weapon attack with the spellcasting ability, and its Radiant damage, are the GM's."
+  "spell:true-strike": enforced(
+    "The cast binds a carried weapon the caster is proficient with and leaves its Magic action open for one attack with that weapon, which uses the spellcasting ability for the attack and damage rolls, deals Radiant or the weapon's own type as the caster picks, and adds 1d6 Radiant at level 5, 2d6 at 11 and 3d6 at 17; the binding ends with that attack (resolution/grant-extras.ts, resolution/true-strike.ts)."
   ),
   "spell:spare-the-dying": enforced(
     "The cast makes a creature at 0 Hit Points Stable with no check (resolution/stabilize.ts), within 15 feet, 30 at level 5, 60 at level 11 and 120 at level 17 (resolution/spell-targets.ts)."
@@ -1699,22 +1731,22 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save deals the Psychic damage and bars the target from casting spells and the Magic action (resolution/economy.ts). The save every 30 days, and Greater Restoration, Heal or Wish ending it, are the GM's."
   ),
   "spell:bestow-curse": enforced(
-    "A failed save leaves the curse the caster picks for the slot's duration (resolution/pending.ts, resolution/concentration.ts): Disadvantage on one ability's checks and saves, Disadvantage on its attack rolls against the caster (resolution/attack.ts), or an extra 1d8 Necrotic when the caster's attack hits it (resolution/damage.ts). Remove Curse or Dispel Magic ends it. The forced Dodge's save at the start of each turn is the GM's to ask."
+    "A failed save leaves the curse the caster picks for the slot's duration (resolution/pending.ts, resolution/concentration.ts): Disadvantage on one ability's checks and saves, Disadvantage on its attack rolls against the caster (resolution/attack.ts), a Wisdom save at the start of each of its turns in a fight whose failure leaves it only the Dodge action that turn (save-stages.ts, resolution/economy.ts), or an extra 1d8 Necrotic when the caster's attack hits it (resolution/damage.ts). Remove Curse or Dispel Magic ends it."
   ),
   "spell:blur": enforced(
     "Attack rolls against the caster have Disadvantage while it lasts, except from an attacker whose Blindsight or Truesight reaches it (resolution/attack.ts)."
   ),
-  "spell:chromatic-orb": guided(
-    "The attack and the chosen damage type are applied, and when two of the d8s match the server says the orb leaps (resolution/orb-leap.ts). Aiming each leap is the caster's to make as another attack."
+  "spell:chromatic-orb": enforced(
+    "The attack and the chosen damage type are applied, 1d8 more a slot level above 1, and it needs a 50 GP diamond (resolution/components.ts). When two of a hit's d8s match, the cast's action stays open for one more orb: cast again at no cost, it attacks a creature within 30 feet of the last target that this casting hasn't struck, with the same damage type and a new damage roll, up to the slot's level in leaps, one for a level 1 slot (resolution/orb-leap.ts)."
   ),
   "spell:confusion": guided(
     "A failed save bars the target's Bonus Actions and Reactions, with the save repeated at the end of each of its turns (save-stages.ts), and random-outcomes.ts rolls its d10 at the start of each of its turns and takes for that turn what the roll forbids. The Sphere grows by 5 feet for each slot level above 4 (spell-zone-state.ts). The wandering move and the random attack are said to the table."
   ),
-  "spell:phantasmal-force": guided(
-    "A failed save leaves the illusion on the target for the spell's duration, and End an Effect lets it study the illusion with an Intelligence (Investigation) check to end it (ending-actions.ts). The illusion, and the 2d8 Psychic damage it deals on the caster's turns, are the GM's."
+  "spell:phantasmal-force": enforced(
+    "A failed Intelligence save leaves the illusion on the target for the spell's duration, and a creature with Truesight succeeds. On each of the caster's turns its sheet offers the phantasm's 2d8 Psychic damage against that creature once, and against no other (lasting-spells.ts, resolution/economy.ts). The target's Study, an Intelligence (Investigation) check against the spell save DC, ends it (ending-actions.ts). What the phantasm is, and whether the target stands in it or within 5 feet of it, are the GM's."
   ),
-  "spell:prismatic-spray": guided(
-    "resolution/prismatic.ts rolls the d8 for each creature in the Cone, two rays on an 8, and the 12d6 once. Red to Blue ask the Dexterity save against their damage, half on a success. Indigo Restrains on a failure, with the Constitution saves counted until three successes end it or three failures Petrify it (save-stages.ts). Violet Blinds on a failure until the start of the caster's next turn; its Wisdom save then, and the trip to another plane, are the GM's."
+  "spell:prismatic-spray": enforced(
+    "resolution/prismatic.ts rolls the d8 for each creature in the Cone, two rays on an 8, and the 12d6 once. Red to Blue ask the Dexterity save against their damage, half on a success. Indigo Restrains on a failure, with the Constitution saves counted until three successes end it or three failures Petrify it (save-stages.ts). Violet Blinds on a failure, and at the start of the caster's next turn the creature makes the Wisdom save: a success ends the Blinded condition, a failure ends it and takes the creature off the map to another plane (save-stages.ts, off-plane.ts). Which plane, and bringing it back, are the GM's."
   ),
   "spell:goodberry": enforced(
     "resolution/provisions.ts puts ten berries in the caster's inventory, gone when the spell's 24 hours end (effects.ts). Eating one (actor.nourish) restores 1 Hit Point, takes the eater's Bonus Action on its turn in a fight, and counts as a day's food while the GM tracks food and water (survival.ts)."
@@ -1765,8 +1797,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:true-resurrection": enforced(
     "resolution/revival.ts refuses a target dead more than 200 years, and brings back one whose body is gone (Disintegrate) in a new body. It returns with all its Hit Points, its poison, curses and Contagion ended. Where a new body appears, and the stat block of an Undead returned to life, are the GM's."
   ),
-  "spell:reincarnate": guided(
-    "resolution/revival.ts refuses a target dead more than 10 days and returns it with all its Hit Points in a new body, rolling the d10 for its species (a 1 rolls again) and noting it on the creature. Rebuilding the sheet with the new species, and the soul's consent, are the GM's."
+  "spell:reincarnate": enforced(
+    "resolution/revival.ts refuses a target dead more than 10 days and returns it with all its Hit Points in a new body, rolling the d10 for its species (a 1 rolls again). A character built here is then rebuilt from its ledger as that species (reincarnation.ts): the old species' traits and picks go, its classes, background and scores stay, and the new species' picks take their first legal options, which the narration names and the GM can change in the Level flow. A creature with no build ledger keeps the note for the GM. The soul's consent is the table's."
   ),
   "spell:gentle-repose": enforced(
     "resolution/revival.ts takes only a corpse, and the game time it spends under the spell's 10 days doesn't count against a revival's limit (death.ts). Keeping it from becoming Undead is the GM's."
@@ -1786,14 +1818,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:dissonant-whispers": enforced(
     "The save and its Psychic damage are applied. On a failure the target spends its Reaction, when it can take one, on a move of its Speed that must end farther from the caster (granted-moves.ts), provoking as any move does; the route is the mover's."
   ),
-  "spell:dominate-beast": guided(
-    "Only a Beast can be the target. A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). It puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns."
+  "spell:dominate-beast": enforced(
+    "Only a Beast can be the target. A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). It puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns, and its Reaction is offered only while the caster has one, spending both (commanded-reactions.ts). What the orders say, and how it carries them out when left alone, are the table's."
   ),
-  "spell:dominate-monster": guided(
-    "Any creature can be the target. A failed save imposes Charmed for the spell's duration, longer from a level 9 slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). It puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns."
+  "spell:dominate-monster": enforced(
+    "Any creature can be the target. A failed save imposes Charmed for the spell's duration, longer from a level 9 slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). It puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns, and its Reaction is offered only while the caster has one, spending both (commanded-reactions.ts). What the orders say, and how it acts when left alone, are the table's."
   ),
-  "spell:dominate-person": guided(
-    "Only a Humanoid can be the target. A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). It puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns."
+  "spell:dominate-person": enforced(
+    "Only a Humanoid can be the target. A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). It puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns, and its Reaction is offered only while the caster has one, spending both (commanded-reactions.ts). What the orders say, and how it acts when left alone, are the table's."
   ),
   "spell:earthquake": guided(
     "The cast places the 100-foot circle, and its Dexterity save leaves a creature Prone with its Concentration broken on a failure. spell-zones.ts repeats the save for each creature on the ground in the circle at the end of each of the caster's turns, sparing one in the air, as the cast does, and zone-ground.ts makes the circle Difficult Terrain. The fissures, and the 50 Bludgeoning damage to structures, which the GM deals to the walls and doors that are objects with object.damage (objects.ts), are the GM's."
@@ -1927,8 +1959,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:sequester": enforced(
     "The target is Invisible and Unconscious until the spell ends, which taking damage does (effects.ts). The end condition the caster sets, and hiding from divination, are the GM's."
   ),
-  "spell:warding-bond": guided(
-    "The target has +1 to AC and saving throws and Resistance to all damage for the hour. The caster's share of its damage, and the spell ending at 60 feet apart, are the GM's."
+  "spell:warding-bond": enforced(
+    "The target has +1 to AC and saving throws and Resistance to all damage for the hour, and each time it takes damage the caster takes the same amount (hit-points.ts). The bond ends when the caster drops to 0 Hit Points or the two are more than 60 feet apart on the map, and a new Warding Bond cast on either creature ends the old one (warding-bond.ts)."
   ),
   "feature:dark-ones-blessing": enforced(
     "When the Warlock drops an enemy to 0 Hit Points, or anyone does within 10 feet of it on the map, it gains Temporary Hit Points equal to its Charisma modifier plus its Warlock level, at least 1, keeping the higher (dark-ones-blessing.ts)."
@@ -1997,8 +2029,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:cloudkill": enforced(
     "spell-zones.ts asks for the Constitution save against 5d8 Poison damage on the cast and when a creature enters the Sphere or ends its turn there, once a turn. At the start of each of the caster's turns it moves the Sphere 10 feet straight away from the caster, and a creature the Sphere moves onto makes the save. The Sphere is Heavily Obscured for dynamic vision (vision/cast-sight.ts)."
   ),
-  "spell:conjure-minor-elementals": guided(
-    "zone-ground.ts makes the ground in the 15-foot Emanation Difficult Terrain for the caster's enemies, and each of the caster's hits on a creature within 15 feet deals an extra 2d8 of the type picked at the cast (resolution/damage.ts). Picking the type for each attack instead, and the extra 1d8 a slot level, are the GM's."
+  "spell:conjure-minor-elementals": enforced(
+    "zone-ground.ts makes the ground in the 15-foot Emanation Difficult Terrain for the caster's enemies, and each of the caster's hits on a creature within 15 feet deals an extra 2d8, 1d8 more a slot level above 4 (item-actions.ts), of the type picked at the cast unless the attack's preview picks another of Acid, Cold, Fire or Lightning (resolution/damage.ts, resolution/hit-options.ts)."
   ),
   "spell:entangle": enforced(
     "The cast's Strength save leaves a creature in the square Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the square Difficult Terrain for the duration. Leaving the caster out of its own square is the GM's."
@@ -2022,7 +2054,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The 10-foot Emanation stays where its caster stood (spell-zones.ts). zone-barriers.ts keeps a spell of level 5 or lower cast from outside from affecting the creatures within, one level higher for each slot level above 6."
   ),
   "spell:glyph-of-warding": guided(
-    "The explosive rune lasts until it goes off, in a fight or out of one, drawn for the GM and the caster's player alone. The first creature that steps onto it sets it off: each creature in the 20-foot Sphere makes the Dexterity save against 5d8 damage of the type chosen at the cast, and the spell ends (spell-zones.ts). Other triggers, noticing the glyph and the spell glyph are the GM's."
+    "The glyph lasts until it goes off, in a fight or out of one, drawn for the GM and the caster's player alone. As an explosive rune, the first creature that steps onto it sets it off: each creature in the 20-foot Sphere makes the Dexterity save against 5d8 damage of the type chosen at the cast, 1d8 more a slot level above 3, and the spell ends (spell-zones.ts). A spell of the glyph's level or lower that its caster casts within the minute is stored in it instead, and when the glyph is set off it takes effect at its caster's numbers on that creature, or on the creatures within its area around that creature (stored-casts.ts, stored-cast-release.ts). Refining the trigger (creature kinds, passwords, an opened book) and noticing the glyph with a Wisdom (Perception) check are the GM's."
   ),
   "spell:grease": enforced(
     "spell-zones.ts asks for the Dexterity save when a creature enters the square or ends its turn there, and a failure leaves it Prone. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the square Difficult Terrain."
@@ -2069,8 +2101,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Giant Octopus/ink-cloud": enforced(
     "triggered-reactions.ts offers it when the octopus takes damage in an underwater fight. Using it fills a 10-foot Cube around the octopus with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). A strong current dispersing the ink is the GM's."
   ),
-  "spell:sorcerous-burst": guided(
-    "The attack and the chosen damage type are applied. Rolling another d8 on each 8 is the GM's."
+  "spell:sorcerous-burst": enforced(
+    "The attack and the chosen damage type are applied, with the cantrip's dice at the caster's level, and each 8 rolled on its d8s adds another d8, the added dice exploding too, up to the caster's spellcasting ability modifier in added dice (resolution/damage.ts)."
   ),
   "spell:spirit-guardians": enforced(
     "spell-zones.ts asks for the save when a creature enters the Emanation or ends its turn there, and charges an affected creature double for each step it moves inside (terrain.ts). The creatures the caster designates are its allies."
@@ -2111,8 +2143,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:gaseous-form": enforced(
     "The willing target becomes a misty cloud: its only speed is a Fly Speed of 10 feet that hovers, it can share a creature's space, has Resistance to Bludgeoning, Piercing and Slashing damage, Immunity to Prone and Advantage on Strength, Dexterity and Constitution saves, and it can't attack, speak or cast spells. A Magic action or 0 Hit Points ends it. Narrow openings and liquids are the GM's."
   ),
-  "spell:wind-walk": guided(
-    "Each willing target becomes a cloud with a Fly Speed of 300 feet that hovers, Immunity to Prone and Resistance to Bludgeoning, Piercing and Slashing damage; it can only Dash or take the Magic action that ends the form, which leaves it Stunned for 1 minute. Turning back into a cloud while the spell lasts, and the descent when it ends, are the GM's."
+  "spell:wind-walk": enforced(
+    "Each willing target becomes a cloud with a Fly Speed of 300 feet that hovers, Immunity to Prone and Resistance to Bludgeoning, Piercing and Slashing damage; it can only Dash or take the Magic action that ends the form, which leaves it Stunned for 1 minute. While the spell lasts each target keeps a Magic action that makes it a cloud again, Stunned for the minute of the change (resolution/shape-shift.ts, granted-actions.ts). A cloud whose form ends in the air drifts down safely, and one more than 600 feet up falls the rest (altitude.ts, falling.ts)."
   ),
   "spell:magic-jar": castOnly(
     "The container, the possession of a host and the return to the body are the GM's: control of one creature passing to another is not modeled."
@@ -2320,8 +2352,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:bag-of-beans": guided(
     "inventory.ts rolls its 3d4 beans when it is added, which never come back, and the bag is a plain one once they are gone. Dumped beans explode in a 10-foot Sphere, DC 15 Dexterity for 5d4 Force, half on a success. What a planted bean grows, on its d100 table, is the GM's."
   ),
-  "item:oil-of-slipperiness": guided(
-    "Applied, it is used up and its creature has Freedom of Movement's effect for 8 hours: a Swim Speed equal to its Speed, and no Paralyzed or Restrained. Poured as Grease on a 10-foot square for 8 hours is the GM's."
+  "item:oil-of-slipperiness": enforced(
+    "Applied, it is used up and its creature has Freedom of Movement's effect for 8 hours: a Swim Speed equal to its Speed, and no Paralyzed or Restrained. Poured, it is used up and casts Grease on its 10-foot square, which lasts 8 hours (item-actions.ts `castLastsMinutes`, resolution/concentration.ts)."
   ),
   "item:well-of-many-worlds": guided(
     "Opening a portal starts its wait of 1d8 hours of game time before the next (clock-pools.ts). Where a portal leads, and what passes through, are the GM's."

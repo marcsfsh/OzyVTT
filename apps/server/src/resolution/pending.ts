@@ -1,7 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { prismaticSpray } from "./prismatic.js";
 import type { PendingReaction, PendingSave } from "@vtt/domain";
-import { catalogIdOf, DamageTypeSchema, type ActionReaction, type GrantOption } from "@vtt/schemas";
+import { catalogIdOf, DamageTypeSchema, type ActionReaction, type GrantOption, type InventoryItem } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { commanderOf } from "../authorization.js";
 import { holdsFeature } from "../class-features.js";
@@ -452,6 +452,17 @@ export function failureEffectFor(
     sourceName: attacker.name,
     ...(duration ? { duration } : {}),
     ...(repeat ? { repeatSave: repeat } : {}),
+    // Bestow Curse's forced Dodge: a save at the start of each of the bearer's turns that compels it that turn.
+    ...(!repeat && option?.turnStartSave
+      ? {
+          repeatSave: {
+            ability: option.turnStartSave.ability,
+            dc: save.dc,
+            timing: "turn-start" as const,
+            failureTurnTags: [...option.turnStartSave.failureTags]
+          }
+        }
+      : {}),
     ...(save.endsOnDamage || option?.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
     ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
@@ -778,6 +789,7 @@ export function parkActionSave(ctx: ResolveContext): void {
   const extra = {
     ...(onSuccessEffect ? { onSuccessEffect } : gmApplies ? { gmApplies: true as const } : {}),
     ...(action.save.breaksConcentration ? { breaksConcentration: true as const } : {}),
+    ...(action.save.successEndsSpell ? { successEndsSpell: true as const } : {}),
     // Moonbeam: a shape-shifted creature that fails reverts to its true form.
     ...(action.save.failureEndsForm ? { endsForm: true as const } : {}),
     // "Failure by 5 or More": what a failure by that much does instead.
@@ -1029,7 +1041,32 @@ export function parkHeldObjectSave(ctx: ResolveContext): void {
   const castId =
     ctx.castId ??
     attacker.effects.find((effect) => effect.spell?.id === action.spellId && effect.castId !== undefined)?.castId;
-  for (const target of targets)
+  for (const target of targets) {
+    const keepHold: NonNullable<PendingSave["onSuccessEffect"]> = {
+      name: `${name}: holding the red-hot object`,
+      tags: ["heat-metal"],
+      linkedConditionIds: [],
+      escapeDc: null,
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      duration: { type: "until-source-next-turn" },
+      ...(castId !== undefined ? { castId } : {}),
+      sourceActionId: action.id,
+      modifiers: [
+        { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] },
+        { type: "roll-mode", roll: "check", mode: "disadvantage", when: [{ type: "on-ability-check" }] }
+      ]
+    };
+    const heated = heatedRowOf(target, ctx.input.itemId ?? null);
+    // A held weapon is dropped on a failure; worn armor can't be, so a failure keeps it as a success does.
+    const failure =
+      heated?.kind === "held"
+        ? { dropsRowId: heated.row.id }
+        : heated?.kind === "worn"
+          ? {}
+          : {
+              failureNote: `${target.name} drops the heated object, if it can. If it can't (armor it wears), give it Disadvantage on attack rolls and ability checks until the start of ${attacker.name}'s next turn.`
+            };
     createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -1042,27 +1079,56 @@ export function parkHeldObjectSave(ctx: ResolveContext): void {
       conditionIds: [],
       // A save against a spell, which Magic Resistance meets with Advantage.
       magical: true,
-      extra: {
-        onSuccessEffect: {
-          name: `${name}: holding the red-hot object`,
-          tags: ["heat-metal"],
-          linkedConditionIds: [],
-          escapeDc: null,
-          sourceActorId: attacker.id,
-          sourceName: attacker.name,
-          duration: { type: "until-source-next-turn" },
-          ...(castId !== undefined ? { castId } : {}),
-          sourceActionId: action.id,
-          modifiers: [
-            { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] },
-            { type: "roll-mode", roll: "check", mode: "disadvantage", when: [{ type: "on-ability-check" }] }
-          ]
-        },
-        failureNote: `${target.name} drops the heated object, if it can. If it can't (armor it wears), give it Disadvantage on attack rolls and ability checks until the start of ${attacker.name}'s next turn.`
-      },
+      ...(heated?.kind === "worn"
+        ? { onFailEffect: { ...keepHold, name: `${name}: wearing the red-hot object` } }
+        : {}),
+      extra: { onSuccessEffect: keepHold, ...failure },
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
+  }
+}
+
+/** Manufactured metal a creature holds or wears: weapons of wood, cord or cane, and leather or hide armor, aren't. */
+const NOT_METAL_WEAPONS: ReadonlySet<string> = new Set([
+  "blowgun",
+  "club",
+  "greatclub",
+  "longbow",
+  "quarterstaff",
+  "shortbow",
+  "sling",
+  "whip"
+]);
+const METAL_ARMOR: ReadonlySet<string> = new Set([
+  "breastplate",
+  "chain-mail",
+  "chain-shirt",
+  "half-plate-armor",
+  "plate-armor",
+  "ring-mail",
+  "scale-mail",
+  "splint-armor"
+]);
+
+/** The object Heat Metal heats on the creature: the row the cast names, else a metal weapon it holds, else the metal
+ *  armor it wears. Null when it carries none the server can tell. */
+function heatedRowOf(
+  target: ResolveContext["targets"][number],
+  itemId: string | null
+): Readonly<{ row: InventoryItem; kind: "held" | "worn" }> | null {
+  const metalOf = (row: InventoryItem) => {
+    const base = row.baseId ?? catalogIdOf(row);
+    if (row.armor) return METAL_ARMOR.has(base);
+    return row.weapon !== undefined && !NOT_METAL_WEAPONS.has(base);
+  };
+  const kindOf = (row: InventoryItem) => (row.armor ? ("worn" as const) : ("held" as const));
+  const named = itemId ? target.inventory.find((row) => row.id === itemId && row.quantity > 0) : undefined;
+  if (named) return { row: named, kind: kindOf(named) };
+  const held = target.inventory.find((row) => row.equipped && row.armor === undefined && metalOf(row));
+  if (held) return { row: held, kind: "held" };
+  const worn = target.inventory.find((row) => row.equipped && row.armor !== undefined && metalOf(row));
+  return worn ? { row: worn, kind: "worn" } : null;
 }
 
 /** The caster's spell save DC for a spell on its sheet: the casting class's, else the sheet's, else 8 + proficiency +

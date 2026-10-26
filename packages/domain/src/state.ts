@@ -14,7 +14,8 @@ import {
   HealthDisplaySchema,
   HitPointBandSchema,
   ObjectStatsSchema,
-  SaveFailureDurationSchema
+  SaveFailureDurationSchema,
+  StoredCastSchema
 } from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
@@ -333,6 +334,10 @@ export const PendingSaveSchema = z
     failureNote: z.string().min(1).max(300).optional(),
     /** A failure also breaks the creature's Concentration (Sleet Storm). */
     breaksConcentration: z.literal(true).optional(),
+    /** A success ends the spell the save is against, its caster's Concentration included (Detect Thoughts' probe). */
+    successEndsSpell: z.literal(true).optional(),
+    /** The carried row a failure makes the creature drop, still carried but out of its hands (Heat Metal's object). */
+    dropsRowId: z.string().min(1).max(80).optional(),
     /** A swallower's save against the damage from inside it: a failure lets out every creature it swallowed, Prone
      *  within this many feet of it. */
     regurgitates: z
@@ -1416,6 +1421,10 @@ export const SpellZoneSchema = z
     damageType: z.string().min(1).max(40).optional(),
     /** The creature Heightened Spell gave Disadvantage on its saves against the spell. */
     heightened: z.uuid().optional(),
+    /** A spell glyph's stored spell, released on the creature that sets it off (Glyph of Warding). */
+    storedCast: StoredCastSchema.optional(),
+    /** The creature that set it off, for a spell glyph bursting with its stored spell. */
+    setOffBy: z.uuid().optional(),
     /** Dice its damage has gained so far (Delayed Blast Fireball: 1d6 whenever its caster's turn ends). */
     grown: z.number().int().nonnegative().max(100).optional(),
     /** Where it stood as its caster's turn began, waiting for the caster to steer its drift (Incendiary Cloud). */
@@ -1517,7 +1526,18 @@ const sceneCombatShape = {
           parentId: z.string().max(120).optional(),
           replacements: z.record(z.string(), z.number().int().nonnegative()).optional(),
           /** How the spell whose rays it holds was shaped (Metamagic), which every later ray keeps. Never projected. */
-          shaping: z.array(CastShapingSchema).max(4).optional()
+          shaping: z.array(CastShapingSchema).max(4).optional(),
+          /** Chromatic Orb leaping: the creature it leaps from, those it struck this cast, the leaps left and its damage
+           *  type. Never projected. */
+          leap: z
+            .object({
+              fromId: z.uuid(),
+              struck: z.array(z.uuid()).max(10),
+              left: z.number().int().min(0).max(9),
+              damageType: z.string().min(1).max(40).optional()
+            })
+            .strict()
+            .optional()
         })
         .strict()
         .nullable()

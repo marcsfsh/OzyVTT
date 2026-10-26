@@ -1,3 +1,4 @@
+import { REINCARNATED_AS } from "../reincarnation.js";
 import { isDead, ROUNDS_PER_MINUTE, type GameState } from "@vtt/domain";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -145,7 +146,8 @@ function liftCurses(state: GameState, target: LiveActor): EffectNarration[] {
 }
 
 /** Reincarnate: "Roll 1d10 and consult the table below to determine the body's species", a 1 rolling again. The
- *  server rolls it; remaking the sheet with the new species' traits is the GM's, so a lasting note says which. */
+ *  server rolls it and tags the creature with it; once the cast lands, a character's sheet is rebuilt as that species
+ *  (`reincarnation.ts`), and the effect stays as the note of it. */
 function newSpecies(ctx: ResolveContext, target: LiveActor): EffectNarration[] {
   let face = 1;
   for (let tries = 0; face === 1 && tries < 20; tries += 1) face = Math.max(1, Math.min(10, ctx.deps.random(10)));
@@ -156,6 +158,7 @@ function newSpecies(ctx: ResolveContext, target: LiveActor): EffectNarration[] {
     makeEffect({
       id: `${ctx.input.commandId}:${target.id}:reincarnated`,
       name: `Reincarnated as a ${species}`,
+      tags: [`${REINCARNATED_AS}${species.toLowerCase()}`],
       sourceActorId: ctx.attacker.id,
       sourceName: ctx.attacker.name,
       startedRound: ctx.state.combat.round,
@@ -165,7 +168,7 @@ function newSpecies(ctx: ResolveContext, target: LiveActor): EffectNarration[] {
   return [
     {
       kind: "effect",
-      text: `${target.name}'s new body is a ${species} (d10: ${face}). The sheet takes the ${species} traits when the GM rebuilds it.`,
+      text: `${target.name}'s new body is a ${species} (d10: ${face}).`,
       actorId: target.id
     }
   ];

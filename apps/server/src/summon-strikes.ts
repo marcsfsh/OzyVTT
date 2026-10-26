@@ -1,6 +1,8 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { ActorAction, StrikesFrom } from "@vtt/schemas";
+import { INTERPOSING_TAG } from "./cover.js";
+import { makeEffect } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 import { laterRowOf } from "./item-actions.js";
 import { creatureDistance, DISTANCE_TOLERANCE_FEET, footprintOf, mapDistance } from "./movement-narration.js";
@@ -17,6 +19,7 @@ import { policeBarrier } from "./zone-barriers.js";
  */
 
 type Point = Readonly<{ x: number; y: number }>;
+type Actor = GameState["actors"][number];
 
 export type StrikeOrigin = Readonly<{
   /** The force on the map, for a later attack; null at the cast, before it appears. */
@@ -122,4 +125,50 @@ export function settleForce(state: GameState, origin: StrikeOrigin, geometry: To
   const token = state.combat.tokens.find((candidate) => candidate.actorId === origin.markerId);
   if (!token?.position || (token.position.x === origin.at.x && token.position.y === origin.at.y)) return;
   moveEncounterToken(state, origin.markerId, origin.at, geometry);
+}
+
+/** The force a caster's spell keeps on the map (Arcane Hand), or undefined. */
+export function forceOf(state: GameState, casterId: string, spellId: string): Actor | undefined {
+  return state.actors.find(
+    (actor) => actor.summon?.by === casterId && actor.summon.spell?.id === spellId && actor.summon.strikesFrom
+  );
+}
+
+/** After a later action of a spell's force: Interposing Hand leaves it interposing until it causes another effect. */
+export function settleInterposing(state: GameState, origin: StrikeOrigin, interposes: boolean): void {
+  const marker = state.actors.find((actor) => actor.id === origin.markerId);
+  if (!marker) return;
+  const id = `${marker.id}:interposing`;
+  const kept = marker.effects.filter((effect) => effect.id !== id);
+  marker.effects = interposes
+    ? [
+        ...kept,
+        makeEffect({
+          id,
+          name: "Interposing",
+          duration: { type: "manual" },
+          tags: [INTERPOSING_TAG],
+          sourceActorId: marker.summon?.by ?? null
+        })
+      ]
+    : kept;
+}
+
+/** The forces interposing for this creature (SRD 5.2.1 Arcane Hand: "The hand grants you Half Cover against attacks
+ *  and other effects that originate from its space or that pass through it"). */
+export function interposingFor(state: GameState, actorId: string): readonly Actor[] {
+  return state.actors.filter(
+    (actor) => actor.summon?.by === actorId && actor.effects.some((effect) => effect.tags.includes(INTERPOSING_TAG))
+  );
+}
+
+/** Whether a token is a spell's force, which doesn't occupy its space: it covers no one unless it interposes. */
+export const isForce = (actor: Pick<Actor, "summon">): boolean => actor.summon?.strikesFrom !== undefined;
+
+/** A force pushing a creature goes with it, staying as near (Forceful Hand: "The hand moves with the target, remaining
+ *  within 5 feet of it"). */
+export function followPushed(state: GameState, forceId: string, before: Point, after: Point): void {
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === forceId);
+  if (!token?.position) return;
+  token.position = { x: token.position.x + after.x - before.x, y: token.position.y + after.y - before.y };
 }

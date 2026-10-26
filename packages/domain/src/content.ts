@@ -918,8 +918,33 @@ export type ActionChoices = Readonly<{
   optionsPerTarget?: true;
   bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true; ammunition?: "only" | "also" }>;
   object?: Readonly<{ kinds: ReadonlyArray<"armor" | "weapon">; metal?: true }>;
+  /** Any item the user carries may be named (Identify). */
+  pickItem?: true;
 }>;
+/** Teleport's familiarity picks, the rows of its Teleportation Outcome table. */
+export const TELEPORT_FAMILIARITY: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "permanent-circle", name: "Permanent circle" },
+  { id: "linked-object", name: "Linked object" },
+  { id: "very-familiar", name: "Very familiar" },
+  { id: "seen-casually", name: "Seen casually" },
+  { id: "viewed-once", name: "Viewed once or described" },
+  { id: "false-destination", name: "False destination" }
+];
+/** Wish's uses, picked as it is cast: duplicating a spell, and the effects the spell lists. */
+export const WISH_USES: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "duplicate", name: "Duplicate a spell" },
+  { id: "object-creation", name: "Object Creation" },
+  { id: "instant-health", name: "Instant Health" },
+  { id: "resistance", name: "Resistance" },
+  { id: "spell-immunity", name: "Spell Immunity" },
+  { id: "sudden-learning", name: "Sudden Learning" },
+  { id: "roll-redo", name: "Roll Redo" },
+  { id: "reshape-reality", name: "Reshape Reality" }
+];
 type ChoosingAction = Readonly<{
+  teleportOutcome?: true;
+  wishUses?: true;
+  identifiesItem?: true;
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
     optionsPerTarget?: true;
@@ -937,7 +962,13 @@ type ChoosingAction = Readonly<{
 }>;
 /** What an action asks its user to choose as it resolves, or null when it asks nothing. */
 export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
-  const chooser = action.grants?.options ? action.grants : action.save?.failureEffect;
+  const chooser = action.grants?.options
+    ? action.grants
+    : action.teleportOutcome
+      ? { options: TELEPORT_FAMILIARITY }
+      : action.wishUses
+        ? { options: WISH_USES }
+        : action.save?.failureEffect;
   const granted = action.grants?.bindsWeapon;
   // An oil that remakes a row asks for a Melee weapon or a stack of ammunition.
   const binds: ActionChoices["bindsWeapon"] = granted
@@ -950,12 +981,15 @@ export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
       ? { melee: true, ammunition: "also" }
       : undefined;
   const object = action.object;
-  if (!chooser?.options && !binds && !object) return null;
+  if (!chooser?.options && !binds && !object && !action.identifiesItem) return null;
   return {
     ...(chooser?.options ? { options: chooser.options.map((option) => ({ id: option.id, name: option.name })) } : {}),
-    ...(chooser?.optionsPerTarget ? { optionsPerTarget: true as const } : {}),
+    ...(chooser && "optionsPerTarget" in chooser && chooser.optionsPerTarget
+      ? { optionsPerTarget: true as const }
+      : {}),
     ...(binds ? { bindsWeapon: binds } : {}),
-    ...(object ? { object: { kinds: [...object.kinds], ...(object.metal ? { metal: true as const } : {}) } } : {})
+    ...(object ? { object: { kinds: [...object.kinds], ...(object.metal ? { metal: true as const } : {}) } } : {}),
+    ...(action.identifiesItem ? { pickItem: true as const } : {})
   };
 }
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */

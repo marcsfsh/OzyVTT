@@ -252,7 +252,13 @@ export function unavailableReason(
 }
 
 /** Features a creature takes on its own turn though their activation reads "other". */
-const TAKEN_ON_A_TURN: ReadonlySet<string> = new Set(["action-surge"]);
+const TAKEN_ON_A_TURN: ReadonlySet<string> = new Set([
+  "action-surge",
+  // A spell's harm its caster or the GM deals by hand, with no action (Phantasmal Force's 2d8, Geas's 5d10).
+  "spell-phantasmal-force-then-harm",
+  "spell-geas-then-defiance",
+  "spell-dream-then-terrifying-message"
+]);
 /** Features used outside a fight that their text doesn't tie to a rest's end. */
 const USED_BETWEEN_FIGHTS: ReadonlySet<string> = new Set(["magical-cunning"]);
 
@@ -284,7 +290,7 @@ export function passiveOf(
   if (builtin) return undefined;
   // A rider tapped before its roll (Brutal Strike) is on the turn list; any other is chosen on a hit.
   if (hitRiderOf(action)) return hitRiderOf(action)!.declaredBeforeRoll ? undefined : "rider";
-  if (action.activation !== "other") return undefined;
+  if (action.activation !== "other" || TAKEN_ON_A_TURN.has(action.id)) return undefined;
   // Moving a spell's area with the caster's move (Conjure Animals' pack), or a storm's bolts the caster aims, costs
   // nothing and is the caster's to take.
   const row = spell ? laterRowOf(spell, action.id) : undefined;

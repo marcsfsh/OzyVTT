@@ -1064,6 +1064,9 @@ export const ModifierSchema = z
         ),
         abilityModifier: AbilitySchema.optional(),
         damageType: DamageTypeSchema.optional(),
+        /** The types its bearer may pick from on each hit, `damageType` being the one it deals unpicked (Conjure Minor
+         *  Elementals: "Acid, Cold, Fire, or Lightning (your choice when you make the attack)"). */
+        damageTypes: z.array(DamageTypeSchema).min(2).max(13).optional(),
         doubleOnCritical: z.boolean().default(true),
         /** It is dealt once a turn at most, whoever's turn it is (Colossus Slayer). */
         oncePerTurn: z.literal(true).optional(),
@@ -1419,11 +1422,14 @@ export const EndedBySchema = z
       .max(2)
       .optional(),
     lockoutHours: z.number().int().min(1).max(168).optional(),
-    destroysItem: z.literal(true).optional()
+    destroysItem: z.literal(true).optional(),
+    /** Its success ends the whole spell the effect came from, the caster's Concentration on it included (Detect
+     *  Thoughts: "ending the spell on a success"). */
+    endsSpell: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any (with a tool the taker must carry), the damage the one who succeeds takes, the damage the bearer takes on each failed check, how long a failed taker's later tries fail, and whether success destroys the item that made the effect"
+    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any (with a tool the taker must carry), the damage the one who succeeds takes, the damage the bearer takes on each failed check, how long a failed taker's later tries fail, whether success destroys the item that made the effect, and whether it ends the whole spell"
   );
 export type EndedBy = z.infer<typeof EndedBySchema>;
 /** The ways an effect ends by an action: one, or several (a Chain's escape and its burst). */
@@ -1450,11 +1456,16 @@ export const RestTriggerSchema = z
       .optional(),
     maximumLoss: DiceFormulaSchema.optional(),
     noBenefit: z.enum(["short", "long", "both"]).optional(),
-    holdsMaximum: z.literal(true).optional()
+    holdsMaximum: z.literal(true).optional(),
+    /** Damage it deals as the rest ends, its bearer waking (Dream's terrifying messenger: 3d6 Psychic). */
+    damage: RepeatFailureDamageSchema.optional(),
+    /** It acts once and ends (Dream: "the target gains no benefit from its rest, and it takes 3d6 Psychic damage when
+     *  it wakes up"). */
+    once: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, and a maximum a Long Rest doesn't restore"
+    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, a maximum a Long Rest doesn't restore, damage as it wakes, and whether it acts only once"
   );
 export type RestTrigger = z.infer<typeof RestTriggerSchema>;
 
@@ -1468,7 +1479,9 @@ export const EffectStageSchema = z
     duration: SaveFailureDurationSchema.optional(),
     endsOnDamage: z.literal(true).optional(),
     repeats: z.literal(true).optional(),
-    endedBy: EndedBySchema.optional()
+    endedBy: EndedBySchema.optional(),
+    /** Tags the stage adds to the effect's own (Prismatic Spray's Violet ray: `off-plane`, sent to another plane). */
+    tags: z.array(EffectTagSchema).min(1).max(2).optional()
   })
   .strict();
 export type EffectStage = z.infer<typeof EffectStageSchema>;
@@ -1476,7 +1489,10 @@ export type EffectStage = z.infer<typeof EffectStageSchema>;
 /**
  * The save an effect's bearer repeats to end it (Hold Person), and when:
  * - `timing`: at the end of each of its turns (absent), at the start of each (`turn-start`, Conjure Elemental's
- *   restraint), or only when something else opens it (`none`: Dominate Person's damage).
+ *   restraint), at the start of the effect's source's turns (`source-turn-start`, Prismatic Spray's Violet ray), or
+ *   only when something else opens it (`none`: Dominate Person's damage).
+ * - `failureTurnTags`: a save that compels: a failure gives the bearer these tags until its turn ends, a success leaves
+ *   that turn free, and the effect stays either way (Bestow Curse's forced Dodge).
  * - `once`: only at the end of its next turn (a basilisk's gaze); `skipsCurrentTurn` marks one that began during that
  *   creature's own turn, so the end of that turn doesn't count.
  * - `onDamage`: each time the bearer takes damage too, with Advantage (`advantage`, Hideous Laughter), or only damage
@@ -1491,9 +1507,10 @@ export const RepeatSaveSchema = z
   .object({
     ability: AbilitySchema,
     dc: z.number().int().min(1).max(40),
-    timing: z.enum(["turn-start", "none"]).optional(),
+    timing: z.enum(["turn-start", "source-turn-start", "none"]).optional(),
     once: z.literal(true).optional(),
     skipsCurrentTurn: z.literal(true).optional(),
+    failureTurnTags: z.array(EffectTagSchema).min(1).max(2).optional(),
     onDamage: z
       .object({
         advantage: z.literal(true).optional(),
@@ -1568,6 +1585,35 @@ export const GrantedSpellActionSchema = z
     modifier: z.number().int().min(-5).max(15),
     /** The damage type picked when the spell was cast, which every use deals. */
     damageType: DamageTypeSchema.optional()
+  })
+  .strict();
+/**
+ * A spell cast and held for later, at its original caster's numbers (SRD 5.2.1 Contingency, Glyph of Warding's spell
+ * glyph, Ring of Spell Storing, a shield guardian's Spell Storing): the spell, the level it was cast at, the caster's
+ * spell save DC, attack bonus and spellcasting ability modifier, and who cast it. `via` says what holds it.
+ */
+export const StoredCastSchema = z
+  .object({
+    spellId: RiderSlugSchema,
+    level: z.number().int().min(0).max(9),
+    saveDc: z.number().int().min(1).max(40),
+    attackBonus: z.number().int().min(-10).max(30),
+    modifier: z.number().int().min(-5).max(15),
+    casterId: z.string().min(1).max(120),
+    casterName: z.string().min(1).max(120),
+    via: z.enum(["contingency", "glyph", "ring", "guardian"])
+  })
+  .strict();
+export type StoredCast = z.infer<typeof StoredCastSchema>;
+/** What waits for the next spell its bearer casts, or one cast at it, to hold it (`StoredCastSchema`): Contingency's
+ *  contingent spell, a spell glyph's spell, a Ring of Spell Storing held out to a spell. `maxLevel` is the highest level
+ *  it takes. */
+export const StoreAwaitsSchema = z
+  .object({
+    via: z.enum(["contingency", "glyph", "ring"]),
+    maxLevel: z.number().int().min(0).max(9),
+    /** The bearer's effect that holds the spell once it is stored (Contingency's own). */
+    holderEffectId: z.string().min(1).max(120).optional()
   })
   .strict();
 /** An action an effect's bearer may take to end it: a save or a check at a DC. */
@@ -1681,6 +1727,9 @@ export const FormSchema = z
     endsAtZeroHitPoints: z.literal(true).optional(),
     /** Leaving it early takes this many rounds, with the Stunned condition (Wind Walk: 1 minute). */
     revertRounds: z.number().int().min(1).max(100).optional(),
+    /** Ending in the air, it lowers its creature 60 feet a round for a minute to a safe landing, and the creature falls
+     *  the rest (Wind Walk's cloud). */
+    descendsSafely: z.literal(true).optional(),
     /** It ends when the bearer has the Incapacitated condition (Wild Shape). */
     endsOnIncapacitated: z.literal(true).optional(),
     /** The Temporary Hit Points the form gave, any left of which vanish when it ends. */
@@ -1984,6 +2033,11 @@ export const EffectInstanceSchema = z
     /** A spell's later action its bearer may take while this lasts, at the numbers it was cast with (Dragon's Breath:
      *  the touched creature exhales, with the damage type picked at the cast). */
     grantedSpellAction: GrantedSpellActionSchema.optional(),
+    /** A spell it holds for later at its caster's numbers (Contingency's contingent spell, a shield guardian's stored
+     *  spell), released as an action of its bearer's (`stored-casts.ts`). */
+    storedCast: StoredCastSchema.optional(),
+    /** It waits for a spell to hold (Contingency, a spell glyph, a Ring of Spell Storing held out). */
+    storeAwaits: StoreAwaitsSchema.optional(),
     /** An action the bearer may take to end this: a save (Irresistible Dance: "take an action to collect itself") or
      *  a check (Maze's DC 20 Intelligence (Investigation)). */
     endAction: EffectEndActionSchema.optional(),
@@ -2171,6 +2225,8 @@ export const InventoryItemSchema = z
       .optional(),
     weapon: ItemWeaponSchema.optional(),
     armor: ItemArmorSchema.optional(),
+    /** The spells cast into this copy, at their casters' numbers (a Ring of Spell Storing's up to 5 levels). */
+    storedCasts: z.array(StoredCastSchema).max(5).optional(),
     /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
      *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
     chosenDamageType: DamageTypeSchema.optional(),
@@ -2246,7 +2302,10 @@ export const InventoryItemSchema = z
     /** The cumulative penalty acid or rust left on this armor or weapon (a black pudding's Pseudopod, a rust monster's
      *  Antennae): armor offers that much less AC and a weapon that much less to its attack rolls, until Mending removes
      *  it. Armor whose AC it takes to 10, or a weapon it takes to -5, is destroyed. The server keeps it. */
-    penalty: z.number().int().min(1).max(10).optional()
+    penalty: z.number().int().min(1).max(10).optional(),
+    /** Identify was cast on this copy: its carrier's player learns its kind and the type the GM picked without
+     *  attuning to it. Only the cast sets it; the server keeps it. */
+    identified: z.literal(true).optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
@@ -2822,6 +2881,13 @@ export const GrantOptionSchema = z
     bonusActions: z.array(BonusActionBaseSchema).min(1).max(3).optional(),
     /** The damage type this option sets for what the effect deals (Dragon's Breath's acid, Fire Shield's cold). */
     damageType: DamageTypeSchema.optional(),
+    /** In a fight, the bearer makes this save at the start of each of its turns against the effect's DC; a failure gives
+     *  it these tags until that turn ends (Bestow Curse: "succeed on a Wisdom saving throw at the start of each of its
+     *  turns or be forced to take the Dodge action on that turn"). */
+    turnStartSave: z
+      .object({ ability: AbilitySchema, failureTags: z.array(EffectTagSchema).min(1).max(2) })
+      .strict()
+      .optional(),
     /** The bearer's Unarmed Strike deals this die of this type while it lasts, using this ability, or the granter's
      *  spellcasting ability, for its attack and damage rolls (Alter Self's claws: 1d6 Slashing). */
     unarmedStrike: z
@@ -2855,6 +2921,12 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   temporaryHitPointsEachTurn: z
     .union([z.number().int().min(1).max(100), z.literal("spellcasting-modifier")])
     .optional(),
+  /** The dice each of its `extra-damage` riders gains for each slot level above the spell's (Conjure Minor Elementals:
+   *  1d8). */
+  extraDamagePerSlot: z
+    .string()
+    .regex(/^\d{1,2}d(?:4|6|8|10|12)$/)
+    .optional(),
   /** What the recipient's Hit Point maximum and current hit points rise by while it lasts (Aid's 5), `perSlot` more for
    *  each slot level above the spell's; with `formula`, a roll made for each recipient (Heroes' Feast's 2d10). */
   hitPointMaximumGain: z
@@ -2865,6 +2937,8 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
     })
     .strict()
     .optional(),
+  /** The recipient's Speed is 0 while it lasts (Dream's messenger in its trance). */
+  speedZero: z.literal(true).optional(),
   /** The recipient's Speed is multiplied by this while it lasts, after every other change (Haste: 2). */
   speedMultiplier: z.number().int().min(2).max(4).optional(),
   /** A base AC the recipient may use while it wears no armor: this plus its Dexterity modifier, a Shield adding
@@ -2883,6 +2957,9 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   /** The spell's later action, by name, that the recipient may take while it lasts at the cast's numbers (Dragon's
    *  Breath: "exhale"); the caster's own sheet doesn't offer it. */
   grantsLaterAction: z.string().min(1).max(60).optional(),
+  /** The effect waits for a spell to hold (Contingency's contingent spell, a spell glyph's, a Ring of Spell Storing
+   *  held out), which `stored-casts.ts` stores. */
+  storeAwaits: StoreAwaitsSchema.optional(),
   /** An action the recipient may take to end it: a save at the caster's spell save DC (`dc: "spellcasting"`) or a
    *  printed DC (Irresistible Dance: a Wisdom save as an action; Maze: DC 20 Intelligence (Investigation)). */
   endAction: EffectEndActionSchema.extend({
@@ -2908,6 +2985,23 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
       weaponIds: z.array(RiderSlugSchema).min(1).max(6).optional(),
       nonmagical: z.literal(true).optional(),
       melee: z.literal(true).optional(),
+      /** Refuses a weapon its wielder lacks proficiency with (True Strike). */
+      needsProficiency: z.literal(true).optional(),
+      /** The cast makes one attack with the weapon as part of its own action, and the binding ends with that attack
+       *  (True Strike). */
+      attacksNow: z.literal(true).optional(),
+      /** Extra damage of one type on its hits, by the granter's character level from each row's level up (True
+       *  Strike: 1d6 Radiant from 5, 2d6 from 11, 3d6 from 17). */
+      extraDamage: z
+        .object({
+          type: DamageTypeSchema,
+          dice: z
+            .array(z.object({ level: z.number().int().min(1).max(20), formula: DiceFormulaSchema }).strict())
+            .min(1)
+            .max(4)
+        })
+        .strict()
+        .optional(),
       /** It binds to a stack of ammunition instead (a coat of Basic Poison on three pieces): its riders ride a shot
        *  that draws from that stack. */
       ammunition: z.literal(true).optional(),
@@ -3404,6 +3498,12 @@ export const SaveOutcomeFields = {
     .max(6)
     .optional()
     .describe("A creature of these types that fails is sent back to its home plane for 24 hours"),
+  /** A success ends the spell the save is against, its caster's Concentration on it included (Detect Thoughts' probe:
+   *  "On a successful save, the spell ends"). */
+  successEndsSpell: z
+    .literal(true)
+    .optional()
+    .describe("A success ends the spell the save is against, and its caster's Concentration on it"),
   /** A failure also breaks the creature's Concentration (Earthquake: "its Concentration is broken"; Sleet Storm). */
   breaksConcentration: z
     .literal(true)
@@ -4217,6 +4317,12 @@ export const ShapeShiftSchema = z
     endsAtZeroHitPoints: z.literal(true).optional(),
     leaveAs: z.enum(["bonus-action", "action"]).optional(),
     revertRounds: z.number().int().min(1).max(100).optional(),
+    /** A form that ends in the air lowers its creature gently, landing it safely within a minute's 60 feet a round and
+     *  letting it fall the rest (Wind Walk). */
+    descendsSafely: z.literal(true).optional(),
+    /** Taking it takes this many rounds, with the Stunned condition (Wind Walk's return to cloud form: "a Magic action
+     *  followed by a 1-minute transformation"). */
+    takesRounds: z.number().int().min(1).max(100).optional(),
     /** It lasts this many minutes (a Potion of Gaseous Form's hour). */
     durationMinutes: z.number().int().min(1).max(1440).optional(),
     /** It lasts hours equal to half the user's level in this class (Wild Shape). Absent: the spell's duration, or until
@@ -4911,6 +5017,27 @@ export const ActionSchema = z
       )
       .max(8)
       .default([]),
+    /** Each die of its damage that rolls its highest face adds another such die, up to `most` dice in all (Sorcerous
+     *  Burst: an 8 on a d8 adds a d8, up to the caster's spellcasting ability modifier). */
+    explodingDice: z
+      .object({ most: z.number().int().min(0).max(10) })
+      .strict()
+      .optional()
+      .describe("Each damage die that rolls its highest face adds another, up to this many in all"),
+    /** Teleport: the caster picks the destination's familiarity as it casts (`optionId`), and the server rolls the
+     *  d100 on the Teleportation Outcome table. */
+    teleportOutcome: z
+      .literal(true)
+      .optional()
+      .describe("The cast picks a destination's familiarity and rolls on the Teleportation Outcome table"),
+    /** Identify: the cast names one item its caster carries (`itemId`), whose kind its player then learns. */
+    identifiesItem: z
+      .literal(true)
+      .optional()
+      .describe("The cast names a carried item (itemId) whose properties its caster learns"),
+    /** Wish: the cast picks one of the spell's uses (`optionId`), and any but duplicating a spell stresses its
+     *  caster. */
+    wishUses: z.literal(true).optional().describe("The cast picks one of Wish's uses"),
     /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
     healing: z
       .object({
@@ -4987,7 +5114,7 @@ export const ActionSchema = z
     darts: z.number().int().min(2).max(20).optional(),
     /** The damage types the caster picks from on each use (Chromatic Orb); the resolve names one, and every damage
      *  part takes it. Absent: the damage's own types. */
-    damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    damageTypes: z.array(DamageTypeSchema).min(2).max(13).optional(),
     /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). A
      *  component's `or` names other actions that can fill its place ("using Scimitar or Shortbow in any combination"). */
     multiattack: z
@@ -5124,6 +5251,15 @@ export const ActionSchema = z
     castThrough: RiderSlugSchema.optional().describe(
       "It is cast through this spell, which its user must be concentrating on: it needs no Concentration of its own, and what it leaves ends when that spell does (a Crystal Ball's Detect Thoughts through Scrying)"
     ),
+    /** What the cast leaves lasts this many minutes, whatever the spell's own duration (Oil of Slipperiness' Grease: 8
+     *  hours). */
+    castLastsMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(14400)
+      .optional()
+      .describe("What the cast leaves lasts this many minutes, whatever the spell's own duration"),
     /** A check its user makes as it is used: a failure spends it and nothing else happens (an Amulet of the Planes'
      *  DC 15 Intelligence (Arcana) before its Plane Shift). */
     castCheck: z
@@ -5872,6 +6008,16 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
         .string()
         .regex(/^[a-z0-9-]+$/)
         .max(80)
+    })
+    .strict(),
+  /** A shield guardian's Spell Storing: its commander, wearing its amulet, casts a spell of `maxLevel` or lower on it
+   *  from within 5 feet, and the spell is stored in place of any other; the guardian casts it at the caster's numbers,
+   *  with no components, once. */
+  z
+    .object({
+      kind: z.literal("spell-storing"),
+      name: TraitNameSchema,
+      maxLevel: z.number().int().min(1).max(9)
     })
     .strict()
 ]);

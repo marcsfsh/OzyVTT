@@ -1,3 +1,4 @@
+import { settleReincarnations } from "../reincarnation.js";
 import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, GameState, RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
@@ -64,7 +65,7 @@ import { passTime } from "../rests.js";
 import { standsInSilence } from "../silence.js";
 import { startTimedPool } from "../clock-pools.js";
 import { bringSummons, familiarDelivery } from "../summons.js";
-import { distanceFromForce, settleForce, strikeOriginFor, struckFrom } from "../summon-strikes.js";
+import { distanceFromForce, settleForce, settleInterposing, strikeOriginFor, struckFrom } from "../summon-strikes.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -599,7 +600,13 @@ export const actionCommands = [
         if (!resolution.preview) countOptionUse(draft, actorId, actionId);
         if (!resolution.preview && areaSpell && areaRow?.atRow) markStageUse(draft, actorId, areaRow, areaSpell);
         // The force moved before it struck again.
-        if (force && geometry && !resolution.preview) settleForce(draft, force, geometry);
+        if (force && geometry && !resolution.preview) {
+          settleForce(draft, force, geometry);
+          // Interposing Hand leaves the hand between its caster and harm until it causes another effect.
+          const forceSpell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
+          const forceRow = forceSpell ? laterRowOf(forceSpell, action.id) : undefined;
+          if (forceRow) settleInterposing(draft, force, forceRow.interposes === true);
+        }
         if (force?.note) resolution = { ...resolution, warnings: [...(resolution.warnings ?? []), force.note] };
         // The familiar's Reaction delivered the touch.
         if (courier && !resolution.preview && draft.combat.active && !draft.combat.reactionsUsed.includes(courier))
@@ -633,6 +640,15 @@ export const actionCommands = [
               })
             : [])
         ];
+        // Reincarnate's new body: a character is rebuilt with the rolled species.
+        if (!resolution.preview)
+          restBroken.push(
+            ...settleReincarnations(draft, {
+              library: kit.playCatalog(),
+              policy: draft.builderPolicy,
+              catalog: kit.equipmentCatalog()
+            })
+          );
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)

@@ -12,9 +12,11 @@ import { heldMoveReady, settleHeldMove } from "../held-moves.js";
 import { offerNearbyReactions } from "../triggered-reactions.js";
 import { movementCost } from "../terrain.js";
 import { burstEndedZones } from "../spell-zones.js";
+import { releaseGlyphSpells } from "../stored-cast-release.js";
 import { planNextTurn } from "../combat-history.js";
 import { nextInitiativeTurn } from "../encounter.js";
 import { holdsSummons, needsSummonSettling, settleSummons, summonHoldingTurnLeaves } from "../summons.js";
+import { holdsBonds, needsBondSettling, settleBonds } from "../warding-bond.js";
 import { holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
 import { holdsZoneOutcomes, settleZoneOutcomes, zoneOutcomesPending } from "../zone-outcomes.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
@@ -281,6 +283,24 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     kit.publishNarrations(events);
   }
 
+  /** A Warding Bond whose caster dropped to 0 or ended more than 60 feet from its ward ends, as its own write. */
+  async function settleWardingBonds() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null || !holdsBonds(before)) return;
+    const distance = await kit.creatureDistance();
+    if (!needsBondSettling(before, (a, b) => distance(before, a, b))) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute(
+      { id: context.newId(), type: "bonds.settle", principal: "table" },
+      (draft) => {
+        events = settleBonds(draft, (a, b) => distance(draft, a, b));
+      }
+    );
+    if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
   /**
    * What the standing spell areas do to fire, fog and clouds once a command has moved a creature or an area (Sleet
    * Storm douses a torch carried in, Gust of Wind disperses a cloud), with the server's dice, as its own write when
@@ -308,8 +328,16 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     if (!before.combat.spellZones.some((zone) => zone.bursting) || before.combat.historyCursor !== null) return;
     const geometry = await kit.liveGeometry();
     let events: EffectNarration[] = [];
+    const distance = await kit.creatureDistance();
     const result = await context.store.execute({ id: context.newId(), type: "spell-zone.burst" }, (draft) => {
-      events = burstEndedZones(draft, kit.zoneDeps(draft, geometry));
+      // A spell glyph's stored spell takes effect on the creature that set it off; an explosive rune bursts.
+      events = [
+        ...releaseGlyphSpells(draft, {
+          ...kit.zoneDeps(draft, geometry),
+          distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+        }),
+        ...burstEndedZones(draft, kit.zoneDeps(draft, geometry))
+      ];
     });
     await context.publishGameState(result.state);
     kit.publishNarrations(events);
@@ -381,6 +409,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       await settleZoneAurasAfter();
       await settleDownedReactions();
       await settleSummoned();
+      await settleWardingBonds();
       await settleFalls();
     }
     return reply;

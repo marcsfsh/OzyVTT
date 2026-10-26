@@ -1,3 +1,4 @@
+import { endCasterSpell } from "../spell-endings.js";
 import { catalogIdOf, type EndedBy } from "@vtt/schemas";
 import type { CheckSubject } from "../ability-checks.js";
 import { addEffect, endEffect, makeEffect } from "../effects.js";
@@ -101,6 +102,10 @@ function takeEnding(ctx: ResolveContext, chosen: Extract<EndingOption, { kind: "
     text: `${attacker.name} ends ${effect.name} on ${bearer.name} (${ending.name}).`,
     actorIds: [attacker.id, bearer.id]
   });
+  // "ending the spell on a success" (Detect Thoughts): the caster's hold on it ends too.
+  if (ending.endsSpell && effect.sourceActorId && effect.spell)
+    for (const event of endCasterSpell(state, effect.sourceActorId, effect.spell.id))
+      ctx.tableNarration.push(tableLineOf(ctx, event));
   if (ending.destroysItem) destroySourceItem(ctx, effect);
   // "The puller takes 10 (3d6) Acid damage."
   for (const part of ending.takerDamage ?? []) hurt(ctx, attacker, part, effect.sourceName ?? effect.name, ending.name);

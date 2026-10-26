@@ -13,7 +13,7 @@ import {
 import { isItemActionId, itemActionRest, laterRowOf, laterSpellActionId } from "../item-actions.js";
 import { CommandRejectedError } from "../game-store.js";
 import { itemRowOfAction } from "../item-charges.js";
-import { castThisTurnKey } from "../lasting-spells.js";
+import { castThisTurnKey, withCastKey } from "../lasting-spells.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { areaAtLevel, endZone } from "../spell-zone-state.js";
 import { actOnCast, pickedZoneRow, pickedZoneType, zoneRowOf } from "../spell-zones.js";
@@ -146,8 +146,18 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
 export function markCastTurn(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
   const { state, attacker } = ctx;
-  if (!spell || isLaterAction(ctx, spell) || state.combat.turnActorId !== attacker.id) return;
-  if (!(spell.effect?.laterActions ?? []).some((row) => row.laterTurnsOnly)) return;
+  if (!spell || state.combat.turnActorId !== attacker.id) return;
+  if (isLaterAction(ctx, spell)) {
+    // The cast's own free use of a later action is spent (Arcane Hand's first effect).
+    if (!ctx.withCast) return;
+    const key = withCastKey(attacker.id, spell.id);
+    state.combat = {
+      ...state.combat,
+      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+    };
+    return;
+  }
+  if (!(spell.effect?.laterActions ?? []).some((row) => row.laterTurnsOnly || row.withCast)) return;
   const key = castThisTurnKey(attacker.id, spell.id);
   state.combat = {
     ...state.combat,
@@ -173,10 +183,13 @@ export function markSpellUp(ctx: ResolveContext): void {
       sourceName: attacker.name,
       sourceActionId: ctx.action.id,
       startedRound: state.combat.round,
-      // Ice Storm's hailstones last "until the end of your next turn", whatever the spell's own duration.
+      // Ice Storm's hailstones last "until the end of your next turn", whatever the spell's own duration; an item's
+      // cast may last its own time (Oil of Slipperiness' Grease: 8 hours).
       duration: zoneRowOf(spell)?.zone?.untilCasterNextTurnEnd
         ? turnEndDuration(state, "until-source-turn-end", attacker.id)
-        : spellEffectDuration(spell, castLevelOf(ctx, spell)),
+        : ctx.action.castLastsMinutes !== undefined
+          ? { type: "minutes", remaining: ctx.action.castLastsMinutes }
+          : spellEffectDuration(spell, castLevelOf(ctx, spell)),
       spell: { id: spell.id, level: castLevelOf(ctx, spell) }
     })
   );
