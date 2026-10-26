@@ -11,6 +11,7 @@ import { spellClassOf } from "./class-features.js";
 import { itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { copyKeyOf, rowRecord } from "./item-records.js";
 import { isFormDefinitionId } from "./transform/forms.js";
+import { catalogIdOf } from "@vtt/schemas";
 
 /**
  * Ability scores a magic item sets or raises while it is worn ("Your Strength is 19 while you wear these gauntlets",
@@ -30,13 +31,25 @@ const ABILITIES: readonly RiderAbility[] = ["str", "dex", "con", "int", "wis", "
 /** Where an overlaid definition keeps the scores it was built with, so a second reading starts from them. */
 const BASE_SCORES = "vtt.base-ability-scores";
 
+/** Where an overlaid definition keeps the Proficiency Bonus it was built with. */
+const BASE_PROFICIENCY = "vtt.base-proficiency-bonus";
+
+const sameScores = (live: Scores, definition: ActorDefinition) =>
+  ABILITIES.every((ability) => live[ability] === definition.abilityScores[ability]);
+
 /** The scores the definition was built with, before any item or effect. */
 export function baseAbilityScoresOf(definition: ActorDefinition): Scores {
   const kept = definition.extensions?.[BASE_SCORES] as Scores | undefined;
   return { ...(kept ?? definition.abilityScores) };
 }
 
-const RIDER_TYPES: ReadonlySet<string> = new Set(["ability-score", "ability-score-minimum"]);
+const RIDER_TYPES: ReadonlySet<string> = new Set([
+  "ability-score",
+  "ability-score-minimum",
+  "granted-score-bonus",
+  "proficiency-bonus",
+  "hit-points-per-level"
+]);
 
 /** The worn items and live effects whose riders set or raise a score, as carriers. */
 function scoreCarriers(actor: Actor, catalog: EquipmentCatalog | undefined): RiderCarrier[] {
@@ -76,21 +89,48 @@ export function liveAbilityScores(
         1,
         scores[effect.abilityReduction.ability] - effect.abilityReduction.amount
       );
+  const riders = liveRiders(actor, catalog);
+  if (riders.length === 0) return scores;
+  const raises = riders.filter((rider) => rider.modifier.type === "ability-score");
+  const floors = riders.filter((rider) => rider.modifier.type === "ability-score-minimum");
+  const lifts = riders.filter((rider) => rider.modifier.type === "granted-score-bonus");
+  for (const { modifier } of raises) raise(scores, modifier);
+  const raised = { ...scores };
+  for (const { modifier } of floors) {
+    if (!modifier.ability || modifier.score === undefined) continue;
+    // What raises the score this item sets (Hammer of Thunderbolts' Might of Giants: +4, to 30), only where the item
+    // bestows it, its score above the creature's own.
+    const lift = lifts
+      .filter((rider) => rider.modifier.ability === modifier.ability)
+      .reduce(
+        (best, rider) =>
+          Math.max(best, Math.min(modifier.score! + (rider.modifier.amount ?? 0), rider.modifier.maximum ?? 30)),
+        modifier.score
+      );
+    const set = modifier.score > raised[modifier.ability] ? lift : modifier.score;
+    scores[modifier.ability] = Math.max(scores[modifier.ability], set);
+  }
+  return scores;
+}
+
+/** The live riders of the worn items and effects that set scores, the Proficiency Bonus and the Hit Point maximum. */
+function liveRiders(actor: Actor, catalog: EquipmentCatalog | undefined) {
   const carriers = scoreCarriers(actor, catalog);
-  if (carriers.length === 0) return scores;
-  const riders = collectRiders(carriers, {
+  if (carriers.length === 0) return [];
+  return collectRiders(carriers, {
     moment: null,
     attunedItemIds: actor.inventory.filter((item) => item.attuned).map((item) => item.id),
+    attunedCatalogIds: actor.inventory.filter((item) => item.attuned).map((item) => catalogIdOf(item)),
     effectTags: actor.effects.flatMap((effect) => effect.tags),
     bearerConditionIds: actor.conditions.map((condition) => condition.id)
   });
-  const raises = riders.filter((rider) => rider.modifier.type === "ability-score");
-  const floors = riders.filter((rider) => rider.modifier.type === "ability-score-minimum");
-  for (const { modifier } of raises) raise(scores, modifier);
-  for (const { modifier } of floors)
-    if (modifier.ability && modifier.score !== undefined)
-      scores[modifier.ability] = Math.max(scores[modifier.ability], modifier.score);
-  return scores;
+}
+
+/** What worn items and effects add to the Proficiency Bonus now (an Ioun Stone of Mastery's 1). */
+export function liveProficiencyBonus(actor: Actor, catalog: EquipmentCatalog | undefined): number {
+  return liveRiders(actor, catalog)
+    .filter((rider) => rider.modifier.type === "proficiency-bonus")
+    .reduce((sum, rider) => sum + (rider.modifier.amount ?? 0), 0);
 }
 
 /** "Increases by 2, to a maximum of 20": never past the maximum, and never lowering a score already past it. A penalty
@@ -113,7 +153,12 @@ const characterLevel = (definition: ActorDefinition) =>
 export function liveHitPointBonus(actor: Actor, definition: ActorDefinition, catalog: EquipmentCatalog | undefined) {
   const base = baseAbilityScoresOf(definition).con;
   const live = liveAbilityScores(actor, definition, catalog).con;
-  return (abilityModifier(live) - abilityModifier(base)) * characterLevel(definition);
+  // An item's Hit Points per level ("your Hit Point maximum increases by 1 for each level you have attained", a
+  // Berserker Axe), counted while it is worn.
+  const perLevel = liveRiders(actor, catalog)
+    .filter((rider) => rider.modifier.type === "hit-points-per-level" && rider.sourceItemId !== undefined)
+    .reduce((sum, rider) => sum + (rider.modifier.amount ?? 0), 0);
+  return (abilityModifier(live) - abilityModifier(base) + perLevel) * characterLevel(definition);
 }
 
 /**
@@ -128,8 +173,11 @@ export function withLiveAbilityScores(
 ): ActorDefinition {
   const base = baseAbilityScoresOf(definition);
   const live = liveAbilityScores(actor, definition, catalog);
-  if (ABILITIES.every((ability) => live[ability] === definition.abilityScores[ability])) return definition;
-  const change = (ability: RiderAbility) => abilityModifier(live[ability]) - abilityModifier(base[ability]);
+  // The Proficiency Bonus an item adds moves every number built from it, as an ability's change moves its own.
+  const basePb = (definition.extensions?.[BASE_PROFICIENCY] as number | undefined) ?? definition.proficiencyBonus;
+  const pb = liveProficiencyBonus(actor, catalog);
+  if (definition.proficiencyBonus === basePb + pb && sameScores(live, definition)) return definition;
+  const change = (ability: RiderAbility) => abilityModifier(live[ability]) - abilityModifier(base[ability]) + pb;
   const casting = definition.spellcasting;
   const moved = (value: number | undefined, ability: RiderAbility) =>
     value === undefined ? undefined : value + change(ability);
@@ -166,10 +214,11 @@ export function withLiveAbilityScores(
   return {
     ...definition,
     abilityScores: live,
-    initiativeBonus: definition.initiativeBonus + change("dex"),
+    proficiencyBonus: basePb + pb,
+    initiativeBonus: definition.initiativeBonus + change("dex") - pb,
     ...(spellcasting ? { spellcasting } : {}),
     actions,
-    extensions: { ...(definition.extensions ?? {}), [BASE_SCORES]: base }
+    extensions: { ...(definition.extensions ?? {}), [BASE_SCORES]: base, [BASE_PROFICIENCY]: basePb }
   };
 }
 

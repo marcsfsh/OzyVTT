@@ -23,7 +23,10 @@ import {
   DamageDrainSchema,
   DamageFormulaSchema,
   DamageTypeSchema,
+  DiceFormulaSchema,
   DispelSchema,
+  RegainHitPointsSchema,
+  FormKeepSchema,
   EffectGrantSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
@@ -834,10 +837,18 @@ export const ItemSpellCastSchema = z
     ),
     /** It is cast as this, whatever the spell's casting time says (a Necklace of Prayer Beads' bead: a Bonus Action). */
     activation: z
-      .enum(["action", "bonus-action"])
+      .enum(["action", "bonus-action", "other"])
       .optional()
       .describe(
-        "What casting it from the item takes, where the item says so in place of the spell's casting time (a prayer bead: a Bonus Action)"
+        "What casting it from the item takes, where the item says so in place of the spell's casting time (a prayer bead: a Bonus Action; a Wand of Wonder's rolled spell: nothing more)"
+      ),
+    /** Offered only as the outcome of its item's table (`rollsOn`), never from the carried row: a Wand of Wonder's
+     *  Fireball. */
+    grantedOnly: z
+      .literal(true)
+      .optional()
+      .describe(
+        "Offered only as the outcome of its item's table, never from the carried row (a Wand of Wonder's Fireball)"
       ),
     /** The spell's options the item's cast may pick, where the item limits them (Wand of Fear's Command: "flee or
      *  grovel only"). */
@@ -890,6 +901,23 @@ export const ItemSpellCastSchema = z
       .describe(
         "It can be cast only while its user has an effect with this tag (a Dragon Orb's spells, for the one who controls it)"
       ),
+    /** The forms its shape-shift may take, by stat block id, and what its creature keeps besides what the spell keeps
+     *  (a Cloak of the Bat's Polymorph: a Bat, keeping Intelligence, Wisdom and Charisma). */
+    forms: z
+      .object({
+        only: z.array(ContentIdSchema).min(1).max(8),
+        keeps: z.array(FormKeepSchema).min(1).max(5).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "The forms its shape-shift may take, by stat block id, and what its creature keeps beside the spell's own (a Cloak of the Bat's Bat, keeping its mental scores)"
+      ),
+    /** It can be cast only while its user stands in Dim Light or Darkness (a Cloak of the Bat). */
+    inDimLightOrDarkness: z
+      .literal(true)
+      .optional()
+      .describe("It can be cast only while its user stands in Dim Light or Darkness (a Cloak of the Bat)"),
     /** What it leaves on its user ends when the item is taken off or put away (a Hat of Disguise: "The spell ends if
      *  the hat is removed"). */
     endsWithItem: z
@@ -1147,6 +1175,8 @@ export const ItemVariantSchema = z
     light: ItemLightSchema.optional(),
     weapon: EquipmentWeaponStatsSchema.nullable().optional(),
     onHit: z.array(OnHitRiderSchema).max(4).optional(),
+    /** Hit Points a copy of this kind gives back as time passes (an Ioun Stone of Regeneration). */
+    regainsHitPoints: RegainHitPointsSchema.optional(),
     /** In this form its own modifiers, hit riders and light stand in for the record's (a Rod of Lordly Might's flame
      *  blade: 2d6 Fire, not the Mace's +3); the record's actions and casts stay. */
     replacesRiders: z.literal(true).optional(),
@@ -1326,6 +1356,58 @@ export const EquipmentReferenceSchema = z
       .optional()
       .describe(
         "While it is active, a successful save against a spell of this level or lower leaves the spell no effect on its bearer (a Ring of Spell Turning, level 7)"
+      ),
+    /** Hit Points its wearer regains as time passes while it is worn (`RegainHitPointsSchema`). */
+    regainsHitPoints: RegainHitPointsSchema.optional().describe(
+      "Hit Points its wearer regains as time passes while it is worn and has at least 1 (a Ring of Regeneration's 1d6 every 10 minutes)"
+    ),
+    /** It and its allies within `feet` of its attuned bearer have Advantage on Initiative (a Weapon of Warning). */
+    initiativeAura: z
+      .object({
+        feet: z.number().int().min(5).max(120),
+        /** As a fight begins it wakes each of them sleeping naturally (Alarm). */
+        wakesSleepers: z.literal(true).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Its bearer and its allies within this many feet have Advantage on Initiative, and with wakesSleepers each of them sleeping naturally wakes as a fight begins (a Weapon of Warning)"
+      ),
+    /** Its wearer's Unarmed Strikes deal this die of this type instead of the usual Bludgeoning damage (Demon Armor's
+     *  clawed gauntlets: 1d8 Slashing). */
+    unarmedStrike: z
+      .object({ dice: DiceFormulaSchema, damageType: DamageTypeSchema })
+      .strict()
+      .optional()
+      .describe(
+        "Its wearer's Unarmed Strikes deal this die of this type instead of the usual Bludgeoning damage (Demon Armor's claws: 1d8 Slashing)"
+      ),
+    /** Its riders stop while its bearer's Speed is 0 (`atSpeedZero`), and from the moment its bearer takes damage until
+     *  the start of the bearer's next turn (`onDamage`): a Cloak of Displacement. */
+    lapses: z
+      .object({ onDamage: z.literal(true).optional(), atSpeedZero: z.literal(true).optional() })
+      .strict()
+      .optional()
+      .describe(
+        "Its riders stop while its bearer's Speed is 0, and from the moment its bearer takes damage until the start of its next turn (a Cloak of Displacement)"
+      ),
+    /** To its holder it is this other item until it is identified (a Potion of Poison passes for a Potion of Healing). */
+    disguisedAs: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
+      .describe(
+        "To its holder it is this other item until Identify reveals it: a Potion of Poison passes for a Potion of Healing"
+      ),
+    /** While its bearer is attuned, a Ranged weapon attack at another creature within `feet` of the bearer targets the
+     *  bearer instead, held or not (a Shield of Missile Attraction's curse). */
+    attractsMissiles: z
+      .object({ feet: z.number().int().min(5).max(60) })
+      .strict()
+      .optional()
+      .describe(
+        "While its bearer is attuned, a Ranged weapon attack at another creature within this many feet of the bearer targets the bearer instead (a Shield of Missile Attraction's curse)"
       ),
     /** Each use of its actions or casts may break it: `percent` chance a use, times the uses of its pool since the last
      *  Long Rest before this one when `cumulative` (a Wind Fan's 20 percent more each time). With `failsUse` the use

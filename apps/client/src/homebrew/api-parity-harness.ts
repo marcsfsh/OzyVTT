@@ -1534,6 +1534,97 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     reason: "the senses of `other-lacks-sense` (Blur), a trigger the content authors and the editor doesn't offer",
     status: "gap"
   },
+  {
+    at: "modifiers[].when[].itemIds",
+    types: "*",
+    reason:
+      "the items of `while-attuned-to` (a Hammer of Thunderbolts beside a Belt of Giant Strength), a trigger the content authors and the editor doesn't offer",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].when[].except",
+    types: "*",
+    reason:
+      "a creature-type gate turned to every type but those (a Sword of Life Stealing's 'not a Construct or an Undead') - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].flat",
+    types: "*",
+    reason:
+      "extra damage of a set number (a Sword of Life Stealing's 15 Necrotic) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].temporaryHitPoints",
+    types: "*",
+    reason:
+      "extra damage whose amount its bearer gains as Temporary Hit Points (a Sword of Life Stealing) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].fireUnderwater",
+    types: "*",
+    reason:
+      "fire that being underwater doesn't resist (a steam mephit's Steam Breath), read from the action's text as the content is built",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].forceOf",
+    types: "*",
+    reason:
+      "an attack that strikes through the force another of its item's actions placed (a Dancing Sword, a Feather Token's whip) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].gmTakes",
+    types: "*",
+    reason:
+      "an action only the GM takes (a Manual of Golems' finished golem) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].grantedOnly",
+    types: "*",
+    reason:
+      "an item action offered only through an outcome or a grant (a Wand of Wonder's rolled spell) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].hurlsWeapon.**",
+    types: "*",
+    reason:
+      "the item's own weapon hurled at a range (a Hammer of Thunderbolts) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].keepsItem",
+    types: "*",
+    reason:
+      "an action that leaves its consumable item unspent (a Manual of Golems read by one who can't use it) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].refusedWithSlots.**",
+    types: "*",
+    reason:
+      "the spell slots that keep an action from befalling its user (a Manual of Golems' reader) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].rollsOn.**",
+    types: "*",
+    reason:
+      "the table an action rolls once it is done (a Wand of Wonder's d100) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].swingsWeapon",
+    types: "*",
+    reason:
+      "an attack with the item's own weapon as its bearer swings it (a Dancing Sword) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
 
   // ---- feature-scope machinery shared by the feature carriers ----
   {
@@ -1609,6 +1700,69 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["equipment"],
     reason:
       "an item cast that ends when the item is taken off (a Hat of Disguise) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].forms.**",
+    types: ["equipment"],
+    reason:
+      "the forms an item's shape-shifting cast is held to (a Cloak of the Bat's Polymorph into a Bat) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].inDimLightOrDarkness",
+    types: ["equipment"],
+    reason:
+      "an item cast only in Dim Light or Darkness (a Cloak of the Bat's Polymorph) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].grantedOnly",
+    types: ["equipment"],
+    reason:
+      "an item cast offered only as the outcome of its table (a Wand of Wonder's Fireball) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^attractsMissiles.**",
+    types: ["equipment"],
+    reason:
+      "the ranged attacks a cursed item draws onto its bearer (a Shield of Missile Attraction) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^disguisedAs",
+    types: ["equipment"],
+    reason:
+      "the item a trap passes for until it is identified (a Potion of Poison's Potion of Healing) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^initiativeAura.**",
+    types: ["equipment"],
+    reason:
+      "an aura of Advantage on Initiative that wakes sleepers (a Weapon of Warning) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^lapses.**",
+    types: ["equipment"],
+    reason:
+      "when an item's riders stop (a Cloak of Displacement at Speed 0 or after damage) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^regainsHitPoints.**",
+    types: ["equipment"],
+    reason:
+      "the Hit Points its bearer regains as time passes (a Ring of Regeneration) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^unarmedStrike.**",
+    types: ["equipment"],
+    reason:
+      "what its wearer's Unarmed Strikes deal (Demon Armor's claws) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

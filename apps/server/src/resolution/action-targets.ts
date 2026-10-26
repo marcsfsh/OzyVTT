@@ -16,6 +16,8 @@ import { specialSpeedsOf } from "../speed.js";
 import type { RuleId } from "../rules-families.js";
 import { endedEffect, sizeAtMost, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 import { dealt } from "./dealings.js";
+import { typeTagsOf } from "../statblock-facts.js";
+import { AXE_BERSERK_TAG } from "../berserker-axe.js";
 
 /**
  * Who an action without a spell may target, checked on the server as `spellTargetViolations` checks a spell (SRD
@@ -228,6 +230,12 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a creature ${attacker.name} holds with ${heldName(rules.heldByAction)}, and ${name} isn't held.`
       });
+    const statBlock = targetDefinition?.source?.externalId ?? target.definitionId;
+    if (rules.statBlocks && (statBlock === null || statBlock === undefined || !rules.statBlocks.includes(statBlock)))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a ${rules.statBlocks.map((id) => id.replace(/-/g, " ")).join(" or ")}, and ${name} isn't one.`
+      });
     if (rules.typeTag && !typeTagsOf(targetDefinition).includes(rules.typeTag.toLowerCase()))
       violations.push({
         rule: "target.not-allowed",
@@ -309,7 +317,8 @@ function berserkViolations(
 ): Violation[] {
   const { state, attacker, action, resolveDefinition, distanceFeet } = check;
   if (action.attack === undefined || !distanceFeet || targets.length === 0) return [];
-  if (!attacker.effects.some((effect) => effect.tags.includes(BERSERK_TAG))) return [];
+  if (!attacker.effects.some((effect) => effect.tags.includes(BERSERK_TAG) || effect.tags.includes(AXE_BERSERK_TAG)))
+    return [];
   const sight = sightRules(
     state,
     {
@@ -363,14 +372,6 @@ export function areaLeavesOut(check: Omit<TargetCheck, "distanceFeet" | "definit
         }).filter((violation) => violation.rule !== "target.too-many").length > 0
     )
   );
-}
-
-/** The type tags a stat block prints ("Fiend (Demon)": demon), lower case. */
-function typeTagsOf(definition: ActorDefinition | undefined): string[] {
-  const tags = (definition?.extensions["open5e.srd-2024"] as { typeTags?: unknown } | undefined)?.typeTags;
-  return Array.isArray(tags)
-    ? tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.toLowerCase())
-    : [];
 }
 
 /** An action's printed name from its id ("web-strand": "Web Strand"). */

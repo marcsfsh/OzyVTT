@@ -72,10 +72,13 @@ const optionOf = (summary: ContentMonsterSummary, catalog: EquipmentCatalog | un
 /** Whether a bestiary row passes a shape-shift's own limits (type, Challenge Rating, size, flight). */
 function withinLimits(
   shift: ShapeShift,
-  summary: Pick<ContentMonsterSummary, "type" | "challengeRating" | "size">,
+  summary: Pick<ContentMonsterSummary, "type" | "challengeRating" | "size"> &
+    Partial<Pick<ContentMonsterSummary, "id">>,
   flies: boolean,
   challengeCap: number | null
 ): string | null {
+  if (shift.onlyForms && (summary.id === undefined || !shift.onlyForms.includes(summary.id)))
+    return "isn't a form this can take";
   const type = summary.type.toLowerCase();
   if (shift.creatureTypes && !shift.creatureTypes.includes(type))
     return `isn't ${withArticle(shift.creatureTypes.map(titled).join(" or "))}`;
@@ -196,6 +199,7 @@ export function formChoice(
     throw new CommandRejectedError("That form isn't in the bestiary.");
   const facts = statblockFacts(statBlock);
   const row = {
+    id: choice,
     type: summary?.type ?? facts.creatureType ?? "",
     challengeRating: summary?.challengeRating ?? facts.challengeRating ?? 0,
     size: statBlock.size

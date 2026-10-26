@@ -8,6 +8,7 @@ import type {
   Actor,
   DamageApplication,
   GameState,
+  HeldAnswer,
   HeldRoll,
   PendingSave,
   RollAnswered,
@@ -68,6 +69,7 @@ import {
   addEffect,
   CONCENTRATING_TAG,
   SMOTHERING_TAG,
+  CHOKING_TAG,
   dropHeldItems,
   effectDurationOf,
   endConcentrationSustainedBy,
@@ -94,13 +96,14 @@ import { countZoneDamage } from "./spell-zone-state.js";
 import { followPushed, forceOf } from "./summon-strikes.js";
 import { endCasterSpell } from "./spell-endings.js";
 import { armedRepeat, durationUntilRepeat, settleEndingSave } from "./save-stages.js";
-import { creatureTypeOf } from "./statblock-facts.js";
+import { creatureTypeOf, typeTagsOf } from "./statblock-facts.js";
 import { suppressConditions } from "./suppressed-conditions.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 import { lightSensitivities, sightRules } from "./vision/rules.js";
 import { legendaryResistancesPerDay } from "./lair.js";
 import { unseat } from "./mounts.js";
 import { spendKillCharge } from "./item-charges.js";
+import { turnSaveBack } from "./spell-reflection.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -170,7 +173,8 @@ export function saveRollSources(
   concentration = false,
   stakes: readonly string[] = [],
   sourceCreatureType: string | null = null,
-  against: SaveSource = {}
+  against: SaveSource = {},
+  sourceTypeTags: readonly string[] = []
 ): RollModeClaims {
   const claims: RollModeClaims = { advantage: [], disadvantage: [] };
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
@@ -185,6 +189,7 @@ export function saveRollSources(
       ...(stakes.length > 0 ? { targetConditionIds: stakes } : {}),
       // The creature whose effect forces the save, for a rider against its kind (Protection from Evil and Good).
       ...(sourceCreatureType !== null ? { sourceCreatureType } : {}),
+      ...(sourceTypeTags.length > 0 ? { sourceTypeTags } : {}),
       // A save against a spell or another magical effect (Spellguard Shield), and against a spell, with its school and
       // level (Mantle of Spell Resistance).
       ...(against.magical ? { magicalSource: true } : {}),
@@ -265,6 +270,16 @@ function sourceCreatureTypeOf(
   const source = sourceActorId === null ? undefined : state.actors.find((actor) => actor.id === sourceActorId);
   if (!source) return null;
   return creatureTypeOf(source, source.definitionId ? resolveDefinition(source.definitionId) : undefined);
+}
+
+/** The tags beside the type of the creature whose effect forces a save ("demon"), for riders against them. */
+function sourceTypeTagsOf(
+  state: GameState,
+  sourceActorId: string | null,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): string[] {
+  const source = sourceActorId === null ? undefined : state.actors.find((actor) => actor.id === sourceActorId);
+  return source?.definitionId ? typeTagsOf(resolveDefinition(source.definitionId)) : [];
 }
 
 /** The conditions a pending save is about: what its failure imposes, or what the effect it would end holds. */
@@ -627,9 +642,9 @@ export function applyFailureEffect(
   if (onFail.tags.includes(SWALLOWED_TAG) && onFail.sourceActorId)
     events.push(...swallowLands(state, target, onFail.sourceActorId));
   // "Is suffocating" while engulfed or whelmed: it holds its breath until what smothers it ends.
-  if (onFail.tags.includes(SMOTHERING_TAG)) {
+  if (onFail.tags.includes(SMOTHERING_TAG) || onFail.tags.includes(CHOKING_TAG)) {
     const definition = target.definitionId ? immunities?.resolveDefinition?.(target.definitionId) : undefined;
-    events.push(...startHoldingBreath(state, target, definition));
+    events.push(...startHoldingBreath(state, target, definition, { choking: onFail.tags.includes(CHOKING_TAG) }));
   }
   // Calm Emotions: a Charmed or Frightened it holds off is kept on the effect for later; one it makes the creature
   // immune to and doesn't hold off ends.
@@ -921,6 +936,7 @@ export function answerSave(
   // What answered the rolled save (`roll-answers.ts`), and what may still answer it on a preview.
   let answerSucceeds = false;
   let answered: RollAnswered[] = [];
+  let turnedBack: HeldAnswer | undefined;
   let offered: RollAnswerOffer[] = [];
   const answerEvents: EffectNarration[] = [];
   // A confirm that waits on another creature's answer to the roll applies nothing yet.
@@ -970,7 +986,8 @@ export function answerSave(
       pending.endsEffects !== undefined,
       conditionsAtStake(state, pending),
       sourceCreatureTypeOf(state, pending.sourceActorId, deps.resolveDefinition),
-      saveSourceOf(pending)
+      saveSourceOf(pending),
+      sourceTypeTagsOf(state, pending.sourceActorId, deps.resolveDefinition)
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
@@ -1125,6 +1142,7 @@ export function answerSave(
     total = read.total;
     answerSucceeds = read.succeed;
     answered = answeredLines(held);
+    turnedBack = held?.answers.find((given) => given.reflectDc !== undefined);
     if (!commit) offered = answersOffered(state, answerTarget(held), answerDepsOf(deps, commandId));
     // A floor under the d20 or the total (Indomitable Might's Strength score) counts as more.
     const floored = flooredSaveTotal(derivation, definition, pending.ability, natural, total);
@@ -1185,23 +1203,29 @@ export function answerSave(
   const turnedBy = success ? spellTurnedBy(target, pending, deps.catalog) : null;
   // A failure that acts by the target's Hit Points (Divine Word, Slaying Bow) does its band's outcome instead.
   const band = success ? null : hitPointBandOf(pending, target);
+  // A save against what follows the damage alone leaves the damage whole (a Potion of Poison).
+  const whole = success && pending.fullOnSuccess === true && turnedBy === null;
   const outcomeParts = band
     ? []
-    : parts && parts.length > 0
-      ? success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
-        ? []
-        : halved
-          ? halveDamageParts(parts)
-          : parts
-      : null;
+    : whole && parts && parts.length > 0
+      ? parts
+      : parts && parts.length > 0
+        ? success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
+          ? []
+          : halved
+            ? halveDamageParts(parts)
+            : parts
+        : null;
   const outcomeDamage =
     outcomeParts !== null
       ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
-      : success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
-        ? 0
-        : halved
-          ? Math.floor(proposedTotal / 2)
-          : proposedTotal;
+      : whole
+        ? proposedTotal
+        : success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
+          ? 0
+          : halved
+            ? Math.floor(proposedTotal / 2)
+            : proposedTotal;
   const outcomeCondition =
     !success &&
     band === null &&
@@ -1291,6 +1315,7 @@ export function answerSave(
             hit: false,
             hitKinds: [],
             ...(drain ? { drain } : {}),
+            ...(pending.damageSource ? { damageSource: pending.damageSource } : {}),
             asked: []
           },
           {
@@ -1314,7 +1339,8 @@ export function answerSave(
         amount: outcomeDamage,
         ...(outcomeParts !== null ? { parts: outcomeParts } : {}),
         sourceActorId: pending.sourceActorId,
-        ...(drain ? { drain } : {})
+        ...(drain ? { drain } : {}),
+        ...(pending.damageSource ? { damageSource: pending.damageSource } : {})
       },
       { role: "gm" },
       {
@@ -1528,6 +1554,11 @@ export function answerSave(
   // counts successes; a failure may count or bring the effect's next stage (a basilisk's second failure).
   if (pending.repeatOf) events.push(...settleEndingSave(state, pending, success, `${commandId}:${saveId}`, immunities));
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
+  // A spell turned back on its caster (a Ring of Spell Turning, a Staff of Charming) asks the caster the same save.
+  if (success && turnedBack?.reflectDc !== undefined) {
+    const bearer = state.actors.find((actor) => actor.id === turnedBack!.actorId);
+    if (bearer) events.push(...turnSaveBack(state, pending, bearer, turnedBack.reflectDc, deps.newRollId));
+  }
   // A spell whose last target saved has nothing left (Hold Person, Phantasmal Killer's "the spell ends").
   const castId = pending.onFailEffect?.castId;
   if (castId !== undefined) events.push(...endIdleConcentration(state, castId));

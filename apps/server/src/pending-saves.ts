@@ -15,6 +15,8 @@ export function createPendingSaves(
     proposedDamage: number;
     proposedDamageParts?: ReadonlyArray<{ amount: number; type: string }>;
     halfOnSuccess: boolean;
+    /** A success still takes the whole damage (a Potion of Poison's). */
+    fullOnSuccess?: boolean;
     conditionIds: readonly string[];
     saveBonus?: number;
     onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "modifiers"> &
@@ -46,6 +48,7 @@ export function createPendingSaves(
       | "regurgitates"
       | "vitality"
       | "spendsOnKill"
+      | "damageSource"
     >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
@@ -111,6 +114,7 @@ export function createPendingSaves(
       ? { proposedDamageParts: [...input.proposedDamageParts] }
       : {}),
     halfOnSuccess: input.halfOnSuccess,
+    ...(input.fullOnSuccess ? { fullOnSuccess: true as const } : {}),
     conditionIds: [...input.conditionIds],
     saveBonus: input.saveBonus ?? 0,
     ...onFailFor(targetActorId),

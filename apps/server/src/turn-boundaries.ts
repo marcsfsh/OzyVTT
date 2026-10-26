@@ -39,6 +39,7 @@ import { stealthAttackAtTurnEnd } from "./supreme-sneak.js";
 import { setDownCarried } from "./movement-rules.js";
 import { offerNearbyReactions } from "./triggered-reactions.js";
 import { teleportsEachTurn } from "./granted-moves.js";
+import { healingThisRound, regeneratesThisRound } from "./clock-healing.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -441,6 +442,18 @@ function hitPointSteps(state: GameState, actorId: string, deps: TurnStartDeps): 
       sourceName: effect.sourceName,
       run: heal(() => effect.hitPointsEachTurn ?? 0, effect.name, effect)
     }));
+  // What heals as time passes heals by the fight's rounds too, 10 to the minute (a Ring of Regeneration).
+  if (regeneratesThisRound(state, actorId, deps.catalog))
+    steps.push({
+      key: "regains:over-time",
+      name: "Regeneration",
+      run: () =>
+        healingThisRound(state, actorId, {
+          resolveDefinition: deps.resolveDefinition,
+          ...(deps.catalog ? { catalog: deps.catalog } : {}),
+          random: deps.rollDie
+        })
+    });
   const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
   const bloodied = (now: Actor) => now.hp.current >= 1 && now.hp.current * 2 <= now.hp.maximum;
   if (room && bloodied(actor) && definition && holdsFeature(definition, "survivor", "Survivor")) {

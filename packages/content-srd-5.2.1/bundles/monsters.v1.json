@@ -16511,7 +16511,8 @@
       "formula": "2d6",
       "type": "fire"
      }
-    ]
+    ],
+    "fireUnderwater": true
    },
    {
     "id": "tail",
@@ -16556,6 +16557,7 @@
       "type": "fire"
      }
     ],
+    "fireUnderwater": true,
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -44481,6 +44483,7 @@
       "type": "fire"
      }
     ],
+    "fireUnderwater": true,
     "uses": {
      "limit": 1,
      "per": "recharge",

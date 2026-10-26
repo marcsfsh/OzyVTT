@@ -1,4 +1,4 @@
-import { armorClassInPlay } from "@vtt/domain";
+import { armorClassInPlay, isDead } from "@vtt/domain";
 import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
@@ -50,7 +50,7 @@ import { areAllies, areEnemies } from "../creature-sides.js";
 import { holdsFeature, spellClassOf } from "../class-features.js";
 import { launchesProjectile } from "../zone-walls.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { creatureTypeOf, swimSpeedFeet } from "../statblock-facts.js";
+import { creatureTypeOf, swimSpeedFeet, typeTagsOf } from "../statblock-facts.js";
 import { auraOfAuthority, traitOf } from "../statblock-traits.js";
 import { attachedAdvantage } from "../attachments.js";
 import { hitRiderOf } from "./hit-riders.js";
@@ -75,6 +75,14 @@ import {
   type ResolveContext
 } from "./context.js";
 
+/** The tags of the effects a creature has put on creatures that still live, for a rider gated on its mark (the
+ *  Oathbow: "While your sworn enemy lives"). */
+export function markingTagsOf(state: ResolveContext["state"], actorId: string): string[] {
+  return state.actors
+    .filter((other) => other.id !== actorId && !isDead(other))
+    .flatMap((other) => other.effects.filter((effect) => effect.sourceActorId === actorId).flatMap((e) => e.tags));
+}
+
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
  *  ranged, so a mapless table never hands a thrown weapon melee-gated riders or bonuses. */
 export function attackUsedAsRanged(
@@ -89,7 +97,15 @@ export function attackUsedAsRanged(
 /** melee/ranged/thrown derive from reach and range, spell from the spell the action casts, weapon from a carried
  *  weapon or a character's own non-spell attack, and melee-weapon/ranged-weapon from a weapon attack made in melee or
  *  at range; reaction/opportunity come from `input.attackKinds`. */
-function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind[] {
+export function attackKindsOf(
+  ctx: Readonly<{
+    action: DefinitionAction;
+    attacker: LiveActor;
+    riderItemId: string | null;
+    input: Readonly<{ attackKinds?: readonly AttackKind[] }>;
+  }>,
+  distance: number | null
+): AttackKind[] {
   const { action, input, attacker } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
   const attack = action.attack;
@@ -254,6 +270,7 @@ function riderClaims(
   const filters = {
     ...(kinds ? { attackKinds: kinds } : {}),
     ...(attackerType !== null ? { sourceCreatureType: attackerType } : {}),
+    sourceTypeTags: typeTagsOf(ctx.deps.definition),
     seesOther: rules.canSee(target.id, ctx.attacker.id),
     seenByOther: rules.canSee(ctx.attacker.id, target.id),
     otherSenses: sensing(ctx.attacker.id, target.id)
@@ -441,7 +458,13 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
   if (attack.rangeFeet === undefined || !deps.distanceFeet || !ranged) return;
   const normal = attack.rangeNormalFeet;
   if (normal !== undefined && distance !== null && distance > normal + 1e-6) {
-    sources.disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
+    // A rider may set long range's Disadvantage aside (the Oathbow against its sworn enemy).
+    const waived = collectRiders(ctx.derivation.carriers, {
+      ...ctx.derivation.context,
+      ...ctx.riderFilters,
+      moment: "on-attack-roll"
+    }).find((rider) => rider.modifier.type === "ignores-long-range");
+    if (!waived) sources.disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
   }
   // An able enemy within 5 feet "who can see you" spoils the shot. A creature at 0 HP is dead or dying, and an ally is
   // no enemy whatever its kind.
@@ -694,7 +717,10 @@ export function rollAttack(ctx: ResolveContext): void {
     targetSize: target.size ?? "medium",
     targetConditionIds: target.conditions.map((condition) => condition.id),
     ...(creatureType !== null ? { targetCreatureType: creatureType } : {}),
+    targetTypeTags: typeTagsOf(targetDefinition),
     sourceItemId: ctx.riderItemId,
+    // The marks the attacker keeps on creatures that still live (the Oathbow's sworn enemy).
+    markingTags: markingTagsOf(ctx.state, attacker.id),
     // What the attacker left on the target (its grapple, its Hunter's Mark), whether it is hurt, and how far it is.
     targetMarkTags: target.effects
       .filter((effect) => effect.sourceActorId === attacker.id)
@@ -763,7 +789,16 @@ export function rollAttack(ctx: ResolveContext): void {
   const coverBonus = coverSetAside ? 0 : ctx.coverBonus;
   const reactionBonus = input.reactionAcBonus?.amount ?? 0;
   const inPlay = armorClassInPlay(target);
-  const targetAc = inPlay !== undefined ? inPlay + coverBonus + reactionBonus : null;
+  // An AC bonus against this kind of attack alone (an Arrow-Catching Shield's +2 against ranged attack rolls).
+  const againstThis = collectRiders(targetDerivation.carriers, {
+    ...targetDerivation.context,
+    ...(ctx.riderFilters.attackKinds ? { attackKinds: ctx.riderFilters.attackKinds } : {}),
+    moment: "on-attack-roll"
+  }).filter((rider) => rider.modifier.type === "armor-class");
+  const momentaryAc = sumRiders(againstThis, "armor-class");
+  for (const rider of againstThis)
+    warnings.push(`${rider.label}: +${rider.modifier.amount ?? 0} to ${target.name}'s AC against this attack.`);
+  const targetAc = inPlay !== undefined ? inPlay + coverBonus + reactionBonus + momentaryAc : null;
   // "Any Critical Hit against you becomes a normal hit" (Adamantine Armor), read on the target as the attack lands.
   const critImmune = [
     ...collectRiders(targetDerivation.carriers, { ...targetDerivation.context, moment: null }),

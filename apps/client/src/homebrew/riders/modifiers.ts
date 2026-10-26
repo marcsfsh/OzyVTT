@@ -54,12 +54,19 @@ const MODIFIER_LABELS: Readonly<
   sense: ["The character", "Another sense"],
   "resource-bonus": ["The character", "A limited-use pool"],
   "short-rest-regain": ["The character", "Uses back on a Short Rest"],
-  "attunement-slots": ["The character", "Attunement slots"]
+  "attunement-slots": ["The character", "Attunement slots"],
+  "proficiency-bonus": ["The character", "Proficiency Bonus"],
+  "granted-score-bonus": ["The character", "Raises another item's score"],
+  "ignores-long-range": ["Damage and defence", "No Disadvantage at long range"]
 };
 
-const MODIFIER_TYPES: readonly SelectOption[] = Object.entries(MODIFIER_LABELS).map(([type, [group, label]]) =>
-  grouped(group)(type, label)
-);
+/** Authored only by the content (a Hammer of Thunderbolts raising a Belt of Giant Strength's score), so the editor
+ *  doesn't offer them. */
+const CONTENT_ONLY_MODIFIERS: ReadonlySet<string> = new Set(["granted-score-bonus"]);
+
+const MODIFIER_TYPES: readonly SelectOption[] = Object.entries(MODIFIER_LABELS)
+  .filter(([type]) => !CONTENT_ONLY_MODIFIERS.has(type))
+  .map(([type, [group, label]]) => grouped(group)(type, label));
 
 /** The GM-facing word for a modifier type, used by publish blockers. */
 export const modifierLabel = (type: unknown): string => {
@@ -121,6 +128,8 @@ function blankModifier(type: string): Draft {
     case "short-rest-regain":
       return { type, poolId: "", amount: 1 };
     case "attunement-slots":
+      return { type, amount: 1 };
+    case "proficiency-bonus":
       return { type, amount: 1 };
     case "critical-range":
       return { type, threshold: 19 };
@@ -385,7 +394,8 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
         "hit-points-per-level",
         "armor-class",
         "spell-save-dc",
-        "spell-attack-bonus"
+        "spell-attack-bonus",
+        "proficiency-bonus"
       )
     },
     /* On a feature the builder bakes this into `speedFeet`; on an item it joins the movement budget

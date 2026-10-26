@@ -11,7 +11,7 @@ import { HAZARDS } from "./hazards.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor } from "./hit-points.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { applyFailureEffect, createPendingSaves } from "./saving-throws.js";
-import { insideAnObject } from "./wall-passage.js";
+import { insideAnObject, shuntOutOfEarth } from "./wall-passage.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import type { SightContent } from "./vision/senses.js";
 import { sightRules } from "./vision/rules.js";
@@ -157,6 +157,8 @@ export function traitsAtTurnEnd(state: GameState, actorId: string, deps: TraitTu
   return [
     ...aurasSavingAtTurnEnd(state, actorId, deps),
     ...burningTraitsAtTurnEnd(state, actorId, deps).flatMap((trait) => trait.run()),
+    // A Ring of Elemental Command of Earth's wearer that ends its turn in the rock.
+    ...shuntOutOfEarth(state, actorId),
     // A ghost that ends its turn in a wall (Incorporeal Movement).
     ...insideAnObject(state, actorId, {
       resolveDefinition: deps.resolveDefinition,

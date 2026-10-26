@@ -139,7 +139,12 @@ export function itemAction(
   const reaction =
     declared.reaction?.response === "reduce-damage" && added !== 0
       ? { ...declared.reaction, formula: formulaPlus(declared.reaction.formula, added) }
-      : declared.reaction;
+      : declared.reaction?.response === "absorb" && declared.reaction.stores
+        ? {
+            ...declared.reaction,
+            stores: { ...declared.reaction.stores, pool: itemPool(item, declared.reaction.stores.pool) }
+          }
+        : declared.reaction;
   // Everything the action schema says passes through (an Elixir's cures, a rod's light, a teleport); what a feature
   // grows by level, and what is read off the bearer, is resolved here.
   const {
@@ -156,10 +161,28 @@ export function itemAction(
     answerAmountByLevel: _answerAmountByLevel,
     reactionByLevel: _reactionByLevel,
     multiattackByLevel: _multiattackByLevel,
+    hurlsWeapon,
+    swingsWeapon,
+    grantedOnly: _grantedOnly,
+    forceOf,
     ...rest
   } = structuredClone(declared);
+  // Hurled as if it had the Thrown property (Hammer of Thunderbolts): the weapon's own attack and damage, from range.
+  const hurled =
+    hurlsWeapon && "weapon" in item && item.weapon ? weaponSwing(item as InventoryItem, definition)?.action : undefined;
+  if (hurled?.attack)
+    attack = { bonus: hurled.attack.bonus, rangeFeet: hurlsWeapon!.longFeet, rangeNormalFeet: hurlsWeapon!.normalFeet };
+  // Swung as its bearer swings it, from wherever its force reaches (`summon-strikes.ts`).
+  const swung =
+    swingsWeapon && "weapon" in item && item.weapon
+      ? weaponSwing(item as InventoryItem, definition)?.action
+      : undefined;
+  if (swung?.attack) attack = { bonus: swung.attack.bonus, reachFeet: 5 };
   return {
     ...rest,
+    ...(hurled ? { damage: hurled.damage } : {}),
+    ...(swung ? { damage: swung.damage } : {}),
+    ...(forceOf ? { forceOf: itemActionId(itemId, forceOf) } : {}),
     id: itemActionId(itemId, declared.id),
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
@@ -264,6 +287,17 @@ export function castAction(
     // The item's own area, where it prints one (a wand's 60-foot Cone), else the spell's.
     ...(cast.area ? { area: structuredClone(cast.area) } : castAreaOf(spell, mechanics)),
     ...(cast.optionIds ? withOptionsOnly(mechanics, cast.optionIds) : mechanics),
+    // The only forms it may take, and what its creature keeps beside the spell's own (a Cloak of the Bat's Bat).
+    ...(cast.forms && mechanics.shapeShift
+      ? {
+          shapeShift: {
+            ...mechanics.shapeShift,
+            onlyForms: [...cast.forms.only],
+            keeps: [...new Set([...mechanics.shapeShift.keeps, ...(cast.forms.keeps ?? [])])]
+          }
+        }
+      : {}),
+    ...(cast.inDimLightOrDarkness ? { sight: { inDimLightOrDarkness: true as const } } : {}),
     // A Reaction spell (Shield, Hellish Rebuke) is cast from the item as a Reaction, offered when its trigger happens.
     ...(spell.effect?.reaction
       ? { activation: "reaction" as const, reaction: structuredClone(spell.effect.reaction) }
@@ -271,7 +305,10 @@ export function castAction(
   };
   // A higher level rolls that slot's dice and makes its darts and rays, as a slot cast at it would (Robe of Stars'
   // level 5 Magic Missile).
-  return level > spell.level ? upcastAction(built, spell, level) : built;
+  // A shape-shift its user casts on itself alone (a Cloak of the Bat's Polymorph) is a willing creature's: no save.
+  const { save: _save, ...unsaved } = built;
+  const ready = cast.forms && cast.targets?.who === "self" ? unsaved : built;
+  return level > spell.level ? upcastAction(ready, spell, level) : ready;
 }
 
 /** The spell's options an item's cast keeps where the item limits them (a Wand of Fear's Command: Flee or Grovel),

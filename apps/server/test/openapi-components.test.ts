@@ -473,7 +473,10 @@ describe("generated OpenAPI components", () => {
       "weapon-is": { ids: ["longbow", "shortbow"] },
       "versus-magic": {},
       "versus-spell": {},
-      "versus-breath-weapon": {}
+      "versus-breath-weapon": {},
+      "other-weapon": {},
+      "while-marking": { tags: ["sworn-enemy"] },
+      "while-attuned-to": { itemIds: ["gauntlets-of-ogre-power"] }
     };
 
     /** One payload per modifier. */
@@ -535,7 +538,10 @@ describe("generated OpenAPI components", () => {
       },
       "no-critical-hits": {},
       "spell-ward": { schools: ["divination"], spellIds: ["zone-of-truth"], alliesAllowed: true, typeSenses: true },
-      "base-armor-class": { base: 15 }
+      "base-armor-class": { base: 15 },
+      "proficiency-bonus": { amount: 1 },
+      "granted-score-bonus": { ability: "str", amount: 4, maximum: 30 },
+      "ignores-long-range": { when: [{ type: "on-attack-roll" }, { type: "versus-marked", tags: ["sworn-enemy"] }] }
     };
 
     it("validates every trigger against the branch its discriminator routes it to", () => {
@@ -625,7 +631,7 @@ describe("generated OpenAPI components", () => {
       expect(() =>
         bundle.EquipmentReferenceSchema.parse({
           ...authored,
-          modifiers: [{ type: "hit-points-per-level", amount: 1 }]
+          modifiers: [{ type: "attunement-slots", amount: 1 }]
         })
       ).toThrow();
     });

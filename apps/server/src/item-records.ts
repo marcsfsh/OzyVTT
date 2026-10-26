@@ -67,7 +67,8 @@ export function withVariant(record: EquipmentReference, item: Pick<InventoryItem
     effects: [...record.effects, ...variant.effects],
     ...(light !== undefined ? { light } : {}),
     ...(onHit !== undefined ? { onHit } : {}),
-    ...(variant.weapon !== undefined ? { weapon: variant.weapon } : {})
+    ...(variant.weapon !== undefined ? { weapon: variant.weapon } : {}),
+    ...(variant.regainsHitPoints ? { regainsHitPoints: variant.regainsHitPoints } : {})
   };
 }
 

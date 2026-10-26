@@ -23,6 +23,8 @@ import { applyKillingHit } from "./kill.js";
 import { lowerScore } from "./score-drain.js";
 import { penalizeRow, wornNonmagicalArmor } from "../row-penalties.js";
 import { HAZARDS } from "../hazards.js";
+import { catalogIdOf } from "@vtt/schemas";
+import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
 export function dealsDamage(ctx: ResolveContext): boolean {
@@ -153,6 +155,12 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       return;
     }
     if (rider.spendsEffectTag && !spendCoat(ctx, rider.spendsEffectTag)) return;
+    // Giant's Bane: only while its wielder is attuned to a Belt of Giant Strength or Gauntlets of Ogre Power too.
+    if (
+      rider.whileAttunedTo &&
+      !attacker.inventory.some((row) => row.attuned && rider.whileAttunedTo!.includes(catalogIdOf(row)))
+    )
+      return;
     if (rider.reminder) warnings.push(`${action.name}: ${rider.reminder}`);
     // A hit that can kill outright (Nine Lives Stealer, a Vorpal Sword) is its own outcome.
     if (rider.kills) {
@@ -321,25 +329,36 @@ function openOnHitSave(
   const failureDamage = (save.failureDamage ?? []).map((part) => rollPlain(ctx, part.formula, part.type, action.name));
   const tags = rider.tags ?? [];
   const modifiers = rider.modifiers ?? [];
-  openRiderSave(
-    ctx,
-    targets[0],
-    { ...action, id: `${action.id}:${index}` },
-    {
-      name,
-      ability: save.ability,
-      dc: save.dc,
-      failureConditions: rider.conditions.map((condition) => condition.id),
-      ...(rider.duration ? { failureDuration: rider.duration } : {}),
-      ...(save.repeatSave ? { repeatSave: true as const } : {}),
-      ...(save.endsOnDamage ? { endsOnDamage: true as const } : {}),
-      ...(tags.length > 0 || modifiers.length > 0
-        ? { failureEffect: { name: rider.name ?? action.name, tags: [...tags], modifiers: [...modifiers] } }
-        : {}),
-      ...(failureDamage.length > 0 ? { failureDamage } : {}),
-      ...(save.halfOnSuccess ? { halfOnSuccess: true as const } : {}),
-      ...(save.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
-      ...(save.immuneMinutes !== undefined ? { immuneMinutes: save.immuneMinutes } : {})
-    }
-  );
+  // "The target and every creature within 30 feet of it other than you" (Hammer of Thunderbolts' thunderclap).
+  const around = save.aroundTargetFeet;
+  const near =
+    around !== undefined && ctx.deps.distanceFeet
+      ? ctx.state.actors.filter((other) => {
+          if (other.id === targets[0]!.id || other.id === ctx.attacker.id || other.hp.current <= 0) return false;
+          const feet = ctx.deps.distanceFeet!(targets[0]!.id, other.id);
+          return feet !== null && feet <= around + DISTANCE_TOLERANCE_FEET;
+        })
+      : [];
+  for (const saver of [targets[0]!, ...near])
+    openRiderSave(
+      ctx,
+      saver,
+      { ...action, id: `${action.id}:${index}` },
+      {
+        name,
+        ability: save.ability,
+        dc: save.dc,
+        failureConditions: rider.conditions.map((condition) => condition.id),
+        ...(rider.duration ? { failureDuration: rider.duration } : {}),
+        ...(save.repeatSave ? { repeatSave: true as const } : {}),
+        ...(save.endsOnDamage ? { endsOnDamage: true as const } : {}),
+        ...(tags.length > 0 || modifiers.length > 0
+          ? { failureEffect: { name: rider.name ?? action.name, tags: [...tags], modifiers: [...modifiers] } }
+          : {}),
+        ...(failureDamage.length > 0 ? { failureDamage } : {}),
+        ...(save.halfOnSuccess ? { halfOnSuccess: true as const } : {}),
+        ...(save.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
+        ...(save.immuneMinutes !== undefined ? { immuneMinutes: save.immuneMinutes } : {})
+      }
+    );
 }

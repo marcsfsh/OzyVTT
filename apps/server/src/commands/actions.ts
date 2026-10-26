@@ -66,8 +66,15 @@ import { castingMinutesOf } from "../resolution/long-casting.js";
 import { passTime } from "../rests.js";
 import { standsInSilence } from "../silence.js";
 import { startTimedPool } from "../clock-pools.js";
-import { bringSummons, familiarDelivery } from "../summons.js";
-import { distanceFromForce, settleForce, settleInterposing, strikeOriginFor, struckFrom } from "../summon-strikes.js";
+import { bringSummons, familiarDelivery, retireSummoned } from "../summons.js";
+import {
+  distanceFromForce,
+  countForceStrike,
+  settleForce,
+  settleInterposing,
+  strikeOriginFor,
+  struckFrom
+} from "../summon-strikes.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -658,6 +665,20 @@ export const actionCommands = [
           const forceSpell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
           const forceRow = forceSpell ? laterRowOf(forceSpell, action.id) : undefined;
           if (forceRow) settleInterposing(draft, force, forceRow.interposes === true);
+          // An item's force goes back to its user after its last attack (a Dancing Sword's fourth).
+          if (!forceSpell && resolution.attack && countForceStrike(draft, actorId, action)) {
+            const marker = draft.actors.find(
+              (candidate) =>
+                candidate.summon?.by === actorId && candidate.summon.actionId === (action.forceOf ?? action.id)
+            );
+            if (marker) {
+              retireSummoned(draft, marker.id, "returns", { silent: true });
+              resolution = {
+                ...resolution,
+                warnings: [...(resolution.warnings ?? []), `${marker.name} flies back to ${kit.actorName(actorId)}.`]
+              };
+            }
+          }
         }
         if (force?.note) resolution = { ...resolution, warnings: [...(resolution.warnings ?? []), force.note] };
         // The familiar's Reaction delivered the touch.

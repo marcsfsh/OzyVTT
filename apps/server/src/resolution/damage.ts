@@ -12,6 +12,7 @@ import { endEffect } from "../effects.js";
 import { abilityModifier, endedEffect, recordRoll, type ResolveContext } from "./context.js";
 import { castInstanceOf } from "./metamagic.js";
 import { declaredBeforeRoll } from "./hit-riders.js";
+import { previewDamage } from "../hit-points.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
 export function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
@@ -308,7 +309,13 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       }
       if (modifier.type !== "extra-damage" || already.has(modifier)) continue;
       const score = modifier.abilityScore === "increased" ? undefined : modifier.abilityScore;
-      if (modifier.formula === undefined && modifier.abilityModifier === undefined && score === undefined) continue;
+      if (
+        modifier.formula === undefined &&
+        modifier.abilityModifier === undefined &&
+        score === undefined &&
+        modifier.flat === undefined
+      )
+        continue;
       if (modifier.oncePerTurn && !firstThisTurn(ctx, rider.label)) continue;
       // "One damage roll of that spell": a later ray of the cast (its open instance) takes none.
       if (modifier.oncePerCast && castInstanceOf(ctx.state, ctx.attacker, ctx.action) !== null) continue;
@@ -324,6 +331,13 @@ export function rollRiderDamage(ctx: ResolveContext): void {
         modifier.damageType ??
         damage[0]?.type ??
         "untyped";
+      // A fixed amount with no die (Sword of Life Stealing's 15 Necrotic), never doubled by a Critical Hit.
+      if (modifier.flat !== undefined) {
+        damage.push({ formula: String(modifier.flat), type, total: modifier.flat });
+        warnings.push(`${rider.label}: +${modifier.flat} ${type}.`);
+        if (modifier.temporaryHitPoints) drainToTemporary(ctx, modifier.flat, type, rider.label);
+        continue;
+      }
       if (modifier.formula === undefined) {
         if (abilityAmount === 0) continue; // a +0 modifier adds no entry and no noise to the card
         damage.push({ formula: String(abilityAmount), type, total: abilityAmount });
@@ -341,9 +355,33 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       const total = rolled.total + abilityAmount;
       damage.push({ formula: rolled.expression.source, type, total });
       warnings.push(`${rider.label}: +${total} ${type}.`);
+      if (modifier.temporaryHitPoints) drainToTemporary(ctx, total, type, rider.label);
       if (rider.sourceEffectId !== undefined) ctx.damageEffectIds.push(rider.sourceEffectId);
     }
   }
+}
+
+/** Sword of Life Stealing: "you gain Temporary Hit Points equal to the amount of Necrotic damage taken". What the target
+ *  takes of the rider's damage, after its defences, becomes the attacker's Temporary Hit Points if that is more than it
+ *  has (they don't add up). Given as the hit is confirmed. */
+function drainToTemporary(ctx: ResolveContext, amount: number, type: string, label: string): void {
+  const { state, attacker, attack, input, deps } = ctx;
+  if (input.commit === false || attack === null) return;
+  const taken = deps.resolveDefinition
+    ? previewDamage(
+        state,
+        attack.targetId,
+        { amount, parts: [{ amount, type }] },
+        { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
+      ).totalApplied
+    : amount;
+  if (taken <= attacker.hp.temporary) return;
+  attacker.hp = { ...attacker.hp, temporary: taken };
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${attacker.name} gains ${taken} Temporary Hit Points from ${label}.`,
+    actorIds: [attacker.id]
+  });
 }
 
 /** Colossus Slayer's "only once per turn": the first time this turn, which it now spends. Outside a fight, always. */

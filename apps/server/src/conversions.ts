@@ -7,6 +7,7 @@ import { actionPools, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 import { healActor } from "./hit-points.js";
+import { itemPool } from "./item-actions.js";
 
 /**
  * The SRD's resource conversions and recoveries: a feature that turns one resource into another (Font of Magic's slots
@@ -284,6 +285,35 @@ function takeTurnAction(context: Context, kind: "bonus-action" | "magic-action",
       turn: { ...state.combat.turn, ...(kind === "bonus-action" ? { bonusActionUsed: true } : { actionUsed: true }) }
     };
   return null;
+}
+
+/** "The rod can absorb and store up to 50 levels of energy." */
+const ROD_LEVELS = 50;
+
+/** A held, attuned Rod of Absorption, its stored energy's pool key, and the levels it holds. */
+function rodOf(context: Context) {
+  const row = context.actor.inventory.find(
+    (item) => catalogIdOf(item) === "rod-of-absorption" && item.quantity > 0 && item.attuned && item.equipped
+  );
+  if (!row) return null;
+  const key = itemPool(row, "rod-of-absorption-stored");
+  return { row, key, left: Math.max(0, ROD_LEVELS - (context.actor.actionUses[key] ?? 0)) };
+}
+
+/** The spent slots the rod's energy can make: "only of a level equal to or lower than your own spell slots, up to a
+ *  maximum of level 5", each costing its level. */
+function rodChoices(context: Context): { level: number; pact: boolean; left: number }[] {
+  const most = Math.min(5, rodOf(context)?.left ?? 0);
+  const spell = spentSlots(context, most).map((entry) => ({
+    level: entry.level,
+    pact: false,
+    left: (context.actor.spellSlots ?? []).find((slot) => slot.level === entry.level)?.remaining ?? 0
+  }));
+  const pact =
+    context.actor.pactSlots && context.actor.pactSlots.level <= most && pactSpent(context) > 0
+      ? [{ level: context.actor.pactSlots.level, pact: true, left: context.actor.pactSlots.remaining }]
+      : [];
+  return [...spell, ...pact];
 }
 
 /** A carried, attuned Pearl of Power row, and the key of its once-per-dawn use. */
@@ -586,6 +616,36 @@ const CONVERSIONS: readonly Conversion[] = [
         );
       movePool(actor, pearlOf(context)!.key, 1);
       return `${actor.name} uses a Pearl of Power to regain a level ${choice.level} spell slot.`;
+    }
+  },
+  {
+    id: "rod-of-absorption",
+    name: "Rod of Absorption",
+    timing: "no-action",
+    holds: (context) =>
+      rodOf(context) !== null && (context.actor.spellSlots !== null || context.actor.pactSlots !== null),
+    line: () =>
+      "Turn the rod's stored spell energy into a spent spell slot of level 5 or lower, spending as many levels as the slot's.",
+    check: (context) =>
+      rodOf(context)!.left === 0
+        ? "The Rod of Absorption holds no spell energy."
+        : rodChoices(context).length > 0
+          ? null
+          : `${context.actor.name} has no spent spell slot the rod's energy can make.`,
+    pick: (context) => ({ kind: "slot", options: rodChoices(context) }),
+    apply: (context, request) => {
+      const choice = rodChoices(context).find(
+        (entry) => entry.level === request.level && entry.pact === (request.pact === true)
+      );
+      if (!choice) throw new CommandRejectedError("Choose a spent spell slot the rod's energy can make.");
+      const { actor } = context;
+      if (choice.pact) actor.pactSlots = { ...actor.pactSlots!, remaining: actor.pactSlots!.remaining + 1 };
+      else
+        actor.spellSlots = (actor.spellSlots ?? []).map((slot) =>
+          slot.level === choice.level ? { ...slot, remaining: slot.remaining + 1 } : slot
+        );
+      movePool(actor, rodOf(context)!.key, choice.level);
+      return `${actor.name} turns ${plural(choice.level, "level")} of the Rod of Absorption's energy into a level ${choice.level} spell slot.`;
     }
   },
   {

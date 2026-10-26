@@ -277,7 +277,7 @@ describe("the item mechanics overlay", () => {
     // the item.
     expect(() =>
       applyItemMechanics(rows, {
-        "amulet-of-health": { modifiers: [{ type: "hit-points-per-level", amount: 1 }] }
+        "amulet-of-health": { modifiers: [{ type: "attunement-slots", amount: 1 }] }
       })
     ).toThrow(
       `amulet-of-health - the schema refuses the merged row. modifiers.0.type: ${ITEM_REFUSED_MODIFIER_MESSAGE}`

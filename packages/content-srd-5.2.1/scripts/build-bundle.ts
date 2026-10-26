@@ -1659,6 +1659,10 @@ const monsters: ActorDefinition[] = creatures
           ? { multiattackReplacements: multiattack.replacements }
           : {}),
         ...(onHit ? { onHit } : {}),
+        // "Being underwater doesn't grant Resistance to this Fire damage" (Steam Breath).
+        ...(/Being underwater doesn[\u2019']t grant Resistance to this Fire damage/.test(action.fields.desc)
+          ? { fireUnderwater: true as const }
+          : {}),
         ...(save && !attack ? withSaveTargets(action.fields.desc) : {}),
         ...(fatal.raisesCorpse
           ? { raisesCorpse: fatal.raisesCorpse, ...(fatal.targets ? { targets: fatal.targets } : {}) }

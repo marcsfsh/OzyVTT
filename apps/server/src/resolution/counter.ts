@@ -11,7 +11,28 @@ import { spellOf } from "./concentration.js";
 import type { ResolveContext } from "./context.js";
 import { heldReadiedSpell } from "./economy.js";
 import { shapingOf } from "./metamagic.js";
-type CounterReaction = Extract<ActionReaction, { response: "counter" }>;
+type CounterReaction = Extract<ActionReaction, { response: "counter" | "absorb" }>;
+type AbsorbReaction = Extract<ActionReaction, { response: "absorb" }>;
+
+/** Whether an absorbing reaction can take this cast: a spell no higher than it cancels, aimed at the reactor alone with
+ *  no area when it says so, and levels its pool still has room for. */
+function absorbs(
+  ctx: ResolveContext,
+  reactor: Readonly<{ id: string; actionUses: Readonly<Record<string, number>> }>,
+  reaction: AbsorbReaction,
+  uses: Readonly<{ limit: number; pool?: string }> | undefined,
+  actionId: string,
+  level: number
+): boolean {
+  if (reaction.maxLevel !== undefined && level > reaction.maxLevel) return false;
+  if (reaction.onlyAtReactor) {
+    const spell = spellOf(ctx);
+    if (ctx.targets.length !== 1 || ctx.targets[0]!.id !== reactor.id) return false;
+    if (ctx.action.area !== undefined || (spell && spell.area !== null) || ctx.input.areaPlaced === true) return false;
+  }
+  if (!uses) return true;
+  return (reactor.actionUses[uses.pool ?? actionId] ?? 0) + level <= uses.limit;
+}
 
 /** The components a cast is made with, after what its stat block or item goes without: Counterspell needs at least one
  *  to see the casting. A spell cast from a magic item "requires no components", so only a Spell Scroll's, read aloud
@@ -45,8 +66,11 @@ function castWithComponents(ctx: ResolveContext): boolean {
  */
 export function parkForCounterspell(ctx: ResolveContext, beginsLongCast = false): boolean {
   const { state, attacker, input, deps, action } = ctx;
-  if (input.economyPaid === true || input.commit === false || !deps.resolveDefinition || !castWithComponents(ctx))
-    return false;
+  const spell = spellOf(ctx);
+  if (input.economyPaid === true || input.commit === false || !deps.resolveDefinition || !spell) return false;
+  // Counterspell sees a casting by its components; an absorbing item takes the spell itself.
+  const seenCasting = castWithComponents(ctx);
+  const level = ctx.plan.castLevel ?? spell.level;
   // A readied spell let go was cast, and seen, when it was readied.
   if (input.ready !== true && heldReadiedSpell(attacker, action.id) !== undefined) return false;
   const content = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
@@ -59,13 +83,19 @@ export function parkForCounterspell(ctx: ResolveContext, beginsLongCast = false)
       state,
       reactor,
       (reaction): reaction is CounterReaction =>
-        reaction.response === "counter" &&
-        (reaction.rangeFeet === undefined ||
-          distance === null ||
-          distance <= reaction.rangeFeet + DISTANCE_TOLERANCE_FEET),
+        (reaction.response === "counter" &&
+          seenCasting &&
+          (reaction.rangeFeet === undefined ||
+            distance === null ||
+            distance <= reaction.rangeFeet + DISTANCE_TOLERANCE_FEET)) ||
+        reaction.response === "absorb",
       { resolveDefinition: deps.resolveDefinition!, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
     );
     if (!offer || areAllies(reactor, attacker, deps.resolveDefinition)) return [];
+    const absorbing = offer.reaction.response === "absorb" ? offer.reaction : null;
+    if (absorbing && !absorbs(ctx, reactor, absorbing, offer.action.uses, offer.action.id, level)) return [];
+    // A spell aimed at the reactor alone is absorbed whoever casts it, seen or not.
+    if (absorbing?.onlyAtReactor) return [{ reactor, offer }];
     if (sight.enabled && !sight.sees(reactor.id, attacker.id)) return [];
     // A caster hidden from the reactor's player isn't seen casting.
     const owner = reactor.kind === "player-character" ? reactor.ownerSessionId : null;
@@ -79,6 +109,7 @@ export function parkForCounterspell(ctx: ResolveContext, beginsLongCast = false)
   const parkedCast = {
     actionId: action.id,
     castCommandId: input.commandId,
+    level,
     targetIds: ctx.targets.map((target) => target.id),
     areaPlaced: input.areaPlaced === true,
     slot: slot ? { level: slot.level, pact: slot.pact === true } : null,

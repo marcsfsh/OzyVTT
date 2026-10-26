@@ -60,6 +60,16 @@ export function burrowsThroughWalls(definition: ActorDefinition | undefined): "f
   return null;
 }
 
+/** What lets its wearer move through earth and rock as Difficult Terrain: a Ring of Elemental Command of Earth ("You can
+ *  move through solid earth or rock as if those areas were Difficult Terrain"), attuned. The map's walls stand for both. */
+const EARTH_PASSAGE_ITEMS: ReadonlySet<string> = new Set(["ring-of-elemental-command#earth"]);
+
+export function passesEarth(actor: Actor): boolean {
+  return actor.inventory.some(
+    (row) => row.equipped && row.attuned && EARTH_PASSAGE_ITEMS.has(`${row.recordId ?? row.id}#${row.variantId ?? ""}`)
+  );
+}
+
 /** Where a path's steps cross a wall, as points on the wall. */
 function crossings(wall: Readonly<{ a: Point; b: Point }>, path: readonly Point[]): Point[] {
   const points: Point[] = [];
@@ -135,6 +145,44 @@ export function insideAnObject(
     },
     ...outcome.events
   ];
+}
+
+/** SRD Ring of Elemental Command (Earth): "If you end your turn there, you are shunted out to the nearest unoccupied
+ *  space you last occupied." Walls are lines, so a wearer whose space a wall crosses as its turn ends is in the rock: it
+ *  moves to the nearest square on the map that no wall crosses and no other creature stands in. */
+export function shuntOutOfEarth(state: GameState, actorId: string): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId && candidate.position !== null);
+  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+  if (!actor || !token?.position || !pixelsPerFoot || !passesEarth(actor)) return [];
+  const square = 5 * pixelsPerFoot;
+  const inRock = (position: Point) =>
+    state.combat.vision.walls.some(
+      (wall) => (wall.kind !== "door" || wall.open !== true) && cuts({ ...token, position }, wall, square)
+    );
+  const taken = (position: Point) =>
+    state.combat.tokens.some(
+      (other) =>
+        other.actorId !== actorId &&
+        other.position !== null &&
+        Math.abs(other.position.x - position.x) < square &&
+        Math.abs(other.position.y - position.y) < square
+    );
+  const from = token.position;
+  if (!inRock(from)) return [];
+  for (let ring = 1; ring <= 6; ring++) {
+    const spots: Point[] = [];
+    for (let dx = -ring; dx <= ring; dx++)
+      for (let dy = -ring; dy <= ring; dy++)
+        if (Math.max(Math.abs(dx), Math.abs(dy)) === ring)
+          spots.push({ x: from.x + dx * square, y: from.y + dy * square });
+    spots.sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y));
+    const out = spots.find((spot) => spot.x >= 0 && spot.y >= 0 && !inRock(spot) && !taken(spot));
+    if (!out) continue;
+    token.position = out;
+    return [{ kind: "effect", text: `${actor.name} ends its turn in the rock and is shunted out.`, actorId }];
+  }
+  return [];
 }
 
 /** Air Form and Water Form as some stat blocks print them: "can enter an enemy's space and stop there". */

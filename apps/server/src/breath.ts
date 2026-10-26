@@ -26,11 +26,13 @@ const LEAST_BREATH_ROUNDS = 5;
 /** Traits and features that let a creature breathe water (a Warlock's Gift of the Depths: "You can breathe
  *  underwater"). */
 const WATER_BREATHERS = /^(amphibious|water breathing|limited amphibiousness|gift of the depths)$/i;
-/** What lets its wearer breathe underwater: "You can breathe underwater" (Cloak of the Manta Ray), "you can breathe
- *  normally in any environment" (Necklace of Adaptation, attuned). */
+/** What lets its wearer breathe underwater: "You can breathe underwater" (Cloak of the Manta Ray, a Ring of Elemental
+ *  Command of Water), "you can breathe normally in any environment" (Necklace of Adaptation, attuned). A kind of an item
+ *  is keyed `record#kind`. */
 const BREATHING_ITEMS: Readonly<Record<string, "worn" | "attuned">> = {
   "cloak-of-the-manta-ray": "worn",
-  "necklace-of-adaptation": "attuned"
+  "necklace-of-adaptation": "attuned",
+  "ring-of-elemental-command#water": "attuned"
 };
 
 function traitsOf(definition: ActorDefinition | undefined): ReadonlyArray<Readonly<{ name: string; text: string }>> {
@@ -47,7 +49,8 @@ export function breathesWater(actor: Actor, definition: ActorDefinition | undefi
   if (traitsOf(definition).some((trait) => WATER_BREATHERS.test(trait.name))) return true;
   if (actor.effects.some((effect) => effect.tags.includes(WATER_BREATHING_TAG))) return true;
   return actor.inventory.some((row) => {
-    const need = BREATHING_ITEMS[row.recordId ?? row.id];
+    const record = row.recordId ?? row.id;
+    const need = BREATHING_ITEMS[`${record}#${row.variantId ?? ""}`] ?? BREATHING_ITEMS[record];
     return need !== undefined && row.equipped && (need === "worn" || row.attuned);
   });
 }
@@ -70,21 +73,22 @@ export function startHoldingBreath(
   state: GameState,
   actor: Actor,
   definition: ActorDefinition | undefined,
-  /** It breathes water but has been out of it too long (Limited Amphibiousness): it runs out of air all the same. */
-  options: Readonly<{ outOfWater?: boolean }> = {}
+  /** It breathes water but has been out of it too long (Limited Amphibiousness): it runs out of air all the same. With
+   *  `choking`, it has no breath to hold and suffocates from the end of its next turn (Dust of Sneezing and Choking). */
+  options: Readonly<{ outOfWater?: boolean; choking?: boolean }> = {}
 ): EffectNarration[] {
-  if (isDead(actor) || (breathesWater(actor, definition) && options.outOfWater !== true)) return [];
+  if (isDead(actor) || (breathesWater(actor, definition) && options.outOfWater !== true && !options.choking)) return [];
   // "While imprisoned, the target doesn't need to breathe."
   if (actor.effects.some((effect) => effect.tags.includes("sustained"))) return [];
   if (actor.effects.some((effect) => effect.breath !== undefined)) return [];
-  const rounds = breathRounds(definition);
+  const rounds = options.choking ? 0 : breathRounds(definition);
   const events: EffectNarration[] = [];
   addEffect(
     state,
     actor.id,
     makeEffect({
       id: `${HOLDING_BREATH_TAG}:${actor.id}`,
-      name: "Holding Breath",
+      name: options.choking ? "Suffocating" : "Holding Breath",
       tags: options.outOfWater ? [HOLDING_BREATH_TAG, "out-of-water"] : [HOLDING_BREATH_TAG],
       startedRound: state.combat.round,
       duration: { type: "manual" },
@@ -94,7 +98,9 @@ export function startHoldingBreath(
   );
   events.push({
     kind: "effect",
-    text: `${actor.name} holds its breath: ${rounds} rounds before it starts to suffocate.`,
+    text: options.choking
+      ? `${actor.name} is choking and suffocates.`
+      : `${actor.name} holds its breath: ${rounds} rounds before it starts to suffocate.`,
     actorId: actor.id
   });
   return events;

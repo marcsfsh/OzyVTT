@@ -522,6 +522,12 @@ export function rollHitOptions(ctx: ResolveContext, diceOnly = false): void {
       continue;
     }
     const effects = pickedEffects(ctx, rider, action, choice);
+    // "Instead of dealing damage to it" (an Energy Bow's Arrow of Restraint): the hit's damage goes.
+    if (rider.insteadOfDamage) {
+      ctx.damage.splice(0);
+      ctx.bonusDamage.splice(0);
+      ctx.warnings.push(`${action.name}: the hit deals ${target.name} no damage.`);
+    }
     const slotLevel = action.spellSlot ? (choice.slotLevel ?? openSlots(ctx, action)[0]) : undefined;
     const pactSlot = rider.pactSlotDie ? openPactSlot(ctx) : null;
     if (rider.pactSlotDie && pactSlot === null) {

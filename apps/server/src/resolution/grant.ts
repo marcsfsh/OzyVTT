@@ -1,8 +1,8 @@
 import { endCrossedBonds, WARDING_BOND_TAG } from "../warding-bond.js";
 import { openStoreWindow } from "../stored-casts.js";
-import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, type GameState } from "@vtt/domain";
+import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, isDead, type GameState } from "@vtt/domain";
 import { abilityModifier, rollDice } from "@vtt/rules-5e";
-import type { DamageType, EffectInstance, Modifier } from "@vtt/schemas";
+import { catalogIdOf, type DamageType, type EffectInstance, type Modifier } from "@vtt/schemas";
 import { ABILITY_NAMES } from "../ability-checks.js";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
@@ -88,6 +88,22 @@ function rageTiming(
   return { startedRound, tags: action.grants!.tags };
 }
 
+/** The item's action a grant hands its recipient (a Feather Token's whip): the record and kind of the row that made it,
+ *  read now, since a used-up token is gone after. */
+function grantedItemActionOf(ctx: ResolveContext, actionId: string | undefined) {
+  if (actionId === undefined) return {};
+  const row = ctx.attacker.inventory.find((item) => ctx.action.id.startsWith(`item-${item.id}-`));
+  if (!row) return {};
+  return {
+    grantedItemAction: {
+      recordId: catalogIdOf(row),
+      ...(row.variantId !== undefined ? { variantId: row.variantId } : {}),
+      actionId,
+      rowId: row.id
+    }
+  };
+}
+
 /** Granted effects (Rage, Reckless Attack on self; Help on an ally; Bless on each creature it targets): replace-on-
  *  refresh. A feature's end when the granter drops to 0 HP; a spell's last its duration, and end with the cast's
  *  Concentration when it has one (`castId`, so `startConcentration` runs first). An `onHit` grant (Guiding Bolt) lands
@@ -107,7 +123,14 @@ export function applyGrant(ctx: ResolveContext): void {
           ? [attacker, ...targets.filter((target) => target.id !== attacker.id)]
           : [attacker];
   if (grant.toggles && endToggled(ctx, recipients)) return;
-  for (const recipient of recipients) grantTo(ctx, recipient);
+  // A duration rolled once for every creature it is given to (Dust of Disappearance: "The duration is the same for all
+  // subjects"), or shared out among them (a Rod of Security's 200 days).
+  const minutes = grant.minutesRolled
+    ? Math.max(1, resolveDice(parseDiceFormula(grant.minutesRolled), ctx.deps.random).total)
+    : grant.daysShared !== undefined
+      ? Math.floor(grant.daysShared / recipients.length) * 24 * 60
+      : null;
+  for (const recipient of recipients) grantTo(ctx, recipient, minutes);
   // Tree Stride's once-a-turn teleport is there on the turn it is cast too.
   if (grant.teleportEachTurn)
     for (const recipient of recipients) teleportsEachTurn(ctx.state, recipient.id, `${ctx.input.commandId}:stride`);
@@ -146,7 +169,7 @@ function turnStartTemporaryHitPoints(
   return amount >= 1 ? { temporaryHitPointsEachTurn: Math.min(100, amount) } : {};
 }
 
-function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
+function grantTo(ctx: ResolveContext, recipient: LiveActor, sharedMinutes: number | null = null): void {
   const { state, action, attacker, input, deps, warnings } = ctx;
   const grant = action.grants!;
   // "Inspire another creature"; "A creature can have only one Bardic Inspiration die at a time."
@@ -156,6 +179,21 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     throw new CommandRejectedError(
       `${recipient.name} already has ${grant.name ?? action.name}, and a creature can have only one at a time.`
     );
+  // "You can have only one such sworn enemy at a time": refused while another living creature still bears it.
+  if (grant.oneAtATime) {
+    const bearer = state.actors.find(
+      (other) =>
+        other.id !== recipient.id &&
+        !isDead(other) &&
+        other.effects.some(
+          (effect) => effect.sourceActorId === attacker.id && grant.tags.some((tag) => effect.tags.includes(tag))
+        )
+    );
+    if (bearer)
+      throw new CommandRejectedError(
+        `${attacker.name} can have only one ${grant.name ?? action.name} at a time, and ${bearer.visibility === "gm-only" ? "another creature" : bearer.name} still bears it.`
+      );
+  }
   if (grant.tags.includes(GIFT_OF_THE_PROTECTORS_TAG)) refuseFullPage(state, attacker, recipient, deps.definition);
   // Dimensional Shackles bar a bound creature's own way to another plane (Etherealness, an Ethereal Jaunt).
   if (recipient.id === attacker.id && travelsPlanes(grant.tags) && planeTravelBarred(recipient))
@@ -255,7 +293,11 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     ? action.timePool === "hours"
       ? { type: "minutes", remaining: paid.amount * 60 }
       : { type: "rounds", remaining: paid.amount }
-    : null;
+    : sharedMinutes !== null
+      ? sharedMinutes <= 10
+        ? { type: "rounds", remaining: sharedMinutes * 10 }
+        : { type: "minutes", remaining: sharedMinutes }
+      : null;
   const spell = spellOf(ctx);
   const castLevel = spell ? (ctx.plan.castLevel ?? spell.level) : null;
   // The choice made as it is granted (Fire Shield's warm or chill), and the weapon it binds to (Magic Weapon).
@@ -315,6 +357,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
         action.spellId === undefined && grant.answer === undefined && !grant.tags.includes(ENDS_ON_DEATH_TAG),
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       ...(grant.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
+      ...(grant.endsInBrightLight ? { endsInBrightLight: true as const } : {}),
+      ...(grant.regainsHitPoints ? { regainsHitPoints: { ...grant.regainsHitPoints } } : {}),
+      ...grantedItemActionOf(ctx, grant.itemAction),
       modifiers: [
         ...modifiers,
         ...hexDisadvantage,

@@ -6,7 +6,8 @@ import {
   CharacterChoiceSchema,
   DamageTypeSchema,
   SaveConditionSchema,
-  type CharacterChoice
+  type CharacterChoice,
+  type DamageSource
 } from "@vtt/schemas";
 import { CharacterDraftSchema } from "./character-draft.js";
 import { AbilityIdSchema, BuilderAbilityMethodSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
@@ -267,6 +268,9 @@ export type ActionResolution = Readonly<{
   /** No attack roll and no save, but damage: what each target is owed, applied or proposed like a hit. A darts action
    *  (Magic Missile) owes each creature only what its own darts dealt. */
   damageTargets?: readonly DamageTarget[];
+  /** What deals its damage (its spell, the carried row it was made with, how the attack was made), for a defence that
+   *  reads it as the damage lands. */
+  damageSource?: DamageSource;
   /** The creatures this action brought onto the map (Summon Dragon's spirit), which appear on it for the table. */
   summoned?: ReadonlyArray<Readonly<{ actorId: string; name: string }>>;
 }>;

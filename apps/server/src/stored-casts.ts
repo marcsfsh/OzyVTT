@@ -37,9 +37,16 @@ type Effect = Actor["effects"][number];
 export const STORED_CAST_PREFIX = "stored-cast-";
 export const isStoredCast = (actionId: string) => actionId.startsWith(STORED_CAST_PREFIX);
 const STORE_AWAITS_TAG = "store-awaits";
-const RING_ID = "ring-of-spell-storing";
-/** "The ring can store up to 5 levels worth of spells at a time." */
-export const RING_LEVELS = 5;
+/** What holds spells cast into it, by record (and kind), and how many levels it holds at a time: "The ring can store
+ *  up to 5 levels worth of spells at a time"; an Ioun Stone of Reserve "can store up to 4 levels of spells". */
+const STORING_ITEMS: Readonly<Record<string, number>> = {
+  "ring-of-spell-storing": 5,
+  "ioun-stone#reserve": 4
+};
+export const RING_LEVELS = STORING_ITEMS["ring-of-spell-storing"]!;
+/** The levels a carried copy holds at a time, when it holds spells. */
+const storingLevels = (row: Actor["inventory"][number]): number | undefined =>
+  STORING_ITEMS[`${catalogIdOf(row)}#${row.variantId ?? ""}`] ?? STORING_ITEMS[catalogIdOf(row)];
 /** How long a store waits for its spell: the minute of the cast it is part of. */
 const WINDOW_ROUNDS = 10;
 
@@ -61,7 +68,7 @@ export function openStoreWindow(
 ): void {
   const via = awaits.via;
   const maxLevel = via === "glyph" && castLevel !== null ? castLevel : awaits.maxLevel;
-  const what = via === "contingency" ? "Contingency" : via === "glyph" ? "the glyph" : "the ring";
+  const what = via === "contingency" ? "Contingency" : via === "glyph" ? "the glyph" : "the item";
   if (via === "contingency")
     addEffect(
       ctx.state,
@@ -159,10 +166,14 @@ export function storeOnCast(ctx: ResolveContext): boolean {
   for (const wearer of wearers) {
     const open = windowOf(wearer, "ring");
     if (!open) continue;
-    const ring = wearer.inventory.find((row) => catalogIdOf(row) === RING_ID && row.quantity > 0);
+    const ring = wearer.inventory.find((row) => storingLevels(row) !== undefined && row.quantity > 0);
     endEffectIfPresent(state, wearer.id, open.id);
     if (!ring) continue;
-    if (level < 1 || level > open.storeAwaits!.maxLevel || levelsHeld(ring.storedCasts) + level > RING_LEVELS) {
+    if (
+      level < 1 ||
+      level > open.storeAwaits!.maxLevel ||
+      levelsHeld(ring.storedCasts) + level > storingLevels(ring)!
+    ) {
       say(`${spell.name} doesn't fit in ${wearer.name}'s ${ring.name} and is lost.`, wearer.id);
       return true;
     }
@@ -268,7 +279,7 @@ export function storedCastActions(actor: Actor, catalog: EquipmentCatalog | unde
         ];
   });
   const fromRings = actor.inventory.flatMap((row): ActorAction[] =>
-    catalogIdOf(row) === RING_ID && row.attuned
+    storingLevels(row) !== undefined && row.attuned
       ? (row.storedCasts ?? []).flatMap((cast, index) => {
           const spell = spellOfCast(cast);
           return spell
@@ -279,7 +290,7 @@ export function storedCastActions(actor: Actor, catalog: EquipmentCatalog | unde
                   `${STORED_CAST_PREFIX}${row.id}-${index}`,
                   `${row.name}: ${spell.name}`,
                   spellActivationOf(spell.castingTime),
-                  `Cast from the ring at ${cast.casterName}'s numbers, freeing its space.`
+                  `Cast from the ${catalogIdOf(row) === "ioun-stone" ? "stone" : "ring"} at ${cast.casterName}'s numbers, freeing its space.`
                 )
               ]
             : [];

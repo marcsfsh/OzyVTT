@@ -4,7 +4,7 @@ import { requireActorAccess, requireGm, type Initiator } from "./authorization.j
 import { holdsFeature } from "./class-features.js";
 import { exhaustionLevel } from "./condition-rules.js";
 import { applyCondition, conditionGained, GOODBERRY_ID, type EffectNarration } from "./effects.js";
-import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 import { healActor } from "./hit-points.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
@@ -75,6 +75,16 @@ export function needsOf(actor: Pick<Actor, "size">): Readonly<{ food: number; wa
 /** On an effect, its bearer needs no air, food or water while it lasts (Imprisonment). */
 export const SUSTAINED_TAG = "sustained";
 const isSustained = (actor: Actor) => actor.effects.some((effect) => effect.tags.includes(SUSTAINED_TAG));
+/** On an item's effect, its bearer needs no food or water while it is worn (an Ioun Stone of Sustenance). */
+export const NEEDS_NO_FOOD_TAG = "needs-no-food";
+const needsNoFood = (actor: Actor, deps: DayEndDeps) =>
+  deps.catalog !== undefined &&
+  (deriveEquipment(
+    actor,
+    actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined,
+    deps.catalog
+  ).context.effectTags?.includes(NEEDS_NO_FOOD_TAG) ??
+    false);
 
 const tracked = (state: GameState, actor: Actor) =>
   state.rest.survival && actor.kind === "player-character" && !actor.archived;
@@ -292,7 +302,13 @@ export function endOfDays(
   for (let day = 0; day < days; day += 1)
     for (const actor of state.actors)
       // An imprisoned creature "doesn't need to breathe, eat, or drink" (Imprisonment).
-      if (actorIds.has(actor.id) && tracked(state, actor) && !isDead(actor) && !isSustained(actor))
+      if (
+        actorIds.has(actor.id) &&
+        tracked(state, actor) &&
+        !isDead(actor) &&
+        !isSustained(actor) &&
+        !needsNoFood(actor, deps)
+      )
         events.push(...endDayFor(state, actor, deps));
   return events;
 }

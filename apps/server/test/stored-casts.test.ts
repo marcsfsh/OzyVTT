@@ -82,6 +82,43 @@ describe("Ring of Spell Storing", () => {
   });
 });
 
+describe("an Ioun Stone of Reserve", () => {
+  it("stores up to 4 levels of spells cast into it, cast by its attuned bearer at the caster's numbers", () => {
+    const table = caster({ combat: false });
+    actorOf(table.state, HERO).inventory.push({
+      id: "ioun-stone",
+      name: "Ioun Stone",
+      quantity: 1,
+      equipped: true,
+      attuned: true,
+      variantId: "reserve"
+    });
+    const holdOut = () =>
+      resolveAs(
+        table,
+        heroAction(table, (id) => id.includes("hold-out"))!,
+        { targetIds: [] }
+      );
+    holdOut();
+    cast(table, "hold-person", { targetIds: [FOE] });
+    const stone = () => actorOf(table.state, HERO).inventory.find((row) => row.id === "ioun-stone")!;
+    expect(stone().storedCasts).toEqual([expect.objectContaining({ spellId: "hold-person", level: 2, saveDc: 15 })]);
+    // Three levels more don't fit beside the two held: four is all it holds.
+    holdOut();
+    cast(table, "fly", { targetIds: [HERO] });
+    expect(stone().storedCasts).toHaveLength(1);
+    resolveAs(
+      table,
+      heroAction(table, (id) => id === "stored-cast-ioun-stone-0")!,
+      { targetIds: [FOE] }
+    );
+    expect(table.state.combat.pendingSaves).toEqual([
+      expect.objectContaining({ targetActorId: FOE, ability: "wis", dc: 15 })
+    ]);
+    expect(stone().storedCasts).toEqual([]);
+  });
+});
+
 describe("a shield guardian's Spell Storing", () => {
   it("stores a spell its commander casts on it, and casts it at the commander's numbers", () => {
     const table = caster({ combat: false });

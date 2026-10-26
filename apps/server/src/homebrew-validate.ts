@@ -632,9 +632,10 @@ const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
   "damage-bonus": DAMAGE_ROLL_MOMENTS,
   "extra-damage": DAMAGE_ROLL_MOMENTS,
   "damage-die-minimum": DAMAGE_ROLL_MOMENTS,
-  "damage-resistance": [],
+  // Standing, or as the damage lands, narrowed by what dealt it (a Brooch of Shielding against Magic Missile).
+  "damage-resistance": ["on-taking-damage"],
   "damage-vulnerability": [],
-  "damage-immunity": [],
+  "damage-immunity": ["on-taking-damage"],
   "ignores-resistance": [],
   "advantage-denied": [],
   "ability-score-minimum": [],
@@ -642,6 +643,8 @@ const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
   "speed-minimum": [],
   "carrying-capacity-larger": [],
   "ignores-cover": ["on-attack-roll"],
+  // Standing, or against one attack roll as it is rolled (an Arrow-Catching Shield's +2 against ranged attacks).
+  "armor-class": ["on-attack-roll"],
   "no-critical-hits": ["on-attack-roll"],
   "spell-ward": [],
   "healing-received-maximized": [],
@@ -671,16 +674,19 @@ function riderIssues(modifiers: readonly Modifier[] | undefined, path: Path, lab
         [...path, index],
         read.length === 0
           ? `A modifier of ${label} waits for a moment in a roll, but a defence is read before any roll, so it would never apply. Remove the moment, or make it depend on a state, such as an effect or a condition.`
-          : read === DAMAGE_ROLL_MOMENTS
-            ? `A damage modifier of ${label} waits for a moment the damage roll never reaches, so it would add nothing. Make it apply on a hit or on the damage roll, or remove the moment for a bonus that always applies.`
-            : `A modifier of ${label} waits for a moment its rule never reaches, so it would never apply. Make it apply ${read.map((entry) => MOMENT_WORDS[entry] ?? entry).join(" or ")}, or remove the moment.`
+          : modifier.type === "damage-resistance" || modifier.type === "damage-immunity"
+            ? `A modifier of ${label} waits for a moment in a roll, but a defence is read before any roll or as the damage lands, so it would never apply. Make it apply when the bearer takes damage, make it depend on a state, or remove the moment.`
+            : read === DAMAGE_ROLL_MOMENTS
+              ? `A damage modifier of ${label} waits for a moment the damage roll never reaches, so it would add nothing. Make it apply on a hit or on the damage roll, or remove the moment for a bonus that always applies.`
+              : `A modifier of ${label} waits for a moment its rule never reaches, so it would never apply. Make it apply ${read.map((entry) => MOMENT_WORDS[entry] ?? entry).join(" or ")}, or remove the moment.`
       );
     }
     if (
       modifier.type === "extra-damage" &&
       modifier.formula === undefined &&
       modifier.abilityModifier === undefined &&
-      modifier.abilityScore === undefined
+      modifier.abilityScore === undefined &&
+      modifier.flat === undefined
     ) {
       checks.add(
         [...path, index],

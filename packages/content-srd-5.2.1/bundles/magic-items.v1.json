@@ -851,7 +851,31 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "deploy",
+    "name": "Crew the Apparatus",
+    "activation": "action",
+    "description": "Open the barrel's hidden hatch and crawl inside with up to one more Medium or smaller creature. The apparatus is a Large object (AC 20, 200 Hit Points, Speed and Swim Speed 30 ft., Immunity to Poison and Psychic damage) that its pilot works with its levers.",
+    "damage": [],
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "apparatus-of-the-crab",
+       "count": 1
+      }
+     ],
+     "rangeFeet": 5,
+     "turn": "after-user",
+     "lasts": {
+      "type": "untimed"
+     },
+     "allegiance": "user",
+     "onlyOne": true,
+     "dismiss": "action"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1259,7 +1283,24 @@
    }
   ],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 2,
+    "whileArmored": false,
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "ranged"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "bag-of-beans",
@@ -2022,6 +2063,28 @@
    {
     "type": "damage-bonus",
     "amount": 1
+   },
+   {
+    "type": "hit-points-per-level",
+    "amount": 1,
+    "when": [
+     {
+      "type": "attuned"
+     }
+    ]
+   },
+   {
+    "type": "roll-mode",
+    "roll": "attack",
+    "mode": "disadvantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "other-weapon"
+     }
+    ]
    }
   ]
  },
@@ -2521,7 +2584,37 @@
    "conditionImmunities": [],
    "spells": []
   },
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "damage-immunity",
+    "damageTypes": [
+     "acid",
+     "bludgeoning",
+     "cold",
+     "fire",
+     "force",
+     "lightning",
+     "necrotic",
+     "piercing",
+     "poison",
+     "psychic",
+     "radiant",
+     "slashing",
+     "thunder"
+    ],
+    "when": [
+     {
+      "type": "on-taking-damage"
+     },
+     {
+      "type": "spell-id-is",
+      "spellIds": [
+       "magic-missile"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "broom-of-flying",
@@ -3091,6 +3184,10 @@
   "description": "Wondrous Item, Rare (Requires Attunement). While you wear this cloak, it magically projects an illusion that makes you appear to be standing in a place near your actual location, causing any creature to have Disadvantage on attack rolls against you. If you take damage, the property ceases to function until the start of your next turn. This property is suppressed while your Speed is 0.",
   "weapon": null,
   "armor": null,
+  "lapses": {
+   "onDamage": true,
+   "atSpeedZero": true
+  },
   "slot": "shoulders",
   "appliesTo": null,
   "rarity": "rare",
@@ -3105,7 +3202,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "incoming-attack",
+    "mode": "disadvantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "cloak-of-elvenkind",
@@ -3272,10 +3380,64 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "polymorph",
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "consumesSpellSlot": false,
+    "targets": {
+     "who": "self"
+    },
+    "forms": {
+     "only": [
+      "bat"
+     ],
+     "keeps": [
+      "mental"
+     ]
+    },
+    "inDimLightOrDarkness": true
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "grip",
+    "name": "Grip the Cloak's Edges",
+    "activation": "other",
+    "description": "In an area of Dim Light or Darkness, grip the edges of the cloak to gain a Fly Speed of 40 feet. If you ever fail to grip the cloak's edges while flying in this way, or if you are no longer in Dim Light or Darkness, you lose this Fly Speed. Use it again to let go.",
+    "damage": [],
+    "grants": {
+     "name": "Cloak of the Bat",
+     "tags": [
+      "cloak-of-the-bat"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [
+      {
+       "type": "special-speed",
+       "movement": "fly",
+       "feet": 40
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "toggles": true,
+     "endsInBrightLight": true
+    },
+    "sight": {
+     "inDimLightOrDarkness": true
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -3744,7 +3906,44 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "toss",
+    "name": "Toss the Sword",
+    "activation": "bonus-action",
+    "description": "Toss the weapon into the air: it hovers, flies up to 30 feet, and attacks one creature of your choice within 5 feet of itself, using your attack roll and adding your ability modifier to damage rolls.",
+    "damage": [],
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "dancing-sword",
+       "count": 1
+      }
+     ],
+     "rangeFeet": 30,
+     "turn": "none",
+     "leashFeet": 30,
+     "allegiance": "user",
+     "intangible": true,
+     "strikesFrom": {
+      "reachFeet": 5,
+      "moveFeet": 30,
+      "withinFeetOfUser": 30,
+      "attacks": 4
+     }
+    },
+    "swingsWeapon": true
+   },
+   {
+    "id": "dance",
+    "name": "Direct the Dancing Sword",
+    "activation": "bonus-action",
+    "forceOf": "toss",
+    "description": "While the weapon hovers, cause it to fly up to 30 feet to another spot within 30 feet of you and attack one creature within 5 feet of it. After its fourth attack, it flies back to you.",
+    "damage": [],
+    "swingsWeapon": true
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3821,7 +4020,292 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "draw",
+    "name": "Draw an Illusion",
+    "activation": "action",
+    "description": "Draw a card at random and throw it to the ground at a point within 30 feet of you. An illusion of the creature it shows forms over the card and remains until dispelled. It looks and behaves like a real creature of its kind, except that it can do no harm, and objects pass through it. While you are within 120 feet of it and can see it, a Magic action moves it anywhere within 30 feet of its card.",
+    "damage": [],
+    "uses": {
+     "limit": 34,
+     "per": "never",
+     "pool": "deck-of-illusions-cards"
+    },
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "adult-red-dragon",
+       "count": 1,
+       "faces": {
+        "from": 1,
+        "to": 3
+       }
+      },
+      {
+       "monsterId": "archmage",
+       "count": 1,
+       "faces": {
+        "from": 4,
+        "to": 6
+       }
+      },
+      {
+       "monsterId": "assassin",
+       "count": 1,
+       "faces": {
+        "from": 7,
+        "to": 9
+       }
+      },
+      {
+       "monsterId": "bandit-captain",
+       "count": 1,
+       "faces": {
+        "from": 10,
+        "to": 12
+       }
+      },
+      {
+       "monsterId": "basilisk",
+       "count": 1,
+       "faces": {
+        "from": 13,
+        "to": 15
+       }
+      },
+      {
+       "monsterId": "berserker",
+       "count": 1,
+       "faces": {
+        "from": 16,
+        "to": 18
+       }
+      },
+      {
+       "monsterId": "bugbear-warrior",
+       "count": 1,
+       "faces": {
+        "from": 19,
+        "to": 21
+       }
+      },
+      {
+       "monsterId": "cloud-giant",
+       "count": 1,
+       "faces": {
+        "from": 22,
+        "to": 24
+       }
+      },
+      {
+       "monsterId": "druid",
+       "count": 1,
+       "faces": {
+        "from": 25,
+        "to": 27
+       }
+      },
+      {
+       "monsterId": "erinyes",
+       "count": 1,
+       "faces": {
+        "from": 28,
+        "to": 30
+       }
+      },
+      {
+       "monsterId": "ettin",
+       "count": 1,
+       "faces": {
+        "from": 31,
+        "to": 33
+       }
+      },
+      {
+       "monsterId": "fire-giant",
+       "count": 1,
+       "faces": {
+        "from": 34,
+        "to": 36
+       }
+      },
+      {
+       "monsterId": "frost-giant",
+       "count": 1,
+       "faces": {
+        "from": 37,
+        "to": 39
+       }
+      },
+      {
+       "monsterId": "gnoll-warrior",
+       "count": 1,
+       "faces": {
+        "from": 40,
+        "to": 42
+       }
+      },
+      {
+       "monsterId": "goblin-warrior",
+       "count": 1,
+       "faces": {
+        "from": 43,
+        "to": 45
+       }
+      },
+      {
+       "monsterId": "guardian-naga",
+       "count": 1,
+       "faces": {
+        "from": 46,
+        "to": 48
+       }
+      },
+      {
+       "monsterId": "hill-giant",
+       "count": 1,
+       "faces": {
+        "from": 49,
+        "to": 51
+       }
+      },
+      {
+       "monsterId": "hobgoblin-warrior",
+       "count": 1,
+       "faces": {
+        "from": 52,
+        "to": 54
+       }
+      },
+      {
+       "monsterId": "incubus",
+       "count": 1,
+       "faces": {
+        "from": 55,
+        "to": 57
+       }
+      },
+      {
+       "monsterId": "iron-golem",
+       "count": 1,
+       "faces": {
+        "from": 58,
+        "to": 60
+       }
+      },
+      {
+       "monsterId": "knight",
+       "count": 1,
+       "faces": {
+        "from": 61,
+        "to": 63
+       }
+      },
+      {
+       "monsterId": "kobold-warrior",
+       "count": 1,
+       "faces": {
+        "from": 64,
+        "to": 66
+       }
+      },
+      {
+       "monsterId": "lich",
+       "count": 1,
+       "faces": {
+        "from": 67,
+        "to": 69
+       }
+      },
+      {
+       "monsterId": "medusa",
+       "count": 1,
+       "faces": {
+        "from": 70,
+        "to": 72
+       }
+      },
+      {
+       "monsterId": "night-hag",
+       "count": 1,
+       "faces": {
+        "from": 73,
+        "to": 75
+       }
+      },
+      {
+       "monsterId": "ogre",
+       "count": 1,
+       "faces": {
+        "from": 76,
+        "to": 78
+       }
+      },
+      {
+       "monsterId": "oni",
+       "count": 1,
+       "faces": {
+        "from": 79,
+        "to": 81
+       }
+      },
+      {
+       "monsterId": "priest",
+       "count": 1,
+       "faces": {
+        "from": 82,
+        "to": 84
+       }
+      },
+      {
+       "monsterId": "succubus",
+       "count": 1,
+       "faces": {
+        "from": 85,
+        "to": 87
+       }
+      },
+      {
+       "monsterId": "troll",
+       "count": 1,
+       "faces": {
+        "from": 88,
+        "to": 90
+       }
+      },
+      {
+       "monsterId": "warrior-veteran",
+       "count": 1,
+       "faces": {
+        "from": 91,
+        "to": 93
+       }
+      },
+      {
+       "monsterId": "wyvern",
+       "count": 1,
+       "faces": {
+        "from": 94,
+        "to": 96
+       }
+      }
+     ],
+     "die": 100,
+     "rangeFeet": 30,
+     "turn": "after-user",
+     "commandedWith": "action",
+     "commandMove": 30,
+     "lasts": {
+      "type": "untimed"
+     },
+     "leashFeet": 120,
+     "allegiance": "user",
+     "noAttacks": true,
+     "intangible": true
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3969,6 +4453,10 @@
   "description": "Armor (Any Light, Medium, or Heavy), Very Rare (Requires Attunement). While wearing this armor, you gain a +1 bonus to Armor Class, and you know Abyssal. In addition, the armor's clawed gauntlets allow your Unarmed Strikes to deal 1d8 Slashing damage instead of the usual Bludgeoning damage, and you gain a +1 bonus to the attack and damage rolls of your Unarmed Strikes. Curse. Once you don this cursed armor, you can't doff it unless you are targeted by a Remove Curse spell or similar magic. While wearing the armor, you have Disadvantage on attack rolls against demons and on saving throws against their spells and special abilities.",
   "weapon": null,
   "armor": null,
+  "unarmedStrike": {
+   "dice": "1d8",
+   "damageType": "slashing"
+  },
   "slot": "armor",
   "appliesTo": {
    "label": "Any Light, Medium, or Heavy",
@@ -4004,6 +4492,68 @@
     "type": "armor-class",
     "amount": 1,
     "whileArmored": false
+   },
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "unarmed"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "unarmed"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "roll-mode",
+    "roll": "attack",
+    "mode": "disadvantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "demon"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "disadvantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "source-creature-type-is",
+      "creatureTypes": [
+       "demon"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -4408,9 +4958,42 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "throw",
+    "name": "Throw the Dust",
+    "activation": "action",
+    "description": "Throw the dust into the air: you and each creature within a 10-foot Emanation originating from you have the Invisible condition for 2d4 minutes, the same for all. The condition ends for a creature immediately after it makes an attack roll, deals damage, or casts a spell.",
+    "damage": [],
+    "grants": {
+     "name": "Dust of Disappearance",
+     "tags": [
+      "until-it-acts"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 8
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self-and-targets",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "conditions": [
+      "invisible"
+     ],
+     "minutesRolled": "2d4"
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 10,
+     "widthFeet": null
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -4526,7 +5109,15 @@
      "failureConditions": [
       "incapacitated"
      ],
-     "repeatSave": true
+     "repeatSave": true,
+     "failureEffect": {
+      "name": "Sneezing",
+      "tags": [
+       "choking",
+       "cured-by-lesser-restoration"
+      ],
+      "modifiers": []
+     }
     }
    }
   ],
@@ -5138,7 +5729,63 @@
   },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "arrow-of-restraint",
+    "name": "Arrow of Restraint",
+    "activation": "other",
+    "description": "When you hit a creature with a ranged attack using this weapon, you can try to restrain it instead of dealing damage to it. It makes a DC 15 Strength saving throw or has the Restrained condition for 1 minute. As an action, it can make a DC 20 Strength (Athletics) check to break the restraint.",
+    "damage": [],
+    "save": {
+     "ability": "str",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "restrained"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "failureEffect": {
+      "name": "Arrow of Restraint",
+      "tags": [],
+      "modifiers": [],
+      "endAction": {
+       "activation": "action",
+       "kind": "check",
+       "ability": "str",
+       "skill": "athletics",
+       "dc": 20,
+       "label": "Break the restraint"
+      }
+     }
+    },
+    "ridesHit": {
+     "rides": "this-weapon",
+     "insteadOfDamage": true
+    }
+   },
+   {
+    "id": "arrow-of-transport",
+    "name": "Arrow of Transport",
+    "activation": "action",
+    "description": "Fire an arrow at a willing creature you can see within 60 feet of you that is Medium or smaller. It teleports to an unoccupied space you can see within 10 feet of you.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "maxSize": "medium",
+     "seen": true,
+     "who": "others"
+    },
+    "teleport": {
+     "feet": 75,
+     "orAnother": true,
+     "nearUserFeet": 10
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -5416,7 +6063,74 @@
     "id": "whip",
     "name": "Whip",
     "modifiers": [],
-    "actions": [],
+    "actions": [
+     {
+      "id": "whip",
+      "name": "Throw the Whip Token",
+      "activation": "action",
+      "description": "Throw the token to a point within 10 feet of yourself: a floating whip takes its place for 1 hour. You can dismiss it as a Magic action, and it disappears if you die or have the Incapacitated condition.",
+      "damage": [],
+      "grants": {
+       "name": "Floating Whip",
+       "tags": [
+        "floating-whip"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "endsOnIncapacitated": true,
+       "concentration": false,
+       "itemAction": "whip-strike"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "feather-token-whip",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 10,
+       "turn": "none",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "endsOnUserDeath": true,
+       "allegiance": "user",
+       "intangible": true,
+       "dismiss": "action",
+       "strikesFrom": {
+        "reachFeet": 10,
+        "moveFeet": 20
+       }
+      }
+     },
+     {
+      "id": "whip-strike",
+      "name": "Crack the Floating Whip",
+      "activation": "bonus-action",
+      "forceOf": "whip",
+      "description": "Direct the whip to fly up to 20 feet and make a melee spell attack against a creature within 10 feet of it, with an attack bonus of +9. On a hit, the target takes 1d6 + 5 Force damage.",
+      "damage": [
+       {
+        "formula": "1d6 + 5",
+        "type": "force"
+       }
+      ],
+      "attack": {
+       "ability": "spellcasting",
+       "proficient": true,
+       "reachFeet": 10,
+       "bonus": 9
+      },
+      "grantedOnly": true
+     }
+    ],
     "casts": [],
     "effects": []
    }
@@ -6669,9 +7383,66 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d4 + 1",
+   "lastChargeRoll": false
+  },
+  "onHit": [
+   {
+    "conditions": [],
+    "save": {
+     "ability": "con",
+     "dc": 17
+    },
+    "whileAttunedTo": [
+     "belt-of-giant-strength",
+     "gauntlets-of-ogre-power"
+    ],
+    "naturalTwenty": true,
+    "creatureTypes": [
+     "giant"
+    ],
+    "kills": {}
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "hurl",
+    "name": "Hurl the Hammer",
+    "activation": "action",
+    "description": "Expend 1 charge and make a ranged attack with the weapon, hurling it as if it had the Thrown property with a normal range of 20 feet and a long range of 60 feet. If the attack hits, the weapon unleashes a thunderclap: the target and every creature within 30 feet of it other than you must succeed on a DC 17 Constitution saving throw or have the Stunned condition until the end of your next turn. The weapon then flies back to your hand.",
+    "damage": [],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "stunned"
+       }
+      ],
+      "name": "Thunderclap",
+      "duration": {
+       "type": "until-source-turn-end"
+      },
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "aroundTargetFeet": 30
+      }
+     }
+    ],
+    "uses": {
+     "limit": 5,
+     "per": "long-rest",
+     "pool": "hammer-of-thunderbolts-charges"
+    },
+    "hurlsWeapon": {
+     "normalFeet": 20,
+     "longFeet": 60
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -6681,6 +7452,21 @@
    {
     "type": "damage-bonus",
     "amount": 1
+   },
+   {
+    "type": "granted-score-bonus",
+    "ability": "str",
+    "amount": 4,
+    "maximum": 30,
+    "when": [
+     {
+      "type": "while-attuned-to",
+      "itemIds": [
+       "belt-of-giant-strength",
+       "gauntlets-of-ogre-power"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -6775,6 +7561,7 @@
   "description": "Wondrous Item, Very Rare (Requires Attunement by a Wizard). This pointed hat has the following properties. Spellcasting Focus. While holding the hat, you can use it as a Spellcasting Focus for your Wizard spells. Any spell you cast using the hat gains a special Somatic component: you must reach into the hat and \"pull\" the spell out of it. Unknown Spell. While holding the hat, you can try to cast a level 1+ spell you don't know. The spell must be on the Wizard spell list, it must be of a level you can cast, and it can't have Material components costing more than 1,000 GP. Once you decide on the spell, you must expend a spell slot of the spell's level. Then, to determine whether you cast the spell, make an Intelligence (Arcana) check (DC 10 plus the spell's level). On a successful check, you cast the spell using its normal casting time, and you can't use this property again until you finish a Short or Long Rest. On a failed check, you fail to cast the spell and a random effect occurs instead, determined by rolling on the following table. Any spell you cast from the hat uses your spell save DC and spell attack bonus. 1d100 01–50: You cast a random spell determined by rolling 1d10: on a 1, *Enlarge/Reduce* (enlarge effect); on a 2, *Enlarge/Reduce* (reduce effect); on a 3, *Faerie Fire*; on a 4, *Fireball*; on a 5, *Gust of Wind*; on a 6, *Invisibility* (cast on yourself); on a 7, *Lightning Bolt*; on an 8, *Phantasmal Force*; on a 9, *Polymorph*; on a 10, *Stinking Cloud*.; 1d100 51–55: You have the Stunned condition until the end of your next turn, believing something awesome just happened.; 1d100 56–60: A harmless swarm of butterflies fills a 10-foot Cube within 30 feet of yourself. The swarm disperses after 1 minute.; 1d100 61–65: You pull a nonmagical object out of the hat. Roll 1d4 to determine the object: on a 1, a vial of Acid; on a 2, a flask of Alchemist's Fire; on a 3, a Crowbar; on a 4, a lit Torch.; 1d100 66–70: You suffer a bout of magic sickness and have the Poisoned condition for 1 hour.; 1d100 71–75: You have the Petrified condition until the end of your next turn.; 1d100 76–80: You pull a nonmagical object out of the hat. Roll 1d4 to determine the object: on a 1, a Dagger; on a 2, a Rope with a Grappling Hook tied to one end; on a 3, a bag of Caltrops; on a 4, a gem worth 50 GP.; 1d100 81–85: A creature appears in an unoccupied space as close to you as possible. The creature isn't under your control and acts as it normally would, and it disappears after 1 hour or when it drops to 0 Hit Points. Roll 1d4 to determine the creature: on a 1, a Camel; on a 2, a Constrictor Snake; on a 3, an Elephant; on a 4, a Mule.; 1d100 86–90: A Hostile Swarm of Bats flies out of the hat, occupies your space, and attacks you.; 1d100 91–95: A vertical, 10-foot-diameter, two-way portal to another plane of existence opens in an unoccupied space within 30 feet of you and remains open until the end of your next turn. The GM determines where it leads.; 1d100 96–00: You pull a magic item out of the hat. Roll 1d6 to determine the item's rarity: on a 1–3, Common; on a 4–5, Uncommon; on a 6, Rare. The GM chooses the item, which disappears after 1 hour if it's not consumed or destroyed before then..",
   "weapon": null,
   "armor": null,
+  "servesAsFocus": "arcane-focus",
   "slot": "wondrous",
   "appliesTo": null,
   "rarity": "very-rare",
@@ -6786,10 +7573,371 @@
    ]
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "enlargereduce",
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "faerie-fire",
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "fireball",
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "gust-of-wind",
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "lightning-bolt",
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "phantasmal-force",
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "polymorph",
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "stinking-cloud",
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "invisibility",
+    "consumesSpellSlot": false,
+    "targets": {
+     "who": "self"
+    },
+    "activation": "other",
+    "grantedOnly": true
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "miscast",
+    "name": "Unknown Spell Fails",
+    "activation": "other",
+    "rollsOn": {
+     "die": 100,
+     "rows": [
+      {
+       "from": 1,
+       "to": 50,
+       "name": "a random spell (a d10 picks it)",
+       "then": "spell-surge"
+      },
+      {
+       "from": 51,
+       "to": 55,
+       "name": "you are Stunned until the end of your next turn",
+       "then": "awestruck"
+      },
+      {
+       "from": 56,
+       "to": 60,
+       "name": "a harmless swarm of butterflies fills a 10-foot Cube within 30 feet for 1 minute"
+      },
+      {
+       "from": 61,
+       "to": 65,
+       "name": "you pull out a vial of Acid, a flask of Alchemist's Fire, a Crowbar or a lit Torch (1d4)"
+      },
+      {
+       "from": 66,
+       "to": 70,
+       "name": "magic sickness: you are Poisoned for 1 hour",
+       "then": "sickness"
+      },
+      {
+       "from": 71,
+       "to": 75,
+       "name": "you are Petrified until the end of your next turn",
+       "then": "petrified"
+      },
+      {
+       "from": 76,
+       "to": 80,
+       "name": "you pull out a Dagger, a Rope with a Grappling Hook, a bag of Caltrops or a 50 GP gem (1d4)"
+      },
+      {
+       "from": 81,
+       "to": 85,
+       "name": "a creature appears beside you (a d4 picks it)",
+       "then": "creature"
+      },
+      {
+       "from": 86,
+       "to": 90,
+       "name": "a Hostile Swarm of Bats flies out and attacks you",
+       "then": "bats"
+      },
+      {
+       "from": 91,
+       "to": 95,
+       "name": "a two-way portal to another plane opens within 30 feet until the end of your next turn"
+      },
+      {
+       "from": 96,
+       "to": 100,
+       "name": "you pull out a magic item the GM chooses (a d6 sets its rarity)"
+      }
+     ]
+    },
+    "description": "When your Intelligence (Arcana) check to cast an unknown spell from the hat fails, you fail to cast the spell and a random effect occurs instead, rolled on the hat's table.",
+    "damage": []
+   },
+   {
+    "id": "spell-surge",
+    "name": "Hat of Many Spells: Spell",
+    "activation": "other",
+    "rollsOn": {
+     "die": 10,
+     "rows": [
+      {
+       "from": 1,
+       "to": 1,
+       "name": "Enlarge/Reduce, enlarging",
+       "then": "cast-enlargereduce"
+      },
+      {
+       "from": 2,
+       "to": 2,
+       "name": "Enlarge/Reduce, reducing",
+       "then": "cast-enlargereduce"
+      },
+      {
+       "from": 3,
+       "to": 3,
+       "name": "Faerie Fire",
+       "then": "cast-faerie-fire"
+      },
+      {
+       "from": 4,
+       "to": 4,
+       "name": "Fireball",
+       "then": "cast-fireball"
+      },
+      {
+       "from": 5,
+       "to": 5,
+       "name": "Gust of Wind",
+       "then": "cast-gust-of-wind"
+      },
+      {
+       "from": 6,
+       "to": 6,
+       "name": "Invisibility on yourself",
+       "then": "cast-invisibility"
+      },
+      {
+       "from": 7,
+       "to": 7,
+       "name": "Lightning Bolt",
+       "then": "cast-lightning-bolt"
+      },
+      {
+       "from": 8,
+       "to": 8,
+       "name": "Phantasmal Force",
+       "then": "cast-phantasmal-force"
+      },
+      {
+       "from": 9,
+       "to": 9,
+       "name": "Polymorph",
+       "then": "cast-polymorph"
+      },
+      {
+       "from": 10,
+       "to": 10,
+       "name": "Stinking Cloud",
+       "then": "cast-stinking-cloud"
+      }
+     ]
+    },
+    "description": "Roll 1d10: Enlarge/Reduce (enlarge), Enlarge/Reduce (reduce), Faerie Fire, Fireball, Gust of Wind, Invisibility on yourself, Lightning Bolt, Phantasmal Force, Polymorph or Stinking Cloud.",
+    "damage": [],
+    "grantedOnly": true
+   },
+   {
+    "id": "awestruck",
+    "name": "Hat of Many Spells: Awestruck",
+    "activation": "other",
+    "description": "You have the Stunned condition until the end of your next turn.",
+    "damage": [],
+    "targets": {
+     "who": "self"
+    },
+    "grants": {
+     "name": "Awestruck",
+     "tags": [
+      "awestruck"
+     ],
+     "duration": {
+      "type": "until-source-turn-end"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "conditions": [
+      "stunned"
+     ]
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "sickness",
+    "name": "Hat of Many Spells: Magic Sickness",
+    "activation": "other",
+    "description": "You have the Poisoned condition for 1 hour.",
+    "damage": [],
+    "targets": {
+     "who": "self"
+    },
+    "grants": {
+     "name": "Magic Sickness",
+     "tags": [
+      "magic-sickness"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 60
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "conditions": [
+      "poisoned"
+     ]
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "petrified",
+    "name": "Hat of Many Spells: Petrified",
+    "activation": "other",
+    "description": "You have the Petrified condition until the end of your next turn.",
+    "damage": [],
+    "targets": {
+     "who": "self"
+    },
+    "grants": {
+     "name": "Petrified by the Hat",
+     "tags": [
+      "hat-petrified"
+     ],
+     "duration": {
+      "type": "until-source-turn-end"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "conditions": [
+      "petrified"
+     ]
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "creature",
+    "name": "Hat of Many Spells: Creature",
+    "activation": "other",
+    "description": "A creature appears in an unoccupied space as close to you as possible: on a d4, 1 a Camel, 2 a Constrictor Snake, 3 an Elephant, 4 a Mule. It isn't under your control and disappears after 1 hour or at 0 Hit Points.",
+    "damage": [],
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "camel",
+       "count": 1,
+       "faces": {
+        "from": 1,
+        "to": 1
+       }
+      },
+      {
+       "monsterId": "constrictor-snake",
+       "count": 1,
+       "faces": {
+        "from": 2,
+        "to": 2
+       }
+      },
+      {
+       "monsterId": "elephant",
+       "count": 1,
+       "faces": {
+        "from": 3,
+        "to": 3
+       }
+      },
+      {
+       "monsterId": "mule",
+       "count": 1,
+       "faces": {
+        "from": 4,
+        "to": 4
+       }
+      }
+     ],
+     "die": 4,
+     "rangeFeet": 10,
+     "turn": "after-user",
+     "lasts": {
+      "type": "minutes",
+      "minutes": 60
+     },
+     "allegiance": "none"
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "bats",
+    "name": "Hat of Many Spells: Swarm of Bats",
+    "activation": "other",
+    "description": "A Hostile Swarm of Bats flies out of the hat, occupies your space, and attacks you.",
+    "damage": [],
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "swarm-of-bats",
+       "count": 1
+      }
+     ],
+     "rangeFeet": 5,
+     "turn": "after-user",
+     "allegiance": "hostile"
+    },
+    "grantedOnly": true
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7599,7 +8747,26 @@
     "id": "absorption",
     "name": "Absorption",
     "modifiers": [],
-    "actions": [],
+    "actions": [
+     {
+      "id": "absorb",
+      "name": "Absorb a Spell (Absorption)",
+      "activation": "reaction",
+      "description": "Cancel a spell of level 4 or lower cast by a creature you can see. Once the stone has canceled 20 levels of spells, it burns out and becomes a nonmagical stone.",
+      "damage": [],
+      "uses": {
+       "limit": 20,
+       "per": "never",
+       "pool": "ioun-stone-absorbed"
+      },
+      "reaction": {
+       "trigger": "casts-spell",
+       "response": "absorb",
+       "maxLevel": 4,
+       "seen": true
+      }
+     }
+    ],
     "casts": [],
     "effects": []
    },
@@ -7667,7 +8834,26 @@
     "id": "greater-absorption",
     "name": "Greater Absorption",
     "modifiers": [],
-    "actions": [],
+    "actions": [
+     {
+      "id": "absorb",
+      "name": "Absorb a Spell (Greater Absorption)",
+      "activation": "reaction",
+      "description": "Cancel a spell of level 8 or lower cast by a creature you can see. Once the stone has canceled 50 levels of spells, it burns out and becomes a nonmagical stone.",
+      "damage": [],
+      "uses": {
+       "limit": 50,
+       "per": "never",
+       "pool": "ioun-stone-absorbed"
+      },
+      "reaction": {
+       "trigger": "casts-spell",
+       "response": "absorb",
+       "maxLevel": 8,
+       "seen": true
+      }
+     }
+    ],
     "casts": [],
     "effects": []
    },
@@ -7719,7 +8905,12 @@
    {
     "id": "mastery",
     "name": "Mastery",
-    "modifiers": [],
+    "modifiers": [
+     {
+      "type": "proficiency-bonus",
+      "amount": 1
+     }
+    ],
     "actions": [],
     "casts": [],
     "effects": []
@@ -7744,13 +8935,44 @@
     "modifiers": [],
     "actions": [],
     "casts": [],
-    "effects": []
+    "effects": [],
+    "regainsHitPoints": {
+     "everyMinutes": 60,
+     "formula": "15"
+    }
    },
    {
     "id": "reserve",
     "name": "Reserve",
     "modifiers": [],
-    "actions": [],
+    "actions": [
+     {
+      "id": "hold-out",
+      "name": "Hold Out to a Spell",
+      "activation": "other",
+      "description": "Touch the stone as a spell of level 1 through 4 is cast: the next such spell cast at you or by you within a minute is stored in the stone if there is room, and lost if there isn't. The stone holds up to 4 levels of spells.",
+      "damage": [],
+      "grants": {
+       "name": "Ioun Stone of Reserve held out",
+       "tags": [
+        "ring-held-out"
+       ],
+       "duration": {
+        "type": "rounds",
+        "rounds": 10
+       },
+       "modifiers": [],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false,
+       "storeAwaits": {
+        "via": "ring",
+        "maxLevel": 4
+       }
+      }
+     }
+    ],
     "casts": [],
     "effects": []
    },
@@ -7775,7 +8997,22 @@
     "modifiers": [],
     "actions": [],
     "casts": [],
-    "effects": []
+    "effects": [
+     {
+      "name": "Sustenance",
+      "tags": [
+       "needs-no-food"
+      ],
+      "duration": {
+       "type": "manual"
+      },
+      "modifiers": [],
+      "onEnd": [],
+      "target": "self",
+      "voidWhileIncapacitated": false,
+      "concentration": false
+     }
+    ]
    }
   ],
   "grantsFeatIds": [],
@@ -8518,9 +9755,157 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
+  "variants": [
+   {
+    "id": "clay",
+    "name": "Clay Golem",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "animate",
+      "name": "Animate the Clay Golem",
+      "activation": "action",
+      "gmTakes": true,
+      "description": "Once 30 days of work and 65,000 GP of supplies have made the Clay Golem, the manual is consumed in eldritch flames and the golem animates under your control, understanding and obeying your commands. Your GM marks the work done.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "clay-golem",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 5,
+       "turn": "after-user",
+       "lasts": {
+        "type": "untimed"
+       },
+       "allegiance": "user"
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "flesh",
+    "name": "Flesh Golem",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "animate",
+      "name": "Animate the Flesh Golem",
+      "activation": "action",
+      "gmTakes": true,
+      "description": "Once 60 days of work and 50,000 GP of supplies have made the Flesh Golem, the manual is consumed in eldritch flames and the golem animates under your control, understanding and obeying your commands. Your GM marks the work done.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "flesh-golem",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 5,
+       "turn": "after-user",
+       "lasts": {
+        "type": "untimed"
+       },
+       "allegiance": "user"
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "iron",
+    "name": "Iron Golem",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "animate",
+      "name": "Animate the Iron Golem",
+      "activation": "action",
+      "gmTakes": true,
+      "description": "Once 120 days of work and 100,000 GP of supplies have made the Iron Golem, the manual is consumed in eldritch flames and the golem animates under your control, understanding and obeying your commands. Your GM marks the work done.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "iron-golem",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 5,
+       "turn": "after-user",
+       "lasts": {
+        "type": "untimed"
+       },
+       "allegiance": "user"
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "stone",
+    "name": "Stone Golem",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "animate",
+      "name": "Animate the Stone Golem",
+      "activation": "action",
+      "gmTakes": true,
+      "description": "Once 90 days of work and 80,000 GP of supplies have made the Stone Golem, the manual is consumed in eldritch flames and the golem animates under your control, understanding and obeying your commands. Your GM marks the work done.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "stone-golem",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 5,
+       "turn": "after-user",
+       "lasts": {
+        "type": "untimed"
+       },
+       "allegiance": "user"
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "read",
+    "name": "Read the Manual",
+    "activation": "action",
+    "keepsItem": true,
+    "refusedWithSlots": {
+     "level": 5,
+     "count": 2
+    },
+    "description": "Try to read the manual. A creature that isn't a spellcaster with at least two level 5 spell slots can't use it and takes 6d6 Psychic damage.",
+    "damage": [
+     {
+      "formula": "6d6",
+      "type": "psychic"
+     }
+    ],
+    "targets": {
+     "who": "self"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -8709,9 +10094,372 @@
   },
   "cursed": false,
   "casts": [],
+  "variants": [
+   {
+    "id": "thirteen",
+    "name": "Thirteen cards",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "draw",
+      "name": "Draw a Card",
+      "activation": "other",
+      "rollsOn": {
+       "die": 100,
+       "rows": [
+        {
+         "from": 1,
+         "to": 8,
+         "name": "Euryale: a curse of -2 to your saving throws",
+         "then": "euryale"
+        },
+        {
+         "from": 9,
+         "to": 16,
+         "name": "Flames: a powerful devil becomes your enemy"
+        },
+        {
+         "from": 17,
+         "to": 24,
+         "name": "Jester: Advantage on D20 Tests for 72 hours, or two more draws",
+         "then": "jester"
+        },
+        {
+         "from": 25,
+         "to": 32,
+         "name": "Key: a Rare or rarer magic weapon you are proficient with appears on you"
+        },
+        {
+         "from": 33,
+         "to": 40,
+         "name": "Knight: a Knight appears within 30 feet to serve you",
+         "then": "knight"
+        },
+        {
+         "from": 41,
+         "to": 48,
+         "name": "Moon: you may cast Wish 1d3 times"
+        },
+        {
+         "from": 49,
+         "to": 56,
+         "name": "Rogue: an NPC of the GM's choice becomes Hostile toward you"
+        },
+        {
+         "from": 57,
+         "to": 64,
+         "name": "Ruin: all your wealth but magic items is lost"
+        },
+        {
+         "from": 65,
+         "to": 72,
+         "name": "Skull: an Avatar of Death appears and attacks you"
+        },
+        {
+         "from": 73,
+         "to": 80,
+         "name": "Star: raise one ability score by 2, to at most 24"
+        },
+        {
+         "from": 81,
+         "to": 88,
+         "name": "Sun: a wondrous item and 50,000 XP"
+        },
+        {
+         "from": 89,
+         "to": 96,
+         "name": "Throne: proficiency and Expertise in Persuasion, and a keep"
+        },
+        {
+         "from": 97,
+         "to": 100,
+         "name": "Void: your soul is drawn away into an object in a place the GM chooses"
+        }
+       ]
+      },
+      "description": "Draw one of the cards you declared: its magic takes effect as soon as it is drawn. Draw each no more than 1 hour after the last.",
+      "damage": []
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "twenty-two",
+    "name": "Twenty-two cards",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "draw",
+      "name": "Draw a Card",
+      "activation": "other",
+      "rollsOn": {
+       "die": 100,
+       "rows": [
+        {
+         "from": 1,
+         "to": 5,
+         "name": "Balance: raise one score by 2 (to 22) and lower another by 2, or nothing"
+        },
+        {
+         "from": 6,
+         "to": 10,
+         "name": "Comet: pick a foe when you next roll Initiative against Hostile creatures"
+        },
+        {
+         "from": 11,
+         "to": 14,
+         "name": "Donjon: you are entombed in an extradimensional sphere and draw no more cards"
+        },
+        {
+         "from": 15,
+         "to": 18,
+         "name": "Euryale: a curse of -2 to your saving throws",
+         "then": "euryale"
+        },
+        {
+         "from": 19,
+         "to": 23,
+         "name": "Fates: you may erase one event as if it never happened"
+        },
+        {
+         "from": 24,
+         "to": 27,
+         "name": "Flames: a powerful devil becomes your enemy"
+        },
+        {
+         "from": 28,
+         "to": 31,
+         "name": "Fool: Disadvantage on D20 Tests for 72 hours; draw another card",
+         "then": "fool"
+        },
+        {
+         "from": 32,
+         "to": 36,
+         "name": "Gem: 50,000 GP of jewelry or gems appear at your feet"
+        },
+        {
+         "from": 37,
+         "to": 41,
+         "name": "Jester: Advantage on D20 Tests for 72 hours, or two more draws",
+         "then": "jester"
+        },
+        {
+         "from": 42,
+         "to": 46,
+         "name": "Key: a Rare or rarer magic weapon you are proficient with appears on you"
+        },
+        {
+         "from": 47,
+         "to": 51,
+         "name": "Knight: a Knight appears within 30 feet to serve you",
+         "then": "knight"
+        },
+        {
+         "from": 52,
+         "to": 56,
+         "name": "Moon: you may cast Wish 1d3 times"
+        },
+        {
+         "from": 57,
+         "to": 60,
+         "name": "Puzzle: your Intelligence or Wisdom drops by 1d4 + 1; one more draw"
+        },
+        {
+         "from": 61,
+         "to": 64,
+         "name": "Rogue: an NPC of the GM's choice becomes Hostile toward you"
+        },
+        {
+         "from": 65,
+         "to": 68,
+         "name": "Ruin: all your wealth but magic items is lost"
+        },
+        {
+         "from": 69,
+         "to": 73,
+         "name": "Sage: within a year, one question answered truthfully"
+        },
+        {
+         "from": 74,
+         "to": 77,
+         "name": "Skull: an Avatar of Death appears and attacks you"
+        },
+        {
+         "from": 78,
+         "to": 82,
+         "name": "Star: raise one ability score by 2, to at most 24"
+        },
+        {
+         "from": 83,
+         "to": 87,
+         "name": "Sun: a wondrous item and 50,000 XP"
+        },
+        {
+         "from": 88,
+         "to": 91,
+         "name": "Talons: every magic item you wear or carry disintegrates"
+        },
+        {
+         "from": 92,
+         "to": 96,
+         "name": "Throne: proficiency and Expertise in Persuasion, and a keep"
+        },
+        {
+         "from": 97,
+         "to": 100,
+         "name": "Void: your soul is drawn away into an object in a place the GM chooses"
+        }
+       ]
+      },
+      "description": "Draw one of the cards you declared: its magic takes effect as soon as it is drawn. Draw each no more than 1 hour after the last.",
+      "damage": []
+     }
+    ],
+    "casts": [],
+    "effects": []
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "euryale",
+    "name": "Euryale's Curse",
+    "activation": "other",
+    "description": "You take a -2 penalty to saving throws while cursed. Only a god or the Fates card can end the curse.",
+    "damage": [],
+    "targets": {
+     "who": "self"
+    },
+    "grants": {
+     "name": "Euryale's Curse",
+     "tags": [
+      "euryale"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [
+      {
+       "type": "save-bonus",
+       "amount": -2
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "fool",
+    "name": "The Fool",
+    "activation": "other",
+    "description": "You have Disadvantage on D20 Tests for the next 72 hours.",
+    "damage": [],
+    "targets": {
+     "who": "self"
+    },
+    "grants": {
+     "name": "The Fool",
+     "tags": [
+      "the-fool"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 4320
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "attack",
+       "mode": "disadvantage"
+      },
+      {
+       "type": "roll-mode",
+       "roll": "check",
+       "mode": "disadvantage"
+      },
+      {
+       "type": "roll-mode",
+       "roll": "save",
+       "mode": "disadvantage"
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "jester",
+    "name": "The Jester",
+    "activation": "other",
+    "description": "You have Advantage on D20 Tests for the next 72 hours.",
+    "damage": [],
+    "targets": {
+     "who": "self"
+    },
+    "grants": {
+     "name": "The Jester",
+     "tags": [
+      "the-jester"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 4320
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "attack",
+       "mode": "advantage"
+      },
+      {
+       "type": "roll-mode",
+       "roll": "check",
+       "mode": "advantage"
+      },
+      {
+       "type": "roll-mode",
+       "roll": "save",
+       "mode": "advantage"
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "knight",
+    "name": "The Knight",
+    "activation": "other",
+    "description": "A Knight magically appears in an unoccupied space you choose within 30 feet of you and serves you loyally until death.",
+    "damage": [],
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "knight",
+       "count": 1
+      }
+     ],
+     "rangeFeet": 30,
+     "turn": "after-user",
+     "lasts": {
+      "type": "untimed"
+     },
+     "allegiance": "user"
+    },
+    "grantedOnly": true
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -8986,7 +10734,8 @@
      "onEnd": [],
      "target": "target",
      "voidWhileIncapacitated": false,
-     "concentration": false
+     "concentration": false,
+     "oneAtATime": true
     },
     "uses": {
      "limit": 1,
@@ -9016,7 +10765,8 @@
        "sworn-enemy"
       ]
      }
-    ]
+    ],
+    "scope": "this-item"
    },
    {
     "type": "ignores-cover",
@@ -9033,6 +10783,41 @@
      },
      {
       "type": "versus-marked",
+      "tags": [
+       "sworn-enemy"
+      ]
+     }
+    ],
+    "scope": "this-item"
+   },
+   {
+    "type": "ignores-long-range",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "versus-marked",
+      "tags": [
+       "sworn-enemy"
+      ]
+     }
+    ],
+    "scope": "this-item"
+   },
+   {
+    "type": "roll-mode",
+    "roll": "attack",
+    "mode": "disadvantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "other-weapon"
+     },
+     {
+      "type": "while-marking",
       "tags": [
        "sworn-enemy"
       ]
@@ -9417,9 +11202,33 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Philter of Love",
+    "activation": "bonus-action",
+    "description": "Drink it: the next time you see a creature within 10 minutes, you have the Charmed condition for 1 hour, charmed by that creature.",
+    "damage": [],
+    "grants": {
+     "name": "Philter of Love",
+     "tags": [
+      "first-sight-charms"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 10
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -9512,15 +11321,107 @@
   "tags": [],
   "actions": [
    {
-    "id": "call",
-    "name": "Call a Swarm of Rats",
+    "id": "play",
+    "name": "Play the Pipes",
     "activation": "action",
-    "description": "Play the pipes and expend 1 charge, calling forth one Swarm of Rats if enough rats are within half a mile of you to be called in this fashion (as determined by the GM). If there aren't enough rats to form a swarm, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.",
+    "description": "Play the pipes: each Swarm of Rats that isn't under another creature's control within 30 feet of you makes a DC 15 Wisdom saving throw. On a failed save, the swarm is Friendly to you and your allies and obeys your commands while you keep playing each round as a Magic action and it starts its turns within 30 feet of you. On a successful save, it can't be swayed by the pipes for 24 hours.",
+    "damage": [],
+    "targets": {
+     "count": 10,
+     "rangeFeet": 30,
+     "statBlocks": [
+      "swarm-of-rats"
+     ]
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     },
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440,
+     "failureEffect": {
+      "name": "Swayed by the Pipes",
+      "tags": [
+       "commanded",
+       "commanded-within-30"
+      ],
+      "modifiers": []
+     }
+    }
+   },
+   {
+    "id": "call-1",
+    "name": "Call a Swarm of Rats",
+    "activation": "bonus-action",
+    "description": "Having played the pipes, expend 1 charge to call forth one Swarm of Rats, if enough rats are within half a mile of you (as determined by the GM); if there aren't, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.",
     "damage": [],
     "uses": {
      "limit": 3,
      "per": "long-rest",
      "pool": "pipes-of-the-sewers-charges"
+    },
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "swarm-of-rats",
+       "count": 1
+      }
+     ],
+     "rangeFeet": 60,
+     "turn": "after-user",
+     "allegiance": "none"
+    }
+   },
+   {
+    "id": "call-2",
+    "name": "Call 2 Swarms of Rats",
+    "activation": "bonus-action",
+    "description": "Having played the pipes, expend 2 charges to call forth 2 Swarms of Rats, if enough rats are within half a mile of you (as determined by the GM); if there aren't, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.",
+    "damage": [],
+    "useCost": 2,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "pipes-of-the-sewers-charges"
+    },
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "swarm-of-rats",
+       "count": 2
+      }
+     ],
+     "rangeFeet": 60,
+     "turn": "after-user",
+     "allegiance": "none"
+    }
+   },
+   {
+    "id": "call-3",
+    "name": "Call 3 Swarms of Rats",
+    "activation": "bonus-action",
+    "description": "Having played the pipes, expend 3 charges to call forth 3 Swarms of Rats, if enough rats are within half a mile of you (as determined by the GM); if there aren't, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.",
+    "damage": [],
+    "useCost": 3,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "pipes-of-the-sewers-charges"
+    },
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "swarm-of-rats",
+       "count": 3
+      }
+     ],
+     "rangeFeet": 60,
+     "turn": "after-user",
+     "allegiance": "none"
     }
    }
   ],
@@ -10833,6 +12734,7 @@
   "description": "Potion, Uncommon. This concoction looks, smells, and tastes like a Potion of Healing or another beneficial potion. However, it is actually poison masked by illusion magic. Identify reveals its true nature. If you drink this potion, you take 4d6 Poison damage and must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 hour.",
   "weapon": null,
   "armor": null,
+  "disguisedAs": "potion-of-healing",
   "slot": "consumable",
   "appliesTo": null,
   "rarity": "uncommon",
@@ -10851,7 +12753,7 @@
     "id": "drink",
     "name": "Drink the Potion",
     "activation": "bonus-action",
-    "description": "Drink it: you take 4d6 Poison damage and must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 hour.",
+    "description": "Drink it, or give it to a creature within 5 feet of you. The drinker takes 4d6 Poison damage and must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 hour.",
     "damage": [
      {
       "formula": "4d6",
@@ -10859,7 +12761,20 @@
      }
     ],
     "targets": {
-     "who": "self"
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 13,
+     "successDamage": "full",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 60
+     }
     }
    }
   ],
@@ -11381,6 +13296,21 @@
     "targets": {
      "count": 1,
      "rangeFeet": 5
+    },
+    "grants": {
+     "name": "Potion of Vitality",
+     "tags": [
+      "hit-dice-maximized"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 1440
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "target",
+     "voidWhileIncapacitated": false,
+     "concentration": false
     }
    }
   ],
@@ -12014,6 +13944,13 @@
      ],
      "failureDuration": {
       "type": "until-source-next-turn"
+     },
+     "failureEffect": {
+      "name": "Elemental Compulsion",
+      "tags": [
+       "commanded"
+      ],
+      "modifiers": []
      }
     }
    }
@@ -12349,6 +14286,10 @@
   "description": "Ring, Very Rare (Requires Attunement). While wearing this ring, you regain 1d6 Hit Points every 10 minutes if you have at least 1 Hit Point. If you lose a body part, the ring causes the missing part to regrow and return to full functionality after 1d6 + 1 days if you have at least 1 Hit Point the whole time.",
   "weapon": null,
   "armor": null,
+  "regainsHitPoints": {
+   "everyMinutes": 10,
+   "formula": "1d6"
+  },
   "slot": "ring",
   "appliesTo": null,
   "rarity": "very-rare",
@@ -12622,7 +14563,40 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "deflect",
+    "name": "Deflect the Spell",
+    "activation": "reaction",
+    "description": "When you succeed on a saving throw against a spell of level 7 or lower that targeted only you and didn't create an area of effect, deflect the spell back at its caster. The caster makes a saving throw against the spell using its own spell save DC.",
+    "damage": [],
+    "answer": {
+     "rolls": [
+      "save"
+     ],
+     "whose": "own",
+     "when": "success",
+     "versus": {
+      "spellSchools": [
+       "abjuration",
+       "conjuration",
+       "divination",
+       "enchantment",
+       "evocation",
+       "illusion",
+       "necromancy",
+       "transmutation"
+      ],
+      "singleTarget": true,
+      "spellMaxLevel": 7
+     },
+     "effect": {
+      "kind": "reflect",
+      "dc": "same"
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -13365,9 +15339,37 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "startingByPool": {
+    "rod-of-absorption-stored": "1d10"
+   }
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "absorb",
+    "name": "Absorb Spell",
+    "activation": "reaction",
+    "description": "When a spell targets only you and not with an area of effect, absorb it: its effect is canceled, and its energy is stored in the rod at the level it was cast. The rod can absorb 50 levels over the course of its existence.",
+    "damage": [],
+    "uses": {
+     "limit": 50,
+     "per": "never",
+     "pool": "rod-of-absorption-absorbed"
+    },
+    "reaction": {
+     "trigger": "casts-spell",
+     "response": "absorb",
+     "onlyAtReactor": true,
+     "stores": {
+      "pool": "rod-of-absorption-stored",
+      "limit": 50
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -13911,7 +15913,7 @@
     "description": "Transport yourself and willing creatures you can see to the rod's demiplane. Take this action again to bring every visitor back to the space it left, or the nearest unoccupied one.",
     "damage": [],
     "targets": {
-     "count": 20,
+     "count": 199,
      "seen": true,
      "who": "allies"
     },
@@ -13919,7 +15921,8 @@
      "name": "In the Rod of Security's demiplane",
      "tags": [
       "off-plane",
-      "rod-of-security"
+      "rod-of-security",
+      "needs-no-food"
      ],
      "duration": {
       "type": "manual"
@@ -13929,7 +15932,12 @@
      "target": "self-and-targets",
      "voidWhileIncapacitated": false,
      "concentration": false,
-     "toggles": true
+     "toggles": true,
+     "regainsHitPoints": {
+      "everyMinutes": 60,
+      "hitPointDie": true
+     },
+     "daysShared": 200
     },
     "uses": {
      "limit": 1,
@@ -14299,6 +16307,9 @@
    "stealthDisadvantage": false,
    "strengthRequired": null
   },
+  "attractsMissiles": {
+   "feet": 10
+  },
   "slot": "shield",
   "appliesTo": null,
   "rarity": "rare",
@@ -14313,7 +16324,37 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "damage-resistance",
+    "damageTypes": [
+     "acid",
+     "bludgeoning",
+     "cold",
+     "fire",
+     "force",
+     "lightning",
+     "necrotic",
+     "piercing",
+     "poison",
+     "psychic",
+     "radiant",
+     "slashing",
+     "thunder"
+    ],
+    "when": [
+     {
+      "type": "on-taking-damage"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "ranged-weapon-kind"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "shield-of-the-cavalier",
@@ -14795,6 +16836,35 @@
      },
      "effect": {
       "kind": "succeed"
+     }
+    }
+   },
+   {
+    "id": "reflect-enchantment",
+    "name": "Reflect Enchantment",
+    "activation": "reaction",
+    "description": "If you succeed on a saving throw against an Enchantment spell that targets only you, you can expend 1 charge to turn the spell back on its caster as if you had cast the spell.",
+    "damage": [],
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-charming-charges"
+    },
+    "answer": {
+     "rolls": [
+      "save"
+     ],
+     "whose": "own",
+     "when": "success",
+     "versus": {
+      "spellSchools": [
+       "enchantment"
+      ],
+      "singleTarget": true
+     },
+     "effect": {
+      "kind": "reflect",
+      "dc": "bearer"
      }
     }
    }
@@ -15602,7 +17672,23 @@
   },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "spell-absorption",
+    "name": "Spell Absorption",
+    "activation": "reaction",
+    "description": "When another creature casts a spell that targets only you, the staff absorbs the magic of the spell, canceling its effect and gaining a number of charges equal to the absorbed spell's level. If that brings the staff above 50 charges, it explodes as if you activated its Retributive Strike.",
+    "damage": [],
+    "reaction": {
+     "trigger": "casts-spell",
+     "response": "absorb",
+     "onlyAtReactor": true,
+     "stores": {
+      "pool": "staff-of-the-magi-charges"
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -15616,6 +17702,19 @@
    {
     "type": "spell-attack-bonus",
     "amount": 2
+   },
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-spell"
+     }
+    ]
    }
   ]
  },
@@ -16373,18 +18472,32 @@
   },
   "cursed": false,
   "casts": [],
-  "onHit": [
-   {
-    "conditions": [],
-    "naturalTwenty": true,
-    "reminder": "Sword of Life Stealing: unless the target is a Construct or an Undead, it takes an extra 15 Necrotic damage, and the wielder gains that many Temporary Hit Points."
-   }
-  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "extra-damage",
+    "damageType": "necrotic",
+    "doubleOnCritical": false,
+    "flat": 15,
+    "temporaryHitPoints": true,
+    "when": [
+     {
+      "type": "on-natural-20"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "construct",
+       "undead"
+      ],
+      "except": true
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "sword-of-sharpness",
@@ -17088,6 +19201,13 @@
    {
     "type": "damage-bonus",
     "amount": 3
+   },
+   {
+    "type": "ignores-resistance",
+    "damageTypes": [
+     "slashing"
+    ],
+    "scope": "this-item"
    }
   ]
  },
@@ -17803,7 +19923,87 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "darkness",
+    "saveDc": 15,
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "faerie-fire",
+    "saveDc": 15,
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "fireball",
+    "saveDc": 15,
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "slow",
+    "saveDc": 15,
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "stinking-cloud",
+    "saveDc": 15,
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "gust-of-wind",
+    "saveDc": 15,
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "lightning-bolt",
+    "saveDc": 15,
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "enlargereduce",
+    "saveDc": 15,
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "invisibility",
+    "consumesSpellSlot": false,
+    "targets": {
+     "who": "self"
+    },
+    "activation": "other",
+    "grantedOnly": true
+   },
+   {
+    "spellId": "polymorph",
+    "saveDc": 15,
+    "consumesSpellSlot": false,
+    "activation": "other",
+    "grantedOnly": true,
+    "forms": {
+     "only": [
+      "black-bear",
+      "giant-wasp",
+      "frog"
+     ]
+    }
+   }
+  ],
   "charges": {
    "regain": "1d6 + 1",
    "lastChargeRoll": true,
@@ -17816,6 +20016,115 @@
     "id": "wild-surge",
     "name": "Wild Surge",
     "activation": "action",
+    "rollsOn": {
+     "die": 100,
+     "rows": [
+      {
+       "from": 1,
+       "to": 20,
+       "name": "a spell from the chosen point (a d10 picks it)",
+       "then": "spell-surge"
+      },
+      {
+       "from": 21,
+       "to": 25,
+       "name": "you are Stunned until the start of your next turn",
+       "then": "awestruck"
+      },
+      {
+       "from": 26,
+       "to": 30,
+       "name": "Gust of Wind, its Line from you to the point",
+       "then": "cast-gust-of-wind"
+      },
+      {
+       "from": 31,
+       "to": 35,
+       "name": "you take 1d6 Psychic damage",
+       "then": "backlash"
+      },
+      {
+       "from": 36,
+       "to": 40,
+       "name": "heavy rain, Lightly Obscured, for 1 minute",
+       "then": "rain"
+      },
+      {
+       "from": 41,
+       "to": 45,
+       "name": "a cloud of butterflies, Heavily Obscured, for 10 minutes",
+       "then": "butterflies"
+      },
+      {
+       "from": 46,
+       "to": 50,
+       "name": "Lightning Bolt, its Line from you to the point",
+       "then": "cast-lightning-bolt"
+      },
+      {
+       "from": 51,
+       "to": 55,
+       "name": "the creature closest to the point is enlarged",
+       "then": "cast-enlargereduce"
+      },
+      {
+       "from": 56,
+       "to": 60,
+       "name": "a creature appears near the point (a d4 picks it)",
+       "then": "beast"
+      },
+      {
+       "from": 61,
+       "to": 64,
+       "name": "grass covers a 60-foot-radius circle of ground near the point"
+      },
+      {
+       "from": 65,
+       "to": 68,
+       "name": "an object of the GM's choice within 120 feet of the point vanishes into the Ethereal Plane"
+      },
+      {
+       "from": 69,
+       "to": 72,
+       "name": "you shrink for 1 minute",
+       "then": "shrink"
+      },
+      {
+       "from": 73,
+       "to": 77,
+       "name": "leaves grow from the creature nearest the point"
+      },
+      {
+       "from": 78,
+       "to": 82,
+       "name": "a burst of shimmering light around you: DC 15 Constitution or Blinded",
+       "then": "light-burst"
+      },
+      {
+       "from": 83,
+       "to": 87,
+       "name": "you cast Invisibility on yourself",
+       "then": "cast-invisibility"
+      },
+      {
+       "from": 88,
+       "to": 92,
+       "name": "1d4 x 10 gems in a 30-foot Line toward the point, 1 Bludgeoning each, shared out among the creatures in it"
+      },
+      {
+       "from": 93,
+       "to": 97,
+       "name": "Polymorph on the creature closest to the point (a d4 picks its form)",
+       "then": "polymorph-surge"
+      },
+      {
+       "from": 98,
+       "to": 100,
+       "name": "the creature closest to the point begins to turn to stone",
+       "then": "stone"
+      }
+     ]
+    },
     "description": "Expend 1 charge and choose a point within 120 feet of yourself. That location becomes the point of origin of a spell or other magical effect determined by rolling on the Wand of Wonder Effects table in this item's description. Spells cast from the wand have a save DC of 15, and any spell whose maximum range is normally less than 120 feet has a range of 120 feet when cast from the wand.",
     "damage": [],
     "uses": {
@@ -17823,6 +20132,338 @@
      "per": "long-rest",
      "pool": "wand-of-wonder-charges"
     }
+   },
+   {
+    "id": "spell-surge",
+    "name": "Wand of Wonder: Spell",
+    "activation": "other",
+    "rollsOn": {
+     "die": 10,
+     "rows": [
+      {
+       "from": 1,
+       "to": 2,
+       "name": "Darkness",
+       "then": "cast-darkness"
+      },
+      {
+       "from": 3,
+       "to": 4,
+       "name": "Faerie Fire",
+       "then": "cast-faerie-fire"
+      },
+      {
+       "from": 5,
+       "to": 6,
+       "name": "Fireball",
+       "then": "cast-fireball"
+      },
+      {
+       "from": 7,
+       "to": 8,
+       "name": "Slow",
+       "then": "cast-slow"
+      },
+      {
+       "from": 9,
+       "to": 10,
+       "name": "Stinking Cloud",
+       "then": "cast-stinking-cloud"
+      }
+     ]
+    },
+    "description": "Roll 1d10: Darkness, Faerie Fire, Fireball, Slow or Stinking Cloud, cast from the chosen point at DC 15.",
+    "damage": [],
+    "grantedOnly": true
+   },
+   {
+    "id": "awestruck",
+    "name": "Wand of Wonder: Awestruck",
+    "activation": "other",
+    "description": "You have the Stunned condition until the start of your next turn, believing something awesome just happened.",
+    "damage": [],
+    "targets": {
+     "who": "self"
+    },
+    "grants": {
+     "name": "Awestruck",
+     "tags": [
+      "awestruck"
+     ],
+     "duration": {
+      "type": "until-bearer-next-turn"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "conditions": [
+      "stunned"
+     ]
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "backlash",
+    "name": "Wand of Wonder: Backlash",
+    "activation": "other",
+    "description": "You take 1d6 Psychic damage.",
+    "damage": [
+     {
+      "formula": "1d6",
+      "type": "psychic"
+     }
+    ],
+    "targets": {
+     "who": "self"
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "rain",
+    "name": "Wand of Wonder: Heavy Rain",
+    "activation": "other",
+    "description": "Heavy rain falls for 1 minute in a 120-foot-high, 60-foot-radius Cylinder centered on the chosen point. The area is Lightly Obscured.",
+    "damage": [],
+    "area": {
+     "shape": "cylinder",
+     "sizeFeet": 60,
+     "widthFeet": null
+    },
+    "sight": {
+     "area": {
+      "kind": "lightly-obscured"
+     },
+     "rounds": 10
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "butterflies",
+    "name": "Wand of Wonder: Butterflies",
+    "activation": "other",
+    "description": "600 oversized butterflies fill a 60-foot-high, 30-foot-radius Cylinder centered on the chosen point for 10 minutes. The area is Heavily Obscured.",
+    "damage": [],
+    "area": {
+     "shape": "cylinder",
+     "sizeFeet": 30,
+     "widthFeet": null
+    },
+    "sight": {
+     "area": {
+      "kind": "heavily-obscured"
+     },
+     "rounds": 100
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "beast",
+    "name": "Wand of Wonder: Creature",
+    "activation": "other",
+    "description": "A magically formed creature appears as close to the chosen point as possible: on a d4, 1 a Rhinoceros, 2 an Elephant, 3-4 a Rat. It isn't under your control, acts as it normally would, and disappears after 1 hour or at 0 Hit Points.",
+    "damage": [],
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "rhinoceros",
+       "count": 1,
+       "faces": {
+        "from": 1,
+        "to": 1
+       }
+      },
+      {
+       "monsterId": "elephant",
+       "count": 1,
+       "faces": {
+        "from": 2,
+        "to": 2
+       }
+      },
+      {
+       "monsterId": "rat",
+       "count": 1,
+       "faces": {
+        "from": 3,
+        "to": 4
+       }
+      }
+     ],
+     "die": 4,
+     "rangeFeet": 120,
+     "turn": "after-user",
+     "lasts": {
+      "type": "minutes",
+      "minutes": 60
+     },
+     "allegiance": "none"
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "shrink",
+    "name": "Wand of Wonder: Shrink",
+    "activation": "other",
+    "description": "You shrink as if you had cast Enlarge/Reduce on yourself for 1 minute: your size decreases by one category, you have Disadvantage on Strength checks and Strength saving throws, and your attacks with weapons or Unarmed Strikes deal 1d4 less damage.",
+    "damage": [],
+    "targets": {
+     "who": "self"
+    },
+    "grants": {
+     "name": "Reduced (Wand of Wonder)",
+     "tags": [
+      "reduced"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "check",
+       "mode": "disadvantage",
+       "when": [
+        {
+         "type": "on-ability-check"
+        },
+        {
+         "type": "ability-is",
+         "abilities": [
+          "str"
+         ]
+        }
+       ]
+      },
+      {
+       "type": "roll-mode",
+       "roll": "save",
+       "mode": "disadvantage",
+       "when": [
+        {
+         "type": "on-saving-throw"
+        },
+        {
+         "type": "ability-is",
+         "abilities": [
+          "str"
+         ]
+        }
+       ]
+      },
+      {
+       "type": "damage-bonus",
+       "amount": 0,
+       "dice": "-1d4",
+       "leavesOne": true,
+       "when": [
+        {
+         "type": "on-damage-roll"
+        },
+        {
+         "type": "attack-kind-is",
+         "kinds": [
+          "weapon",
+          "unarmed"
+         ]
+        }
+       ]
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "sizeChange": {
+      "step": -1
+     }
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "light-burst",
+    "name": "Wand of Wonder: Burst of Light",
+    "activation": "other",
+    "description": "A burst of colorful, shimmering light extends from you in a 30-foot Emanation. Each creature in the area makes a DC 15 Constitution saving throw or has the Blinded condition for 1 minute, repeating the save at the end of each of its turns.",
+    "damage": [],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 30,
+     "widthFeet": null
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "blinded"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
+    },
+    "grantedOnly": true
+   },
+   {
+    "id": "polymorph-surge",
+    "name": "Wand of Wonder: Polymorph",
+    "activation": "other",
+    "rollsOn": {
+     "die": 4,
+     "rows": [
+      {
+       "from": 1,
+       "to": 1,
+       "name": "a Black Bear",
+       "then": "cast-polymorph"
+      },
+      {
+       "from": 2,
+       "to": 2,
+       "name": "a Giant Wasp",
+       "then": "cast-polymorph"
+      },
+      {
+       "from": 3,
+       "to": 4,
+       "name": "a Frog",
+       "then": "cast-polymorph"
+      }
+     ]
+    },
+    "description": "Roll 1d4 for the form: 1 a Black Bear, 2 a Giant Wasp, 3-4 a Frog.",
+    "damage": [],
+    "grantedOnly": true
+   },
+   {
+    "id": "stone",
+    "name": "Wand of Wonder: Turn to Stone",
+    "activation": "other",
+    "description": "The creature closest to the chosen point makes a DC 15 Constitution saving throw. On a failure it has the Restrained condition and begins to turn to stone, repeating the save at the end of its next turn: a success ends the effect, and a failure leaves it Petrified until Greater Restoration or similar magic frees it.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "restrained"
+     ],
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "petrified"
+      ]
+     }
+    },
+    "grantedOnly": true
    }
   ],
   "effects": [],
@@ -17838,6 +20479,10 @@
   "description": "Weapon (Any Simple or Martial), Uncommon (Requires Attunement). As long as this weapon is within your reach and you are attuned to it, you and allies within 30 feet of you gain the following benefits. Alarm. The weapon magically awakens each subject who is sleeping naturally when combat begins. This benefit doesn't wake a subject from magically induced sleep. Supernatural Readiness. Each subject has Advantage on its Initiative rolls.",
   "weapon": null,
   "armor": null,
+  "initiativeAura": {
+   "feet": 30,
+   "wakesSleepers": true
+  },
   "slot": "weapon",
   "appliesTo": {
    "label": "Any Simple or Martial",
@@ -17894,13 +20539,7 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": [
-   {
-    "type": "roll-mode",
-    "roll": "initiative",
-    "mode": "advantage"
-   }
-  ]
+  "modifiers": []
  },
  {
   "id": "weapon-1",

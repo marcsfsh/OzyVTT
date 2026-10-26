@@ -19,6 +19,8 @@ export const DEATH_SAVE_FLOOR_TAG = "death-save-floor";
 /** The tag on an item's effect that doubles what each Hit Point Die rolled to heal restores (Periapt of Wound
  *  Closure). */
 export const HIT_DICE_DOUBLED_TAG = "hit-dice-doubled";
+/** On an effect, each Hit Point Die its bearer spends restores its maximum (a Potion of Vitality, for 24 hours). */
+export const HIT_DICE_MAXIMIZED_TAG = "hit-dice-maximized";
 
 export type DeathSaveRollDependencies = Readonly<{
   random: RandomSource;

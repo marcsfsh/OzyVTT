@@ -62,7 +62,10 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "sees-other": "You can see the other creature",
   "seen-by-other": "The other creature can see you",
   "other-lacks-sense": "The other creature lacks a sense",
-  "situation-is": "A situation the roller names"
+  "situation-is": "A situation the roller names",
+  "other-weapon": "Another weapon than this one",
+  "while-marking": "While it marks a creature",
+  "while-attuned-to": "While attuned to another item"
 };
 
 /** Read only on an effect the engine puts on another creature (Hunter's Mark, Bestow Curse), or authored only by the
@@ -70,7 +73,9 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
 const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set([
   "by-effect-source",
   "versus-effect-source",
-  "other-lacks-sense"
+  "other-lacks-sense",
+  "while-marking",
+  "while-attuned-to"
 ]);
 
 const TRIGGER_TYPES: readonly SelectOption[] = (Object.keys(TRIGGER_LABELS) as RiderTrigger["type"][])

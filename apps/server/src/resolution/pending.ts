@@ -38,6 +38,7 @@ import { areAllies } from "../creature-sides.js";
 import { chosenEffectOption } from "./effect-options.js";
 import { failureFormOf } from "./shape-shift.js";
 import { vitalityOfCast } from "./vitality.js";
+import { damageSourceOf, withDamageSource } from "./damage-source.js";
 import { doesntSleep } from "../trance.js";
 import { objectRowOf } from "../row-penalties.js";
 
@@ -83,6 +84,7 @@ export function parkReaction(ctx: ResolveContext): void {
       hit: true,
       hitKinds: ctx.riderFilters.attackKinds ?? [],
       ...(ctx.action.drain ? { drain: ctx.action.drain } : {}),
+      ...withDamageSource(damageSourceOf(ctx)),
       asked: []
     },
     windowDeps(ctx)
@@ -815,6 +817,7 @@ export function parkActionSave(ctx: ResolveContext): void {
     ...(vitality ? { vitality } : {}),
     // "Failure by 5 or More": what a failure by that much does instead.
     ...(action.save.failureByMargin ? { failureByMargin: structuredClone(action.save.failureByMargin) } : {}),
+    ...withDamageSource(damageSourceOf(ctx)),
     ...fatal
   };
   for (const { saveBonus, option, advantageFrom, autoSucceeds, swallows, objectRowId, targetIds } of groups.values()) {
@@ -846,6 +849,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       proposedDamageParts: parts,
       saveBonus,
       halfOnSuccess: action.save.successDamage === "half" || potentCantrip(ctx),
+      ...(action.save.successDamage === "full" ? { fullOnSuccess: true } : {}),
       // A pick's own Prone stays bare, as the action's does (Command's Grovel).
       conditionIds: swallows ? [...conditionIds, ...barePicks(option)] : [],
       ...(onFailEffect ? { onFailEffect } : {}),

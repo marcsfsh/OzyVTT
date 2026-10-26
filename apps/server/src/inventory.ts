@@ -30,6 +30,7 @@ import { attunementRefusal } from "./attunement.js";
 import { donInFight } from "./held-items.js";
 import { nestedIn, placeInContainer, type Placement } from "./containers.js";
 import { chargeHandling } from "./object-interactions.js";
+import { keepDisguise, mintDisguise, shownName } from "./disguised-items.js";
 
 const MAX_ITEMS = 200;
 /** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
@@ -433,6 +434,14 @@ export function setInventoryItem(
     const { recordId: _same, ...plain } = item;
     item = plain;
   }
+  // A copy that passes for another item takes that item's id as it arrives, and keeps its record and disguise after.
+  if (item.quantity > 0 && !actor.inventory.some((entry) => entry.id === item.id))
+    item = mintDisguise(item, new Set(actor.inventory.map((entry) => entry.id)), deps.catalog);
+  item = keepDisguise(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item,
+    deps.role
+  );
   // A pack added to the sheet is the things it holds, each joining its stack or starting one.
   const contents = deps.catalog?.equipmentRecord(catalogIdOf(item))?.contents;
   if (contents && item.quantity > 0 && !actor.inventory.some((entry) => entry.id === item.id))
@@ -717,8 +726,10 @@ export function giveItem(
     throw new CommandRejectedError(`${to.name}'s pack is full. Remove something first.`);
   const catalogId = catalogIdOf(row);
   const taken = new Set(to.inventory.map((entry) => entry.id));
-  let id = catalogId;
-  for (let copy = 2; taken.has(id); copy += 1) id = `${catalogId.slice(0, 76)}-${copy}`;
+  // A disguised copy's id comes from the item it passes for, so the new holder's row doesn't name it either.
+  const base = row.disguisedAs ?? catalogId;
+  let id = base;
+  for (let copy = 2; taken.has(id); copy += 1) id = `${base.slice(0, 76)}-${copy}`;
   const { recordId: _recordId, ...plain } = row;
   const moved: InventoryItem = {
     ...plain,
@@ -747,7 +758,7 @@ export function giveItem(
   endBindingsOfGoneRows(state, from);
   // What the item gave its old holder ends as it leaves them.
   endGrantsOfPutAway(state, from, row, deps);
-  return { name: row.name };
+  return { name: shownName(row, deps.catalog) };
 }
 
 /** Set the whole coin purse. Owner-scoped by the caller. */

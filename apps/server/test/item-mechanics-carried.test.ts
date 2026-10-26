@@ -544,7 +544,7 @@ describe("the charged items with no roll of their own, whose counter they enforc
       ],
       ["bag-of-tricks", "Bag of Tricks", "item-bag-of-tricks-pull-gray", 3, "Pull a Fuzzy Object (Gray bag)"],
       ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer", 3, "Peer Through the Gem"],
-      ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call", 3, "Call a Swarm of Rats"]
+      ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call-1", 3, "Call a Swarm of Rats"]
     ] as const) {
       // A Bag of Tricks is one of three bags: this one the gray.
       const state = fight(stateWith([carried(id, name, id === "bag-of-tricks" ? { variantId: "gray" } : {})]));
@@ -747,6 +747,7 @@ describe("what no carried item can carry", () => {
       "oil-of-etherealness",
       "oil-of-sharpness",
       "oil-of-slipperiness",
+      "philter-of-love",
       "potion-of-animal-friendship",
       "potion-of-climbing",
       "potion-of-diminution",
@@ -771,11 +772,11 @@ describe("what no carried item can carry", () => {
 
   it("authors no curse, and could not have, since no carried row requires attunement AND prints a curse", () => {
     expect(CARRIED_ROWS.filter((row) => row.cursed).map((row) => row.id)).toEqual([]);
-    // `mysterious-deck` is the only carried row whose prose says "cursed", and `schemas.ts` would refuse a
-    // curse on it anyway because it requires no attunement.
+    // `mysterious-deck` is the only carried row whose prose says "cursed": Euryale's curse is an effect its draw leaves,
+    // and `schemas.ts` would refuse a curse on the row anyway because it requires no attunement.
     const deck = CARRIED_ROWS.find((row) => row.id === "mysterious-deck")!;
     expect(deck.attunement?.required).toBe(false);
-    expect(carries(deck)).toBe(false);
+    expect(deck.cursed).toBeFalsy();
   });
 });
 
@@ -831,8 +832,8 @@ describe("the absences that were measured and must stay absent", () => {
     ]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
-    // Rows needing mechanics not modeled yet: a Pearl of Power is a slot recovery (conversions.ts), not an item row.
-    for (const id of ["mysterious-deck", "pearl-of-power"]) {
+    // A Pearl of Power is a slot recovery (conversions.ts), not an item row.
+    for (const id of ["pearl-of-power"]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
   });

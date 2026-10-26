@@ -9,6 +9,8 @@ import {
 } from "./movement-narration.js";
 import { nearestOpenSpace } from "./off-plane.js";
 import { moveEncounterToken, snappedTokenPosition, type TokenMapGeometry } from "./token-placement.js";
+import { reactionSpent, spendReaction } from "./commanded-reactions.js";
+import { isIncapacitated } from "./condition-rules.js";
 
 /**
  * SRD forced movement (push, pull, slide): a direction the server derives from two token positions and
@@ -31,6 +33,29 @@ const unmovable = (state: GameState, actorId: string) =>
   state.actors.some(
     (actor) => actor.id === actorId && actor.effects.some((effect) => effect.tags.includes(UNMOVABLE_TAG))
   );
+
+/** SRD Dwarven Plate: "If an effect moves you against your will along the ground, you can take a Reaction to reduce
+ *  the distance you are moved by up to 10 feet." Armor that braces its wearer, by record, with the feet it takes off. */
+const BRACING_ARMOR: Readonly<Record<string, number>> = { "dwarven-plate": 10 };
+
+/** The feet the creature's armor takes off a forced move now: worn, in a fight, its Reaction free and able to take it.
+ *  No wearer would choose to be moved farther, so the server takes the Reaction for it. */
+function bracedFeet(state: GameState, actorId: string): number {
+  if (!state.combat.active || !state.combat.initiative.some((entry) => entry.actorId === actorId)) return 0;
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || actor.hp.current <= 0 || isIncapacitated(actor) || reactionSpent(state, actorId)) return 0;
+  if (actor.effects.some((effect) => effect.tags.includes("no-reactions"))) return 0;
+  const row = actor.inventory.find((item) => item.equipped && BRACING_ARMOR[item.recordId ?? item.id] !== undefined);
+  return row ? BRACING_ARMOR[row.recordId ?? row.id]! : 0;
+}
+
+/** The distance a forced move goes after its target braces against it, spending its Reaction when it does. */
+function afterBracing(state: GameState, actorId: string, distanceFeet: number): number {
+  const braced = Math.min(bracedFeet(state, actorId), Math.abs(distanceFeet));
+  if (braced === 0) return distanceFeet;
+  spendReaction(state, actorId);
+  return Math.sign(distanceFeet) * (Math.abs(distanceFeet) - braced);
+}
 
 export type ForcedMove = Readonly<{
   /** Who is moved. */
@@ -88,7 +113,9 @@ export function pullTokenToward(
   const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
   if (from === null) return null;
   if (unmovable(state, actorId)) return { value: 0, unit: "ft" };
-  const destination = pushDestination(geometry, from, point, -distanceFeet);
+  const braced = afterBracing(state, actorId, distanceFeet);
+  if (braced === 0) return { value: 0, unit: "ft" };
+  const destination = pushDestination(geometry, from, point, -braced);
   if (destination === null) return null;
   moveEncounterToken(state, actorId, destination, geometry);
   const to = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
@@ -113,7 +140,8 @@ export function pushTokenAway(
     ? (tokenCreatureDistance(state, geometry, input.actorId, input.awayFromActorId) ?? null)
     : null;
   if (input.toward && apart === null) return null;
-  const distance = input.toward ? -Math.max(0, Math.min(input.distanceFeet, apart!.value - 5)) : input.distanceFeet;
+  const pushed = input.toward ? -Math.max(0, Math.min(input.distanceFeet, apart!.value - 5)) : input.distanceFeet;
+  const distance = pushed === 0 ? 0 : afterBracing(state, input.actorId, pushed);
   if (distance === 0) return { value: 0, unit: apart?.unit ?? "ft" };
   const destination = pushDestination(geometry, from, source, distance);
   if (destination === null) return null;

@@ -172,11 +172,13 @@ export function answeredLines(held: Pick<HeldRoll, "answers"> | undefined): Roll
         : "rerolled"
       : answer.face !== undefined
         ? `the d20 is ${answer.face}`
-        : answer.succeed
-          ? "succeeds"
-          : answer.hit
-            ? "hits"
-            : `${answer.bonus >= 0 ? "+" : ""}${answer.bonus}${answer.spent ? "" : ", use kept"}`
+        : answer.reflectDc !== undefined
+          ? "turns the spell back"
+          : answer.succeed
+            ? "succeeds"
+            : answer.hit
+              ? "hits"
+              : `${answer.bonus >= 0 ? "+" : ""}${answer.bonus}${answer.spent ? "" : ", use kept"}`
   }));
 }
 
@@ -207,6 +209,8 @@ function doesOf(answer: RollAnswer): string {
       return "Succeed";
     case "hit":
       return "Hit";
+    case "reflect":
+      return "Turn the spell back on its caster";
   }
 }
 
@@ -231,7 +235,12 @@ function versusMatches(
   if (!stakes) return false;
   if (versus.conditions?.some((condition) => stakes.conditions.includes(condition))) return true;
   const spell = stakes.spell;
-  if (spell && versus.spellSchools?.includes(spell.school) && (versus.singleTarget !== true || spell.singleTarget))
+  if (
+    spell &&
+    versus.spellSchools?.includes(spell.school) &&
+    (versus.singleTarget !== true || spell.singleTarget) &&
+    (versus.spellMaxLevel === undefined || spell.level <= versus.spellMaxLevel)
+  )
     return true;
   if (versus.creatureTypes && stakes.sourceActorId !== null) {
     const source = state.actors.find((actor) => actor.id === stakes.sourceActorId);
@@ -278,6 +287,14 @@ function refusal(
   const effect = answer.effect;
   if (effect.kind === "succeed" && target.kind !== "save") return `${source.name} answers a saving throw.`;
   if (effect.kind === "hit" && target.kind !== "attack") return `${source.name} answers an attack roll.`;
+  if (
+    effect.kind === "reflect" &&
+    (target.kind !== "save" ||
+      !target.stakes?.spell ||
+      target.stakes.sourceActorId === null ||
+      target.stakes.sourceActorId === target.roller.id)
+  )
+    return `${source.name} turns back a spell another creature cast.`;
   const held = state.heldRolls.find((entry) => entry.key === target.key);
   if (held?.answers.some((given) => given.id === source.id && given.actorId === bearer.id))
     return `${source.name} has already answered this roll.`;
@@ -545,6 +562,12 @@ export function applyRollAnswer(
     case "hit":
       entry = { ...given, hit: true };
       break;
+    case "reflect": {
+      const definition = bearer.definitionId ? deps.resolveDefinition(bearer.definitionId) : undefined;
+      const dc = effect.dc === "bearer" ? (definition?.spellcasting?.saveDc ?? target.threshold) : target.threshold;
+      entry = { ...given, ...(dc !== null ? { reflectDc: Math.max(1, Math.min(40, dc)) } : {}) };
+      break;
+    }
   }
   const events: EffectNarration[] = [];
   if (entry.spent) payFor(state, bearer, source, events, deps);
@@ -618,6 +641,7 @@ export type AnswerPromptRoll = Readonly<{
   /** A held hit's damage: how the hit was made, and what it drains, for the reactions after this answer. */
   hitKinds?: readonly string[];
   drain?: PendingReaction["drain"];
+  damageSource?: PendingReaction["damageSource"];
   asked: readonly string[];
 }>;
 
@@ -657,6 +681,7 @@ export function askAnswer(
     asked: [...roll.asked],
     ...(roll.hitKinds && roll.hitKinds.length > 0 ? { hitKinds: [...roll.hitKinds] } : {}),
     ...(roll.drain ? { drain: roll.drain } : {}),
+    ...(roll.damageSource ? { damageSource: roll.damageSource } : {}),
     createdAt: Date.parse(deps.now())
   };
   state.combat = { ...state.combat, pendingReactions: [...state.combat.pendingReactions, prompt] };

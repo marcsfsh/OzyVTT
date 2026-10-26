@@ -5,6 +5,7 @@ import {
   AreaTriggerSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
+  DamageSourceSchema,
   ForcedPushSchema,
   ActorSchema,
   CastShapingSchema,
@@ -318,6 +319,8 @@ export const PendingSaveSchema = z
       .max(9)
       .optional(),
     halfOnSuccess: z.boolean().default(true),
+    /** A success still takes the whole damage: the save is against what follows it alone (a Potion of Poison). */
+    fullOnSuccess: z.literal(true).optional(),
     /** Conditions a failed save imposes. */
     conditionIds: z
       .array(
@@ -386,6 +389,9 @@ export const PendingSaveSchema = z
     immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional(),
     /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). GM bookkeeping, never projected. */
     drain: DamageDrainSchema.optional(),
+    /** What deals the save's damage, for a defence that reads it (`DamageSourceSchema`). GM bookkeeping, never
+     *  projected. */
+    damageSource: DamageSourceSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
     failurePush: ForcedPushSchema.optional(),
     /** Where a success pushes the creature (a bulette's Deadly Leap), narrated when it lands. */
@@ -559,6 +565,8 @@ export const HeldAnswerSchema = z
     rerolled: z.literal(true).optional(),
     succeed: z.literal(true).optional(),
     hit: z.literal(true).optional(),
+    /** A successful save's spell is turned back on its caster, who saves against this DC. */
+    reflectDc: z.number().int().min(1).max(40).optional(),
     spent: z.boolean().default(true)
   })
   .strict();
@@ -855,6 +863,8 @@ export const ParkedCastSchema = z
     targetIds: z.array(z.uuid()).max(60),
     /** The targets are the catch of a template placed on the map. */
     areaPlaced: z.boolean(),
+    /** The level the spell is cast at, which an absorbing reaction counts (an Ioun Stone of Absorption's 20 levels). */
+    level: z.number().int().min(0).max(9).optional(),
     /** The slot the spell is cast with, spent if it goes ahead. */
     slot: z
       .object({ level: z.number().int().min(1).max(9), pact: z.boolean() })
@@ -1020,6 +1030,8 @@ export const PendingReactionSchema = z
     damageResponse: DamageResponseSchema.optional(),
     /** takes-damage: what the parked damage drains as it lands (a save's Harm). */
     drain: DamageDrainSchema.optional(),
+    /** What deals the damage the prompt holds, for a defence that reads it as it lands. */
+    damageSource: DamageSourceSchema.optional(),
     /** How the hit whose damage it holds was made, so a reaction limited to some attacks is offered after it. */
     hitKinds: z.array(z.string().min(1).max(20)).max(10).optional(),
     createdAt: z.number().int().nonnegative()
@@ -1065,6 +1077,8 @@ export const PendingDamageSchema = z
     critical: z.boolean().default(false),
     /** What the damage drains as it lands (Vampiric Touch's healing). */
     drain: DamageDrainSchema.optional(),
+    /** What dealt it, for a defence that reads it as it lands. */
+    damageSource: DamageSourceSchema.optional(),
     /** The attacker knocks the target out: a drop to 0 leaves it at 1 Hit Point and Unconscious (SRD). */
     nonlethal: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()

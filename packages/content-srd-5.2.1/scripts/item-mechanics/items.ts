@@ -44,6 +44,24 @@ const GOAT_THROW = "Throw the figurine to a point on the ground within 60 feet:"
 const FIGURINE_OBEYS =
   "The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.";
 
+/** Every damage type, for a defence against a source whatever type it deals (a Brooch of Shielding against Magic
+ *  Missile). */
+const ALL_DAMAGE_TYPES = [
+  "acid",
+  "bludgeoning",
+  "cold",
+  "fire",
+  "force",
+  "lightning",
+  "necrotic",
+  "piercing",
+  "poison",
+  "psychic",
+  "radiant",
+  "slashing",
+  "thunder"
+] satisfies DamageType[];
+
 /** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
 const RESISTANCE_TABLE = [
   "acid",
@@ -70,7 +88,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Recurring limits:
   //   - `damage-bonus` is bounded to +/-10.
   //   - `versus-creature-type` reads the target's stat block, so a character target never matches one.
-  //   - `armor-class` is read in the standing pass, so it cannot be narrowed to a kind of attack.
+  //   - `armor-class` is read in the standing pass, or against one attack roll with `on-attack-roll` and its kind.
   //   - An item's `grants.languages` reaches no reader.
   //
   // GM choices where the SRD prints a table: Armor of Resistance resists lightning (d10 row 5), Dragon
@@ -107,13 +125,35 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "shield-of-the-cavalier": { modifiers: [{ type: "armor-class", amount: 2 }] },
 
   /**
-   * `cursed: true` is legal because the SRD gates this item behind attunement. Not modeled: Abyssal
-   * (item language grants have no reader), the clawed Unarmed Strikes and their +1, Disadvantage
-   * against demons, and tying the curse's lifting to Remove Curse.
+   * `cursed: true` is legal because the SRD gates this item behind attunement, and a cursed item attuned can't be taken
+   * off until Remove Curse (`inventory.ts`). Its clawed gauntlets make Unarmed Strikes 1d8 Slashing with +1 to attack
+   * and damage, and its wearer has Disadvantage on attacks against demons and on saves against what they force.
+   * Abyssal is the sheet's (item language grants have no reader).
    */
   "demon-armor": {
     cursed: true,
-    modifiers: [{ type: "armor-class", amount: 1 }]
+    unarmedStrike: { dice: "1d8", damageType: "slashing" },
+    modifiers: [
+      { type: "armor-class", amount: 1 },
+      {
+        type: "attack-bonus",
+        amount: 1,
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["unarmed"] }]
+      },
+      { type: "damage-bonus", amount: 1, when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["unarmed"] }] },
+      {
+        type: "roll-mode",
+        roll: "attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "versus-creature-type", creatureTypes: ["demon"] }]
+      },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "disadvantage",
+        when: [{ type: "on-saving-throw" }, { type: "source-creature-type-is", creatureTypes: ["demon"] }]
+      }
+    ]
   },
 
   // The dragon's kind sets the type; fire (a red dragon) until the GM picks. "Advantage on saving throws against the
@@ -186,10 +226,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     vulnerableToOtherChoices: true
   },
 
-  // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
-  // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon
-  // damage (resistance goes by damage type alone) and the redirect of nearby ranged attacks.
-  "shield-of-missile-attraction": { cursed: true },
+  // Resistance to the damage of attacks made with Ranged weapons while it is held, read as the damage lands with how
+  // the attack was made. The curse draws onto its attuned bearer every Ranged weapon attack at a creature within 10
+  // feet, held or not, until Remove Curse ends the Attunement.
+  "shield-of-missile-attraction": {
+    cursed: true,
+    attractsMissiles: { feet: 10 },
+    modifiers: [
+      {
+        type: "damage-resistance",
+        damageTypes: [...ALL_DAMAGE_TYPES],
+        when: [{ type: "on-taking-damage" }, { type: "attack-kind-is", kinds: ["ranged-weapon-kind"] }]
+      }
+    ]
+  },
 
   // Advantage on Initiative and on Wisdom (Perception) checks: a sheet roll, Search or the GM's call made with Perception.
   "sentinel-shield": {
@@ -325,8 +375,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- Weapon rows whose riders are not weapon-scoped (plus their +N halves) -----------------------
 
-  // Bearer only: the 30-foot ally aura and the surprise/sleep clause are not expressible.
-  "weapon-of-warning": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
+  // Its attuned bearer and the allies within 30 feet of it have Advantage on Initiative, read from the map as it is
+  // rolled, and as the fight begins its Alarm wakes each of them that sleeps naturally: Unconscious with Hit Points
+  // and nothing magical holding it there.
+  "weapon-of-warning": { initiativeAura: { feet: 30, wakesSleepers: true } },
 
   // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Wish casts on 1d3
   // charges rolled when the blade is added, which never come back, and once a dawn.
@@ -476,11 +528,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // On a rolled 20 the sword cuts off a head (`kills.beheads`): 30 Slashing more where it can't, and a creature with
-  // Legendary Resistance left spends it. Not modeled: ignoring Resistance to Slashing damage.
+  // Legendary Resistance left spends it. Its own Slashing damage ignores Resistance: scoped to the sword, so the
+  // wielder's other weapons are still resisted.
   "vorpal-sword": {
     modifiers: [
       { type: "attack-bonus", amount: 3 },
-      { type: "damage-bonus", amount: 3 }
+      { type: "damage-bonus", amount: 3 },
+      { type: "ignores-resistance", damageTypes: ["slashing"], scope: "this-item" }
     ],
     onHit: [{ conditions: [], naturalTwenty: true, kills: { beheads: true } }]
   },
@@ -671,22 +725,70 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     modifiers: [{ type: "extra-damage", formula: "2d6", doubleOnCritical: true, when: [{ type: "on-hit" }] }]
   },
 
-  // Not modeled: the thrown thunderclap area, Giant's Bane and Might of Giants (cross-item triggers).
+  // Each of its 5 charges hurls it as if it had the Thrown property (20/60), and a hit's thunderclap asks the target and
+  // every other creature within 30 feet of it to save or be Stunned. With a Belt of Giant Strength or Gauntlets of Ogre
+  // Power attuned too, a rolled 20 against a Giant asks a DC 17 Constitution save or it dies, and the Strength that item
+  // sets rises by 4, to at most 30.
   "hammer-of-thunderbolts": {
+    charges: { regain: "1d4 + 1" },
     modifiers: [
       { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
+      { type: "damage-bonus", amount: 1 },
+      {
+        type: "granted-score-bonus",
+        ability: "str",
+        amount: 4,
+        maximum: 30,
+        when: [{ type: "while-attuned-to", itemIds: ["belt-of-giant-strength", "gauntlets-of-ogre-power"] }]
+      }
+    ],
+    onHit: [
+      {
+        conditions: [],
+        naturalTwenty: true,
+        creatureTypes: ["giant"],
+        whileAttunedTo: ["belt-of-giant-strength", "gauntlets-of-ogre-power"],
+        save: { ability: "con", dc: 17 },
+        kills: {}
+      }
+    ],
+    actions: [
+      {
+        id: "hurl",
+        name: "Hurl the Hammer",
+        activation: "action",
+        description:
+          "Expend 1 charge and make a ranged attack with the weapon, hurling it as if it had the Thrown property with a normal range of 20 feet and a long range of 60 feet. If the attack hits, the weapon unleashes a thunderclap: the target and every creature within 30 feet of it other than you must succeed on a DC 17 Constitution saving throw or have the Stunned condition until the end of your next turn. The weapon then flies back to your hand.",
+        damage: [],
+        hurlsWeapon: { normalFeet: 20, longFeet: 60 },
+        uses: { limit: 5, per: "long-rest", pool: "hammer-of-thunderbolts-charges" },
+        onHit: [
+          {
+            name: "Thunderclap",
+            conditions: [{ id: "stunned" }],
+            duration: { type: "until-source-turn-end" },
+            save: { ability: "con", dc: 17, aroundTargetFeet: 30 }
+          }
+        ]
+      }
     ]
   },
 
   // The curse's attunement lock is authored (SRD: attunement to a cursed item can't be ended voluntarily), and its
-  // berserk save is the server's (`berserker-axe.ts`). Not modeled: +1 HP per level (`hit-points-per-level` is refused
-  // on items).
+  // berserk save is the server's (`berserker-axe.ts`). While attuned its bearer has 1 more Hit Point maximum a level,
+  // read live, and Disadvantage on attack rolls with any other weapon.
   "berserker-axe": {
     cursed: true,
     modifiers: [
       { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
+      { type: "damage-bonus", amount: 1 },
+      { type: "hit-points-per-level", amount: 1, when: [{ type: "attuned" }] },
+      {
+        type: "roll-mode",
+        roll: "attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "other-weapon" }]
+      }
     ]
   },
 
@@ -779,13 +881,92 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "An arrow produced by this weapon deals Force damage instead of Piercing damage", with no ammunition to spend. Not
-  // modeled: the arrows' light, Arrow of Restraint, Arrow of Transport and the Energy Ladder.
+  // A Bonus Action tosses it: it hovers in a space within 30 feet and attacks a creature within 5 feet of it with its
+  // wielder's attack roll and damage. Each later Bonus Action moves it up to 30 feet, to a spot within 30 feet of its
+  // wielder, and attacks again; after the fourth attack it flies back, and it falls if its wielder is more than 30 feet
+  // from it (`summon-strikes.ts`). Grasping it out of the air, and a wielder with no hand free, are the table's.
+  "dancing-sword": {
+    actions: [
+      {
+        id: "toss",
+        name: "Toss the Sword",
+        activation: "bonus-action",
+        description:
+          "Toss the weapon into the air: it hovers, flies up to 30 feet, and attacks one creature of your choice within 5 feet of itself, using your attack roll and adding your ability modifier to damage rolls.",
+        damage: [],
+        swingsWeapon: true,
+        summons: {
+          creatures: [{ monsterId: "dancing-sword" }],
+          rangeFeet: 30,
+          turn: "none",
+          intangible: true,
+          leashFeet: 30,
+          strikesFrom: { reachFeet: 5, moveFeet: 30, withinFeetOfUser: 30, attacks: 4 }
+        }
+      },
+      {
+        id: "dance",
+        name: "Direct the Dancing Sword",
+        activation: "bonus-action",
+        description:
+          "While the weapon hovers, cause it to fly up to 30 feet to another spot within 30 feet of you and attack one creature within 5 feet of it. After its fourth attack, it flies back to you.",
+        damage: [],
+        swingsWeapon: true,
+        forceOf: "toss"
+      }
+    ]
+  },
+
+  // "An arrow produced by this weapon deals Force damage instead of Piercing damage", with no ammunition to spend. Arrow
+  // of Restraint rides a hit in place of its damage (DC 15 Strength or Restrained for 1 minute, a DC 20 Athletics check
+  // as an action to escape), and Arrow of Transport sends a willing creature within 60 feet to a space within 10 feet of
+  // its user. The arrows' light is momentary, and the Energy Ladder is a climbable surface the map has no model for.
   "energy-bow": {
     weaponChanges: { damageType: "force", removeProperties: ["ammunition"] },
     modifiers: [
       { type: "attack-bonus", amount: 1 },
       { type: "damage-bonus", amount: 1 }
+    ],
+    actions: [
+      {
+        id: "arrow-of-restraint",
+        name: "Arrow of Restraint",
+        activation: "other",
+        description:
+          "When you hit a creature with a ranged attack using this weapon, you can try to restrain it instead of dealing damage to it. It makes a DC 15 Strength saving throw or has the Restrained condition for 1 minute. As an action, it can make a DC 20 Strength (Athletics) check to break the restraint.",
+        damage: [],
+        save: {
+          ability: "str",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["restrained"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          failureEffect: {
+            name: "Arrow of Restraint",
+            tags: [],
+            modifiers: [],
+            endAction: {
+              activation: "action",
+              kind: "check",
+              ability: "str",
+              skill: "athletics",
+              dc: 20,
+              label: "Break the restraint"
+            }
+          }
+        },
+        ridesHit: { rides: "this-weapon", insteadOfDamage: true }
+      },
+      {
+        id: "arrow-of-transport",
+        name: "Arrow of Transport",
+        activation: "action",
+        description:
+          "Fire an arrow at a willing creature you can see within 60 feet of you that is Medium or smaller. It teleports to an unoccupied space you can see within 10 feet of you.",
+        damage: [],
+        targets: { count: 1, rangeFeet: 60, seen: true, maxSize: "medium", who: "others" },
+        teleport: { feet: 75, orAnother: true, nearUserFeet: 10 }
+      }
     ]
   },
 
@@ -872,8 +1053,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // The sworn enemy: a creature its wielder names as it shoots, until it dies or seven days pass, one at a time. Against
-  // it the bow's ranged attack rolls have Advantage, ignore Half and Three-Quarters Cover and deal 3d6 Piercing more.
-  // Not modeled: ignoring long range's Disadvantage, and the Disadvantage with other weapons while it lives.
+  // it the bow's ranged attack rolls have Advantage, ignore Half and Three-Quarters Cover and long range's Disadvantage,
+  // and deal 3d6 Piercing more; while it lives, its wielder has Disadvantage on attack rolls with every other weapon.
   oathbow: {
     actions: [
       {
@@ -889,7 +1070,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           name: "Sworn Enemy",
           target: "target",
           tags: ["sworn-enemy"],
-          duration: { type: "minutes", minutes: 10080 }
+          duration: { type: "minutes", minutes: 10080 },
+          oneAtATime: true
         }
       }
     ],
@@ -898,6 +1080,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "attack",
         mode: "advantage",
+        scope: "this-item",
         when: [
           { type: "on-attack-roll" },
           { type: "attack-kind-is", kinds: ["ranged"] },
@@ -907,11 +1090,23 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "ignores-cover",
         degree: "three-quarters",
+        scope: "this-item",
         when: [
           { type: "on-attack-roll" },
           { type: "attack-kind-is", kinds: ["ranged"] },
           { type: "versus-marked", tags: ["sworn-enemy"] }
         ]
+      },
+      {
+        type: "ignores-long-range",
+        scope: "this-item",
+        when: [{ type: "on-attack-roll" }, { type: "versus-marked", tags: ["sworn-enemy"] }]
+      },
+      {
+        type: "roll-mode",
+        roll: "attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "other-weapon" }, { type: "while-marking", tags: ["sworn-enemy"] }]
       },
       {
         type: "extra-damage",
@@ -924,22 +1119,34 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // A rolled 20 deals 15 Necrotic more to a creature that is neither a Construct nor an Undead, and its wielder gains
-  // that many Temporary Hit Points: said with the hit, since a flat amount of another type has no rider.
+  // Temporary Hit Points equal to the Necrotic damage the target takes.
   "sword-of-life-stealing": {
-    onHit: [
+    modifiers: [
       {
-        conditions: [],
-        naturalTwenty: true,
-        reminder:
-          "Sword of Life Stealing: unless the target is a Construct or an Undead, it takes an extra 15 Necrotic damage, and the wielder gains that many Temporary Hit Points."
+        type: "extra-damage",
+        flat: 15,
+        damageType: "necrotic",
+        doubleOnCritical: false,
+        temporaryHitPoints: true,
+        when: [
+          { type: "on-natural-20" },
+          { type: "versus-creature-type", creatureTypes: ["construct", "undead"], except: true }
+        ]
       }
     ]
   },
 
   // "Whenever an attacker makes a ranged attack roll against a target within 5 feet of you, you can take a Reaction to
-  // become the target of the attack instead": offered before the roll. Not modeled: the +2 AC against ranged attack
-  // rolls, since an AC bonus cannot be limited to them.
+  // become the target of the attack instead": offered before the roll. The +2 AC is read against a ranged attack roll
+  // alone, as it is rolled.
   "arrow-catching-shield": {
+    modifiers: [
+      {
+        type: "armor-class",
+        amount: 2,
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+      }
+    ],
     actions: [
       {
         id: "catch-the-attack",
@@ -954,7 +1161,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Prose-only items:
-  //   `arrow-catching-shield` - an AC bonus cannot be limited to ranged attacks (its Reaction is authored above).
   //   `dancing-sword` - a sword that attacks from its own space needs an object token that strikes.
 
   // The GM says which creature type a found piece slays (its kind). A shot that draws it carries its hit: a creature of
@@ -1043,8 +1249,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // "Each Ring of Elemental Command is linked to one of the four Elemental Planes. The GM chooses": the plane is the
   // copy's kind. Every ring has Elemental Bane (Advantage on attack rolls against Elementals, which have Disadvantage
   // against its wearer) and Elemental Compulsion (a DC 18 Wisdom save or Charmed until the start of the wearer's next
-  // turn). The plane gives its Resistance, Immunity or speed, and its spells on 5 charges (1d4 + 1 back at dawn), each
-  // at DC 18 and its printed charges. The languages, breathing water and moving through earth are the GM's.
+  // turn, which is the wearer's to play). The plane gives its Resistance, Immunity or speed, and its spells on 5 charges
+  // (1d4 + 1 back at dawn), each at DC 18 and its printed charges. The water ring's wearer breathes water (`breath.ts`),
+  // and the earth ring's moves through the map's walls as Difficult Terrain (`wall-passage.ts`). The languages are the
+  // GM's.
   "ring-of-elemental-command": {
     charges: { regain: "1d4 + 1" },
     modifiers: [
@@ -1074,7 +1282,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           dc: 18,
           successDamage: "none",
           failureConditions: ["charmed"],
-          failureDuration: { type: "until-source-next-turn" }
+          failureDuration: { type: "until-source-next-turn" },
+          failureEffect: { name: "Elemental Compulsion", tags: ["commanded"], modifiers: [] }
         },
         targets: { count: 1, rangeFeet: 60, seen: true, creatureTypes: ["elemental"] }
       }
@@ -1364,10 +1573,64 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
+  // While held, a Reaction absorbs a spell aimed at its holder alone with no area: the spell has no effect and its levels
+  // are stored, up to 50 absorbed in the rod's existence; a found rod holds 1d10. A spellcaster holding it turns stored
+  // levels into a spent spell slot of level 5 or lower (`conversions.ts`). A rod that can absorb nothing more and holds
+  // nothing is mundane, which the GM says.
+  "rod-of-absorption": {
+    charges: { startingByPool: { "rod-of-absorption-stored": "1d10" } },
+    actions: [
+      {
+        id: "absorb",
+        name: "Absorb Spell",
+        activation: "reaction",
+        description:
+          "When a spell targets only you and not with an area of effect, absorb it: its effect is canceled, and its energy is stored in the rod at the level it was cast. The rod can absorb 50 levels over the course of its existence.",
+        damage: [],
+        uses: { limit: 50, per: "never", pool: "rod-of-absorption-absorbed" },
+        reaction: {
+          trigger: "casts-spell",
+          response: "absorb",
+          onlyAtReactor: true,
+          stores: { pool: "rod-of-absorption-stored", limit: 50 }
+        }
+      }
+    ]
+  },
   // "You have Advantage on saving throws against spells", and a success against a spell of level 7 or lower leaves it
-  // no effect on the wearer. Turning a spell back on its caster is the GM's.
+  // no effect on the wearer. When that spell targeted the wearer alone with no area, a Reaction turns it back on its
+  // caster, who saves against its own spell save DC.
   "ring-of-spell-turning": {
     savesNegateSpells: { maxLevel: 7 },
+    actions: [
+      {
+        id: "deflect",
+        name: "Deflect the Spell",
+        activation: "reaction",
+        description:
+          "When you succeed on a saving throw against a spell of level 7 or lower that targeted only you and didn't create an area of effect, deflect the spell back at its caster. The caster makes a saving throw against the spell using its own spell save DC.",
+        damage: [],
+        answer: {
+          rolls: ["save"],
+          when: "success",
+          versus: {
+            spellSchools: [
+              "abjuration",
+              "conjuration",
+              "divination",
+              "enchantment",
+              "evocation",
+              "illusion",
+              "necromancy",
+              "transmutation"
+            ],
+            singleTarget: true,
+            spellMaxLevel: 7
+          },
+          effect: { kind: "reflect", dc: "same" }
+        }
+      }
+    ],
     modifiers: [
       {
         type: "roll-mode",
@@ -1714,8 +1977,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // "Transports you and up to 199 other willing creatures you can see to a demiplane ... When the time runs out or you
   // take a Magic action to end the effect, all visitors reappear in the location they occupied when you activated the
   // rod or an unoccupied space nearest that location. Once used, this property can't be used again until 10 days have
-  // passed": off the map and back (`off-plane.ts`), up to 20 creatures a use as the target picker holds them, and 240
-  // hours of game time before the next. The hourly healing and the time limit are the GM's.
+  // passed": off the map and back (`off-plane.ts`), its user and up to 199 others, and 240 hours of game time before the
+  // next. Each hour there a visitor regains Hit Points as if it spent a Hit Point Die (`clock-healing.ts`), it needs no
+  // food or water, and the visit lasts 200 days divided by the visitors.
   "rod-of-security": {
     actions: [
       {
@@ -1726,13 +1990,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Transport yourself and willing creatures you can see to the rod's demiplane. Take this action again to bring every visitor back to the space it left, or the nearest unoccupied one.",
         damage: [],
         uses: { limit: 1, per: "time", afterHours: "240" },
-        targets: { count: 20, seen: true, who: "allies" },
+        targets: { count: 199, seen: true, who: "allies" },
         grants: {
           name: "In the Rod of Security's demiplane",
-          tags: ["off-plane", "rod-of-security"],
+          tags: ["off-plane", "rod-of-security", "needs-no-food"],
           target: "self-and-targets",
           toggles: true,
           duration: { type: "manual" },
+          daysShared: 200,
+          regainsHitPoints: { everyMinutes: 60, hitPointDie: true },
           modifiers: [],
           onEnd: [],
           voidWhileIncapacitated: false,
@@ -1752,7 +2018,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // All three one-charge casts on one pool. No `saveDc`: the cast uses the wielder's own DC, as
   // printed. Resist Enchantment turns a failed save against an Enchantment spell aimed only at the holder into a
-  // success once a day. Not modeled: Reflect Enchantment (turning the spell back on its caster).
+  // success once a day, and Reflect Enchantment turns a successful one back on its caster for a Reaction and a charge,
+  // as if the holder cast it: the caster saves against the holder's spell save DC.
   "staff-of-charming": {
     charges: { regain: "1d8 + 2", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
@@ -1769,6 +2036,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           when: "failure",
           versus: { spellSchools: ["enchantment"], singleTarget: true },
           effect: { kind: "succeed" }
+        }
+      },
+      {
+        id: "reflect-enchantment",
+        name: "Reflect Enchantment",
+        activation: "reaction",
+        description:
+          "If you succeed on a saving throw against an Enchantment spell that targets only you, you can expend 1 charge to turn the spell back on its caster as if you had cast the spell.",
+        damage: [],
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" },
+        answer: {
+          rolls: ["save"],
+          when: "success",
+          versus: { spellSchools: ["enchantment"], singleTarget: true },
+          effect: { kind: "reflect", dc: "bearer" }
         }
       }
     ],
@@ -1923,15 +2205,38 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * The +2 Quarterstaff, the +2 to spell attack rolls, the zero-charge casts, and the rest at their printed charge
-   * costs on 50 charges; a 20 on the last charge's d20 gives back 1d12 + 1. Not authored: Advantage on saves against
-   * spells, Spell Absorption and Retributive Strike.
+   * The +2 Quarterstaff, the +2 to spell attack rolls, Advantage on saves against spells, the zero-charge casts, and the
+   * rest at their printed charge costs on 50 charges; a 20 on the last charge's d20 gives back 1d12 + 1. Spell
+   * Absorption's Reaction cancels a spell aimed at the holder alone and adds its level to the charges. Retributive
+   * Strike, and the explosion of a staff absorbed past 50 charges, are the GM's.
    */
   "staff-of-the-magi": {
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 },
-      { type: "spell-attack-bonus", amount: 2 }
+      { type: "spell-attack-bonus", amount: 2 },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-spell" }]
+      }
+    ],
+    actions: [
+      {
+        id: "spell-absorption",
+        name: "Spell Absorption",
+        activation: "reaction",
+        description:
+          "When another creature casts a spell that targets only you, the staff absorbs the magic of the spell, canceling its effect and gaining a number of charges equal to the absorbed spell's level. If that brings the staff above 50 charges, it explodes as if you activated its Retributive Strike.",
+        damage: [],
+        reaction: {
+          trigger: "casts-spell",
+          response: "absorb",
+          onlyAtReactor: true,
+          stores: { pool: "staff-of-the-magi-charges" }
+        }
+      }
     ],
     charges: { regain: "4d6 + 2", lastChargeRoll: true, lastChargeTwenty: "1d12 + 1" },
     casts: [
@@ -2401,6 +2706,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // The d100 effect table is GM-rolled; the charge is real, and a 1 on the last charge's d20 crumbles the wand.
+  // Each charge rolls the d100 table (`item-outcomes.ts`): what lands on its user (Stunned, 1d6 Psychic, its own shrinking
+  // and Invisibility) happens at once, and what has a point of origin (the spells at DC 15, the rain and the butterflies
+  // as obscured areas, the creature that appears, the burst of light, the creature turning to stone) is its user's to
+  // place this turn at no further cost. The grass, the leaves, the object sent to the Ethereal Plane and the gems' Line
+  // are told to the table for the GM.
   "wand-of-wonder": {
     charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
@@ -2410,7 +2720,229 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge and choose a point within 120 feet of yourself. That location becomes the point of origin of a spell or other magical effect determined by rolling on the Wand of Wonder Effects table in this item's description. Spells cast from the wand have a save DC of 15, and any spell whose maximum range is normally less than 120 feet has a range of 120 feet when cast from the wand.",
-        uses: { limit: 7, per: "long-rest", pool: "wand-of-wonder-charges" }
+        damage: [],
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-wonder-charges" },
+        rollsOn: {
+          die: 100,
+          rows: [
+            { from: 1, to: 20, name: "a spell from the chosen point (a d10 picks it)", then: "spell-surge" },
+            { from: 21, to: 25, name: "you are Stunned until the start of your next turn", then: "awestruck" },
+            { from: 26, to: 30, name: "Gust of Wind, its Line from you to the point", then: "cast-gust-of-wind" },
+            { from: 31, to: 35, name: "you take 1d6 Psychic damage", then: "backlash" },
+            { from: 36, to: 40, name: "heavy rain, Lightly Obscured, for 1 minute", then: "rain" },
+            { from: 41, to: 45, name: "a cloud of butterflies, Heavily Obscured, for 10 minutes", then: "butterflies" },
+            { from: 46, to: 50, name: "Lightning Bolt, its Line from you to the point", then: "cast-lightning-bolt" },
+            { from: 51, to: 55, name: "the creature closest to the point is enlarged", then: "cast-enlargereduce" },
+            { from: 56, to: 60, name: "a creature appears near the point (a d4 picks it)", then: "beast" },
+            { from: 61, to: 64, name: "grass covers a 60-foot-radius circle of ground near the point" },
+            {
+              from: 65,
+              to: 68,
+              name: "an object of the GM's choice within 120 feet of the point vanishes into the Ethereal Plane"
+            },
+            { from: 69, to: 72, name: "you shrink for 1 minute", then: "shrink" },
+            { from: 73, to: 77, name: "leaves grow from the creature nearest the point" },
+            {
+              from: 78,
+              to: 82,
+              name: "a burst of shimmering light around you: DC 15 Constitution or Blinded",
+              then: "light-burst"
+            },
+            { from: 83, to: 87, name: "you cast Invisibility on yourself", then: "cast-invisibility" },
+            {
+              from: 88,
+              to: 92,
+              name: "1d4 x 10 gems in a 30-foot Line toward the point, 1 Bludgeoning each, shared out among the creatures in it"
+            },
+            {
+              from: 93,
+              to: 97,
+              name: "Polymorph on the creature closest to the point (a d4 picks its form)",
+              then: "polymorph-surge"
+            },
+            { from: 98, to: 100, name: "the creature closest to the point begins to turn to stone", then: "stone" }
+          ]
+        }
+      },
+      {
+        id: "spell-surge",
+        name: "Wand of Wonder: Spell",
+        activation: "other",
+        description:
+          "Roll 1d10: Darkness, Faerie Fire, Fireball, Slow or Stinking Cloud, cast from the chosen point at DC 15.",
+        damage: [],
+        grantedOnly: true,
+        rollsOn: {
+          die: 10,
+          rows: [
+            { from: 1, to: 2, name: "Darkness", then: "cast-darkness" },
+            { from: 3, to: 4, name: "Faerie Fire", then: "cast-faerie-fire" },
+            { from: 5, to: 6, name: "Fireball", then: "cast-fireball" },
+            { from: 7, to: 8, name: "Slow", then: "cast-slow" },
+            { from: 9, to: 10, name: "Stinking Cloud", then: "cast-stinking-cloud" }
+          ]
+        }
+      },
+      {
+        id: "awestruck",
+        name: "Wand of Wonder: Awestruck",
+        activation: "other",
+        description:
+          "You have the Stunned condition until the start of your next turn, believing something awesome just happened.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Awestruck",
+          target: "self",
+          tags: ["awestruck"],
+          conditions: ["stunned"],
+          duration: { type: "until-bearer-next-turn" }
+        }
+      },
+      {
+        id: "backlash",
+        name: "Wand of Wonder: Backlash",
+        activation: "other",
+        description: "You take 1d6 Psychic damage.",
+        damage: [{ formula: "1d6", type: "psychic" }],
+        grantedOnly: true,
+        targets: { who: "self" }
+      },
+      {
+        id: "rain",
+        name: "Wand of Wonder: Heavy Rain",
+        activation: "other",
+        description:
+          "Heavy rain falls for 1 minute in a 120-foot-high, 60-foot-radius Cylinder centered on the chosen point. The area is Lightly Obscured.",
+        damage: [],
+        grantedOnly: true,
+        area: { shape: "cylinder", sizeFeet: 60, widthFeet: null },
+        sight: { area: { kind: "lightly-obscured" }, rounds: 10 }
+      },
+      {
+        id: "butterflies",
+        name: "Wand of Wonder: Butterflies",
+        activation: "other",
+        description:
+          "600 oversized butterflies fill a 60-foot-high, 30-foot-radius Cylinder centered on the chosen point for 10 minutes. The area is Heavily Obscured.",
+        damage: [],
+        grantedOnly: true,
+        area: { shape: "cylinder", sizeFeet: 30, widthFeet: null },
+        sight: { area: { kind: "heavily-obscured" }, rounds: 100 }
+      },
+      {
+        id: "beast",
+        name: "Wand of Wonder: Creature",
+        activation: "other",
+        description:
+          "A magically formed creature appears as close to the chosen point as possible: on a d4, 1 a Rhinoceros, 2 an Elephant, 3-4 a Rat. It isn't under your control, acts as it normally would, and disappears after 1 hour or at 0 Hit Points.",
+        damage: [],
+        grantedOnly: true,
+        summons: {
+          creatures: [
+            { monsterId: "rhinoceros", faces: { from: 1, to: 1 } },
+            { monsterId: "elephant", faces: { from: 2, to: 2 } },
+            { monsterId: "rat", faces: { from: 3, to: 4 } }
+          ],
+          die: 4,
+          rangeFeet: 120,
+          allegiance: "none",
+          lasts: { type: "minutes", minutes: 60 }
+        }
+      },
+      {
+        id: "shrink",
+        name: "Wand of Wonder: Shrink",
+        activation: "other",
+        description:
+          "You shrink as if you had cast Enlarge/Reduce on yourself for 1 minute: your size decreases by one category, you have Disadvantage on Strength checks and Strength saving throws, and your attacks with weapons or Unarmed Strikes deal 1d4 less damage.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Reduced (Wand of Wonder)",
+          target: "self",
+          tags: ["reduced"],
+          duration: { type: "rounds", rounds: 10 },
+          sizeChange: { step: -1 },
+          modifiers: [
+            ...strengthRolls("disadvantage"),
+            {
+              type: "damage-bonus",
+              amount: 0,
+              dice: "-1d4",
+              leavesOne: true,
+              when: [{ type: "on-damage-roll" }, { type: "attack-kind-is", kinds: ["weapon", "unarmed"] }]
+            }
+          ]
+        }
+      },
+      {
+        id: "light-burst",
+        name: "Wand of Wonder: Burst of Light",
+        activation: "other",
+        description:
+          "A burst of colorful, shimmering light extends from you in a 30-foot Emanation. Each creature in the area makes a DC 15 Constitution saving throw or has the Blinded condition for 1 minute, repeating the save at the end of each of its turns.",
+        damage: [],
+        grantedOnly: true,
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["blinded"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        area: { shape: "emanation", sizeFeet: 30, widthFeet: null }
+      },
+      {
+        id: "polymorph-surge",
+        name: "Wand of Wonder: Polymorph",
+        activation: "other",
+        description: "Roll 1d4 for the form: 1 a Black Bear, 2 a Giant Wasp, 3-4 a Frog.",
+        damage: [],
+        grantedOnly: true,
+        rollsOn: {
+          die: 4,
+          rows: [
+            { from: 1, to: 1, name: "a Black Bear", then: "cast-polymorph" },
+            { from: 2, to: 2, name: "a Giant Wasp", then: "cast-polymorph" },
+            { from: 3, to: 4, name: "a Frog", then: "cast-polymorph" }
+          ]
+        }
+      },
+      {
+        id: "stone",
+        name: "Wand of Wonder: Turn to Stone",
+        activation: "other",
+        description:
+          "The creature closest to the chosen point makes a DC 15 Constitution saving throw. On a failure it has the Restrained condition and begins to turn to stone, repeating the save at the end of its next turn: a success ends the effect, and a failure leaves it Petrified until Greater Restoration or similar magic frees it.",
+        damage: [],
+        grantedOnly: true,
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["restrained"],
+          repeatOnce: true,
+          secondFailure: { conditions: ["petrified"] }
+        },
+        targets: { count: 1, rangeFeet: 120 }
+      }
+    ],
+    casts: [
+      ...(
+        ["darkness", "faerie-fire", "fireball", "slow", "stinking-cloud", "gust-of-wind", "lightning-bolt"] as const
+      ).map((spellId) => ({ spellId, saveDc: 15, activation: "other" as const, grantedOnly: true as const })),
+      { spellId: "enlargereduce", saveDc: 15, activation: "other", grantedOnly: true },
+      { spellId: "invisibility", activation: "other", grantedOnly: true, targets: { who: "self" } },
+      {
+        spellId: "polymorph",
+        saveDc: 15,
+        activation: "other",
+        grantedOnly: true,
+        forms: { only: ["black-bear", "giant-wasp", "frog"] }
       }
     ]
   },
@@ -2769,8 +3301,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "plane-shift", check: { ability: "int", skill: "arcana", dc: 15 } }]
   },
 
-  // Immunity to Magic Missile damage only (not all Force) is not expressible.
-  "brooch-of-shielding": { grants: { damageResistances: ["force"] } },
+  // Resistance to Force damage, and Immunity to the damage of the Magic Missile spell, read as the damage lands.
+  "brooch-of-shielding": {
+    grants: { damageResistances: ["force"] },
+    modifiers: [
+      {
+        type: "damage-immunity",
+        damageTypes: [...ALL_DAMAGE_TYPES],
+        when: [{ type: "on-taking-damage" }, { type: "spell-id-is", spellIds: ["magic-missile"] }]
+      }
+    ]
+  },
 
   "medallion-of-thoughts": {
     charges: { regain: "1d4" },
@@ -2965,8 +3506,47 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Stealth advantage is unqualified. The Fly Speed (light-level gated) and the self-Polymorph cast are not expressible.
+  // Attack rolls against its wearer have Disadvantage, except while its Speed is 0 and from the moment it takes damage
+  // until the start of its next turn (`lapses`).
+  "cloak-of-displacement": {
+    lapses: { onDamage: true, atSpeedZero: true },
+    modifiers: [
+      { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+    ]
+  },
+
+  // Stealth advantage is unqualified. In Dim Light or Darkness its wearer grips its edges for a Fly Speed of 40 feet that
+  // ends in Bright Light (`light-endings.ts`, and a flier then falls), and once a dawn casts Polymorph on itself into a
+  // Bat that keeps its Intelligence, Wisdom and Charisma.
   "cloak-of-the-bat": {
+    actions: [
+      {
+        id: "grip",
+        name: "Grip the Cloak's Edges",
+        activation: "other",
+        description:
+          "In an area of Dim Light or Darkness, grip the edges of the cloak to gain a Fly Speed of 40 feet. If you ever fail to grip the cloak's edges while flying in this way, or if you are no longer in Dim Light or Darkness, you lose this Fly Speed. Use it again to let go.",
+        damage: [],
+        sight: { inDimLightOrDarkness: true },
+        grants: {
+          name: "Cloak of the Bat",
+          tags: ["cloak-of-the-bat"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "special-speed", movement: "fly", feet: 40 }],
+          endsInBrightLight: true,
+          toggles: true
+        }
+      }
+    ],
+    casts: [
+      {
+        spellId: "polymorph",
+        uses: { limit: 1, per: "long-rest" },
+        targets: { who: "self" },
+        forms: { only: ["bat"], keeps: ["mental"] },
+        inDimLightOrDarkness: true
+      }
+    ],
     modifiers: [
       {
         type: "roll-mode",
@@ -3125,12 +3705,439 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `pipes-of-the-sewers`, `cubic-gate` and `iron-bands`. Not when the sheet would then be wrong
   // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a Long Rest.
   //
-  // Trap items (`bag-of-devouring`, `dust-of-sneezing-and-choking`) are not authored: a button naming the real effect
-  // would spoil the trap. A Potion of Poison is the GM's to name.
+  // A trap item that passes for another (a Potion of Poison) says so with `disguisedAs`: its holder sees, and is offered,
+  // the item it passes for until it is identified.
 
   // ---- Carried wondrous items (alphabetical, absences inline) ----------------------------------
 
-  // `apparatus-of-the-crab`: a vehicle, outside the rider model.
+  // "Most (75 percent) of these decks have thirteen cards, but some have twenty-two": the GM says which a found deck is.
+  // Each draw rolls the deck's column of the d100 table (`item-outcomes.ts`): Euryale's curse of -2 to saves, the Fool's
+  // and the Jester's 72 hours of Disadvantage or Advantage on D20 Tests and the Knight who serves are applied; every
+  // other card is told to the table for the GM, and so are the count of draws declared, the Fool and Jester leaving the
+  // deck, and the Jester's two extra draws in place of its Advantage.
+  "mysterious-deck": {
+    actions: [
+      {
+        id: "euryale",
+        name: "Euryale's Curse",
+        activation: "other",
+        description:
+          "You take a -2 penalty to saving throws while cursed. Only a god or the Fates card can end the curse.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Euryale's Curse",
+          target: "self",
+          tags: ["euryale"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "save-bonus", amount: -2 }]
+        }
+      },
+      {
+        id: "fool",
+        name: "The Fool",
+        activation: "other",
+        description: "You have Disadvantage on D20 Tests for the next 72 hours.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "The Fool",
+          target: "self",
+          tags: ["the-fool"],
+          duration: { type: "minutes", minutes: 4320 },
+          modifiers: [
+            { type: "roll-mode", roll: "attack", mode: "disadvantage" },
+            { type: "roll-mode", roll: "check", mode: "disadvantage" },
+            { type: "roll-mode", roll: "save", mode: "disadvantage" }
+          ]
+        }
+      },
+      {
+        id: "jester",
+        name: "The Jester",
+        activation: "other",
+        description: "You have Advantage on D20 Tests for the next 72 hours.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "The Jester",
+          target: "self",
+          tags: ["the-jester"],
+          duration: { type: "minutes", minutes: 4320 },
+          modifiers: [
+            { type: "roll-mode", roll: "attack", mode: "advantage" },
+            { type: "roll-mode", roll: "check", mode: "advantage" },
+            { type: "roll-mode", roll: "save", mode: "advantage" }
+          ]
+        }
+      },
+      {
+        id: "knight",
+        name: "The Knight",
+        activation: "other",
+        description:
+          "A Knight magically appears in an unoccupied space you choose within 30 feet of you and serves you loyally until death.",
+        damage: [],
+        grantedOnly: true,
+        summons: { creatures: [{ monsterId: "knight" }], rangeFeet: 30, lasts: { type: "untimed" } }
+      }
+    ],
+    variants: [
+      {
+        id: "thirteen",
+        name: "Thirteen cards",
+        actions: [
+          {
+            id: "draw",
+            name: "Draw a Card",
+            activation: "other",
+            description:
+              "Draw one of the cards you declared: its magic takes effect as soon as it is drawn. Draw each no more than 1 hour after the last.",
+            damage: [],
+            rollsOn: {
+              die: 100,
+              rows: [
+                { from: 1, to: 8, name: "Euryale: a curse of -2 to your saving throws", then: "euryale" },
+                { from: 9, to: 16, name: "Flames: a powerful devil becomes your enemy" },
+                {
+                  from: 17,
+                  to: 24,
+                  name: "Jester: Advantage on D20 Tests for 72 hours, or two more draws",
+                  then: "jester"
+                },
+                { from: 25, to: 32, name: "Key: a Rare or rarer magic weapon you are proficient with appears on you" },
+                { from: 33, to: 40, name: "Knight: a Knight appears within 30 feet to serve you", then: "knight" },
+                { from: 41, to: 48, name: "Moon: you may cast Wish 1d3 times" },
+                { from: 49, to: 56, name: "Rogue: an NPC of the GM's choice becomes Hostile toward you" },
+                { from: 57, to: 64, name: "Ruin: all your wealth but magic items is lost" },
+                { from: 65, to: 72, name: "Skull: an Avatar of Death appears and attacks you" },
+                { from: 73, to: 80, name: "Star: raise one ability score by 2, to at most 24" },
+                { from: 81, to: 88, name: "Sun: a wondrous item and 50,000 XP" },
+                { from: 89, to: 96, name: "Throne: proficiency and Expertise in Persuasion, and a keep" },
+                { from: 97, to: 100, name: "Void: your soul is drawn away into an object in a place the GM chooses" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        id: "twenty-two",
+        name: "Twenty-two cards",
+        actions: [
+          {
+            id: "draw",
+            name: "Draw a Card",
+            activation: "other",
+            description:
+              "Draw one of the cards you declared: its magic takes effect as soon as it is drawn. Draw each no more than 1 hour after the last.",
+            damage: [],
+            rollsOn: {
+              die: 100,
+              rows: [
+                { from: 1, to: 5, name: "Balance: raise one score by 2 (to 22) and lower another by 2, or nothing" },
+                { from: 6, to: 10, name: "Comet: pick a foe when you next roll Initiative against Hostile creatures" },
+                {
+                  from: 11,
+                  to: 14,
+                  name: "Donjon: you are entombed in an extradimensional sphere and draw no more cards"
+                },
+                { from: 15, to: 18, name: "Euryale: a curse of -2 to your saving throws", then: "euryale" },
+                { from: 19, to: 23, name: "Fates: you may erase one event as if it never happened" },
+                { from: 24, to: 27, name: "Flames: a powerful devil becomes your enemy" },
+                {
+                  from: 28,
+                  to: 31,
+                  name: "Fool: Disadvantage on D20 Tests for 72 hours; draw another card",
+                  then: "fool"
+                },
+                { from: 32, to: 36, name: "Gem: 50,000 GP of jewelry or gems appear at your feet" },
+                {
+                  from: 37,
+                  to: 41,
+                  name: "Jester: Advantage on D20 Tests for 72 hours, or two more draws",
+                  then: "jester"
+                },
+                { from: 42, to: 46, name: "Key: a Rare or rarer magic weapon you are proficient with appears on you" },
+                { from: 47, to: 51, name: "Knight: a Knight appears within 30 feet to serve you", then: "knight" },
+                { from: 52, to: 56, name: "Moon: you may cast Wish 1d3 times" },
+                { from: 57, to: 60, name: "Puzzle: your Intelligence or Wisdom drops by 1d4 + 1; one more draw" },
+                { from: 61, to: 64, name: "Rogue: an NPC of the GM's choice becomes Hostile toward you" },
+                { from: 65, to: 68, name: "Ruin: all your wealth but magic items is lost" },
+                { from: 69, to: 73, name: "Sage: within a year, one question answered truthfully" },
+                { from: 74, to: 77, name: "Skull: an Avatar of Death appears and attacks you" },
+                { from: 78, to: 82, name: "Star: raise one ability score by 2, to at most 24" },
+                { from: 83, to: 87, name: "Sun: a wondrous item and 50,000 XP" },
+                { from: 88, to: 91, name: "Talons: every magic item you wear or carry disintegrates" },
+                { from: 92, to: 96, name: "Throne: proficiency and Expertise in Persuasion, and a keep" },
+                { from: 97, to: 100, name: "Void: your soul is drawn away into an object in a place the GM chooses" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+
+  // A Magic action draws a card at random, rolling the d100 table, and throws it within 30 feet: an illusion of that
+  // creature forms over it, which can't harm, attack or be touched, and which its user moves with a Magic action
+  // (`summons.ts`). The 34 cards are its charges, a found deck short 1d20 - 1 of them as the GM sets. A 97-00 shows the
+  // drawer, which the GM places; a Study and a DC 15 Investigation check seeing through it, and Dispel Magic or a moved
+  // card ending it, are the GM's.
+  "deck-of-illusions": {
+    actions: [
+      {
+        id: "draw",
+        name: "Draw an Illusion",
+        activation: "action",
+        description:
+          "Draw a card at random and throw it to the ground at a point within 30 feet of you. An illusion of the creature it shows forms over the card and remains until dispelled. It looks and behaves like a real creature of its kind, except that it can do no harm, and objects pass through it. While you are within 120 feet of it and can see it, a Magic action moves it anywhere within 30 feet of its card.",
+        damage: [],
+        uses: { limit: 34, per: "never", pool: "deck-of-illusions-cards" },
+        summons: {
+          creatures: [
+            { monsterId: "adult-red-dragon", faces: { from: 1, to: 3 } },
+            { monsterId: "archmage", faces: { from: 4, to: 6 } },
+            { monsterId: "assassin", faces: { from: 7, to: 9 } },
+            { monsterId: "bandit-captain", faces: { from: 10, to: 12 } },
+            { monsterId: "basilisk", faces: { from: 13, to: 15 } },
+            { monsterId: "berserker", faces: { from: 16, to: 18 } },
+            { monsterId: "bugbear-warrior", faces: { from: 19, to: 21 } },
+            { monsterId: "cloud-giant", faces: { from: 22, to: 24 } },
+            { monsterId: "druid", faces: { from: 25, to: 27 } },
+            { monsterId: "erinyes", faces: { from: 28, to: 30 } },
+            { monsterId: "ettin", faces: { from: 31, to: 33 } },
+            { monsterId: "fire-giant", faces: { from: 34, to: 36 } },
+            { monsterId: "frost-giant", faces: { from: 37, to: 39 } },
+            { monsterId: "gnoll-warrior", faces: { from: 40, to: 42 } },
+            { monsterId: "goblin-warrior", faces: { from: 43, to: 45 } },
+            { monsterId: "guardian-naga", faces: { from: 46, to: 48 } },
+            { monsterId: "hill-giant", faces: { from: 49, to: 51 } },
+            { monsterId: "hobgoblin-warrior", faces: { from: 52, to: 54 } },
+            { monsterId: "incubus", faces: { from: 55, to: 57 } },
+            { monsterId: "iron-golem", faces: { from: 58, to: 60 } },
+            { monsterId: "knight", faces: { from: 61, to: 63 } },
+            { monsterId: "kobold-warrior", faces: { from: 64, to: 66 } },
+            { monsterId: "lich", faces: { from: 67, to: 69 } },
+            { monsterId: "medusa", faces: { from: 70, to: 72 } },
+            { monsterId: "night-hag", faces: { from: 73, to: 75 } },
+            { monsterId: "ogre", faces: { from: 76, to: 78 } },
+            { monsterId: "oni", faces: { from: 79, to: 81 } },
+            { monsterId: "priest", faces: { from: 82, to: 84 } },
+            { monsterId: "succubus", faces: { from: 85, to: 87 } },
+            { monsterId: "troll", faces: { from: 88, to: 90 } },
+            { monsterId: "warrior-veteran", faces: { from: 91, to: 93 } },
+            { monsterId: "wyvern", faces: { from: 94, to: 96 } }
+          ],
+          die: 100,
+          rangeFeet: 30,
+          intangible: true,
+          noAttacks: true,
+          commandedWith: "action",
+          commandMove: 30,
+          leashFeet: 120,
+          lasts: { type: "untimed" }
+        }
+      }
+    ]
+  },
+
+  // Only a Wizard attunes to it, and it serves as an Arcane Focus. Unknown Spell's pick of a Wizard spell it doesn't
+  // know, its slot and its Intelligence (Arcana) check are the GM's to run; on a failed check its user rolls the hat's
+  // d100 table (`item-outcomes.ts`): its spells at its user's own numbers, Stunned, Poisoned or Petrified on its user,
+  // the creature that appears and the Hostile bats. The butterflies, the objects pulled out, the portal and the magic
+  // item are told to the table for the GM.
+  "hat-of-many-spells": {
+    servesAsFocus: "arcane-focus",
+    actions: [
+      {
+        id: "miscast",
+        name: "Unknown Spell Fails",
+        activation: "other",
+        description:
+          "When your Intelligence (Arcana) check to cast an unknown spell from the hat fails, you fail to cast the spell and a random effect occurs instead, rolled on the hat's table.",
+        damage: [],
+        rollsOn: {
+          die: 100,
+          rows: [
+            { from: 1, to: 50, name: "a random spell (a d10 picks it)", then: "spell-surge" },
+            { from: 51, to: 55, name: "you are Stunned until the end of your next turn", then: "awestruck" },
+            {
+              from: 56,
+              to: 60,
+              name: "a harmless swarm of butterflies fills a 10-foot Cube within 30 feet for 1 minute"
+            },
+            {
+              from: 61,
+              to: 65,
+              name: "you pull out a vial of Acid, a flask of Alchemist's Fire, a Crowbar or a lit Torch (1d4)"
+            },
+            { from: 66, to: 70, name: "magic sickness: you are Poisoned for 1 hour", then: "sickness" },
+            { from: 71, to: 75, name: "you are Petrified until the end of your next turn", then: "petrified" },
+            {
+              from: 76,
+              to: 80,
+              name: "you pull out a Dagger, a Rope with a Grappling Hook, a bag of Caltrops or a 50 GP gem (1d4)"
+            },
+            { from: 81, to: 85, name: "a creature appears beside you (a d4 picks it)", then: "creature" },
+            { from: 86, to: 90, name: "a Hostile Swarm of Bats flies out and attacks you", then: "bats" },
+            {
+              from: 91,
+              to: 95,
+              name: "a two-way portal to another plane opens within 30 feet until the end of your next turn"
+            },
+            { from: 96, to: 100, name: "you pull out a magic item the GM chooses (a d6 sets its rarity)" }
+          ]
+        }
+      },
+      {
+        id: "spell-surge",
+        name: "Hat of Many Spells: Spell",
+        activation: "other",
+        description:
+          "Roll 1d10: Enlarge/Reduce (enlarge), Enlarge/Reduce (reduce), Faerie Fire, Fireball, Gust of Wind, Invisibility on yourself, Lightning Bolt, Phantasmal Force, Polymorph or Stinking Cloud.",
+        damage: [],
+        grantedOnly: true,
+        rollsOn: {
+          die: 10,
+          rows: [
+            { from: 1, to: 1, name: "Enlarge/Reduce, enlarging", then: "cast-enlargereduce" },
+            { from: 2, to: 2, name: "Enlarge/Reduce, reducing", then: "cast-enlargereduce" },
+            { from: 3, to: 3, name: "Faerie Fire", then: "cast-faerie-fire" },
+            { from: 4, to: 4, name: "Fireball", then: "cast-fireball" },
+            { from: 5, to: 5, name: "Gust of Wind", then: "cast-gust-of-wind" },
+            { from: 6, to: 6, name: "Invisibility on yourself", then: "cast-invisibility" },
+            { from: 7, to: 7, name: "Lightning Bolt", then: "cast-lightning-bolt" },
+            { from: 8, to: 8, name: "Phantasmal Force", then: "cast-phantasmal-force" },
+            { from: 9, to: 9, name: "Polymorph", then: "cast-polymorph" },
+            { from: 10, to: 10, name: "Stinking Cloud", then: "cast-stinking-cloud" }
+          ]
+        }
+      },
+      {
+        id: "awestruck",
+        name: "Hat of Many Spells: Awestruck",
+        activation: "other",
+        description: "You have the Stunned condition until the end of your next turn.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Awestruck",
+          target: "self",
+          tags: ["awestruck"],
+          conditions: ["stunned"],
+          duration: { type: "until-source-turn-end" }
+        }
+      },
+      {
+        id: "sickness",
+        name: "Hat of Many Spells: Magic Sickness",
+        activation: "other",
+        description: "You have the Poisoned condition for 1 hour.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Magic Sickness",
+          target: "self",
+          tags: ["magic-sickness"],
+          conditions: ["poisoned"],
+          duration: { type: "minutes", minutes: 60 }
+        }
+      },
+      {
+        id: "petrified",
+        name: "Hat of Many Spells: Petrified",
+        activation: "other",
+        description: "You have the Petrified condition until the end of your next turn.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Petrified by the Hat",
+          target: "self",
+          tags: ["hat-petrified"],
+          conditions: ["petrified"],
+          duration: { type: "until-source-turn-end" }
+        }
+      },
+      {
+        id: "creature",
+        name: "Hat of Many Spells: Creature",
+        activation: "other",
+        description:
+          "A creature appears in an unoccupied space as close to you as possible: on a d4, 1 a Camel, 2 a Constrictor Snake, 3 an Elephant, 4 a Mule. It isn't under your control and disappears after 1 hour or at 0 Hit Points.",
+        damage: [],
+        grantedOnly: true,
+        summons: {
+          creatures: [
+            { monsterId: "camel", faces: { from: 1, to: 1 } },
+            { monsterId: "constrictor-snake", faces: { from: 2, to: 2 } },
+            { monsterId: "elephant", faces: { from: 3, to: 3 } },
+            { monsterId: "mule", faces: { from: 4, to: 4 } }
+          ],
+          die: 4,
+          rangeFeet: 10,
+          allegiance: "none",
+          lasts: { type: "minutes", minutes: 60 }
+        }
+      },
+      {
+        id: "bats",
+        name: "Hat of Many Spells: Swarm of Bats",
+        activation: "other",
+        description: "A Hostile Swarm of Bats flies out of the hat, occupies your space, and attacks you.",
+        damage: [],
+        grantedOnly: true,
+        summons: {
+          creatures: [{ monsterId: "swarm-of-bats" }],
+          rangeFeet: 5,
+          allegiance: "hostile"
+        }
+      }
+    ],
+    casts: [
+      ...(
+        [
+          "enlargereduce",
+          "faerie-fire",
+          "fireball",
+          "gust-of-wind",
+          "lightning-bolt",
+          "phantasmal-force",
+          "polymorph",
+          "stinking-cloud"
+        ] as const
+      ).map((spellId) => ({ spellId, activation: "other" as const, grantedOnly: true as const })),
+      { spellId: "invisibility", activation: "other", grantedOnly: true, targets: { who: "self" } }
+    ]
+  },
+
+  // Opened and crewed, the barrel is a Large vehicle with its printed AC, Hit Points, speeds and immunities, which its
+  // pilot works on the turn after its own: its claws swing at +8 for 2d6 Bludgeoning or close to grapple (escape DC
+  // 15). The crew inside, their cover, its shutters, light, depth and air are the GM's.
+  "apparatus-of-the-crab": {
+    actions: [
+      {
+        id: "deploy",
+        name: "Crew the Apparatus",
+        activation: "action",
+        description:
+          "Open the barrel's hidden hatch and crawl inside with up to one more Medium or smaller creature. The apparatus is a Large object (AC 20, 200 Hit Points, Speed and Swim Speed 30 ft., Immunity to Poison and Psychic damage) that its pilot works with its levers.",
+        damage: [],
+        summons: {
+          creatures: [{ monsterId: "apparatus-of-the-crab" }],
+          rangeFeet: 5,
+          lasts: { type: "untimed" },
+          onlyOne: true,
+          dismiss: "action"
+        }
+      }
+    ]
+  },
   // 3d4 beans when found, which never come back; with none left the bag is a plain one. Dumped beans explode in a
   // 10-foot-radius Sphere (DC 15 Dexterity, 5d4 Force, half on a success), the dumper included. A planted bean's
   // d100 table is the GM's.
@@ -3664,8 +4671,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
   // Thrown into the air, it makes its thrower and every creature in a 30-foot Emanation save (DC 15 Constitution) or be
-  // Incapacitated with sneezing, repeating the save at the end of each turn. Constructs, Elementals, Oozes, Plants and
-  // Undead succeed, so none of them is a target. Suffocating is the GM's.
+  // Incapacitated with sneezing and suffocating (`choking`: no breath to hold, a level of Exhaustion at the end of each of
+  // its turns, gone when it saves), repeating the save at the end of each turn. Constructs, Elementals, Oozes, Plants and
+  // Undead succeed, so none of them is a target. Lesser Restoration on a creature ends it.
   "dust-of-sneezing-and-choking": {
     consumedOnUse: true,
     actions: [
@@ -3681,6 +4689,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           dc: 15,
           successDamage: "none",
           failureConditions: ["incapacitated"],
+          failureEffect: { name: "Sneezing", tags: ["choking", "cured-by-lesser-restoration"], modifiers: [] },
           repeatSave: true
         },
         area: { shape: "emanation", sizeFeet: 30, widthFeet: null },
@@ -3887,7 +4896,49 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { id: "fan", name: "Fan" },
       { id: "swan-boat", name: "Swan Boat" },
       { id: "tree", name: "Tree" },
-      { id: "whip", name: "Whip" }
+      {
+        id: "whip",
+        name: "Whip",
+        actions: [
+          {
+            id: "whip",
+            name: "Throw the Whip Token",
+            activation: "action",
+            description:
+              "Throw the token to a point within 10 feet of yourself: a floating whip takes its place for 1 hour. You can dismiss it as a Magic action, and it disappears if you die or have the Incapacitated condition.",
+            damage: [],
+            summons: {
+              creatures: [{ monsterId: "feather-token-whip" }],
+              rangeFeet: 10,
+              turn: "none",
+              intangible: true,
+              lasts: { type: "minutes", minutes: 60 },
+              endsOnUserDeath: true,
+              dismiss: "action",
+              strikesFrom: { reachFeet: 10, moveFeet: 20 }
+            },
+            grants: {
+              name: "Floating Whip",
+              target: "self",
+              tags: ["floating-whip"],
+              duration: { type: "minutes", minutes: 60 },
+              endsOnIncapacitated: true,
+              itemAction: "whip-strike"
+            }
+          },
+          {
+            id: "whip-strike",
+            name: "Crack the Floating Whip",
+            activation: "bonus-action",
+            description:
+              "Direct the whip to fly up to 20 feet and make a melee spell attack against a creature within 10 feet of it, with an attack bonus of +9. On a hit, the target takes 1d6 + 5 Force damage.",
+            attack: { ability: "spellcasting", bonus: 9, reachFeet: 10 },
+            damage: [{ formula: "1d6 + 5", type: "force" }],
+            grantedOnly: true,
+            forceOf: "whip"
+          }
+        ]
+      }
     ]
   },
   // One action for each figurine (each lion and each goat its own): thrown within 60 feet, it becomes its creature for
@@ -4422,11 +5473,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
   // "Many types of Ioun Stones exist": the GM says which a found stone is, and its benefit holds while it orbits its
-  // attuned owner's head (worn). Absorption and Greater Absorption (cancelling a spell), Mastery (the Proficiency
-  // Bonus), Regeneration (healing each hour), Reserve (stored spells) and Sustenance (food) stay the GM's.
+  // attuned owner's head (worn): Absorption's and Greater Absorption's Reaction cancelling a spell it sees cast, until it
+  // has cancelled 20 or 50 levels, Mastery's Proficiency Bonus, Regeneration's 15 Hit Points each hour, Reserve's stored
+  // spells (`stored-casts.ts`; the 1d4 levels a found stone holds are the GM's), Sustenance's freedom from food and
+  // water.
   "ioun-stone": {
     variants: [
-      { id: "absorption", name: "Absorption" },
+      {
+        id: "absorption",
+        name: "Absorption",
+        actions: [absorbingStone("Absorption", 4, 20)]
+      },
       {
         id: "agility",
         name: "Agility",
@@ -4450,7 +5507,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Fortitude",
         modifiers: [{ type: "ability-score", ability: "con", amount: 2, maximum: 20 }]
       },
-      { id: "greater-absorption", name: "Greater Absorption" },
+      {
+        id: "greater-absorption",
+        name: "Greater Absorption",
+        actions: [absorbingStone("Greater Absorption", 8, 50)]
+      },
       {
         id: "insight",
         name: "Insight",
@@ -4466,16 +5527,39 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Leadership",
         modifiers: [{ type: "ability-score", ability: "cha", amount: 2, maximum: 20 }]
       },
-      { id: "mastery", name: "Mastery" },
+      { id: "mastery", name: "Mastery", modifiers: [{ type: "proficiency-bonus", amount: 1 }] },
       { id: "protection", name: "Protection", modifiers: [{ type: "armor-class", amount: 1 }] },
-      { id: "regeneration", name: "Regeneration" },
-      { id: "reserve", name: "Reserve" },
+      { id: "regeneration", name: "Regeneration", regainsHitPoints: { everyMinutes: 60, formula: "15" } },
+      {
+        id: "reserve",
+        name: "Reserve",
+        actions: [
+          {
+            id: "hold-out",
+            name: "Hold Out to a Spell",
+            activation: "other",
+            description:
+              "Touch the stone as a spell of level 1 through 4 is cast: the next such spell cast at you or by you within a minute is stored in the stone if there is room, and lost if there isn't. The stone holds up to 4 levels of spells.",
+            damage: [],
+            grants: {
+              name: "Ioun Stone of Reserve held out",
+              tags: ["ring-held-out"],
+              duration: { type: "rounds", rounds: 10 },
+              storeAwaits: { via: "ring", maxLevel: 4 }
+            }
+          }
+        ]
+      },
       {
         id: "strength",
         name: "Strength",
         modifiers: [{ type: "ability-score", ability: "str", amount: 2, maximum: 20 }]
       },
-      { id: "sustenance", name: "Sustenance" }
+      {
+        id: "sustenance",
+        name: "Sustenance",
+        effects: [{ name: "Sustenance", tags: ["needs-no-food"], duration: { type: "manual" } }]
+      }
     ]
   },
 
@@ -4623,14 +5707,81 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     charges: { regain: "1d3" },
     actions: [
       {
-        id: "call",
-        name: "Call a Swarm of Rats",
+        id: "play",
+        name: "Play the Pipes",
         activation: "action",
         description:
-          "Play the pipes and expend 1 charge, calling forth one Swarm of Rats if enough rats are within half a mile of you to be called in this fashion (as determined by the GM). If there aren't enough rats to form a swarm, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.",
-        uses: { limit: 3, per: "long-rest", pool: "pipes-of-the-sewers-charges" }
-      }
+          "Play the pipes: each Swarm of Rats that isn't under another creature's control within 30 feet of you makes a DC 15 Wisdom saving throw. On a failed save, the swarm is Friendly to you and your allies and obeys your commands while you keep playing each round as a Magic action and it starts its turns within 30 feet of you. On a successful save, it can't be swayed by the pipes for 24 hours.",
+        damage: [],
+        save: {
+          ability: "wis",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: [],
+          failureDuration: { type: "until-source-next-turn" },
+          failureEffect: { name: "Swayed by the Pipes", tags: ["commanded", "commanded-within-30"], modifiers: [] },
+          immuneOnSuccess: true,
+          immuneMinutes: 1440
+        },
+        targets: { count: 10, rangeFeet: 30, statBlocks: ["swarm-of-rats"] }
+      },
+      ...([1, 2, 3] as const).map((count) => ({
+        id: `call-${count}`,
+        name: `Call ${count === 1 ? "a Swarm" : `${count} Swarms`} of Rats`,
+        activation: "bonus-action" as const,
+        description: `Having played the pipes, expend ${count === 1 ? "1 charge" : `${count} charges`} to call forth ${count === 1 ? "one Swarm" : `${count} Swarms`} of Rats, if enough rats are within half a mile of you (as determined by the GM); if there aren't, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.`,
+        damage: [],
+        uses: { limit: 3, per: "long-rest" as const, pool: "pipes-of-the-sewers-charges" },
+        ...(count > 1 ? { useCost: count } : {}),
+        summons: {
+          creatures: [{ monsterId: "swarm-of-rats", count }],
+          rangeFeet: 60,
+          allegiance: "none" as const
+        }
+      }))
     ]
+  },
+
+  // The GM says which golem a found manual teaches. A reader that isn't a spellcaster with two level 5 spell slots takes
+  // 6d6 Psychic damage; the golem is made over the manual's days of work, which the GM gives and marks done, and then
+  // joins the map under its maker's command, the manual burning as it does. The cost in gold is the GM's.
+  "manual-of-golems": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "read",
+        name: "Read the Manual",
+        activation: "action",
+        description:
+          "Try to read the manual. A creature that isn't a spellcaster with at least two level 5 spell slots can't use it and takes 6d6 Psychic damage.",
+        damage: [{ formula: "6d6", type: "psychic" }],
+        targets: { who: "self" },
+        keepsItem: true,
+        refusedWithSlots: { level: 5, count: 2 }
+      }
+    ],
+    variants: (
+      [
+        ["clay", "Clay Golem", "clay-golem", 30, "65,000"],
+        ["flesh", "Flesh Golem", "flesh-golem", 60, "50,000"],
+        ["iron", "Iron Golem", "iron-golem", 120, "100,000"],
+        ["stone", "Stone Golem", "stone-golem", 90, "80,000"]
+      ] as const
+    ).map(([id, name, monsterId, days, cost]) => ({
+      id,
+      name,
+      actions: [
+        {
+          id: "animate",
+          name: `Animate the ${name}`,
+          activation: "action" as const,
+          description: `Once ${days} days of work and ${cost} GP of supplies have made the ${name}, the manual is consumed in eldritch flames and the golem animates under your control, understanding and obeying your commands. Your GM marks the work done.`,
+          damage: [],
+          gmTakes: true as const,
+          summons: { creatures: [{ monsterId }], rangeFeet: 5, lasts: { type: "untimed" as const } }
+        }
+      ]
+    }))
   },
 
   // What is put in it weighs next to nothing; put in another extradimensional space, it is destroyed with what it
@@ -5069,6 +6220,49 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
+  // Thrown with a Utilize action: its user and each creature in a 10-foot Emanation are Invisible for 2d4 minutes, one roll
+  // for all, ending for a creature that makes an attack roll, deals damage or casts a spell. Objects in it are scenery.
+  "dust-of-disappearance": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "throw",
+        name: "Throw the Dust",
+        activation: "action",
+        description:
+          "Throw the dust into the air: you and each creature within a 10-foot Emanation originating from you have the Invisible condition for 2d4 minutes, the same for all. The condition ends for a creature immediately after it makes an attack roll, deals damage, or casts a spell.",
+        damage: [],
+        area: { shape: "emanation", sizeFeet: 10, widthFeet: null },
+        grants: {
+          name: "Dust of Disappearance",
+          target: "self-and-targets",
+          tags: ["until-it-acts"],
+          conditions: ["invisible"],
+          duration: { type: "minutes", minutes: 8 },
+          minutesRolled: "2d4"
+        }
+      }
+    ]
+  },
+
+  // "The next time you see a creature within 10 minutes after drinking this philter, you have the Charmed condition for
+  // 1 hour": the first creature the drinker sees with dynamic vision on charms it (`first-sight.ts`); with it off the GM
+  // names it. Whether it is the drinker's true love is the story's.
+  "philter-of-love": {
+    consumedOnUse: true,
+    actions: [
+      drink(
+        "Philter of Love",
+        "Drink it: the next time you see a creature within 10 minutes, you have the Charmed condition for 1 hour, charmed by that creature.",
+        {
+          name: "Philter of Love",
+          tags: ["first-sight-charms"],
+          duration: { type: "minutes", minutes: 10 }
+        }
+      )
+    ]
+  },
+
   // The Invisible condition for 1 hour, ending early if the drinker makes an attack roll, deals damage or casts a spell.
   "potion-of-invisibility": {
     consumedOnUse: true,
@@ -5193,28 +6387,61 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Drink it, or give it to a creature within 5 feet of you: it removes the drinker's Exhaustion levels and ends the Poisoned condition on it. For the next 24 hours, it regains the maximum number of Hit Points for any Hit Point Die it spends.",
         damage: [],
         endsConditions: ["exhaustion", "poisoned"],
-        targets: { count: 1, rangeFeet: 5 }
+        targets: { count: 1, rangeFeet: 5 },
+        // Each Hit Point Die it spends restores its maximum (`rests.ts`, `resolution/hit-point-die.ts`).
+        grants: {
+          name: "Potion of Vitality",
+          target: "target",
+          tags: ["hit-dice-maximized"],
+          duration: { type: "minutes", minutes: 1440 }
+        }
       }
     ]
   },
 
-  // The poison's 4d6 Poison damage, dealt to its drinker. The DC 13 Constitution save against an hour of Poisoned, which
-  // a success does not halve the damage of, is the GM's, and so is its disguise: the GM names the row.
+  // "You regain 1d6 Hit Points every 10 minutes if you have at least 1 Hit Point", by the game clock or a fight's rounds
+  // (`clock-healing.ts`). Regrowing a lost body part is the story's: the sheet has no body parts.
+  "ring-of-regeneration": { regainsHitPoints: { everyMinutes: 10, formula: "1d6" } },
+
+  // It "looks, smells, and tastes like a Potion of Healing": its holder sees a Potion of Healing until Identify reveals
+  // it, and it is drunk or given as one is. The drinker takes 4d6 Poison damage whatever its DC 13 Constitution save,
+  // which is against an hour of Poisoned.
   "potion-of-poison": {
     consumedOnUse: true,
+    disguisedAs: "potion-of-healing",
     actions: [
       {
         id: "drink",
         name: "Drink the Potion",
         activation: "bonus-action",
         description:
-          "Drink it: you take 4d6 Poison damage and must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 hour.",
+          "Drink it, or give it to a creature within 5 feet of you. The drinker takes 4d6 Poison damage and must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 hour.",
         damage: [{ formula: "4d6", type: "poison" }],
-        targets: { who: "self" }
+        save: {
+          ability: "con",
+          dc: 13,
+          successDamage: "full",
+          failureConditions: ["poisoned"],
+          failureDuration: { type: "minutes", minutes: 60 }
+        },
+        targets: { count: 1, rangeFeet: 5 }
       }
     ]
   }
 };
+
+/** An Ioun Stone that cancels a spell it sees cast, of at most `maxLevel`, until it has cancelled `levels` levels. */
+function absorbingStone(name: string, maxLevel: number, levels: number): ItemAction {
+  return {
+    id: "absorb",
+    name: `Absorb a Spell (${name})`,
+    activation: "reaction",
+    description: `Cancel a spell of level ${maxLevel} or lower cast by a creature you can see. Once the stone has canceled ${levels} levels of spells, it burns out and becomes a nonmagical stone.`,
+    damage: [],
+    uses: { limit: levels, per: "never", pool: "ioun-stone-absorbed" },
+    reaction: { trigger: "casts-spell", response: "absorb", maxLevel, seen: true }
+  };
+}
 
 /** Every SRD damage type: "Resistance to all damage". */
 function allDamageTypes(): DamageType[] {

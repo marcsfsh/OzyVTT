@@ -523,15 +523,17 @@ describe("the authored riders are present in the shipped bundle", () => {
       "frost-brand": ["extra-damage 1d6 cold"],
       "sword-of-wounding": ["extra-damage 2d6 necrotic"],
       "sword-of-sharpness": ["damage-bonus +7 on a rolled 20", "damage-bonus +7 on a rolled 20"],
-      "sun-blade": ["attack-bonus +2", "damage-bonus +2", "extra-damage 1d8 radiant vs undead"]
+      "sun-blade": ["attack-bonus +2", "damage-bonus +2", "extra-damage 1d8 radiant vs undead"],
+      "sword-of-life-stealing": ["extra-damage 15 necrotic on a rolled 20 vs all but construct, undead"]
     };
     const WEAPON_SCOPED = ["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice", "damage-bonus"];
     type Named = {
       type: string;
       amount?: number;
       formula?: string;
+      flat?: number;
       damageType?: string;
-      when?: ReadonlyArray<{ type: string; creatureTypes?: readonly string[] }>;
+      when?: ReadonlyArray<{ type: string; creatureTypes?: readonly string[]; except?: boolean }>;
     };
     // A gate names when the rider fires: on a critical hit, or against the creature types it names.
     const gateOf = (modifier: Named): string => {
@@ -540,12 +542,13 @@ describe("the authored riders are present in the shipped bundle", () => {
         : modifier.when?.some((trigger) => trigger.type === "on-natural-20")
           ? " on a rolled 20"
           : "";
-      const versus = modifier.when?.find((trigger) => trigger.type === "versus-creature-type")?.creatureTypes;
-      return `${crit}${versus ? ` vs ${versus.join(", ")}` : ""}`;
+      const typed = modifier.when?.find((trigger) => trigger.type === "versus-creature-type");
+      const versus = typed?.creatureTypes;
+      return `${crit}${versus ? ` vs ${typed?.except ? "all but " : ""}${versus.join(", ")}` : ""}`;
     };
     const nameOf = (modifier: Named): string =>
       (modifier.type === "extra-damage"
-        ? `extra-damage ${modifier.formula} ${modifier.damageType ?? "of the weapon's type"}`
+        ? `extra-damage ${modifier.formula ?? modifier.flat} ${modifier.damageType ?? "of the weapon's type"}`
         : `${modifier.type} ${(modifier.amount ?? 0) >= 0 ? "+" : ""}${modifier.amount}`) + gateOf(modifier);
     const actual = Object.fromEntries(
       weapons

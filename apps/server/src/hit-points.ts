@@ -25,13 +25,14 @@ import {
   reduceDamageParts,
   rescaleDamageParts,
   resolveDice,
+  type AttackKind,
   type DamagePart,
   type DamageReduction,
   type RandomSource,
   type ResolvedRider
 } from "@vtt/rules-5e";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
-import type { ActorDefinition, DamageDrain } from "@vtt/schemas";
+import type { ActorDefinition, DamageDrain, DamageSource } from "@vtt/schemas";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
 import {
@@ -73,7 +74,12 @@ import { openRepeatSavesOnDamage } from "./save-stages.js";
 import { berserkerCurse } from "./berserker-axe.js";
 import { interruptRests } from "./rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
-import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import {
+  deriveEquipment,
+  ITEM_LAPSED_TAG,
+  type EquipmentCatalog,
+  type EquipmentDerivation
+} from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
 import { noteFire } from "./zone-fire-note.js";
 import { sightRules } from "./vision/rules.js";
@@ -84,6 +90,7 @@ import {
   stopRegeneration,
   undeadFortitude
 } from "./statblock-traits.js";
+import { rowRecord } from "./item-records.js";
 
 export function healthBandOf(hp: Actor["hp"]): HealthBand {
   if (hp.current <= 0) return "down";
@@ -120,6 +127,8 @@ export type DamageInput = Readonly<{
   bondShare?: true;
   /** Sunlight deals it (a vampire's Sunlight weakness), which a form's Resistance may not meet (`sunlightPierces`). */
   fromSunlight?: true;
+  /** What dealt it (its spell, the row it was dealt with, the attack's kinds), for a defence that reads it. */
+  damageSource?: DamageSource;
 }>;
 export type DamageDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -246,14 +255,48 @@ function reductionRolling(state: GameState, actor: Actor, rollDie: RandomSource 
 
 /** The damage types whose Resistance the dealer's damage ignores (Boon of Irresistible Offense), from its standing
  *  `ignores-resistance` riders. */
-function resistanceIgnoredBy(state: GameState, sourceActorId: string | null, deps: DamageDeps | undefined): string[] {
+function resistanceIgnoredBy(
+  state: GameState,
+  sourceActorId: string | null,
+  deps: DamageDeps | undefined,
+  damageSource: DamageSource | undefined
+): string[] {
   const source = sourceActorId === null ? undefined : state.actors.find((actor) => actor.id === sourceActorId);
   if (!source || !deps) return [];
   const definition = source.definitionId ? deps.resolveDefinition(source.definitionId) : undefined;
   const derivation = deriveEquipment(source, definition, deps.catalog);
-  return collectRiders(derivation.carriers, { ...derivation.context, moment: null }).flatMap((rider) =>
+  // A rider scoped to its item ignores Resistance only with the row the damage was dealt with (a Vorpal Sword).
+  const context = { ...derivation.context, moment: null, sourceItemId: damageSource?.rowId ?? null };
+  return collectRiders(derivation.carriers, context).flatMap((rider) =>
     rider.modifier.type === "ignores-resistance" ? [...(rider.modifier.damageTypes ?? [])] : []
   );
+}
+
+/** Immunities and Resistances the target holds against this damage alone, by what dealt it: its `on-taking-damage`
+ *  riders narrowed by the spell (a Brooch of Shielding against Magic Missile) or the attack's kind (a Shield of Missile
+ *  Attraction against Ranged weapons), each type with the item or effect that gives it. */
+function sourcedDefences(
+  derivation: EquipmentDerivation,
+  types: readonly string[],
+  damageSource: DamageSource | undefined
+): Readonly<{ immunities: DerivedDefence[]; resistances: DerivedDefence[] }> {
+  const immunities: DerivedDefence[] = [];
+  const resistances: DerivedDefence[] = [];
+  for (const type of new Set(types)) {
+    const riders = collectRiders(derivation.carriers, {
+      ...derivation.context,
+      moment: "on-taking-damage",
+      damageTypes: [type],
+      ...(damageSource?.spellId !== undefined ? { spellId: damageSource.spellId } : {}),
+      ...(damageSource?.attackKinds ? { attackKinds: damageSource.attackKinds as AttackKind[] } : {})
+    });
+    for (const rider of riders) {
+      if (!(rider.modifier.damageTypes ?? []).includes(type)) continue;
+      if (rider.modifier.type === "damage-immunity") immunities.push({ type, source: rider.label });
+      if (rider.modifier.type === "damage-resistance") resistances.push({ type, source: rider.label });
+    }
+  }
+  return { immunities, resistances };
 }
 
 /** The stat block's defences minus any a rest-time re-choice superseded (chosen options are baked in). */
@@ -347,23 +390,27 @@ function weighDamage(
       adjustment: NonNullable<DamageApplication["parts"][number]["adjustment"]>,
       type: string
     ) => {
+      const asListed = (rows: readonly DerivedDefence[]) => rows.map((row) => ({ id: row.type, source: row.source }));
       const lists =
         adjustment === "immunity"
-          ? [derivation.damageImmunities]
+          ? [derivation.damageImmunities, asListed(sourced.immunities)]
           : adjustment === "vulnerability"
             ? [derivation.damageVulnerabilities]
             : adjustment === "resistance"
-              ? [derivation.damageResistances]
-              : [derivation.damageResistances, derivation.damageVulnerabilities];
-      const sources = lists.flatMap((list) => list.filter((entry) => entry.id === type).map((entry) => entry.source));
+              ? [derivation.damageResistances, asListed(sourced.resistances)]
+              : [derivation.damageResistances, asListed(sourced.resistances), derivation.damageVulnerabilities];
+      const sources = lists.flatMap((list) =>
+        list.filter((entry) => entry.id === type).flatMap((entry) => (entry.source ? [entry.source] : []))
+      );
       return sources.length > 0 ? [...new Set(sources)].join(", ") : null;
     };
     const resisted = (adjustment: DamageApplication["parts"][number]["adjustment"]) =>
       adjustment === "resistance" || adjustment === "resistance-and-vulnerability";
     // SRD 5.2.1 Petrified: resistance to all damage, poison included (its immunity is to the Poisoned condition).
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
-    // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
-    const underwater = state.combat.active && state.combat.underwater;
+    // SRD Underwater Combat: everything fully underwater has resistance to fire damage, except Fire that says it keeps
+    // its force there (Steam Breath).
+    const underwater = state.combat.active && state.combat.underwater && input.damageSource?.fireUnderwater !== true;
     const shadowy = inShadowyForm(state, actor, definition, deps)
       ? typed.map((part) => normalizeDamageType(part.type)).filter((type) => !SHADOWY_FORM_SPARES.includes(type))
       : [];
@@ -376,6 +423,11 @@ function weighDamage(
       ? { ...formed, resistances: formed.resistances.filter((row) => !pierced.has(row.source ?? "")) }
       : formed;
     const types = (rows: readonly DerivedDefence[]) => rows.map((row) => row.type);
+    const sourced = sourcedDefences(
+      derivation,
+      typed.map((part) => normalizeDamageType(part.type)),
+      input.damageSource
+    );
     // SRD Order of Application: flat reductions first, then Resistance, then Vulnerability.
     const reduction = reduceDamageParts(
       typed,
@@ -387,12 +439,17 @@ function weighDamage(
     );
     flatReduction = reduction.reduced;
     const adjusted = adjustDamageParts(reduction.parts, {
-      resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : []), ...shadowy],
-      immunities: types(standing.immunities),
+      resistances: [
+        ...types(standing.resistances),
+        ...types(sourced.resistances),
+        ...(underwater ? ["fire"] : []),
+        ...shadowy
+      ],
+      immunities: [...types(standing.immunities), ...types(sourced.immunities)],
       // Effects and items can make a target vulnerable as a stat block can; with a same-type resistance both apply.
       vulnerabilities: types(standing.vulnerabilities),
       resistAll: petrified,
-      ignoresResistance: resistanceIgnoredBy(state, input.sourceActorId ?? null, deps)
+      ignoresResistance: resistanceIgnoredBy(state, input.sourceActorId ?? null, deps, input.damageSource)
     });
     parts = adjusted.map((part) => {
       const type = part.type.trim().toLowerCase();
@@ -778,6 +835,28 @@ export function loseHitPoints(
   return { lost: before - actor.hp.current, events };
 }
 
+/** Marks each worn item whose riders lapse when its bearer takes damage (`lapses.onDamage`) as lapsed until the start
+ *  of the bearer's next turn (`equipment-derivation.ts` reads the mark). */
+function lapseOnDamage(state: GameState, actor: Actor, catalog: EquipmentCatalog): void {
+  for (const row of actor.inventory) {
+    const record = rowRecord(catalog, row);
+    if (!record?.lapses?.onDamage || row.quantity <= 0 || !row.equipped) continue;
+    const id = `${row.id}:lapsed`;
+    actor.effects = [
+      ...actor.effects.filter((effect) => effect.id !== id),
+      makeEffect({
+        id,
+        name: `${record.name} (stopped)`,
+        tags: [ITEM_LAPSED_TAG],
+        itemId: row.id,
+        startedRound: state.combat.round,
+        // Outside a fight there is no next turn to wait for: the next hit is all it stops.
+        duration: state.combat.active ? { type: "until-bearer-next-turn" } : { type: "rounds", remaining: 1 }
+      })
+    ];
+  }
+}
+
 /** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
  *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
  *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
@@ -862,6 +941,9 @@ export function applyDamageDetailed(
         ...(deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : {})
       })
     );
+
+  // A Cloak of Displacement: "If you take damage, the property ceases to function until the start of your next turn."
+  if (totalAdjusted > 0 && deps?.catalog) lapseOnDamage(state, actor, deps.catalog);
 
   // A Berserker Axe's curse: damage from another creature asks a save against going berserk.
   if (totalAdjusted > 0 && deps?.newId)
