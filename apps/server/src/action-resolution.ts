@@ -122,6 +122,7 @@ import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
 import { applyAdjustsLight, applyDouses, applyKindles, checkLightTarget } from "./resolution/cast-lights.js";
+import { revealSense } from "./resolution/sense-reveal.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -409,6 +410,7 @@ export function resolveDefinitionAction(
   applyKindles(ctx);
   applyDouses(ctx);
   applyAdjustsLight(ctx);
+  revealSense(ctx);
   refuseThePrayedFor(ctx);
   // A heal that was looked at restores the dice it showed.
   if (heldLook && rollsHealingDice(ctx.action)) {

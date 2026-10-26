@@ -166,6 +166,9 @@ export const SpellLaterActionSchema = z
     area: ActionAreaSchema.optional(),
     /** It moves the cast's `grant` from a creature at 0 Hit Points to its own target (Hunter's Mark, Hex). */
     movesGrant: z.literal(true).optional(),
+    /** It shows what the spell's sense finds in detail (Detect Magic: "take the Magic action to see a faint aura around
+     *  any visible creature ... that bears the magic, and ... learn the spell's school of magic"). */
+    reveals: z.literal(true).optional(),
     /** It is taken only on the caster's turns after the one it cast the spell on ("As a Bonus Action on your later
      *  turns": Spiritual Weapon, Heat Metal). */
     laterTurnsOnly: z.literal(true).optional(),

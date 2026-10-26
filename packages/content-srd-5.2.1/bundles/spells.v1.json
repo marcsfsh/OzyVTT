@@ -4793,7 +4793,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "clairvoyance-sensor",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 1000,
+    "turn": "none",
+    "allegiance": "user",
+    "noAttacks": true,
+    "intangible": true,
+    "sight": "always"
+   }
   },
   "classes": [
    "bard",
@@ -8266,7 +8280,38 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "see the auras",
+     "activation": "action",
+     "when": "A Magic action shows the faint aura round each creature in sight within 30 feet that bears magic, and the school of the spells on it.",
+     "reveals": true,
+     "damage": []
+    }
+   ],
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Detect Magic",
+    "tags": [
+     "detect-magic"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "detects": {
+     "kinds": [
+      "magic"
+     ],
+     "feet": 30,
+     "blockedByWalls": true,
+     "afterAction": true
+    }
+   }
   },
   "classes": [
    "bard",
@@ -8319,7 +8364,28 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Detect Poison and Disease",
+    "tags": [
+     "detect-poison-and-disease"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "detects": {
+     "kinds": [
+      "poison"
+     ],
+     "feet": 30,
+     "blockedByWalls": true
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -8402,7 +8468,28 @@
      "damage": []
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Detect Thoughts",
+    "tags": [
+     "detect-thoughts"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "detects": {
+     "kinds": [
+      "minds"
+     ],
+     "feet": 30,
+     "blockedByWalls": true
+    }
+   }
   },
   "classes": [
    "bard",
@@ -12800,7 +12887,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "floating-disk",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 30,
+    "turn": "none",
+    "leashFeet": 100,
+    "follows": 20,
+    "allegiance": "user",
+    "noAttacks": true,
+    "intangible": true
+   }
   },
   "classes": [
    "wizard"

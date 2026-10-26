@@ -1296,13 +1296,31 @@ export type CarriedLight = z.infer<typeof CarriedLightSchema>;
  *  one ("blocked by 1 foot of stone"). */
 export const DetectsSchema = z
   .object({
-    creatureTypes: z.array(RiderSlugSchema).min(1).max(14),
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(14).optional(),
+    /** What else it senses beside creature types: creatures bearing `magic` (magic items, spell effects: the creatures
+     *  it sees, with their spells' schools), `poison` (poisons carried, poisonous or venomous creatures, magical
+     *  contagions, with their kind) and `minds` (creatures with an Intelligence of 4 or more). */
+    kinds: z
+      .array(z.enum(["magic", "poison", "minds"]))
+      .min(1)
+      .max(3)
+      .optional(),
+    /** The direction of the nearest creature Hostile to the bearer, hidden or not, but not its distance (a Wand of Enemy
+     *  Detection). */
+    nearestHostile: z.literal(true).optional(),
+    /** What it finds shows only once its bearer has taken the spell's later action to look (Detect Magic's Magic action
+     *  to see the auras); `revealed` once it has. */
+    afterAction: z.literal(true).optional(),
+    revealed: z.literal(true).optional(),
     feet: z.number().int().min(5).max(240),
     blockedByWalls: z.literal(true).optional()
   })
   .strict()
+  .refine((detects) => detects.creatureTypes || detects.kinds || detects.nearestHostile, {
+    message: "A sense names creature types, kinds of thing, or the nearest Hostile creature."
+  })
   .describe(
-    "Creatures of these types within `feet` of the bearer whose place and type it knows, seen or not (Divine Sense); with `blockedByWalls`, not through a wall. Shown only to the bearer's player, on a scene with dynamic vision."
+    "What the bearer senses within `feet`, seen or not: creatures of these types (Divine Sense), creatures bearing magic, poison or a mind, or the direction of the nearest Hostile creature; with `blockedByWalls`, not through a wall. Shown only to the bearer's player, on a scene with dynamic vision."
   );
 export type Detects = z.infer<typeof DetectsSchema>;
 
@@ -2493,6 +2511,8 @@ export const SummonedSchema = z
     endsOnDamage: z.literal(true).optional(),
     endsOnUserDeath: z.literal(true).optional(),
     leashFeet: z.number().int().min(5).max(5280).optional(),
+    /** It follows its user to stay within this many feet (Floating Disk). */
+    follows: z.number().int().min(5).max(120).optional(),
     /** It takes no turns, can't be harmed and doesn't block a space (Arcane Eye, Spiritual Weapon's force). */
     intangible: z.literal(true).optional(),
     /** It takes no turns of its own; its user moves it (Spiritual Weapon's force, Arcane Hand), this far with each
@@ -4939,6 +4959,9 @@ export const SummonSchema = z
     endsOnDamage: z.literal(true).optional(),
     endsOnUserDeath: z.literal(true).optional(),
     leashFeet: z.number().int().min(5).max(5280).optional(),
+    /** It stays put while its user is within this many feet, and follows to stay that near as its user moves away
+     *  (Floating Disk: 20). */
+    follows: z.number().int().min(5).max(120).optional(),
     /** Who commands it: its user, no one (a Wand of Wonder's Rhinoceros), or no one and it turns on its user (a Horn of
      *  Valhalla blown without the training it asks). */
     allegiance: z.enum(["user", "none", "hostile"]).default("user"),

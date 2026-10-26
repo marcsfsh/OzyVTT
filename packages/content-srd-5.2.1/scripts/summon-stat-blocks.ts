@@ -543,6 +543,25 @@ const ARCANE_EYE = force({
     "An Invisible, invulnerable eye that hovers and sees in every direction, with Darkvision 30 ft. Its caster sees what it sees, and a Bonus Action moves it up to 30 feet."
 });
 
+/** Clairvoyance: "an Invisible sensor ... The intangible, invulnerable sensor remains in place". */
+const CLAIRVOYANCE_SENSOR = force({
+  id: "clairvoyance-sensor",
+  name: "Clairvoyance Sensor",
+  size: "tiny",
+  invisible: true,
+  description:
+    "An Invisible, intangible and invulnerable sensor that stays where it was made. Its caster sees through it as if in its space. A creature that sees the Invisible sees a luminous orb the size of a fist."
+});
+
+/** Floating Disk: "a circular, horizontal plane of force, 3 feet in diameter ... that floats 3 feet above the ground". */
+const FLOATING_DISK = force({
+  id: "floating-disk",
+  name: "Floating Disk",
+  size: "small",
+  description:
+    "A disk of force 3 feet across floating 3 feet off the ground. It holds up to 500 pounds, stays put while its caster is within 20 feet, and follows to stay within 20 feet; more than 100 feet from it, the spell ends."
+});
+
 /** Mage Hand: "a spectral, floating hand". */
 const MAGE_HAND = force({
   id: "mage-hand",
@@ -642,8 +661,10 @@ export const SUMMON_STAT_BLOCKS: readonly ActorDefinition[] = [
   ARCANE_EYE,
   ARCANE_HAND,
   ARCANE_SWORD,
+  CLAIRVOYANCE_SENSOR,
   DRACONIC_SPIRIT,
   FEY_SPIRIT,
+  FLOATING_DISK,
   GIANT_FLY,
   GIANT_INSECT,
   ILLUSORY_COPY,

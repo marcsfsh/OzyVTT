@@ -1137,6 +1137,17 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   // target makes a Wisdom saving throw. ... On a successful save, the spell ends. Either way, the target knows that you
   // are probing into its mind, and ... the target can take an action on its turn to make an Intelligence (Arcana) check
   // against your spell save DC, ending the spell on a success." What the caster learns is the GM's.
+  // "If you sense such effects, you can take the Magic action to see a faint aura around any visible creature or object
+  // in the area that bears the magic, and if an effect was created by a spell, you learn the spell's school of magic."
+  "detect-magic": [
+    {
+      name: "see the auras",
+      activation: "action",
+      when: "A Magic action shows the faint aura round each creature in sight within 30 feet that bears magic, and the school of the spells on it.",
+      reveals: true,
+      damage: []
+    }
+  ],
   "detect-thoughts": [
     {
       name: "probe",
@@ -1995,6 +2006,32 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   // "For the duration, you sense the location of any Aberration, Celestial, Elemental, Fey, Fiend, or Undead within 30
   // feet of yourself. You also sense whether the Hallow spell is active there and, if so, where. The spell is blocked
   // by 1 foot of stone, dirt, or wood; 1 inch of metal; or a thin sheet of lead."
+  // "You sense the presence of magical effects within 30 feet of yourself ... The spell is blocked by 1 foot of stone"
+  // (`vision/detect.ts`): the creatures in sight bearing magic, shown once its Magic action looks.
+  "detect-magic": spellGrant({
+    name: "Detect Magic",
+    tags: ["detect-magic"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: { kinds: ["magic"], feet: 30, blockedByWalls: true, afterAction: true }
+  }),
+  // "You sense the location of poisons, poison- or venom-bearing creatures, and magical contagions within 30 feet of
+  // yourself. You sense the kind of poison, creature, or contagion in each case."
+  "detect-poison-and-disease": spellGrant({
+    name: "Detect Poison and Disease",
+    tags: ["detect-poison-and-disease"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: { kinds: ["poison"], feet: 30, blockedByWalls: true }
+  }),
+  // Sense Thoughts: the minds within 30 feet, blocked by a thick enough barrier (`vision/detect.ts`).
+  "detect-thoughts": spellGrant({
+    name: "Detect Thoughts",
+    tags: ["detect-thoughts"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: { kinds: ["minds"], feet: 30, blockedByWalls: true }
+  }),
   "detect-evil-and-good": spellGrant({
     name: "Detect Evil and Good",
     tags: ["detect-evil-and-good"],

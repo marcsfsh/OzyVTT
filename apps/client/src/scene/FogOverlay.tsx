@@ -9,7 +9,7 @@ export type VisionMask = Readonly<{
   visible: readonly (readonly number[])[];
   bright?: readonly (readonly number[])[];
   explored: readonly Rect[];
-  sensed?: readonly Readonly<{ x: number; y: number; creatureType: string }>[];
+  sensed?: readonly Readonly<{ x: number; y: number; creatureType: string; sense?: string }>[];
 }>;
 
 const points = (polygon: readonly number[]) => {
@@ -125,10 +125,14 @@ export function FogOverlay({
           />
           {vision.sensed?.map((creature, index) => (
             <g key={index} className="vision-sensed" pointerEvents="none">
-              <title>{`You sense ${article(creature.creatureType)} here`}</title>
+              <title>
+                {creature.sense
+                  ? `You sense ${creature.sense} here`
+                  : `You sense ${article(creature.creatureType)} here`}
+              </title>
               <circle cx={creature.x} cy={creature.y} r={markRadius} />
               <text x={creature.x} y={creature.y + markRadius * 1.7} textAnchor="middle" fontSize={markRadius * 0.7}>
-                {titled(creature.creatureType)}
+                {creature.sense ? titled(creature.sense) : titled(creature.creatureType)}
               </text>
             </g>
           ))}

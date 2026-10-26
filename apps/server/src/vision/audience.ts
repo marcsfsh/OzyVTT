@@ -16,6 +16,7 @@ import {
 import { sensesOf, type SightContent } from "./senses.js";
 import { isEthereal, needsEtherealSight, seesIntoEthereal } from "../ethereal.js";
 import { distance } from "./geometry.js";
+import { spellWardOf } from "../resolution/spell-wards.js";
 import { derivedUuid } from "./cast-sight.js";
 import { sceneSight, sightIsCached, wallPieces } from "./sight.js";
 
@@ -131,6 +132,36 @@ function etherealUnseen(state: GameState, viewerIds: readonly string[], content:
     .map((actor) => actor.id);
 }
 
+/** The creatures seen only through a divination's sensor (Arcane Eye, Clairvoyance) that a ward keeps from it
+ *  (Nondetection: "can't be perceived through magical scrying sensors"). */
+function wardedFromSensors(
+  state: GameState,
+  viewerIds: readonly string[],
+  perceivedBy: (viewerIds: readonly string[]) => ReadonlySet<string>,
+  content: SightContent
+): string[] {
+  const sensors = viewerIds.flatMap((viewerId) => {
+    const sensor = state.actors.find((actor) => actor.id === viewerId);
+    const spell = sensor?.summon?.spell ? content.catalog?.spellRecord?.(sensor.summon.spell.id) : undefined;
+    return sensor && spell?.school === "divination" ? [{ sensor, spell }] : [];
+  });
+  if (sensors.length === 0) return [];
+  const eyes = new Set(viewerIds.filter((viewerId) => !sensors.some(({ sensor }) => sensor.id === viewerId)));
+  const byEyes = perceivedBy([...eyes]);
+  const wardContent = { resolveDefinition: content.definition, catalog: content.catalog };
+  return state.actors
+    .filter(
+      (actor) =>
+        !byEyes.has(actor.id) &&
+        sensors.every(
+          ({ sensor, spell }) =>
+            !perceivedBy([sensor.id]).has(actor.id) ||
+            spellWardOf(state, actor, spell, sensor.summon!.by, wardContent) !== null
+        )
+    )
+    .map((actor) => actor.id);
+}
+
 const placed = (state: GameState, actorId: string) =>
   state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
 const inPlay = (actor: Actor) => actor.visibility === "public" && !actor.archived;
@@ -216,6 +247,7 @@ export function audienceSight(
     for (const actorId of known) hidden.delete(actorId);
     if (!sight.enabled) return hidden.size === 0 && fogged.size === 0 ? OFF : { ...OFF, hidden, fogged, viewerIds };
     const perceived = new Set([...sight.perceivedBy(viewerIds), ...known]);
+    for (const actorId of wardedFromSensors(state, viewerIds, sight.perceivedBy, content)) perceived.delete(actorId);
     const combatants = new Set([
       ...state.combat.initiative.map((entry) => entry.actorId),
       ...state.combat.tokens.map((token) => token.actorId)

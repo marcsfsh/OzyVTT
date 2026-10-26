@@ -204,6 +204,26 @@ const ROWS: Readonly<Record<string, SummonInput>> = {
   },
   // An Invisible force within 60 feet (AC 10, 1 Hit Point, Strength 2) that can't attack: once on each of the caster's
   // turns a Bonus Action moves it 15 feet, and the spell ends if it is more than 60 feet away.
+  // An Invisible sensor within range that stays put, whose sight its caster shares while the spell lasts; a sensor off
+  // this map, and what it hears, are the GM's.
+  clairvoyance: {
+    creatures: [{ monsterId: "clairvoyance-sensor" }],
+    rangeFeet: 1000,
+    turn: "none",
+    intangible: true,
+    sight: "always",
+    noAttacks: true
+  },
+  // A disk of force within 30 feet that follows its caster to stay within 20 feet, and ends more than 100 feet from it.
+  "floating-disk": {
+    creatures: [{ monsterId: "floating-disk" }],
+    rangeFeet: 30,
+    turn: "none",
+    intangible: true,
+    follows: 20,
+    leashFeet: 100,
+    noAttacks: true
+  },
   "unseen-servant": {
     creatures: [{ monsterId: "unseen-servant" }],
     rangeFeet: 60,

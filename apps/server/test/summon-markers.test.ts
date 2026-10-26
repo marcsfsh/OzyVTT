@@ -159,6 +159,41 @@ describe("Arcane Eye", () => {
   });
 });
 
+describe("Clairvoyance", () => {
+  it("leaves an Invisible sensor that stays put, which its caster's player sees through", async () => {
+    const table = await bootSummons(cleanups);
+    await table.post(GAME_PATHS.encounterEnd, table.gmToken);
+    const cast = await table.resolve({
+      actionId: "spell-clairvoyance",
+      summon: { at: cell(14, 2) },
+      override: { reason: "The focus is in the pack." }
+    });
+    expect(cast.status, await cast.clone().text()).toBe(200);
+    const [sensor] = table.named("Clairvoyance Sensor");
+    expect(sensor!.conditions.some((condition) => condition.id === "invisible")).toBe(true);
+    const player = table.server.auth.issuePlayerSession();
+    expect((await table.post(GAME_PATHS.claims, player, { actorId: CASTER })).status).toBe(200);
+    const session = table.snapshot().actors.find((actor) => actor.id === CASTER)!.ownerSessionId!;
+    expect(playerViewerIds(table.snapshot(), session)).toEqual(expect.arrayContaining([CASTER, sensor!.id]));
+  });
+});
+
+describe("Floating Disk", () => {
+  it("follows its caster to stay within 20 feet, and ends 100 feet away", async () => {
+    const table = await bootSummons(cleanups);
+    await table.post(GAME_PATHS.encounterEnd, table.gmToken);
+    const cast = await table.resolve({ actionId: "spell-floating-disk", summon: { at: cell(3, 2) } });
+    expect(cast.status, await cast.clone().text()).toBe(200);
+    const [disk] = table.named("Floating Disk");
+    const start = positionOf(table, CASTER)!;
+    await table.move(CASTER, table.gmToken, { position: { x: start.x + 400, y: start.y } });
+    const caster = positionOf(table, CASTER)!;
+    const after = positionOf(table, disk!.id)!;
+    expect(Math.abs(caster.x - after.x) / 10).toBeLessThanOrEqual(25);
+    expect(after.x).toBeGreaterThan(cell(3, 2).x);
+  });
+});
+
 describe("Mage Hand", () => {
   it("vanishes more than 30 feet from its caster, and a second casting replaces it", async () => {
     const table = await bootSummons(cleanups);

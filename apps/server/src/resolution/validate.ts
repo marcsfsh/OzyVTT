@@ -140,6 +140,8 @@ function combatantsOf(
     (laterRowOf(spell, action.id)?.movesArea !== undefined ||
       laterRowOf(spell, action.id)?.interposes === true ||
       laterRowOf(spell, action.id)?.liftFeet !== undefined);
+  // Looking at what a sense finds (Detect Magic's auras) is something done.
+  const revealsASense = spell !== undefined && laterRowOf(spell, action.id)?.reveals === true;
   // Spreading Caltrops leaves an area that acts on whoever meets it later.
   const leavesAnArea = action.zone !== undefined && !castsASpell;
   const rollsOnTargets =
@@ -155,6 +157,7 @@ function combatantsOf(
     spendsALimitedUse ||
     startsALastingSpell ||
     movesAnArea ||
+    revealsASense ||
     leavesAnArea ||
     // A move, jump or teleport of its own (a troll's Charge, a bulette's Leap) is something done.
     action.move !== undefined ||
@@ -197,6 +200,7 @@ function combatantsOf(
     !spendsALimitedUse &&
     !castsASpell &&
     !movesAnArea &&
+    !revealsASense &&
     action.sight === undefined &&
     !shapeShifts &&
     action.move === undefined &&

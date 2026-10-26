@@ -273,6 +273,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       (draft) => {
         events = settleSummons(draft, {
           distanceFeet: leash(draft),
+          geometry: draft.combat.mapAssetId === before.combat.mapAssetId ? geometry : null,
           resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
           catalog: kit.equipmentCatalog()
         });
