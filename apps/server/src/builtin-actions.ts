@@ -416,8 +416,10 @@ function bonusSources(definition: ActorDefinition | undefined, bearer?: ActionBe
   if (features.some((feature) => feature.id === "martial-arts")) offer(UNARMED, "Martial Arts");
   if (holds("step-of-the-wind")) offer(["dash"], "Step of the Wind");
   if (holds("patient-defense")) offer(["disengage"], "Patient Defense");
+  // A move that ends with a free Hide (a weretiger's Prowl) offers it only once moved, through its effect.
   for (const action of actions)
-    if (action.activation === "bonus-action") offer(offeredActions(action.description), action.name);
+    if (action.activation === "bonus-action" && action.move?.thenHide !== true)
+      offer(offeredActions(action.description), action.name);
   // A live effect's own: Expeditious Retreat's Dash, Conjure Woodland Beings' Disengage.
   for (const effect of bearer?.effects ?? []) offer(effect.bonusActions ?? [], effect.name);
   return offered;

@@ -1,4 +1,5 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { grappledBy } from "../movement-rules.js";
 import { onOtherPlanes, planeOf } from "../ethereal.js";
 import { underAntimagic } from "../antimagic.js";
 import { catalogIdOf } from "@vtt/schemas";
@@ -89,6 +90,9 @@ function combatantsOf(
   const attacker = state.actors.find((item) => item.id === input.actorId);
   if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
   if (!inFight(input.actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
+  // "If the roc has a creature Grappled": the flight that drops it needs one held.
+  if (action.move?.dropsHeld && grappledBy(state, attacker.id).length === 0)
+    throw new CommandRejectedError(`${attacker.name} has no creature Grappled to drop with ${action.name}.`);
   // A creature off the plane, or on the Border Ethereal, affects and is affected only by what is there with it
   // (Banishment, Etherealness, Blink).
   const awayFrom = (target: LiveActor) => onOtherPlanes(attacker, target);

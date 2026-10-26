@@ -1869,7 +1869,11 @@ export const EffectInstanceSchema = z
         towardActorId: z.uuid().optional(),
         /** It passes through the spaces of creatures this size or smaller, and these are the ones it has entered. */
         throughCreatures: SizeSchema.optional(),
-        entered: z.array(z.uuid()).max(50).optional()
+        entered: z.array(z.uuid()).max(50).optional(),
+        /** The move ends by letting go of what its creature grapples (a roc's Swoop). */
+        dropsHeld: z.literal(true).optional(),
+        /** At its end the creature can take the Hide action freely (a weretiger's Prowl). */
+        thenHide: z.literal(true).optional()
       })
       .strict()
       .optional(),
@@ -4877,7 +4881,13 @@ export const ActionMoveSchema = z
     first: z.literal(true).optional(),
     /** The largest creature whose space it may pass through (a gelatinous cube's Engulf: "can move through the spaces
      *  of Large or smaller creatures"); the creatures whose spaces it enters are what the action then targets. */
-    throughCreatures: SizeSchema.optional()
+    throughCreatures: SizeSchema.optional(),
+    /** It is taken only while its user grapples a creature, and the move ends by letting it go, a creature carried into
+     *  the air falling from there (a roc's Swoop: "If the roc has a creature Grappled, the roc flies up to half its Fly
+     *  Speed ... and drops that creature"). */
+    dropsHeld: z.literal(true).optional(),
+    /** At the end of the move its user can take the Hide action with no action of its own (a weretiger's Prowl). */
+    thenHide: z.literal(true).optional()
   })
   .strict();
 export type ActionMove = z.infer<typeof ActionMoveSchema>;
@@ -5844,7 +5854,14 @@ export const ActionSchema = z
             /** Only against a target of at most this size. */
             maxTargetSize: SizeSchema.optional(),
             /** Conditions it imposes too (a charge's Prone). */
-            conditions: z.array(ConditionIdSchema).max(2).optional()
+            conditions: z.array(ConditionIdSchema).max(2).optional(),
+            /** An action of its user's it may then make against the target with no further action, once its
+             *  conditions land (an allosaurus's charge: "the allosaurus can make one Bite attack against it"). */
+            followUp: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(120)
+              .optional()
           })
           .strict()
       )

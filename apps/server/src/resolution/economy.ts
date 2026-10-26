@@ -56,6 +56,8 @@ import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../endi
 import { castMarks, markMoveOf } from "./marks.js";
 import { actionTargetViolations } from "./action-targets.js";
 import { swallowViolations } from "../swallow.js";
+import { followUpViolation } from "../follow-ups.js";
+import { THEN_HIDE_TAG } from "../granted-moves.js";
 import { bloodiedHitViolation } from "../bloodied-hits.js";
 import { attachmentViolations } from "../attachments.js";
 import { hitRiderOf } from "./hit-riders.js";
@@ -222,7 +224,8 @@ export function evaluateActionEconomy(
     resolveDefinition,
     onOwnTurn: state.combat.turnActorId === attacker.id,
     proseMultiattack: siblings.some((candidate) => candidate.untrackedMultiattack === true),
-    freeBonusAction: fleet.free,
+    // A weretiger's Prowl ends with a Hide that takes no action of its own.
+    freeBonusAction: fleet.free || hidesFreely(attacker, action),
     violations: [],
     softViolations: [],
     notes: []
@@ -294,6 +297,8 @@ export function evaluateActionEconomy(
     ...attachmentViolations(state, attacker, action, targetIds),
     // A Rampage waits on damage to a creature already Bloodied.
     ...[bloodiedHitViolation(state, attacker, action)].filter((violation) => violation !== null),
+    // A follow-up attack a hit opened goes only at that hit's target (an allosaurus's Bite).
+    ...[followUpViolation(state, attacker, action, targetIds)].filter((violation) => violation !== null),
     ...raiseViolations({ state, attacker, action, targetIds })
   );
   if (spell) checkMarkMove(evaluation, spell);
@@ -1962,4 +1967,9 @@ export function commitUse(state: GameState, attacker: LiveActor, spendUse: NonNu
     [spendUse.key]: (attacker.actionUses[spendUse.key] ?? 0) + spendUse.amount,
     ...(spendUse.also ? { [spendUse.also]: (attacker.actionUses[spendUse.also] ?? 0) + 1 } : {})
   };
+}
+
+/** The Hide a move's end offers (a weretiger's Prowl): its Bonus Action form, while the effect that offers it lasts. */
+function hidesFreely(attacker: LiveActor, action: DefinitionAction): boolean {
+  return action.id === "hide-bonus" && attacker.effects.some((effect) => effect.tags.includes(THEN_HIDE_TAG));
 }

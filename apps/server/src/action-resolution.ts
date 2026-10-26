@@ -171,6 +171,8 @@ import {
 } from "./resolution/held-damage.js";
 import { CommandRejectedError } from "./game-store.js";
 import { checkDestination, landAtDestination } from "./resolution/destination.js";
+import { openFollowUps } from "./follow-ups.js";
+import { THEN_HIDE_TAG } from "./granted-moves.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -468,6 +470,11 @@ export function resolveDefinitionAction(
   vitalityOnHit(ctx);
   // After the economy, which writes the action's instance that a leap continues.
   orbLeap(ctx);
+  // A hit's follow-up attack (an allosaurus's Bite) is one more place in the action just written.
+  openFollowUps(ctx.state, ctx.attacker.id);
+  // The free Hide a move's end offered is taken.
+  if (ctx.action.id === "hide-bonus")
+    ctx.attacker.effects = ctx.attacker.effects.filter((effect) => !effect.tags.includes(THEN_HIDE_TAG));
   openStrike(ctx);
   spendStrike(ctx);
   recallSpellSlot(ctx);

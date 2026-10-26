@@ -5,7 +5,7 @@ import type { MoveMode } from "@vtt/domain/commands";
 import type { ActorDefinition, TeleportLanding } from "@vtt/schemas";
 import { footprintOrigin } from "@vtt/rules-5e";
 import { RulesBlockedError } from "./game-store.js";
-import { altitudesAlong, heightRefusal, sharesHeight } from "./altitude.js";
+import { altitudeOf as altitudeOfToken, altitudesAlong, heightRefusal, setAltitude, sharesHeight } from "./altitude.js";
 import {
   activeMoveGrant,
   activeTeleportGrant,
@@ -139,6 +139,10 @@ export type MovementRulesOutcome = Readonly<{
   heldAt?: Readonly<{ position: Point; altitudeFeet: number; promptIds: readonly string[]; refundFeet: number }>;
   /** The way a walk, a flight, a climb, a swim or a burrow went, step by step, as its cost measured it. */
   path?: readonly Point[];
+  /** The granted move ends by letting go of what its mover grapples (a roc's Swoop: "drops that creature"). */
+  dropsHeld?: true;
+  /** At the end of the granted move its mover can take the Hide action freely (a weretiger's Prowl). */
+  thenHide?: true;
 }>;
 
 /**
@@ -329,20 +333,27 @@ export function dragCostsExtra(
   });
 }
 
-/** The creatures a grappler drags come along, moved the same way it went, and snapped (SRD Grappled: "Movable").
- *  Returns those moved. */
+/** The creatures a grappler drags come along, moved the same way it went, and snapped (SRD Grappled: "Movable"). A
+ *  grappler that rose or came down takes them up or down as far (a roc carrying its prey aloft), where they hang in
+ *  its grip until it lets go (`heldAloft` in `falling.ts`). Returns those moved. */
 export function dragAlong(
   state: GameState,
   heldIds: readonly string[],
   from: Point,
   to: Point,
-  geometry: TokenMapGeometry
+  geometry: TokenMapGeometry,
+  riseFeet = 0
 ): string[] {
   const moved: string[] = [];
   for (const heldId of heldIds) {
-    const held = state.combat.tokens.find((token) => token.actorId === heldId)?.position;
+    const token = state.combat.tokens.find((candidate) => candidate.actorId === heldId);
+    const held = token?.position;
     if (!held) continue;
     moveEncounterToken(state, heldId, { x: held.x + to.x - from.x, y: held.y + to.y - from.y }, geometry);
+    if (riseFeet !== 0) {
+      const height = Math.max(0, altitudeOfToken(token) + riseFeet);
+      setAltitude(state, heldId, height, height > 0 ? "fly" : undefined);
+    }
     moved.push(heldId);
   }
   return moved;
@@ -477,6 +488,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   let failOn: string | undefined;
   let smoke = false;
   let heldAt: MovementRulesOutcome["heldAt"];
+  let dropsHeld = false;
+  let thenHide = false;
   const travelled: { path?: readonly Point[] } = {};
   const done = (crawled = false): MovementRulesOutcome => ({
     warning: outcome.warnings.length > 0 ? outcome.warnings.join(" ") : null,
@@ -491,7 +504,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     ...(passengerId ? { teleportPassengerId: passengerId, ...(failOn ? { teleportFailDamage: failOn } : {}) } : {}),
     ...(smoke ? { teleportSmoke: true as const } : {}),
     ...(heldAt ? { heldAt } : {}),
-    ...(travelled.path ? { path: travelled.path } : {})
+    ...(travelled.path ? { path: travelled.path } : {}),
+    ...(dropsHeld ? { dropsHeld: true as const } : {}),
+    ...(thenHide ? { thenHide: true as const } : {})
   });
   // Forced movement is the GM's (the command refuses a player's), and spends nothing.
   if (!mover || from === null || to === null || mode === "forced") return done();
@@ -582,7 +597,10 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   if (mode === "teleport") return done();
   // A granted move is charged to its grant, and provokes unless it says otherwise.
   if (grant) {
-    spendMoveGrant(mover, grant.effectId, grant.chargeFeet);
+    // A flight that ends by dropping its prey is one move: the rest of it goes with the drop.
+    spendMoveGrant(mover, grant.effectId, grant.dropsHeld ? grant.feet : grant.chargeFeet);
+    dropsHeld = grant.dropsHeld === true;
+    thenHide = grant.thenHide === true;
     // The creatures a move through them entered are what its action then targets (a cube's Engulf).
     if (grant.throughCreatures)
       recordEntered(

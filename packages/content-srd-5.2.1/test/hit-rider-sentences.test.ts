@@ -26,6 +26,10 @@ const READERS: readonly Check[] = [
   },
   { pattern: /\bit has the Prone condition\b/, read: (action) => condition(action, "prone") },
   {
+    pattern: /\bcan make one [A-Z][a-z]+ attack against it\b/,
+    read: (action) => (action.conditionalDamage ?? []).some((variant) => variant.followUp !== undefined)
+  },
+  {
     pattern: /\bthe target has the ([A-Z][a-z]+) condition until the (?:start|end) of\b/,
     read: (action) => (action.onHit ?? []).some((rider) => rider.duration !== undefined && rider.conditions.length > 0)
   },

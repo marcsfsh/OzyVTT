@@ -10,8 +10,6 @@ const HURL_FLAME =
   "A flammable object the target hit that isn't worn or carried starts burning; objects are the GM's to burn.";
 
 const HIT_NOTES: Readonly<Record<string, string>> = {
-  "allosaurus/claws":
-    "After a charge that knocks the target Prone, the allosaurus can make one Bite attack against it; take it from the turn list.",
   "animated-rug-of-smothering/smother":
     "The rug smothers one creature at a time. While it grapples the target, the target is suffocating, and the rug halves the damage it takes (round down) while the target takes the same amount.",
   "barbed-devil/hurl-flame": HURL_FLAME,

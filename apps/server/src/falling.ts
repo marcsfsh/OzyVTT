@@ -66,6 +66,20 @@ export const fallDice = (feet: number) => Math.min(20, Math.floor(Math.max(0, fe
 const definitionOf = (actor: Actor, deps: Pick<FallDeps, "resolveDefinition">) =>
   actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
 
+/** A creature held in another's grip that is in the air itself, which carries it there (a roc's prey): it hangs on until
+ *  it is let go. */
+export function heldAloft(state: GameState, actorId: string): boolean {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  return (
+    actor?.effects.some(
+      (effect) =>
+        (effect.tags.includes("grapple") || effect.tags.includes("swallowed")) &&
+        effect.sourceActorId !== null &&
+        altitudeOf(state.combat.tokens.find((token) => token.actorId === effect.sourceActorId)) > 0
+    ) === true
+  );
+}
+
 /** Whether a creature in the air stays up (SRD Flying, Hover): a flier falls if it is Prone or Incapacitated or its
  *  Fly Speed is 0, unless it can hover, and one with nothing to fly with falls whatever it can do. */
 export function staysAloft(actor: Actor, deps: Pick<FallDeps, "resolveDefinition" | "catalog">): boolean {
@@ -377,7 +391,7 @@ export function settleFalls(state: GameState, deps: FallDeps): EffectNarration[]
       events.push({ kind: "effect", text: `${actor.name} floats gently to the ground.`, actorId: actor.id });
       continue;
     }
-    if (staysAloft(actor, deps)) continue;
+    if (staysAloft(actor, deps) || heldAloft(state, actor.id)) continue;
     events.push(...startFall(state, { actorId: actor.id, feet: height }, deps));
   }
   return events;
@@ -421,7 +435,7 @@ export function needsSettling(state: GameState, deps: Pick<FallDeps, "resolveDef
     const actor = state.actors.find((candidate) => candidate.id === token.actorId);
     if (!actor) return false;
     if (token.airborne === "levitate") return !actor.effects.some((effect) => effect.tags.includes(LEVITATING_TAG));
-    return !staysAloft(actor, deps);
+    return !staysAloft(actor, deps) && !heldAloft(state, actor.id);
   });
 }
 

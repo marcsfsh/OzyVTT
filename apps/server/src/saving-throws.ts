@@ -695,7 +695,7 @@ function forcedMoveOnSave(
   // unoccupied space beside the source.
   const sourceAt = state.combat.tokens.find((token) => token.actorId === sourceId)?.position;
   const stacked =
-    !push.toward && before !== null && sourceAt !== undefined && sourceAt.x === before.x && sourceAt.y === before.y;
+    !push.toward && before !== null && !!sourceAt && sourceAt.x === before.x && sourceAt.y === before.y;
   if (moved === null && stacked && deps.placeBeside?.(target.id, sourceId))
     return [
       {

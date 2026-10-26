@@ -67,12 +67,14 @@ export function applyMovementGrants(ctx: ResolveContext): void {
       provokes: move.provokes,
       ...(move.straight ? { straight: true as const } : {}),
       ...(move.throughCreatures ? { throughCreatures: move.throughCreatures } : {}),
+      ...(move.dropsHeld ? { dropsHeld: true as const } : {}),
+      ...(move.thenHide ? { thenHide: true as const } : {}),
       ...(input.moveFirst === true ? { owedActionId: action.id } : {})
     });
     const verb =
       move.mode === "fly" ? "fly" : move.mode === "swim" ? "swim" : move.mode === "burrow" ? "burrow" : "move";
     say(
-      `${attacker.name} may ${verb} ${feet} ft${move.provokes ? "" : " without provoking Opportunity Attacks"}${move.straight ? " straight toward an enemy" : ""}${input.moveFirst === true ? `, then finish ${action.name}` : ""}.`
+      `${attacker.name} may ${verb} ${feet} ft${move.provokes ? "" : " without provoking Opportunity Attacks"}${move.straight ? " straight toward an enemy" : ""}${input.moveFirst === true ? `, then finish ${action.name}` : ""}${move.dropsHeld ? ", then drop what it grapples" : ""}${move.thenHide ? ", then take the Hide action" : ""}.`
     );
   }
   if (input.moveFirst === true) return;

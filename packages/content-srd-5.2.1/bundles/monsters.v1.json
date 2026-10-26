@@ -3736,10 +3736,10 @@
       "damage": [],
       "conditions": [
        "prone"
-      ]
+      ],
+      "followUp": "bite"
      }
-    ],
-    "reminder": "After a charge that knocks the target Prone, the allosaurus can make one Bite attack against it; take it from the turn list."
+    ]
    }
   ],
   "token": {
@@ -39919,7 +39919,8 @@
     "move": {
      "speed": "half",
      "mode": "fly",
-     "provokes": false
+     "provokes": false,
+     "dropsHeld": true
     }
    },
    {
@@ -50542,7 +50543,8 @@
     ],
     "move": {
      "speed": "full",
-     "provokes": false
+     "provokes": false,
+     "thenHide": true
     }
    },
    {
