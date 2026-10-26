@@ -633,8 +633,9 @@ describe("the casts that survived the spell-record check", () => {
     const detect = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-detect-thoughts")!;
     const suggest = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-suggestion")!;
 
-    // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored.
-    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: [] });
+    // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored. Detect Thoughts' cast
+    // asks no save: its Wisdom save is the probe's, a later action.
+    expect(detect.save).toBeUndefined();
     expect(suggest.save).toEqual({
       ability: "wis",
       dc: 13,
@@ -693,7 +694,7 @@ describe("the casts that survived the spell-record check", () => {
     const detect = effectiveActions(definition, medallion.actors[0], catalog).find(
       (entry) => entry.id === "item-medallion-of-thoughts-cast-detect-thoughts"
     )!;
-    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: [] });
+    expect(detect.save).toBeUndefined();
     expect(detect.uses).toEqual({ limit: 5, per: "long-rest", pool: "medallion-of-thoughts-charges" });
   });
 
