@@ -11,6 +11,7 @@ import {
   type DamageType,
   type TraitMechanic
 } from "@vtt/schemas";
+import { immunityMinutesOf } from "./save-outcomes.js";
 
 type Trait = Readonly<{ name: string; description: string }>;
 
@@ -197,7 +198,9 @@ function turnStartAura(trait: Trait): TraitMechanic | null {
       successDamage: "none",
       failureConditions: conditionId ? [conditionId] : [],
       ...(conditionId ? { failureDuration: { type: "until-bearer-next-turn" as const } } : {}),
-      ...(match[7] && /^The target is immune to this\b/.test(match[7]) ? { immuneOnSuccess: true as const } : {})
+      ...(match[7] && /^The target is immune to this\b/.test(match[7])
+        ? { immuneOnSuccess: true as const, ...immunityMinutesOf(match[7]) }
+        : {})
     },
     // A gibbering mouther's "rolls 1d8 to determine what it does during the current turn" is a table the server rolls.
     ...(conditionId

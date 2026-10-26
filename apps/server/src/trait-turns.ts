@@ -1,5 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import { GIBBERING_TAG } from "./random-outcomes.js";
+import { ridersOf, WHILE_RIDDEN_TAG } from "./mounts.js";
 import { parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition, TraitMechanic } from "@vtt/schemas";
 import { conditionLabel, isIncapacitated } from "./condition-rules.js";
@@ -517,6 +518,8 @@ function aurasStartedIn(state: GameState, actor: Actor, deps: TraitTurnDeps, eve
       if (aura.kind !== "aura" || aura.trigger !== "turn-start-inside" || !aura.save) continue;
       if (!auraActive(bearer, aura) || !(reached(state, bearer, aura, deps) ?? []).some((one) => one.id === actor.id))
         continue;
+      // "While you ride the goat": only while a creature rides the bearer.
+      if (aura.whileRidden && ridersOf(state, bearer.id).length === 0) continue;
       // A gaze that works only on a creature that sees its bearer (Vile Appearance).
       if (aura.seenOnly && !sightRules(state, sightContentOf(deps), deps.distanceFeet).canSee(actor.id, bearer.id))
         continue;
@@ -544,12 +547,16 @@ function aurasStartedIn(state: GameState, actor: Actor, deps: TraitTurnDeps, eve
           ? {
               onFailEffect: {
                 name: `${conditionLabel(linked[0]!)} by ${bearer.name} (${aura.name})`.slice(0, 120),
-                tags: [],
+                tags: aura.whileRidden ? [WHILE_RIDDEN_TAG] : [],
                 linkedConditionIds: linked,
                 escapeDc: null,
                 sourceActorId: bearer.id,
                 sourceName: bearer.name,
                 ...(save.failureDuration ? { duration: save.failureDuration } : {}),
+                // "The Frightened creature repeats the save at the end of each of its turns" (a Goat of Terror).
+                ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
+                // "Or until the goat reverts to figurine form".
+                ...(aura.whileRidden ? { endsWhenSourceDefeated: true } : {}),
                 sourceActionId: key
               }
             }
@@ -570,6 +577,7 @@ function aurasStartedIn(state: GameState, actor: Actor, deps: TraitTurnDeps, eve
               }
             : {}),
         ...(save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+        ...(save.immuneMinutes !== undefined ? { immuneMinutes: save.immuneMinutes } : {}),
         newSaveId: deps.newId,
         createdAt: Date.parse((deps.now ?? (() => new Date().toISOString()))())
       });

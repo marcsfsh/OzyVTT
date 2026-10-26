@@ -1,5 +1,6 @@
 import { d20Count, d20FacesFor, effectiveSlot, otherDiceOf, type AggregatedRollMode } from "@vtt/rules-5e";
 import { DETACH_SELF_ID, detachItself } from "./detach.js";
+import { slipFree } from "./slip-free.js";
 import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
@@ -23,7 +24,7 @@ import {
 import { isIncapacitated } from "../condition-rules.js";
 import { endUsedHelp, helpToolTag, useHelp } from "../help-assist.js";
 import { checkSightFor, couldSpot } from "../vision/rules.js";
-import { builtinBaseId, END_EFFECT_ID } from "../builtin-actions.js";
+import { builtinBaseId, END_EFFECT_ID, SLIP_FREE_ID } from "../builtin-actions.js";
 import {
   addEffect,
   endEffect,
@@ -805,6 +806,7 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   "move-sphere": { apply: moveSphere(false) },
   "move-sphere-far": { apply: moveSphere(true) },
   [DETACH_SELF_ID]: { apply: detachItself },
+  [SLIP_FREE_ID]: { apply: slipFree },
 
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
    *  as a Bonus Action brings its own numbers, which stand. */

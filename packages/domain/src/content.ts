@@ -930,6 +930,50 @@ export const TELEPORT_FAMILIARITY: ReadonlyArray<Readonly<{ id: string; name: st
   { id: "viewed-once", name: "Viewed once or described" },
   { id: "false-destination", name: "False destination" }
 ];
+/** Greater Restoration's harms, one of which its caster picks to end. */
+export const RESTORATION_PICKS: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "exhaustion", name: "An Exhaustion level" },
+  { id: "charmed", name: "Charmed" },
+  { id: "petrified", name: "Petrified" },
+  { id: "curse", name: "A curse" },
+  { id: "ability-score", name: "A lowered ability score" },
+  { id: "hit-point-maximum", name: "A lowered Hit Point maximum" },
+  // What another effect's own text says Greater Restoration ends (Befuddlement, Contact Other Plane's Incapacitated).
+  { id: "other", name: "Another effect it ends" }
+];
+/** Scrying's save modifiers, picked as it is cast: how well the caster knows the target, and what of it the caster
+ *  has. `bonus` adds to the target's Wisdom save. */
+export const SCRYING_PICKS: ReadonlyArray<Readonly<{ id: string; name: string; bonus: number }>> = (
+  [
+    ["secondhand", "Secondhand", 5],
+    ["firsthand", "Firsthand", 0],
+    ["extensive", "Extensive", -5]
+  ] as const
+).flatMap(([knowledge, known, knowledgeBonus]) =>
+  (
+    [
+      ["", "no connection", 0],
+      ["likeness", "a likeness", -2],
+      ["possession", "a possession", -4],
+      ["body-part", "a body part", -10]
+    ] as const
+  ).map(([connection, held, connectionBonus]) => ({
+    id: connection ? `${knowledge}-${connection}` : knowledge,
+    name: `${known}, ${held} (${knowledgeBonus + connectionBonus >= 0 ? "+" : ""}${knowledgeBonus + connectionBonus})`,
+    bonus: knowledgeBonus + connectionBonus
+  }))
+);
+/** The horizontal directions a compelling spell can name (Compulsion), by eighths of a turn from north. */
+export const COMPASS_HEADINGS: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "north", name: "North" },
+  { id: "northeast", name: "Northeast" },
+  { id: "east", name: "East" },
+  { id: "southeast", name: "Southeast" },
+  { id: "south", name: "South" },
+  { id: "southwest", name: "Southwest" },
+  { id: "west", name: "West" },
+  { id: "northwest", name: "Northwest" }
+];
 /** Wish's uses, picked as it is cast: duplicating a spell, and the effects the spell lists. */
 export const WISH_USES: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
   { id: "duplicate", name: "Duplicate a spell" },
@@ -944,6 +988,9 @@ export const WISH_USES: ReadonlyArray<Readonly<{ id: string; name: string }>> = 
 type ChoosingAction = Readonly<{
   teleportOutcome?: true;
   wishUses?: true;
+  restores?: true;
+  setsHeading?: true;
+  scryingModifiers?: true;
   identifiesItem?: true;
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
@@ -968,7 +1015,13 @@ export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
       ? { options: TELEPORT_FAMILIARITY }
       : action.wishUses
         ? { options: WISH_USES }
-        : action.save?.failureEffect;
+        : action.restores
+          ? { options: RESTORATION_PICKS }
+          : action.setsHeading
+            ? { options: COMPASS_HEADINGS }
+            : action.scryingModifiers
+              ? { options: SCRYING_PICKS.map(({ id, name }) => ({ id, name })) }
+              : action.save?.failureEffect;
   const granted = action.grants?.bindsWeapon;
   // An oil that remakes a row asks for a Melee weapon or a stack of ammunition.
   const binds: ActionChoices["bindsWeapon"] = granted
@@ -1035,9 +1088,12 @@ export type ContentActionSummary = Readonly<{
   /** Its own move comes before the rest of it ("moves up to half its Speed, and it makes one Rend attack"), so it can
    *  be taken move first: `action.resolve`'s `moveFirst`. */ moveFirst?: true;
   /** It sets a creature down in a space its use picks within `feet` of its user: the user itself (a bulette's Deadly
-   *  Leap) or its one target (a kraken's Fling); `action.resolve`'s `destination`. */ destination?: Readonly<{
+   *  Leap) or its one target (a kraken's Fling, or Telekinesis on a failed save, within `feet` of where it stands);
+   *  `action.resolve`'s `destination`. `lifts`: the use also names how high it lifts the target
+   *  (`destinationAltitudeFeet`). */ destination?: Readonly<{
     who: "user" | "target";
     feet: number;
+    lifts?: true;
   }>;
   /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
   /** Added to a hit and never taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;

@@ -1,4 +1,4 @@
-import { TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
+import { COMPASS_HEADINGS, RESTORATION_PICKS, SCRYING_PICKS, TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
 import { checkWishUse } from "./wish.js";
 import { abilityModifier, isMeleeWeapon } from "@vtt/rules-5e";
 import {
@@ -53,7 +53,17 @@ export function checkChoices(
 ): void {
   const offered =
     optionsOf(action)?.options ??
-    (action.teleportOutcome ? TELEPORT_FAMILIARITY : action.wishUses ? WISH_USES : undefined);
+    (action.teleportOutcome
+      ? TELEPORT_FAMILIARITY
+      : action.wishUses
+        ? WISH_USES
+        : action.restores
+          ? RESTORATION_PICKS
+          : action.setsHeading
+            ? COMPASS_HEADINGS
+            : action.scryingModifiers
+              ? SCRYING_PICKS
+              : undefined);
   // End an Effect's pick is the way out it takes (`resolution/endings.ts`).
   const own = action.id === END_EFFECT_ACTION_ID ? [] : [input.optionId];
   const picks = [...own, ...Object.values(input.targetOptions ?? {})].filter(
@@ -71,7 +81,7 @@ export function checkChoices(
       throw new CommandRejectedError(`${attacker.name} isn't carrying that item.`);
     return;
   }
-  if (input.itemId != null && !binds && !action.rebindsRow)
+  if (input.itemId != null && !binds && !action.rebindsRow && !action.restores)
     throw new CommandRejectedError(`${action.name} isn't cast on a weapon.`);
   if (binds && input.itemId != null && action.grants!.target === "self")
     fittingRow(attacker, binds, input.itemId, catalog, action.name, definition);
@@ -140,13 +150,15 @@ export function optionParts(option: GrantOption | null): Readonly<{
   conditions: readonly string[];
   conditionImmunities: readonly string[];
   suppresses: readonly string[];
+  compelled?: GrantOption["compelled"];
 }> {
   return {
     tags: option?.tags ?? [],
     modifiers: option?.modifiers ?? [],
     conditions: option?.conditions ?? [],
     conditionImmunities: option?.conditionImmunities ?? [],
-    suppresses: option?.suppressesConditions ?? []
+    suppresses: option?.suppressesConditions ?? [],
+    ...(option?.compelled ? { compelled: option.compelled } : {})
   };
 }
 

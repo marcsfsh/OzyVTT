@@ -5620,7 +5620,32 @@
          "monsterId": "giant-goat",
          "count": 1,
          "except": {
-          "name": "Goat of Terror"
+          "name": "Goat of Terror",
+          "traits": [
+           {
+            "kind": "aura",
+            "name": "Terror",
+            "trigger": "turn-start-inside",
+            "rangeFeet": 30,
+            "affects": "enemies",
+            "whileRidden": true,
+            "save": {
+             "ability": "wis",
+             "dc": 15,
+             "successDamage": "none",
+             "failureConditions": [
+              "frightened"
+             ],
+             "failureDuration": {
+              "type": "rounds",
+              "rounds": 10
+             },
+             "repeatSave": true,
+             "immuneOnSuccess": true,
+             "immuneMinutes": 1440
+            }
+           }
+          ]
          }
         }
        ],
@@ -8348,7 +8373,19 @@
       "type": "rounds",
       "rounds": 10
      },
-     "repeatSave": true
+     "repeatSave": true,
+     "failureEffect": {
+      "name": "Wave of Terror",
+      "tags": [
+       "flee-only",
+       "no-opportunity-attacks"
+      ],
+      "modifiers": [],
+      "compelled": {
+       "way": "away",
+       "allMovement": true
+      }
+     }
     }
    }
   ],
@@ -9164,7 +9201,8 @@
     "grants": {
      "name": "Freedom of Movement (Oil of Slipperiness)",
      "tags": [
-      "freedom-of-movement"
+      "freedom-of-movement",
+      "slips-restraints"
      ],
      "duration": {
       "type": "minutes",
@@ -9180,11 +9218,7 @@
      "onEnd": [],
      "target": "target",
      "voidWhileIncapacitated": false,
-     "concentration": false,
-     "conditionImmunities": [
-      "paralyzed",
-      "restrained"
-     ]
+     "concentration": false
     }
    }
   ],
@@ -9442,7 +9476,8 @@
       "rounds": 10
      },
      "repeatSave": true,
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440
     }
    }
   ],

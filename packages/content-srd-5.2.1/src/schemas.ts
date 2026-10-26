@@ -208,6 +208,19 @@ export const SpellLaterActionSchema = z
     interposes: z.literal(true).optional(),
     /** How often it can be taken (Phantasmal Force's harm: once a turn; Geas's 5d10: once a day of game time). */
     uses: ActionSchema.shape.uses,
+    /** Whom it may target, when not the spell's own targets (Dispel Evil and Good's Dismissal: one creature of the
+     *  warded types within 5 feet that the caster sees). */
+    targets: ActionTargetsSchema.optional(),
+    /** It ends the Charmed, Frightened and possession creatures of these types gave its target (Break Enchantment). */
+    breaksEnchantment: ActionSchema.shape.breaksEnchantment,
+    /** Taking it ends the spell (Dispel Evil and Good's special functions). */
+    endsSpell: z.literal(true).optional(),
+    /** It names the direction the spell's creatures move on their next turns (Compulsion's Bonus Action). */
+    setsHeading: ActionSchema.shape.setsHeading,
+    /** A failure moves its target to the space it picks, lifting it where it says so (Telekinesis). */
+    failureMove: ActionSchema.shape.failureMove,
+    /** The carried object it acts on (Telekinesis pulling a weapon from a creature's hands). */
+    object: ActionSchema.shape.object,
     /** It is taken only on the caster's own turn ("On each of your turns": Phantasmal Force). */
     ownTurnOnly: z.literal(true).optional(),
     /** Only the GM takes it, judging when the text's trigger has happened (Geas: "if it acts in a manner directly
@@ -400,6 +413,13 @@ export const SpellEffectSchema = z
     dispel: DispelSchema.optional(),
     /** The cast ends the curses on its target and its Attunement to cursed items (Remove Curse). */
     endsCurses: z.literal(true).optional(),
+    /** The cast ends one harm the caster picks on its target (Greater Restoration). */
+    restores: ActionSchema.shape.restores,
+    /** The cast picks the knowledge and connection that modify its target's save (Scrying). */
+    scryingModifiers: ActionSchema.shape.scryingModifiers,
+    /** Dispel Magic ends what it leaves only when cast from a slot of this level or higher, with no check below it
+     *  (Imprisonment: "only if it is cast with a level 9 spell slot"). */
+    dispelledFromSlot: z.number().int().min(1).max(9).optional(),
     /** The spell keeps something of its own besides what it leaves on creatures (Entangle's tangled ground, an
      *  earthquake's fissures), so its Concentration holds when no creature is affected any more. */
     persistsWithoutTargets: z.literal(true).optional(),

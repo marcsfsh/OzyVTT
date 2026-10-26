@@ -693,6 +693,12 @@ function act(
     conditionIds,
     content.spell ? { spell: content.spell, level: zone.level } : undefined
   );
+  // A flight from the area itself (a Symbol of Fear: "at least 30 feet away from the glyph") measures from its origin.
+  const origin =
+    onFail?.compelled?.fromArea && zone.annotationId
+      ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)?.geometry.origin
+      : undefined;
+  if (onFail?.compelled && origin) onFail.compelled = { ...onFail.compelled, point: { x: origin.x, y: origin.y } };
   // A save at the start of the creature's own turn that lasts "until the end of that turn" ends with this one.
   const currentTurn = meeting === "starts its turn in" && save.failureDuration?.type === "until-bearer-turn-end";
   createPendingSaves(state, {
@@ -721,6 +727,7 @@ function act(
     ...(save.failurePush ? { failurePush: save.failurePush } : {}),
     // "A creature that successfully saves against this effect is immune to it" (Antipathy/Sympathy).
     ...(save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+    ...(save.immuneMinutes !== undefined ? { immuneMinutes: save.immuneMinutes } : {}),
     // A Sphere of Annihilation obliterates a creature its damage drops to 0.
     ...(action.drain ? { drain: structuredClone(action.drain) } : {}),
     // Heightened Spell's target has Disadvantage on every save against the spell.
@@ -795,14 +802,16 @@ function withMoreDice(formula: string, extra: number): string {
 }
 
 /** Whether a creature already bears what an area round a target leaves (Frightened of it), or saved against it and is
- *  immune for now. */
+ *  immune for now. The immunity is named for the save it won: the spell's, or its effect's repeat (Antipathy). */
 function heldByAnchor(creature: Actor, zone: SpellZone, anchorId: string): boolean {
+  const effectName = zone.laterActionId.split("-then-")[1];
   return creature.effects.some(
     (effect) =>
       (effect.sourceActorId === anchorId && effect.sourceActionId === zone.laterActionId) ||
       (effect.tags.includes(AURA_IMMUNE_TAG) &&
         (effect.sourceActorId === anchorId || effect.sourceActorId === zone.casterId) &&
-        effect.name.includes(zone.name))
+        (effect.name.includes(zone.name) ||
+          (effectName !== undefined && effect.name.toLowerCase().includes(effectName))))
   );
 }
 

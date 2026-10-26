@@ -138,8 +138,10 @@ export type ResolveInput = Readonly<{
   moveFirst?: boolean;
   /** The rest of an action whose move was taken first: its cost was spent then, so it is neither checked nor spent. */
   owedPaid?: boolean;
-  /** The space an action's `destination` sets its creature down in (a bulette's Deadly Leap, a kraken's Fling). */
+  /** The space an action's `destination` sets its creature down in (a bulette's Deadly Leap, a kraken's Fling), or a
+   *  failure's move takes its target to (Telekinesis), with the height it lifts it to. */
   destination?: Readonly<{ x: number; y: number }>;
+  destinationAltitudeFeet?: number;
   /** The spell area a cast that ends spells is aimed at (Dispel Magic on a Spirit Guardians); the GM's to name. */
   zoneId?: string;
   /** The door or wall on the live map a cast is aimed at (Knock, Arcane Lock, Passwall). */

@@ -72,6 +72,17 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
     ...(action.save?.conditionChoices ? { conditionChoices: [...action.save.conditionChoices] } : {}),
+    // The space a leap or a throw lands in, or a failed save moves its target to (Telekinesis), and how high.
+    ...(action.destination ? { destination: { who: action.destination.who, feet: action.destination.feet } } : {}),
+    ...(action.failureMove
+      ? {
+          destination: {
+            who: "target" as const,
+            feet: action.failureMove.feet,
+            ...(action.failureMove.lifts ? { lifts: true as const } : {})
+          }
+        }
+      : {}),
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     // Conditions a touch may also end, each for points of its pool (Restoring Touch).

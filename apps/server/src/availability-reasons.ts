@@ -114,6 +114,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "movement.altitude": () => "Fly, climb or jump to change height.",
   "movement.jump": () => "A jump goes as far as the creature's Strength allows.",
   "movement.toward-fear": () => "You can't move closer to what you fear.",
+  "movement.compelled": () => "An effect decides where you move this turn.",
   "movement.mount": () => "Mount a creature within 5 feet that is at least one size larger.",
   "economy.action-used": actionSpentReason,
   "economy.bonus-action-used": ({ state, attacker }) =>
@@ -143,6 +144,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "condition.no-spells": () => "You can't cast spells now.",
   "condition.cant-attack": () => "You can't attack now.",
   "condition.dash-only": () => "You can take only the Dash action now.",
+  "condition.forced-attack": () => "This turn your action is one melee attack on the creature picked for you.",
   "condition.one-thing-a-turn": () => "This turn you can only move, take an action or take a Bonus Action.",
   "mount.controlled": () => "A controlled mount can only Dash, Disengage or Dodge.",
   "movement.cant-stand": () => "You can't stand up now.",

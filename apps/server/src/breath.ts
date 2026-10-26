@@ -74,6 +74,8 @@ export function startHoldingBreath(
   options: Readonly<{ outOfWater?: boolean }> = {}
 ): EffectNarration[] {
   if (isDead(actor) || (breathesWater(actor, definition) && options.outOfWater !== true)) return [];
+  // "While imprisoned, the target doesn't need to breathe."
+  if (actor.effects.some((effect) => effect.tags.includes("sustained"))) return [];
   if (actor.effects.some((effect) => effect.breath !== undefined)) return [];
   const rounds = breathRounds(definition);
   const events: EffectNarration[] = [];

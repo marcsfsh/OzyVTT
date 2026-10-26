@@ -258,7 +258,6 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   "spider-climb": { count: 1, perSlot: 1 },
   stoneskin: { count: 1 },
   suggestion: { count: 1 },
-  telekinesis: { count: 1 },
   "telepathic-bond": { count: 8 },
   teleport: { count: 9 },
   // Instant Health: "you and up to twenty other creatures"; Resistance and Spell Immunity take up to ten.
@@ -370,6 +369,9 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "flaming-sphere",
   "forcecage",
   "freedom-of-movement",
+  // Its Strength save belongs to the creature or object it is exerted on, the cast's own use and each later one
+  // (`LATER_ACTIONS`).
+  "telekinesis",
   "gaseous-form",
   "guardian-of-faith",
   "haste",
@@ -430,7 +432,11 @@ const wardAgainst = (types: readonly string[]) => ({
       ]
     }
   ],
-  conditionWards: { conditionIds: ["charmed" as const, "frightened" as const], creatureTypes: [...types] }
+  conditionWards: {
+    conditionIds: ["charmed" as const, "frightened" as const],
+    creatureTypes: [...types],
+    possession: true as const
+  }
 });
 
 /** Magic Circle facing out (keeping the chosen types out and warding those inside) or reversed (holding them in and
@@ -512,8 +518,8 @@ function celestialLight(
 }
 
 /** Symbol's six glyphs, each a hidden glyph that glows when a creature comes onto it (SRD 5.2.1 text): Death,
- *  Discord, Fear, Pain, Sleep and Stunning. Fear's "must move at least 30 feet away from the glyph" is the
- *  Frightened creature's to obey. */
+ *  Discord, Fear, Pain, Sleep and Stunning. Fear's "must move at least 30 feet away from the glyph" binds the
+ *  Frightened creature's moves (`compelled-moves.ts`). */
 function symbolGlyphs(): Later[] {
   const MINUTE = { type: "rounds" as const, rounds: 10 };
   const glyph = (
@@ -571,11 +577,21 @@ function symbolGlyphs(): Later[] {
         }
       })
     ),
+    // "While Frightened, the target must move at least 30 feet away from the glyph on each of its turns, if able."
     glyph(
       "fear",
       "Fear",
-      "makes a Wisdom save or is Frightened for 1 minute.",
-      fails("wis", { failureConditions: ["frightened"], failureDuration: MINUTE })
+      "makes a Wisdom save or is Frightened for 1 minute, moving at least 30 feet away from the glyph on each of its turns.",
+      fails("wis", {
+        failureConditions: ["frightened"],
+        failureDuration: MINUTE,
+        failureEffect: {
+          name: "Symbol of Fear",
+          tags: [],
+          modifiers: [],
+          compelled: { way: "away", minFeet: 30, fromArea: true }
+        }
+      })
     ),
     glyph(
       "pain",
@@ -716,7 +732,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ],
   // "A creature of the chosen kind makes a Wisdom saving throw when it comes within 120 feet of the target": the area is
   // round the targeted creature and moves with it, acting on the creature type picked with the form. A creature that
-  // ends its turn more than 120 feet from the target saves again; a success frees it and leaves it immune for now.
+  // ends its turn more than 120 feet from the target saves again; a success frees it and leaves it immune for 1 minute.
   antipathysympathy: [
     {
       name: "antipathy",
@@ -727,8 +743,11 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         successDamage: "none",
         failureConditions: ["frightened"],
         repeatBeyondFeet: 120,
-        immuneOnSuccess: true
+        immuneOnSuccess: true,
+        immuneMinutes: 1
       },
+      // "The Frightened creature must use its movement on its turns to get as far away as possible from the target".
+      failureEffect: { name: "Antipathy", tags: [], modifiers: [], compelled: { way: "away", allMovement: true } },
       damage: [],
       zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
       option: { id: "antipathy", name: "Antipathy" }
@@ -743,7 +762,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         failureConditions: ["charmed"],
         repeatBeyondFeet: 120,
         repeatOnDamage: { fromSourceOnly: true },
-        immuneOnSuccess: true
+        immuneOnSuccess: true,
+        immuneMinutes: 1
+      },
+      // "Must use its movement on its turns to get as close as possible to the target ... If the creature is within 5
+      // feet of the target, the creature can't willingly move away."
+      failureEffect: {
+        name: "Sympathy",
+        tags: [],
+        modifiers: [],
+        compelled: { way: "toward", allMovement: true, holdsNear: true }
       },
       damage: [],
       zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
@@ -1262,7 +1290,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       exclusive: true,
       bars: { way: "in", types: [...HALLOW_TYPES] },
       holds: {
-        conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...HALLOW_TYPES] },
+        conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...HALLOW_TYPES], possession: true },
         suppresses: true
       },
       picks: {
@@ -1353,6 +1381,80 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "action",
       when: "A Magic action shows the faint aura round each creature in sight within 30 feet that bears magic, and the school of the spells on it.",
       reveals: true,
+      damage: []
+    }
+  ],
+  // "When you cast the spell and as a Magic action on your later turns before the spell ends, you can exert your will on
+  // one creature or object that you can see within range ... Creature. You can try to move a Huge or smaller creature.
+  // The target must succeed on a Strength saving throw, or you move it up to 30 feet in any direction within the spell's
+  // range. Until the end of your next turn, the creature has the Restrained condition, and if you lift it into the air,
+  // it is suspended there ... Object ... If the object is worn or carried by a creature, that creature must succeed on a
+  // Strength saving throw, or you pull the object away". Fine control of objects is the table's.
+  telekinesis: [
+    {
+      name: "move a creature",
+      activation: "action",
+      withCast: true,
+      when: "With the cast and as a Magic action on later turns, a Huge or smaller creature you see within 60 feet makes a Strength save or is moved up to 30 feet to the space you pick, lifted if you choose, and Restrained until the end of your next turn.",
+      targets: { count: 1, rangeFeet: 60, seen: true, maxSize: "huge" },
+      save: {
+        ability: "str",
+        successDamage: "none",
+        failureConditions: ["restrained"],
+        failureDuration: { type: "until-source-turn-end" }
+      },
+      failureEffect: { name: "Telekinesis", tags: ["telekinetic", "suspended"], modifiers: [] },
+      failureMove: { feet: 30, lifts: true },
+      damage: []
+    },
+    {
+      name: "pull an object",
+      activation: "action",
+      withCast: true,
+      when: "With the cast and as a Magic action on later turns, a creature you see within 60 feet makes a Strength save or the weapon it holds is pulled from its hands.",
+      targets: { count: 1, rangeFeet: 60, seen: true },
+      object: { kinds: ["weapon"], does: "pulled-on-failure" },
+      save: { ability: "str", successDamage: "none", failureConditions: [] },
+      damage: []
+    }
+  ],
+  // "For the duration, you can take a Bonus Action to designate a direction that is horizontal to you."
+  compulsion: [
+    {
+      name: "direction",
+      activation: "bonus-action",
+      when: "A Bonus Action names a direction: each creature the spell charms uses as much of its movement as possible to move that way on its next turn, then repeats the save.",
+      setsHeading: true,
+      damage: []
+    }
+  ],
+  // "Break Enchantment. As a Magic action, you touch a creature that is possessed by or has the Charmed or Frightened
+  // condition from one or more creatures of the types above ... Dismissal. As a Magic action, you target one creature
+  // you can see within 5 feet of you that has one of the creature types above. The target must succeed on a Charisma
+  // saving throw or be sent back to its home plane". Either ends the spell.
+  "dispel-evil-and-good": [
+    {
+      name: "Break Enchantment",
+      activation: "action",
+      when: "A Magic action touches a creature to end the Charmed, Frightened and possession that Celestials, Elementals, Fey, Fiends or Undead gave it, and ends the spell.",
+      targets: { count: 1, rangeFeet: 5 },
+      breaksEnchantment: { creatureTypes: [...CIRCLE_TYPES] },
+      endsSpell: true,
+      damage: []
+    },
+    {
+      name: "Dismissal",
+      activation: "action",
+      when: "A Magic action makes a Celestial, Elemental, Fey, Fiend or Undead the caster sees within 5 feet succeed on a Charisma save or be sent home, and ends the spell.",
+      targets: { count: 1, rangeFeet: 5, seen: true, creatureTypes: [...CIRCLE_TYPES] },
+      save: {
+        ability: "cha",
+        successDamage: "none",
+        failureConditions: [],
+        failureBanishes: [...CIRCLE_TYPES],
+        banishedForGood: true
+      },
+      endsSpell: true,
       damage: []
     }
   ],
@@ -2686,16 +2788,16 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [{ type: "speed", amount: 10 }]
   }),
-  // "The target also has a Swim Speed equal to its Speed." Its other protections stay with the GM.
+  // "Spells and other magical effects can neither reduce the target's Speed nor cause the target to have the Paralyzed
+  // or Restrained conditions. The target also has a Swim Speed equal to its Speed ... the target can spend 5 feet of
+  // movement to automatically escape from nonmagical restraints": the tags the engine reads (effects.ts, speed.ts,
+  // resolution/builtins.ts), so a Net or a constrictor still holds it until it slips free.
   "freedom-of-movement": spellGrant({
     name: "Freedom of Movement",
-    tags: ["freedom-of-movement"],
+    tags: ["freedom-of-movement", "slips-restraints"],
     target: "targets",
     duration: { type: "manual" },
-    modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }],
-    // "Spells and other magical effects can neither reduce its Speed nor cause it to have the Paralyzed or Restrained
-    // conditions"; a nonmagical restraint it escapes for 5 feet of movement, so it is kept off whatever its source.
-    conditionImmunities: ["paralyzed", "restrained"]
+    modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
   }),
   // "Until the spell ends, the target can take a Magic action to exhale", the type chosen at the cast: the touched
   // creature's own action, at the caster's numbers.
@@ -2881,7 +2983,7 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "target",
     duration: rounds(100),
     modifiers: [attackedWithDisadvantageBy(OTHERWORLDLY)],
-    conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...OTHERWORLDLY] }
+    conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...OTHERWORLDLY], possession: true }
   }),
   // "Celestials, Elementals, Fey, Fiends, and Undead have Disadvantage on attack rolls against you."
   "dispel-evil-and-good": spellGrant({
@@ -3142,7 +3244,22 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   banishment: { name: "Banished", tags: ["off-plane", "banished-home"], modifiers: [] },
   // Imprisoned "until the spell is dispelled": off the map until the GM ends it. Its form, and the trigger that frees
   // it, are the GM's.
-  imprisonment: { name: "Imprisoned", tags: ["off-plane"], modifiers: [] },
+  // "While imprisoned, the target doesn't need to breathe, eat, or drink ... Divination spells can't locate or perceive
+  // the imprisoned target, and the target can't teleport", in the form the caster picks: Burial, Hedged Prison and
+  // Minimus Containment take it from the map; Chaining holds it Restrained in place, unmovable by any means; Slumber
+  // leaves it Unconscious, and nothing wakes it.
+  imprisonment: {
+    name: "Imprisoned",
+    tags: ["imprisoned", "no-teleport", "sustained"],
+    modifiers: [{ type: "spell-ward", schools: ["divination"] }],
+    options: [
+      option("burial", "Burial", { tags: ["off-plane"] }),
+      option("chaining", "Chaining", { conditions: ["restrained"], tags: ["unmovable"] }),
+      option("hedged-prison", "Hedged Prison", { tags: ["off-plane"] }),
+      option("minimus-containment", "Minimus Containment", { tags: ["off-plane"] }),
+      option("slumber", "Slumber", { conditions: ["unconscious"] })
+    ]
+  },
   // "Must immediately use its Reaction, if available, to move as far away from you as it can, using the safest route":
   // the server spends the Reaction and gives the creature a move of its Speed that must end farther away.
   "dissonant-whispers": {
@@ -3152,7 +3269,10 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
     modifiers: []
   },
   // "Can't cast spells or take the Magic action", until a repeated save every 30 days or a spell ends it.
-  befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
+  // "The effect can also be ended by the Greater Restoration, Heal, or Wish spell."
+  befuddlement: { name: "Befuddlement", tags: ["no-spells", "restorable", "cured-by-heal"], modifiers: [] },
+  // "A Greater Restoration spell cast on you ends this effect."
+  "contact-other-plane": { name: "Contact Other Plane", tags: ["restorable"], modifiers: [] },
   // "Another 5d4 Acid damage at the end of its next turn" (the save carries the damage).
   "vitriolic-sphere": { name: "Vitriolic Sphere", tags: ["vitriolic-sphere"], duration: rounds(1), modifiers: [] },
   // "Has Disadvantage on ability checks and attack rolls for the duration", and the save at the end of each of its turns
@@ -3227,8 +3347,8 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
       option("indifferent", "Indifferent", { tags: ["indifferent"] })
     ]
   },
-  // "Follow the command on its next turn": Flee spends its turn on the Dash, Grovel is Prone and ends its turn, Halt
-  // neither moves nor acts. Approach and Drop are the GM's to move and drop.
+  // "Follow the command on its next turn": Flee spends its turn on the Dash away, Grovel is Prone and ends its turn,
+  // Halt neither moves nor acts. Approach and Drop are the GM's to move and drop.
   command: {
     name: "Command",
     tags: ["commanded"],
@@ -3237,7 +3357,8 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
     options: [
       option("approach", "Approach"),
       option("drop", "Drop", { tags: ["no-actions"] }),
-      option("flee", "Flee", { tags: ["dash-only"] }),
+      // "The target spends its turn moving away from you by the fastest available means."
+      option("flee", "Flee", { tags: ["dash-only"], compelled: { way: "away", dashes: true, allMovement: true } }),
       option("grovel", "Grovel", { conditions: ["prone"], tags: ["no-actions"], speedZero: true }),
       option("halt", "Halt", { tags: ["no-actions"], speedZero: true })
     ]
@@ -3250,7 +3371,12 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
     modifiers: [],
     options: [
       option("asleep", "Asleep", { conditions: ["unconscious"], tags: ["wakeable"], endsOnDamage: true }),
-      option("panicked", "Panicked", { conditions: ["frightened"], tags: ["dash-only"] }),
+      // "On each of its turns, the Frightened target must take the Dash action and move away from you".
+      option("panicked", "Panicked", {
+        conditions: ["frightened"],
+        tags: ["dash-only"],
+        compelled: { way: "away", dashes: true, minFeet: 5 }
+      }),
       option("sickened", "Sickened", { conditions: ["poisoned"] })
     ]
   },
@@ -3312,8 +3438,23 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   geas: { name: "Geas", tags: ["curse"], modifiers: [] },
   // "You create a phantasmal object, creature, or other phenomenon ... perceivable only to the target for the duration."
   "phantasmal-force": { name: "Phantasmal Force", tags: [], modifiers: [] },
-  // "Each target ... drops whatever it is holding and has the Frightened condition for the duration."
-  fear: { name: "Fear", tags: ["drops-held"], modifiers: [] },
+  // "Each target ... drops whatever it is holding and has the Frightened condition for the duration. A Frightened
+  // creature takes the Dash action and moves away from you by the safest route on each of its turns unless there is
+  // nowhere to move."
+  fear: {
+    name: "Fear",
+    tags: ["drops-held", "dash-only"],
+    modifiers: [],
+    compelled: { way: "away", dashes: true, minFeet: 5 }
+  },
+  // "Each Charmed target must use as much of its movement as possible to move in that direction on its next turn": the
+  // direction the caster's Bonus Action names (`LATER_ACTIONS`).
+  compulsion: {
+    name: "Compulsion",
+    tags: [],
+    modifiers: [],
+    compelled: { way: "heading", allMovement: true, once: true }
+  },
   // "Can't take Bonus Actions or Reactions, and it rolls 1d10 at the start of each of its turns" (`random-outcomes.ts`).
   confusion: { name: "Confusion", tags: ["confused", "no-bonus-actions", "no-reactions"], modifiers: [] },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
@@ -3579,6 +3720,13 @@ const CAST_DISPELS: Readonly<Record<string, NonNullable<SpellEffect["dispel"]>>>
   "dispel-magic": { automaticLevel: 3 }
 };
 const CAST_ENDS_CURSES: ReadonlySet<string> = new Set(["remove-curse"]);
+/** Greater Restoration: the caster picks one harm the cast ends (an Exhaustion level, Charmed or Petrified, a curse, a
+ *  lowered ability score or Hit Point maximum). */
+const CAST_RESTORES: ReadonlySet<string> = new Set(["greater-restoration"]);
+/** Scrying: the caster picks its knowledge of the target and its connection to it, which modify the save. */
+const CAST_SCRYING_MODIFIERS: ReadonlySet<string> = new Set(["scrying"]);
+/** What only a Dispel Magic of this slot level or higher ends (Imprisonment: level 9). */
+const DISPELLED_FROM_SLOT: Readonly<Record<string, number>> = { imprisonment: 9 };
 
 /** Concentration spells that keep a part of their own besides what they leave on creatures, so they don't end when no
  *  creature is affected any more: Entangle's tangled ground, an earthquake's shaking ground and fissures, Reverse
@@ -3706,6 +3854,9 @@ export function spellEffectFor(
     ...(selfSave ? { selfSave: { ...selfSave } } : {}),
     ...(dispel ? { dispel: { ...dispel } } : {}),
     ...(CAST_ENDS_CURSES.has(id) ? { endsCurses: true as const } : {}),
+    ...(CAST_RESTORES.has(id) ? { restores: true as const } : {}),
+    ...(CAST_SCRYING_MODIFIERS.has(id) ? { scryingModifiers: true as const } : {}),
+    ...(DISPELLED_FROM_SLOT[id] !== undefined ? { dispelledFromSlot: DISPELLED_FROM_SLOT[id] } : {}),
     ...(PERSISTS_WITHOUT_TARGETS.has(id) ? { persistsWithoutTargets: true as const } : {}),
     ...(SEEN_TARGETS.has(id) ? { seenTargets: true as const } : {}),
     ...(TARGET_TYPES[id] ? { targetTypes: [...TARGET_TYPES[id]] } : {}),
@@ -3815,6 +3966,9 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_DISPELS),
   ...Object.keys(CAST_SELF_SAVES),
   ...CAST_ENDS_CURSES,
+  ...CAST_RESTORES,
+  ...CAST_SCRYING_MODIFIERS,
+  ...Object.keys(DISPELLED_FROM_SLOT),
   ...PERSISTS_WITHOUT_TARGETS,
   ...SEEN_TARGETS,
   ...Object.keys(TARGET_TYPES),

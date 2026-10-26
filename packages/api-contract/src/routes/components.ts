@@ -9,7 +9,8 @@ import {
   EffectGrantSchema,
   EffectOnEndSchema,
   ModifierSchema,
-  RiderTriggerSchema
+  RiderTriggerSchema,
+  TraitMechanicSchema
 } from "@vtt/schemas";
 import * as contract from "../index.js";
 import * as codex from "../schemas/codex.js";
@@ -115,6 +116,8 @@ nameAll([
   ["Action", ActionSchema],
   ["ActionUses", ActionUsesSchema],
   ["ActionOnHit", unwrap(objectOf(ActionSchema).shape.onHit as z.ZodType, z.ZodArray).element as z.ZodType],
+  // A stat block's trait mechanics, which a summoned creature's printed changes carry too (a Goat of Terror's fear).
+  ["TraitMechanic", TraitMechanicSchema],
   ["EffectGrant", EffectGrantSchema],
   ...branches("EffectDuration", EffectGrantSchema.shape.duration),
   ["EffectOnEnd", EffectOnEndSchema],

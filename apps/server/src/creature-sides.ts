@@ -4,8 +4,12 @@ import type { ActorDefinition } from "@vtt/schemas";
 /** Who fights alongside whom. */
 export type Side = "party" | "foes";
 
-/** What a side is read from: the creature's kind and stat block, and who commands it, when someone does. */
-type Sided = Pick<Actor, "kind" | "definitionId"> & Partial<Pick<Actor, "control">>;
+/** What a side is read from: the creature's kind and stat block, who commands it, when someone does, and its effects. */
+type Sided = Pick<Actor, "kind" | "definitionId"> & Partial<Pick<Actor, "control" | "effects">>;
+
+/** On an effect, its bearer is the GM's to run while it lasts, against the party (a lycanthrope's curse at 0 Hit
+ *  Points: "it instead becomes a Werewolf under the DM's control"). */
+export const GM_CONTROLLED_TAG = "gm-controlled";
 
 /**
  * The side a creature fights on. A creature under another's command (a summoned spirit, a dominated ogre) fights on
@@ -19,6 +23,7 @@ export function sideOf(
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined
 ): Side | null {
   if (actor.control) return actor.control.side;
+  if (actor.effects?.some((effect) => effect.tags.includes(GM_CONTROLLED_TAG))) return "foes";
   if (actor.kind === "player-character") return "party";
   const disposition = actor.definitionId ? resolveDefinition?.(actor.definitionId)?.token.disposition : undefined;
   if (disposition === "friendly") return "party";

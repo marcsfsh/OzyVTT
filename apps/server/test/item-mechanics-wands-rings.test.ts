@@ -624,8 +624,13 @@ describe("the staffs that cast at their printed charge costs", () => {
       dc: 13,
       successDamage: "none",
       failureConditions: ["frightened"],
-      // Fear's own failure: the creature drops what it is holding.
-      failureEffect: { name: "Fear", tags: ["drops-held"], modifiers: [] },
+      // Fear's own failure: the creature drops what it is holding, and Dashes away on each of its turns.
+      failureEffect: {
+        name: "Fear",
+        tags: ["drops-held", "dash-only"],
+        modifiers: [],
+        compelled: { way: "away", dashes: true, minFeet: 5 }
+      },
       repeatUnseenSource: true
     });
     // Speak with Animals forces no save, so a `saveDc` would have no reader.

@@ -858,7 +858,8 @@ export function applyDamageDetailed(
       ...openRepeatSavesOnDamage(state, actor, input.sourceActorId ?? undefined, {
         newId: deps.newId,
         now: deps.now ?? (() => new Date().toISOString()),
-        ...(deps.rollDie ? { rollDie: deps.rollDie } : {})
+        ...(deps.rollDie ? { rollDie: deps.rollDie } : {}),
+        ...(deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : {})
       })
     );
 

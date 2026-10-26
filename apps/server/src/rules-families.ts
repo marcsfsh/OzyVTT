@@ -29,6 +29,8 @@ const RULE_FAMILIES = {
   "movement.jump": "movement",
   // Frightened: "You can't willingly move closer to the source of fear."
   "movement.toward-fear": "movement",
+  // A move an effect compels: Fear's flight, Compulsion's heading, Confusion's wander, and the movement it must spend.
+  "movement.compelled": "movement",
   "movement.mount": "movement",
   // A Climber's Kit anchor holds its user within 25 feet of the anchor point.
   "movement.tether": "movement",
@@ -64,6 +66,8 @@ const RULE_FAMILIES = {
   // all but one of moving, an action and a Bonus Action a turn (Abjure Foes).
   "condition.cant-attack": "economy",
   "condition.dash-only": "economy",
+  // Confusion's and Gibbering's 7-8: one melee attack on the creature the roll picked.
+  "condition.forced-attack": "economy",
   "condition.one-thing-a-turn": "economy",
   // A controlled mount takes only the Dash, Disengage and Dodge actions (SRD Mounted Combat).
   "mount.controlled": "economy",

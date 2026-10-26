@@ -1,6 +1,7 @@
 import { ALIVE_AT_ZERO_TAG, type Actor, type GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { CANT_SPEAK_TAG, makeEffect, type EffectNarration } from "../effects.js";
+import { GM_CONTROLLED_TAG } from "../creature-sides.js";
+import { CANT_SPEAK_TAG, CURSE_TAG, makeEffect, type EffectNarration } from "../effects.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { sightRules } from "../vision/rules.js";
 import { takeForm } from "./assume.js";
@@ -60,8 +61,8 @@ export function escapeIntoForm(
 
 /**
  * A lycanthrope's curse: "If the cursed target drops to 0 Hit Points, it instead becomes a Werewolf under the DM's
- * control and has 10 Hit Points." The creature takes that stat block as a form with nothing of its own kept, until the
- * GM ends it (Remove Curse, or the story). Who controls it is the GM's to run. True when the curse held it up.
+ * control and has 10 Hit Points." The creature takes that stat block as a form with nothing of its own kept, run by the
+ * GM against the party, until the curse ends (Remove Curse ends both) or the GM ends it. True when the curse held it up.
  */
 export function lycanthropyAtZero(
   state: GameState,
@@ -81,6 +82,7 @@ export function lycanthropyAtZero(
     sourceName: curse.sourceName,
     sourceActionId: curse.sourceActionId,
     startedRound: state.combat.round,
+    tags: [GM_CONTROLLED_TAG, CURSE_TAG],
     duration: { type: "manual" },
     form: { name: statBlock.name, statBlockId, keeps: [], gear: "worn" }
   });

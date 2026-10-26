@@ -5,8 +5,7 @@ import type { EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { offerableReaction, slotChoiceOf, type ReactionOffer } from "./reaction-offers.js";
-import type { DefinitionAction } from "./resolution/context.js";
-import { AURA_IMMUNE_TAG, traitActionId } from "./statblock-traits.js";
+import { immuneToActionOf } from "./save-immunity.js";
 import { hiddenFrom } from "./vision/audience.js";
 import { sceneSight, type SceneSight } from "./vision/sight.js";
 
@@ -44,16 +43,6 @@ const rangeOf = (reaction: ActionReaction): number | undefined =>
 
 const within = (distance: number | null, feet: number | undefined) =>
   feet === undefined || distance === null || distance <= feet + DISTANCE_TOLERANCE_FEET;
-
-/** The target succeeded against this action of this reactor earlier, which keeps it immune for the fight (a chain
- *  devil's gaze: "immune to this devil's Unnerving Gaze for 24 hours"). */
-function immuneTo(target: Actor, reactor: Actor, action: DefinitionAction): boolean {
-  const key = traitActionId(action.name);
-  return target.effects.some(
-    (effect) =>
-      effect.tags.includes(AURA_IMMUNE_TAG) && effect.sourceActorId === reactor.id && effect.sourceActionId === key
-  );
-}
 
 /** Whether a reactor could take a prompt now: in the fight, up, and not already asked by one of these. */
 function mayBeAsked(state: GameState, reactor: Actor): boolean {
@@ -171,7 +160,12 @@ export function offerNearbyReactions(
       },
       deps
     );
-    if (!offer || immuneTo(mover, reactor, offer.action) || hiddenFromReactor(state, reactor, mover, deps)) continue;
+    if (
+      !offer ||
+      immuneToActionOf(mover, reactor.id, offer.action.name) ||
+      hiddenFromReactor(state, reactor, mover, deps)
+    )
+      continue;
     events.push(openTriggered(state, reactor, mover, NEAR_CAUSES[trigger], offer, deps));
   }
   return events;

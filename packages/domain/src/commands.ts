@@ -526,6 +526,8 @@ export const ActionResolveSchema = z
     /** The space an action with a `destination` sets its creature down in (a bulette's Deadly Leap, a kraken's Fling),
      *  as a point on the live map; the server snaps it and checks its reach, sight and occupants. */
     destination: AnnotationPointSchema.optional(),
+    /** How high above the ground an action that lifts its target sets it (Telekinesis), in feet. */
+    destinationAltitudeFeet: z.number().int().min(0).max(1000).optional(),
     /** GM only: the spell area a cast that ends spells is aimed at (Dispel Magic on a Moonbeam), from
      *  `combat.spellZones`. */
     zoneId: z.string().min(1).max(120).optional(),

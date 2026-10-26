@@ -555,7 +555,35 @@ export function builtinActionsFor(
   const variants = [...bonusSources(definition, bearer)].map(([base, source]) =>
     bonusVariant(base, source, definition)
   );
-  return [...BUILTIN_ACTIONS, ...variants, ...endEffectActions(bearer), ...selfDetach(definition)];
+  return [
+    ...BUILTIN_ACTIONS,
+    ...variants,
+    ...endEffectActions(bearer),
+    ...selfDetach(definition),
+    ...slipFreeOffer(bearer)
+  ];
+}
+
+/** On an effect, its bearer slips nonmagical restraints for 5 feet of movement (Freedom of Movement). */
+export const SLIPS_RESTRAINTS_TAG = "slips-restraints";
+/** The id of the generic action that slips free (`resolution/slip-free.ts`). */
+export const SLIP_FREE_ID = "slip-free";
+
+/** Freedom of Movement: "spend 5 feet of movement to automatically escape from nonmagical restraints", offered while
+ *  the bearer has the ability. */
+function slipFreeOffer(bearer: ActionBearer | undefined): BuiltinAction[] {
+  if (!bearer?.effects.some((effect) => effect.tags.includes(SLIPS_RESTRAINTS_TAG))) return [];
+  return [
+    {
+      id: SLIP_FREE_ID,
+      name: "Slip Free",
+      activation: "other",
+      description:
+        "Spend 5 feet of movement to escape a nonmagical restraint, such as manacles or a creature's grapple, with no action and no check (SRD 5.2.1 Freedom of Movement).",
+      damage: [],
+      requiresEffectTag: SLIPS_RESTRAINTS_TAG
+    }
+  ];
 }
 
 /** "The stirge can detach itself by spending 5 feet of its movement": offered to a creature whose hits attach it so. */

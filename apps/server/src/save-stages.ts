@@ -1,6 +1,6 @@
 import type { AbilityId, GameState, PendingSave } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
-import type { EffectStage, EndedBy, RepeatSave, SaveFailureDuration } from "@vtt/schemas";
+import type { ActorDefinition, EffectStage, EndedBy, RepeatSave, SaveFailureDuration } from "@vtt/schemas";
 import { conditionLabel } from "./condition-rules.js";
 import {
   addEffect,
@@ -9,6 +9,7 @@ import {
   makeEffect,
   sourceOf,
   swapEffect,
+  wardAgainst,
   type ConditionImmunitySource,
   type EffectNarration
 } from "./effects.js";
@@ -35,7 +36,9 @@ export type RepeatFields = Readonly<{
   repeatByAction?: true;
   repeatUnseenSource?: true;
   repeatBeyondFeet?: number;
+  repeatAfterCompelledMove?: true;
   immuneOnSuccess?: true;
+  immuneMinutes?: number;
   repeatFailureDamage?: RepeatSave["failureDamage"];
   repeatTally?: number;
   repeatTallySuccessesOnly?: true;
@@ -62,6 +65,7 @@ export function repeatSaveOf(
     save.repeatOnce === true ||
     save.repeatTally !== undefined ||
     save.repeatUnseenSource === true ||
+    save.repeatAfterCompelledMove === true ||
     save.repeatBeyondFeet !== undefined;
   if (!atTurns && !save.repeatOnDamage && !save.repeatByAction && !save.repeatAtTurnStart) return undefined;
   const second = save.secondFailure;
@@ -74,7 +78,11 @@ export function repeatSaveOf(
     ...(save.repeatByAction ? { byAction: true as const } : {}),
     ...(save.repeatUnseenSource ? { unseenSource: true as const } : {}),
     ...(save.repeatBeyondFeet !== undefined ? { beyondFeet: save.repeatBeyondFeet } : {}),
+    ...(save.repeatAfterCompelledMove ? { afterCompelledMove: true as const } : {}),
     ...(save.immuneOnSuccess && save.repeatBeyondFeet !== undefined ? { immuneOnSuccess: true as const } : {}),
+    ...(save.immuneOnSuccess && save.repeatBeyondFeet !== undefined && save.immuneMinutes !== undefined
+      ? { immuneMinutes: save.immuneMinutes }
+      : {}),
     ...(save.repeatFailureDamage
       ? { failureDamage: save.repeatFailureDamage.map((part) => ({ ...part })) }
       : again && again.length > 0
@@ -137,6 +145,8 @@ export type EndingSaveDeps = Readonly<{
   sees?: (viewerId: string, targetId: string) => boolean;
   /** Creature-to-creature distance on the map; null when it can't tell. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** Stat blocks, so a ward against the source's creature type can give the save Advantage. */
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
 }>;
 
 /** The repeat saves `actorId` owes as its turn starts or ends: one per effect that repeats then. A once-only repeat
@@ -166,6 +176,8 @@ export function openRepeatSaves(
     // "If the creature ends its turn in a space where it doesn't have line of sight to you" (Fear).
     if (repeat.unseenSource && (effect.sourceActorId === null || seesSource(deps, actor.id, effect.sourceActorId)))
       continue;
+    // "After moving in this way, a target repeats the save" (Compulsion): only after a turn a direction bound.
+    if (repeat.afterCompelledMove && effect.compelled?.heading === undefined) continue;
     // "If the Frightened or Charmed creature ends its turn more than 120 feet away from the target" (Antipathy).
     if (repeat.beyondFeet !== undefined) {
       const apart =
@@ -241,6 +253,8 @@ export function openEndingSave(
   advantageFrom?: string
 ): EffectNarration {
   const repeat = verb === "repeats" ? effect.repeatSave : undefined;
+  // Protection from Evil and Good: Advantage on a new save against what such a creature holds the bearer with.
+  const advantage = advantageFrom ?? wardAgainst(state, bearer, effect, deps.resolveDefinition) ?? undefined;
   const parts =
     repeat?.failureDamage && deps.rollDie
       ? repeat.failureDamage.map((part) => ({
@@ -265,7 +279,8 @@ export function openEndingSave(
     magical: effect.magical === true,
     // A success leaves the bearer immune to the effect's source (Antipathy/Sympathy).
     ...(repeat?.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
-    ...(advantageFrom ? { advantageFrom } : {}),
+    ...(repeat?.immuneMinutes !== undefined ? { immuneMinutes: repeat.immuneMinutes } : {}),
+    ...(advantage ? { advantageFrom: advantage } : {}),
     newSaveId: deps.newId,
     createdAt: Date.parse(deps.now())
   });

@@ -35,6 +35,7 @@ import {
   setSummonType,
   setTargetDarts,
   setTargetingSpend,
+  setDestinationAltitude,
   SHAPING_CREATURE_PICKS,
   sharedOut,
   targetingReady,
@@ -128,11 +129,25 @@ export function ActionTargetPicker({
       {destination && (
         <p className="action-targeting-hint">
           {destination.who === "target" && picking.selected.length !== 1
-            ? "Choose the creature to throw, then tap the space it lands in."
+            ? `Choose the creature to ${destination.lifts ? "move" : "throw"}, then tap the space it lands in.`
             : picking.destination
               ? `Tap again to move the space. It must be within ${destination.feet} ft.`
               : `Tap the space on the map to land in, within ${destination.feet} ft.`}
         </p>
+      )}
+      {/* Telekinesis lifts the creature it moves up to its full reach into the air, where it hangs. */}
+      {destination?.lifts && picking.destination && (
+        <Stepper
+          label="Lift (ft)"
+          value={picking.destinationAltitudeFeet ?? 0}
+          onChange={setDestinationAltitude}
+          min={0}
+          max={destination.feet}
+          step={5}
+          disabled={busy}
+          aria-label={`How high ${name} lifts it`}
+          className="action-targeting-spend"
+        />
       )}
       {picking.mode === "none" ? (
         <p className="action-targeting-head">

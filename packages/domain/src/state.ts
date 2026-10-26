@@ -14,6 +14,7 @@ import {
   HealthDisplaySchema,
   HitPointBandSchema,
   InventoryItemSchema,
+  MAX_EFFECT_MINUTES,
   ObjectStatsSchema,
   SaveFailureDurationSchema,
   StoredCastSchema
@@ -292,7 +293,9 @@ const PendingSaveEffectSchema = z
     /** The form a failure shape-shifts the creature into (Polymorph's Beast), taken as the effect lands. */
     form: EffectInstanceSchema.shape.form,
     /** The creature's size while it lasts (Enlarge/Reduce). */
-    sizeChange: EffectInstanceSchema.shape.sizeChange
+    sizeChange: EffectInstanceSchema.shape.sizeChange,
+    /** How it makes the creature move on its turns (Fear's flight). */
+    compelled: EffectInstanceSchema.shape.compelled
   })
   .strict();
 
@@ -379,6 +382,8 @@ export const PendingSaveSchema = z
     /** A success makes the target immune to this source's trait for the rest of the fight ("immune to this ghast's
      * Stench for 24 hours"). */
     immuneOnSuccess: z.literal(true).optional(),
+    /** How long that immunity lasts on the game clock, in minutes ("for 24 hours"); absent, the fight. */
+    immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional(),
     /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). GM bookkeeping, never projected. */
     drain: DamageDrainSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
@@ -388,6 +393,16 @@ export const PendingSaveSchema = z
     /** A success moves the creature out beside the source, failing with no room (a gelatinous cube's Engulf). */
     successMovesOut: z
       .object({ withinFeet: z.number().int().min(5).max(30) })
+      .strict()
+      .optional(),
+    /** Where a failure sets the creature down, and how high, picked as the action was used (Telekinesis). GM
+     *  bookkeeping, never projected: the move is narrated when it lands. */
+    failureMovesTo: z
+      .object({
+        x: z.number().min(0).max(1_000_000),
+        y: z.number().min(0).max(1_000_000),
+        altitudeFeet: z.number().int().min(0).max(1000).optional()
+      })
       .strict()
       .optional(),
     /** SRD Mounted Combat: a failure throws the rider off this mount, landing Prone within 5 feet of it. GM
@@ -458,6 +473,8 @@ export const PendingSaveSchema = z
       .min(1)
       .max(6)
       .optional(),
+    /** The banished creature stays home, with no 24-hour return (Dispel Evil and Good's Dismissal). GM bookkeeping. */
+    banishedForGood: z.literal(true).optional(),
     /** What gives the save Disadvantage, as the roll names it (Heightened Spell). GM bookkeeping, never projected. */
     disadvantageFrom: z.string().min(1).max(60).optional(),
     /** A failure returns a shape-shifted creature to its true form (Moonbeam). Narrated when it lands. */

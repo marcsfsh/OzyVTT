@@ -45,6 +45,8 @@ export type SaveOutcome = {
   failureExhaustion?: number;
   advantageIfFighting?: true;
   immuneOnSuccess?: true;
+  immuneMinutes?: number;
+  repeatAfterCompelledMove?: true;
   endsWhenSourceDies?: true;
   endedBy?: EndedBy;
   onlyCreatureTypes?: string[];
@@ -396,9 +398,9 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
       : {}),
     ...(exhaustion ? { failureExhaustion: Number.parseInt(exhaustion[1]!, 10) } : {}),
     ...(onDamage ? { repeatOnDamage: onDamage } : {}),
-    // "Success: The target is immune to this cloaker's Moan for the next 24 hours."
+    // "Success: The target is immune to this cloaker's Moan for the next 24 hours", on the game clock.
     ...(/(?<!or )\bSuccess:\s*The target is immune to this\b/.test(description)
-      ? { immuneOnSuccess: true as const }
+      ? { immuneOnSuccess: true as const, ...immunityMinutesOf(description) }
       : {}),
     ...(dies ? { failureKills: dies[1] ? { sourceRegains: dies[1] } : {} } : {}),
     ...(only && only[1] !== "Creature" ? { onlyCreatureTypes: [only[1]!.toLowerCase()] } : {}),
@@ -767,6 +769,13 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // "At the end of each of its turns, an affected target repeats the save, ending the spell on itself on a success",
   // with no condition named for the reader to hang it on.
   confusion: { repeatSave: true },
+  // "Each Charmed target must use as much of its movement as possible to move in that direction on its next turn ...
+  // After moving in this way, a target repeats the save, ending the spell on itself on a success."
+  compulsion: { repeatAfterCompelledMove: true },
+  // "On a successful save, the target is unaffected, and it is immune to this spell for the next 24 hours."
+  imprisonment: { immuneOnSuccess: true, immuneMinutes: 24 * 60 },
+  // "On a successful save, the target isn't affected, and you can't use this spell on it again for 24 hours."
+  scrying: { immuneOnSuccess: true, immuneMinutes: 24 * 60 },
   // "Another 5d4 Acid damage at the end of its next turn", with no condition for the reader to hang it on.
   "vitriolic-sphere": {
     ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }
@@ -806,3 +815,11 @@ export function spellSaveOutcomeFor(spellId: string, description: string): SaveO
 
 /** Every override must still name a spell, so a renamed id fails the build out loud. */
 export const SPELL_SAVE_OVERRIDE_IDS: readonly string[] = Object.keys(SPELL_SAVE_OVERRIDES);
+
+/** How long a printed immunity lasts, in minutes of the game clock ("immune to this ghast's Stench for 24 hours"). */
+export function immunityMinutesOf(text: string): { immuneMinutes?: number } {
+  const timed = /\bimmune to [^.]*? for (?:the next )?(\d+) (hours?|minutes?)\b/.exec(text);
+  if (!timed) return {};
+  const count = Number.parseInt(timed[1]!, 10);
+  return { immuneMinutes: timed[2]!.startsWith("hour") ? count * 60 : count };
+}

@@ -382,6 +382,8 @@ export function spellCastMechanics(
       | "endsOneCondition"
       | "dispel"
       | "endsCurses"
+      | "restores"
+      | "scryingModifiers"
       | "summons"
       | "shapeShift"
       | "effectOptions"
@@ -478,6 +480,10 @@ export function spellCastMechanics(
     // The spells it ends on its target (Dispel Magic), and the curses (Remove Curse).
     ...(effect.dispel ? { dispel: { ...effect.dispel } } : {}),
     ...(effect.endsCurses ? { endsCurses: true as const } : {}),
+    // The harm it ends that its caster picks (Greater Restoration).
+    ...(effect.restores ? { restores: true as const } : {}),
+    // Scrying's knowledge and connection, picked as it is cast.
+    ...(effect.scryingModifiers ? { scryingModifiers: true as const } : {}),
     // The creatures it brings, with the caster's numbers a spell-printed stat block reads (Summon Dragon's Rend).
     ...(effect.summons
       ? {
@@ -592,6 +598,14 @@ export function laterSpellAction(
     ...(later.shapeShift ? { shapeShift: structuredClone(later.shapeShift) } : {}),
     // How often it is taken (Phantasmal Force's once a turn, Geas's once a day).
     ...(later.uses ? { uses: { ...later.uses } } : {}),
+    // Whom it reaches, and what it does beside a save (Dispel Evil and Good's Break Enchantment and Dismissal).
+    ...(later.targets ? { targets: structuredClone(later.targets) } : {}),
+    ...(later.breaksEnchantment ? { breaksEnchantment: structuredClone(later.breaksEnchantment) } : {}),
+    ...(later.endsSpell ? { endsOwnSpell: true as const } : {}),
+    ...(later.setsHeading ? { setsHeading: true as const } : {}),
+    // Where its failure moves its target, and the carried object it acts on (Telekinesis).
+    ...(later.failureMove ? { failureMove: { ...later.failureMove } } : {}),
+    ...(later.object ? { object: structuredClone(later.object) } : {}),
     spellId: spell.id
   };
 }

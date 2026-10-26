@@ -10,6 +10,7 @@ import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { nextInitiativeTurn, type TurnAdvanceDeps } from "./encounter.js";
 import type { EffectNarration } from "./effects.js";
 import { effectiveModeFor, overrideCovers } from "./rules-families.js";
+import { compelledTurnUnmet } from "./compelled-moves.js";
 
 /** Manual economy toggles (ADR-0020): marking a slot spent is bookkeeping anyone may do for their own creature.
  *  Giving a spent one back lets the creature act again, so under a policed economy only the GM does that. */
@@ -106,9 +107,19 @@ export function setLegendaryUsed(state: GameState, actorId: string, spent: numbe
   state.combat = { ...state.combat, legendaryUsed: spent === 0 ? rest : { ...rest, [actorId]: spent } };
 }
 
-/** Player-facing End Turn: same advance as the GM's Next, gated to the claimed character's own turn. */
+/** Player-facing End Turn: same advance as the GM's Next, gated to the claimed character's own turn. A move an effect
+ *  compels that the player still owes (Fear's Dash away, Compulsion's heading) keeps the turn until it is made; the
+ *  GM's Next passes the turn of a creature with nowhere to move. */
 export function endTurn(state: GameState, initiator: Initiator, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   requireActiveCombat(state);
   requireOwnTurn(state, initiator);
+  const actor = state.actors.find((candidate) => candidate.id === state.combat.turnActorId);
+  if (initiator.role === "player" && actor && deps) {
+    const unmet = compelledTurnUnmet(state, actor, deps);
+    const mode = effectiveModeFor(state.combat, "movement.compelled");
+    if (unmet && mode === "strict" && !overrideCovers(state.combat.turn, "movement.compelled"))
+      throw new CommandRejectedError(unmet);
+    if (unmet && mode !== "freeform") events?.push({ kind: "effect", text: unmet, actorId: actor.id, gmOnly: true });
+  }
   nextInitiativeTurn(state, events, deps);
 }

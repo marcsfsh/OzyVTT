@@ -70,6 +70,10 @@ import { releaseItemEffects } from "./resolution/endings.js";
 import { rebindRow } from "./resolution/rebind.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
+import { applyRestoration, endNamedEffects } from "./resolution/restoration.js";
+import { breakEnchantment, endOwnSpell } from "./resolution/break-enchantment.js";
+import { designateHeading } from "./resolution/compel.js";
+import { releasePriorTarget } from "./resolution/telekinesis.js";
 import { mendOnCast } from "./resolution/mend.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
 import { raiseOnAction, reviveOnCast } from "./resolution/revival.js";
@@ -469,6 +473,8 @@ export function resolveDefinitionAction(
   applyAreaHeal(ctx);
   prayerShortRest(ctx);
   applyConditionCures(ctx);
+  applyRestoration(ctx);
+  endNamedEffects(ctx);
   mendOnCast(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
@@ -481,14 +487,18 @@ export function resolveDefinitionAction(
   identifyOnCast(ctx);
   wishStressOnCast(ctx);
   wishOnCast(ctx);
+  breakEnchantment(ctx);
+  designateHeading(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
+  releasePriorTarget(ctx);
   parkActionSave(ctx);
   endTargetMarks(ctx);
   parkBurstSave(ctx);
   parkConcentrationSave(ctx);
   parkHeldObjectSave(ctx);
+  endOwnSpell(ctx);
   applyRageRules(ctx);
 
   commitEconomy(ctx);

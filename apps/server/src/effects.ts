@@ -12,7 +12,8 @@ import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
 import { refreshArmorClass } from "./held-items.js";
 import { doesntSleep } from "./trance.js";
-import { knockedProneWhileMounted } from "./mounts.js";
+import { endWhileRidden, knockedProneWhileMounted, RIDING_TAG } from "./mounts.js";
+import { FREEDOM_OF_MOVEMENT_TAG } from "./speed.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -45,6 +46,9 @@ export const NO_BONUS_ACTIONS_TAG = "no-bonus-actions";
 export const CANT_ATTACK_TAG = "cant-attack";
 /** The bearer's only actions are Dash and the Magic action that ends this (Wind Walk's cloud form). */
 export const DASH_ONLY_TAG = "dash-only";
+/** Its bearer flees: for its action only the Dash, an escape from what holds it, or Dodge when it has nowhere to move
+ *  (a Mace of Terror's wave). */
+export const FLEE_ONLY_TAG = "flee-only";
 /** The bearer's action this turn is the Dodge action (Bestow Curse: "be forced to take the Dodge action on that turn"). */
 export const DODGE_ONLY_TAG = "dodge-only";
 /** The bearer can't end the Prone condition on itself while this lasts (Hideous Laughter). */
@@ -204,14 +208,29 @@ export type ConditionImmunitySource = Readonly<{
   catalog?: EquipmentCatalog;
   state?: GameState;
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** The condition comes from a spell or another magical effect, which Freedom of Movement keeps off. */
+  magical?: boolean;
 }>;
 
+const MAGIC_CANT_IMPOSE: ReadonlySet<string> = new Set(["paralyzed", "restrained"]);
+
+/** Whether a live effect or a worn item's own effect keeps magic from holding the creature (`FREEDOM_OF_MOVEMENT_TAG`). */
+function freeOfMagicalHolds(actor: Actor, source: ConditionImmunitySource | undefined): boolean {
+  if (actor.effects.some((effect) => effect.tags.includes(FREEDOM_OF_MOVEMENT_TAG))) return true;
+  if (!source?.catalog) return false;
+  const definition = actor.definitionId ? source.resolveDefinition?.(actor.definitionId) : undefined;
+  return (deriveEquipment(actor, definition, source.catalog).context.effectTags ?? []).includes(
+    FREEDOM_OF_MOVEMENT_TAG
+  );
+}
+
 /** SRD condition immunity: innate, granted by what the actor carries when a catalog is supplied, Petrified's own
- *  immunity to the Poisoned condition, or a Paladin's aura it stands in. */
+ *  immunity to the Poisoned condition, a Paladin's aura it stands in, or Freedom of Movement against magic. */
 export function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
   if (actor.conditionImmunities.includes(conditionId)) return true;
   // An effect's own immunity while it lasts (Heroism: Frightened).
   if (actor.effects.some((effect) => effect.conditionImmunities?.includes(conditionId))) return true;
+  if (source?.magical === true && MAGIC_CANT_IMPOSE.has(conditionId) && freeOfMagicalHolds(actor, source)) return true;
   if (conditionId === "poisoned" && hasCondition(actor, "petrified")) return true;
   if (
     source?.state &&
@@ -245,6 +264,50 @@ export function wardedFrom(
   if (!source) return false;
   const type = creatureTypeOf(source, source.definitionId ? resolveDefinition?.(source.definitionId) : undefined);
   return type !== null && wards.some((effect) => effect.conditionWards!.creatureTypes.includes(type));
+}
+
+/** On an effect, its bearer is possessed by the effect's source (a ghost's Possession): Protection from Evil and Good
+ *  keeps it off, and Dispel Evil and Good's Break Enchantment ends it. */
+export const POSSESSED_TAG = "possessed";
+
+/** Whether one of the bearer's wards keeps a creature of the source's type from possessing it. */
+function wardedFromPossession(
+  state: GameState,
+  actor: Actor,
+  sourceActorId: string | null,
+  immunities: ConditionImmunitySource | undefined
+): boolean {
+  const wards = actor.effects.filter((effect) => effect.conditionWards?.possession === true);
+  if (wards.length === 0 || sourceActorId === null) return false;
+  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
+  if (!source) return false;
+  const definition = source.definitionId ? immunities?.resolveDefinition?.(source.definitionId) : undefined;
+  const type = creatureTypeOf(source, definition);
+  return type !== null && wards.some((effect) => effect.conditionWards!.creatureTypes.includes(type));
+}
+
+/** The ward that gives its bearer Advantage on a new save against an effect a warded creature already holds it with
+ *  (Protection from Evil and Good: "If the target is already possessed, Charmed, or Frightened by such a creature, the
+ *  target has Advantage on any new saving throw against the relevant effect"); null when none does. */
+export function wardAgainst(
+  state: GameState,
+  actor: Actor,
+  effect: EffectInstance,
+  resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined
+): string | null {
+  const source = state.actors.find((candidate) => candidate.id === effect.sourceActorId);
+  if (!source) return null;
+  const type = creatureTypeOf(source, source.definitionId ? resolveDefinition?.(source.definitionId) : undefined);
+  if (type === null) return null;
+  const ward = actor.effects.find((candidate) => {
+    const covers = candidate.conditionWards;
+    if (!covers || candidate.id === effect.id || !covers.creatureTypes.includes(type)) return false;
+    return (
+      (covers.possession === true && effect.tags.includes(POSSESSED_TAG)) ||
+      effect.linkedConditionIds.some((id) => (covers.conditionIds as readonly string[]).includes(id))
+    );
+  });
+  return ward ? ward.name : null;
 }
 
 const hasCondition = (actor: Actor, conditionId: string) =>
@@ -435,6 +498,16 @@ export function addEffect(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const existing = actor.effects.find((candidate) => candidate.id === effect.id);
   if (existing) return existing;
+  // SRD Protection from Evil and Good: "The target also can't be possessed by ... them."
+  if (effect.tags.includes(POSSESSED_TAG) && wardedFromPossession(state, actor, effect.sourceActorId, immunities)) {
+    events?.push({
+      kind: "condition",
+      text: `${actor.name} can't be possessed by ${effect.sourceName ?? "that creature"}, so ${effect.name} has no effect.`,
+      actorId,
+      immune: true
+    });
+    return effect;
+  }
   // SRD Trance: "magic can't put you to sleep" (Eyebite's Asleep, a brass dragon's Sleep Breath).
   if (isMagicalSleep(effect)) {
     const definition = actor.definitionId ? immunities?.resolveDefinition?.(actor.definitionId) : undefined;
@@ -483,8 +556,9 @@ export function addEffect(
       throw new CommandRejectedError("That combatant already has too many active effects.");
     actor.effects = [...actor.effects, effect];
   }
-  // A creature that can breathe water now (the Water Breathing spell) stops holding its breath.
-  if (effect.tags.includes("water-breathing"))
+  // A creature that can breathe water now (the Water Breathing spell), or needs no air at all (Imprisonment), stops
+  // holding its breath.
+  if (effect.tags.includes("water-breathing") || effect.tags.includes("sustained"))
     for (const held of actor.effects.filter((candidate) => candidate.breath !== undefined))
       endEffectInternal(state, actor, held.id, events ?? []);
   for (const conditionId of effect.linkedConditionIds) {
@@ -494,7 +568,8 @@ export function addEffect(
       if (!present.standalone && !heldBefore.has(conditionId)) writeCondition(actor, { ...present, standalone: true });
       continue;
     }
-    if (immuneToCondition(actor, conditionId, { ...immunities, state })) continue;
+    const magical = immunities?.magical === true || effect.magical === true || effect.spell !== undefined;
+    if (immuneToCondition(actor, conditionId, { ...immunities, state, magical })) continue;
     // A ward against the kind of creature that imposes it (Protection from Evil and Good).
     if (wardedFrom(state, actor, conditionId, effect.sourceActorId, immunities?.resolveDefinition)) continue;
     if (actor.conditions.length >= 20) continue;
@@ -700,6 +775,9 @@ function endEffectInternal(
       events.push(...applyExhaustionDeath(state, actor));
   }
   if (effect.tags.includes(HASTED_TAG) && !sweeping) addLethargy(state, actor, effect, events);
+  // Dismounting ends what lasted only while the mount was ridden (a Goat of Terror's fear).
+  if (effect.tags.includes(RIDING_TAG) && effect.sourceActorId !== null)
+    endWhileRidden(state, effect.sourceActorId, events);
   // A flight that lowers its creature when it ends (Winged Boots: "you descend ... until you land") drifts it down;
   // Wind Walk's cloud "descends 60 feet per round for 1 minute until it lands", and falls the rest.
   if (effect.tags.includes(DESCENDS_SAFELY_TAG)) descendSafely(state, actor.id);

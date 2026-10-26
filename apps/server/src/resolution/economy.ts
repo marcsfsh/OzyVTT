@@ -16,6 +16,7 @@ import { areAllies } from "../creature-sides.js";
 import {
   CANT_ATTACK_TAG,
   DASH_ONLY_TAG,
+  FLEE_ONLY_TAG,
   DODGE_ONLY_TAG,
   HASTED_TAG,
   concentrationOn,
@@ -599,6 +600,14 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
 /** What a creature limited to Dash may still do (Wind Walk): the Dash action, as an action or a Bonus Action, and the
  *  action that ends its cloud form. */
 const DASH_ONLY_ALLOWED: ReadonlySet<string> = new Set(["dash", "dash-bonus", "end-effect"]);
+/** What a fleeing creature may still do (a Mace of Terror: "it can use only the Dash action or try to escape from an
+ *  effect that prevents it from moving. If it has nowhere it can move, the creature can take the Dodge action"). */
+const FLEE_ONLY_ALLOWED: ReadonlySet<string> = new Set([
+  ...DASH_ONLY_ALLOWED,
+  "escape-grapple",
+  "end-an-effect",
+  "dodge"
+]);
 
 /** An effect's name in a refusal, as the creature's own sheet shows it: a caster hidden from the table is "A hidden
  *  threat" there. */
@@ -671,6 +680,33 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
       rule: "condition.dash-only",
       message: `${attacker.name} can take only the Dash action or end ${shownEffectName(state, dashOnly, resolveDefinition)} while it lasts.`
     });
+  const fleeing = attacker.effects.find((effect) => effect.tags.includes(FLEE_ONLY_TAG));
+  if (
+    fleeing &&
+    !FLEE_ONLY_ALLOWED.has(builtinBaseId(action.id)) &&
+    action.activation !== "reaction" &&
+    action.activation !== "other"
+  )
+    violations.push({
+      rule: "condition.dash-only",
+      message: `${attacker.name} can take only the Dash action, try to escape what holds it, or Dodge with nowhere to move while ${shownEffectName(state, fleeing, resolveDefinition)} lasts.`
+    });
+  // SRD Confusion's 7-8: "it takes the Attack action to make one melee attack against a random creature within reach"
+  // (Gibbering's too): one melee weapon or Unarmed Strike attack on the creature the roll picked, and nothing else.
+  const forced = attacker.effects.find((effect) => effect.forcedAttack !== undefined)?.forcedAttack;
+  if (forced && (action.activation === "action" || action.activation === "bonus-action")) {
+    const melee =
+      action.spellId === undefined &&
+      action.multiattack === undefined &&
+      (unarmed || (action.attack !== undefined && action.attack.reachFeet !== undefined));
+    const picked = state.actors.find((actor) => actor.id === forced.targetId);
+    const pickedName = !picked || picked.visibility === "gm-only" ? "the creature picked" : picked.name;
+    if (!melee || state.combat.turn.actionUsed || targetIds.length !== 1 || targetIds[0] !== forced.targetId)
+      violations.push({
+        rule: "condition.forced-attack",
+        message: `${attacker.name}'s action this turn is one melee attack against ${pickedName}.`
+      });
+  }
   // SRD Bestow Curse: a failed Wisdom save at the start of its turn means it is "forced to take the Dodge action on
   // that turn".
   const dodgeOnly = attacker.effects.find((effect) => effect.tags.includes(DODGE_ONLY_TAG));

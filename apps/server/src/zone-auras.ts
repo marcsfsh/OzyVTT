@@ -2,7 +2,14 @@ import type { GameState, SpellZone } from "@vtt/domain";
 import type { EffectInstance } from "@vtt/schemas";
 import { isIncapacitated } from "./condition-rules.js";
 import { COVER_TAGS } from "./cover.js";
-import { addEffect, endEffectIfPresent, KEEPS_MAXIMUM_TAG, makeEffect, NO_SPELLS_TAG } from "./effects.js";
+import {
+  addEffect,
+  endEffectIfPresent,
+  KEEPS_MAXIMUM_TAG,
+  makeEffect,
+  NO_SPELLS_TAG,
+  POSSESSED_TAG
+} from "./effects.js";
 import { ANTIMAGIC_TAG, suppressedByAntimagic, underAntimagic, WINKED_OUT_TAG } from "./antimagic.js";
 import { refreshArmorClass } from "./held-items.js";
 import { OFF_PLANE_TAG } from "./off-plane.js";
@@ -133,7 +140,13 @@ function wanted(state: GameState, deps: Deps): Map<string, Map<string, EffectIns
           ...(holds.conditions ? { linkedConditionIds: [...holds.conditions] } : {}),
           ...(holds.conditionImmunities ? { conditionImmunities: [...holds.conditionImmunities] } : {}),
           ...(holds.conditionWards
-            ? { conditionWards: { conditionIds: [...holds.conditionWards.conditionIds], creatureTypes: [...warded] } }
+            ? {
+                conditionWards: {
+                  conditionIds: [...holds.conditionWards.conditionIds],
+                  creatureTypes: [...warded],
+                  ...(holds.conditionWards.possession ? { possession: true as const } : {})
+                }
+              }
             : {}),
           ...(holds.struck ? { struck: struckAt(holds.struck, zone.dc) } : {}),
           ...(content.spell ? { spell: { id: content.spell.id, level: zone.level } } : {}),
@@ -298,17 +311,25 @@ function heldOff(state: GameState, actorId: string, effect: EffectInstance, deps
   if (!zone || !ward || zoneContentOf(zone, deps.catalog)?.trigger.holds?.suppresses !== true) return;
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return;
-  const fromWarded = ward.conditionIds.filter((conditionId) => {
+  const warded = (holder: EffectInstance) => {
+    const source = state.actors.find((candidate) => candidate.id === holder.sourceActorId);
+    const definition = source?.definitionId ? deps.resolveDefinition(source.definitionId) : undefined;
+    const type = source ? creatureTypeOf(source, definition) : null;
+    return type !== null && ward.creatureTypes.includes(type);
+  };
+  // A possession by such a creature holds off the conditions it gives the body (a ghost's Incapacitated).
+  const possessedBy = ward.possession
+    ? actor.effects.filter((candidate) => candidate.tags.includes(POSSESSED_TAG) && warded(candidate))
+    : [];
+  const fromWarded = [
+    ...new Set([...ward.conditionIds, ...possessedBy.flatMap((holder) => holder.linkedConditionIds)])
+  ].filter((conditionId) => {
     if (!actor.conditions.some((condition) => condition.id === conditionId)) return false;
     const holders = actor.effects.filter((candidate) => candidate.linkedConditionIds.includes(conditionId));
+    const ownCondition = (ward.conditionIds as readonly string[]).includes(conditionId);
     return (
       holders.length > 0 &&
-      holders.every((holder) => {
-        const source = state.actors.find((candidate) => candidate.id === holder.sourceActorId);
-        const definition = source?.definitionId ? deps.resolveDefinition(source.definitionId) : undefined;
-        const type = source ? creatureTypeOf(source, definition) : null;
-        return type !== null && ward.creatureTypes.includes(type);
-      })
+      holders.every((holder) => warded(holder) && (ownCondition || holder.tags.includes(POSSESSED_TAG)))
     );
   });
   if (fromWarded.length > 0) effect.suppressedConditions = suppressConditions(actor, fromWarded);

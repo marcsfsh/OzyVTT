@@ -298,9 +298,10 @@ describe("talismans, a Carpet of Flying, and what a drink or an oil leaves", () 
     expect(row(table, IDS.wizard, "potion-of-mind-reading")).toBeUndefined();
     resolveAt(table, IDS.wizard, "item-oil-of-slipperiness-apply", [], { targetIds: [IDS.wizard] });
     const oiled = table.actor(IDS.wizard).effects.find((effect) => effect.tags.includes("freedom-of-movement"));
+    // Its Paralyzed and Restrained immunity holds against magic alone, read from the tag (effects.ts).
     expect(oiled).toMatchObject({
       duration: { type: "minutes", remaining: 480 },
-      conditionImmunities: ["paralyzed", "restrained"]
+      tags: ["freedom-of-movement", "slips-restraints"]
     });
   });
 });

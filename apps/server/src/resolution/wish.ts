@@ -4,6 +4,7 @@ import { addEffect, makeEffect } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
 import { applyDamageDetailed, healActor } from "../hit-points.js";
 import { spellOf } from "./concentration.js";
+import { restoreEverything } from "./restoration.js";
 import {
   tableLineOf,
   type DefinitionAction,
@@ -14,11 +15,11 @@ import {
 
 /**
  * SRD 5.2.1 Wish. The cast picks one use: duplicating a spell of level 8 or lower, or one of the effects the spell
- * lists. Instant Health, Resistance and Spell Immunity land on the creatures picked; Object Creation, Sudden Learning,
- * Roll Redo and Reshape Reality are told to the GM. Any use but duplication stresses the caster: "each time you cast a
- * spell until you finish a Long Rest, you take 1d10 Necrotic damage per level of that spell. This damage can't be
- * reduced or prevented in any way. In addition, your Strength score becomes 3 for 2d4 days ... Finally, there is a 33
- * percent chance that you are unable to cast Wish ever again."
+ * lists. Instant Health (with everything Greater Restoration ends), Resistance and Spell Immunity land on the creatures
+ * picked; Object Creation, Sudden Learning, Roll Redo and Reshape Reality are told to the GM. Any use but duplication
+ * stresses the caster: "each time you cast a spell until you finish a Long Rest, you take 1d10 Necrotic damage per
+ * level of that spell. This damage can't be reduced or prevented in any way. In addition, your Strength score becomes 3
+ * for 2d4 days ... Finally, there is a 33 percent chance that you are unable to cast Wish ever again."
  */
 
 /** The tag on Wish's stress until its caster's Long Rest: each spell it casts hurts it. */
@@ -86,12 +87,25 @@ export function wishOnCast(ctx: ResolveContext): void {
     case "instant-health":
       for (const id of [...new Set([attacker.id, ...targets])]) {
         const creature = state.actors.find((actor) => actor.id === id);
-        if (!creature || creature.hp.current >= creature.hp.maximum) continue;
+        if (!creature) continue;
+        // "You end all effects on them described in the Greater Restoration spell", which may raise the maximum first.
+        const definition =
+          creature.id === attacker.id
+            ? ctx.deps.definition
+            : creature.definitionId
+              ? ctx.deps.resolveDefinition?.(creature.definitionId)
+              : undefined;
+        for (const line of restoreEverything(state, creature, {
+          ...(definition ? { definition } : {}),
+          ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
+        }))
+          ctx.tableNarration.push({ kind: "effect", text: `${line.slice(0, -1)} (Wish).`, actorIds: [creature.id] });
+        if (creature.hp.current >= creature.hp.maximum) continue;
         for (const event of healActor(state, id, creature.hp.maximum - creature.hp.current, { role: "gm" }))
           ctx.tableNarration.push(tableLineOf(ctx, event));
       }
       say(
-        `Wish: ${attacker.name} and the creatures it chose regain all their Hit Points. Ending what Greater Restoration ends is the GM's.`
+        `Wish: ${attacker.name} and the creatures it chose regain all their Hit Points and are free of what Greater Restoration ends.`
       );
       break;
     case "resistance": {

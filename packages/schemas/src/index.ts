@@ -1572,8 +1572,12 @@ export const RepeatSaveSchema = z
     unseenSource: z.literal(true).optional(),
     /** Only when the bearer ends its turn more than this many feet from the effect's source (Antipathy/Sympathy). */
     beyondFeet: z.number().int().min(5).max(5280).optional(),
+    /** Only at the end of a turn on which the effect compelled its move (Compulsion). */
+    afterCompelledMove: z.literal(true).optional(),
     /** A success makes the bearer immune to the effect's source for the rest of the fight (Antipathy/Sympathy). */
     immuneOnSuccess: z.literal(true).optional(),
+    /** How long that immunity lasts on the game clock, in minutes (Antipathy/Sympathy's 1); absent, the fight. */
+    immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional(),
     failureDamage: RepeatFailureDamageSchema.optional(),
     tally: z
       .object({
@@ -1591,11 +1595,13 @@ export const RepeatSaveSchema = z
   })
   .strict();
 export type RepeatSave = z.infer<typeof RepeatSaveSchema>;
-/** Conditions a creature of these types can't give the bearer (Protection from Evil and Good). */
+/** Conditions a creature of these types can't give the bearer, and whether it can't possess the bearer either
+ *  (Protection from Evil and Good). */
 export const ConditionWardSchema = z
   .object({
     conditionIds: z.array(ConditionSchema).min(1).max(6),
-    creatureTypes: z.array(RiderSlugSchema).min(1).max(12)
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(12),
+    possession: z.literal(true).optional()
   })
   .strict();
 /** A condition held off while an effect lasts, kept as it was (an Exhaustion level, a player's own mark). */
@@ -1821,6 +1827,36 @@ export const TeleportLandingSchema = z
   })
   .strict();
 export type TeleportLanding = z.infer<typeof TeleportLandingSchema>;
+/**
+ * How an effect makes its bearer move on its own turns (SRD 5.2.1 Fear: "takes the Dash action and moves away from you
+ * by the safest route on each of its turns"; Compulsion: "must use as much of its movement as possible to move in that
+ * direction"): each of its moves must go `away` from or `toward` the effect's source (or `point`, a spot on the map:
+ * a Symbol's glyph), or along `heading` (degrees clockwise from the map's top: 0 north, 90 east). `allMovement`: it
+ * uses all the movement it has that way; `minFeet`: at least that far, if able; `dashes`: it takes the Dash action.
+ * `fromArea`: the point is the area's origin, set as the effect lands. `once`: it binds only the bearer's next turn.
+ * `holdsNear`: within 5 feet of the source it can't willingly move away (Sympathy).
+ */
+export const CompelledMoveSchema = z
+  .object({
+    way: z.enum(["away", "toward", "heading"]),
+    point: z
+      .object({ x: z.number().min(0).max(1_000_000), y: z.number().min(0).max(1_000_000) })
+      .strict()
+      .optional(),
+    heading: z.number().int().min(0).max(359).optional(),
+    allMovement: z.literal(true).optional(),
+    minFeet: z.number().int().min(5).max(120).optional(),
+    dashes: z.literal(true).optional(),
+    fromArea: z.literal(true).optional(),
+    once: z.literal(true).optional(),
+    holdsNear: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "How the effect makes its bearer move on its turns: away from or toward its source (or a point), or along a heading in degrees; with all its movement, at least minFeet, after taking the Dash action, only on its next turn (once), or unable to move away once within 5 feet (holdsNear)"
+  );
+export type CompelledMove = z.infer<typeof CompelledMoveSchema>;
+
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
 export const EffectInstanceSchema = z
@@ -2158,7 +2194,12 @@ export const EffectInstanceSchema = z
     ownSize: z
       .object({ size: SizeSchema.optional(), sizeCells: z.number().int().min(1).max(4).optional() })
       .strict()
-      .optional()
+      .optional(),
+    /** How it makes its bearer move on its turns (Fear's flight, Compulsion's heading, Confusion's wander). */
+    compelled: CompelledMoveSchema.optional(),
+    /** The one creature its bearer's action may strike this turn, with one melee attack (Confusion's 7-8: "one melee
+     *  attack against a random creature within reach"), picked by the server. */
+    forcedAttack: z.object({ targetId: z.uuid() }).strict().optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -3029,7 +3070,9 @@ export const GrantOptionSchema = z
         ability: z.union([AbilitySchema, z.literal("spellcasting")])
       })
       .strict()
-      .optional()
+      .optional(),
+    /** How it makes the bearer move on its turns (Command's Flee, Eyebite's Panicked: away from the caster). */
+    compelled: CompelledMoveSchema.optional()
   })
   .strict();
 export type GrantOption = z.infer<typeof GrantOptionSchema>;
@@ -3571,6 +3614,12 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("The target repeats the save only when it ends its turn where it can't see the source"),
+  /** The target repeats the save at the end of a turn on which the effect compelled its move, and only then
+   *  (Compulsion: "After moving in this way, a target repeats the save"). */
+  repeatAfterCompelledMove: z
+    .literal(true)
+    .optional()
+    .describe("The target repeats the save at the end of a turn the effect compelled it to move on, and only then"),
   /** The failure ends when the target ends its turn out of the source's line of sight (Horror Nimbus). */
   endsOutOfSight: z
     .literal(true)
@@ -3604,6 +3653,15 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("A success makes the target immune to this action of its source, held for the rest of the fight"),
+  /** How long that immunity lasts on the game clock, in minutes ("for 24 hours": 1440), through the fight and past it;
+   *  absent, the rest of the fight. */
+  immuneMinutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_EFFECT_MINUTES)
+    .optional()
+    .describe('How long the immunity after a success lasts on the game clock, in minutes ("for 24 hours": 1440)'),
   /** The failure's conditions end when the source dies ("until the aboleth dies"). */
   endsWhenSourceDies: z
     .literal(true)
@@ -3683,6 +3741,11 @@ export const SaveOutcomeFields = {
     .max(6)
     .optional()
     .describe("A creature of these types that fails is sent back to its home plane for 24 hours"),
+  /** It doesn't come back after the 24 hours (Dispel Evil and Good's Dismissal: "sent back to its home plane"). */
+  banishedForGood: z
+    .literal(true)
+    .optional()
+    .describe("A creature `failureBanishes` sends home stays there, with no 24-hour return"),
   /** A success ends the spell the save is against, its caster's Concentration on it included (Detect Thoughts' probe:
    *  "On a successful save, the spell ends"). */
   successEndsSpell: z
@@ -4017,7 +4080,9 @@ export const SaveFailureEffectSchema = z
     /** The light the creature sheds while it lasts (Faerie Fire: "Each creature ... sheds Dim Light"). */
     light: CarriedLightSchema.optional(),
     /** The creature's size while it lasts (Enlarge/Reduce: one size larger or smaller). */
-    sizeChange: SizeChangeSchema.optional()
+    sizeChange: SizeChangeSchema.optional(),
+    /** How it makes the creature move on its turns (Fear: Dash away from the caster on each of them). */
+    compelled: CompelledMoveSchema.optional()
   })
   .strict();
 
@@ -4168,7 +4233,11 @@ export const OnHitRiderSchema = z
         /** A success takes half the failure's damage (Ammunition of Slaying's 6d10 Force). */
         halfOnSuccess: z.literal(true).optional(),
         repeatSave: z.literal(true).optional(),
-        endsOnDamage: z.literal(true).optional()
+        endsOnDamage: z.literal(true).optional(),
+        /** A success makes the target immune to this rider of its attacker for `immuneMinutes` of the game clock, or
+         *  for the fight ("immune to this werewolf's curse for 24 hours"). */
+        immuneOnSuccess: z.literal(true).optional(),
+        immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional()
       })
       .strict()
       .optional(),
@@ -5118,6 +5187,12 @@ export const SummonCreatureSchema = z
           .array(z.string().regex(/^(?:darkvision|blindsight|tremorsense|truesight) \d{1,4} ft\.$/))
           .min(1)
           .max(4)
+          .optional(),
+        /** What it does beside its stat block's traits, run as theirs are (a Goat of Terror's fear while ridden). */
+        traits: z
+          .array(z.lazy(() => TraitMechanicSchema))
+          .min(1)
+          .max(3)
           .optional()
       })
       .strict()
@@ -5463,6 +5538,49 @@ export const ActionSchema = z
     /** It ends every curse on its target, and breaks the target's Attunement to a cursed magic item, whose curse stays
      *  on the item (Remove Curse). */
     endsCurses: z.literal(true).optional(),
+    /** It ends one harm on its target that its user picks (`optionId`): an Exhaustion level, the Charmed or Petrified
+     *  condition, a curse (its Attunement to a cursed item included), the lowering of one ability score, or the
+     *  lowering of its Hit Point maximum (Greater Restoration). */
+    restores: z
+      .literal(true)
+      .optional()
+      .describe(
+        "It ends one harm its user picks on the target: an Exhaustion level, Charmed or Petrified, a curse, a lowered ability score or a lowered Hit Point maximum"
+      ),
+    /** It ends the Charmed and Frightened conditions, and the possession, that creatures of these types gave its target
+     *  (Dispel Evil and Good's Break Enchantment). */
+    breaksEnchantment: z
+      .object({ creatureTypes: z.array(RiderSlugSchema).min(1).max(8) })
+      .strict()
+      .optional()
+      .describe("It ends the Charmed, Frightened and possession that creatures of these types gave its target"),
+    /** Taking it ends the spell it belongs to, its user's Concentration on it included (Dispel Evil and Good's special
+     *  functions). */
+    endsOwnSpell: z.literal(true).optional().describe("Taking it ends its spell, and its user's Concentration on it"),
+    /** It names a compass direction (`optionId`) that each creature its spell compels must move on its next turn
+     *  (Compulsion: "you can take a Bonus Action to designate a direction that is horizontal to you"). */
+    setsHeading: z
+      .literal(true)
+      .optional()
+      .describe("It names the compass direction each creature its spell compels must move on its next turn"),
+    /** The cast picks how well its caster knows the target and what of it the caster has (`optionId`), whose modifiers
+     *  add to the target's save (Scrying: Secondhand +5 to Extensive -5, a likeness -2 to a body part -10). */
+    scryingModifiers: z
+      .literal(true)
+      .optional()
+      .describe(
+        "The cast picks its caster's knowledge of the target and connection to it, which modify the target's save"
+      ),
+    /** A failed save moves the target up to `feet` to the space its use picks (`destination`), within the action's
+     *  range of its user; with `lifts`, up into the air to the height the use names (`destinationAltitudeFeet`), where
+     *  it hangs while the failure lasts and falls once it ends (Telekinesis). */
+    failureMove: z
+      .object({ feet: z.number().int().min(5).max(120), lifts: z.literal(true).optional() })
+      .strict()
+      .optional()
+      .describe(
+        "A failed save moves the target up to `feet` to the space its use picks, within its range; with `lifts`, up to the height the use names, held there while the failure lasts"
+      ),
     /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
      *  The resolve's targets assign them in order, a target named twice taking two. */
     darts: z.number().int().min(2).max(20).optional(),
@@ -5854,7 +5972,9 @@ export const ActionSchema = z
           .min(1)
           .max(2),
         metal: z.literal(true).optional(),
-        does: z.enum(["penalty-on-failure"])
+        /** What a failed save does to it: a cumulative -1 (a rust monster's Antennae), or it is pulled from the
+         *  creature's hands (Telekinesis on a carried object). */
+        does: z.enum(["penalty-on-failure", "pulled-on-failure"])
       })
       .strict()
       .optional()
@@ -6386,6 +6506,9 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       seenOnly: z.literal(true).optional(),
       /** It acts only while the fight is underwater (an aboleth's Mucus Cloud). */
       underwaterOnly: z.literal(true).optional(),
+      /** It acts only while a creature rides its bearer, and what its failure leaves ends once none does (a Goat of
+       *  Terror: "While you ride the goat ... until you are no longer riding the goat"). */
+      whileRidden: z.literal(true).optional(),
       damage: TraitDamageSchema.optional(),
       save: TraitSaveSchema.optional(),
       /** The fire it sets (a fire elemental's Emanation): "start burning" (SRD Burning). */

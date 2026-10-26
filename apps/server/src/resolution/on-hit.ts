@@ -1,3 +1,4 @@
+import { immuneToActionOf } from "../save-immunity.js";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import {
@@ -309,6 +310,14 @@ function openOnHitSave(
 ): void {
   const { action, targets } = ctx;
   const save = rider.save!;
+  const name = rider.name ? `${action.name}: ${rider.name}` : action.name;
+  // "Success: The target is immune to this werewolf's curse for 24 hours."
+  if (save.immuneOnSuccess && targets[0] && immuneToActionOf(targets[0], ctx.attacker.id, name)) {
+    ctx.warnings.push(
+      `${targets[0].name} is immune to ${ctx.attacker.name}'s ${rider.name ?? action.name}, so it makes no save.`
+    );
+    return;
+  }
   const failureDamage = (save.failureDamage ?? []).map((part) => rollPlain(ctx, part.formula, part.type, action.name));
   const tags = rider.tags ?? [];
   const modifiers = rider.modifiers ?? [];
@@ -317,7 +326,7 @@ function openOnHitSave(
     targets[0],
     { ...action, id: `${action.id}:${index}` },
     {
-      name: rider.name ? `${action.name}: ${rider.name}` : action.name,
+      name,
       ability: save.ability,
       dc: save.dc,
       failureConditions: rider.conditions.map((condition) => condition.id),
@@ -328,7 +337,9 @@ function openOnHitSave(
         ? { failureEffect: { name: rider.name ?? action.name, tags: [...tags], modifiers: [...modifiers] } }
         : {}),
       ...(failureDamage.length > 0 ? { failureDamage } : {}),
-      ...(save.halfOnSuccess ? { halfOnSuccess: true as const } : {})
+      ...(save.halfOnSuccess ? { halfOnSuccess: true as const } : {}),
+      ...(save.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
+      ...(save.immuneMinutes !== undefined ? { immuneMinutes: save.immuneMinutes } : {})
     }
   );
 }

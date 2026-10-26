@@ -1,4 +1,5 @@
 import type { GameState } from "@vtt/domain";
+import { GM_CONTROLLED_TAG } from "./creature-sides.js";
 
 /** The principal may not do this: a GM-only command from a player, or a player acting on a character that
  *  is not theirs. Always a 403 over HTTP. */
@@ -30,6 +31,10 @@ export function canInitiateForActor(
   const commander = commanderOf(state, actor);
   const ownsCommander = commander !== undefined && !commander.archived && ownedBy(commander, initiator.sessionId);
   if (ownedBy(actor, initiator.sessionId)) {
+    // A character the GM runs for now (a lycanthrope's curse at 0 Hit Points) acts as the GM decides; its player still
+    // rolls its checks and saves.
+    if (COMMANDED_KINDS.has(kind) && actor.effects.some((effect) => effect.tags.includes(GM_CONTROLLED_TAG)))
+      return { ok: false, message: `${actor.name} is under the GM's control.` };
     // A character under another creature's command (an aboleth's Dominate Mind) acts as that creature decides. Its
     // player still rolls its checks and saves and keeps its sheet.
     if (commander && !ownsCommander && COMMANDED_KINDS.has(kind))

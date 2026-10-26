@@ -12813,7 +12813,8 @@
      "failureDuration": {
       "type": "until-bearer-turn-end"
      },
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440
     },
     "damage": [],
     "reaction": {
@@ -13556,7 +13557,8 @@
      "failureDuration": {
       "type": "until-source-turn-end"
      },
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440
     },
     "damage": [],
     "area": {
@@ -20133,7 +20135,8 @@
      "failureDuration": {
       "type": "until-bearer-next-turn"
      },
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440
     }
    }
   ],
@@ -20253,7 +20256,8 @@
      "failureDuration": {
       "type": "until-source-next-turn"
      },
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440
     },
     "damage": [
      {
@@ -20287,7 +20291,15 @@
      "failureConditions": [
       "incapacitated"
      ],
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440,
+     "failureEffect": {
+      "name": "Possessed",
+      "tags": [
+       "possessed"
+      ],
+      "modifiers": []
+     }
     },
     "damage": [],
     "targets": {
@@ -26977,7 +26989,8 @@
      "repeatOnDamage": {
       "notFromSource": true
      },
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440
     },
     "damage": [],
     "area": {
@@ -30801,6 +30814,13 @@
      "failureDuration": {
       "type": "minutes",
       "minutes": 60
+     },
+     "failureEffect": {
+      "name": "Cursed",
+      "tags": [
+       "curse"
+      ],
+      "modifiers": []
      }
     },
     "damage": [
@@ -33918,7 +33938,8 @@
      "failureDuration": {
       "type": "until-source-turn-end"
      },
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440
     },
     "damage": [],
     "targets": {
@@ -34487,6 +34508,7 @@
      },
      "endsOnDamage": true,
      "immuneOnSuccess": true,
+     "immuneMinutes": 1440,
      "endsOutOfSight": true
     },
     "damage": [
@@ -37299,7 +37321,8 @@
      "failureDuration": {
       "type": "until-bearer-next-turn"
      },
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440
     }
    },
    {
@@ -41443,7 +41466,8 @@
      "failureDuration": {
       "type": "until-bearer-next-turn"
      },
-     "immuneOnSuccess": true
+     "immuneOnSuccess": true,
+     "immuneMinutes": 1440
     }
    }
   ],
@@ -50198,16 +50222,18 @@
       "conditions": [],
       "name": "Lycanthropy (Werebear)",
       "tags": [
-       "lycanthropy-werebear"
+       "lycanthropy-werebear",
+       "curse"
       ],
       "creatureTypes": [
        "humanoid"
       ],
       "save": {
        "ability": "con",
-       "dc": 14
-      },
-      "reminder": "A creature that succeeds is immune to this werebear's curse for 24 hours."
+       "dc": 14,
+       "immuneOnSuccess": true,
+       "immuneMinutes": 1440
+      }
      }
     ],
     "formOnly": [
@@ -50412,16 +50438,18 @@
       "conditions": [],
       "name": "Lycanthropy (Wereboar)",
       "tags": [
-       "lycanthropy-wereboar"
+       "lycanthropy-wereboar",
+       "curse"
       ],
       "creatureTypes": [
        "humanoid"
       ],
       "save": {
        "ability": "con",
-       "dc": 12
-      },
-      "reminder": "A creature that succeeds is immune to this wereboar's curse for 24 hours."
+       "dc": 12,
+       "immuneOnSuccess": true,
+       "immuneMinutes": 1440
+      }
      }
     ],
     "formOnly": [
@@ -50641,16 +50669,18 @@
       "conditions": [],
       "name": "Lycanthropy (Wererat)",
       "tags": [
-       "lycanthropy-wererat"
+       "lycanthropy-wererat",
+       "curse"
       ],
       "creatureTypes": [
        "humanoid"
       ],
       "save": {
        "ability": "con",
-       "dc": 11
-      },
-      "reminder": "A creature that succeeds is immune to this wererat's curse for 24 hours."
+       "dc": 11,
+       "immuneOnSuccess": true,
+       "immuneMinutes": 1440
+      }
      }
     ],
     "formOnly": [
@@ -50841,16 +50871,18 @@
       "conditions": [],
       "name": "Lycanthropy (Weretiger)",
       "tags": [
-       "lycanthropy-weretiger"
+       "lycanthropy-weretiger",
+       "curse"
       ],
       "creatureTypes": [
        "humanoid"
       ],
       "save": {
        "ability": "con",
-       "dc": 13
-      },
-      "reminder": "A creature that succeeds is immune to this weretiger's curse for 24 hours."
+       "dc": 13,
+       "immuneOnSuccess": true,
+       "immuneMinutes": 1440
+      }
      }
     ],
     "formOnly": [
@@ -51077,16 +51109,18 @@
       "conditions": [],
       "name": "Lycanthropy (Werewolf)",
       "tags": [
-       "lycanthropy-werewolf"
+       "lycanthropy-werewolf",
+       "curse"
       ],
       "creatureTypes": [
        "humanoid"
       ],
       "save": {
        "ability": "con",
-       "dc": 12
-      },
-      "reminder": "A creature that succeeds is immune to this werewolf's curse for 24 hours."
+       "dc": 12,
+       "immuneOnSuccess": true,
+       "immuneMinutes": 1440
+      }
      }
     ],
     "formOnly": [

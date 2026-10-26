@@ -41,6 +41,7 @@ export function createPendingSaves(
       | "failureByMargin"
       | "objectPenalty"
       | "failureBanishes"
+      | "banishedForGood"
       | "endsForm"
       | "regurgitates"
       | "vitality"
@@ -48,8 +49,10 @@ export function createPendingSaves(
     >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
-    /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
+    /** A success makes the target immune to this trait of its source (a ghast's Stench). */
     immuneOnSuccess?: boolean;
+    /** How long that immunity lasts on the game clock, in minutes; absent, the fight. */
+    immuneMinutes?: number;
     /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). */
     drain?: DamageDrain;
     /** Where a failure pushes the creature (Thunderwave). */
@@ -58,6 +61,8 @@ export function createPendingSaves(
     successPush?: ForcedPush;
     /** A success moves the creature out beside the source, or fails with no room (a gelatinous cube's Engulf). */
     successMovesOut?: PendingSave["successMovesOut"];
+    /** Where a failure sets the creature down, and how high (Telekinesis). */
+    failureMovesTo?: PendingSave["failureMovesTo"];
     /** A failure throws the rider off this mount (SRD Mounted Combat). */
     unseats?: string;
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
@@ -123,6 +128,7 @@ export function createPendingSaves(
     ...(input.extra?.endsForm ? { endsForm: true as const } : {}),
     ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
     ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
+    ...(input.extra?.banishedForGood ? { banishedForGood: true as const } : {}),
     ...(input.extra?.spendsOnKill ? { spendsOnKill: { ...input.extra.spendsOnKill } } : {}),
     ...(input.extra?.failureByMargin ? { failureByMargin: structuredClone(input.extra.failureByMargin) } : {}),
     ...(input.extra?.objectPenalty ? { objectPenalty: { ...input.extra.objectPenalty } } : {}),
@@ -130,10 +136,12 @@ export function createPendingSaves(
     ...(input.extra?.vitality ? { vitality: { ...input.extra.vitality } } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
+    ...(input.immuneOnSuccess && input.immuneMinutes !== undefined ? { immuneMinutes: input.immuneMinutes } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
     ...(input.successPush ? { successPush: { ...input.successPush } } : {}),
     ...(input.successMovesOut ? { successMovesOut: { ...input.successMovesOut } } : {}),
+    ...(input.failureMovesTo ? { failureMovesTo: { ...input.failureMovesTo } } : {}),
     ...(input.unseats ? { unseats: input.unseats } : {}),
     ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
     ...(input.disadvantageTypes ? { disadvantageTypes: [...input.disadvantageTypes] } : {}),

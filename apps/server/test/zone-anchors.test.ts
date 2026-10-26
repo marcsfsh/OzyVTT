@@ -134,6 +134,7 @@ describe("Antipathy/Sympathy round its target", () => {
     expect(savesOf(state, FOE)).toEqual([expect.objectContaining({ ability: "wis" })]);
     answer(state, FOE, 30);
     expect(effectsOf(state, FOE).some((effect) => effect.linkedConditionIds.includes("frightened"))).toBe(false);
+
     // Immune now, it comes back within 120 feet and makes no save.
     walk(state, FOE, [
       [0, 10],

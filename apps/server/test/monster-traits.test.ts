@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, isDead, type GameState } from "@vtt/domain";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
-import { loadMonsterDefinitions, loadSpells } from "@vtt/content-srd-5.2.1";
+import { loadMagicItems, loadMonsterDefinitions, loadSpells } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
-import type { EffectNarration } from "../src/effects.js";
+import { endEffect, makeEffect, type EffectNarration } from "../src/effects.js";
 import { nextInitiativeTurn, startEncounter, type TurnAdvanceDeps } from "../src/encounter.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
@@ -441,6 +441,41 @@ describe("auras", () => {
     expect(state.combat.turnActorId).toBe(IDS.hero);
     expect(actor(state, IDS.hero).conditions).toEqual([]);
     expect(pendingOn(state, IDS.hero)).toHaveLength(1);
+  });
+
+  it("grips a Goat of Terror's enemies with fear only while it is ridden, and a dismount ends it", () => {
+    // SRD 5.2.1 Figurine of Wondrous Power, Goat of Terror: "While you ride the goat, any Hostile creature that starts
+    // its turn within a 30-foot Emanation originating from the goat must succeed on a DC 15 Wisdom saving throw or have
+    // the Frightened condition for 1 minute, until you are no longer riding the goat ... Once it succeeds on the save,
+    // a creature is immune to this effect for the next 24 hours."
+    const figurine = loadMagicItems().find((item) => item.id === "figurine-of-wondrous-power")!;
+    const goats = figurine.variants!.find((variant) => variant.id === "ivory-goats")!;
+    const terror = goats.actions!.find((action) => action.id === "goat-of-terror")!;
+    const goat = { ...monster("giant-goat"), traitMechanics: [...terror.summons!.creatures[0]!.except!.traits!] };
+    monsters.set("goat-of-terror", goat as ActorDefinition);
+    const state = game("giant-goat");
+    actor(state, IDS.foe).definitionId = "goat-of-terror";
+    const reach: Positions = { [IDS.hero]: [0, 0], [IDS.foe]: [20, 0], [IDS.ally]: [60, 0] };
+    for (let turn = 0; turn < 3; turn += 1) advance(state, [], reach);
+    expect(pendingOn(state, IDS.hero)).toEqual([]);
+    // A rider on the goat: the hero, the goat's enemy, starts its next turn within 30 feet.
+    actor(state, IDS.ally).effects.push(
+      makeEffect({
+        id: "ridden",
+        name: "Riding",
+        tags: ["riding"],
+        sourceActorId: IDS.foe,
+        duration: { type: "manual" }
+      })
+    );
+    for (let turn = 0; turn < 3; turn += 1) advance(state, [], reach);
+    const [pending] = pendingOn(state, IDS.hero);
+    expect(pending).toMatchObject({ ability: "wis", dc: 15, immuneOnSuccess: true, immuneMinutes: 1440 });
+    answerSave(state, nextId(), pending!.id, "manual", 5, true, GM, saveDeps([]));
+    expect(actor(state, IDS.hero).conditions.map((condition) => condition.id)).toEqual(["frightened"]);
+    expect(actor(state, IDS.hero).effects[0]?.repeatSave).toMatchObject({ ability: "wis", dc: 15 });
+    endEffect(state, IDS.ally, "ridden");
+    expect(actor(state, IDS.hero).conditions).toEqual([]);
   });
 
   it("makes a creature that succeeds immune to that ghast's Stench for the fight", () => {

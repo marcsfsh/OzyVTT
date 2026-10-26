@@ -582,8 +582,15 @@ describe("the casts that survived the spell-record check", () => {
       const cast = effectiveActions(definition, state.actors[0], catalog).find(
         (entry) => entry.id === `item-${id}-cast-scrying`
       )!;
-      // The save Scrying's own target makes, at the item's own printed DC.
-      expect(cast.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureConditions: [] });
+      // The save Scrying's own target makes, at the item's own printed DC, with the spell's 24 hours of immunity.
+      expect(cast.save).toEqual({
+        ability: "wis",
+        dc: 17,
+        successDamage: "none",
+        failureConditions: [],
+        immuneOnSuccess: true,
+        immuneMinutes: 1440
+      });
       expect(cast.damage).toEqual([]);
       expect(cast.attack).toBeUndefined();
       expect(cast.uses).toBeUndefined(); // no charge limit is printed on any of the four

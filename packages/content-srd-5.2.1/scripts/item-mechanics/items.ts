@@ -838,8 +838,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "adamantine-armor": { modifiers: [{ type: "no-critical-hits" }] },
 
   // Three charges, 1d3 back at dawn: a Magic action and a charge make each creature of the wielder's choice within 30
-  // feet save (DC 15 Wisdom) or be Frightened for 1 minute, repeating the save at the end of each of its turns. That it
-  // must flee and can only Dash is the GM's.
+  // feet save (DC 15 Wisdom) or be Frightened for 1 minute, repeating the save at the end of each of its turns. While
+  // Frightened it moves as far from the wielder as it can (`compelled-moves.ts`), makes no Opportunity Attacks, and for
+  // its action can only Dash, try to escape what holds it, or Dodge with nowhere to move (`resolution/economy.ts`).
   "mace-of-terror": {
     charges: { regain: "1d3" },
     actions: [
@@ -856,7 +857,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           successDamage: "none",
           failureConditions: ["frightened"],
           failureDuration: { type: "rounds", rounds: 10 },
-          repeatSave: true
+          repeatSave: true,
+          failureEffect: {
+            name: "Wave of Terror",
+            tags: ["flee-only", "no-opportunity-attacks"],
+            modifiers: [],
+            compelled: { way: "away", allMovement: true }
+          }
         },
         uses: { limit: 3, per: "long-rest", pool: "mace-of-terror-charges" },
         targets: { rangeFeet: 30, who: "others" }
@@ -1219,9 +1226,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling." */
   "ring-of-feather-falling": { modifiers: [{ type: "movement", rule: "safe-fall" }] },
 
-  // "Difficult Terrain doesn't cost you extra movement": the Freedom of Movement tag the movement rules read. Magic
-  // neither reducing its Speeds nor Paralyzing or Restraining its wearer wait on a magical-source immunity, which an
-  // absolute one would overreach (a net would no longer restrain).
+  // "Difficult Terrain doesn't cost you extra movement. In addition, magic can't reduce any of your speeds or cause you
+  // to have the Paralyzed or Restrained condition": the Freedom of Movement tag, which the movement rules, speed.ts and
+  // the condition immunity read (effects.ts), so a net still restrains its wearer.
   "ring-of-free-action": {
     effects: [
       {
@@ -3887,8 +3894,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // its time, on its user's side and acting right after its user, defending itself when uncommanded; a Magic action
   // turns it back, and its days of waiting start when it reverts. The Goat of Traveling spends its 24 hourly charges as
   // it goes and waits its 7 days only once they are spent. The Obsidian Steed's d10 shows 1 one time in ten, and the
-  // nightmare then answers to no one. The Goat of Terror's horns and fear, the Onyx Dog's speech, the steed's ride to
-  // Hades and the owl's telepathy are the table's.
+  // nightmare then answers to no one. The Goat of Terror's fear grips each Hostile creature that starts its turn within
+  // 30 feet of it while it is ridden, repeating the save each turn, ending once no one rides it, and leaving one that
+  // saves immune for 24 hours (`trait-turns.ts`). Its horns, the Onyx Dog's speech, the steed's ride to Hades and the
+  // owl's telepathy are the table's.
   "figurine-of-wondrous-power": {
     variants: [
       {
@@ -3966,7 +3975,38 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             description: `${GOAT_THROW} it becomes a Giant Goat for up to 3 hours, which can't attack. You can remove its horns as a Magic action: one becomes a +1 Lance and the other a +2 Longsword until it reverts. While you ride it, a Hostile creature that starts its turn within 30 feet of it makes a DC 15 Wisdom save or is Frightened. ${FIGURINE_OBEYS} Once it reverts, it can't be used again until 15 days have passed.`,
             uses: { limit: 1, per: "time", afterHours: "360", pool: "goat-of-terror" },
             summons: {
-              creatures: [{ monsterId: "giant-goat", except: { name: "Goat of Terror" } }],
+              creatures: [
+                {
+                  monsterId: "giant-goat",
+                  except: {
+                    name: "Goat of Terror",
+                    // "While you ride the goat, any Hostile creature that starts its turn within a 30-foot Emanation
+                    // originating from the goat must succeed on a DC 15 Wisdom saving throw or have the Frightened
+                    // condition for 1 minute ... Once it succeeds on the save, a creature is immune to this effect for
+                    // the next 24 hours."
+                    traits: [
+                      {
+                        kind: "aura",
+                        name: "Terror",
+                        trigger: "turn-start-inside",
+                        rangeFeet: 30,
+                        affects: "enemies",
+                        whileRidden: true,
+                        save: {
+                          ability: "wis",
+                          dc: 15,
+                          successDamage: "none",
+                          failureConditions: ["frightened"],
+                          failureDuration: { type: "rounds", rounds: 10 },
+                          repeatSave: true,
+                          immuneOnSuccess: true,
+                          immuneMinutes: 24 * 60
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 180 },
               dodgesUncommanded: true,
@@ -4565,7 +4605,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           failureConditions: ["frightened"],
           failureDuration: { type: "rounds", rounds: 10 },
           repeatSave: true,
-          immuneOnSuccess: true
+          immuneOnSuccess: true,
+          immuneMinutes: 24 * 60
         },
         uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" },
         targets: { rangeFeet: 30 }
@@ -5117,11 +5158,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         targets: { count: 1, rangeFeet: 5 },
         grants: {
           name: "Freedom of Movement (Oil of Slipperiness)",
-          tags: ["freedom-of-movement"],
+          tags: ["freedom-of-movement", "slips-restraints"],
           target: "target",
           duration: { type: "minutes", minutes: 480 },
-          modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }],
-          conditionImmunities: ["paralyzed", "restrained"]
+          modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
         }
       }
     ]

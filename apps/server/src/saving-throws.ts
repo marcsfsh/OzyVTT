@@ -1,4 +1,5 @@
 import { dropHeldRow } from "./effects.js";
+import { setAltitude } from "./altitude.js";
 import { ownSizeOf, takeForm } from "./transform/assume.js";
 import { revertOnFailure } from "./transform/rules.js";
 import { refreshSize } from "./transform/forms.js";
@@ -49,6 +50,7 @@ import {
   type AnswerTarget
 } from "./roll-answers.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
+import { immunityDuration } from "./save-immunity.js";
 import { settleTouchedZone } from "./zone-touch.js";
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
 import { giveVitality } from "./resolution/vitality.js";
@@ -594,6 +596,8 @@ export function applyFailureEffect(
     ...(onFail.conditionImmunities ? { conditionImmunities: [...onFail.conditionImmunities] } : {}),
     // The light it sheds while it lasts (Faerie Fire's Dim Light).
     ...(onFail.light ? { light: { ...onFail.light } } : {}),
+    // How it makes the creature move on its turns (Fear's flight).
+    ...(onFail.compelled ? { compelled: structuredClone(onFail.compelled) } : {}),
     // What holds it (a Net), whose destruction frees it.
     ...(onFail.heldBy ? { heldBy: { ...onFail.heldBy, hitPoints: { ...onFail.heldBy.hitPoints } } } : {}),
     // What it does while it lasts (Bane's -1d4).
@@ -1336,7 +1340,9 @@ export function answerSave(
   const immunities = {
     resolveDefinition: (definitionId: string) => deps.resolveDefinition(definitionId),
     ...(deps.catalog ? { catalog: deps.catalog } : {}),
-    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+    // Against a spell or a magic item's effect, which Freedom of Movement keeps from Paralyzing or Restraining.
+    magical: pending.magical === true || pending.spell !== undefined
   };
   if (outcomeCondition) {
     // What the failure's effect links lands with the effect below; the rest (Prone, Exhaustion) stands alone.
@@ -1413,9 +1419,25 @@ export function answerSave(
         ...(deps.catalog ? { catalog: deps.catalog } : {})
       })
     );
+  // Telekinesis: the creature is moved to the space picked, and up into the air where it was lifted.
+  if (!success && pending.failureMovesTo) {
+    const { altitudeFeet, ...at } = pending.failureMovesTo;
+    deps.placeToken?.(target.id, at);
+    if (altitudeFeet !== undefined) setAltitude(state, target.id, altitudeFeet, "fly");
+    events.push({
+      kind: "effect",
+      text: `${pending.actionName} moves ${target.name}${altitudeFeet ? `, lifting it ${altitudeFeet} feet into the air` : ""}.`,
+      actorId: target.id
+    });
+  }
   // A gibbering mouther's d8 decides what the creature does this turn.
   if (!success && pending.onFailEffect?.tags.includes(GIBBERING_TAG))
-    events.push(...gibberingTurn(target, deps.random));
+    events.push(
+      ...gibberingTurn(state, target, deps.random, {
+        resolveDefinition: deps.resolveDefinition,
+        ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+      })
+    );
   // A Ring of Spell Turning's success leaves the spell nothing; otherwise what a success leaves instead (Heat Metal's
   // Disadvantage on a creature that keeps hold of the object).
   if (turnedBy !== null)
@@ -1486,7 +1508,7 @@ export function answerSave(
       (condition) =>
         pending.conditionIds.includes(condition.id) || pending.onFailEffect?.linkedConditionIds.includes(condition.id)
     );
-  // "Success: The target is immune to this ghast's Stench for 24 hours", held for the fight.
+  // "Success: The target is immune to this ghast's Stench for 24 hours": on the game clock where the text prints a time.
   if (success && pending.immuneOnSuccess && pending.sourceActorId !== null)
     addEffect(
       state,
@@ -1499,7 +1521,7 @@ export function answerSave(
         sourceName: pending.sourceName,
         sourceActionId: traitActionId(pending.actionName),
         startedRound: state.combat.round,
-        duration: { type: "encounter" }
+        duration: immunityDuration(pending.immuneMinutes)
       })
     );
   // A repeated save that succeeds ends the effect it was repeated for (Hold Person ends on that target), unless the text
