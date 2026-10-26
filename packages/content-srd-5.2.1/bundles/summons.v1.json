@@ -137,6 +137,139 @@
   "source": {
    "name": "SRD 5.2.1",
    "version": "5.2.1",
+   "externalId": "apparatus-of-the-crab"
+  },
+  "name": "Apparatus of the Crab",
+  "summary": "Large object - CR none",
+  "size": "large",
+  "abilityScores": {
+   "str": 20,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 1,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 20,
+  "hitPoints": {
+   "maximum": 200
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 30,
+  "actions": [
+   {
+    "id": "claws",
+    "name": "Claws (Lever 5 Up)",
+    "activation": "action",
+    "description": "Each extended claw makes a melee attack: +8 to hit, reach 5 ft. Hit: 7 (2d6) Bludgeoning damage.",
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "claw",
+    "name": "Claw",
+    "activation": "action",
+    "description": "Melee Attack Roll: +8, reach 5 ft. Hit: 7 (2d6) Bludgeoning damage.",
+    "attack": {
+     "bonus": 8,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "bludgeoning"
+     }
+    ]
+   },
+   {
+    "id": "grasp",
+    "name": "Grasping Claws (Lever 5 Down)",
+    "activation": "action",
+    "description": "Each extended claw makes a melee attack: +8 to hit, reach 5 ft. Hit: The target has the Grappled condition (escape DC 15).",
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "grasping-claw",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "grasping-claw",
+    "name": "Grasping Claw",
+    "activation": "action",
+    "description": "Melee Attack Roll: +8, reach 5 ft. Hit: The target has the Grappled condition (escape DC 15).",
+    "attack": {
+     "bonus": 8,
+     "reachFeet": 5
+    },
+    "damage": [],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 15
+     }
+    ]
+   }
+  ],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 2,
+    "height": 2
+   }
+  },
+  "damageImmunities": [
+   "poison",
+   "psychic"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 30,
+     "swim": 30,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 5,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "poison, psychic",
+    "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Vehicle",
+      "description": "Its pilot works it from inside with Utilize actions, two levers at a time: Lever 1 extends or retracts its legs (Speed and Swim Speed 0 when retracted), Lever 4 its claws, Lever 5 swings or closes them, Lever 6 walks it, and Lever 7 turns it. Its compartment holds two Medium or smaller creatures."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
    "externalId": "arcane-eye"
   },
   "name": "Arcane Eye",
@@ -528,6 +661,102 @@
   "source": {
    "name": "SRD 5.2.1",
    "version": "5.2.1",
+   "externalId": "dancing-sword"
+  },
+  "name": "Dancing Sword",
+  "summary": "Medium force - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": 30,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Item Force",
+      "description": "A hovering sword. Its wielder's attacks with it reach a creature within 5 feet of it, and a Bonus Action moves it up to 30 feet, to a spot within 30 feet of its wielder, before each later attack. It flies back after its fourth attack."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
    "externalId": "draconic-spirit"
   },
   "name": "Draconic Spirit",
@@ -671,6 +900,102 @@
      {
       "name": "Shared Resistances",
       "description": "When you summon the spirit, choose one of its Resistances. You have Resistance to the chosen damage type until the spell ends."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "feather-token-whip"
+  },
+  "name": "Floating Whip",
+  "summary": "Medium force - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": 20,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Item Force",
+      "description": "A floating whip. Its user's Bonus Action moves it up to 20 feet and makes a melee spell attack, +9 to hit, against a creature within 10 feet of it, for 1d6 + 5 Force damage."
      }
     ]
    }
