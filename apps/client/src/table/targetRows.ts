@@ -1,4 +1,5 @@
-import type { ContentActionSummary, ContentSpellSummary, EncounterToken, PlayerView } from "@vtt/domain";
+import type { ContentActionSummary, ContentSpellSummary, EncounterToken, KnownDefences, PlayerView } from "@vtt/domain";
+import { titleCase } from "../encounter/format";
 import { useTargeting } from "../encounter/targeting";
 import { initialsOf } from "../scene/tokenGlyph";
 import type { GridCalibration } from "../scene/gridPreview";
@@ -13,7 +14,7 @@ export type TargetRow = Readonly<{
   initials: string;
   kind: string;
   number?: number;
-  /** "50 ft · AC 15": the distance from the attacker, and the AC when this viewer knows it. */
+  /** "50 ft · AC 15": the distance from the attacker, the AC when this viewer knows it, and what Hunter's Lore tells. */
   detail?: string;
   /** The distance from the attacker in feet, where the map measures it. */
   feet?: number;
@@ -23,7 +24,28 @@ export type TargetRow = Readonly<{
   unavailable?: string;
 }>;
 
-type Candidate = Readonly<{ id: string; name: string; kind: string; armorClass?: number; down?: boolean }>;
+type Candidate = Readonly<{
+  id: string;
+  name: string;
+  kind: string;
+  armorClass?: number;
+  down?: boolean;
+  /** What the viewer's Hunter knows of the creature it marks (Hunter's Lore). */
+  lore?: string;
+}>;
+
+/** A marked creature's defences as Hunter's Lore tells them: "Immune Necrotic, Poison · Resists Acid · Can't be
+ *  Frightened". */
+export function loreWords(known: KnownDefences): string {
+  const list = (ids: readonly string[]) => ids.map(titleCase).join(", ");
+  const parts = [
+    known.damageImmunities.length > 0 ? `Immune ${list(known.damageImmunities)}` : null,
+    known.damageResistances.length > 0 ? `Resists ${list(known.damageResistances)}` : null,
+    known.damageVulnerabilities.length > 0 ? `Vulnerable ${list(known.damageVulnerabilities)}` : null,
+    known.conditionImmunities.length > 0 ? `Can't be ${list(known.conditionImmunities)}` : null
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join(" · ") : "No Immunities, Resistances or Vulnerabilities";
+}
 
 /** Target rows for `attackerId`'s action. A player knows the AC of their party only; the GM knows every creature's. */
 export function targetRows(
@@ -41,7 +63,8 @@ export function targetRows(
     const feet = attacker && token ? creatureDistanceFeet(calibration, attacker, token) : null;
     const parts = [
       feet !== null ? `${feet} ft` : null,
-      candidate.armorClass !== undefined ? `AC ${candidate.armorClass}` : null
+      candidate.armorClass !== undefined ? `AC ${candidate.armorClass}` : null,
+      candidate.lore ?? null
     ].filter((part): part is string => part !== null);
     const number = numbers.get(candidate.id);
     return {
@@ -104,6 +127,7 @@ export function playerTargetCandidates(state: PlayerView): Candidate[] {
             name: entry.name,
             kind: actor.kind,
             ...(actor.armorClass !== undefined ? { armorClass: actor.armorClass } : {}),
+            ...(actor.knownDefences ? { lore: loreWords(actor.knownDefences) } : {}),
             // A player knows a creature is down from its band; a party member's points are exact.
             ...((actor.hp.kind === "band" ? actor.hp.band === "down" : actor.hp.current <= 0) ? { down: true } : {})
           }

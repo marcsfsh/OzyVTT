@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { catalogIdOf, rowUsesKey, type ContentActionSummary, type ContentEquipmentSummary } from "@vtt/domain";
 import { ABILITY_NAMES } from "@vtt/rules-5e";
 import type { InventoryItem } from "@vtt/schemas";
@@ -99,7 +99,8 @@ export function GearTab({
   inFight,
   others = [],
   actionBlocked = null,
-  onUseAction
+  onUseAction,
+  crafting = null
 }: Readonly<{
   actor: SheetActor;
   role: "gm" | "player";
@@ -119,7 +120,10 @@ export function GearTab({
   others?: readonly Readonly<{ id: string; name: string }>[];
   /** Why an item's action can't be used from here now ("It isn't your turn."), or null. */
   actionBlocked?: string | null;
-  onUseAction: (row: ContentActionSummary) => void;
+  /** Uses an item's action; with `fastHands`, a Thief takes it as a Bonus Action. */
+  onUseAction: (row: ContentActionSummary, options?: Readonly<{ fastHands?: boolean }>) => void;
+  /** The character's crafting projects, under the pack. */
+  crafting?: ReactNode;
 }>) {
   const inventory = actor.inventory ?? [];
   const [openId, setOpenId] = useState<string | null>(null);
@@ -517,6 +521,22 @@ export function GearTab({
                         {action.id === `item-${open.id}` && open.weapon ? `Attack with the ${open.name}` : action.name}
                       </Button>
                       {why && actionBlocked === null && <span className="cs-sub">{why}</span>}
+                      {/* Fast Hands: an item's Utilize or Magic action as a Bonus Action, on the Thief's turn. */}
+                      {inFight && facts.get(action.id)?.fastHands && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            block
+                            disabled={busy || actionBlocked !== null || !facts.get(action.id)!.fastHands!.available}
+                            onClick={() => onUseAction(action, { fastHands: true })}
+                          >
+                            {action.name} as a Bonus Action
+                          </Button>
+                          {facts.get(action.id)!.fastHands!.reason && actionBlocked === null && (
+                            <span className="cs-sub">{facts.get(action.id)!.fastHands!.reason}</span>
+                          )}
+                        </>
+                      )}
                     </span>
                   );
                 })}
@@ -691,6 +711,7 @@ export function GearTab({
           <span className="cs-sub">Half of the {fired} fired come back, rounded down.</span>
         </p>
       )}
+      {crafting}
       <section className="cs-group" aria-label="Add an item">
         <span className="cs-eyebrow">Add an item</span>
         <form

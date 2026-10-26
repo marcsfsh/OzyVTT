@@ -61,6 +61,29 @@ describe("an area cast outside a fight", () => {
     );
   });
 
+  // SRD Ring of Mind Shielding: "immune to magic that allows other creatures to ... determine whether you're lying".
+  it("asks no save of a creature wearing a Ring of Mind Shielding", () => {
+    const { state } = zoneOfTruth();
+    const goblin = state.actors.find((actor) => actor.id === FOE)!;
+    goblin.inventory = [
+      {
+        id: "ring-of-mind-shielding",
+        name: "Ring of Mind Shielding",
+        quantity: 1,
+        equipped: true,
+        attuned: true,
+        category: "ring"
+      } as (typeof goblin.inventory)[number]
+    ];
+    expect(
+      walk(state, FOE, [
+        [10, 5],
+        [8, 5]
+      ])
+    ).toEqual([]);
+    expect(savesOf(state, FOE)).toEqual([]);
+  });
+
   it("asks a creature the GM moves into it for the save, each time it comes in", () => {
     const { state } = zoneOfTruth();
     const entering = walk(state, FOE, [

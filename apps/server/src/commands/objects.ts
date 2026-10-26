@@ -49,18 +49,25 @@ export const objectCommands = [
     type: "door.use",
     operationId: "useDoor",
     description:
-      "A creature within 5 feet of a closed door works on it (SRD 5.2.1 Thieves' Tools, Ram Portable, Spikes Iron): `pick` its lock with Thieves' Tools (a Dexterity (Sleight of Hand) check against the lock's DC, 15 for the SRD Lock; an Arcane Lock can't be picked), `force` it open (a Strength (Athletics) check against the highest DC holding it, +4 with a Portable Ram and Advantage when `helperId` names another character beside the door to help with it), `jam` it shut with an Iron Spike (DC 15 to force), `pry` it open with Carpenter's or Smith's Tools (a Strength check with the tool against DC 20; a sealed door and an Arcane Lock hold), or `seal` it with Carpenter's Tools (the same check; DC 20 to force). Each takes the Utilize action in a fight on the creature's turn. The server rolls the check. GM-grade for any creature; a player session for their own character.",
+      "A creature within 5 feet of a closed door works on it (SRD 5.2.1 Thieves' Tools, Ram Portable, Spikes Iron): `pick` its lock with Thieves' Tools (a Dexterity (Sleight of Hand) check against the lock's DC, 15 for the SRD Lock; an Arcane Lock can't be picked), `force` it open (a Strength (Athletics) check against the highest DC holding it, +4 with a Portable Ram and Advantage when `helperId` names another character beside the door to help with it), `jam` it shut with an Iron Spike (DC 15 to force), `pry` it open with Carpenter's or Smith's Tools (a Strength check with the tool against DC 20; a sealed door and an Arcane Lock hold), or `seal` it with Carpenter's Tools (the same check; DC 20 to force). Each takes the Utilize action in a fight on the creature's turn, or with `bonusAction` a Thief's Bonus Action (Fast Hands). The server rolls the check. GM-grade for any creature; a player session for their own character.",
     summary: "Pick, force, pry, jam or seal a door beside your character.",
     schema: DoorUseSchema,
     malformed: "The door command is malformed.",
     issueMessage: true,
     async run({ principal, request, execute }, kit) {
-      const { wallId, actorId, how, helperId, commandId } = request;
+      const { wallId, actorId, how, helperId, bonusAction, commandId } = request;
       let done: DoorUseResult | null = null;
       const { duplicate } = await execute((state) => {
         done = useDoor(
           state,
-          { wallId, actorId, how, ...(helperId !== undefined ? { helperId } : {}), visibility: "public" },
+          {
+            wallId,
+            actorId,
+            how,
+            ...(helperId !== undefined ? { helperId } : {}),
+            ...(bonusAction !== undefined ? { bonusAction } : {}),
+            visibility: "public"
+          },
           initiatorOf(principal),
           {
             random: (sides) => kit.context.random(sides),

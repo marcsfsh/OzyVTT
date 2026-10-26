@@ -2,11 +2,13 @@ import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, GameState,
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
-import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
+import { areaOriginatesFromCaster, areaOriginPoint, tokensInTemplate } from "../area-targeting.js";
 import { areaOriginHeight, creatureAtPoint, withinAreaHeight } from "../altitude.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { requireStartOrdered } from "../simultaneous-effects.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
+import { areaLeavesOut } from "../resolution/action-targets.js";
+import { withPickedDamageTypes } from "../statblock-picks.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
@@ -30,7 +32,7 @@ import { grantOutsideFight } from "../resolution/grant.js";
 import { lastChargeLine, lastChargeRollFor, regainOnTwenty } from "../item-charges.js";
 import { endItemMagic } from "../item-spent.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
-import { leaveShortRest } from "../short-rest-interruptions.js";
+import { interruptRests } from "../rest-interruptions.js";
 import { ammunitionLabel, shotFrom, spendPiece } from "../ammunition.js";
 import { checkPlan } from "../ability-checks.js";
 import { rollSettledCheck } from "../check-rolls.js";
@@ -47,6 +49,7 @@ import { enclosedFrom } from "../enclosures.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
+import { withFastHands } from "../fast-hands.js";
 import { applyLooseHealing, looseHealTargets, partyMember } from "../loose-healing.js";
 import { countOptionUse } from "../option-uses.js";
 import { castLine, castSpellOf } from "../cast-narration.js";
@@ -156,8 +159,10 @@ export const actionCommands = [
         );
         const listed = statBlockAction ?? builtinActionFor(definition, actionId, attacker);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
-        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
-        const action = withChosenCost(listed, request.spend);
+        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked; a Thief's Fast Hands takes
+        // an item's Utilize or Magic action as a Bonus Action.
+        const costed = withChosenCost(listed, request.spend, request.conditionIds);
+        const action = request.fastHands === true ? withFastHands(costed, attacker, definition) : costed;
         // The GM may impose any condition; a player picks only among the ones the action lets its caster choose
         // (Blindness/Deafness), read from the spell too for a sheet built before the action carried them.
         const offered = conditionChoicesOf(
@@ -172,6 +177,8 @@ export const actionCommands = [
               : null;
         let resolvedTargetIds: readonly string[];
         let originAtCaster = false;
+        // The area's point of origin, for the cover its Dexterity saves read.
+        let areaOrigin: Readonly<{ x: number; y: number }> | undefined;
         let areaMove: AreaMove | null = null;
         // An item's action that leaves an area to act later (spread Caltrops) catches no one as it is used.
         const leavesArea = action.zone !== undefined && action.spellId === undefined;
@@ -226,6 +233,7 @@ export const actionCommands = [
           const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
           const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
           originAtCaster = casterOutside;
+          areaOrigin = areaOriginPoint(snapped, placed.shape);
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
@@ -326,6 +334,21 @@ export const actionCommands = [
               throw new CommandRejectedError(OUTSIDE_FIGHT_TARGETS);
           }
         }
+        // An area's own rules leave some creatures under it out ("each enemy in a Sphere").
+        if ((template || templates) && action.targets && resolvedTargetIds.length > 0) {
+          const out = areaLeavesOut({
+            state: draft,
+            attacker,
+            action,
+            targetIds: resolvedTargetIds,
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId)
+          });
+          resolvedTargetIds = resolvedTargetIds.filter((id) => !out.has(id));
+          wardNotes = [
+            ...wardNotes,
+            ...[...out].map((id) => `${action.name} doesn't affect ${kit.actorName(id)}, which is under its area.`)
+          ];
+        }
         // A spell's force (Spiritual Weapon's, an Arcane Eye) can't be harmed: an area passes over it, and nothing
         // harmful targets it.
         const untouchable = resolvedTargetIds.find(
@@ -347,9 +370,12 @@ export const actionCommands = [
             kit.zoneDeps(draft, geometry)
           );
           resolvedTargetIds = resolvedTargetIds.filter((id) => !warded.some((entry) => entry.actorId === id));
-          wardNotes = warded.map(
-            (entry) => `${entry.ward} keeps ${spellCast.name} from affecting ${kit.actorName(entry.actorId)}.`
-          );
+          wardNotes = [
+            ...wardNotes,
+            ...warded.map(
+              (entry) => `${entry.ward} keeps ${spellCast.name} from affecting ${kit.actorName(entry.actorId)}.`
+            )
+          ];
         }
         // A sphere of force lets no area in or out (Resilient Sphere); a single target across one is refused later.
         if (template && resolvedTargetIds.length > 0) {
@@ -436,7 +462,10 @@ export const actionCommands = [
             ...(request.ability !== undefined ? { ability: request.ability } : {}),
             ...(request.optionId !== undefined ? { optionId: request.optionId } : {}),
             ...(request.targetOptions !== undefined ? { targetOptions: request.targetOptions } : {}),
+            ...(request.conditionIds !== undefined ? { conditionIds: request.conditionIds } : {}),
+            ...(request.healingShares !== undefined ? { healingShares: request.healingShares } : {}),
             ...(request.itemId !== undefined ? { itemId: request.itemId } : {}),
+            ...(request.objectItemId !== undefined ? { objectItemId: request.objectItemId } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
@@ -456,6 +485,7 @@ export const actionCommands = [
             ...(request.gear !== undefined ? { gear: request.gear } : {}),
             ...(request.option !== undefined ? { option: request.option } : {}),
             ...(template || templates ? { areaPlaced: true } : {}),
+            ...(areaOrigin ? { areaOrigin } : {}),
             // The template as the map draws it, for the walls a cast raises on it (Wall of Force).
             ...(placed && geometry?.calibration
               ? {
@@ -537,7 +567,10 @@ export const actionCommands = [
         restBroken = [
           ...clockEvents,
           ...(spell && spell.level > 0 && !draft.combat.active
-            ? leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)
+            ? interruptRests(draft, new Set([actorId]), `cast ${spell.name}`, {
+                resolveDefinition: kit.resolveDefinition,
+                catalog: kit.equipmentCatalog()
+              })
             : [])
         ];
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
@@ -783,11 +816,15 @@ export const actionCommands = [
       // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
       const castLevel = listed.spellSlot ? castSlotLevel(actor, listed.spellSlot.level, slotLevel) : undefined;
       const spell = listed.spellId ? kit.equipmentCatalog().spellRecord?.(listed.spellId) : undefined;
-      const action = withChosenDamageType(
-        castLevel !== undefined && spell && castLevel > listed.spellSlot!.level
-          ? upcastAction(listed, spell, castLevel)
-          : listed,
-        damageType ?? null
+      const action = withPickedDamageTypes(
+        withChosenDamageType(
+          castLevel !== undefined && spell && castLevel > listed.spellSlot!.level
+            ? upcastAction(listed, spell, castLevel)
+            : listed,
+          damageType ?? null
+        ),
+        actor,
+        definition
       );
 
       // Loose: the server rolls the action's dice, attributed to the character, and spends what the action
@@ -985,7 +1022,13 @@ export const actionCommands = [
             : null;
         // Casting a spell other than a cantrip stops a Short Rest.
         if (spell && spell.level > 0)
-          narrations = [...narrations, ...leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)];
+          narrations = [
+            ...narrations,
+            ...interruptRests(draft, new Set([actorId]), `cast ${spell.name}`, {
+              resolveDefinition: kit.resolveDefinition,
+              catalog: kit.equipmentCatalog()
+            })
+          ];
         // A potion drunk or a flask thrown outside a fight is used up all the same.
         const consumable = consumableRowFor(action, live.inventory, kit.equipmentCatalog());
         if (consumable) live.inventory = withOneUsedUp(live.inventory, consumable.id);

@@ -330,7 +330,15 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-ward",
+    "schools": [
+     "divination"
+    ],
+    "alliesAllowed": true
+   }
+  ]
  },
  {
   "id": "amulet-of-the-planes",
@@ -11478,7 +11486,17 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-ward",
+    "spellIds": [
+     "detect-thoughts",
+     "zone-of-truth",
+     "detect-evil-and-good"
+    ],
+    "typeSenses": true
+   }
+  ]
  },
  {
   "id": "ring-of-protection",
@@ -15718,7 +15736,15 @@
      "limit": 3,
      "per": "long-rest"
     },
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "targets": {
+     "creatureTypes": [
+      "beast"
+     ],
+     "speeds": [
+      "swim"
+     ]
+    }
    }
   ],
   "charges": {

@@ -43,6 +43,7 @@ import {
 } from "../rules-families.js";
 import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
+import { bookOfShadowsGap } from "../book-of-shadows.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { activationCost, alsoSpentMessage, alsoUsesKey, notEnoughUses } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -226,6 +227,12 @@ export function evaluateActionEconomy(
   );
   checkTurnsBegun(evaluation);
   checkOwnTurn(evaluation);
+  // "While underwater, the seahorse moves": only in a fight the GM marked as underwater.
+  if (action.underwaterOnly && !(state.combat.active && state.combat.underwater))
+    evaluation.violations.push({
+      rule: "action.underwater-only",
+      message: `${action.name} can be used only underwater, and this fight isn't.`
+    });
   checkExtraAttackOpened(evaluation);
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition, catalog);
@@ -251,7 +258,16 @@ export function evaluateActionEconomy(
   checkTargeting(evaluation, distanceFeet);
   // Who a non-spell action may target: its count, range and creatures (`ActionSchema.targets`).
   evaluation.violations.push(
-    ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet }),
+    ...actionTargetViolations({
+      state,
+      attacker,
+      action,
+      targetIds,
+      definition,
+      resolveDefinition,
+      distanceFeet,
+      catalog
+    }),
     // How many it can hold swallowed, and what it can't do while it holds one (a giant toad's Bite).
     ...swallowViolations(state, attacker, action, siblings, targetIds),
     // What a creature attached to another can't do while it holds on (a stirge's Proboscis).
@@ -991,6 +1007,11 @@ function openedBy(
  *  mix weapons legally; a spell's rays or beams are that spell's alone, never a swing of the Attack action. */
 function attackPool(action: DefinitionAction): Record<string, number> {
   const left = (action.attack?.count ?? 1) - 1;
+  // Attacks a weapon gives only itself (Thirsting Blade's pact weapon) are that weapon's, held in either grip.
+  if (action.attack?.countWithItself && action.spellId === undefined) {
+    const base = action.id.replace(new RegExp(`-${TWO_HANDED_SUFFIX}$`), "");
+    return { [`${base}|${base}-${TWO_HANDED_SUFFIX}`]: left };
+  }
   return action.spellId === undefined ? { attack: left } : { [action.id]: left };
 }
 
@@ -1416,13 +1437,17 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
 
 /** Why a spell cast with a slot is refused for not being prepared (SRD: you cast the spells you have prepared), or
  *  null. Cantrips, always-prepared spells, anything not on the sheet's list (an item's cast) and a sheet that keeps
- *  no prepared list (an import with no prepared cap) need nothing. */
+ *  no prepared list (an import with no prepared cap) need nothing, except a Book of Shadows' spells, which are
+ *  prepared only while the book is carried. */
 export function unpreparedSpell(
   actor: Pick<LiveActor, "name" | "preparedSpellIds"> & Partial<Pick<LiveActor, "inventory">>,
   action: Pick<DefinitionAction, "id" | "spellSlot" | "spellId">,
   definition: ActorDefinition | undefined
 ): string | null {
   if (action.spellId === undefined) return null;
+  const entry = definition?.spellcasting?.spells.find((candidate) => candidate.id === action.spellId);
+  const book = entry && !isItemActionId(action.id) ? bookOfShadowsGap(actor, entry, definition) : null;
+  if (book) return book;
   // A slot cast, or a Ritual ("To cast a spell as a Ritual, a spellcaster must have it prepared").
   const ritual = action.id === ritualSpellActionId(action.spellId);
   if (!action.spellSlot && !ritual) return null;

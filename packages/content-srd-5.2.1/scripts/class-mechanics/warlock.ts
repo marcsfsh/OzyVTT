@@ -1,14 +1,10 @@
-/**
- * Warlock and Fiend Patron mechanics, merged over the ETL-generated prose.
- *
- * Stays prose throughout: "whenever you gain a Warlock level, you can replace..." clauses; the pact weapon's
- * own riders (Charisma for its rolls, its damage types), since the trigger vocabulary cannot name one conjured
- * weapon. Eldritch Smite and Lifedrinker ride its hits.
- */
+/** Warlock and Fiend Patron mechanics, merged over the ETL-generated prose. */
 import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
 /** An invocation's spell: cast at will without a slot, and never with one, since the Warlock does not know it. */
 const atWill = (id: string, level: number) => ({ id, level, withoutSlot: "at-will" as const, withSlot: false });
+/** An invocation's spell cast "on yourself" only. */
+const onYourself = (id: string, level: number) => ({ ...atWill(id, level), self: true as const });
 
 /** Every SRD damage type Fiendish Resilience may name: the printed twelve, less Force. */
 const RESILIENCE_TYPES: ReadonlyArray<readonly [id: string, name: string]> = [
@@ -50,24 +46,20 @@ export const warlock: ClassMechanicsModule = {
       options: {
         /**
          * Agonizing Blast, Eldritch Spear and Repelling Blast pick one of the character's known cantrips
-         * (`fromPicks`). Agonizing Blast's Charisma damage is gated to Eldritch Blast by id, since the gate
-         * cannot name the picked cantrip; the engine reads Eldritch Spear's and Repelling Blast's picks off the sheet.
+         * (`fromPicks`), which the server reads off the sheet: Charisma on its damage rolls in its own damage type
+         * (effective-actions.ts), its range (effective-actions.ts) and its push (resolution/masteries.ts). Each is
+         * "Repeatable", for a different cantrip each time.
          */
         "agonizing-blast": {
-          choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "deals-damage" } },
-          modifiers: [
-            {
-              type: "extra-damage",
-              abilityModifier: "cha",
-              damageType: "force",
-              when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["eldritch-blast"] }]
-            }
-          ]
+          repeatable: true,
+          choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "deals-damage" } }
         },
         "eldritch-spear": {
+          repeatable: true,
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "ranged-damage" } }
         },
         "repelling-blast": {
+          repeatable: true,
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "attack-roll" } }
         },
         // "Advantage on Constitution saving throws that you make to maintain Concentration."
@@ -78,31 +70,64 @@ export const warlock: ClassMechanicsModule = {
         // "You have Truesight with a range of 30 feet."
         "witch-sight": { modifiers: [{ type: "sense", sense: "truesight", feet: 30 }] },
         // ---- castings without a spell slot ---------------------------------------------------------
-        "armor-of-shadows": { grants: { spells: [atWill("mage-armor", 1)] } },
-        "ascendant-step": { grants: { spells: [atWill("levitate", 2)] } },
-        "fiendish-vigor": { grants: { spells: [atWill("false-life", 1)] } },
+        "armor-of-shadows": { grants: { spells: [onYourself("mage-armor", 1)] } },
+        "ascendant-step": { grants: { spells: [onYourself("levitate", 2)] } },
+        // "You don't roll the die for the Temporary Hit Points; you automatically get the highest number on the die."
+        "fiendish-vigor": { grants: { spells: [{ ...onYourself("false-life", 1), maximized: true }] } },
         /**
-         * The only one limited to once per Long Rest, so it also takes a counter. The Swim Speed stays
-         * prose (no per-movement-mode speed).
+         * "You can breathe underwater, and you gain a Swim Speed equal to your Speed": the Swim Speed is read live by
+         * speed.ts and the breathing by breath.ts (the invocation's name). The free Water Breathing is the only casting
+         * limited to once per Long Rest, so it also takes a counter.
          */
         "gift-of-the-depths": {
+          modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }],
           grants: { spells: [{ id: "water-breathing", level: 3, withoutSlot: "free", withSlot: false }] },
           uses: { limit: 1, per: "long-rest" }
         },
         "mask-of-many-faces": { grants: { spells: [atWill("disguise-self", 1)] } },
         "master-of-myriad-forms": { grants: { spells: [atWill("alter-self", 2)] } },
         "misty-visions": { grants: { spells: [atWill("silent-image", 1)] } },
-        /** The "while you're in Dim Light or Darkness" gate stays prose: there is no light-level trigger. */
-        "one-with-shadows": { grants: { spells: [atWill("invisibility", 2)] } },
-        "otherworldly-leap": { grants: { spells: [atWill("jump", 1)] } },
+        // "While you're in an area of Dim Light or Darkness": the light at the Warlock's space is read as the cast is
+        // made (resolution/validate.ts).
+        "one-with-shadows": { grants: { spells: [onYourself("invisibility", 2)] } },
+        "otherworldly-leap": { grants: { spells: [onYourself("jump", 1)] } },
         "visions-of-distant-realms": { grants: { spells: [atWill("arcane-eye", 4)] } },
         "whispers-of-the-grave": { grants: { spells: [atWill("speak-with-dead", 3)] } },
         // ---- picks an invocation makes on top of itself --------------------------------------------
         /**
-         * `fromCatalog: "weapons"` is wider than "a Simple or Martial Melee weapon" (catalog slugs cannot be
-         * filtered). Proficiency with the chosen weapon stays prose: `grants.weapons` names groups only.
+         * The kind picked is the "Simple or Martial Melee weapon of your choice" its Bonus Action conjures; with a
+         * magic weapon picked on the use, it bonds that one instead. The bond (`bindsWeapon`, the effect tagged
+         * `pact-weapon`) lends proficiency, the Spellcasting Focus, Charisma for its rolls and the three damage types,
+         * and ends on another use or the Warlock's death, taking a conjured weapon with it.
          */
-        "pact-of-the-blade": { choice: { kind: "weapon", choose: 1, fromCatalog: "weapons" } },
+        "pact-of-the-blade": {
+          choice: { kind: "weapon", choose: 1, fromCatalog: "melee-weapons" },
+          actions: [
+            {
+              id: "pact-of-the-blade",
+              name: "Pact of the Blade",
+              activation: "bonus-action",
+              description:
+                "Conjure your pact weapon in your hand (the kind you chose), or bond with a magic weapon you carry. Until the bond ends you have proficiency with it, can use it as a Spellcasting Focus, can use your Charisma modifier for its attack and damage rolls, and can make it deal Necrotic, Psychic or Radiant damage. The bond ends when you use this Bonus Action again or die, and a conjured weapon disappears with it.",
+              damage: [],
+              grants: {
+                name: "Pact Weapon",
+                target: "self",
+                tags: ["pact-weapon", "ends-on-death"],
+                duration: { type: "manual" },
+                bindsWeapon: {
+                  melee: true,
+                  magical: true,
+                  ability: "cha",
+                  damageTypes: ["necrotic", "psychic", "radiant"],
+                  proficient: true,
+                  focus: true,
+                  conjures: { pickOf: "pact-of-the-blade" }
+                }
+              }
+            }
+          ]
+        },
         /**
          * Both ride a hit with the pact weapon, once per turn: Eldritch Smite spends a Pact Magic slot for 1d8 Force
          * plus 1d8 per slot level, and may knock a Huge or smaller target Prone; Lifedrinker adds 1d6 of the type
@@ -178,14 +203,66 @@ export const warlock: ClassMechanicsModule = {
             ]
           }
         },
+        // "You have received knowledge from an elder entity of the multiverse, allowing you to gain one Origin feat of
+        // your choice", a different one each time it is taken.
+        "lessons-of-the-first-ones": {
+          repeatable: true,
+          choice: { kind: "feat", choose: 1, fromCatalog: "origin-feats" }
+        },
         /**
-         * The three cantrips only. The two level-1 Ritual spells from any class list are not expressible
-         * (no all-classes list, no Ritual filter).
+         * "Choose three cantrips, and choose two level 1 spells that have the Ritual tag. The spells can be from any
+         * class's spell list, and they must be spells you don't already have prepared" (character-build.ts refuses one
+         * the sheet has). The book is conjured "at the end of a Short or Long Rest", when its spells may be chosen anew,
+         * and it is a gear row: its spells are prepared and it serves as a Spellcasting Focus while it is carried
+         * (book-of-shadows.ts).
          */
-        "pact-of-the-tome": { choice: { kind: "cantrip", choose: 3, fromCatalog: "warlock-spells", maxSpellLevel: 0 } }
-        // Not modeled: Lessons of the First Ones (a feat pick on an option's nested choice cannot be
-        // settled by the build's pass ordering), the pact weapon itself with Thirsting Blade and Devouring Blade, and
-        // Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master.
+        "pact-of-the-tome": {
+          choices: [
+            { kind: "cantrip", choose: 3, fromCatalog: "spells", maxSpellLevel: 0 },
+            { kind: "spell", choose: 2, fromCatalog: "spells", minSpellLevel: 1, maxSpellLevel: 1, ritual: true }
+          ],
+          replaces: [
+            { offer: "feature:pact-of-the-tome", when: "short-rest", amount: 3 },
+            { offer: "feature:pact-of-the-tome/2", when: "short-rest", amount: 2 }
+          ]
+        },
+        /**
+         * "A new page appears in your Book of Shadows when you conjure it. With your permission, a creature can take an
+         * action to write its name on that page, which can contain a number of names equal to your Charisma modifier
+         * (minimum of one name). When any creature whose name is on the page is reduced to 0 Hit Points but not killed
+         * outright, the creature magically drops to 1 Hit Point instead. Once this magic is triggered, no creature can
+         * benefit from it until you finish a Long Rest." A name is an effect from the Warlock on the creature named (the
+         * GM adds one outside a fight); book-of-shadows.ts holds the page to the Charisma modifier, blanks it when a book
+         * is conjured, and keeps a named creature at 1 Hit Point on the Warlock's counter.
+         */
+        "gift-of-the-protectors": {
+          actions: [
+            {
+              id: "gift-of-the-protectors",
+              name: "Gift of the Protectors",
+              activation: "other",
+              description:
+                "With your permission, a creature takes an action to write its name on the page in your Book of Shadows. The page holds as many names as your Charisma modifier (minimum one), and a new book starts a blank page.",
+              damage: [],
+              grants: {
+                name: "Gift of the Protectors",
+                target: "target",
+                tags: ["gift-of-the-protectors", "ends-on-death"],
+                duration: { type: "manual" }
+              }
+            },
+            {
+              id: "gift-of-the-protectors-page",
+              name: "Gift of the Protectors: 1 Hit Point",
+              activation: "other",
+              description:
+                "Spent when a creature named on the page is reduced to 0 Hit Points but not killed outright, and drops to 1 Hit Point instead. No creature benefits again until you finish a Long Rest.",
+              damage: [],
+              uses: { limit: 1, per: "long-rest" }
+            }
+          ]
+        }
+        // Thirsting Blade and Devouring Blade are read off the bonded pact weapon (pact-weapon.ts).
       }
     },
     /**
@@ -214,29 +291,37 @@ export const warlock: ClassMechanicsModule = {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 6, maxSpellLevel: 6 },
       uses: { limit: 1, per: "long-rest" },
       // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
-      // same level."
-      replaces: [{ offer: "feature:mystic-arcanum-level-6-spell", when: "level-up", amount: 1 }]
+      // same level": one swap a level across the four arcana, which share it.
+      replaces: [
+        { offer: "feature:mystic-arcanum-level-6-spell", when: "level-up", amount: 1, shares: "mystic-arcanum" }
+      ]
     },
     "mystic-arcanum-level-7-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 7, maxSpellLevel: 7 },
       uses: { limit: 1, per: "long-rest" },
       // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
       // same level."
-      replaces: [{ offer: "feature:mystic-arcanum-level-7-spell", when: "level-up", amount: 1 }]
+      replaces: [
+        { offer: "feature:mystic-arcanum-level-7-spell", when: "level-up", amount: 1, shares: "mystic-arcanum" }
+      ]
     },
     "mystic-arcanum-level-8-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 8, maxSpellLevel: 8 },
       uses: { limit: 1, per: "long-rest" },
       // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
       // same level."
-      replaces: [{ offer: "feature:mystic-arcanum-level-8-spell", when: "level-up", amount: 1 }]
+      replaces: [
+        { offer: "feature:mystic-arcanum-level-8-spell", when: "level-up", amount: 1, shares: "mystic-arcanum" }
+      ]
     },
     "mystic-arcanum-level-9-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 9, maxSpellLevel: 9 },
       uses: { limit: 1, per: "long-rest" },
       // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
       // same level."
-      replaces: [{ offer: "feature:mystic-arcanum-level-9-spell", when: "level-up", amount: 1 }]
+      replaces: [
+        { offer: "feature:mystic-arcanum-level-9-spell", when: "level-up", amount: 1, shares: "mystic-arcanum" }
+      ]
     },
     "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
   },

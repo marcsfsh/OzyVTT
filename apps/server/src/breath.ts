@@ -23,8 +23,9 @@ export const WATER_BREATHING_TAG = "water-breathing";
 const ROUNDS_PER_MINUTE = 10;
 /** "Minimum of 30 seconds". */
 const LEAST_BREATH_ROUNDS = 5;
-/** Traits that let a creature breathe water. */
-const WATER_BREATHERS = /^(amphibious|water breathing|limited amphibiousness)$/i;
+/** Traits and features that let a creature breathe water (a Warlock's Gift of the Depths: "You can breathe
+ *  underwater"). */
+const WATER_BREATHERS = /^(amphibious|water breathing|limited amphibiousness|gift of the depths)$/i;
 /** What lets its wearer breathe underwater: "You can breathe underwater" (Cloak of the Manta Ray), "you can breathe
  *  normally in any environment" (Necklace of Adaptation, attuned). */
 const BREATHING_ITEMS: Readonly<Record<string, "worn" | "attuned">> = {

@@ -1,5 +1,5 @@
 import type { Actor } from "@vtt/domain";
-import type { ActorDefinition } from "@vtt/schemas";
+import { MASKED_TYPE_TAG, type ActorDefinition } from "@vtt/schemas";
 import { experienceForChallenge, experienceInLair } from "@vtt/rules-5e";
 
 /** The extension key challenge rating and creature type actually live under. */
@@ -53,8 +53,20 @@ export function statblockFacts(definition: ActorDefinition): {
 }
 
 /** A creature's type for the rules that name one: its stat block's, else Humanoid for a player character (every SRD
- *  species is a Humanoid); null when neither says. */
-export function creatureTypeOf(actor: Pick<Actor, "kind">, definition: ActorDefinition | undefined): string | null {
+ *  species is a Humanoid); null when neither says. Spells and other magic read the type a live effect masks it as
+ *  (Arcanist's Magic Aura: "Spells and other magical effects treat the target as if it were a creature of the chosen
+ *  type"); a rule that isn't magic (Animal Handling, a stat block's own trait) asks for the `true` type. */
+export function creatureTypeOf(
+  actor: Pick<Actor, "kind"> & Partial<Pick<Actor, "effects">>,
+  definition: ActorDefinition | undefined,
+  read: "magic" | "true" = "magic"
+): string | null {
+  if (read === "magic") {
+    const masked = (actor.effects ?? [])
+      .flatMap((effect) => effect.tags)
+      .find((tag) => tag.startsWith(MASKED_TYPE_TAG));
+    if (masked) return masked.slice(MASKED_TYPE_TAG.length);
+  }
   const printed = definition ? statblockFacts(definition).creatureType : null;
   if (printed !== null) return printed.toLowerCase();
   return actor.kind === "player-character" ? "humanoid" : null;

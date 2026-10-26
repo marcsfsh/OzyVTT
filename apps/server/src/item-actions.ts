@@ -373,6 +373,7 @@ export function spellCastMechanics(
       | "summons"
       | "shapeShift"
       | "effectOptions"
+      | "inflicts"
     >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
@@ -458,7 +459,9 @@ export function spellCastMechanics(
       : {}),
     // The form it shape-shifts a creature into (Polymorph), and the effects it picks one of (Enlarge or Reduce).
     ...(effect.shapeShift ? { shapeShift: structuredClone(effect.shapeShift) } : {}),
-    ...(effect.effectOptions ? { effectOptions: structuredClone(effect.effectOptions) } : {})
+    ...(effect.effectOptions ? { effectOptions: structuredClone(effect.effectOptions) } : {}),
+    // What it does to its targets with no roll (Awaken's Charmed).
+    ...(effect.inflicts ? { inflicts: structuredClone(effect.inflicts) } : {})
   };
 }
 
@@ -601,7 +604,8 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
           endsConditions: [...effect.endsConditions],
           ...(effect.endsOneCondition ? { endsOneCondition: true as const } : {})
         }
-      : {})
+      : {}),
+    ...(action.inflicts === undefined && effect.inflicts ? { inflicts: structuredClone(effect.inflicts) } : {})
   };
   const grants = action.grants === undefined && effect.grant ? structuredClone(effect.grant) : undefined;
   const failureEffect =
@@ -791,9 +795,14 @@ export function weaponSwing(
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
   const ids = item.baseId !== undefined ? [catalogIdOf(item), item.baseId] : [catalogIdOf(item)];
+  // A binding may lend proficiency with the weapon (a pact weapon).
   const proficient =
-    trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
-  const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
+    trained === undefined ||
+    bound?.proficient === true ||
+    trainingCovers(grantedWeapons, weapon, ids) ||
+    trainingCovers(trained, weapon, ids);
+  // What acid or rust took off the weapon's attack rolls (`row-penalties.ts`).
+  const bonus = modifier + (proficient ? definition.proficiencyBonus : 0) - (item.penalty ?? 0);
   const pickable = bound?.damageTypes ? [...new Set([weapon.damageType as DamageType, ...bound.damageTypes])] : [];
   const action: ActorAction = {
     id: itemActionId(item.id, options.twoHanded ? TWO_HANDED_SUFFIX : undefined),

@@ -47,6 +47,12 @@ const DEFINITIONS: Record<string, ActorDefinition> = {
     extensions: {},
     character: { features: [{ id: "roving", kind: "class", sourceId: "ranger" }] }
   } as unknown as ActorDefinition,
+  halfling: {
+    actions: [],
+    token: { disposition: "friendly" },
+    extensions: {},
+    character: { features: [{ id: "halfling-nimbleness", kind: "species", sourceId: "halfling" }] }
+  } as unknown as ActorDefinition,
   ...Object.fromEntries(
     ["Flyby", "Agile", "Abduct", "Swarm", "Air Form"].map((trait) => [
       trait,
@@ -324,6 +330,43 @@ describe("when and where a creature may move", () => {
         commandId: "50000000-0000-4000-8000-000000000001"
       })
     ).toThrowError("Borin can't get there. Other creatures bar the way.");
+  });
+
+  // SRD 5.2.1 Halfling Nimbleness: "You can move through the space of any creature that is a size larger than you,
+  // but you can't stop in the same space."
+  it("takes a Halfling through a hostile orc's space as Difficult Terrain, and not to a stop there", () => {
+    const corridor: TokenMapGeometry = { ...GRID, height: 50 };
+    const along = (state: GameState, to: { x: number; y: number }) =>
+      applyMovementRules(state, {
+        actorId: HERO,
+        from: cell(0, 0),
+        to,
+        distance: (a, b) => mapDistance(corridor, a, b)?.value ?? null,
+        cost: (a, b, costOptions) => movementCost(state, corridor, HERO, a, b, costOptions),
+        calibration: corridor.calibration,
+        override: null,
+        resolveDefinition,
+        newPromptId: () => "70000000-0000-4000-8000-000000000001",
+        now: () => 0,
+        commandId: "50000000-0000-4000-8000-000000000001"
+      });
+    const small = (definitionId: string | null, orcSize = "medium") => {
+      const state = game({ [HERO]: cell(0, 0), [ORC]: cell(2, 0) });
+      const hero = state.actors.find((actor) => actor.id === HERO)!;
+      hero.size = "small";
+      if (definitionId) hero.definitionId = definitionId;
+      state.actors.find((actor) => actor.id === ORC)!.size = orcSize as "medium";
+      return state;
+    };
+    const halfling = small("halfling");
+    along(halfling, cell(4, 0));
+    expect(used(halfling)).toBe(25);
+    expect(blockedBy(() => along(small("halfling"), cell(2, 0)))).toBe("movement.occupied");
+    // A gnome has no such trait, and a Small goblin is no larger than the Halfling.
+    expect(() => along(small(null), cell(4, 0))).toThrowError("Borin can't get there. Other creatures bar the way.");
+    expect(() => along(small("halfling", "small"), cell(4, 0))).toThrowError(
+      "Borin can't get there. Other creatures bar the way."
+    );
   });
 });
 

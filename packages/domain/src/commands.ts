@@ -270,6 +270,24 @@ export const SetActorLairSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** GM picks what a creature's stat block leaves to the GM (a half-dragon's Draconic Origin damage type, a commoner's
+ *  Training skill); null clears it. */
+export const SetActorPickSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    key: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    value: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const HpAmountSchema = z
   .object({
     commandId: z.uuid(),
@@ -567,6 +585,13 @@ export const ActionResolveSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(80)
       .optional(),
+    /** The armor or weapon its target wears or carries that the action acts on (a rust monster's Antennae, Mending);
+     *  absent, the target's worn armor, else its weapon in hand. */
+    objectItemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
@@ -577,14 +602,36 @@ export const ActionResolveSchema = z
     /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
      *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
-    /** How much of its pool an action that lets its user choose spends (Lay on Hands' points); refused otherwise. */
-    spend: z.number().int().min(1).max(100).optional(),
+    /** How much of its pool an action that lets its user choose spends (Lay on Hands' points); refused otherwise. 0 only
+     *  beside `conditionIds`, which cost points of their own. */
+    spend: z.number().int().min(0).max(100).optional(),
+    /** The conditions an action with `conditionPicks` also ends on its target (Restoring Touch), each costing the
+     *  points it names on top of `spend`. */
+    conditionIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .min(1)
+      .max(8)
+      .optional(),
+    /** The Hit Points each target regains from a heal its user divides (Preserve Life, Mass Heal), by target id; they
+     *  add up to the pool at most, and none past what the heal lets a target regain. Absent, the pool is split evenly. */
+    healingShares: z
+      .record(z.uuid(), z.number().int().min(0).max(1000))
+      .refine((shares) => Object.keys(shares).length <= 20, "At most 20 targets share a heal.")
+      .optional(),
     /** Knocking out a creature (SRD): a melee hit that drops the target to 0 leaves it at 1 Hit Point and Unconscious
      *  instead. Refused on any other attack. */
     knockOut: z.boolean().optional(),
     /** An Evoker's Overchannel (Wizard 14): a Wizard spell cast with a level 1 to 5 slot deals its maximum damage, the
      *  caster taking Necrotic damage for each use after the first before a Long Rest. Refused for anything else. */
     overchannel: z.boolean().optional(),
+    /** A Thief's Fast Hands: an item's Utilize action, or a magic item's Magic action, taken as a Bonus Action.
+     *  Refused for anyone without the feature and for any other action. */
+    fastHands: z.boolean().optional(),
     shaping: CastShapingListSchema.optional(),
     /** What the user picks for an action that brings creatures onto the map (Find Familiar's form, Giant Insect's
      *  spider, Summon Dragon's breath and the Resistance it shares), and the point they appear at, within the action's
@@ -695,7 +742,8 @@ export const ReactionAnswerSchema = z
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
-    /** Redirect Attack: the ally the attack turns to, one of the prompt's `redirectChoices`. */
+    /** Redirect Attack: the ally the attack turns to; Deflect Missile: the creature the force turns on if the damage is
+     *  reduced to 0. One of the prompt's `redirectChoices`. */
     redirectTo: z.uuid().optional(),
     /** The spell slot a reaction spell is cast with (Shield, Hellish Rebuke, Counterspell): absent, its own level or the
      *  lowest above it with a slot left. A higher slot upcasts it as a cast on the caster's turn does. */
@@ -920,9 +968,26 @@ export const CheckRollSchema = z
     sense: z.enum(["sight", "hearing"]).optional(),
     /** The situations the roller says the check fits, from the sheet's list (a Book's topic, prying with a Crowbar). */
     situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
+    /** A piece of gear whose printed Utilize use this is (a Grappling Hook), with `use`. A tool's use names `tool`. */
+    item: SkillOrToolIdSchema.optional(),
+    /** Which of the tool's or gear's printed Utilize uses this is, by its place in the list: the server takes the
+     *  record's DC, ability and skill. */
+    use: z.number().int().min(0).max(9).optional(),
+    /** Fast Hands (Thief): the Utilize use, or a Dexterity (Sleight of Hand) check, takes the Bonus Action. */
+    bonusAction: z.boolean().optional(),
+    /** The creature a use works for (the wearer of the footwear Cobbler's Tools modify); absent, the roller. */
+    forActorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
-  .strict();
+  .strict()
+  .refine((request) => request.use === undefined || request.tool !== undefined || request.item !== undefined, {
+    message: "Name the tool or the item whose use this is.",
+    path: ["use"]
+  })
+  .refine((request) => request.item === undefined || request.use !== undefined, {
+    message: "An item's check is one of its uses: say which.",
+    path: ["item"]
+  });
 
 /** Reroll one die of a character's latest check (the lowest), while it is still their latest roll: a player spends
  *  Heroic Inspiration; the GM rerolls freely. */
@@ -1374,6 +1439,8 @@ export const DoorUseSchema = z
     how: z.enum(["pick", "force", "jam", "pry", "seal"]),
     /** Another character helping with a Portable Ram (Advantage on the check). */
     helperId: z.uuid().optional(),
+    /** Fast Hands (Thief): the use takes the Bonus Action. */
+    bonusAction: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1552,8 +1619,8 @@ export const RestAnswerSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** The GM rests several characters at once. Long: the rest happens now and 8 hours pass. Short: it opens, each
- *  player spends Hit Dice on their own device, and it ends when the GM finishes it. */
+/** The GM rests several characters at once. Long: it opens, and it ends when the GM finishes it, which passes its
+ *  8 hours. Short: it opens, each player spends Hit Dice on their own device, and it ends when the GM finishes it. */
 export const RestPartySchema = z
   .object({
     commandId: z.uuid(),
@@ -1575,11 +1642,29 @@ export const RestMarkDoneSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** The GM ends the party's Short Rest: `apply` gives its benefits and an hour passes; otherwise it is called off. */
+/** The GM ends the party's rest: `apply` gives its benefits and its time passes; otherwise it is called off. */
 export const RestFinishSchema = z
   .object({
     commandId: z.uuid(),
     apply: z.boolean(),
+    /** Which rest: absent, the Short Rest when one is under way, else the Long Rest. */
+    kind: z.enum(["short", "long"]).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A member of the party's Long Rest that an interruption stopped takes it up again. */
+export const RestResumeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM interrupts one member's Long Rest (an hour of walking or other physical exertion). */
+export const RestInterruptSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1597,7 +1682,7 @@ export const ActorNourishSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
-    food: z.enum(["meal", "ration", "goodberry"]).optional(),
+    food: z.enum(["meal", "ration", "goodberry", "bead"]).optional(),
     water: z.enum(["fill", "waterskin"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -1618,12 +1703,65 @@ export const TimePassSchema = z
     hours: z.number().int().min(0).max(720).default(0),
     /** Minutes on top of the hours, so a group can skip the minute or the 10 minutes a spell lasts. */
     minutes: z.number().int().min(0).max(59).default(0),
-    /** The party travels for that time at this pace (SRD 5.2.1 Travel Pace): the log says how far it went. */
+    /** The party travels for that time at this pace (SRD 5.2.1 Travel Pace): the log says how far it went, and each
+     *  traveller's checks read the pace until time passes without one. */
     pace: z.enum(["fast", "normal", "slow"]).optional(),
+    /** The time is downtime: each character works up to 8 hours a day on its crafting projects. */
+    downtime: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
   .refine((request) => request.hours > 0 || request.minutes > 0, "Choose at least 1 minute.");
+const CraftIdSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(80);
+/** A character starts making something in its downtime (SRD 5.2.1 Crafting): a catalog item, a Spell Scroll of a
+ *  spell, or a magic item on its base, with the tool that makes it. */
+export const CraftingStartSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    itemId: CraftIdSchema,
+    /** The spell a Spell Scroll bears. */
+    spellId: CraftIdSchema.optional(),
+    /** What a magic weapon or armor is made on (a +1 Longsword's Longsword). */
+    baseId: CraftIdSchema.optional(),
+    /** The tool to make it with, when more than one can; absent, the first the character can work with. */
+    toolId: CraftIdSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A character joins a project as a helper, or leaves it. */
+export const CraftingHelpSchema = z
+  .object({
+    commandId: z.uuid(),
+    projectId: z.uuid(),
+    actorId: z.uuid(),
+    helping: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM logs days of downtime work on a project, with no time passing on the clock. */
+export const CraftingWorkSchema = z
+  .object({
+    commandId: z.uuid(),
+    projectId: z.uuid(),
+    days: z.number().int().min(1).max(250),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A project is called off. */
+export const CraftingCancelSchema = z
+  .object({
+    commandId: z.uuid(),
+    projectId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** What a character could start crafting now. */
+export const ActorCraftingOffersSchema = z.object({ actorId: z.uuid() }).strict();
+
 /** The hour of the day dawn comes on the game clock, or null for a Long Rest to stand in for the day. */
 export const TimeSetDawnSchema = z
   .object({

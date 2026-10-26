@@ -40,6 +40,10 @@ export type TargetingSession = Readonly<
     slotLevel?: number;
     /** How much of its pool an action whose user picks the cost spends (Lay on Hands' points). */
     spend?: number;
+    /** The conditions a touch also ends, each for points of its pool (Restoring Touch). */
+    conditionIds?: readonly string[];
+    /** The Hit Points each target takes of a pool its user divides (Preserve Life); absent, the server splits evenly. */
+    healingShares?: Readonly<Record<string, number>>;
     /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
     darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
     /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
@@ -56,6 +60,8 @@ export type TargetingSession = Readonly<
     targetOptions?: Readonly<Record<string, string>>;
     /** The carried weapon a grant binds to (Magic Weapon, Shillelagh). */
     itemId?: string;
+    /** The target's armor or weapon the action acts on (a rust monster's Antennae); absent, the server's default. */
+    objectItemId?: string;
     /** The GM places a spell's lingering area and resolves no action: the zone it is for. */
     placeZoneId?: string;
     /** How the caster shapes the cast (Metamagic, Sculpt Spells), with the creatures each pick names once chosen. */
@@ -63,6 +69,8 @@ export type TargetingSession = Readonly<
     /** The creature a summon brings, and its creature type, where its user picks (Find Familiar's form). */
     summonPick?: Readonly<{ monsterId: string; form?: string }>;
     summonType?: string;
+    /** A Thief's Fast Hands takes this item action as a Bonus Action. */
+    fastHands?: true;
   } & ShapeChoice
 >;
 
@@ -136,7 +144,8 @@ export function beginTargeting(
   attackerId: string,
   slotLevel?: number,
   dartsAtSlot?: number,
-  shaping?: readonly CastShaping[]
+  shaping?: readonly CastShaping[],
+  options: Readonly<{ fastHands?: boolean }> = {}
 ) {
   const area = action.area;
   const dartTotal = dartsAtSlot ?? action.darts;
@@ -151,6 +160,7 @@ export function beginTargeting(
     ...(action.useCost === "chosen" ? { spend: 1 } : {}),
     // An option starts on the first, as the server reads none.
     ...(action.choices?.options?.[0] ? { optionId: action.choices.options[0].id } : {}),
+    ...(options.fastHands ? { fastHands: true as const } : {}),
     ...startingShapeChoice(action)
   };
   if (area) {
@@ -306,6 +316,13 @@ export function setBoundItem(itemId: string | undefined) {
   session = itemId === undefined ? rest : { ...rest, itemId };
   emit();
 }
+/** Picks the target's armor or weapon the action acts on; undefined leaves it to the server (worn armor first). */
+export function setObjectItem(objectItemId: string | undefined) {
+  if (!session?.action.choices?.object) return;
+  const { objectItemId: _previous, ...rest } = session;
+  session = objectItemId === undefined ? rest : { ...rest, objectItemId };
+  emit();
+}
 /** Picks the skill a check action is made with; undefined lets Escape a Grapple use the better one. */
 export function setCheckSkill(skill: string | undefined) {
   if (!session) return;
@@ -375,10 +392,18 @@ export function targetingReady(picking: TargetingSession): boolean {
   if (picking.action.choosesAbility && picking.ability === undefined) return false;
   if (shapingUnchosen(picking)) return false;
   if (formUnchosen(picking.action, picking, picking.selected)) return false;
+  // A chosen cost of nothing spends nothing (Restoring Touch with no Hit Points and no condition picked).
+  if (picking.action.useCost === "chosen" && picking.spend === 0 && (picking.conditionIds ?? []).length === 0)
+    return false;
+  // A divided pool can't give out more than it holds.
+  if (picking.action.dividesHealing !== undefined && sharedOut(picking) > picking.action.dividesHealing) return false;
   if (picking.mode === "template") return Boolean(picking.template?.placed);
   if (picking.mode === "none") return true;
   return picking.selected.length > 0;
 }
+/** The Hit Points of a divided pool given to the creatures still selected (Preserve Life). */
+export const sharedOut = (picking: TargetingSession): number =>
+  picking.selected.reduce((sum, id) => sum + (picking.healingShares?.[id] ?? 0), 0);
 /** Sets how many darts a selected target takes, within the darts the action has left to assign. */
 export function setTargetDarts(actorId: string, count: number) {
   if (!session?.darts || !session.selected.includes(actorId)) return;
@@ -411,6 +436,22 @@ export function setTemplatePlacement(origin: AnnotationPoint, target: Annotation
 export function setTargetingSpend(spend: number) {
   if (!session || session.action.useCost !== "chosen") return;
   session = { ...session, spend };
+  emit();
+}
+/** Picks or drops a condition the touch also ends (Restoring Touch). */
+export function toggleConditionPick(conditionId: string) {
+  if (!session?.action.conditionPicks?.conditions.includes(conditionId)) return;
+  const picked = session.conditionIds ?? [];
+  session = {
+    ...session,
+    conditionIds: picked.includes(conditionId) ? picked.filter((id) => id !== conditionId) : [...picked, conditionId]
+  };
+  emit();
+}
+/** The Hit Points one target takes of a pool its user divides (Preserve Life). */
+export function setHealingShare(targetId: string, points: number) {
+  if (!session || session.action.dividesHealing === undefined) return;
+  session = { ...session, healingShares: { ...session.healingShares, [targetId]: Math.max(0, points) } };
   emit();
 }
 export function clearTargeting() {
@@ -474,6 +515,8 @@ export function resolveTargeting(
     template,
     slotLevel,
     spend,
+    conditionIds,
+    healingShares,
     darts,
     damageType,
     skill,
@@ -484,7 +527,8 @@ export function resolveTargeting(
     summonType,
     optionId,
     targetOptions,
-    itemId
+    itemId,
+    objectItemId
   } = session;
   const shapeChoice = shapeChoicePayload(session, selected);
   if (session.placeZoneId !== undefined) {
@@ -511,6 +555,7 @@ export function resolveTargeting(
   // A look at the damage is a preview of it, whatever the action.
   const commit = opts.damageLook ? false : (opts.commit ?? !isAttack);
   const extra = {
+    ...(session.fastHands ? { fastHands: true } : {}),
     ...(opts.override ? { override: opts.override } : {}),
     ...(opts.rollMode ? { rollMode: opts.rollMode } : {}),
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
@@ -523,6 +568,15 @@ export function resolveTargeting(
     ...(opts.damageAnswer ? { damageAnswer: { id: opts.damageAnswer.id, dice: [...opts.damageAnswer.dice] } } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     ...(spend !== undefined ? { spend } : {}),
+    ...(conditionIds && conditionIds.length > 0 ? { conditionIds: [...conditionIds] } : {}),
+    // The division of a pool among the creatures still selected; a target given nothing takes nothing.
+    ...(healingShares && action.dividesHealing !== undefined
+      ? {
+          healingShares: Object.fromEntries(
+            selected.map((id) => [id, healingShares[id] ?? 0] as const).filter(([, points]) => points > 0)
+          )
+        }
+      : {}),
     ...(damageType !== undefined ? { damageType } : {}),
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
@@ -535,6 +589,7 @@ export function resolveTargeting(
         }
       : {}),
     ...(itemId !== undefined ? { itemId } : {}),
+    ...(objectItemId !== undefined ? { objectItemId } : {}),
     ...(shaping && shaping.length > 0 ? { shaping: shaping.map((entry) => ({ ...entry })) } : {}),
     ...(summonPick || summonType
       ? {

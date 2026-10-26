@@ -73,6 +73,11 @@ export type ResolveInput = Readonly<{
   skill?: string | null;
   /** The ability a cast chooses (Hex). */
   ability?: "str" | "dex" | "con" | "int" | "wis" | "cha" | null;
+  /** The conditions an action with `conditionPicks` also ends on its target (Restoring Touch); their points were added
+   *  to the action's chosen cost. */
+  conditionIds?: readonly string[];
+  /** What each target regains from a heal its user divides (Preserve Life), checked against the pool and each cap. */
+  healingShares?: Readonly<Record<string, number>>;
   /** The option picked for an action that offers several (`grants.options`, `failureEffect.options`); absent, the
    *  first. */
   optionId?: string | null;
@@ -80,6 +85,12 @@ export type ResolveInput = Readonly<{
   targetOptions?: Readonly<Record<string, string>>;
   /** The carried weapon a grant binds to (`grants.bindsWeapon`). */
   itemId?: string | null;
+  /** The armor or weapon of the target the action acts on (`action.object`, Mending). */
+  objectItemId?: string | null;
+  /** A reaction to this creature's turn starting: a failure "until the end of its turn" ends with that turn. */
+  currentTurnOf?: string;
+  /** The action's area is centred on its user where it stands (an octopus's ink), with no template placed. */
+  areaAt?: Readonly<{ x: number; y: number }>;
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];
@@ -110,6 +121,9 @@ export type ResolveInput = Readonly<{
   /** The cast's area was placed on the map as a template, whose annotation takes this command's id; a spell that
    *  leaves its area behind (Moonbeam) keeps acting there. */
   areaPlaced?: boolean;
+  /** The placed area's point of origin on the map, from which its Dexterity saves read cover (SRD Cover: "an attack
+   *  or other effect originates on the opposite side of the cover"). A replay reads it from the template's drawing. */
+  areaOrigin?: Readonly<{ x: number; y: number }>;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
   /** A long casting's first turn going ahead after no Counterspell stopped it: it begins as that turn's cast would. */

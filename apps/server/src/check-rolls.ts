@@ -20,7 +20,7 @@ import {
   totalCheck
 } from "./ability-checks.js";
 import { creatureTypeOf } from "./statblock-facts.js";
-import { endUsedHelp, useHelp } from "./help-assist.js";
+import { endUsedHelp, settleUseOutcome, useHelp } from "./help-assist.js";
 import {
   canPlayerTarget,
   GameAccessDeniedError,
@@ -85,6 +85,10 @@ export type CheckRollInput = Readonly<{
   callId?: string;
   /** The situations the roller says the check fits (a Book's topic, prying with a Crowbar). */
   situations?: readonly string[];
+  /** The name a tool's or gear's Utilize use rolls under ("Pick a lock (Thieves' Tools)"). */
+  label?: string;
+  /** What the use leaves on a creature while the check succeeds (Cobbler's Tools' footwear). */
+  onSuccess?: NonNullable<HeldRoll["check"]>["onSuccess"];
 }>;
 
 /** A check as it was rolled, and whether its numbers are kept from the one who rolled it (a blind roll), with what
@@ -111,7 +115,7 @@ function versusOf(actor: Actor, other: Actor, deps: CheckRollDependencies): Chec
   const definition = other.definitionId ? deps.resolveDefinition(other.definitionId) : undefined;
   return {
     actor: other,
-    humanoid: creatureTypeOf(other, definition) === "humanoid",
+    humanoid: creatureTypeOf(other, definition, "true") === "humanoid",
     feet: deps.distanceFeet?.(actor.id, other.id) ?? null
   };
 }
@@ -166,7 +170,7 @@ function recordCheck(
   const roll = totalCheck(plan, faces, readAs, deps.random, options.others ?? []);
   const visibility = checkVisibility(state, scope, actor.id, input.visibility);
   const rollId = deps.newId();
-  const label = `${options.label ?? plan.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}${roll.raisedBy ? ` (${roll.raisedBy})` : ""}`;
+  const label = `${options.label ?? input.label ?? plan.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}${roll.raisedBy ? ` (${roll.raisedBy})` : ""}`;
   const record: RollRecord = {
     id: rollId,
     commandId: input.commandId,
@@ -200,7 +204,9 @@ function recordCheck(
       ...(!typed && input.forcedMode !== undefined ? { rollMode: input.forcedMode } : {}),
       ...(input.callId !== undefined ? { callId: input.callId } : {}),
       ...(input.findActorId !== undefined ? { findActorId: input.findActorId } : {}),
-      ...(input.situations !== undefined && input.situations.length > 0 ? { situations: [...input.situations] } : {})
+      ...(input.situations !== undefined && input.situations.length > 0 ? { situations: [...input.situations] } : {}),
+      ...(input.label !== undefined ? { label: input.label.slice(0, 80) } : {}),
+      ...(input.onSuccess !== undefined ? { onSuccess: { ...input.onSuccess } } : {})
     }
   });
   return heldCheckResult(state, scope, actor, plan, typed ? "normal" : readAs, deps, input.commandId);
@@ -225,6 +231,8 @@ function heldCheckResult(
   const rollId = held.rollId!;
   if (check.callId !== undefined)
     recordCallResult(state, check.callId, actor.id, { natural: roll.natural, total: roll.total, success, rollId });
+  // What a tool's use leaves holds while its check succeeds, so a reroll or an answer settles it again.
+  const settled = check.onSuccess ? settleUseOutcome(state, actor, check.onSuccess, success === true) : [];
   // A typed die was thrown under the mode the rules gave, which the player was told before rolling.
   const rollMode = shownRollMode(plan.rollMode, held.typed ? undefined : check.rollMode);
   const answered = answeredLines(held);
@@ -239,10 +247,11 @@ function heldCheckResult(
     deps,
     commandId
   );
+  const told = [...settled, ...events];
   return {
-    ...(events.length > 0 ? { events } : {}),
+    ...(told.length > 0 ? { events: told } : {}),
     outcome: {
-      label: plan.label,
+      label: check.label ?? plan.label,
       natural: roll.natural,
       total: roll.total,
       dc: check.dc,
@@ -377,7 +386,9 @@ export function answerAbilityCheck(
     ...(check.rollMode !== undefined ? { forcedMode: check.rollMode } : {}),
     ...(check.findActorId !== undefined ? { findActorId: check.findActorId } : {}),
     ...(check.callId !== undefined ? { callId: check.callId } : {}),
-    ...(check.situations !== undefined ? { situations: check.situations } : {})
+    ...(check.situations !== undefined ? { situations: check.situations } : {}),
+    ...(check.label !== undefined ? { label: check.label } : {}),
+    ...(check.onSuccess !== undefined ? { onSuccess: check.onSuccess } : {})
   };
   const { plan } = planFor(state, scope, rollInput, deps);
   const readAs = held.typed ? "normal" : (check.rollMode ?? plan.rollMode.mode);
@@ -501,10 +512,12 @@ export function rerollAbilityCheck(
     ...(check.rollMode !== undefined ? { forcedMode: check.rollMode } : {}),
     ...(check.findActorId !== undefined ? { findActorId: check.findActorId } : {}),
     ...(check.callId !== undefined ? { callId: check.callId } : {}),
-    ...(check.situations !== undefined ? { situations: check.situations } : {})
+    ...(check.situations !== undefined ? { situations: check.situations } : {}),
+    ...(check.label !== undefined ? { label: check.label } : {}),
+    ...(check.onSuccess !== undefined ? { onSuccess: check.onSuccess } : {})
   };
   const { plan } = planFor(state, scope, rollInput, deps);
-  const label = `${plan.label} reroll`;
+  const label = `${check.label ?? plan.label} reroll`;
   if (input.face !== undefined)
     return recordCheck(state, scope, rollInput, deps, plan, [input.face], "normal", true, {
       label,

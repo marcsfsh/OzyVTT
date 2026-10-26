@@ -151,7 +151,10 @@ audience. There are five:
   (`commanded`, `orders`); who summoned it and what keeps it stay the GM's. That player acts for it, and
   sees through it when it lends its sight (`playerViewerIds`).
   A creature's `attitude`, which the GM sets for Influence, never reaches a player; a character's food and water
-  for the day (`nourishment`) goes wherever its sheet resources go.
+  for the day (`nourishment`) goes wherever its sheet resources go. A creature a player's own Hunter marks with
+  Hunter's Mark, while that Hunter has Hunter's Lore, carries `knownDefences` in that player's projection alone:
+  its damage Immunities, Resistances and Vulnerabilities and its condition Immunities, read live, gone when the mark
+  ends (`hunters-lore.ts`).
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
   room that may hold non-players. It follows the live scene, before and during its fight, unless
   the GM paused it. Only public actors with a position become tokens; annotations
@@ -271,9 +274,12 @@ of a hidden thing. When in doubt, leave it out.
 - The rules read sight through `vision/rules.ts` (`sightRules`), which answers with the map while
   vision is on and with the conditions and Blindsight, Truesight and See Invisibility by distance
   while it is off: an attack's unseen Advantage and Disadvantage and Invisible, Cover from walls
-  and creatures between (`cover.ts`), an area that leaves out what its origin can't reach
+  and creatures between (`cover.ts`; a placed area's save reads it from the area's point of origin,
+  `resolution/pending.ts`), an area that leaves out what its origin can't reach
   (`area-targeting.ts`), Hide's hiding place and the Passive Perception it tells the GM meets it (5
-  less where the hider is Lightly Obscured), Search finding a hidden creature, Frightened's line
+  less where the hider is Lightly Obscured), Search finding each hidden creature (its one roll read per
+  hider, with Disadvantage against one Lightly Obscured to the searcher), Truesight's save against a
+  visual illusion, which succeeds with no roll, Frightened's line
   of sight and its refused approach (`movement-rules.ts`), Dodge and other riders that name who
   sees whom (`sees-other`, `seen-by-other`, `other-lacks-sense`), Blinded and Heavily Obscured
   checks, a save that needs its source seen (a gaze, a pattern), and the traits and features that
@@ -364,7 +370,11 @@ of a hidden thing. When in doubt, leave it out.
   where it cast the spell, ends it.
 - Squeezing and passing walls: a footprint that fits a gap only as a creature one size smaller squeezes
   through it as through Difficult Terrain (`footprintStepPassage`), and Incorporeal Movement passes walls
-  and creatures the same way. A stat block's traits widen that (`wall-passage.ts`): Amorphous, Compression
+  and creatures the same way. A one-cell footprint has no narrower one, so its opening is measured between
+  the walls across its way (`laneWidth`): a Small or Medium creature walks through three quarters of a square,
+  squeezes through half of one (a Tiny creature's space) and is barred by less, and a Tiny one needs the half.
+  Walls running alongside the way, as a corridor's do, make no opening. Halfling Nimbleness passes the space
+  of any larger creature as Difficult Terrain (`spacePassage`'s `nimble`, from the `actor:movement` reply). A stat block's traits widen that (`wall-passage.ts`): Amorphous, Compression
   and the elementals' forms slip through a gap an inch wide and a swarm through one a Tiny creature fits, at
   no extra cost (`slipsThroughStep`); Earth Glide burrows through walls freely and Tunneler at double cost.
   A wall a spell raised stops every one of them. The `actor:movement` reply carries the opening and the
@@ -372,7 +382,8 @@ of a hidden thing. When in doubt, leave it out.
 - Doors and objects (ADR-0023's second amendment): a door may be held shut (`VisionWall.door`: a lock with
   its key holders, stuck, barred, jammed with a spike, sealed by Stone Shape, an Arcane Lock), and
   `door.set-open` refuses a player one held shut against their character. `door.use` picks, forces, pries,
-  jams or seals a door beside the acting creature, the server rolling the check (`doors.ts`); `door.set-state`
+  jams or seals a door beside the acting creature, the server rolling the check and spending the Utilize action in a
+  fight (`doors.ts`, `utilize.ts`); `door.set-state`
   is the GM's. A wall or door may be an object with AC and Hit Points (`VisionWall.object`), as is what holds a
   creature (`EffectInstance.heldBy`: a Net, a web, a rope). `object.attack` rolls an attack against one
   (`object-strikes.ts`), `object.damage` is the GM's, and at 0 Hit Points a wall or door is gone and a held
@@ -394,7 +405,9 @@ rests, death saves, weapon masteries and movement budgets. Entry points are
 sequence of steps over one shared context, one module per step in `apps/server/src/resolution/`
 (validation, attack roll, damage, masteries, on-hit effects, grants, concentration, pending saves
 and reactions, the action economy, release); builtin actions such as Hide and the unarmed Grapple
-add their special cases through the handler table in `resolution/builtins.ts`. Every condition
+add their special cases through the handler table in `resolution/builtins.ts`. Hiding ends only as the SRD
+says: on an attack roll or a spell cast with a Verbal component (`resolution/release.ts`), or when a Search meets
+the Hide total; a sound louder than a whisper is the GM's. Every condition
 write goes through `applyCondition` in `effects.ts`, which honours innate and item-granted
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
 Concentration and its grapples). In a fight, effects count down at turn start and turn end; the
@@ -448,8 +461,8 @@ a zone that carries the action's own save and damage (`SpellZone.rule`), which s
 or it goes off once.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
-(`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
-Rest moves it 8 hours and finishing the party's Short Rest moves it an hour, and `passGameTime`
+(`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), finishing the party's
+Long Rest moves it to the rest's end and finishing the party's Short Rest moves it an hour, and `passGameTime`
 (`game-time.ts`) counts every creature's effects down by it, 10 rounds to the minute. A fight's rounds
 don't move the clock. When a fight ends, what has a minute (10 rounds) or less left ends with it, and
 anything longer carries on in game time; a parked fight's combatants and a replay's copies wait outside
@@ -460,7 +473,8 @@ dispelled with no Concentration. An effect can also last until its bearer's next
 would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
 once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
 While the GM tracks food and water (`rest.survival`), each midnight it crosses ends a day for every
-character, which eats and drinks what it carries and meets the hunger and thirst rules (`survival.ts`).
+character, which eats and drinks what it carries (Rations, then a Bead of Nourishment) and meets the hunger and
+thirst rules (`survival.ts`).
 A creature out of air counts its held breath down on the clock as it does at its turns' ends (`breath.ts`).
 
 Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
@@ -521,7 +535,10 @@ A grant or a failed save can offer options (Fire Shield's warm or chill, Bestow 
 each target where the text says so. The resolve carries the pick (`optionId`, `targetOptions`), which is
 checked before anything rolls and kept on the effect with what it adds (`resolution/grant-extras.ts`). A
 grant can also bind to one carried weapon (`itemId`): its `this-item` riders reach that row's rolls and
-its `weapon` changes how the row swings, until the row leaves the pack (`bound-weapons.ts`). A live effect
+its `weapon` changes how the row swings, until the row leaves the pack (`bound-weapons.ts`). A binding can conjure
+the row it binds, lend proficiency with it and make it a Spellcasting Focus; Pact of the Blade's does, and its bonded
+weapon carries Thirsting and Devouring Blade's attacks and Eldritch Smite's and Lifedrinker's hits (`pact-weapon.ts`).
+A live effect
 can offer its bearer actions: a Bonus Action Dash or Disengage, an action that ends it with a save or a
 check, and another creature's spell action at the numbers it was cast with (`builtinActionsFor` in
 `builtin-actions.ts`, `granted-actions.ts`).
@@ -533,8 +550,22 @@ the confirm checks and spends it with the hit (`resolution/hit-options.ts`); it 
 What a stat block's or a magic weapon's hit leaves by itself (`onHit`: conditions, tags and modifiers on
 one effect, a pull, a save at a printed DC, only on a rolled 20 or against some creature types) lands in
 `resolution/on-hit.ts`. Who an action that isn't a spell may target (`targets`: how many, how far,
-creature types, size, sight, grappled by its user, a condition, in its space, enemies or allies) is
-checked as a spell's targets are, in `resolution/action-targets.ts`.
+size, sight, grappled by its user, a condition, in its space, enemies or allies) is
+checked as a spell's targets are, in `resolution/action-targets.ts`. Sight there and in a spell's targets is
+`sightRules().canSee`, so a Blinded user or an Invisible target counts with dynamic vision off too. The creature types an
+action or spell affects follow the Spells chapter's invalid target (`resolution/type-gates.ts`): a creature of another
+type is still a target, the use or slot is spent, nothing happens to it, and its player is told only that (the GM's line
+names the type). An ability cap on the target (Awaken's Intelligence of 3 or less) is read the same way. A creature's
+type there is `creatureTypeOf` (`statblock-facts.ts`), which reads an Arcanist's Magic Aura mask (a `masked-as-<type>`
+tag) for spells and other magic, and the true type for skills and a stat block's own traits. A ward its target bears
+(`spell-ward` modifier: Nondetection, Mind Blank, an Amulet of Proof against Detection and Location, a Ring of Mind
+Shielding) refuses a spell of its schools or ids aimed at it, leaves it out of such a spell's area and zone, and hides
+it from such a spell's sense (`resolution/spell-wards.ts`); one with `typeSenses` also hides it from every magical sense
+that tells a creature's type, Divine Sense included (`vision/detect.ts`). A picked target is also held to the spell's size limit,
+and to the caster or its own side for a spell on a willing creature (Light, Nondetection). Several picked targets are
+each checked for Total Cover. A heal that divides a pool (Preserve Life) takes the shares the user sets
+(`healingShares`), and one that also ends conditions for points of its pool (Restoring Touch, `conditionPicks`) takes
+the conditions picked (`conditionIds`); both are offered in the target picker (`resolution/heal.ts`).
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
@@ -587,16 +618,30 @@ body armor, which takes minutes, and a Shield takes the Utilize action on their 
 Unconscious creature, or one a failed Fear save makes drop them, keeps its held rows carried but out of its hands
 (`dropHeldItems` in `effects.ts`), and what one gave its Armor Class (a Staff of Power's +2) goes with it. `carrying.ts`
 weighs what a character carries, coins included, against its Strength times its size's figure (a
-`carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that. The
-sheet offers each tool's Utilize uses as checks at the DCs its record prints (`toolUses` in `ability-checks.ts`).
+`carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that.
+
+The Utilize action is one module (`utilize.ts`): in a fight it spends the action on the user's own turn, or a Thief's
+Bonus Action with Fast Hands, and outside one nothing. A Shield, a door, and each tool's and gear's Utilize uses take
+it. The sheet offers the uses (a tool's from `toolUses` in `ability-checks.ts`, gear's from its record's `utilize`,
+a Grappling Hook's DC 13 Acrobatics), and `check.roll` with `use`, or with a tool and a DC, rolls one through
+`rollUtilizeCheck` (`tool-uses.ts`), which needs the item in the pack. That is also the call for a rule that rolls a
+tool check of its own. A Cobbler's success lands its rider when the held check settles (`settleUseOutcome`). A
+Thief's Fast Hands also takes a magic item's Magic action as a Bonus Action (`fast-hands.ts`).
+
+Crafting (SRD 5.2.1) is downtime work kept on the game state (`GameState.crafting`, `crafting.ts`). A character
+starts a project with a tool it is proficient with and carries: an item its tool's Craft line names, a Potion of
+Healing, a Spell Scroll of a prepared spell or a magic item, and pays the raw materials from its purse at the start.
+`time.pass` with `downtime` works each project up to 8 hours a game day, its helpers' hours added, and the GM can log
+days by hand (`crafting.work`). A finished item joins the crafter's pack; a scribed scroll keeps the scribe's save DC
+and attack bonus (`InventoryItem.scribed`). Players see their own characters' projects and the visible party's, with
+the price only on their own (`playerCrafting`).
 
 Every spell a sheet or stat block knows is a cast action (`character-build.ts`, `monster-spells.ts`), so even
 one with nothing to roll (Light) spends its casting time and slot, holds its Concentration, places its area and is
 told to the table as cast (`cast-narration.ts`). Before anything is spent the economy checks the cast's components
 (`resolution/components.ts`: speech outside Silence, a free hand, a pouch, a focus the class names or a priced
 material the content build lists on the spell) and its targets (`resolution/spell-targets.ts`: the count the spell
-names, its creature type, sight with dynamic vision on, range, and for creatures of the caster's choice in an area,
-the area). A cast with components waits while a creature that sees it may answer with Counterspell
+names, sight, range, and for creatures of the caster's choice in an area, the area). A cast with components waits while a creature that sees it may answer with Counterspell
 (`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A Spell
 Scroll's cast is seen (a wand's needs no components and isn't), a spell readied with the Ready action is seen as it is
 cast and not when it is let go, and a long casting as it begins. A
@@ -614,10 +659,15 @@ resource back is its own checked command. `conversions.ts` is one table of the f
 into another or recover one (Font of Magic both ways, Arcane and Natural Recovery, Magical Cunning, restoring a
 use with a slot or points, Pearl of Power), each with its timing, its check and its pick, offered by
 `actor:available-actions` and taken with `actor.convert`. Hit Point Dice are spent only during a Short Rest, a
-player's own or the party's (`rests.ts`). A finished rest opens a step on the actor (`restStep`) where its
+player's own or the party's (`rests.ts`), or by a member whose interrupted Long Rest gave it a Short Rest's benefits.
+The party's Long Rest is a span (`long-rest.ts`): it opens at the clock's time and lasts until the GM finishes it.
+Rolling Initiative, damage, a spell above a cantrip and the GM's interrupt for exertion stop a member's rest
+(`rest-interruptions.ts`), and resuming adds an hour. A finished rest opens a step on the actor (`restStep`) where its
 recoveries and re-choices are made until its player taps Done; a re-choice the build reads (a Weapon Mastery pick,
 a Wizard's cantrip, a Hunter's option) is written to the ledger and the sheet rebuilt (`ledger-rechoice.ts`), a
-pick of several one held answer at a time. When Initiative is rolled, `initiative-hooks.ts` opens a window for the
+pick of several one held answer at a time, and a feature's picks of different kinds each under its own offer (Pact of
+the Tome's cantrips and rituals). Pact of the Tome's book is a gear row the rest conjures anew (`book-of-shadows.ts`):
+its spells are prepared, and it serves as a focus, only while it is carried. When Initiative is rolled, `initiative-hooks.ts` opens a window for the
 features that act then (Persistent Rage, Uncanny Metabolism) and gives back what others restore (Perfect Focus,
 Superior Inspiration, Archdruid).
 
@@ -677,6 +727,11 @@ An attack can wait before its roll too, while a creature that may change its tar
 `resolution/redirect.ts`): Redirect Attack hands it to an ally, the two swapping places, and an Arrow-Catching Shield's
 wielder takes it on itself. A guardian's ward (Shield Guardian's Protection) is an `attack-would-hit` prompt to the
 guardian for the creature that commands it, whose AC it raises.
+A stat block's reaction to something else is a `triggered` prompt naming its `cause` (`triggered-reactions.ts`): an
+attack roll that hits it (Reflexive Antennae), a creature starting or ending its turn, or ending a move, nearby
+(Unnerving Gaze, Ink Cloud, Pursuit), or damage it takes (Split). Its answer does what the declared response says
+(`reactions.ts`): it resolves the action against that creature, on the reactor itself, as a teleport near that
+creature, or splits the reactor in two (`split.ts`).
 Players type die faces, never totals, and only while the table allows typed dice. On the client every roll prompt
 shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`).
@@ -739,6 +794,14 @@ names no family is the GM's own ruling on the whole command.
   imported as an actor definition. What a character's next level brings is read from the same
   survey at the next level (`next-level.ts`, `character:next-level`), for whoever may level it.
   The builder's own rolls carry the purpose `builder`, so a sheet's latest roll leaves them out.
+- A feature's granted spell can change how it is cast: components its castings go without (`waives`), a cast on its
+  caster only (`self`) or healing dice at their highest (`maximized`), merged with any other source of the same spell
+  (`character-build.ts`). `freeCastOf` spends a feature's own uses on free castings of what other features grant
+  (Natural Recovery). A spell pick can be held to a casting time, the Ritual tag or the character's spellbook, which
+  `spellbook.ts` checks as a build or a re-choice makes the pick, and a pick with a `default` is filled by the build
+  when the ledger names none, so a sheet made before the pick existed still builds. A `replaces` clause's `shares`
+  name lets several clauses spend one allowance (Mystic Arcanum's one swap a level). A kit item with `pickFrom` asks
+  which item the kit gives (a Bard's instrument), answered in its own ledger row.
 - A fresh table starts with a sample party (`sample-party.ts`): three level 7 characters made by the
   same builder from a fixed seed, so they level like any built character. Each is marked `sample`
   (GM-only), and one command (`actor.remove-samples`) removes every sample the roster rules let go and
@@ -800,7 +863,8 @@ The table has one clock (ADR-0029): the Codex calendar keeps the day and the gam
 of day (`rest.clockHours`, which the 16-hour rule between Long Rests reads, and `rest.clockMinutes`). A party rest or Pass time that
 crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
 `codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day. Pass time
-with a travel pace (SRD Travel Pace) logs how far the party went and what the pace does to its checks.
+with a travel pace (SRD Travel Pace) logs how far the party went, and each traveller holds the pace as an effect its
+checks read until time passes without one, it rests or it rolls Initiative (`travel.ts`).
 
 ## Public HTTP API
 

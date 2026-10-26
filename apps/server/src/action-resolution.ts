@@ -60,6 +60,7 @@ import { applySummons } from "./resolution/summon.js";
 import { failsCastCheck, readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
+import { mendOnCast } from "./resolution/mend.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
 import { raiseOnAction, reviveOnCast } from "./resolution/revival.js";
 import { killOnCast } from "./resolution/kill.js";
@@ -73,7 +74,13 @@ import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } f
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { endTargetMarks } from "./resolution/action-targets.js";
-import { markMultiattackDefense, strikeBackFromEffects, strikeBackOnHit } from "./resolution/struck.js";
+import {
+  corrodeOnHit,
+  markMultiattackDefense,
+  offerReactionToHit,
+  strikeBackFromEffects,
+  strikeBackOnHit
+} from "./resolution/struck.js";
 import {
   parkActionSave,
   parkBurstSave,
@@ -105,6 +112,8 @@ import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-
 import { layOutProvisions } from "./resolution/provisions.js";
 import { turnedAwayByWard } from "./resolution/ward.js";
 import { orbLeap } from "./resolution/orb-leap.js";
+import { fastHandsAllows } from "./fast-hands.js";
+import { holdsFastHands } from "./utilize.js";
 import {
   shapedAction,
   shapedOutcome,
@@ -320,7 +329,9 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   strikeBackOnHit(ctx);
+  corrodeOnHit(ctx);
   strikeBackFromEffects(ctx);
+  offerReactionToHit(ctx);
   markMultiattackDefense(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
@@ -343,6 +354,7 @@ export function resolveDefinitionAction(
   applyHealing(ctx);
   prayerShortRest(ctx);
   applyConditionCures(ctx);
+  mendOnCast(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
   reviveOnCast(ctx);
@@ -569,6 +581,30 @@ export function actionAvailability(
         componentsRemaining = instance.components["attack"];
     }
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
+    // Fast Hands' Bonus Action form of an item's Utilize or Magic action, checked as that form would be.
+    const fastForm =
+      !builtin && fastHandsAllows(action) && holdsFastHands(definition)
+        ? { ...action, activation: "bonus-action" as const }
+        : null;
+    const fastEvaluation = fastForm
+      ? evaluateActionEconomy(
+          state,
+          attacker,
+          fastForm,
+          [],
+          definition,
+          undefined,
+          siblings,
+          undefined,
+          false,
+          catalog,
+          spell
+        )
+      : null;
+    const fastReason =
+      fastForm && fastEvaluation
+        ? unavailableReason(fastEvaluation.violations, { state, attacker, action: fastForm, siblings, spell })
+        : undefined;
     const passive = passiveOf(action, builtin);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
     const damageLook = !builtin && damageLookOffered(state, attacker, action, definition, siblings);
@@ -581,6 +617,14 @@ export function actionAvailability(
       violations: evaluation.violations,
       // The sheet's one sentence for why not; the violations keep the full account.
       ...(reason !== undefined ? { reason } : {}),
+      ...(fastEvaluation
+        ? {
+            fastHands: {
+              available: fastEvaluation.violations.length === 0,
+              ...(fastReason !== undefined ? { reason: fastReason } : {})
+            }
+          }
+        : {}),
       ...(passive !== undefined ? { passive } : {}),
       ...(shaping !== undefined ? { shaping } : {}),
       ...(damageLook ? { damageLook: true as const } : {}),

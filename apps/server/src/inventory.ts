@@ -384,6 +384,20 @@ function keepDormant(stored: InventoryItem | undefined, item: InventoryItem): In
   return stored?.dormant ? { ...rest, dormant: true } : rest;
 }
 
+/** A scribed scroll's numbers are the server's record (`crafting.ts`): an edit keeps them as stored and can't set
+ *  them. */
+function keepScribed(stored: InventoryItem | undefined, item: InventoryItem): InventoryItem {
+  const { scribed: _sent, ...rest } = item;
+  return stored?.scribed ? { ...rest, scribed: { ...stored.scribed } } : rest;
+}
+
+/** The penalty acid or rust left on a row is the server's record (`row-penalties.ts`): an edit keeps it as stored, and
+ *  only Mending removes it. */
+function keepPenalty(stored: InventoryItem | undefined, item: InventoryItem): InventoryItem {
+  const { penalty: _sent, ...rest } = item;
+  return stored?.penalty !== undefined ? { ...rest, penalty: stored.penalty } : rest;
+}
+
 /** SRD Ephemeral (a will-o'-wisp): "The wisp can't wear or carry anything." */
 function refuseToCarry(actor: Actor, definition: ActorDefinition | undefined): void {
   if (holdsFeature(definition, "ephemeral", "Ephemeral"))
@@ -449,6 +463,14 @@ export function setInventoryItem(
     deps.catalog
   );
   item = keepDormant(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item
+  );
+  item = keepScribed(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item
+  );
+  item = keepPenalty(
     actor.inventory.find((entry) => entry.id === item.id),
     item
   );

@@ -9,6 +9,8 @@ import { spellCastOf } from "./pending.js";
 import { forceMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { effectNameOf } from "../effect-names.js";
 import { applyKillingHit } from "./kill.js";
+import { lowerScore } from "./score-drain.js";
+import { penalizeRow, wornNonmagicalArmor } from "../row-penalties.js";
 import { HAZARDS } from "../hazards.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
@@ -73,6 +75,16 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       applyKillingHit(ctx, rider, index);
       return;
     }
+    // A score the hit lowers (a shadow's Strength), which kills at 0.
+    if (rider.lowersScore) lowerScore(ctx, rider, index);
+    // Acid that eats the nonmagical armor the target wears (a black pudding's Pseudopod).
+    const armor = rider.armorPenalty ? wornNonmagicalArmor(target, deps.catalog) : null;
+    if (armor && deps.resolveDefinition)
+      for (const event of penalizeRow(state, target.id, armor.id, {
+        resolveDefinition: deps.resolveDefinition,
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      }))
+        ctx.tableNarration.push(tableLineOf(ctx, event));
     if (rider.pull) forceMove(ctx, target, action.name, rider.pull, true);
     if (rider.hazard === "burning") setBurning(ctx, index);
     if (rider.save) {

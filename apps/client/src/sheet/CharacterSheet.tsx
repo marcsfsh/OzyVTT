@@ -23,6 +23,7 @@ import {
   useToast
 } from "@vtt/ui";
 import { abilityModifier } from "@vtt/rules-5e";
+import { SheetCrafting } from "../crafting/SheetCrafting";
 import { DicePanel } from "../dice/DicePanel";
 import { useRollPreference, type SheetAttackMode } from "../dice/roll-preference";
 import { signed } from "../encounter/format";
@@ -339,6 +340,8 @@ export function CharacterSheet({
       edit={edit}
       onEdited={showEdited}
       helping={controller.inFight ? undefined : state}
+      inFight={controller.inFight}
+      party={state}
       onFeedback={say}
     />
   ) : null;
@@ -393,6 +396,11 @@ export function CharacterSheet({
         inFight={controller.inFight}
         actionBlocked={controller.itemBlocked}
         onUseAction={controller.itemAction}
+        crafting={
+          actor.kind === "player-character" ? (
+            <SheetCrafting actor={actor} state={state} busy={busy} edit={edit} />
+          ) : null
+        }
         others={
           role === "gm" && state
             ? state.actors

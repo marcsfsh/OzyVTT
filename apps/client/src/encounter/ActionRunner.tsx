@@ -284,6 +284,7 @@ export function ActionRunner({
           )}
           insideNow={insideNow}
           carried={actor.inventory}
+          carriedBy={(actorId) => state.actors.find((candidate) => candidate.id === actorId)?.inventory ?? []}
           onMap
           busy={resolveBusy}
           onInvalidFace={onFeedback}

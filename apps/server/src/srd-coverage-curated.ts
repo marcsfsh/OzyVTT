@@ -23,7 +23,7 @@ const reference = (note: string): CuratedCoverage => ({ state: "reference", note
 
 export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   blinded: enforced(
-    "resolution/attack.ts: its attack rolls have Disadvantage and attack rolls against it have Advantage. ability-checks.ts fails its Perception check to find a creature unless its Blindsight reaches it, and any check the GM marks as needing sight (check-rolls.ts, a call for a roll). movement-rules.ts: it makes an Opportunity Attack only against a mover in its Blindsight, and with dynamic vision on vision/sight.ts lets it see only within Blindsight."
+    "resolution/attack.ts: its attack rolls have Disadvantage and attack rolls against it have Advantage. ability-checks.ts fails its Perception check to find a creature unless its Blindsight reaches it, and any check the GM marks as needing sight (check-rolls.ts, a call for a roll). It can't target a creature a spell or action needs it to see unless its Blindsight reaches it (resolution/spell-targets.ts, action-targets.ts, vision/rules.ts). movement-rules.ts: it makes an Opportunity Attack only against a mover in its Blindsight, and with dynamic vision on vision/sight.ts lets it see only within Blindsight."
   ),
   charmed: enforced(
     "resolution/economy.ts: a Charmed creature can't attack its charmer or target it with a save, damage or a spell, whether the condition came from a spell, an action or the GM's chip naming the charmer (actor-conditions.ts). ability-checks.ts gives the charmer Advantage on Charisma checks and Animal Handling against it (Influence, or a check the GM calls naming it)."
@@ -44,7 +44,7 @@ export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/economy.ts refuses its actions, Bonus Actions and Reactions. effects.ts ends its Concentration and its grapples, and encounter.ts gives it Disadvantage on Initiative."
   ),
   invisible: enforced(
-    "resolution/attack.ts: Advantage on its attack rolls and Disadvantage on attack rolls against it, unless the other creature sees it (Blindsight, Truesight or See Invisibility within range, or the map with dynamic vision on) or Faerie Fire outlines it. encounter.ts: Advantage on Initiative. movement-rules.ts: it provokes an Opportunity Attack only from a creature whose Blindsight or Truesight reaches it."
+    "resolution/attack.ts: Advantage on its attack rolls and Disadvantage on attack rolls against it, unless the other creature sees it (Blindsight, Truesight or See Invisibility within range, or the map with dynamic vision on) or Faerie Fire outlines it. A spell or action that needs a target its user sees can't pick it unless its user sees it the same way (resolution/spell-targets.ts, action-targets.ts). encounter.ts: Advantage on Initiative. movement-rules.ts: it provokes an Opportunity Attack only from a creature whose Blindsight or Truesight reaches it."
   ),
   paralyzed: enforced(
     "It counts as Incapacitated, and speed.ts sets its Speed to 0. saving-throws.ts fails its Strength and Dexterity saves. resolution/attack.ts gives attack rolls against it Advantage and makes a hit from within 5 feet a Critical Hit."
@@ -160,7 +160,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   cone: areaShape("its width at any point equals that point's distance from the origin."),
   cover: enforced(
-    "With dynamic vision on, cover.ts works out Half, Three-Quarters and Total Cover from the walls between the attacker or the effect's origin and the target, and Half Cover from a creature in the way; a spell's wall gives the cover its text names (Blade Barrier's Three-Quarters, zone-walls.ts), and the GM can mark more. The server adds 2 or 5 to AC and Dexterity saves, and resolution/validate.ts refuses an attack against Total Cover, or across a sphere of force (enclosures.ts)."
+    "With dynamic vision on, cover.ts works out Half, Three-Quarters and Total Cover from the walls between the attacker, or a placed area's point of origin (resolution/pending.ts), and each target, and Half Cover from a creature in the way; a spell's wall gives the cover its text names against an attack or a picked target (Blade Barrier's Three-Quarters, zone-walls.ts), and the GM can mark more. The server adds 2 or 5 to AC and Dexterity saves, and resolution/validate.ts refuses any picked target behind Total Cover, each of a spell's several targets included, or across a sphere of force (enclosures.ts). Cover from what the map doesn't hold (furniture, a low wall drawn as a full one) is the GM's mark."
   ),
   crawling: enforced("movement-rules.ts charges an extra foot per foot while a creature is Prone."),
   creature: reference("A definition; there is nothing to apply."),
@@ -204,7 +204,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "survival.ts, while the GM tracks food and water: each character drinks from its Waterskins as the game day ends, as far as its need goes; less than half its water costs a level of Exhaustion that no rest removes until it drinks its fill. The GM gives a drink at a source."
   ),
   "difficult-terrain": enforced(
-    "The GM paints difficult terrain on the map (terrain.ts), and movement-rules.ts charges double through it, through an enemy's space and through an opening sized for a creature one size smaller (footprintStepPassage). Freedom of Movement ignores it."
+    "The GM paints difficult terrain on the map (terrain.ts), and movement-rules.ts charges double through it, through an enemy's space and, with dynamic vision on, through an opening sized for a creature one size smaller, which a narrower gap bars (footprintStepPassage in rules-5e): a Small or Medium creature squeezes through a gap half a square to three quarters of one wide. The map's drag preview charges the same path (movePreview.ts). Freedom of Movement ignores it."
   ),
   "difficulty-class": enforced(
     "The server works out spell save DCs and feature DCs from the sheet and compares every save and check with its DC."
@@ -260,7 +260,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown, initiative-reroll.ts an initiative die before the character's first turn, and resolution/held-damage.ts one die of an action's damage looked at before it counts. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). The dice of a hit's extras (Sneak Attack, a smite), a reaction's strike, healing and Hit Point Dice are the GM's to reroll."
   ),
   hide: enforced(
-    "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it attacks, casts a spell with a Verbal component or an enemy's Search meets its total. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call."
+    "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it makes an attack roll or casts a spell with a Verbal component (resolution/release.ts), or an enemy's Search meets its total; a throw that asks for a save (a Net, a flask) keeps it hidden. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call."
   ),
   "high-jump": enforced(
     "jumping.ts lets a jump rise up to 3 plus the Strength modifier with 10 feet moved this turn before it, half from a standing start, a foot of movement for each foot. Reaching up half its height more is the GM's."
@@ -300,14 +300,14 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "A melee hit's confirm offers Knock out (resolution/knock-out.ts), and every apply path then lands it: hit-points.ts leaves a creature it drops at 1 Hit Point and Unconscious until it regains Hit Points, stabilize.ts gives it first aid, or an hour passes on the game clock and its Short Rest ends (game-time.ts)."
   ),
   "lightly-obscured": enforced(
-    "With dynamic vision on, vision/sight.ts knows Lightly Obscured points (Dim Light, a painted light fog or foliage area), and ability-checks.ts gives a Perception check to find a creature there Disadvantage, and a Passive Perception compared with a Hide total 5 less (resolution/builtins.ts)."
+    "With dynamic vision on, vision/sight.ts knows Lightly Obscured points (Dim Light, a painted light fog or foliage area), and ability-checks.ts gives a Perception check to find a creature there Disadvantage: a check naming it, and the Search action, whose one roll is read against each hidden creature with the lower of two d20s where that creature is Lightly Obscured (resolution/builtins.ts). A Passive Perception compared with a Hide total is 5 less."
   ),
   line: areaShape("a Line has a fixed width, and the point it starts from isn't in it."),
   "long-jump": enforced(
     "jumping.ts lets a jump cover up to the Strength score with 10 feet moved this turn before it, half from a standing start, a foot of movement for each foot, and rolls the DC 10 Dexterity (Acrobatics) check on a landing in Difficult Terrain. Clearing a low obstacle is the GM's."
   ),
   "long-rest": enforced(
-    "rests.ts needs 1 Hit Point and 16 hours since the last one. It restores Hit Points, Hit Point Dice, spell slots and uses, removes a level of Exhaustion and ends what lasts until a Long Rest. The party's Long Rest moves the game clock 8 hours, which counts down every effect (game-time.ts)."
+    "rests.ts needs 1 Hit Point and 16 hours since the last one. It restores Hit Points, Hit Point Dice, spell slots and uses, removes a level of Exhaustion and ends what lasts until a Long Rest. The party's Long Rest stays open from the game clock's time until the GM finishes it, which moves the clock 8 hours and counts down every effect (long-rest.ts, game-time.ts). Rolling Initiative, taking damage or casting a spell above a cantrip interrupts a member's rest, and the GM interrupts one for an hour of walking or exertion (rest-interruptions.ts): after an hour of rest it gets a Short Rest's benefits and may spend Hit Point Dice, and resuming adds an hour per interruption. A Long Rest the GM grants one character at once has no span to interrupt."
   ),
   magic: enforced(
     "resolution/economy.ts spends the action when a spell or an item's action is used. A creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last (resolution/long-casting.ts); outside a fight it completes at once and moves the game clock by its whole hours. An item's long cast in a fight is a reminder to the GM (resolution/validate.ts)."
@@ -362,13 +362,13 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "saving-throws.ts opens a save prompt for each target and rolls it on the server, with the proficiency, riders, Advantage and Disadvantage that apply. A creature may choose to fail it without a roll (save.answer)."
   ),
   search: guided(
-    "resolution/builtins.ts rolls the chosen Wisdom check. With dynamic vision on, a Perception search finds each hidden creature in its line of sight whose Hide total it meets and ends its hiding. The GM sets any other DC and says what else the creature finds."
+    "resolution/builtins.ts rolls the chosen Wisdom check. With dynamic vision on, a Perception search finds each hidden creature in its line of sight whose Hide total it meets and ends its hiding, read with Disadvantage against one Lightly Obscured to the searcher and Advantage against one its Hunter's Mark marks. The GM sets the DC of an Insight, Medicine or Survival search and says what the creature finds, and with dynamic vision off who the searcher can see is the GM's."
   ),
   "shape-shifting": enforced(
     "transform/assume.ts takes a form as an effect on the creature: a stat block's statistics replace its own, with what the effect says it keeps (transform/compose.ts), or one of its printed forms changes its size and speeds. Its Hit Points stay its own, conditions and effects carry over, and the token takes the form's size (transform/forms.ts). It reverts when the effect ends or it dies (transform/rules.ts)."
   ),
   "short-rest": enforced(
-    "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent, gives back what a Short Rest restores and ends what lasts until one. The party's Short Rest moves the game clock an hour when the GM finishes it. short-rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
+    "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent, gives back what a Short Rest restores and ends what lasts until one. The party's Short Rest moves the game clock an hour when the GM finishes it. rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
   ),
   "simultaneous-effects": guided(
     "simultaneous-effects.ts: two or more things that change Hit Points as a turn starts or ends (ongoing damage, Hit Points or Temporary Hit Points regained, a trait that burns or regenerates) wait for the creature's controller, its player or the GM, to put them in order, and turn-boundaries.ts plays them out that way. The saves a turn opens are prompts answered in any order. Other things that happen at once (effects set off by the same hit) run in the server's order, which the GM may correct."
@@ -409,7 +409,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "speed.ts gives a creature with a Swim Speed its own budget for swimming, with no extra cost."
   ),
   target: enforced(
-    "resolution/spell-targets.ts holds a spell to the number of targets it names (more with a higher slot), the creature type it affects, the ones the caster can see when dynamic vision is on, its range, and for creatures of the caster's choice in an area, to those inside it."
+    "resolution/spell-targets.ts holds a spell to the number of targets it names (more with a higher slot), the ones the caster can see (vision/rules.ts, with dynamic vision on or off), its range, and for creatures of the caster's choice in an area, to those inside it; resolution/validate.ts refuses one behind Total Cover. A target of a type the spell can't affect is unaffected and the slot is spent, and its player isn't told the type (resolution/type-gates.ts)."
   ),
   telepathy: reference("Telepathy is the table's to run."),
   teleportation: enforced(
@@ -422,7 +422,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "vision/senses.ts reads it, and with dynamic vision on vision/sight.ts lets the creature pinpoint creatures within range, walls or not, without seeing them. Whether a creature is touching the ground is the GM's."
   ),
   truesight: enforced(
-    "Within its range vision/sight.ts lets a creature see Invisible creatures and into normal and magical Darkness, and attack rolls read it, by the distance between the tokens with dynamic vision off. Illusions, true forms and the Ethereal Plane are the GM's."
+    "Within its range vision/sight.ts lets a creature see Invisible creatures and into normal and magical Darkness, and attack rolls read it, by the distance between the tokens with dynamic vision off. It succeeds with no roll on its saves against a visual illusion (Phantasmal Force, Phantasmal Killer, Hypnotic Pattern) cast within its range (resolution/pending.ts). True forms and the Ethereal Plane are the GM's."
   ),
   "unarmed-strike": enforced(
     "resolution/builtins.ts rolls the strike for 1 plus Strength Bludgeoning damage, or the grapple or shove save against 8 plus Strength plus the Proficiency Bonus."
@@ -430,7 +430,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   unconscious: condition("unconscious"),
   "unoccupied-space": enforced("movement-rules.ts ends a move only in a space no other creature fills."),
   utilize: guided(
-    "resolution/economy.ts spends the action, and a Shield donned or doffed in a fight takes it (held-items.ts). The sheet offers each tool's Utilize uses as checks at their printed DCs. What the object does is the GM's."
+    "In a fight the Utilize action takes the user's action on its own turn, and outside one it takes nothing. A Shield donned or doffed (held-items.ts), a door worked on (doors.ts) and a tool's or gear's Utilize use from the sheet (tool-uses.ts) take it, and a use needs the item in the pack. What the object does is the GM's."
   ),
   vulnerability: enforced("hit-points.ts doubles damage of a type the creature is vulnerable to, once per instance."),
   weapon: reference("A definition. Each weapon's own row under Weapons says what the app does with it."),
@@ -447,10 +447,15 @@ const revives = guided(
 const breath = enforced(
   "breath.ts reads it: the creature breathes water, or holds its breath for the time it prints, when it is out of air."
 );
-/** A tool's row: its check and its Utilize uses are the sheet's; crafting with it is the GM's. */
-const toolUse = guided(
-  "The sheet rolls its check with the ability it names and offers its Utilize uses at their printed DCs (ability-checks.ts toolUses). In a fight that is the Utilize action, and crafting with it is the GM's."
+/** What every tool's Utilize uses do on the sheet. */
+const TOOL_USES =
+  "The sheet rolls its check with the ability it names and offers its Utilize uses at their printed DCs; a use rolled in a fight takes the Utilize action and needs the tool in the pack (tool-uses.ts).";
+/** A tool with a Craft line: its uses, and crafting.ts making what the line lists. */
+const toolCraft = guided(
+  `${TOOL_USES} crafting.ts makes what its Craft line lists in downtime, for half the price in raw materials and a day of 8 hours per 10 GP, helpers with the proficiency dividing the days. What a check finds is the GM's.`
 );
+/** A tool with no Craft line: its uses, and what the check finds or makes. */
+const toolCheck = (what: string) => guided(`${TOOL_USES} What the check finds or makes (${what}) is the GM's.`);
 /** A trait that lights the map around its creature. */
 const sheds = enforced("vision/senses.ts gives the creature its printed Bright and Dim Light, carried with its token.");
 /** A trait that hinders a creature standing in sunlight, read from the light where its token stands. */
@@ -515,8 +520,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Celestial Restoration": revives,
   Compression: squeezes,
   "Confer Fire Resistance": reference("Granting its rider Resistance is the GM's to apply."),
-  "Corrosive Form": guided(
-    "resolution/struck.ts deals the black pudding's 1d8 Acid damage to a creature that hits it with a melee attack. The gray ooze's printing deals none, and the damage to weapons and ammunition is the GM's."
+  "Corrosive Form": enforced(
+    "resolution/struck.ts deals the black pudding's 1d8 Acid damage to a creature that hits it with a melee attack (the gray ooze's printing deals none), and gives a nonmagical weapon that damages it a cumulative -1 to attack rolls, destroyed at -5 (row-penalties.ts; Mending removes it, resolution/mend.ts). Nonmagical ammunition that hits and damages it is destroyed, so none of it is found after the fight (resolution/ammunition.ts). Eating through wood or metal is the GM's."
   ),
   "Death Burst": enforced(
     "statblock-traits.ts opens the save for each creature in the Emanation when it dies, with the damage rolled once."
@@ -527,7 +532,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Demonic Restoration": revives,
   "Diabolical Restoration": revives,
   "Divine Awareness": senses,
-  "Draconic Origin": reference("The GM picks the damage type and edits the stat block to match."),
+  "Draconic Origin": enforced(
+    "The GM picks the damage type once for each half-dragon from its row tools (statblock-picks.ts, PickControl). Its Dragon's Breath and its Claw's 2d6 deal that type every time, and an unpicked one asks for the pick first."
+  ),
   "Earth Glide": enforced(
     "A burrowing move passes it through the map's walls at no extra cost (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. Leaving no trace is the GM's."
   ),
@@ -652,7 +659,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and let it through any gap in the walls a Tiny creature fits at no extra cost (wall-passage.ts). The map's drag preview (movePreview.ts) charges the same path. Healing a swarm restores nothing (resolution/heal.ts)."
   ),
   "Telepathic Bond": senses,
-  Training: reference("The GM picks the skill and applies its Advantage."),
+  Training: enforced(
+    "The GM picks the skill for each creature from its row tools (statblock-picks.ts). ability-checks.ts adds its Proficiency Bonus to checks with that skill and rolls them with Advantage."
+  ),
   Transparent: reference("Noticing the cube is the GM's call, with the DC the trait prints."),
   "Treasure Sense": senses,
   "Troll Spawn": reference("What becomes of a severed limb is the GM's to run."),
@@ -758,11 +767,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:unseen-servant": enforced(
     "The Invisible servant appears within 60 feet with AC 10, 1 Hit Point and Strength 2 and can't attack (summons.ts). A Bonus Action sends it 15 feet (summon-orders.ts), and it ends more than 60 feet from the caster. Its tasks are the GM's."
   ),
-  "feature:wild-companion": guided(
-    "Find Familiar is always prepared and cast as a Magic action with a slot or a use of Wild Shape; the familiar is Fey and leaves when the Druid finishes a Long Rest (character-build.ts, summons.ts). Going without the Material component is the GM's."
+  "feature:wild-companion": enforced(
+    "Find Familiar is always prepared and cast as a Magic action with a slot or a use of Wild Shape, with no Material component (resolution/components.ts reads the cast's waiver); the familiar is Fey and leaves when the Druid finishes a Long Rest (character-build.ts, summons.ts)."
   ),
-  "feature:dragon-companion": guided(
-    "Summon Dragon is cast free once a Long Rest, and any casting may go without Concentration, lasting 1 minute then (character-build.ts, summons.ts). Going without the Material component is the GM's."
+  "feature:dragon-companion": enforced(
+    "Summon Dragon is cast with no Material component (resolution/components.ts reads the cast's waiver), free once a Long Rest, and any casting may go without Concentration, lasting 1 minute then (character-build.ts, summons.ts)."
   ),
   "item:bag-of-tricks": enforced(
     "The GM says which bag a found one is (item-records.ts); its pull rolls the d8 on that bag's table, and the creature appears within 20 feet acting right after its user until the next Long Rest or 0 Hit Points (summons.ts). A Bonus Action commands it (summon-orders.ts)."
@@ -817,7 +826,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Each target can leap up to 30 feet for 10 feet of movement once on each of its turns for 1 minute (jumping.ts)."
   ),
   "spell:levitate": guided(
-    "A failed save lifts the target 20 feet (falling.ts); while levitating it moves only as if climbing (altitude.ts), and it floats gently down when the spell ends. A willing target's save, and moving it up or down on the caster's turn, are the GM's, who sets its height."
+    "A creature on the caster's side rises 20 feet with no save, and any other creature only on a failed Constitution save (falling.ts); while levitating it moves only as if climbing (altitude.ts), and it floats gently down when the spell ends. Raising or lowering it on the caster's turn, and an object, are the GM's, who sets its height."
   ),
   "spell:banishment": guided(
     "A failed save Incapacitates the target and takes it off the map while the caster concentrates (off-plane.ts); it can't be targeted, and it returns to the space it left or the nearest unoccupied one. An extraplanar creature that stays gone after the full minute is the GM's."
@@ -915,8 +924,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Gibbering Mouther/bite": enforced(
     "The hit's damage, and Prone on a Medium or smaller target, are applied. A creature it drops to 0 Hit Points dies outright with nothing left of its body (hit-points.ts)."
   ),
-  "action:Mummy Lord/whirlwind-of-sand": guided(
-    "The Reaction gives a 60-foot teleport (granted-moves.ts). The +2 AC against the triggering attack and the creatures it blinds are the GM's."
+  "action:Mummy Lord/whirlwind-of-sand": enforced(
+    "resolution/pending.ts offers it on every hit, and one answer raises the mummy's AC by 2 against that attack, which may then miss, and grants its 60-foot teleport (reactions.ts, granted-moves.ts). Landing Blinds each enemy the mummy sees within 5 feet of its destination until the end of the mummy's next turn (granted-moves.ts); its allies are left out as the creatures it wouldn't choose."
   ),
   "action:Balor/teleport": enforced(
     "A 60-foot teleport is granted to the balor, or to the one demon within 10 feet it names instead (resolution/movement-grants.ts, resolution/action-targets.ts). Whether that demon is willing is its player's or the GM's."
@@ -940,7 +949,27 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "It works only in the tiger and hybrid forms (transform/rules.ts), and a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts). The Hide at the end of it is the GM's."
   ),
   // Cantrips with nothing to roll: the cast is the server's, what it does is the table's.
-  "spell:light": castOnly("The light and the object it shines from are the GM's."),
+  "spell:light": enforced(
+    "The object touched, held by the caster or a creature on its side, sheds Bright Light 20 feet and Dim Light 20 feet more for the hour, and moves with its holder; casting it again ends the earlier light (vision/cast-sight.ts). An enemy's object is refused (resolution/spell-targets.ts). An object no one holds, and covering the light, are the table's."
+  ),
+  "spell:continual-flame": enforced(
+    "The object touched, held by the caster or a creature on its side, sheds Bright Light 20 feet and Dim Light 20 feet more until dispelled, and moves with its holder (vision/cast-sight.ts); an enemy's object is refused (resolution/spell-targets.ts). It consumes 50 GP of ruby dust (resolution/components.ts). An object no one holds, and covering the flame, are the table's."
+  ),
+  "spell:animal-messenger": guided(
+    "Only a Tiny Beast the caster can see within 30 feet is affected: a larger creature is refused, and a creature of another type is unaffected though the slot is spent (resolution/spell-targets.ts, resolution/type-gates.ts). One whose Challenge Rating isn't 0 succeeds on the Charisma save with no roll (resolution/pending.ts). The message, the journey and its longer duration from a higher slot are the GM's."
+  ),
+  "spell:awaken": enforced(
+    "Only a Beast or a Plant with an Intelligence of 3 or less is affected, and any other creature isn't, though the cast is spent (resolution/type-gates.ts). The cast takes its 8 hours and consumes the agate (resolution/components.ts). The target's Intelligence becomes 10 for good, and it is Charmed by the caster for 30 days or until the caster or an ally damages it (resolution/inflicts.ts). Its language, a natural plant's statistics and its attitude after are the GM's."
+  ),
+  "spell:seeming": guided(
+    "Each creature the caster picks that it can see within 30 feet takes the disguise: one on the caster's side with no save, any other only on a failed Charisma save (resolution/pending.ts). The disguises and their 8 hours are the GM's."
+  ),
+  "spell:nondetection": enforced(
+    "The caster or a creature on its side that it touches can't be the target of a Divination spell for 8 hours, nor be caught in one's area or sensed by one (resolution/spell-wards.ts). It consumes 25 GP of diamond dust (resolution/components.ts). Hiding a place or an object, and scrying sensors, are the GM's."
+  ),
+  "spell:arcanists-magic-aura": enforced(
+    "Mask gives the caster or a creature on its side the creature type the caster picks for 24 hours, which spells and other magical effects read wherever they check a type (statblock-facts.ts creatureTypeOf); a skill check and a stat block's own traits read the true one. False Aura on an object, and making it last, are the GM's."
+  ),
   "spell:mage-hand": enforced(
     "The hand appears as a token at a point within 30 feet (summons.ts); a Magic action moves it up to 30 feet (summon-orders.ts), and it vanishes more than 30 feet from the caster or when the spell is cast again. Aimed at a door on the map within 30 feet, it opens or shuts an unlocked one (resolution/cast-walls.ts), and a door held shut stays shut. What else it handles is the GM's."
   ),
@@ -969,7 +998,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 18 Dexterity (Acrobatics) check, its action, frees it. The DC 13 Strength (Athletics) check to bind it and bursting the Chain are the GM's."
   ),
   "item:rope": enforced(
-    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 15 Dexterity (Acrobatics) check, its action, frees it. Bursting the Rope is the GM's."
+    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 15 Dexterity (Acrobatics) check, its action, frees it. Its Utilize use ties a knot with a DC 10 Dexterity (Sleight of Hand) check (tool-uses.ts). Bursting the Rope is the GM's."
   ),
   "item:manacles": guided(
     "Its action binds a Small or Medium creature within 5 feet that is Grappled, Incapacitated or Restrained: it has Disadvantage on attack rolls until a DC 20 Dexterity (Sleight of Hand) check, its action, frees it. The DC 13 check to bind it, the Restrained condition while they are fixed in place, and bursting them are the GM's."
@@ -1000,10 +1029,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     [
       "alchemists-supplies",
       "brewers-supplies",
-      "calligraphers-supplies",
-      "carpenters-tools",
       "cartographers-tools",
-      "cobblers-tools",
       "cooks-utensils",
       "glassblowers-tools",
       "jewelers-tools",
@@ -1011,20 +1037,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
       "masons-tools",
       "painters-supplies",
       "potters-tools",
-      "smiths-tools",
       "tinkers-tools",
       "weavers-tools",
       "woodcarvers-tools",
       "disguise-kit",
-      "forgery-kit",
-      "herbalism-kit",
-      "navigators-tools",
-      "poisoners-kit",
-      "thieves-tools",
-      "gaming-set-dice",
-      "gaming-set-playing-cards",
-      "gaming-set-dragonchess",
-      "gaming-set-three-dragon-ante",
+      "poisoners-kit"
+    ].map((id) => [`item:${id}`, toolCraft])
+  ),
+  ...Object.fromEntries(
+    ["gaming-set-dice", "gaming-set-playing-cards", "gaming-set-dragonchess", "gaming-set-three-dragon-ante"].map(
+      (id) => [`item:${id}`, toolCheck("who cheats and who wins the game")]
+    )
+  ),
+  ...Object.fromEntries(
+    [
       "instrument-bagpipes",
       "instrument-drum",
       "instrument-dulcimer",
@@ -1035,7 +1061,24 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
       "instrument-pan-flute",
       "instrument-shawm",
       "instrument-viol"
-    ].map((id) => [`item:${id}`, toolUse])
+    ].map((id) => [`item:${id}`, toolCheck("how the tune or song lands")])
+  ),
+  "item:forgery-kit": toolCheck("how convincing the forgery is"),
+  "item:navigators-tools": toolCheck("the course plotted and the position found"),
+  "item:calligraphers-supplies": guided(
+    `${TOOL_USES} crafting.ts makes Ink in downtime, and scribes a Spell Scroll of a spell the scribe has prepared on each day of work, at the Spell Scroll Costs table's days and gold, with the scribe's spell save DC and attack bonus. What a check finds is the GM's.`
+  ),
+  "item:herbalism-kit": guided(
+    `${TOOL_USES} crafting.ts makes what its Craft line lists in downtime, and brews a Potion of Healing for 25 GP and a day of work. What a check finds is the GM's.`
+  ),
+  "item:cobblers-tools": guided(
+    `${TOOL_USES} A success at modifying footwear gives its wearer Advantage on its next Dexterity (Acrobatics) check (help-assist.ts). crafting.ts makes a Climber's Kit in downtime. Hiding a compartment in a boot heel is the GM's.`
+  ),
+  "item:grappling-hook": guided(
+    "Its Utilize use rolls a DC 13 Dexterity (Acrobatics) check to catch the hook, taking the action in a fight (tool-uses.ts). Whether something within 50 feet can hold it is the GM's."
+  ),
+  "item:bead-of-nourishment": enforced(
+    "It is a day's food: while the GM tracks food and water, a character eats one from its pack (actor.nourish), and survival.ts eats the beads it carries as the game day ends, after its Rations."
   ),
   "item:rations": enforced(
     "survival.ts, while the GM tracks food and water: a character eats a Ration from its inventory on its own (actor.nourish) or as the game day ends, a pound of food each, as far as its need goes."
@@ -1152,8 +1195,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
 
   // Answers to a roll after it is seen (roll-answers.ts), and reactions to damage about to land (damage-window.ts).
-  "feature:bardic-inspiration": guided(
-    "The Bonus Action gives another creature the Bard's die, a d6 growing to a d12, one die at a time, and roll-answers.ts offers it when that creature fails an attack roll, a save, a check or a death save: the die is added and spent. A creature beyond 60 feet is refused, and an unused die ends after an hour. Whether the creature can see or hear the Bard is the GM's."
+  "feature:bardic-inspiration": enforced(
+    "The Bonus Action gives another creature within 60 feet that can see or hear the Bard (resolution/action-targets.ts) the Bard's die, a d6 growing to a d12, one die at a time, for an hour of game time; roll-answers.ts offers it when that creature fails an attack roll, a save, a check or a death save, and the die is added and spent."
+  ),
+  "feature:uncanny-dodge": enforced(
+    "When an attacker the Rogue can see hits it with an attack roll, damage-window.ts offers its Reaction to halve the attack's damage before it lands."
   ),
   "feature:cutting-words": enforced(
     "roll-answers.ts asks the Bard by a reaction prompt when a creature it can see within 60 feet hits with an attack roll, succeeds on a check or rolls damage. Using it spends a Bardic Inspiration use and the Reaction and takes the die off the roll, which can turn the hit into a miss or lower the damage before it lands (damage-window.ts)."
@@ -1188,11 +1234,106 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:superior-hunters-defense": enforced(
     "damage-window.ts offers it when the Ranger is about to take damage from a hit or a failed save. Using it gives Resistance to the damage's largest type, that damage included, until the end of the current turn."
   ),
-  "action:Stone Giant/deflect-missile": guided(
-    "A ranged hit with Bludgeoning, Piercing or Slashing damage opens the giant's reaction prompt (damage-window.ts), and using it takes 1d10 + 6 off the damage, recharging on a 5 or 6. Redirecting the force at another creature when the damage reaches 0 is the GM's."
+  "action:Stone Giant/deflect-missile": enforced(
+    "A ranged hit with Bludgeoning, Piercing or Slashing damage opens the giant's reaction prompt (damage-window.ts), and using it takes 1d10 + 6 off the damage, recharging on a 5 or 6. When nothing is left, the same answer turns its DC 17 Dexterity save, 11 (1d10 + 6) Force damage on a failure, on the creature the GM picks among those the giant sees within 60 feet, the attacker unless another is picked (reactions.ts)."
   ),
-  "action:Rust Monster/reflexive-antennae": guided(
-    "damage-reactions.ts offers it when a creature within 5 feet damages the rust monster, and using it resolves Antennae against that creature, opening its Dexterity save. It is offered on any damage, not only a hit's, so the GM declines it for a spell."
+  "action:Rust Monster/reflexive-antennae": enforced(
+    "triggered-reactions.ts offers it when an attack roll from a creature within 5 feet hits the rust monster, and using it resolves Antennae against that creature (reactions.ts)."
+  ),
+  // Stat-block actions whose printed riders, target rules and drop-to-0 clauses the readers carry (build-bundle.ts,
+  // save-outcomes.ts), each a row the data pass would read as plain damage.
+  "action:Half-Dragon/claw": enforced(
+    "The hit's Slashing damage and 2d6 of the type picked for its Draconic Origin are applied (statblock-picks.ts); a half-dragon with no pick yet asks the GM for one first."
+  ),
+  "action:Giant Ape/boulder-toss": enforced(
+    "The save's Bludgeoning damage is applied, half on a success, and a failure knocks a Large or smaller creature Prone (resolution/pending.ts); a bigger one takes the damage alone."
+  ),
+  "action:Gladiator/shield-bash": enforced(
+    "The save's Bludgeoning damage is applied, and a failure knocks a Medium or smaller creature Prone (resolution/pending.ts); a bigger one takes the damage alone."
+  ),
+  "action:Ghoul/claw": enforced(
+    "The hit's Slashing damage is applied, and its Constitution save opens only on a creature that is neither an Undead nor an elf (resolution/pending.ts), a failure leaving it Paralyzed until the end of its next turn."
+  ),
+  "action:Steam Mephit/steam-breath": guided(
+    "The save's Fire damage is applied, half on a success, and a failure takes 10 feet off the target's Speed until the end of the mephit's next turn (saving-throws.ts). Underwater, hit-points.ts still gives the Fire damage Resistance, which the breath ignores; the GM gives that half back."
+  ),
+  "action:Adult Brass Dragon/scorching-sands": enforced(
+    "The save's Fire damage is applied, and a failure halves the target's Speed until the end of its next turn (saving-throws.ts). The dragon takes it once until its next turn starts (resolution/economy.ts)."
+  ),
+  "action:Adult Black Dragon/cloud-of-insects": enforced(
+    "The save's Poison damage is applied, and a failure gives the target Disadvantage on saves to keep Concentration until the end of its next turn (saving-throws.ts). The dragon takes it once until its next turn starts (resolution/economy.ts)."
+  ),
+  "action:Dretch/fetid-cloud-1-day": enforced(
+    "Each creature in the Emanation saves, and a failure leaves it Poisoned until the end of its next turn, taking an action or a Bonus Action on its turn and no Reactions while it lasts (saving-throws.ts, resolution/economy.ts)."
+  ),
+  "action:Swarm of Ravens/cacophony": enforced(
+    "A failure leaves the target Deafened until the start of the swarm's next turn, with Disadvantage on ability checks and attack rolls while it lasts (saving-throws.ts)."
+  ),
+  "action:Ghost/horrific-visage": enforced(
+    "The Cone's save reaches only a creature that sees the ghost and isn't an Undead (resolution/pending.ts, resolution/type-gates.ts). A failure deals the Psychic damage and Frightens it until the start of the ghost's next turn, and a success makes it immune for the fight."
+  ),
+  "action:Lich/disrupt-life": enforced(
+    "The Emanation's save leaves out every Undead (resolution/type-gates.ts), and the Necrotic damage lands, half on a success. The lich takes it once until its next turn starts (resolution/economy.ts)."
+  ),
+  "action:Planetar/holy-burst": enforced(
+    "The Sphere's save reaches only the planetar's enemies (commands/actions.ts), and the Radiant damage lands, half on a success."
+  ),
+  "action:Rakshasa/baleful-command": enforced(
+    "The Emanation's save reaches only the rakshasa's enemies (commands/actions.ts). A failure deals the Psychic damage and leaves the target Frightened and Incapacitated until the start of the rakshasa's next turn."
+  ),
+  "action:Sphinx of Lore/mind-rending-roar": enforced(
+    "The Emanation's save reaches only the sphinx's enemies (commands/actions.ts). A failure deals the Psychic damage and Incapacitates the target until the start of the sphinx's next turn."
+  ),
+  "action:Aboleth/consume-memories": enforced(
+    "It targets one creature within 30 feet that is Charmed or Grappled by the aboleth (resolution/action-targets.ts), and the Psychic damage lands, half on a success. Gaining a Humanoid's memories is the story's."
+  ),
+  "action:Doppelganger/unsettling-visage": enforced(
+    "The Emanation's save reaches only a creature that sees the doppelganger (resolution/pending.ts). A failure Frightens it, repeating the save at the end of each of its turns, and it succeeds on its own after 1 minute."
+  ),
+  "action:Kraken/toxic-ink": enforced(
+    "resolution/economy.ts refuses it in a fight the GM hasn't marked as underwater. A failure leaves each creature in the Emanation Blinded and Poisoned until the end of the kraken's next turn, and the kraken gets its move (granted-moves.ts)."
+  ),
+  "action:Seahorse/bubble-dash": enforced(
+    "resolution/economy.ts refuses it in a fight the GM hasn't marked as underwater; underwater it grants a swim of its Swim Speed that provokes no Opportunity Attacks (granted-moves.ts)."
+  ),
+  "action:Giant Seahorse/bubble-dash": enforced(
+    "resolution/economy.ts refuses it in a fight the GM hasn't marked as underwater; underwater it grants a swim of half its Swim Speed that provokes no Opportunity Attacks (granted-moves.ts)."
+  ),
+  "action:Homunculus/bite": enforced(
+    "The hit's damage is applied and its Constitution save opens. A failure leaves the target Poisoned until the end of the homunculus's next turn; a failure by 5 or more Poisons it for 1 minute, and Unconscious with it until it takes damage (save-margins.ts)."
+  ),
+  "action:Pseudodragon/sting": enforced(
+    "A failure deals the Poison damage and Poisons the target for 1 hour. A failure by 5 or more also leaves it Unconscious while Poisoned, until it takes damage or a creature within 5 feet takes an action to wake it (save-margins.ts)."
+  ),
+  "action:Chain Devil/unnerving-gaze": enforced(
+    "triggered-reactions.ts offers it when a creature that sees the devil, and that the devil sees, starts its turn within 30 feet of it; creatures of the devil's own side open no prompt. Using it opens the DC 15 Wisdom save: a failure Frightens the creature until that turn ends, and a success makes it immune to this devil's gaze for the fight (saving-throws.ts)."
+  ),
+  "action:Nalfeshnee/nalfeshnee-pursuit": enforced(
+    "triggered-reactions.ts offers it when a creature the nalfeshnee sees ends a move within 120 feet of it (commands/map.ts, or a held move once it goes on). Using it grants its Teleport, which a destination within 10 feet of that creature takes (granted-moves.ts, movement-rules.ts); one farther is the GM's own move."
+  ),
+  "action:Black Pudding/black-pudding-split": enforced(
+    "triggered-reactions.ts offers it when the pudding, Large or Medium with 10 or more Hit Points, becomes Bloodied or is dealt Lightning or Slashing damage. Using it puts two puddings of its stat block in its place, each one size smaller with half its Hit Points (round down) as current and maximum, on its Initiative count (split.ts)."
+  ),
+  "action:Ochre Jelly/split": enforced(
+    "triggered-reactions.ts offers it when the jelly, Large or Medium with 10 or more Hit Points, becomes Bloodied or is dealt Lightning or Slashing damage. Using it puts two jellies of its stat block in its place, each one size smaller with half its Hit Points (round down) as current and maximum, on its Initiative count (split.ts)."
+  ),
+  "action:Black Pudding/dissolving-pseudopod": enforced(
+    "The attack and its 4d6 + 3 Acid damage are applied, and a hit gives the nonmagical body armor the target wears a cumulative -1 to the AC it offers, destroying it at AC 10 (resolution/on-hit.ts, row-penalties.ts). Mending removes the penalty (resolution/mend.ts)."
+  ),
+  "action:Gray Ooze/pseudopod": enforced(
+    "The attack and its 2d8 + 1 Acid damage are applied, and a hit gives the nonmagical body armor the target wears a cumulative -1 to the AC it offers, destroying it at AC 10 (resolution/on-hit.ts, row-penalties.ts). Mending removes the penalty (resolution/mend.ts)."
+  ),
+  "action:Rust Monster/antennae": enforced(
+    "The Dexterity save is rolled against the creature (saving-throws.ts). A failure gives the nonmagical metal armor or weapon the GM names, else its worn armor or its weapon in hand, a cumulative -1 to the AC it offers or to its attack rolls, armor destroyed at AC 10 and a weapon at -5 (row-penalties.ts). A magic item is refused, and Mending removes the penalty (resolution/mend.ts)."
+  ),
+  "action:Shadow/draining-swipe": guided(
+    "The hit's Necrotic damage is applied, and the target's Strength drops by 1d4, cumulatively until ended, read by every rule (resolution/score-drain.ts, live-abilities.ts); a target taken to 0 Strength dies. A Shadow rising from a Humanoid it slays 1d4 hours later is the GM's."
+  ),
+  "action:Phase Spider/bite": enforced(
+    "The attack and its 1d10 + 3 Piercing plus 2d8 Poison damage are applied. A target the damage drops to 0 Hit Points is Stable instead of dying, Poisoned and Paralyzed for 1 hour, and regains 1 Hit Point after 1d4 hours unless healed first (stable-at-zero.ts)."
+  ),
+  "action:Vampire Familiar/umbral-dagger": enforced(
+    "The attack and its 1d4 + 3 Piercing plus 3d4 Necrotic damage are applied. A target the attack drops to 0 Hit Points is Stable instead of dying, Poisoned and Paralyzed for 1 hour, and regains 1 Hit Point after 1d4 hours unless healed first (stable-at-zero.ts)."
   ),
   "action:Sphinx of Wonder/burst-of-ingenuity": enforced(
     "roll-answers.ts offers it on the sphinx's own check or save and asks it by a prompt about another creature's within 30 feet. Using it adds 2 to the roll, twice a day."
@@ -1204,13 +1345,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Protector's training and Thaumaturge's extra cantrip are applied, and Thaumaturge adds the Wisdom modifier, at least +1, to Arcana and Religion checks (ability-checks.ts)."
   ),
   "feature:eldritch-invocations": guided(
-    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied, and level-up-picks.ts lets a level up replace one invocation. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). Devil's Sight and Witch Sight are senses dynamic vision reads (vision/senses.ts), and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Pact of the Chain casts Find Familiar as a Magic action and adds its special forms (character-build.ts, summons.ts); forgoing an attack so the familiar attacks with its Reaction is the GM's. Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
+    "Agonizing Blast adds Charisma to the damage of the cantrip picked for it (effective-actions.ts), Eldritch Spear its range and Repelling Blast its push (resolution/masteries.ts), each repeatable on another cantrip. Eldritch Mind's Advantage and the free casts are applied, an \"on yourself\" cast targets only the Warlock and Fiendish Vigor's die is at its highest; level-up-picks.ts lets a level up replace one invocation. Pact of the Blade's Bonus Action conjures or bonds the weapon picked, with proficiency, Charisma, the three damage types and its use as a focus, and Thirsting and Devouring Blade add attacks with it (pact-weapon.ts); Eldritch Smite and Lifedrinker ride its hits (resolution/hit-options.ts). Pact of the Tome's book holds three cantrips and two Rituals from any list, prepared and a Spellcasting Focus while it is carried, conjured anew with its picks re-made at the end of a rest; Gift of the Protectors' page holds the names written on it and drops one to 1 Hit Point once a Long Rest (book-of-shadows.ts). Gift of the Depths gives its Swim Speed and water breathing, Lessons of the First Ones its Origin feat, Devil's Sight and Witch Sight are senses dynamic vision reads, and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Pact of the Chain casts Find Familiar as a Magic action with its special forms (summons.ts). Forgoing an attack for the familiar's, Investment of the Chain Master and Gaze of Two Minds are the GM's."
   ),
   "feature:elemental-fury": enforced(
     "Primal Strike's extra damage, of the type the Druid picks, rides a weapon attack or a Beast form's attack in Wild Shape once a turn (resolution/hit-riders.ts). Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
   ),
   "feature:wild-shape": enforced(
-    "The Druid picks its known forms on the sheet, as many as its level allows and within its Challenge Rating and Fly Speed limits, and replaces one after a Long Rest (transform/known-forms.ts). The Bonus Action takes one for hours equal to half its Druid level: the Beast's statistics with the Druid's Hit Points, mind, features and proficiencies, Temporary Hit Points equal to its Druid level, no spells, Concentration kept and gear melded or worn as it picks (transform/compose.ts). It ends as a Bonus Action, on another use, on the Incapacitated condition or at 0 Hit Points (transform/rules.ts)."
+    "The Druid picks its known forms on the sheet, as many as its level allows and within its Challenge Rating and Fly Speed limits, and replaces one after a Long Rest (transform/known-forms.ts). The Bonus Action takes one for hours equal to half its Druid level: the Beast's statistics with the Druid's Hit Points, mind, type, class features (their defences included), feats and proficiencies (the higher printed modifiers used), Temporary Hit Points equal to its Druid level, no spells, Concentration kept and gear melded or worn as it picks (transform/compose.ts). It ends as a Bonus Action, on another use, on the Incapacitated condition or at 0 Hit Points (transform/rules.ts)."
   ),
   "feature:beast-spells": enforced(
     "transform/rules.ts lets a Druid 18 cast spells in a Wild Shape form, except one whose Material component has a cost or is consumed."
@@ -1251,6 +1392,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:devious-strikes": enforced(
     "Daze (one of moving, an action or a Bonus Action, resolution/economy.ts), Knock Out (Unconscious that ends on damage, with repeat saves) and Obscure (Blinded) join Cunning Strike's effects. A Dazed creature's move after acting is the GM's."
   ),
+  "feature:fast-hands": enforced(
+    "As a Bonus Action the Thief takes the Utilize action for a tool's or gear's use on the sheet (tool-uses.ts) or at a door (doors.ts), a magic item's Magic action (fast-hands.ts), or a Dexterity (Sleight of Hand) check with Thieves' Tools or to pick a pocket. The server spends the Thief's Bonus Action for it."
+  ),
   "feature:supreme-sneak": guided(
     "Stealth Attack joins Cunning Strike's effects, and the attack leaves the Rogue's Invisible from the Hide action on (resolution/release.ts). Whether it ends the turn behind Three-Quarters or Total Cover is the GM's, said with the hit."
   ),
@@ -1276,7 +1420,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The ability score increase is applied, and roll-answers.ts offers Peerless Aim on a missed attack roll: the attack hits, and the boon waits for the start of the creature's next turn."
   ),
   "feature:boon-of-dimensional-travel": enforced(
-    "The ability score increase is applied, and after the Attack or Magic action resolution/movement-grants.ts gives a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space the creature can see."
+    "The ability score increase is applied, and once each Attack or Magic action is taken (after its last attack or ray) resolution/movement-grants.ts gives a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space the creature can see."
   ),
   "feature:tactical-shift": enforced(
     "Second Wind gives the Fighter a move of half its Speed for the turn that provokes no Opportunity Attacks (resolution/movement-grants.ts), charged to its own grant (movement-rules.ts)."
@@ -1298,6 +1442,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "feature:boon-of-truesight": enforced(
     "The ability score increase is applied, and Truesight 60 feet is a sense dynamic vision and attack rolls read (vision/senses.ts)."
+  ),
+  "feature:halfling-nimbleness": enforced(
+    "A Halfling moves through the space of a creature larger than it as Difficult Terrain, and can't end its move there (movement-rules.ts, spacePassage in rules-5e); the map's drag preview charges the same path."
   ),
   "feature:halfling-naturally-stealthy": enforced(
     "With dynamic vision on, resolution/validate.ts lets a Halfling Hide behind a creature at least one size larger than it (vision/rules.ts)."
@@ -1759,7 +1906,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The caster's nonmagical weapon picked gains +1 to its attack and damage rolls, +2 from a level 3 slot and +3 from level 6 (equipment-derivation.ts), for the hour; casting it again moves it. A weapon another creature carries is the GM's."
   ),
   "spell:mind-blank": enforced(
-    "The target is immune to Psychic damage (hit-points.ts) and the Charmed condition (effects.ts). What it hides from divination is the GM's."
+    "The target is immune to Psychic damage (hit-points.ts) and the Charmed condition (effects.ts), and a Divination spell can't target it, catch it in its area or sense it (resolution/spell-wards.ts). Other ways to read its emotions or thoughts, and scrying sensors, are the GM's."
   ),
   "spell:mind-spike": enforced(
     "The save and its Psychic damage are applied, and a failure outlines the target to the caster: Invisible gives it nothing against the caster's attacks or the caster's against it (resolution/attack.ts). Knowing where it is, and hiding, are the GM's."
@@ -1885,11 +2032,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:web": enforced(
     "spell-zones.ts asks for the Dexterity save the first time a creature enters the webs on a turn or starts its turn there, and a failure leaves it Restrained, escaped with a Strength (Athletics) check against the spell save DC. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the webs Difficult Terrain, and they are Lightly Obscured for dynamic vision (vision/cast-sight.ts). Burning the webs away is the GM's, who ends the area."
   ),
-  "action:Octopus/ink-cloud": guided(
-    "The Reaction fills its 5-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). Offering it when a creature ends its turn beside the octopus underwater is the GM's."
+  "action:Octopus/ink-cloud": enforced(
+    "triggered-reactions.ts offers it in an underwater fight when a creature ends its turn within 5 feet of the octopus. Using it fills a 5-foot Cube around the octopus with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). A strong current dispersing the ink is the GM's."
   ),
-  "action:Giant Octopus/ink-cloud": guided(
-    "The Reaction fills its 10-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). Offering it when the octopus takes damage underwater is the GM's."
+  "action:Giant Octopus/ink-cloud": enforced(
+    "triggered-reactions.ts offers it when the octopus takes damage in an underwater fight. Using it fills a 10-foot Cube around the octopus with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). A strong current dispersing the ink is the GM's."
   ),
   "spell:sorcerous-burst": guided(
     "The attack and the chosen damage type are applied. Rolling another d8 on each 8 is the GM's."
@@ -2001,7 +2148,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "When the Druid rolls Initiative with no use of Wild Shape left, initiative-hooks.ts restores one. conversions.ts turns uses of Wild Shape into one spell slot, two levels a use, once per Long Rest (Nature Magician). Its slow aging is narrative."
   ),
   "feature:natural-recovery": enforced(
-    "In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Druid level, none of level 6 or higher, once per Long Rest."
+    "One level 1+ spell the Druid has prepared from its Circle Spells is cast with no slot, once per Long Rest: each land spell's free casting spends the one counter (character-build.ts). In the step a Short Rest opens, conversions.ts recovers spent slots of combined level up to half the Druid level (round up), none of level 6 or higher, once per Long Rest."
   ),
   "feature:arcane-recovery": enforced(
     "In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Wizard level, none of level 6 or higher, once per Long Rest."
@@ -2016,8 +2163,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:contact-patron": enforced(
     "Contact Other Plane is always prepared and cast once per Long Rest with no slot, and that cast succeeds on its own Intelligence save with no roll (resolution/pending.ts). What the patron answers is the GM's."
   ),
-  "feature:restoring-touch": guided(
-    "From Paladin 14, Lay on Hands spends 5 points to end one of Blinded, Charmed, Deafened, Frightened, Paralyzed or Stunned on a creature it touches (resolution/heal.ts). Ending several in one Bonus Action takes one use each here."
+  "feature:restoring-touch": enforced(
+    "From Paladin 14 a use of Lay on Hands on a creature it touches also ends any of Blinded, Charmed, Deafened, Frightened, Paralyzed and Stunned the Paladin picks in the target picker, 5 points of the pool each, beside the Hit Points it restores (resolution/heal.ts)."
+  ),
+  "feature:preserve-life": enforced(
+    "A use of Channel Divinity divides up to five times the Cleric level in Hit Points among Bloodied creatures within 30 feet, as the Cleric splits them in the target picker or else evenly, none above half its Hit Point maximum (resolution/heal.ts)."
+  ),
+  "feature:hunters-lore": enforced(
+    "While a Hunter's Mark of the Ranger's lasts on a creature, its player's target list shows that creature's damage Immunities, Resistances and Vulnerabilities and its condition Immunities, which no other player receives (hunters-lore.ts, projections.ts)."
   ),
   "feature:uncanny-metabolism": enforced(
     "When the Monk rolls Initiative, initiative-hooks.ts offers it: all Focus Points back and Hit Points equal to its Monk level plus a Martial Arts die, once per Long Rest (conversions.ts)."
@@ -2052,11 +2205,17 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:overchannel": enforced(
     "The cast offers Overchannel beside Metamagic (resolution/metamagic.ts): it deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts)."
   ),
-  "feature:signature-spells": guided(
-    "Both spells are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts). That they come from the spellbook is the player's to keep."
+  "feature:signature-spells": enforced(
+    "Two level 3 spells from the spellbook (spellbook.ts checks the pick as a build or a level up makes it) are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts)."
   ),
-  "feature:spell-mastery": guided(
-    "The level 1 and level 2 picks are always prepared and cast at will at their own level with no slot (character-build.ts). That they come from the spellbook with a casting time of an action, and swapping one after a Long Rest, are the GM's."
+  "feature:high-elf-cantrip": enforced(
+    "The High Elf knows Prestidigitation, a pick the build fills when the ledger names none (character-build.ts), or the Wizard cantrip it swapped in during the step a Long Rest opens (ledger-rechoice.ts)."
+  ),
+  "feature:evocation-savant": enforced(
+    "Two Evocation spells of level 2 or lower go into the spellbook at Wizard 3 (character-build.ts), and one more Evocation spell goes in free each time a new level of spell slots opens, beside the two a Wizard level gives (spell-choices.ts)."
+  ),
+  "feature:spell-mastery": enforced(
+    "The level 1 and level 2 picks, spells from the spellbook with a casting time of an action (character-offers.ts filters the casting time, spellbook.ts checks the book), are always prepared and cast at will at their own level with no slot (character-build.ts); one is swapped for another of the same level from the book in the step a Long Rest opens (ledger-rechoice.ts)."
   ),
   "spell:mirror-image": enforced(
     "The caster has three duplicates for a minute. Each hit on it rolls a d6 a duplicate, and on a 3 or higher the hit lands on a duplicate, which is destroyed, ending the spell with the last; an attacker Blinded or with Blindsight or Truesight is unaffected (resolution/mirror-image.ts)."
@@ -2183,17 +2342,29 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:bead-of-force": enforced(
     "Throwing a bead uses it up: each creature in the 10-foot-radius Sphere makes the DC 15 Dexterity save or takes 5d4 Force damage, and one that fails is shut in the sphere for a minute, which no attack or effect passes (enclosures.ts). Pushing out the creatures that saved, and rolling the sphere, are the GM's."
   ),
+  "item:holy-water": enforced(
+    "Thrown in place of an attack at a creature the thrower sees within 20 feet: on a failed Dexterity save a Fiend or an Undead takes 2d8 Radiant damage, and any other creature nothing, though the flask is used (resolution/type-gates.ts)."
+  ),
+  "item:amulet-of-proof-against-detection-and-location": enforced(
+    "While it is worn and attuned, a Divination spell can't target its wearer, catch it in its area or sense it (resolution/spell-wards.ts), unless the wearer allows it, which it does for a spell cast by its own side. Being seen through a scrying sensor is the GM's, as the sensor is."
+  ),
+  "item:ring-of-mind-shielding": enforced(
+    "While it is worn and attuned, Detect Thoughts can't target its wearer, Zone of Truth doesn't hold it, and no magical sense that tells a creature's type finds it, Detect Evil and Good and Divine Sense included (resolution/spell-wards.ts, vision/detect.ts). Telepathy, the imperceptible ring and the soul it can hold are the GM's."
+  ),
+  "item:trident-of-fish-command": guided(
+    "A charge casts Dominate Beast at DC 15 on a creature with a Swim Speed (resolution/action-targets.ts), which affects only a Beast (resolution/type-gates.ts); it has 3 charges and regains 1d3 at dawn, and the cast takes the spell's state. What the Beast does under it is the GM's."
+  ),
   "item:net": enforced(
     "Thrown in place of an attack at a Large or smaller creature the thrower sees within 15 feet, a failed Dexterity save leaves it Restrained, escaped with a DC 10 Strength (Athletics) check. The Net is an object with AC 10 and 5 Hit Points, immune to Bludgeoning damage, and an attack that breaks it frees the creature (objects.ts)."
   ),
   "item:thieves-tools": guided(
-    "door.use's pick rolls a Dexterity (Sleight of Hand) check with the tools against a lock on a door of the map, DC 15 unless the GM sets another, and unlocks it on a success (doors.ts). It takes the Utilize action in a fight. Disarming a trap is the GM's."
+    "door.use's pick rolls a Dexterity (Sleight of Hand) check with the tools against a lock on a door of the map, DC 15 unless the GM sets another, and unlocks it on a success (doors.ts). Its Utilize uses roll from the sheet at their DCs (tool-uses.ts), and every use takes the Utilize action in a fight. Picking Manacles' lock and disarming a trap are the GM's, rolled as the sheet's check."
   ),
   "item:carpenters-tools": guided(
-    "door.use pries a door on the map open, or seals a closed one, with a DC 20 Strength check with the tools (doors.ts). A sealed door is forced open at DC 20. Crafting is the GM's."
+    "door.use pries a door on the map open, or seals a closed one, with a DC 20 Strength check with the tools, taking the Utilize action in a fight (doors.ts). A sealed door is forced open at DC 20. Its sheet use takes the Utilize action too (tool-uses.ts), and crafting.ts makes what its Craft line lists in downtime. Prying a container is the GM's."
   ),
   "item:smiths-tools": guided(
-    "door.use pries a door on the map open with a DC 20 Strength check with the tools (doors.ts). Crafting is the GM's."
+    "door.use pries a door on the map open with a DC 20 Strength check with the tools, taking the Utilize action in a fight (doors.ts). Its sheet use takes the Utilize action too (tool-uses.ts), and crafting.ts makes what its Craft line lists in downtime, the melee weapons and the armor its bands name among them. Prying a container is the GM's."
   ),
   "item:lock": enforced(
     "A door on the map can be locked (the GM's door editor): it stays shut against everyone but the creatures holding its key, and Thieves' Tools pick it with a DC 15 Dexterity (Sleight of Hand) check (doors.ts)."

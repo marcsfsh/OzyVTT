@@ -220,6 +220,36 @@ describe("Search", () => {
     expect(state.actors.find((actor) => actor.id === GOBLIN)!.conditions).toEqual([]);
   });
 
+  // SRD Lightly Obscured: "Disadvantage on Wisdom (Perception) checks to see something in a Lightly Obscured space."
+  it("finds a hider in Dim Light only when the lower of two d20s meets its Hide total", () => {
+    const missed = hiddenGoblin(visionGame({ ambient: "dim" }));
+    const first = search(missed, 15);
+    expect(first.check?.total).toBe(15);
+    expect(goblinHidden(missed)).toBe(true);
+    expect(first.tableNarration).toContainEqual(
+      expect.objectContaining({
+        text: `Borin's Perception against ${GOBLIN_NAME} has Disadvantage (${GOBLIN_NAME} is Lightly Obscured): 1 against its 12.`,
+        gmOnly: true
+      })
+    );
+    const found = hiddenGoblin(visionGame({ ambient: "dim" }));
+    resolveDefinitionAction(
+      found,
+      builtinAction("search")!,
+      {
+        actorId: HERO,
+        targetIds: [],
+        commandId: commandId(),
+        builtin: true,
+        rollMode: null,
+        override: null,
+        skill: "perception"
+      },
+      deps(found, [15, 13])
+    );
+    expect(goblinHidden(found)).toBe(false);
+  });
+
   it("misses one below the total, behind a wall or in magical Darkness", () => {
     const low = hiddenGoblin(visionGame());
     search(low, 5);

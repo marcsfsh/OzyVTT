@@ -118,8 +118,8 @@ describe("a Material component", () => {
   it("is served by a Component Pouch or the class's focus, and refused with neither", () => {
     const { state, resolve, hero } = fight(wizard);
     strictComponents(state);
-    // The Wizard's spellbook is its focus ("an Arcane Focus or your spellbook").
-    hero.inventory = hero.inventory.filter((item) => item.id !== "spellbook");
+    // The Wizard's spellbook is its focus ("an Arcane Focus or your spellbook"), and so is its kit's Arcane Focus staff.
+    hero.inventory = hero.inventory.filter((item) => item.id !== "spellbook" && item.id !== "arcane-focus-staff");
     expect(() => resolve("spell-mage-armor", { targetIds: [HERO] })).toThrowError(
       /Mage Armor has a Material component \(a piece of cured leather\), and Ansel carries no Component Pouch or Spellcasting Focus/
     );

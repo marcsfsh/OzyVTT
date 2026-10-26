@@ -30,16 +30,30 @@ export const alsoSpentMessage = (action: Pick<ActorAction, "name" | "alsoUses">)
 
 /** The action as this activation spends it: a `chosen` cost fixed to the amount the user picked (Lay on Hands'
  *  points). An amount for an action that takes none is refused, so a client can't spend more than a use. */
-export function withChosenCost<T extends Pick<ActorAction, "name" | "useCost">>(
+export function withChosenCost<T extends Pick<ActorAction, "name" | "useCost" | "conditionPicks">>(
   action: T,
-  spend: number | undefined
+  spend: number | undefined,
+  conditionIds: readonly string[] = []
 ): T {
+  if (conditionIds.length > 0 && !action.conditionPicks)
+    throw new CommandRejectedError(`${action.name} ends no conditions you pick. Send none.`);
   if (action.useCost !== "chosen") {
     if (spend !== undefined) throw new CommandRejectedError(`${action.name} spends a set amount. Send no amount.`);
     return action;
   }
   if (spend === undefined) throw new CommandRejectedError(`Choose how much of ${action.name} to spend.`);
-  return { ...action, useCost: spend };
+  // Restoring Touch: each condition picked costs its points on top of the Hit Points restored.
+  const total = spend + conditionCost(action, conditionIds);
+  if (total < 1) throw new CommandRejectedError(`Choose how much of ${action.name} to spend.`);
+  return { ...action, useCost: total };
+}
+
+/** The points of an action's pool its picked conditions cost (Restoring Touch: 5 each). */
+export function conditionCost(
+  action: Pick<ActorAction, "conditionPicks">,
+  conditionIds: readonly string[] | undefined
+): number {
+  return action.conditionPicks ? action.conditionPicks.pointsEach * new Set(conditionIds ?? []).size : 0;
 }
 
 /** Why a pool can't pay for this activation when it still holds something. */

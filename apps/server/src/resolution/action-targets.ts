@@ -6,10 +6,12 @@ import { conditionLabel } from "../condition-rules.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
 import { endEffect } from "../effects.js";
 import { hiddenFrom } from "../vision/audience.js";
-import { sceneSight } from "../vision/sight.js";
+import { sightRules } from "../vision/rules.js";
+import { deriveEquipment, type EquipmentCatalog } from "../equipment-derivation.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { enteredOnMoveOf } from "../granted-moves.js";
+import { specialSpeedsOf } from "../speed.js";
 import type { RuleId } from "../rules-families.js";
 import { endedEffect, sizeAtMost, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -29,6 +31,8 @@ type TargetCheck = Readonly<{
   definition: ActorDefinition | undefined;
   resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined;
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined;
+  /** The item catalog, for senses an item gives (a Ring of See Invisibility). */
+  catalog?: EquipmentCatalog | undefined;
 }>;
 
 const words = (types: readonly string[]) =>
@@ -65,7 +69,22 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
     });
   const rules = action.targets;
   if (!rules) return violations;
-  const sight = rules.seen ? sceneSight(state, resolveDefinition ? { definition: resolveDefinition } : {}) : null;
+  // "A creature you can see": the map with its vision on, else the conditions and the senses by distance.
+  const sight =
+    rules.seen || rules.perceivesUser
+      ? sightRules(
+          state,
+          {
+            ...(resolveDefinition ? { definition: resolveDefinition } : {}),
+            ...(check.catalog ? { catalog: check.catalog } : {})
+          },
+          distanceFeet
+        )
+      : null;
+  // It hears the user unless it is Deafened or the user stands where no sound can be made (Silence).
+  const perceives = (target: LiveActor, user: LiveActor) =>
+    sight?.canSee(target.id, user.id) === true ||
+    (!target.conditions.some((condition) => condition.id === "deafened") && !silenced(user, check.catalog));
   // Taken move first, it reaches only the creatures its move entered; taken where it stands, the GM picks them.
   const entered = rules.entered ? enteredOnMoveOf(attacker, action.id) : null;
   for (const target of targets) {
@@ -83,7 +102,9 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
     if (rules.who === "allies" && !self && !areAllies(attacker, target, resolveDefinition))
       violations.push({ rule: "target.not-allowed", message: `${action.name} targets allies, and ${name} isn't one.` });
     const targetDefinition = target.definitionId ? resolveDefinition?.(target.definitionId) : undefined;
-    const type = creatureTypeOf(target, targetDefinition);
+    // A creature of a type the action doesn't affect is still a target that nothing happens to (`type-gates.ts`); an
+    // attack resolves against its one target, so its types are checked as it is aimed.
+    const type = action.attack !== undefined ? creatureTypeOf(target, targetDefinition) : null;
     if (rules.creatureTypes && type !== null && !rules.creatureTypes.includes(type))
       violations.push({
         rule: "target.not-allowed",
@@ -108,6 +129,19 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
       violations.push({
         rule: "target.not-allowed",
         message: `${action.name} targets a ${rules.conditions.map(conditionLabel).join(" or ")} creature, and ${name} isn't.`
+      });
+    // "Charmed or Grappled by the aboleth": the condition comes from the user's own effect.
+    if (
+      rules.conditionsFromSource &&
+      !target.effects.some(
+        (effect) =>
+          effect.sourceActorId === attacker.id &&
+          effect.linkedConditionIds.some((id) => rules.conditionsFromSource!.includes(id as never))
+      )
+    )
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a creature that is ${rules.conditionsFromSource.map(conditionLabel).join(" or ")} by ${attacker.name}, and ${name} isn't.`
       });
     if (
       rules.heldByAction &&
@@ -134,12 +168,37 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a creature at 0 Hit Points, and ${name} isn't.`
       });
+    // "Choose Bloodied creatures" (Preserve Life): at half its Hit Points or fewer, which its health band shows.
+    if (rules.bloodied && !bloodied(target))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a Bloodied creature, and ${name} isn't.`
+      });
+    // "A Beast that has a Swim Speed" (Trident of Fish Command).
+    if (rules.speeds) {
+      const speeds = specialSpeedsOf(
+        target,
+        targetDefinition,
+        deriveEquipment(target, targetDefinition, check.catalog)
+      );
+      if (!rules.speeds.some((mode) => (speeds[mode] ?? 0) > 0))
+        violations.push({
+          rule: "target.not-allowed",
+          message: `${action.name} targets a creature with a ${rules.speeds.map((mode) => `${mode[0]!.toUpperCase()}${mode.slice(1)}`).join(" or ")} Speed, and ${name} has none.`
+        });
+    }
+    // "Another creature ... who can see or hear you" (Bardic Inspiration).
+    if (rules.perceivesUser && !self && !perceives(target, attacker))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} needs a creature that can see or hear ${attacker.name}, and ${name} can do neither.`
+      });
     if (rules.markedBy && !markedBy(target, attacker, rules.markedBy))
       violations.push({
         rule: "target.not-allowed",
         message: `${action.name} targets the creature ${attacker.name} marked with it, and ${name} isn't marked.`
       });
-    if (sight?.enabled && !self && !sight.sees(attacker.id, target.id))
+    if (rules.seen && sight && !self && !sight.canSee(attacker.id, target.id))
       violations.push({
         rule: "target.not-allowed",
         message: `${action.name} targets a creature ${attacker.name} can see.`
@@ -159,6 +218,36 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
   return violations;
 }
 
+/**
+ * The creatures under an action's area that its own rules leave out ("each enemy in a 20-foot-radius Sphere"). An area
+ * catches everyone under it; these rules say whom it affects, so the rest are dropped from its catch rather than
+ * refusing the use. A creature type it doesn't affect ("each creature that isn't an Undead") stays in the catch and
+ * is left out of what it does as it resolves (`type-gates.ts`).
+ */
+export function areaLeavesOut(check: Omit<TargetCheck, "distanceFeet" | "definition">): ReadonlySet<string> {
+  const rules = check.action.targets;
+  if (!rules) return new Set();
+  const { who, typeTag } = rules;
+  const membership = {
+    ...(who && who !== "self" ? { who } : {}),
+    ...(typeTag ? { typeTag } : {})
+  };
+  if (Object.keys(membership).length === 0) return new Set();
+  const action = { ...check.action, targets: membership };
+  return new Set(
+    check.targetIds.filter(
+      (targetId) =>
+        actionTargetViolations({
+          ...check,
+          action,
+          targetIds: [targetId],
+          definition: undefined,
+          distanceFeet: undefined
+        }).filter((violation) => violation.rule !== "target.too-many").length > 0
+    )
+  );
+}
+
 /** The type tags a stat block prints ("Fiend (Demon)": demon), lower case. */
 function typeTagsOf(definition: ActorDefinition | undefined): string[] {
   const tags = (definition?.extensions["open5e.srd-2024"] as { typeTags?: unknown } | undefined)?.typeTags;
@@ -173,6 +262,15 @@ const heldName = (actionId: string) =>
     .split("-")
     .map((word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`)
     .join(" ");
+
+/** SRD Bloodied: "while it has half its Hit Points or fewer remaining". */
+const bloodied = (target: LiveActor) => target.hp.current <= target.hp.maximum / 2;
+
+/** The creature stands inside a spell's area where no sound can be made: it holds that spell's aura (Silence). */
+const silenced = (actor: LiveActor, catalog: EquipmentCatalog | undefined) =>
+  actor.effects.some(
+    (effect) => effect.spell !== undefined && catalog?.spellRecord?.(effect.spell.id)?.effect?.silencesArea === true
+  );
 
 const grappledBy = (target: LiveActor, source: LiveActor) =>
   target.effects.some((effect) => effect.sourceActorId === source.id && effect.linkedConditionIds.includes("grappled"));

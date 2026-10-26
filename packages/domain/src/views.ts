@@ -4,6 +4,7 @@ import type {
   Annotation,
   BuilderPolicy,
   CheckSubject,
+  CraftingProject,
   CombatState,
   EncounterToken,
   GameState,
@@ -151,7 +152,16 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{
       style: "bar" | "ring" | "aura";
     }>;
+    /** What this player's Hunter knows of the creature its Hunter's Mark marks (Hunter's Lore), while the mark lasts.
+     *  Only in that player's own projection. */ knownDefences?: KnownDefences;
   };
+/** A creature's damage Immunities, Resistances and Vulnerabilities and its condition Immunities, by id. */
+export type KnownDefences = Readonly<{
+  damageImmunities: readonly string[];
+  damageResistances: readonly string[];
+  damageVulnerabilities: readonly string[];
+  conditionImmunities: readonly string[];
+}>;
 export type PlayerInitiativeEntry = Readonly<{
   actorId: string;
   name: string;
@@ -305,6 +315,30 @@ export type PlayerRollCall = Readonly<{
 export type PlayerRestView = Readonly<{
   requests: readonly string[];
   shortRest: Readonly<{ actorIds: readonly string[]; done: readonly string[] }> | null;
+  /** The party's Long Rest when one of their characters is in it, cut down to them: who was interrupted and waits to
+   *  resume, and who of those has a Short Rest's benefits to spend Hit Point Dice in. */
+  longRest: Readonly<{
+    actorIds: readonly string[];
+    interrupted: readonly string[];
+    shortRestEarned: readonly string[];
+  }> | null;
+}>;
+/** A party crafting project as a player sees it (their own characters' and the visible party's): what it makes, with
+ *  what, and how far it has come. When it started and the scroll's numbers stay with the GM; helpers are named only
+ *  among the party's visible characters. */
+export type PlayerCraftingProject = Readonly<{
+  id: string;
+  crafterId: string;
+  itemId: string;
+  itemName: string;
+  kind: CraftingProject["kind"];
+  toolId: string;
+  spellId?: string;
+  helperIds: readonly string[];
+  workMinutes: number;
+  doneMinutes: number;
+  /** What its raw materials cost, in copper: only on the player's own characters' projects. */
+  paidCp?: number;
 }>;
 export type PlayerView = Pick<GameState, "revision"> & {
   combat: PlayerCombatView;
@@ -315,6 +349,7 @@ export type PlayerView = Pick<GameState, "revision"> & {
   /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;
   /** Long Rest requests and the party's Short Rest, for the player's own characters only. */ rest: PlayerRestView;
+  /** The party's crafting projects: their own characters' and the visible party's. */ crafting: readonly PlayerCraftingProject[];
 };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */

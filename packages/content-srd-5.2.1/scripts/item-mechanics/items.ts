@@ -321,13 +321,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "cold", doubleOnCritical: true }]
   },
 
-  /**
-   * Dominate Beast at DC 15 on 3 charges, 1d3 back at dawn. The "Beast with a Swim Speed" target restriction stays
-   * prose.
-   */
+  // Three charges, 1d3 back at dawn: Dominate Beast at DC 15 "on a Beast that has a Swim Speed".
   "trident-of-fish-command": {
     charges: { regain: "1d3" },
-    casts: [{ spellId: "dominate-beast", saveDc: 15, uses: { limit: 3, per: "long-rest" } }]
+    casts: [
+      {
+        spellId: "dominate-beast",
+        saveDc: 15,
+        uses: { limit: 3, per: "long-rest" },
+        targets: { creatureTypes: ["beast"], speeds: ["swim"] }
+      }
+    ]
   },
 
   // ---- +N weapon pairs and unconditional on-hit dice ---------------------------------------------
@@ -1153,7 +1157,18 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "While wearing this ring, you can cast Jump from it, but can target only yourself." */
   "ring-of-jumping": { casts: [{ spellId: "jump", targets: { who: "self" } }] },
 
-  // `ring-of-mind-shielding` - no immunity keyed to an effect kind.
+  // "You are immune to magic that allows other creatures to read your thoughts, determine whether you're lying, know
+  // your alignment, or know your creature type": Detect Thoughts, Zone of Truth and Detect Evil and Good don't reach the
+  // wearer. Telepathy by consent and the soul the ring keeps are the GM's.
+  "ring-of-mind-shielding": {
+    modifiers: [
+      {
+        type: "spell-ward",
+        spellIds: ["detect-thoughts", "zone-of-truth", "detect-evil-and-good"],
+        typeSenses: true
+      }
+    ]
+  },
 
   "ring-of-protection": {
     modifiers: [
@@ -2457,7 +2472,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "Your Constitution is 19 while you wear this amulet": the Hit Point maximum follows it. */
   "amulet-of-health": { modifiers: [{ type: "ability-score-minimum", ability: "con", score: 19 }] },
-  // `amulet-of-proof-against-detection-and-location` - no immunity keyed to a school of magic.
+  // "You can't be targeted by Divination spells unless you allow it": the wearer's own side's spells reach it. Being
+  // perceived through a scrying sensor is the GM's.
+  "amulet-of-proof-against-detection-and-location": {
+    modifiers: [{ type: "spell-ward", schools: ["divination"], alliesAllowed: true }]
+  },
   // Plane Shift after a DC 15 Intelligence (Arcana) check. On a failure the wearer and everything within 15 feet go
   // to a random destination: the d100 table and the journey are the GM's.
   "amulet-of-the-planes": {
@@ -2951,7 +2970,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // `bead-of-nourishment` - no hunger model.
+  // `bead-of-nourishment` needs no overlay: survival.ts eats a carried bead as a day of Rations.
 
   /**
    * The four elemental-commanding items (`bowl-of-commanding-water-elementals`,

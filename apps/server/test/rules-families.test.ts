@@ -55,6 +55,7 @@ describe("rule families", () => {
       ["movement.toward-fear", "movement"],
       ["movement.mount", "movement"],
       ["economy.action-used", "economy"],
+      ["action.underwater-only", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
       ["economy.not-your-turn", "economy"],

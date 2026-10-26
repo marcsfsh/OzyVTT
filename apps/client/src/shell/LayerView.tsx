@@ -1,7 +1,7 @@
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Button, useToast } from "@vtt/ui";
 import { useReleaseCharacter } from "../actors/MyCharacter";
-import { ShortRestPrompt } from "../rest/ShortRestPrompt";
+import { RestPrompt } from "../rest/RestPrompt";
 import { lazySurface } from "../components/lazySurface";
 import { NotFoundPage } from "../components/NotFoundView";
 import { CharacterSheet } from "../sheet/CharacterSheet";
@@ -146,7 +146,7 @@ function PlayerSheetPage({
         state={state}
         presentation="page"
         token={token}
-        top={<ShortRestPrompt state={state} />}
+        top={<RestPrompt state={state} />}
         {...(state.builderPolicy.playerBuilder === "open"
           ? { onLevel: () => navigate(`/characters/${actorId}/level`) }
           : {})}

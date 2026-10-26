@@ -11,17 +11,19 @@ import type { TargetRow } from "../table/targetRows";
 import { InFooter } from "../table/footerSlot";
 import { ShapeChoices } from "./ShapeChoices";
 import { revealInRegion } from "../lib/reveal";
-import { weaponChoicesOf, type CarriedRow } from "./weapon-choices";
+import { objectChoicesOf, weaponChoicesOf, type CarriedRow } from "./weapon-choices";
 import {
   clearTargeting,
   placeAnotherTemplate,
   setBoundItem,
+  setObjectItem,
   setChoiceOption,
   setCheckSkill,
   setChosenAbility,
   setConditionChoice,
   setDamageType,
   setEffectOption,
+  setHealingShare,
   setShapeForm,
   setShapeGear,
   setShapingCreatures,
@@ -30,7 +32,9 @@ import {
   setTargetDarts,
   setTargetingSpend,
   SHAPING_CREATURE_PICKS,
+  sharedOut,
   targetingReady,
+  toggleConditionPick,
   toggleTarget,
   type TargetingSession
 } from "./targeting";
@@ -63,6 +67,7 @@ export function ActionTargetPicker({
   onInvalidFace,
   insideNow,
   carried = [],
+  carriedBy,
   onMoveFirst,
   onLookAtDamage
 }: Readonly<{
@@ -78,6 +83,8 @@ export function ActionTargetPicker({
   insideNow?: readonly TargetRow[];
   /** What the acting creature carries, for a grant cast on one of its weapons (Magic Weapon). */
   carried?: readonly CarriedRow[];
+  /** What another creature carries, for an action at its armor or weapon (a rust monster's Antennae). */
+  carriedBy?: (actorId: string) => readonly CarriedRow[];
   /** Take the action's own move first (Pounce), when it has one that comes before the rest. */
   onMoveFirst?: () => void;
   /** Roll the damage and look at it before it counts, for an answer to it (Empowered Spell, Heroic Inspiration). */
@@ -97,6 +104,10 @@ export function ActionTargetPicker({
   const skillName = (id: string) => skillCatalog.items.find((skill) => skill.id === id)?.name ?? id;
   const darts = picking.darts;
   const assigned = darts ? Object.values(darts.counts).reduce((sum, count) => sum + count, 0) : 0;
+  // A pool its user divides among the creatures picked (Preserve Life).
+  const pool = picking.action.dividesHealing;
+  const given = sharedOut(picking);
+  const picks = picking.action.conditionPicks;
   // The level or "Cantrip" the list shows in brackets is noise once the action is chosen.
   const name = plainActionName(picking.action.name);
   // A summon that rolls nothing (Find Familiar) asks for its creature and is used, not rolled.
@@ -167,6 +178,9 @@ export function ActionTargetPicker({
             {darts
               ? `. ${darts.total} darts: ${assigned >= darts.total ? "all assigned" : `${darts.total - Math.min(assigned, darts.total)} left, which go round the chosen targets in order`}.`
               : ""}
+            {pool !== undefined
+              ? `. ${pool} Hit Points to divide: ${given > pool ? `${given - pool} too many given` : `${pool - given} left`}. With none given, they are split evenly.`
+              : ""}
           </p>
           <ul className="action-target-list scroll-y">
             {targets.map((target) => (
@@ -193,6 +207,15 @@ export function ActionTargetPicker({
                     max={darts.total}
                     aria-label={`Darts at ${target.label}`}
                     onChange={(count) => setTargetDarts(target.id, count)}
+                  />
+                )}
+                {pool !== undefined && picking.selected.includes(target.id) && (
+                  <Stepper
+                    value={picking.healingShares?.[target.id] ?? 0}
+                    min={0}
+                    max={pool}
+                    aria-label={`Hit Points for ${target.label}`}
+                    onChange={(points) => setHealingShare(target.id, points)}
                   />
                 )}
               </li>
@@ -234,10 +257,10 @@ export function ActionTargetPicker({
           more than is left. */}
       {picking.action.useCost === "chosen" && (
         <Stepper
-          label="Points to spend"
+          label={picks ? "Hit Points to restore" : "Points to spend"}
           value={picking.spend ?? 1}
           onChange={setTargetingSpend}
-          min={1}
+          min={picks ? 0 : 1}
           max={picking.action.usesLimit ?? 100}
           disabled={busy}
           aria-label={`How much of ${picking.action.name} to spend`}
@@ -259,7 +282,7 @@ export function ActionTargetPicker({
           </Select>
         </label>
       )}
-      <ChoicePicks picking={picking} targets={targets} carried={carried} />
+      <ChoicePicks picking={picking} targets={targets} carried={carried} carriedBy={carriedBy} />
       <ShapeChoices
         action={picking.action}
         choice={picking}
@@ -329,6 +352,26 @@ export function ActionTargetPicker({
           </Select>
         </label>
       )}
+      {/* Conditions the touch also ends, each for points of the pool (Restoring Touch). */}
+      {picks && (
+        <fieldset className="action-condition-picks">
+          <legend>Also end · {picks.pointsEach} points each</legend>
+          <ul className="action-target-list">
+            {picks.conditions.map((id) => (
+              <li key={id}>
+                <label className={`action-target${picking.conditionIds?.includes(id) ? " is-picked" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={picking.conditionIds?.includes(id) ?? false}
+                    onChange={() => toggleConditionPick(id)}
+                  />
+                  <span className="action-target-name">{id.charAt(0).toUpperCase() + id.slice(1)}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      )}
       {/* On a phone Cancel and Roll go to the bar under the thumb. */}
       <InFooter>
         <div className="action-targeting-buttons">
@@ -372,16 +415,21 @@ export function ActionTargetPicker({
 function ChoicePicks({
   picking,
   targets,
-  carried
+  carried,
+  carriedBy
 }: Readonly<{
   picking: TargetingSession;
   targets: ReadonlyArray<Pick<TargetRow, "id" | "label">>;
   carried: readonly CarriedRow[];
+  carriedBy?: (actorId: string) => readonly CarriedRow[];
 }>) {
   const choices = picking.action.choices;
   if (!choices) return null;
   const options = choices.options ?? [];
   const weapons = weaponChoicesOf(carried, choices.bindsWeapon);
+  // The one target's armor and weapons, once it is picked.
+  const holder = picking.selected.length === 1 ? picking.selected[0]! : null;
+  const objects = holder && carriedBy ? objectChoicesOf(carriedBy(holder), choices.object) : [];
   const optionSelect = (key: string, label: string, value: string | undefined, onPick: (id: string) => void) => (
     <label className="action-damage-type" key={key}>
       <span>{label}</span>
@@ -423,6 +471,22 @@ function ChoicePicks({
           ) : (
             <span>No weapon it can be cast on is carried.</span>
           )}
+        </label>
+      )}
+      {choices.object && objects.length > 0 && (
+        <label className="action-damage-type">
+          <span>Object</span>
+          <Select
+            value={picking.objectItemId ?? ""}
+            onChange={(event) => setObjectItem(event.target.value === "" ? undefined : event.target.value)}
+          >
+            <option value="">Worn armor, else weapon in hand</option>
+            {objects.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.name}
+              </option>
+            ))}
+          </Select>
         </label>
       )}
     </>

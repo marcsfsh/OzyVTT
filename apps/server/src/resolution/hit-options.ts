@@ -11,6 +11,7 @@ import { addEffect, applyCondition, makeEffect, type EffectNarration } from "../
 import { sourceItemOf } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { upcastAction, UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
+import { pactWeaponRowId } from "../pact-weapon.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { SMITE_OF_PROTECTION_TAG } from "../paladin-auras.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
@@ -63,16 +64,9 @@ function fromFlurry(ctx: ResolveContext): boolean {
   );
 }
 
-/** The pact weapon (SRD Pact of the Blade): the weapon of the kind the Warlock picked for it. Any other weapon may be a
- *  magic weapon the Warlock bonded instead, which the attacker vouches for. */
-function pactWeapon(ctx: ResolveContext): true | string {
-  const picked = ctx.deps.definition?.character?.choices?.find(
-    (choice) => choice.kind === "weapon" && choice.payload?.featureId === "pact-of-the-blade"
-  )?.id;
-  const item = ctx.attacker.inventory.find((row) => row.id === ctx.riderItemId);
-  if (picked !== undefined && item && (catalogIdOf(item) === picked || item.baseId === picked)) return true;
-  return `Only with ${ctx.attacker.name}'s pact weapon.`;
-}
+/** The pact weapon (SRD Pact of the Blade): the weapon the Warlock's bond holds, conjured or a magic weapon bonded. */
+const pactWeapon = (ctx: ResolveContext): boolean =>
+  ctx.riderItemId != null && pactWeaponRowId(ctx.attacker) === ctx.riderItemId;
 
 /** An attack of the stat block the attacker took a form from (a Wolf's Bite in Wild Shape). */
 function formAttack(ctx: ResolveContext): boolean {
@@ -120,8 +114,7 @@ function qualifies(ctx: ResolveContext, rider: HitRider, action: DefinitionActio
       if ((!weapon && !unarmed) || ctx.riderFilters.ability !== "str") return false;
       break;
     case "pact-weapon":
-      if (!weapon) return false;
-      verdict = pactWeapon(ctx);
+      if (!weapon || !pactWeapon(ctx)) return false;
       break;
     case "this-weapon":
     case "melee-this-weapon":

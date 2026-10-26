@@ -10,8 +10,6 @@ export type MonsterActionFix = Readonly<{
   save?: Partial<NonNullable<ActorAction["save"]>>;
   /** The damage in place of the reader's. */
   damage?: ActorAction["damage"];
-  /** The damage types a use picks from (Chromatic Orb's shape). */
-  damageTypes?: ActorAction["damageTypes"];
   /** What a hit leaves, in place of the reader's. */
   onHit?: OnHitRider[];
   /** The GM's reminder in place of the reader's; null drops it. */
@@ -19,11 +17,6 @@ export type MonsterActionFix = Readonly<{
 }>;
 
 export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = {
-  "half-dragon/dragon-s-breath": {
-    why: "the damage is of the type chosen for the Draconic Origin trait, which each use picks",
-    damage: [{ formula: "8d6", type: "fire" }],
-    damageTypes: ["acid", "cold", "fire", "lightning", "poison"]
-  },
   "gelatinous-cube/engulf": {
     why: "the escape and the pull from outside are printed in the action and the Ooze Cube trait",
     save: {
@@ -211,10 +204,19 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     save: { failureEffect: { name: "Engulfed", tags: ["carried-free"], modifiers: [] } },
     reminder: null
   },
-  "rust-monster/antennae": {
-    why: "the penalty is on one carried armor or weapon, which items don't track",
-    reminder:
-      "On a failure, the armor or weapon the rust monster targeted takes a cumulative -1 penalty: to the AC it offers, or to its attack rolls. Change the item by hand. Armor whose AC falls to 10, or a weapon at -5, is destroyed, and Mending removes the penalty."
+  "chain-devil/conjure-infernal-chain": {
+    why: "a failure's pull toward the devil is a forced move no save failure makes yet",
+    reminder: "If the target is Large or smaller, move it up to 30 feet straight toward the devil."
+  },
+  "chain-devil/unnerving-gaze": {
+    why: "the reaction prints its failure and success in italic labels the save reader doesn't take apart",
+    // "Failure: The target has the Frightened condition until the end of its turn. Success: The target is immune to
+    // this devil's Unnerving Gaze for 24 hours."
+    save: {
+      failureConditions: ["frightened"],
+      failureDuration: { type: "until-bearer-turn-end" },
+      immuneOnSuccess: true
+    }
   }
 };
 
@@ -223,7 +225,6 @@ export function fixedFields(fix: MonsterActionFix | undefined): Partial<ActorAct
   if (!fix) return {};
   return {
     ...(fix.damage ? { damage: fix.damage.map((part) => ({ ...part })) } : {}),
-    ...(fix.damageTypes ? { damageTypes: [...fix.damageTypes] } : {}),
     ...(fix.onHit ? { onHit: structuredClone(fix.onHit) } : {}),
     ...(typeof fix.reminder === "string" ? { reminder: fix.reminder } : {})
   };
