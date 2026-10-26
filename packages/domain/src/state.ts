@@ -1679,6 +1679,15 @@ export const CombatStateSchema = z
       .strict()
       .nullable()
       .default(null),
+    /** Thief's Reflexes: the second turn of round 1 running now, at its creature's Initiative minus 10, and the turn
+     *  that comes after it (null at the round's end). Live table only; GM-only. */
+    secondTurn: z
+      .object({ actorId: z.uuid(), score: z.number().int(), resume: z.uuid().nullable() })
+      .strict()
+      .nullable()
+      .default(null),
+    /** The creatures that took their second turn of round 1. Live table only; GM-only. */
+    secondTurnsTaken: z.array(z.uuid()).max(200).default([]),
     /** Creatures gone from the fight's plane (Banishment, Blink's Ethereal turns), with the space each left and its
      *  height there, so it comes back to that space or the nearest unoccupied one (`off-plane.ts`). Live table only;
      *  GM-only, since a creature the party never saw leave would be placed by it. */

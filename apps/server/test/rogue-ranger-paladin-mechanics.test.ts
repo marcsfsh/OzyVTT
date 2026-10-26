@@ -1786,3 +1786,82 @@ describe("Paladin: Lay on Hands is a touch, and Abjure Foes counts the Charisma 
     expect(abjure(others.slice(0, limit).map((other) => other.id)).save?.targets).toHaveLength(limit);
   });
 });
+
+describe("Thief: Thief's Reflexes takes a second turn in round 1", () => {
+  const OTHER = "10000000-0000-4000-8000-000000000003";
+  /** The Thief at 18, an orc at 12 and the foe at 5. */
+  const fight = (level: number, foeScore = 5) => {
+    const definition = buildCharacterDefinition(rogueInput(level), library, policy);
+    const catalog = equipmentCatalogOf(library);
+    const creature = (id: string, name: string) => ({
+      id,
+      name,
+      kind: "monster",
+      visibility: "public",
+      hp: { current: 20, maximum: 20 },
+      armorClass: 10
+    });
+    const state = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [creature(IDS.foe, "Foe"), creature(OTHER, "Orc")]
+    }) as GameState;
+    importActorDefinition(state, definition, IDS.hero, "public", catalog);
+    startEncounter(
+      state,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.hero, score: 18 },
+          { actorId: OTHER, score: 12 },
+          { actorId: IDS.foe, score: foeScore }
+        ]
+      },
+      () => 1,
+      GEOMETRY
+    );
+    return state;
+  };
+  const turnDeps = (state: GameState) => ({
+    resolveDefinition: (id: string) => state.definitions.find((entry) => entry.id === id)?.definition,
+    rollDie: () => 1
+  });
+  /** Who has each turn, `count` turns on from the current one. */
+  const order = (state: GameState, count: number) => {
+    const turns = [state.combat.turnActorId];
+    for (let index = 1; index < count; index += 1) {
+      nextInitiativeTurn(state, [], turnDeps(state));
+      turns.push(state.combat.turnActorId);
+    }
+    return turns;
+  };
+
+  it("acts at 18 and again at 8 in round 1, and only at 18 from round 2", () => {
+    const state = fight(17);
+    expect(order(state, 4)).toEqual([IDS.hero, OTHER, IDS.hero, IDS.foe]);
+    expect(state.combat.round).toBe(1);
+    nextInitiativeTurn(state, [], turnDeps(state));
+    expect(state.combat.round).toBe(2);
+    expect(order(state, 4)).toEqual([IDS.hero, OTHER, IDS.foe, IDS.hero]);
+  });
+
+  it("takes the second turn last when nobody is below it, and then round 2 begins", () => {
+    const state = fight(17, 9);
+    expect(order(state, 4)).toEqual([IDS.hero, OTHER, IDS.foe, IDS.hero]);
+    expect(state.combat.round).toBe(1);
+    nextInitiativeTurn(state, [], turnDeps(state));
+    expect(state.combat).toMatchObject({ round: 2, turnActorId: IDS.hero, secondTurn: null });
+  });
+
+  it("gives its second turn a fresh economy", () => {
+    const state = fight(17);
+    nextInitiativeTurn(state, [], turnDeps(state));
+    state.combat.turn.actionUsed = true;
+    nextInitiativeTurn(state, [], turnDeps(state));
+    expect(state.combat.turnActorId).toBe(IDS.hero);
+    expect(state.combat.turn.actionUsed).toBe(false);
+  });
+
+  it("gives a Rogue 16 one turn", () => {
+    expect(order(fight(16), 4)).toEqual([IDS.hero, OTHER, IDS.foe, IDS.hero]);
+  });
+});

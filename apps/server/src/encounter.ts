@@ -10,6 +10,7 @@ import { dropStaleGrants } from "./granted-moves.js";
 import { proneInSharedSpace } from "./occupied-space.js";
 import { blinkAway } from "./off-plane.js";
 import { timeStopGoesOn } from "./time-stop.js";
+import { secondTurnDue } from "./second-turns.js";
 import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
@@ -412,6 +413,8 @@ export function startEncounter(
     pendingRuleAsks: [],
     pendingInitiative,
     initiativeWindow: [],
+    secondTurn: null,
+    secondTurnsTaken: [],
     // A fresh fight starts live; the handler captures this start state as the rewind baseline.
     historyCursor: null,
     historyDirty: false
@@ -839,18 +842,38 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // Wait mode holds turns until every player has rolled their initiative (or the GM rolls the rest).
   if (state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0)
     throw new CommandRejectedError("Players are still rolling initiative. Roll for the rest to begin.");
-  const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
-  if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
+  const ownIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
+  if (ownIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
+  // Thief's Reflexes: a second turn goes on to the turn it came before, or ends the round.
+  const running = state.combat.secondTurn;
+  const fromSecond = running !== null && running.actorId === state.combat.turnActorId;
+  const resumeIndex =
+    fromSecond && running.resume !== null
+      ? state.combat.initiative.findIndex((entry) => entry.actorId === running.resume)
+      : -1;
+  const currentIndex = fromSecond ? (resumeIndex < 0 ? state.combat.initiative.length - 1 : resumeIndex - 1) : ownIndex;
   // A defeated creature takes no more turns: the order passes over it to the next one still in the fight.
   const length = state.combat.initiative.length;
   // So does a summoned thing with no turns of its own (Spiritual Weapon's force).
   const passedOver = (actorId: string) => isDefeated(state, actorId) || takesNoTurns(state, actorId);
   let steps = 1;
-  while (steps < length && passedOver(state.combat.initiative[(currentIndex + steps) % length].actorId)) steps += 1;
+  while (steps < length && passedOver(state.combat.initiative[(currentIndex + length + steps) % length].actorId))
+    steps += 1;
   if (steps === length) steps = 1;
   // Time Stop: the caster takes its turns in a row while no time passes for anyone else.
   const stopped = timeStopGoesOn(state);
-  const wraps = !stopped && currentIndex + steps >= length;
+  const passesRound = !stopped && currentIndex + steps >= length;
+  // A Thief's second turn of round 1 comes before the first turn below its Initiative minus 10.
+  const second = stopped
+    ? null
+    : secondTurnDue(
+        state,
+        fromSecond ? running.score : state.combat.initiative[ownIndex]!.score,
+        passesRound ? null : state.combat.initiative[currentIndex + steps]!.score,
+        deps?.resolveDefinition,
+        passedOver
+      );
+  const wraps = passesRound && second === null;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
@@ -882,14 +905,26 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
   const nextActorId = stopped
     ? outgoingId!
-    : wraps
-      ? (order.find((entry) => !passedOver(entry.actorId)) ?? order[0]).actorId
-      : order[currentIndex + steps].actorId;
+    : second
+      ? second.actorId
+      : wraps
+        ? (order.find((entry) => !passedOver(entry.actorId)) ?? order[0]).actorId
+        : order[currentIndex + steps]!.actorId;
+  if (second)
+    events?.push({
+      kind: "effect",
+      text: `${state.actors.find((actor) => actor.id === second.actorId)?.name ?? "A Thief"} takes a second turn at Initiative ${second.score} (Thief's Reflexes).`,
+      actorId: second.actorId
+    });
   state.combat = {
     ...state.combat,
     initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
+    secondTurn: second
+      ? { ...second, resume: passesRound ? null : state.combat.initiative[currentIndex + steps]!.actorId }
+      : null,
+    ...(second ? { secondTurnsTaken: [...state.combat.secondTurnsTaken, second.actorId] } : {}),
     // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD). The turn
     // that just ended opens the window for legendary actions, until the incoming creature does something.
     turn: { ...EMPTY_TURN, ...(outgoingId && !stopped ? { afterActorId: outgoingId } : {}) },
@@ -930,6 +965,7 @@ export function previousInitiativeTurn(state: GameState) {
     ...state.combat,
     round: wraps && state.combat.round > 1 ? state.combat.round - 1 : state.combat.round,
     turnActorId: previousActorId,
+    secondTurn: null,
     // Backing up is a GM correction, so the strip starts clean. Effect durations do not rewind here; the
     // timeline restore is the real undo.
     turn: { ...EMPTY_TURN },

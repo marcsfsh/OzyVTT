@@ -1280,6 +1280,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:devious-strikes": enforced(
     "Daze (one of moving, an action or a Bonus Action, resolution/economy.ts), Knock Out (Unconscious that ends on damage, with repeat saves) and Obscure (Blinded) join Cunning Strike's effects. A Dazed creature's move after acting is the GM's."
   ),
+  "feature:thiefs-reflexes": enforced(
+    "In the first round of a fight a Thief 17 takes a second turn, with a fresh action, Bonus Action and movement, when the order passes its Initiative minus 10 (encounter.ts, second-turns.ts)."
+  ),
   "feature:supreme-sneak": enforced(
     "Stealth Attack joins Cunning Strike's effects for 1d6: the attack keeps the Hide action's Invisible (resolution/release.ts), which ends at the end of the Rogue's turn unless it has Three-Quarters or Total Cover from every enemy on the map, measured from the walls and creatures or marked by the GM (supreme-sneak.ts, cover.ts). With dynamic vision off the cover is the GM's, said with the hit."
   ),

@@ -290,7 +290,10 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
     offPlane: [],
     timeStop: null,
     heldMove: null,
-    turnSteps: null
+    turnSteps: null,
+    // A second turn of round 1 belongs to the table it began on.
+    secondTurn: null,
+    secondTurnsTaken: []
   };
   // Switching away from a launched replay ends it. Runs after the swap so the park still had a slot.
   if (departingId !== null) dropReplayScene(state, departingId);
@@ -372,7 +375,10 @@ export function activateNewScene(
     offPlane: [],
     timeStop: null,
     heldMove: null,
-    turnSteps: null
+    turnSteps: null,
+    // A second turn of round 1 belongs to the table it began on.
+    secondTurn: null,
+    secondTurnsTaken: []
   };
   // Launching a replay from a replay ends the first one, so repeated launches don't hit the scene cap.
   if (departingId !== null) dropReplayScene(state, departingId);
