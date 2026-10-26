@@ -306,10 +306,12 @@ of a hidden thing. When in doubt, leave it out.
   lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
   and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies,
   Gust of Wind's Line 2 feet for every foot a creature moves closer to its caster (`costlyStep`), and
-  a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. The
+  a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. Speak with
+  Plants clears the painted Difficult Terrain in its Emanation (`clearedAt`), and a gibbering mouther's ground is
+  Difficult round it wherever it goes. The
   server charges it on the ground (a mover off the ground passes over it as over painted terrain), and the
-  `actor:movement` reply gives the preview the cells it changes for the mover, of the areas the asker can see
-  (`areaGround`, `zone-preview.ts`); the area itself is on the map. A cast's template grows with a higher slot as
+  `actor:movement` reply gives the preview the cells it changes for the mover, of the areas and the creatures the
+  asker can see (`areaGround`, `zone-preview.ts`); the area itself is on the map. A cast's template grows with a higher slot as
   the availability row says (`areaPerSlot`), so the drawn template is the size the server places.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
   point is above the ground, and `airborne` says what holds it up in the air (flying, or a
@@ -458,7 +460,26 @@ under more than one is caught once (`multi-templates.ts`).
 A creature pushed or pulled by force meets the areas on its straight way as any mover does (`pushed-through.ts`).
 An item's action with a `zone` (spread Caltrops, a set Hunting Trap) rolls nothing as it is used: it opens
 a zone that carries the action's own save and damage (`SpellZone.rule`), which stays until the GM ends it
-or it goes off once.
+or it goes off once. Such an area may hold its user's Concentration (a djinni's whirlwind), last a set number of
+rounds (a planted Rod of Alertness), catch the creatures it appears on, spare its user, carry the creatures it
+Restrained when it is dragged, or open one zone per area placed with damage by their number (a Ring of Shooting
+Stars' lightning spheres, `zoneForEachArea`). A Sphere of Annihilation is such an area that a creature controls with
+an Arcana check and moves toward a creature (`zone-sphere.ts`); a Delayed Blast Fireball's bead is touched, and
+thrown on a success, with a generic action (`zone-touch.ts`).
+
+A cast picks its area among the spell's options (`option` on a later row): a wall's form, a ring that acts only on its
+edge and a burning side within 10 feet of it (`zone-shapes.ts`), a Symbol's glyph, Antipathy/Sympathy's creature type
+(one option per type), Conjure Celestial's lights, Create or Destroy Water's rain or fog, and the client swaps the
+template to the picked form's area. An area can be round the creature the cast targets and move with it
+(Antipathy/Sympathy), wait hidden until a creature comes onto it and then grow (Symbol), run a schedule of later rows
+at its caster's turn starts (Storm of Vengeance), be steered or drift and carry what is in it (Incendiary Cloud,
+Tsunami: `zone-waves.ts`), or be moved by a later row's terms (anywhere in range, with its caster's move, to an
+unoccupied space: `zone-moves.ts`). Later rows can aim inside the area (Call Lightning's bolts), cut squares out of it
+as it is cast (Plant Growth: `zone-later.ts`), and pull creatures toward its middle as their turns start. What an
+area does to the world settles after every command (`zone-outcomes.ts`): wind and water put out fires, carried
+flames and lanterns, and disperse the fog they reach, and fire burns flammable areas cell by cell (Web:
+`zone-fire.ts`). A stat block's ground trait (a gibbering mouther's Aberrant Ground) makes the ground round it
+Difficult Terrain as it moves (`zone-ground.ts`).
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), finishing the party's
@@ -581,13 +602,18 @@ species, a spellcaster or another item attuned) the character meets (`attunement
 What a worn item's own action gave its user (a Ring of Invisibility's Invisible) ends when it is taken off,
 unattuned or put away. A cast spends its printed cost (`useCost`), and one whose extra charges raise its
 level (`chargesRaiseLevel`, a Wand of Fireballs) is one action for each cost. A pool that never comes back
-(`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`).
-A Long Rest gives back the item's printed dice (`charges.regain`), not every charge; when the GM keeps a dawn hour
-(`time.set-dawn`) the clock's dawn gives them back instead (`clock-pools.ts`). Spending the last charge rolls the
-SRD's d20, and the record says what a 1 does (destroyed, or a plain item it becomes) and what a 20 gives back
-(`resolution/charges.ts`, which also rolls a Thief's Use Magic Device d6). A pool spent for a time (`per: "time"`,
-Wings of Flying) waits `afterHours` of game time from its first use (`readyAt` on the actor) and comes back as
-`passGameTime` passes it. Ammunition is
+(`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`,
+or `charges.startingByPool` for a Helm of Brilliance's kinds of gem). A use may count against a second limit too
+(`alsoUses`: a Luck Blade's Wish once a dawn). A Long Rest gives back the item's printed dice (`charges.regain`), not
+every charge; when the GM keeps a dawn hour (`time.set-dawn`) the clock's dawn gives them back instead
+(`clock-pools.ts`). Spending the last charge rolls the SRD's d20, and the record says what a 1 does (destroyed,
+nonmagical with its row kept dormant, or a plain item it becomes) and what a 20 gives back; a pool that never comes
+back ends the item with no roll (`resolution/charges.ts` and `item-spent.ts`; the former also rolls a Thief's Use
+Magic Device d6, and the d100 of an item that may break as it is used, `item-breaks.ts`). A pool spent for a time
+(`per: "time"`, Wings of Flying) waits `afterHours` of game time from its first use, or from when the creature it
+brought leaves (`waitsFromEnd`, a figurine), with `readyAt` on the actor, and comes back as `passGameTime` passes it.
+A pool of time (`timePool`: Boots of Speed's rounds, a Goat of Traveling's hours) is spent whole by a use, and what is
+left when the use ends early comes back. Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
 kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only

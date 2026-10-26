@@ -65,6 +65,22 @@ export function removeZone(state: GameState, zone: SpellZone): void {
   };
 }
 
+/** The zone an item's use left, as one for each area the use placed (a Ring of Shooting Stars' lightning spheres): each
+ *  on its own area, acting and ending on its own, with the damage its trigger gives for that many areas. */
+export function zoneForEachArea(state: GameState, zoneId: string, moreAreaIds: readonly string[]): void {
+  const zone = state.combat.spellZones.find((candidate) => candidate.id === zoneId);
+  if (!zone?.rule) return;
+  const byCount = zone.rule.trigger.damageByCount;
+  const formula = byCount?.[Math.min(moreAreaIds.length + 1, byCount.length) - 1];
+  if (formula)
+    zone.rule = {
+      ...zone.rule,
+      damage: zone.rule.damage.map((part, index) => (index === 0 ? { ...part, formula } : part))
+    };
+  const copies = moreAreaIds.map((id) => ({ ...structuredClone(zone), id, annotationId: id }));
+  state.combat = { ...state.combat, spellZones: [...state.combat.spellZones, ...copies].slice(-20) };
+}
+
 /** The zones a Concentration cast holds end with it. */
 export function endZonesOfCast(state: GameState, castId: string): void {
   for (const zone of state.combat.spellZones) if (zone.castId === castId) endZone(state, zone.id);

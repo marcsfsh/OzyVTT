@@ -1,7 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState, PassiveOption } from "@vtt/domain";
 import { conditionLabel, incapacitatingCondition } from "./condition-rules.js";
-import { hasEffectTag, NO_ACTIONS_TAG, SLOWED_TAG } from "./effects.js";
+import { concentrationOn, hasEffectTag, NO_ACTIONS_TAG, SLOWED_TAG, spellWords } from "./effects.js";
 import { laterRowOf } from "./item-actions.js";
 import { castSlot, useLimitFor } from "./resolution/economy.js";
 import type { DefinitionAction, LiveActor } from "./resolution/context.js";
@@ -88,6 +88,8 @@ function actionSpentReason({ state, attacker, siblings }: ReasonFacts): string {
 function requiresReason({ attacker, action, spell }: ReasonFacts): string {
   if (action.requiresEffectTag && !hasEffectTag(attacker, action.requiresEffectTag))
     return `Only while ${conditionLabel(action.requiresEffectTag)}.`;
+  if (action.castThrough && !concentrationOn(attacker, action.castThrough))
+    return `Only while you concentrate on ${spellWords(action.castThrough)}.`;
   if (spell && markMoveOf(spell, action.id)) return `You aren't concentrating on ${spell.name}.`;
   if (spell && laterRowOf(spell, action.id)) return `Cast ${spell.name} first.`;
   if (action.id === END_EFFECT_ACTION_ID) return NO_ENDING_OPTION;
@@ -274,11 +276,19 @@ const structured = (action: DefinitionAction): boolean =>
  * answers a roll, a hit or a cast (Savage Attacker, Indomitable, Metamagic), or a rest's end (Arcane Recovery). A
  * spell area's later step is run by the server.
  */
-export function passiveOf(action: DefinitionAction, builtin: boolean): PassiveOption | undefined {
+export function passiveOf(
+  action: DefinitionAction,
+  builtin: boolean,
+  spell?: Parameters<typeof laterRowOf>[0]
+): PassiveOption | undefined {
   if (builtin) return undefined;
   // A rider tapped before its roll (Brutal Strike) is on the turn list; any other is chosen on a hit.
   if (hitRiderOf(action)) return hitRiderOf(action)!.declaredBeforeRoll ? undefined : "rider";
   if (action.activation !== "other") return undefined;
+  // Moving a spell's area with the caster's move (Conjure Animals' pack), or a storm's bolts the caster aims, costs
+  // nothing and is the caster's to take.
+  const row = spell ? laterRowOf(spell, action.id) : undefined;
+  if (row?.movesArea || row?.atRow || row?.cutsArea) return undefined;
   if (/^spell-.+-then-/.test(action.id)) return "automatic";
   if (structured(action) || TAKEN_ON_A_TURN.has(action.id)) return undefined;
   if (/\bas (?:a|an|your) (?:magic action|bonus action|action|reaction)\b/i.test(action.description)) return undefined;

@@ -60,6 +60,7 @@ export type PlayerEffect = Omit<
   | "grantedSpellAction"
   | "endAction"
   | "usedOnTurn"
+  | "refundsUses"
   | "shrinksEachLongRest"
   | "unarmedStrike"
   | "struck"
@@ -192,6 +193,7 @@ export type PlayerPendingSave = Omit<
   | "advantageAtSize"
   | "spell"
   | "confirmed"
+  | "spendsOnKill"
 > & {
   onFailEffect?: Omit<
     NonNullable<PendingSave["onFailEffect"]>,

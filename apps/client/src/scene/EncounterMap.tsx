@@ -334,7 +334,8 @@ export function EncounterMap({
           placedArea.placed,
           placedArea.widthFeet,
           tokens.filter((placed) => placed.actorId !== activeTargeting?.attackerId),
-          placedArea.sizeFeet
+          placedArea.sizeFeet,
+          placedArea.toTarget === true
         )
       : []
   );
@@ -600,7 +601,13 @@ export function EncounterMap({
   })();
   // Placing an area template, the drag places and points the area; its size is the action's own.
   const templateFeet = activeTargeting?.mode === "template" ? activeTargeting.template?.sizeFeet : undefined;
-  const preview = gesturePreview(calibration, gesture, annotationAt, templateFeet);
+  const preview = gesturePreview(
+    calibration,
+    gesture,
+    annotationAt,
+    templateFeet,
+    activeTargeting?.mode === "template" && activeTargeting.template?.toTarget === true
+  );
   const selected = selectedId ? annotationAt(selectedId) : null;
 
   const inspector =

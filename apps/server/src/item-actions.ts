@@ -219,7 +219,17 @@ export function castAction(
     // The bearer's own slot is spent on top of the item's charges when the item says so.
     ...(cast.consumesSpellSlot && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {}),
     // Who the item's cast may affect beside the spell's own targets (a ring's Fear: Beasts only).
-    ...(cast.targets ? { targets: structuredClone(cast.targets) } : {})
+    ...(cast.targets ? { targets: structuredClone(cast.targets) } : {}),
+    // Cast through the item's own Scrying (a Crystal Ball's Detect Thoughts), or only after a check (an Amulet of the
+    // Planes).
+    ...(cast.through ? { castThrough: cast.through } : {}),
+    // Once a dawn as well as from its charges (a Luck Blade's Wish), counted per carried copy.
+    ...(uses && cast.alsoUses
+      ? { alsoUses: { limit: cast.alsoUses.limit, pool: itemPool(item, `${cast.spellId}-dawn`) } }
+      : {}),
+    ...(cast.check ? { castCheck: { ...cast.check } } : {}),
+    // Only while its user controls the item (a Dragon Orb's spells).
+    ...(cast.requiresEffectTag ? { requiresEffectTag: cast.requiresEffectTag } : {})
   };
   if (!spell) return base;
 
@@ -249,7 +259,7 @@ export function castAction(
     ...base,
     // The item's own area, where it prints one (a wand's 60-foot Cone), else the spell's.
     ...(cast.area ? { area: structuredClone(cast.area) } : castAreaOf(spell, mechanics)),
-    ...mechanics,
+    ...(cast.optionIds ? withOptionsOnly(mechanics, cast.optionIds) : mechanics),
     // A Reaction spell (Shield, Hellish Rebuke) is cast from the item as a Reaction, offered when its trigger happens.
     ...(spell.effect?.reaction
       ? { activation: "reaction" as const, reaction: structuredClone(spell.effect.reaction) }
@@ -258,6 +268,30 @@ export function castAction(
   // A higher level rolls that slot's dice and makes its darts and rays, as a slot cast at it would (Robe of Stars'
   // level 5 Magic Missile).
   return level > spell.level ? upcastAction(built, spell, level) : built;
+}
+
+/** The spell's options an item's cast keeps where the item limits them (a Wand of Fear's Command: Flee or Grovel),
+ *  on its failed save's effect, its grant and the effects it picks among; the resolve refuses a pick it dropped. */
+function withOptionsOnly<Mechanics extends Pick<ActorAction, "save" | "grants" | "effectOptions">>(
+  mechanics: Mechanics,
+  optionIds: readonly string[]
+): Mechanics {
+  // A choice is of two or more; an item naming fewer of the spell's own leaves the spell's.
+  const kept = <Option extends { id: string }>(options: readonly Option[] | undefined) => {
+    const left = options?.filter((option) => optionIds.includes(option.id));
+    return left && left.length >= 2 ? left : options;
+  };
+  const failure = mechanics.save?.failureEffect;
+  const grantOptions = kept(mechanics.grants?.options);
+  const effectOptions = kept(mechanics.effectOptions);
+  return {
+    ...mechanics,
+    ...(failure?.options && mechanics.save
+      ? { save: { ...mechanics.save, failureEffect: { ...failure, options: kept(failure.options) } } }
+      : {}),
+    ...(grantOptions && mechanics.grants ? { grants: { ...mechanics.grants, options: grantOptions } } : {}),
+    ...(effectOptions ? { effectOptions } : {})
+  };
 }
 
 /** An item cast as the sheet offers it: one cast, or, where each charge after the first casts it a level higher (a

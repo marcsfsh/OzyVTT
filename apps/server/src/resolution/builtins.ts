@@ -26,6 +26,7 @@ import { builtinBaseId, END_EFFECT_ID } from "../builtin-actions.js";
 import {
   addEffect,
   endEffect,
+  endEffectIfPresent,
   ESCAPE_ATHLETICS_TAG,
   ESCAPE_DISADVANTAGE_TAG,
   makeEffect,
@@ -35,6 +36,10 @@ import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
 import { endAnEffect, isNamedEnding, namedEnding } from "./endings.js";
 import { CommandRejectedError } from "../game-store.js";
+import { touchBead } from "../zone-touch.js";
+import { holdsTalisman, SPHERE_CONTROL_TAG } from "../zone-sphere.js";
+import { liveZones } from "../spell-zones.js";
+import { zoneContentOf } from "../spell-zone-state.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
 import {
   abilityModifier,
@@ -83,9 +88,11 @@ export function rollCheck(
   stakes: readonly string[] = [],
   versus?: CheckVersus,
   /** A Disadvantage the check's own rule gives it, by name (escaping a mimic's grip). */
-  disadvantage?: string
+  disadvantage?: string,
+  /** An Advantage the check's own rule gives it, by name (a Talisman of the Sphere). */
+  advantage?: string
 ): boolean | null {
-  return rolledCheck(ctx, subject, dc, label, stakes, versus, disadvantage).success;
+  return rolledCheck(ctx, subject, dc, label, stakes, versus, disadvantage, advantage).success;
 }
 
 /** A check `rollCheck` made: its outcome, its plan's context, the dice it threw and the mode they were thrown under. */
@@ -104,7 +111,8 @@ function rolledCheck(
   label?: string,
   stakes: readonly string[] = [],
   versus?: CheckVersus,
-  disadvantage?: string
+  disadvantage?: string,
+  advantage?: string
 ): RolledCheck {
   // A Help an earlier check used ends before this one is planned.
   const helpEnded = endUsedHelp(ctx.state, ctx.attacker);
@@ -132,13 +140,21 @@ function rolledCheck(
     )
   });
   const forced = label === undefined ? (ctx.input.rollMode ?? undefined) : undefined;
+  const advantages = advantage === undefined ? plan.rollMode.advantage : [...plan.rollMode.advantage, advantage];
+  const disadvantages =
+    disadvantage === undefined ? plan.rollMode.disadvantage : [...plan.rollMode.disadvantage, disadvantage];
   const rollMode =
-    disadvantage === undefined
+    disadvantage === undefined && advantage === undefined
       ? plan.rollMode
       : {
-          mode: plan.rollMode.advantage.length > 0 ? ("normal" as const) : ("disadvantage" as const),
-          advantage: plan.rollMode.advantage,
-          disadvantage: [...plan.rollMode.disadvantage, disadvantage]
+          mode:
+            advantages.length > 0 && disadvantages.length > 0
+              ? ("normal" as const)
+              : advantages.length > 0
+                ? ("advantage" as const)
+                : ("disadvantage" as const),
+          advantage: advantages,
+          disadvantage: disadvantages
         };
   const mode = forced ?? rollMode.mode;
   ctx.rollMode = shownRollMode(rollMode, forced);
@@ -536,6 +552,87 @@ function shakeAwake(ctx: ResolveContext): void {
   }
 }
 
+/** Taking control of a Sphere of Annihilation within 60 feet (`zone-sphere.ts`): the DC 25 Intelligence (Arcana) check,
+ *  with Advantage from a Talisman of the Sphere. A success holds it until the start of the creature's next turn; a
+ *  failure draws it 10 feet toward the creature. */
+function controlSphere(ctx: ResolveContext): void {
+  const { state, attacker, deps } = ctx;
+  const sphere = liveZones(state)
+    .flatMap((zone) => {
+      const controlled = zoneContentOf(zone, deps.catalog)?.trigger.controlled;
+      const feet = controlled ? (deps.zoneFeet?.(attacker.id, zone.id) ?? null) : null;
+      return controlled && (feet === null || feet <= controlled.withinFeet + DISTANCE_TOLERANCE_FEET)
+        ? [{ zone, controlled, feet: feet ?? 0 }]
+        : [];
+    })
+    .sort((a, b) => a.feet - b.feet)[0];
+  if (!sphere) throw new CommandRejectedError("There is no Sphere of Annihilation within 60 feet to control.");
+  const { zone, controlled } = sphere;
+  const success = rollCheck(
+    ctx,
+    { ability: "int", skill: "arcana" },
+    controlled.dc,
+    `${zone.name}: control`,
+    [],
+    undefined,
+    undefined,
+    holdsTalisman(attacker) ? "Talisman of the Sphere" : undefined
+  );
+  if (success === true) {
+    // "If it was under another creature's control, that creature loses control of the sphere."
+    const previous = zone.controllerId;
+    if (previous !== undefined) endEffectIfPresent(state, previous, `${zone.id}:control:${previous}`);
+    zone.controllerId = attacker.id;
+    addEffect(
+      state,
+      attacker.id,
+      makeEffect({
+        id: `${zone.id}:control:${attacker.id}`,
+        name: `In control of ${zone.name}`,
+        tags: [SPHERE_CONTROL_TAG],
+        sourceActorId: attacker.id,
+        sourceName: attacker.name,
+        startedRound: state.combat.round,
+        duration: { type: "until-source-next-turn" }
+      })
+    );
+    ctx.tableNarration.push({
+      kind: "effect",
+      text: `${attacker.name} takes control of ${zone.name}.`,
+      actorIds: [attacker.id]
+    });
+  } else if (success === false)
+    for (const event of deps.moveZone?.(zone.id, attacker.id, controlled.pullFeet) ?? [])
+      ctx.tableNarration.push(tableLineOf(ctx, event));
+}
+
+/** Moving a Sphere of Annihilation its user controls toward the creature it names: a Bonus Action's 5 feet for each
+ *  point of its Intelligence modifier (minimum 5), or with a Talisman of the Sphere, having started its turn in
+ *  control, a Magic action's 10 feet plus 10 for each point. */
+function moveSphere(far: boolean) {
+  return (ctx: ResolveContext): void => {
+    const { state, attacker, targets, deps } = ctx;
+    const zone = liveZones(state).find(
+      (candidate) =>
+        (far ? candidate.heldAtTurnStart : candidate.controllerId) === attacker.id &&
+        zoneContentOf(candidate, deps.catalog)?.trigger.controlled !== undefined
+    );
+    if (far && !holdsTalisman(attacker))
+      throw new CommandRejectedError("Only a creature holding a Talisman of the Sphere moves a sphere this way.");
+    if (!zone)
+      throw new CommandRejectedError(
+        far
+          ? `${attacker.name} didn't start this turn in control of a Sphere of Annihilation.`
+          : `${attacker.name} isn't in control of a Sphere of Annihilation.`
+      );
+    if (targets.length !== 1) throw new CommandRejectedError("Choose the creature to move the sphere toward.");
+    const intelligence = abilityModifier(deps.definition, "int");
+    const feet = far ? 10 + 10 * Math.max(0, intelligence) : Math.max(5, 5 * intelligence);
+    for (const event of deps.moveZone?.(zone.id, targets[0]!.id, feet) ?? [])
+      ctx.tableNarration.push(tableLineOf(ctx, event));
+  };
+}
+
 /** An effect's natural weapon for the Unarmed Strike (Alter Self): its die and type, and the ability it uses "rather
  *  than using Strength". */
 function naturalWeaponOf(
@@ -622,6 +719,10 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   "end-an-effect": { check: endAnEffect },
   [END_EFFECT_ID]: { check: endOwnEffect },
   "shake-awake": { apply: shakeAwake },
+  "touch-bead": { apply: touchBead },
+  "control-sphere": { check: controlSphere },
+  "move-sphere": { apply: moveSphere(false) },
+  "move-sphere-far": { apply: moveSphere(true) },
 
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
    *  as a Bonus Action brings its own numbers, which stand. */

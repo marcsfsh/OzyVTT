@@ -203,7 +203,8 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
 /** Whether an item's riders apply: equipped, present and (if required) attuned. A cursed item contributes
  *  nothing before attunement. No catalog record fails open to mundane. */
 export function itemIsActive(item: InventoryItem, record: EquipmentReference | undefined): boolean {
-  if (item.quantity <= 0 || !item.equipped) return false;
+  // A copy whose magic is spent (a Gem of Brightness with no charges left, a studied manual) is a plain object.
+  if (item.quantity <= 0 || !item.equipped || item.dormant === true) return false;
   // A template not yet bound to its base ("Armor, +1" with no armor picked) is no armor or weapon yet, so its magic
   // has nothing to ride. One with a single base is that base.
   if (record?.appliesTo && record.appliesTo.baseIds.length > 1 && item.baseId === undefined) return false;
@@ -461,6 +462,7 @@ export function deriveEquipment(
     // Caltrops are spread straight from their bag, as a potion is drunk from the pack; one in a Bag of Holding is taken
     // out first, with the action that costs.
     else if (
+      item.dormant !== true &&
       (record?.consumedOnUse || record?.actions.some((action) => action.zone !== undefined)) &&
       containerOf(hostOf(inventory, item), catalog)?.retrieval === undefined
     )

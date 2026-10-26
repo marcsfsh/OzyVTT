@@ -59,10 +59,13 @@ export type ItemRiderKey =
   | "weaponChanges"
   | "bonusActionAttack"
   | "magicSaveAura"
+  | "servesAsFocus"
+  | "savesNegateSpells"
+  | "breaks"
   | "container"
   | "attunementHeldBy";
 
-/** The same twenty-five, as a value, so the empty-rider check below iterates the list it is typed against. */
+/** The same keys, as a value, so the empty-rider check below iterates the list it is typed against. */
 const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "tags",
   "actions",
@@ -87,6 +90,9 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "weaponChanges",
   "bonusActionAttack",
   "magicSaveAura",
+  "servesAsFocus",
+  "savesNegateSpells",
+  "breaks",
   "container",
   "attunementHeldBy"
 ] as const);
@@ -251,6 +257,7 @@ const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKin
  *   `while-proficient-with.ids` for weapon/armor/tool: groups (the `"skill"` kind is checked).
  *   `sense` - an open name: dynamic vision reads the ones it knows (`vision/senses.ts`), the rest are shown.
  *   `actions[].id`, `multiattack[].actionId` - local to the item's own action list.
+ *   `casts[].optionIds` - local to the cast spell's own options.
  *   `grants.saves` - already a closed zod enum.
  */
 export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
@@ -263,7 +270,8 @@ export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
   "armor",
   "sense",
   "saves",
-  "actionId"
+  "actionId",
+  "optionIds"
 ]);
 
 /** Levenshtein, only ever run against one vocabulary to turn a refusal into a fix. */
@@ -408,7 +416,7 @@ export function applyItemMechanics(
     const unknown = Object.keys(entry).filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
     if (unknown.length > 0) {
       refused.push(
-        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The twenty-five are: ${ITEM_RIDER_KEYS.join(", ")}`
+        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The keys are: ${ITEM_RIDER_KEYS.join(", ")}`
       );
       continue;
     }

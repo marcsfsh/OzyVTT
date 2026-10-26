@@ -39,6 +39,7 @@ import { areaGroundFor } from "../zone-preview.js";
 import { visibleToPlayerAnnotation } from "../projections.js";
 import { previewScene } from "../scene-preview.js";
 import { nextLevelOf } from "../next-level.js";
+import { castOptionsOf } from "../spell-zones.js";
 import { craftingOffers } from "../crafting.js";
 import { craftingDeps } from "./crafting.js";
 import { GameNotFoundError } from "./failures.js";
@@ -143,15 +144,18 @@ export const gameReads = [
           ? actionSummariesOf([...playedActions]).map((summary, index) => {
               // A Shape-Shift offers its forms and aims at no one; leaving a form too.
               const action = playedActions[index]!;
-              if (!action.shapeShift && !action.endsForm && !action.effectOptions) return summary;
+              // The effects a use picks among, or the form of the area a cast leaves (Wall of Fire's ring).
+              const picks = castOptionsOf(
+                action,
+                action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined
+              );
+              if (!action.shapeShift && !action.endsForm && !picks.options) return summary;
               return {
                 ...summary,
                 ...(action.shapeShift
                   ? { forms: formsOffer(kit.read(), combatant, action, played, kit.equipmentCatalog()) }
                   : {}),
-                ...(action.effectOptions
-                  ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
-                  : {}),
+                ...picks,
                 ...(action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)
                   ? { targeting: "none" as const }
                   : {})
@@ -312,7 +316,8 @@ export const gameReads = [
               resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
               catalog: kit.equipmentCatalog()
             },
-            seen
+            seen,
+            (creatureId) => !hidden(creatureId)
           )
         : undefined;
       return {

@@ -13,7 +13,9 @@ import {
   CANT_ATTACK_TAG,
   DASH_ONLY_TAG,
   HASTED_TAG,
+  concentrationOn,
   hasEffectTag,
+  spellWords,
   NO_ACTIONS_TAG,
   NO_BONUS_ACTIONS_TAG,
   NO_REACTIONS_TAG,
@@ -44,7 +46,7 @@ import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
 import { bookOfShadowsGap } from "../book-of-shadows.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
-import { notEnoughUses, useCostOf } from "../use-cost.js";
+import { activationCost, alsoSpentMessage, alsoUsesKey, notEnoughUses } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { planThisTurn, usedMarkOf } from "./multiattack-after.js";
 import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
@@ -96,7 +98,13 @@ export type EconomyPlan = Readonly<{
     shaping?: readonly CastShaping[];
   }> | null;
   /** Limited-use spend to record, keyed per scope: `amount` uses of it (one, or the action's cost). */
-  spendUse: Readonly<{ key: string; per: NonNullable<DefinitionAction["uses"]>["per"]; amount: number }> | null;
+  spendUse: Readonly<{
+    key: string;
+    per: NonNullable<DefinitionAction["uses"]>["per"];
+    amount: number;
+    /** The second limit the use counts against too (`alsoUses`), one more of it spent. */
+    also?: string;
+  }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions), and the mark of one it
    *  can't take again until its next turn. */
   spendLegendary: Readonly<{ cost: number; onceKey?: string }> | null;
@@ -655,6 +663,12 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
       message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.`
     });
   }
+  // A cast through another spell (a Crystal Ball's Detect Thoughts through Scrying) needs that spell held.
+  if (action.castThrough && !concentrationOn(attacker, action.castThrough))
+    violations.push({
+      rule: "feature.requires-effect",
+      message: `${action.name} is cast through ${spellWords(action.castThrough)}, which ${attacker.name} isn't concentrating on.`
+    });
   // End an Effect needs an effect an action ends, on the creature named or anywhere before one is.
   if (action.id === END_EFFECT_ACTION_ID && !hasEndingOption(state, attacker, targetIds))
     violations.push({ rule: "feature.requires-effect", message: NO_ENDING_OPTION });
@@ -861,13 +875,17 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
       message: `${action.name} comes as use ${action.useNumber} of ${limit}, and ${attacker.name} has spent ${spent}.`
     });
   // Some activations spend several (Lay on Hands' 5-point cure, or the points its user chose).
-  const cost = useCostOf(action);
+  const cost = activationCost(action, spent, limit);
   if (spent + cost > limit)
     violations.push({
       rule: "feature.no-uses-remaining",
       message: spent >= limit ? noUsesRemaining(action, limit) : notEnoughUses(action.name, limit - spent, cost)
     });
-  return { key, per: uses.per, amount: cost };
+  // A second limit it counts against too (a Luck Blade's Wish, once a dawn).
+  const also = alsoUsesKey(action);
+  if (also && (attacker.actionUses[also] ?? 0) >= action.alsoUses!.limit)
+    violations.push({ rule: "feature.no-uses-remaining", message: alsoSpentMessage(action) });
+  return { key, per: uses.per, amount: cost, ...(also ? { also } : {}) };
 }
 
 /** Whether this turn's open action is the plan of the pool's own action (a Hellfire Spellcasting's two casts), with a
@@ -1855,6 +1873,7 @@ export function commitUse(state: GameState, attacker: LiveActor, spendUse: NonNu
   }
   attacker.actionUses = {
     ...attacker.actionUses,
-    [spendUse.key]: (attacker.actionUses[spendUse.key] ?? 0) + spendUse.amount
+    [spendUse.key]: (attacker.actionUses[spendUse.key] ?? 0) + spendUse.amount,
+    ...(spendUse.also ? { [spendUse.also]: (attacker.actionUses[spendUse.also] ?? 0) + 1 } : {})
   };
 }

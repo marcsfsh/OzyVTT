@@ -404,7 +404,7 @@ export function GearTab({
               <p className="cs-sub">Resists {titleCase(open.chosenDamageType)}.</p>
             )}
             {open.dormant ? (
-              <p className="cs-sub">Its magic is spent. It regains it in a century.</p>
+              <p className="cs-sub">Its magic is spent.{study ? " It regains it in a century." : ""}</p>
             ) : (
               study && (
                 <p className="cs-sub">
@@ -424,7 +424,7 @@ export function GearTab({
                 {open.equipped ? "Equipped" : "Equip"}
               </button>
               {/* Only an item that needs attunement takes a slot; a stale attuned row can still be cleared. */}
-              {(open.magic?.attunementRequired || open.attuned) && (
+              {((open.magic?.attunementRequired && !open.dormant) || open.attuned) && (
                 <button
                   type="button"
                   className={`cs-toggle interactive${open.attuned ? " is-on" : ""}`}
@@ -470,7 +470,7 @@ export function GearTab({
                 </div>
               );
             })()}
-            {(open.magic?.attunementRequired || open.attuned) && (
+            {((open.magic?.attunementRequired && !open.dormant) || open.attuned) && (
               <p className="cs-sub">
                 {prerequisites.length > 0
                   ? `Requires attunement by ${prerequisites.map(prerequisiteWords).join(" or ")}. `

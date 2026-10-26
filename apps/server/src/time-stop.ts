@@ -7,7 +7,8 @@ import type { ResolveContext } from "./resolution/context.js";
  * this period, or any effects that you create during it, affects a creature other than you ... In addition, the spell
  * ends if you move to a place more than 1,000 feet from the location where you cast it." The cast rolls the turns
  * (`startTimeStop`); a turn change gives the caster the next one while any are left (`timeStopGoesOn`); a resolve that
- * reaches another creature, or a move too far, ends it (`breakTimeStop`).
+ * reaches another creature, a spell area made during it that later acts on one (`spell-zones.ts`), or a move too far,
+ * ends it (`breakTimeStop`).
  */
 
 export const TIME_STOP_SPELL_ID = "time-stop";

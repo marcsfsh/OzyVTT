@@ -368,6 +368,19 @@ export function settleFalls(state: GameState, deps: FallDeps): EffectNarration[]
 
 const LEVITATE_RISE_FEET = 20;
 
+/** An effect that ends when its bearer lands (a Broom of Flying: "The broom stops hovering when you land"). */
+export const ENDS_ON_LANDING_TAG = "ends-on-landing";
+
+/** A move from the air to the ground ends what lasts only until its creature lands. */
+export function endsOnLanding(state: GameState, actorId: string, fromFeet: number, toFeet: number): EffectNarration[] {
+  if (fromFeet <= 0 || toFeet > 0) return [];
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  return actor.effects
+    .filter((effect) => effect.tags.includes(ENDS_ON_LANDING_TAG))
+    .flatMap((effect) => endEffect(state, actor.id, effect.id));
+}
+
 /** The creature, when a levitation holds it (Levitate's effect). */
 function levitated(state: GameState, actorId: string): Actor | undefined {
   const actor = state.actors.find((candidate) => candidate.id === actorId);

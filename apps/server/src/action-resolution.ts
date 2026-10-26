@@ -10,6 +10,7 @@ import {
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
 import { conditionChoicesOf } from "./item-actions.js";
+import { castOptionsOf } from "./spell-zones.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
 import { builtinCheckSkills, helpToolsOf } from "./resolution/builtins.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -28,7 +29,7 @@ import {
   spendUntilItActs,
   spendUntilOwnAttack
 } from "./resolution/attack.js";
-import { rollLastCharge } from "./resolution/charges.js";
+import { breaksBeforeUse, rollLastCharge } from "./resolution/charges.js";
 import { recallSpellSlot } from "./resolution/spell-recall.js";
 import { rollForAnAnswer } from "./resolution/divinations.js";
 import { prayerShortRest, refuseThePrayedFor } from "./resolution/prayer-of-healing.js";
@@ -57,7 +58,7 @@ import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { applySummons } from "./resolution/summon.js";
-import { readScroll } from "./resolution/scroll.js";
+import { failsCastCheck, readScroll } from "./resolution/scroll.js";
 import { failsCheckFirst } from "./resolution/check-first.js";
 import { releaseItemEffects } from "./resolution/endings.js";
 import { rebindRow } from "./resolution/rebind.js";
@@ -233,6 +234,16 @@ export function resolveDefinitionAction(
   if (failsCheckFirst(ctx)) {
     commitEconomy(ctx);
     releaseHideAndReady(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // So does a failed check an item's cast asks first (an Amulet of the Planes).
+  if (failsCastCheck(ctx)) {
+    commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // An item that breaks as it fails to work (a Wind Fan) is gone with its pool, and its action is spent.
+  if (breaksBeforeUse(ctx)) {
+    commitEconomy({ ...ctx, plan: { ...ctx.plan, spendUse: null } });
     return { ...resolutionOf(ctx), save: null };
   }
   // Spread Caltrops or a set trap acts on whoever meets it later, so nothing is rolled now.
@@ -606,7 +617,7 @@ export function actionAvailability(
       fastForm && fastEvaluation
         ? unavailableReason(fastEvaluation.violations, { state, attacker, action: fastForm, siblings, spell })
         : undefined;
-    const passive = passiveOf(action, builtin);
+    const passive = passiveOf(action, builtin, spell);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
     const damageLook = !builtin && damageLookOffered(state, attacker, action, definition, siblings);
     const forms = action.shapeShift ? formsOffer(state, attacker, action, definition, catalog) : undefined;
@@ -634,9 +645,7 @@ export function actionAvailability(
         ? { areaPerSlot: { feet: spell.effect.areaPerSlot, level: spell.level } }
         : {}),
       ...(forms !== undefined ? { forms } : {}),
-      ...(action.effectOptions
-        ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
-        : {}),
+      ...castOptionsOf(action, spell),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),

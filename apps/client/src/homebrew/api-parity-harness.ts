@@ -466,6 +466,7 @@ const SAVE_LIFETIME_KEYS = [
   "failureMaxSize",
   "repeatDamageAgain",
   "repeatUnseenSource",
+  "repeatBeyondFeet",
   "endsOutOfSight",
   "autoSuccess.**",
   "endedBy.**",
@@ -491,6 +492,34 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "how many uses one activation spends (Lay on Hands' points, its 5-point cure) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castThrough",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast made through a spell its user concentrates on (a Crystal Ball's Detect Thoughts through Scrying) - synthesised from an item cast's `through`; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castCheck.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a check made before a use (an Amulet of the Planes' DC 15 Intelligence (Arcana)) - synthesised from an item cast's `check`; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].alsoUses.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a second limit each use counts against, restored by a Long Rest (a Luck Blade's Wish once a dawn) - synthesised from an item cast's `alsoUses`; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].timePool",
+    types: ACTION_CARRIERS,
+    reason:
+      "uses that are time, a use spending all that is left (Boots of Speed's rounds, a Goat of Traveling's hours) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {
@@ -637,6 +666,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "attack keys the action rows do not enumerate: surfaced when the bare-group false credit was removed (this batch's adversarial review)",
+    status: "gap"
+  },
+  {
+    at: "actions[].attack.bonus",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a printed to-hit that stands in for the derived one (a Ring of the Ram's +7) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {
@@ -1301,6 +1337,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "casts[].requiresEffectTag",
+    types: ["equipment"],
+    reason:
+      "the effect an item's cast needs on its user (a Dragon Orb's control) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "casts[].useCost",
     types: ["equipment"],
     reason:
@@ -1315,10 +1358,66 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "casts[].alsoUses.**",
+    types: ["equipment"],
+    reason:
+      "an item cast's once-a-dawn limit beside its charges (a Luck Blade's Wish) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.startingByPool",
+    types: ["equipment"],
+    reason:
+      "each pool's own count when a copy is added (a Helm of Brilliance's gems) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].through",
+    types: ["equipment"],
+    reason:
+      "the spell an item's cast goes through (a Crystal Ball's Scrying) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].check.**",
+    types: ["equipment"],
+    reason:
+      "the check an item's cast asks first (an Amulet of the Planes) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "servesAsFocus",
+    types: ["equipment"],
+    reason:
+      "the Spellcasting Focus a magic item serves as (a talisman's Holy Symbol) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "savesNegateSpells.**",
+    types: ["equipment"],
+    reason:
+      "a successful save that leaves a spell no effect (a Ring of Spell Turning) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "breaks.**",
+    types: ["equipment"],
+    reason:
+      "the chance a use breaks the item (a Horn of Blasting, a Wind Fan) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].optionIds",
+    types: ["equipment"],
+    reason:
+      "the spell's options an item's cast may pick (Wand of Fear's Command: flee or grovel only) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "charges.lastCharge.**",
     types: ["equipment"],
     reason:
-      "what the last charge does to the item (destroyed, or a plain item it becomes) - authored in the item overlay; no editor control yet",
+      "what the last charge does to the item (destroyed, nonmagical, or an item it becomes) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

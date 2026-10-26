@@ -484,8 +484,8 @@ const absorbs = (type: string) =>
 
 export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   Abduct: enforced("movement-rules.ts charges the bugbear no extra movement to drag a creature it grapples."),
-  "Aberrant Ground": reference(
-    "The GM can paint the Emanation as difficult terrain (terrain.ts), but the painted terrain doesn't move with the mouther."
+  "Aberrant Ground": enforced(
+    "zone-ground.ts makes the ground within 10 feet of the mouther Difficult Terrain for every other creature, and it moves with the mouther; the move preview shows it round a mouther the mover can see (zone-preview.ts)."
   ),
   "Acid Absorption": absorbs("Acid"),
   Adhesive: reference("Sticking to what touches it is the GM's to apply with the Grappled condition."),
@@ -796,19 +796,19 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The GM says which gem a found one is (item-records.ts): breaking it uses it up, and its elemental appears beside its user, acts right after it and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts)."
   ),
   "item:efreeti-bottle": guided(
-    "Opened, an Efreeti appears within 30 feet and the server rolls the d10 (summons.ts): on a 1 it attacks its user and leaves after 5 rounds, on 2 to 9 it obeys for 1 hour, on a 10 it stays up to an hour to grant a Wish. The first roll setting every later opening, the 24 hours between openings and the Wish are the GM's."
+    "Opened the first time, an Efreeti appears within 30 feet and the server rolls the d10, which settles the bottle (summons.ts): on a 1 it attacks its user and leaves after 5 rounds, on a 10 it stays up to an hour to grant a Wish, and either way the bottle's magic is gone; on 2 to 9 it obeys for 1 hour and the bottle holds a servant from then on, which comes twice more, each opening 24 hours after it returns (clock-pools.ts), and then the bottle is spent. What the Wish does is the GM's."
   ),
   "item:feather-token": guided(
     "The GM says which token a found one is (item-records.ts). The Bird token is used up for a Roc that can't attack and obeys its user until it is dismissed with a Magic action or drops to 0 Hit Points (summons.ts). The Anchor, Fan, Swan Boat, Tree and Whip are the GM's."
   ),
   "item:figurine-of-wondrous-power": guided(
-    "The GM says which figurine a found one is (item-records.ts): its creature appears within 60 feet for its time, acts right after its user and defends itself when uncommanded, and a Magic action turns it back (summons.ts); clock-pools.ts holds it for its days. The Silver Raven, the goats' own waits and powers and the Obsidian Steed ignoring orders are the GM's."
+    "The GM says which figurine a found one is (item-records.ts): its creature appears within 60 feet for its time, acts right after its user and defends itself when uncommanded, and a Magic action turns it back (summons.ts). Its days of waiting start when it reverts (clock-pools.ts), each Golden Lion and each Ivory Goat on its own; the Goat of Traveling spends an hour or part of one each time from its 24 and waits only once they are spent. The Goat of Terror can't attack, the Onyx Dog has Blindsight 60 feet, the Silver Raven offers Animal Messenger, and the Obsidian Steed's d10 shows 1 one time in ten, leaving it under no one's command. The Goat of Terror's horns and fear, the steed refusing to revert and its ride to Hades are the GM's."
   ),
   "item:ring-of-djinni-summoning": enforced(
-    "The djinni appears within 120 feet while its wearer keeps Concentration, up to 1 hour, defending itself when uncommanded (summons.ts); clock-pools.ts holds the ring for 24 hours. The ring losing its magic when the djinni dies is the GM's."
+    "The djinni appears within 120 feet while its wearer keeps Concentration, up to 1 hour, defending itself when uncommanded (summons.ts); clock-pools.ts holds the ring for 24 hours from when it departs, and the ring loses its magic if the djinni dies (item-spent.ts)."
   ),
-  "item:staff-of-the-python": guided(
-    "Thrown within 10 feet, it becomes a Giant Constrictor Snake that acts right after its user, commanded within 60 feet and defending itself otherwise; a Bonus Action turns it back (summons.ts, summon-orders.ts). The hour before it works again, and the staff shattering when the snake dies, are the GM's."
+  "item:staff-of-the-python": enforced(
+    "Thrown within 10 feet, it becomes a Giant Constrictor Snake that acts right after its user, commanded within 60 feet and defending itself otherwise; a Bonus Action turns it back (summons.ts, summon-orders.ts), and the staff then waits an hour (clock-pools.ts). The snake dying shatters the staff (item-spent.ts)."
   ),
   "item:staff-of-swarming-insects": enforced(
     "Insect Cloud fills a 30-foot Emanation that is Heavily Obscured for everyone but its holder for 10 minutes (vision/cast-sight.ts). Giant Insect costs 4 charges and brings the insect (summons.ts), and Insect Plague costs 5. A strong wind dispersing the cloud is the GM's."
@@ -847,20 +847,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:imprisonment": guided(
     "A failed save takes the target off the map until the GM ends the spell (off-plane.ts). The form of the prison, the 24 hours of immunity on a success and the ending trigger are the GM's."
   ),
-  "spell:time-stop": guided(
-    "time-stop.ts rolls 1d4 + 1 and gives the caster that many turns in a row; an action of its that targets another creature, or a move more than 1,000 feet from where it cast the spell, ends it. An effect it created that later reaches another creature is the GM's to end it on."
+  "spell:time-stop": enforced(
+    "time-stop.ts rolls 1d4 + 1 and gives the caster that many turns in a row; an action of its that targets another creature, or a move more than 1,000 feet from where it cast the spell, ends it. A spell area the caster made during it that later acts on another creature ends it too (spell-zones.ts), a burst included."
   ),
   "item:boots-of-striding-and-springing": guided(
     "Its wearer's Speed is at least 30 feet and armor's Strength requirement takes none of it (speed.ts), and the once-a-turn leap of 30 feet for 10 feet of movement is applied (jumping.ts). Carried weight is the GM's."
   ),
-  "item:boots-of-levitation": guided(
-    "The action levitates the wearer with no save for the spell's 10 minutes: it rises 20 feet, moves only as if climbing, and floats down when the levitation ends (falling.ts). Concentration on it is the wearer's to end sooner on the sheet."
+  "item:boots-of-levitation": enforced(
+    "The action levitates the wearer with no save for up to 10 minutes on its Concentration (effects.ts), which damage, another Concentration spell or Incapacitation ends: it rises 20 feet, moves only as if climbing, and floats down when the levitation ends (falling.ts)."
   ),
   "item:wings-of-flying": enforced(
     "The action gives a Fly Speed of 60 feet for an hour, or until the wearer ends it on the sheet; a creature in the air when it ends falls (falling.ts). clock-pools.ts keeps the wings from being used again until 1d12 + 1 hours of game time have passed from their use (the hour they last, then the wait)."
   ),
-  "item:broom-of-flying": guided(
-    "The action gives the rider a Fly Speed of 50 feet with hover until it ends it on the sheet. The slower 30 feet while it carries over 200 pounds is the GM's."
+  "item:broom-of-flying": enforced(
+    "The action gives the rider a Fly Speed of 50 feet with hover, which ends when it lands (falling.ts) or when it gets off on the sheet. Its slower 30 feet while it carries over 200 pounds needs the rider's body weight, which no sheet records, and sending it alone to a place within a mile is story."
   ),
   "item:cape-of-the-mountebank": guided(
     "The cast of Dimension Door, once a dawn, teleports the wearer on the map (granted-moves.ts). The smoke cloud is the GM's."
@@ -1477,8 +1477,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
 
   // Magic items whose riders apply part of what they do, and leave a property the table would expect applied.
-  "item:armor-of-invulnerability": guided(
-    "Resistance to Bludgeoning, Piercing and Slashing damage is applied. The once-a-day Immunity to them is the GM's."
+  "item:armor-of-invulnerability": enforced(
+    "Resistance to Bludgeoning, Piercing and Slashing damage is applied, and Metal Shell's Magic action gives Immunity to them for 10 minutes once a dawn, ending if the armor comes off (inventory.ts)."
   ),
   "item:berserker-axe": guided(
     "The +1 to attack and damage rolls and the curse's lock on Attunement are applied. berserker-axe.ts asks the DC 15 Wisdom save when another creature damages the bearer, and ends the berserk on a turn that starts with no creature within 60 feet. Its attacks on the nearest creature, and the extra Hit Points, are the GM's."
@@ -1505,14 +1505,23 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:dagger-of-venom": enforced(
     "The +1 to attack and damage rolls is applied. Coating the blade is a Bonus Action once a day, and the dagger's next hit spends it on a DC 15 Constitution save against 2d10 Poison and Poisoned for 1 minute (resolution/on-hit.ts)."
   ),
-  "item:defender": guided(
-    "The +3 to attack and damage rolls is applied, and its wielder moves 1, 2 or 3 of it to AC as a form on the sheet (inventory.ts setItemForm). Picking it with the first attack of a turn, and holding it to the next, are the wielder's."
+  "item:defender": enforced(
+    "The +3 to attack and damage rolls is applied, and its wielder moves 1, 2 or 3 of it to AC as a form on the sheet before its first attack of a turn, held until its next turn starts and giving AC only while it holds the weapon (inventory.ts setItemForm, turn-boundaries.ts)."
+  ),
+  "item:ring-of-free-action": guided(
+    "Difficult Terrain costs its wearer no extra movement (movement-rules.ts). That magic can't reduce its Speeds or give it the Paralyzed or Restrained condition is the GM's to apply, since the engine doesn't yet tell a magical source from another."
+  ),
+  "item:horseshoes-of-a-zephyr": guided(
+    "The creature wearing all four ignores Difficult Terrain (movement-rules.ts). Floating over water or lava is the GM's until the map holds water and lava areas; its tracks and its 12 hours of travel a day are overland travel the app doesn't run."
   ),
   "item:demon-armor": guided(
     "The +1 AC and the curse's lock on Attunement are applied. The clawed Unarmed Strikes and the Disadvantage against demons are the GM's."
   ),
-  "item:dragon-scale-mail": guided(
-    "The +1 AC and the Resistance to the type the GM picks are applied, with Advantage on a save a Dragon forces (riders.ts), its breath's and any other. Sensing dragons is the GM's."
+  "item:dragon-scale-mail": enforced(
+    "The +1 AC and the Resistance to the type the GM picks are applied, with Advantage on saves against a Dragon's breath weapon (saving-throws.ts). Its Magic action to sense the nearest dragon is counted once a dawn; the distance and direction it tells are the GM's."
+  ),
+  "item:javelin-of-lightning": enforced(
+    "It may deal Lightning damage on a hit, and once a dawn it becomes a bolt: a 5-foot Line from its thrower that ends at a target within 120 feet (annotations.ts), DC 13 Dexterity save for 4d6 Lightning, half on a success."
   ),
   "item:dwarven-plate": guided("The +2 AC is applied. The Reaction against forced movement is the GM's."),
   "item:dwarven-thrower": enforced(
@@ -1535,7 +1544,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:iron-flask": guided("The command's save is applied. Trapping the creature in the flask is the GM's."),
   "item:luck-blade": guided(
-    "The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish casts on 1d3 charges rolled when it is added, which never come back; its once a day limit, and what a Wish does, are the GM's."
+    "The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish casts on 1d3 charges rolled when it is added, which never come back, and once a dawn (resolution/economy.ts). What a Wish does is the GM's."
   ),
   "item:gloves-of-missile-snaring": enforced(
     "A hit by a weapon from range opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the wearer's Dexterity modifier off the damage. Whether a hand is free, and catching the missile, are the GM's."
@@ -1546,26 +1555,29 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:mace-of-smiting": enforced(
     "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a rolled 20 (14 against a Construct) are applied. A Construct that rolled 20 leaves at 25 Hit Points or fewer is destroyed (resolution/kill.ts)."
   ),
-  "item:nine-lives-stealer": guided(
-    "The +2 to attack and damage rolls is applied. On a rolled 20 against a creature with fewer than 100 Hit Points, other than a Construct or an Undead, the target makes the DC 15 Constitution save, and a failure slays it (resolution/kill.ts). The 1d8 + 1 charges, one spent per slaying, are the GM's to count."
+  "item:nine-lives-stealer": enforced(
+    "The +2 to attack and damage rolls is applied. On a rolled 20 against a creature with fewer than 100 Hit Points, other than a Construct or an Undead, the target makes the DC 15 Constitution save, and a failure slays it (resolution/kill.ts). Each slaying spends one of the 1d8 + 1 charges rolled when the sword is added, which never come back, and with none left it slays no more."
   ),
-  "item:pipes-of-haunting": guided(
-    "The save against Frightened, with its repeat at the end of each turn, is applied. The immunity after a success is the GM's."
+  "item:helm-of-brilliance": guided(
+    "inventory.ts counts each kind of gem when the helm is added (1d10 diamonds, 2d10 rubies, 3d10 fire opals, 4d10 opals), which never come back, and each of its spells at DC 18 spends one gem of its kind: Daylight an opal, Fireball a fire opal, Prismatic Spray a diamond, Wall of Fire a ruby. Diamond Light against Undead, Fire Opal Flames, Ruby Resistance while a ruby is left, the helm losing its magic once every gem is gone, and the d20 when Fire from a spell lands are the GM's."
+  ),
+  "item:pipes-of-haunting": enforced(
+    "Its 3 charges come back 1d3 at dawn; each opens the DC 15 Wisdom save against Frightened for a minute on the creatures its user picks within 30 feet, repeated at the end of each turn, and a creature that succeeds is immune to the pipes for the rest of the fight (resolution/pending.ts)."
   ),
   "item:quarterstaff-of-the-acrobat": enforced(
     "The +2 to attack and damage rolls and Advantage on Dexterity (Acrobatics) checks are applied, it is thrown 30/120, and Attack Deflection is offered once a rest when a hit would land (resolution/pending.ts). A Bonus Action makes it a rod or a pole (inventory.ts setItemForm), where it neither swings nor deflects."
   ),
   "item:ring-of-shooting-stars": guided(
-    "Its at-will cantrips and the one-charge Shooting Stars are applied. Faerie Fire, the Lightning Spheres and the larger Shooting Stars are the GM's."
+    "Its at-will cantrips, and on its 6 charges Faerie Fire, Shooting Stars of 1 to 3 Cubes at a charge each (use-cost.ts, multi-templates.ts) and the Lightning Spheres, are applied: up to four areas on the wearer's Concentration for a minute, each discharging once at the first creature within 5 feet of it for the damage its number gives (spell-zone-state.ts, spell-zones.ts). The spheres' Dim Light, and their Bonus Action move within 120 feet, are the GM's, who drags each sphere's area."
   ),
-  "item:robe-of-scintillating-colors": guided(
-    "The save against Stunned is applied. The light, the Disadvantage on attacks against the wearer and ending the stun are the GM's."
+  "item:robe-of-scintillating-colors": enforced(
+    "Its 3 charges (1d3 back at dawn) each make the robe shed Bright Light 30 feet and Dim Light 30 more until the end of the wearer's next turn, give Disadvantage to attackers that see it, and Stun until then a creature within 30 feet that sees it and fails the DC 15 Wisdom save (resolution/pending.ts, vision/rules.ts)."
   ),
   "item:robe-of-stars": guided(
     "The +1 to saving throws is applied, and its six stars each cast a level 5 Magic Missile, 1d6 coming back at dusk or a Long Rest. The trip to the Astral Plane is the GM's."
   ),
-  "item:rod-of-alertness": guided(
-    "Advantage on Initiative and Wisdom (Perception) checks, and its detection casts, are applied. The Protective Aura's benefit to allies is the GM's."
+  "item:rod-of-alertness": enforced(
+    "Advantage on Initiative and Wisdom (Perception) checks, and its detection casts, are applied. The Protective Aura once a dawn plants the rod's light where its user stands for 10 minutes, and while in its 60 feet of Bright Light the user and its allies have +1 to AC and saves and See Invisibility there (zone-auras.ts). Pulling the rod out is the GM's, who ends its area."
   ),
   "item:rope-of-entanglement": enforced(
     "The save against Restrained is applied, with the DC 15 Strength (Athletics) or Dexterity (Acrobatics) check to escape (ending-actions.ts), and its user's Bonus Action command releases the target (resolution/endings.ts). The rope that holds it is an object with AC 20 and 20 Hit Points, immune to Poison and Psychic damage, that an attack can break, which frees it, and it regains 1 Hit Point every 5 minutes (objects.ts, effects.ts)."
@@ -1589,7 +1601,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Resistance to Cold damage is applied, and Fog Cloud, Cone of Cold, Ice Storm and Wall of Ice spend their printed charges (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts)."
   ),
   "item:staff-of-power": guided(
-    "It swings as a +2 Quarterstaff, the +2 to AC, saving throws and spell attack rolls is applied, and its spells spend their printed charges; a 20 on the last charge's d20 gives 1d8 + 2 back (resolution/charges.ts). Retributive Strike, and a 1 on that d20, are the GM's."
+    "It swings as a +2 Quarterstaff, the +2 to AC, saving throws and spell attack rolls is applied, and its spells spend their printed charges; the last charge's d20 gives 1d8 + 2 back on a 20 and leaves only a +2 Quarterstaff on a 1 (resolution/charges.ts). Retributive Strike is the GM's."
   ),
   "item:staff-of-the-magi": guided(
     "It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, and its spells spend their printed charges from 50; a 20 on the last charge's d20 gives 1d12 + 1 back (resolution/charges.ts). Advantage on saves against spells, Spell Absorption and Retributive Strike are the GM's."
@@ -1598,16 +1610,16 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, its spells spend their printed charges and Tree Form's use is counted. A 1 on the last charge's d20 leaves a plain Quarterstaff (resolution/charges.ts)."
   ),
   "item:staff-of-thunder-and-lightning": enforced(
-    "It swings as a +2 Quarterstaff. Lightning and Thunder ride a melee hit, Thunder and Lightning does both as a Bonus Action (resolution/hit-options.ts), and Lightning Strike and Thunderclap are actions, each once a day."
+    "It swings as a +2 Quarterstaff. Lightning and Thunder ride a melee hit, Thunder and Lightning does both as a Bonus Action (resolution/hit-options.ts), and Lightning Strike's 120-foot Line and Thunderclap's 60-foot Emanation are actions (area-targeting.ts), each once a day."
   ),
   "item:staff-of-striking": enforced(
-    "It swings as a +3 Quarterstaff, and a melee hit can spend 1, 2 or 3 of its 10 charges for 1d6 Force each (resolution/hit-options.ts)."
+    "It swings as a +3 Quarterstaff, a melee hit can spend 1, 2 or 3 of its 10 charges for 1d6 Force each (resolution/hit-options.ts), and a 1 on the last charge's d20 leaves a plain Quarterstaff (resolution/charges.ts)."
   ),
   "item:staff-of-withering": enforced(
-    "It swings as a Quarterstaff, and a hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save against Disadvantage on Strength and Constitution checks and saves (resolution/hit-options.ts). The hour it lasts is the GM's."
+    "It swings as a Quarterstaff, and a hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save against an hour of Disadvantage on Strength and Constitution checks and saves (resolution/hit-options.ts), counted on the game clock after a fight (game-time.ts)."
   ),
-  "item:rod-of-lordly-might": guided(
-    "It swings as a +3 Mace; Drain Life and Paralyze ride a melee hit and Terrify is an action, each once a day. Its buttons are forms its holder picks for a Bonus Action (inventory.ts setItemForm): a flaming Longsword or Shortsword with 2d6 Fire and its light, a +3 Battleaxe or Spear, a pole or a battering ram (+10 to break through). Drain Life's healing, the pole's length and the north it finds are the GM's."
+  "item:rod-of-lordly-might": enforced(
+    "It swings as a +3 Mace; Drain Life (healing its wielder half the Necrotic damage a failed save deals) and Paralyze ride a melee hit and Terrify is an action, each once a day. Its buttons are forms its holder picks for a Bonus Action (inventory.ts setItemForm): a flaming Longsword or Shortsword with 2d6 Fire and its light, a +3 Battleaxe or Spear, a pole or a battering ram (+10 to break through). The pole's length and anchoring, magnetic north and the depth or height it tells are story."
   ),
   "item:sun-blade": enforced(
     "It swings as a +2 Finesse Longsword that deals Radiant damage, with 1d8 Radiant more against an Undead, and its blade sheds its sunlight. A Bonus Action puts the blade away to the hilt or brings it back (inventory.ts setItemForm). The radius its Magic action adjusts is the GM's."
@@ -1616,13 +1628,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A rolled 20 against a creature adds 14 Slashing damage and a level of Exhaustion (resolution/damage.ts, resolution/on-hit.ts), and its damage dice against an object are maximized (object-strikes.ts)."
   ),
   "item:talisman-of-pure-good": guided(
-    "The +2 to spell attack rolls is applied. The 8d6 Radiant it deals a Fiend or an Undead that touches it, and Pure Rebuke's fissure on its charges, are the GM's."
+    "It is a Holy Symbol for its bearer's spells (resolution/components.ts) with +2 to spell attack rolls, and Pure Rebuke spends one of its 7 charges, which never come back; the last destroys it (item-spent.ts). The rebuke's DC 20 Dexterity save, with Disadvantage for a Fiend or an Undead, a failure destroying the target and a success dealing 4d6 Psychic, and the 8d6 Radiant it deals a Fiend or an Undead that touches it, are the GM's."
   ),
   "item:talisman-of-ultimate-evil": guided(
-    "The +2 to spell attack rolls is applied. The 8d6 Necrotic it deals a creature other than a Fiend or an Undead that touches it, and Ultimate End's fissure on its charges, are the GM's."
+    "It is a Holy Symbol for its bearer's spells (resolution/components.ts) with +2 to spell attack rolls, and Ultimate End spends one of its 6 charges, which never come back; the last destroys it (item-spent.ts). The DC 20 Dexterity save, with Disadvantage for a Celestial, a failure destroying the target and a success dealing 4d6 Psychic, and the 8d6 Necrotic it deals any other creature that touches it, are the GM's."
   ),
   "item:sword-of-wounding": enforced(
-    "The extra Necrotic damage is applied, and a hit opens a DC 15 Constitution save whose failure stops the target regaining Hit Points until it succeeds on the save it repeats at the end of each of its turns (resolution/on-hit.ts)."
+    "The extra Necrotic damage is applied, and a hit opens a DC 15 Constitution save whose failure stops the target regaining Hit Points for 1 hour or until it succeeds on the save it repeats at the end of each of its turns (resolution/on-hit.ts); the hour runs on the game clock after a fight (game-time.ts)."
   ),
   "item:vorpal-sword": guided(
     "The +3 to attack and damage rolls is applied. On a rolled 20 it cuts off the target's head (resolution/kill.ts): the creature dies, and only a revival that restores lost parts brings it back. A creature with no head, Immunity to Slashing damage, a neck too big (larger than Large) or Legendary Resistance to spend takes 30 Slashing damage more instead, and a hydra loses one head. Ignoring Resistance to Slashing damage, and a creature that lives without its head, are the GM's."
@@ -1651,8 +1663,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:potion-of-poison": guided(
     "Drinking it deals its 4d6 Poison damage to the drinker. The DC 13 Constitution save against an hour of Poisoned, and its disguise, are the GM's: the GM names the row."
   ),
-  "item:boots-of-speed": guided(
-    "A Bonus Action doubles its wearer's Speed (speed.ts) and gives Opportunity Attacks against it Disadvantage, for 10 minutes once a Long Rest. The minutes left when it ends early are the GM's to count."
+  "item:boots-of-speed": enforced(
+    "A Bonus Action doubles its wearer's Speed (speed.ts) and gives Opportunity Attacks against it Disadvantage. Its 10 minutes a Long Rest are 100 rounds: a click lasts all that is left, and ending it early gives the rest back (use-cost.ts, effects.ts)."
   ),
   "item:thunderous-greatclub": guided(
     "Its wearer's Strength is at least 20 (live-abilities.ts), a hit deals 1d8 Thunder more, Clap of Thunder's 30-foot Cone asks for the DC 15 Strength save against Prone, and Earthquake's once-a-day DC 20 Dexterity save against Prone is applied. Earthquake's Concentration save, its fissure and the damage to objects are the GM's."
@@ -1719,8 +1731,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:compulsion": guided(
     "A failed save imposes Charmed. The move it forces each turn, and the save after it, are the GM's."
   ),
-  "spell:conjure-celestial": guided(
-    "The Healing Light on the cast is applied, and Bright Light fills the Cylinder for dynamic vision (vision/cast-sight.ts). Searing Light, and moving the Cylinder, are the GM's."
+  "spell:conjure-celestial": enforced(
+    "The cast picks the lights: Healing Light on the caster's side and Searing Light on the rest, or one of them for all. spell-zones.ts shines it on each creature in the Cylinder on the cast and as a creature enters it or ends its turn there, once a turn: 4d12 plus the spellcasting modifier healed, or the Dexterity save against 6d12 Radiant damage, each 1d12 more a slot level above 7. When the caster moves on its turn the Cylinder can move 30 feet too, bathing the creatures it moves onto (zone-moves.ts), and Bright Light fills it for dynamic vision (vision/cast-sight.ts)."
   ),
   "spell:conjure-elemental": enforced(
     "spell-zones.ts asks for the spirit's Dexterity save when an enemy enters its space or starts its turn within 5 feet of it, while it has no creature Restrained: 8d8 damage of its element and Restrained until the spell ends on a failure. The Restrained creature repeats the save at the start of each of its turns, taking 4d8 of the element on a failure and going free on a success (save-stages.ts)."
@@ -1731,8 +1743,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:contagion": enforced(
     "The save's 11d8 Necrotic damage and Poisoned are applied, with Disadvantage on saves with the ability the caster picks (resolution/pending.ts), and the repeat saves are counted until three successes end it or three failures leave it Poisoned for 7 days (save-stages.ts)."
   ),
-  "spell:delayed-blast-fireball": guided(
-    "The bead waits at its point, in a fight or out of one, and spell-zones.ts explodes it when the spell ends, Concentration broken included: the Dexterity save and 12d6 Fire damage, plus 1d6 for each of the caster's turns that ended while it waited. A creature that touches or throws the bead is the GM's to run."
+  "spell:delayed-blast-fireball": enforced(
+    "The bead waits at its point, in a fight or out of one, and spell-zones.ts explodes it when the spell ends, Concentration broken included: the Dexterity save and 12d6 Fire damage, 1d6 more a slot level, plus 1d6 for each of the caster's turns that ended while it waited. A creature within 5 feet can Touch the Bead (zone-touch.ts): its Dexterity save sets it off on a failure, and on a success it throws the bead up to 40 feet at a creature, where it explodes. Flammable objects that catch are the GM's."
   ),
   "spell:dispel-magic": enforced(
     "resolution/dispel.ts ends each spell on the target creature of the slot's level or lower, and for each higher one rolls the caster's spellcasting ability check against DC 10 plus its level. The GM can aim it at a spell's area on the map instead. A spell on an object the app doesn't track is the GM's."
@@ -1789,8 +1801,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:fear": guided(
     "A failed save imposes Frightened and drops what the creature holds (effects.ts), and a creature that ends its turn out of the caster's sight repeats the save (save-stages.ts, with dynamic vision on). The Dash away on each of its turns is the GM's."
   ),
-  "spell:faithful-hound": guided(
-    "The hound stays at its point in a fight or out of one, and spell-zones.ts makes it bite at the start of each of the caster's turns in a fight: the enemy nearest it within 5 feet makes the Dexterity save against 4d8 Force damage. Moving the hound and its warning bark are the GM's, and so is its sight of Invisible creatures."
+  "spell:faithful-hound": enforced(
+    "The hound stays at its point in a fight or out of one, and spell-zones.ts makes it bite at the start of each of the caster's turns in a fight: the enemy nearest it within 5 feet makes the Dexterity save against 4d8 Force damage. It barks for the caster when a Small or larger creature comes within 30 feet of it without the password, the caster's later Magic action moves it 30 feet (zone-moves.ts), and the spell ends when the caster is more than 300 feet from it. The password, and its sight of Invisible creatures, are the GM's."
   ),
   "spell:flesh-to-stone": enforced(
     "A failed save imposes Restrained, and the repeat saves are counted: three successes end it, three failures Petrify it (save-stages.ts). A success leaves Speed 0 until the start of the caster's next turn, and a Construct succeeds without a roll."
@@ -1799,7 +1811,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "speed.ts gives the target a Swim Speed equal to its Speed, terrain.ts charges it nothing extra for Difficult Terrain, and the target can't have the Paralyzed or Restrained condition (effects.ts), whatever its source. Keeping its Speed from being reduced and slipping free of restraints are the GM's."
   ),
   "spell:gust-of-wind": enforced(
-    "The cast's save pushes a creature that fails 15 feet away from the caster, and the Line disperses the fog and clouds it overlaps (vision/cast-sight.ts). spell-zones.ts repeats the save for a creature ending its turn in the Line, zone-ground.ts charges 2 feet for every foot a creature in it moves closer to the caster, and the Bonus Action points the Line another way from the caster (zone-moves.ts). Putting out flames is the table's."
+    "The cast's save pushes a creature that fails 15 feet away from the caster, and the Line disperses the fog and clouds it overlaps (vision/cast-sight.ts). spell-zones.ts repeats the save for a creature ending its turn in the Line, zone-ground.ts charges 2 feet for every foot a creature in it moves closer to the caster, and the Bonus Action points the Line another way from the caster (zone-moves.ts). It puts out a burning creature's fire and the open flames carried in the Line, and gives a lantern its 50 percent chance (zone-outcomes.ts, item-light.ts)."
   ),
   "spell:hideous-laughter": enforced(
     "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns and each time it takes damage, with Advantage then (save-stages.ts). It can't stand up while it laughs (actor-conditions.ts)."
@@ -1808,7 +1820,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save Charms the target, holds its Speed at 0, gives it Disadvantage on Dexterity saves and attack rolls and attackers Advantage against it, and offers it an action to collect itself with a Wisdom save at the spell save DC (builtin-actions.ts). A success holds its Speed at 0 until the end of its next turn."
   ),
   "spell:major-image": guided(
-    "resolution/concentration.ts holds the caster's Concentration on it, and from a level 4 slot it lasts until dispelled with none. The illusion itself is the GM's to run."
+    "resolution/concentration.ts holds the caster's Concentration on it, and from a level 4 slot it lasts until dispelled with none. Its 20-foot Cube stays on the map, and the caster's Magic action moves it anywhere within range while the caster is (zone-moves.ts). The illusion itself is the GM's to run."
   ),
   "spell:mass-heal": enforced(
     "resolution/heal.ts divides the 700 Hit Points evenly among the creatures the caster picks, none past its maximum, and ends Blinded, Deafened and Poisoned on each. A different split is the caster's to make by hand."
@@ -1934,8 +1946,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:survivor": enforced(
     "A Champion 18 rolls death saves with Advantage (saving-throws.ts) and regains 5 plus its Constitution modifier at the start of each turn while Bloodied and above 0 (turn-boundaries.ts). An 18 or 19 on a death save counting as a 20 is the GM's."
   ),
-  "spell:sleet-storm": guided(
-    "spell-zones.ts asks for the Dexterity save when a creature enters the Cylinder or starts its turn there, and a failure leaves it Prone and ends its Concentration. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the Cylinder Difficult Terrain of ice, and it is Heavily Obscured for dynamic vision (vision/cast-sight.ts). Dousing the flames in it is the GM's."
+  "spell:sleet-storm": enforced(
+    "spell-zones.ts asks for the Dexterity save when a creature enters the Cylinder or starts its turn there, and a failure leaves it Prone and ends its Concentration. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the Cylinder Difficult Terrain of ice, and it is Heavily Obscured for dynamic vision (vision/cast-sight.ts). It douses a burning creature in it and the open flames carried there (zone-outcomes.ts, item-light.ts)."
   ),
   "spell:alarm": enforced(
     "The warded area lasts 8 hours, in a fight or out of one, on the game clock (spell-zones.ts, game-time.ts). When an enemy of the caster enters it, the GM is told who in a line only the GM sees. The GM wards a door or a window by hand, and passes on the bell or the ping."
@@ -1950,10 +1962,37 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "spell-zones.ts asks for the Strength save on the cast and when a creature enters the square or ends its turn there, once a turn: 3d6 Bludgeoning damage and Restrained, escaped with a Strength (Athletics) check against the spell save DC. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the square Difficult Terrain."
   ),
   "spell:blade-barrier": enforced(
-    "spell-zones.ts asks for the Dexterity save against 6d10 Force damage on the cast and when a creature enters the wall or ends its turn there, once a turn. zone-ground.ts makes the wall's space Difficult Terrain, and zone-walls.ts gives a creature on its far side Three-Quarters Cover against attacks and Dexterity saves across it. Its ring form is the GM's."
+    "spell-zones.ts asks for the Dexterity save against 6d10 Force damage on the cast and when a creature enters the wall or ends its turn there, once a turn. zone-ground.ts makes the wall's space Difficult Terrain, and zone-walls.ts gives a creature on its far side Three-Quarters Cover against attacks and Dexterity saves across it. The cast picks a straight wall or a ring up to 60 feet across, which acts only on its edge (zone-shapes.ts)."
   ),
-  "spell:call-lightning": guided(
-    "The cast and each later Magic action strike a 5-foot Sphere with the Dexterity save against 3d10 Lightning damage, at the cast's slot level. Keeping the bolts under the cloud, and the extra 1d10 in a storm, are the GM's."
+  "spell:antipathysympathy": enforced(
+    "The cast picks antipathy or sympathy and a creature type. spell-zones.ts holds the 120 feet round the target creature, moving with it, and a creature of that type that comes within it makes the Wisdom save: Frightened of the target, or Charmed by it. It saves again when it ends a turn more than 120 feet from the target, and Sympathy's also when the target damages it (save-stages.ts); a success ends it and leaves it immune for the fight. Its moves away from or toward the target, a story kind matched to stat blocks, and an object target off the map are the GM's."
+  ),
+  "spell:conjure-animals": enforced(
+    "The pack holds the 10 feet round its point (spell-zones.ts): an enemy of the caster's that the pack moves within 10 feet of, or that comes within 10 feet of it or ends its turn there, makes the Dexterity save against 3d10 Slashing damage, once a turn, at the cast's slot level. Its caster has Advantage on Strength saves within 5 feet of it (zone-auras.ts), and when the caster moves on its turn the pack can move 30 feet to an unoccupied space (zone-moves.ts)."
+  ),
+  "spell:symbol": enforced(
+    "The cast picks the glyph, which waits hidden at its point, drawn for the GM and its caster (spell-zones.ts). A creature that comes onto it sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes the glyph's save (Death's 10d10 Necrotic, Discord, Fear, Pain, Sleep or Stunning). Noticing the glyph with a search, and a frightened creature's move away, are the GM's."
+  ),
+  "spell:speak-with-plants": guided(
+    "The cast picks what the plants do with the ground of its 30-foot Emanation, which stays where it was cast: the plants clear the painted Difficult Terrain to ordinary ground, or overgrow it into Difficult Terrain (zone-ground.ts). Talking with the plants is the GM's."
+  ),
+  "spell:silent-image": guided(
+    "resolution/concentration.ts holds the caster's Concentration on it, and its 15-foot Cube stays on the map: the caster's Magic action moves it anywhere within range (zone-moves.ts). The illusion itself is the GM's to run."
+  ),
+  "spell:create-or-destroy-water": enforced(
+    "The cast picks Create Water or Destroy Water over its 30-foot Cube, 5 feet bigger a slot level. Rain puts out the fire on a creature in it and the open flames carried there (zone-outcomes.ts, item-light.ts), and Destroy Water ends the fog in the Cube (vision/cast-sight.ts). Water in a container is the GM's."
+  ),
+  "item:sphere-of-annihilation": enforced(
+    "Set the Sphere puts it on the map, where a creature whose space it enters, or that enters its space, makes the DC 19 Dexterity save or takes 8d10 Force damage, obliterated at 0 Hit Points (spell-zones.ts, hit-points.ts). Control the Sphere rolls the DC 25 Intelligence (Arcana) check from within 60 feet, holding it until the start of the creature's next turn or drawing it 10 feet closer, and Move the Sphere moves it toward a creature 5 feet a point of Intelligence (zone-sphere.ts). Its meetings with portals are the GM's."
+  ),
+  "item:talisman-of-the-sphere": enforced(
+    "Attuned, it gives Control the Sphere's Intelligence (Arcana) check Advantage, and its holder that starts its turn in control of a Sphere of Annihilation can take a Magic action to move it 10 feet plus 10 a point of Intelligence (zone-sphere.ts)."
+  ),
+  "action:Djinni/create-whirlwind": guided(
+    "The whirlwind is an area on the djinni's Concentration (resolution/concentration.ts): the creatures it appears on, and each that walks into it or that it is dragged onto, make the Strength save once a turn, and the djinni is spared (spell-zones.ts). A failure Restrains with 6d6 Thunder damage at the start of each of the target's turns and a repeat save at its ends, and a dragged whirlwind carries the creatures it holds. Moving it up to 20 feet at the start of the djinni's turns is the GM's drag."
+  ),
+  "spell:call-lightning": enforced(
+    "The cloud is a 60-foot Cylinder over its caster's point that stays (spell-zones.ts). The cast and each later Magic action strike a 5-foot Sphere centred under it (zone-later.ts) with the Dexterity save against 3d10 Lightning damage, at the cast's slot level, and 1d10 more when the cast picked a storm overhead. Whether it is outdoors is the GM's."
   ),
   "spell:cloudkill": enforced(
     "spell-zones.ts asks for the Constitution save against 5d8 Poison damage on the cast and when a creature enters the Sphere or ends its turn there, once a turn. At the start of each of the caster's turns it moves the Sphere 10 feet straight away from the caster, and a creature the Sphere moves onto makes the save. The Sphere is Heavily Obscured for dynamic vision (vision/cast-sight.ts)."
@@ -1994,8 +2033,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:ice-storm": enforced(
     "The cast's Dexterity save deals the Bludgeoning and Cold damage, half on a success. zone-ground.ts makes the Cylinder Difficult Terrain of ice until the end of the caster's next turn."
   ),
-  "spell:incendiary-cloud": guided(
-    "spell-zones.ts asks for the Dexterity save against 10d8 Fire damage on the cast and when a creature enters the cloud or ends its turn there, once a turn. At the start of each of the caster's turns it moves the cloud 10 feet straight away from the caster, and a creature the cloud moves onto makes the save. The cloud is Heavily Obscured for dynamic vision (vision/cast-sight.ts). Choosing another direction is the GM's, who drags the area."
+  "spell:incendiary-cloud": enforced(
+    "spell-zones.ts asks for the Dexterity save against 10d8 Fire damage on the cast and when a creature enters the cloud or ends its turn there, once a turn. At the start of each of the caster's turns the caster steers it 10 feet in a direction away from itself (zone-moves.ts), or as that turn ends it drifts straight away, and a creature the cloud moves onto makes the save. The cloud is Heavily Obscured for dynamic vision (vision/cast-sight.ts), and a strong wind disperses it (zone-outcomes.ts)."
   ),
   "spell:insect-plague": enforced(
     "spell-zones.ts asks for the Constitution save against 4d10 Piercing damage on the cast and when a creature enters the Sphere or ends its turn there, once a turn. zone-ground.ts makes the Sphere Difficult Terrain, and it is Lightly Obscured for dynamic vision (vision/cast-sight.ts)."
@@ -2010,7 +2049,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "zone-auras.ts gives the caster and its allies +10 to Dexterity (Stealth) checks while they stand in the 30-foot Emanation. Leaving no tracks is the GM's to narrate."
   ),
   "spell:plant-growth": guided(
-    "Overgrowth makes a creature spend 4 feet of movement for every foot it moves in the Sphere (zone-ground.ts), until the GM ends the area. Leaving parts of the Sphere out, and the 8-hour Enrichment, are the GM's."
+    "Overgrowth makes a creature spend 4 feet of movement for every foot it moves in the Sphere (zone-ground.ts), until the GM ends the area, and the caster leaves squares of it out as it casts (zone-later.ts). The 8-hour Enrichment is the GM's."
   ),
   "spell:silence": enforced(
     "zone-auras.ts makes a creature Deafened and Immune to Thunder damage while it stands in the Sphere, and silence.ts refuses a spell with a Verbal component cast from inside it (resolution/components.ts)."
@@ -2022,7 +2061,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "spell-zones.ts asks for the Dexterity save against 7d8 Slashing damage when a creature enters the wall or ends its turn there, once a turn, after the cast's 7d8 Piercing. zone-ground.ts makes a creature spend 4 feet of movement for every foot it moves through the wall, and the wall blocks sight for dynamic vision (vision/cast-sight.ts). Its circle form is the GM's."
   ),
   "spell:web": enforced(
-    "spell-zones.ts asks for the Dexterity save the first time a creature enters the webs on a turn or starts its turn there, and a failure leaves it Restrained, escaped with a Strength (Athletics) check against the spell save DC. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the webs Difficult Terrain, and they are Lightly Obscured for dynamic vision (vision/cast-sight.ts). Burning the webs away is the GM's, who ends the area."
+    "spell-zones.ts asks for the Dexterity save the first time a creature enters the webs on a turn or starts its turn there, and a failure leaves it Restrained, escaped with a Strength (Athletics) check against the spell save DC. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the webs Difficult Terrain, and they are Lightly Obscured for dynamic vision (vision/cast-sight.ts). Fire burns them (zone-fire.ts): a 5-foot square that Fire damage, a fire's area or a burning creature reaches burns for a round, dealing 2d4 Fire damage to a creature that starts its turn there, and is then gone, and the spell ends with the last of the webs."
   ),
   "action:Octopus/ink-cloud": enforced(
     "triggered-reactions.ts offers it in an underwater fight when a creature ends its turn within 5 feet of the octopus. Using it fills a 5-foot Cube around the octopus with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). A strong current dispersing the ink is the GM's."
@@ -2036,11 +2075,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:spirit-guardians": enforced(
     "spell-zones.ts asks for the save when a creature enters the Emanation or ends its turn there, and charges an affected creature double for each step it moves inside (terrain.ts). The creatures the caster designates are its allies."
   ),
-  "spell:storm-of-vengeance": guided(
-    "The first turn's save, Thunder damage and Deafened condition are applied. The storm's turns 2 to 10 are the GM's."
+  "spell:storm-of-vengeance": enforced(
+    "The first turn's save, Thunder damage and Deafened condition are applied, and spell-zones.ts runs turns 2 to 10 at the start of each of the caster's later turns under the cloud: the acid rain, the six bolts the caster calls with a Magic action (zone-later.ts), the hail, and the freezing rain that makes the ground Difficult Terrain, Heavily Obscures it, stops ranged weapon attacks and puts out open flames. Whether it is outdoors is the GM's."
   ),
-  "spell:tsunami": guided(
-    "The wall's first save and damage are applied. Its movement and the damage on later turns are the GM's."
+  "spell:tsunami": enforced(
+    "The wall's first save and damage are applied. At the start of each of the caster's later turns zone-waves.ts moves it 50 feet away from the caster with the creatures in it, each Huge or smaller creature in it or that it moves onto making the save once a round, and at the end of that turn it loses 50 feet of height and 1d10 of its damage, ending at none. A creature in it can't move unless it first succeeds on a Strength (Athletics) check against the spell save DC. A fall from the wall's top is the GM's."
   ),
   "spell:wall-of-ice": enforced(
     "The save and its Cold damage for creatures in the wall's space are applied, and they are moved out of it. The wall rises on its placed Line as 10-foot sections that stop movement and leave sight through (spell-walls.ts), each an object with AC 12 and 30 Hit Points, Immunity to Cold damage and Vulnerability to Fire damage that is gone at 0 Hit Points (objects.ts). It goes when the Concentration ends. The frigid air a broken section leaves, and the dome and sphere forms, are the GM's."
@@ -2081,8 +2120,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:potion-of-growth": enforced(
     "Drinking it makes the drinker one size larger for 10 minutes, with Advantage on Strength checks and saves and 1d4 more damage with weapons and Unarmed Strikes. The token takes the new size (transform/forms.ts)."
   ),
-  "item:potion-of-diminution": guided(
-    "Drinking it makes the drinker one size smaller for 1d4 hours, rolled by the server, with Disadvantage on Strength checks and saves. The 1d4 less damage is the GM's."
+  "item:potion-of-diminution": enforced(
+    "Drinking it makes the drinker one size smaller for 1d4 hours, rolled by the server, with Disadvantage on Strength checks and saves and 1d4 less damage with weapons and Unarmed Strikes, never below 1 (resolution/damage.ts)."
   ),
   "item:potion-of-gaseous-form": enforced(
     "Drinking it gives Gaseous Form's misty cloud for 1 hour with no Concentration, ended early as a Bonus Action or at 0 Hit Points."
@@ -2228,19 +2267,73 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Each metal is its own action: 2 to 5 Berserkers appear within 60 feet for 1 hour, immune to Charmed and Frightened (summons.ts). They obey a user whose sheet has the metal's training and attack one whose sheet lacks it. clock-pools.ts keeps it from being blown again until 7 days have passed on the game clock."
   ),
   "item:necklace-of-fireballs": enforced(
-    "inventory.ts rolls its 1d6 + 3 beads when it is added, and each bead casts a level 3 Fireball at DC 15 and never comes back. Hurling several beads at once is the GM's."
+    "inventory.ts rolls its 1d6 + 3 beads when it is added, and each bead casts a level 3 Fireball at DC 15 and never comes back; up to five hurled at once add 1d6 each, to 12d6 (item-actions.ts)."
   ),
   "item:chime-of-opening": enforced(
     "Each strike casts Knock on its 10 charges, which never come back, and the last one cracks it (resolution/charges.ts)."
   ),
   "item:ring-of-three-wishes": guided(
-    "Its three Wish casts are counted and never come back (resolution/charges.ts). What a Wish does is the GM's."
+    "Its three Wish casts are counted and never come back, and the ring is nonmagical after the last (resolution/charges.ts, item-spent.ts). What a Wish does is the GM's."
   ),
   "item:gem-of-brightness": enforced(
-    "Its light is lit and put out on the row, and its beam (1 charge) and flare (5 charges) open the DC 15 Constitution save against Blinded on its 50 charges, which never come back."
+    "Its light is lit and put out on the row, and its beam (1 charge) and flare (5 charges) open the DC 15 Constitution save against Blinded on its 50 charges, which never come back; with none left it is a plain jewel that no longer lights (item-spent.ts)."
   ),
   "item:rod-of-resurrection": enforced(
     "Its casts spend their printed charges, and it regains 1 charge at dawn or at a Long Rest (item-charges.ts)."
+  ),
+  "item:cube-of-force": guided(
+    "Mage Armor, Shield (a Reaction when its holder is hit), Tiny Hut, Private Sanctum, Resilient Sphere and Wall of Force are casts at DC 17 on its 10 charges at their printed costs, 1d6 back at dawn (item-actions.ts). It takes the state of Tiny Hut and Private Sanctum."
+  ),
+  "item:potion-of-water-breathing": enforced(
+    "Drinking it lets the drinker breathe underwater for 24 hours of game time (breath.ts)."
+  ),
+  "item:ring-of-spell-turning": guided(
+    "Its wearer has Advantage on saves against spells, and a successful save against a spell of level 7 or lower leaves the spell no effect on it: no half damage, nothing a success would leave (saving-throws.ts). Deflecting a spell that targeted only the wearer back at its caster is the GM's."
+  ),
+  "item:candle-of-invocation": guided(
+    "Lit, it sheds Dim Light 30 feet for its 4 hours (item-light.ts), and while it burns its attuned bearer has Advantage on attack rolls, saves, checks and Initiative. It casts Gate once, which destroys it. Whether an alignment matches the candle's, the others in its light, slot-free level 1 spells for a Cleric or Druid, Gate only at the first lighting, and the minutes a snuffed candle keeps are the GM's."
+  ),
+  "item:crystal-ball-of-mind-reading": guided(
+    "It casts Scrying at DC 17, and Detect Thoughts at DC 17 only through that Scrying: it takes no Concentration of its own and ends with the Scrying (resolution/concentration.ts). Which creatures stand within 30 feet of the sensor is the GM's."
+  ),
+  "item:crystal-ball-of-telepathy": guided(
+    "It casts Scrying at DC 17, and Suggestion at DC 17 once a dawn only through that Scrying: it takes no Concentration of its own and ends with the Scrying (resolution/concentration.ts). Speaking telepathically with creatures near the sensor, and which of them it can reach, are the GM's."
+  ),
+  "item:potion-of-mind-reading": guided(
+    "Drunk, it is used up and its drinker bears Detect Thoughts for 10 minutes with no Concentration. The thoughts it reads, and the DC 13 save a creature makes against a deeper probe, are the GM's."
+  ),
+  "item:amulet-of-the-planes": guided(
+    "Its Plane Shift is cast only after a DC 15 Intelligence (Arcana) check, which the server rolls in a fight and outside one; a failure spends the action and casts nothing (cast-check.ts). Where a failure sends its wearer and those within 15 feet, on the d100 table, is the GM's."
+  ),
+  "item:ring-of-the-ram": guided(
+    "Each of its three actions spends 1 to 3 of its 3 charges (1d3 back at dawn) on a ranged spell attack at its printed +7 against a creature within 60 feet, dealing 2d10 Force and pushing it 5 feet for each charge. Its Strength check at +5 a charge to break an object is the GM's."
+  ),
+  "item:dragon-orb": guided(
+    "Peering into it is a DC 15 Charisma save its user makes: a success gives control of the orb, and a failure leaves the user Charmed by it while attuned, and a player can't end that attunement (attunement.ts); the GM ending the attunement ends either. Only a user who controls it casts its spells, at their printed charges from 7 (1d4 + 3 back at dawn): Cure Wounds at level 9 for 4, Daylight for 1, Death Ward for 2, Detect Magic for none, Scrying at DC 18 for 3; and Call Dragons waits an hour of game time (clock-pools.ts). The Suggestion it casts on a charmed user and its AC 20 are the GM's."
+  ),
+  "item:carpet-of-flying": enforced(
+    "The GM says which of the four sizes a carpet is, and a Magic action makes it hover and fly with its user at that size's Fly Speed until it lands (falling.ts). Its weight limits and half speed, and steering it from 30 feet away, need what the sheet doesn't record."
+  ),
+  "item:horn-of-blasting": enforced(
+    "Its blast fills a 30-foot Cone with a DC 15 Constitution save: 5d8 Thunder and Deafened for 1 minute on a failure, half on a success. Each use rolls the d100 for its 20 percent chance to explode, dealing 10d6 Force to its user and destroying it (resolution/charges.ts, item-breaks.ts). The glass and crystal objects it shatters are story."
+  ),
+  "item:bag-of-beans": guided(
+    "inventory.ts rolls its 3d4 beans when it is added, which never come back, and the bag is a plain one once they are gone. Dumped beans explode in a 10-foot Sphere, DC 15 Dexterity for 5d4 Force, half on a success. What a planted bean grows, on its d100 table, is the GM's."
+  ),
+  "item:oil-of-slipperiness": guided(
+    "Applied, it is used up and its creature has Freedom of Movement's effect for 8 hours: a Swim Speed equal to its Speed, and no Paralyzed or Restrained. Poured as Grease on a 10-foot square for 8 hours is the GM's."
+  ),
+  "item:well-of-many-worlds": guided(
+    "Opening a portal starts its wait of 1d8 hours of game time before the next (clock-pools.ts). Where a portal leads, and what passes through, are the GM's."
+  ),
+  "item:wand-of-paralysis": enforced(
+    "Its ray (1 of 7 charges, 1d6 + 1 back at dawn) opens a DC 15 Constitution save against Paralyzed for 1 minute on one creature it sees within 60 feet, repeated at each turn's end, and a 1 on the last charge's d20 destroys it (resolution/charges.ts). Only a spellcaster attunes to it."
+  ),
+  "item:wand-of-polymorph": enforced(
+    "Polymorph at DC 15 on 7 charges, 1d6 + 1 back at dawn, a 1 on the last charge's d20 destroying it (resolution/charges.ts); only a spellcaster attunes to it."
+  ),
+  "item:wand-of-fear": guided(
+    "Command (Flee or Grovel only, 1 charge) and Fear in a 60-foot Cone (3 charges) at DC 15 on 7 charges, 1d6 + 1 back at dawn, a 1 on the last charge's d20 destroying it (item-actions.ts, resolution/charges.ts). It takes Fear's state."
   ),
 
   // Walls, doors and objects on the map (spell-walls.ts, doors.ts, objects.ts, enclosures.ts, zone-walls.ts).
@@ -2254,7 +2347,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The cast raises the 20-foot cage on its placed Cube as bars that stop movement and leave sight, attacks and spells through (spell-walls.ts), and moves a creature standing in the bars out of them. A creature that teleports out first makes a Charisma save against the caster's spell save DC, which the server rolls, and a failure keeps it in and wastes the teleport (forcecage.ts). Disintegrate destroys the cage, and it goes when the spell ends. The solid 10-foot box and its reach into the Ethereal Plane are the GM's."
   ),
   "spell:wall-of-fire": enforced(
-    "spell-zones.ts deals 5d8 Fire damage to a creature that enters the wall for the first time on a turn or ends its turn in it, after the cast's Dexterity save, and the wall blocks sight for dynamic vision (vision/cast-sight.ts). The burning side's damage within 10 feet and the ring form are the GM's."
+    "spell-zones.ts deals 5d8 Fire damage to a creature that enters the wall for the first time on a turn or ends its turn in it, after the cast's Dexterity save, and the wall blocks sight for dynamic vision (vision/cast-sight.ts). The cast picks a straight wall or a ring and its burning side, and a creature that ends its turn within 10 feet of that side takes the damage too (zone-shapes.ts)."
   ),
   "spell:knock": enforced(
     "Aimed at a door on the map that the caster sees within 60 feet, it takes away one of what holds it shut, a lock, a stuck or barred state or a spike, and holds an Arcane Lock off for 10 minutes (doors.ts). A door Stone Shape sealed stays shut. The knock heard 300 feet away is the table's."
@@ -2324,9 +2417,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:ammunition-of-slaying": enforced(
     "The GM picks the creature type it slays. A hit on a creature of that type makes it take the DC 17 Constitution save for 6d10 Force damage, half on a success, and spends the piece's magic; a hit on another creature keeps it (resolution/ammunition.ts)."
-  ),
-  "item:dragon-orb": guided(
-    "Peering into it is a DC 15 Charisma save its user makes: a success gives control of the orb, and a failure leaves the user Charmed by it while attuned, and a player can't end that attunement (attunement.ts). The GM ending the attunement ends either. Its spells, the Suggestion it casts on a charmed user and calling dragons are the GM's."
   ),
   "item:backpack": enforced(
     "It holds 30 pounds of gear in the Gear tab, weighed with its bearer's load (containers.ts, carrying.ts). Taking a thing out in a fight is the turn's free object interaction, and a second takes the Utilize action (object-interactions.ts)."

@@ -4,6 +4,7 @@ import type { InventoryItem } from "@vtt/schemas";
 import { setInventoryItem } from "../src/inventory.js";
 import { answerSave } from "../src/saving-throws.js";
 import {
+  actionOf,
   catalog,
   catalogRow,
   edit,
@@ -169,6 +170,17 @@ describe("a Dragon Orb", () => {
     expect(orbOf(table)?.attuned).toBe(false);
     expect(tagged(table, "dragon-orb-charmed")).toBe(false);
     expect(charmed()).toBe(false);
+  });
+
+  it("casts its spells only for a user who controls it", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    attuned(table);
+    expect(actionOf(table, IDS.fighter, "item-dragon-orb-cast-daylight").requiresEffectTag).toBe("dragon-orb-control");
+    expect(actionOf(table, IDS.fighter, "item-dragon-orb-call-dragons").requiresEffectTag).toBe("dragon-orb-control");
+    fight(table, IDS.fighter);
+    expect(() => resolveAt(table, IDS.fighter, "item-dragon-orb-cast-detect-magic", [], { targetIds: [] })).toThrow(
+      "Cast Detect Magic (Dragon Orb) requires an active Dragon Orb Control effect."
+    );
   });
 
   it("gives control to a user who saves, whose attunement ends with a Short Rest as any other", () => {

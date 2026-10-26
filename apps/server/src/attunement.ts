@@ -55,6 +55,7 @@ export function attunementRefusal(
   if (incoming.attuned === was) return null;
   const resting = inShortRest(state, actor.id) || actor.restStep !== null;
   if (incoming.attuned) {
+    if (stored?.dormant === true) return `${incoming.name} has lost its magic, so there is nothing to attune to.`;
     const prerequisites = record.attunement.restrictedTo;
     if (prerequisites.length > 0 && !prerequisites.some((entry) => meets(entry, actor, definition, incoming.id)))
       return `${incoming.name} requires attunement by ${prerequisites.map(prerequisiteName).join(" or ")}.`;

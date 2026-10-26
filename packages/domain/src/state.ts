@@ -341,6 +341,12 @@ export const PendingSaveSchema = z
       .optional(),
     /** The spell area that raised it (`SpellZone`), which counts the damage it deals toward its cap. Never projected. */
     zoneId: z.string().min(1).max(120).optional(),
+    /** A save for touching an area that goes off (Delayed Blast Fireball's bead): a failure sets it off where it is, a
+     *  success throws it at `throwAtId`, where it goes off. Never projected. */
+    touchedZone: z
+      .object({ zoneId: z.string().min(1).max(120), throwAtId: z.uuid().optional() })
+      .strict()
+      .optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
     repeatOf: z
       .object({
@@ -375,6 +381,12 @@ export const PendingSaveSchema = z
     /** Why the target succeeds without rolling (a Construct against Flesh to Stone, an elf against Sleep). GM
      *  bookkeeping, never projected: the result says it when the save is answered. */
     autoSucceeds: z.string().min(1).max(120).optional(),
+    /** The charge a kill spends: the pool on its source that loses one when the failure slays the target (Nine Lives
+     *  Stealer). GM bookkeeping, never projected. */
+    spendsOnKill: z
+      .object({ actorId: z.uuid(), key: z.string().min(1).max(120) })
+      .strict()
+      .optional(),
     /** A failure kills the target outright, and the source regains these hit points (Consume Life). GM bookkeeping,
      *  never projected. */
     failureKills: z
@@ -1278,7 +1290,9 @@ export const VisionAreaSchema = z
         .object({
           type: z.literal("template"),
           annotationId: z.uuid(),
-          widthFeet: z.number().positive().max(1000).nullable().default(null)
+          widthFeet: z.number().positive().max(1000).nullable().default(null),
+          /** A ringed wall: only the circle's outer edge this many feet thick (Wall of Fire's ring). */
+          ringFeet: z.number().positive().max(100).optional()
         })
         .strict(),
       z
@@ -1287,7 +1301,12 @@ export const VisionAreaSchema = z
     ]),
     /** The one creature that sees through it (Insect Cloud: "Heavily Obscured for creatures other than you"). */
     sparedActorId: z.uuid().optional(),
-    source: VisionSourceSchema.optional()
+    source: VisionSourceSchema.optional(),
+    /** What clears it, ending the spell that made it: a strong wind (Gust of Wind) or water that destroys fog. */
+    dispersedBy: z
+      .array(z.enum(["wind", "water"]))
+      .max(2)
+      .optional()
   })
   .strict();
 export type VisionArea = z.infer<typeof VisionAreaSchema>;
@@ -1377,9 +1396,19 @@ export const SpellZoneSchema = z
     /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
      *  may be gone; a spell's area reads its spell instead. */
     rule: z
-      .object({ trigger: AreaTriggerSchema, save: ActionSchema.shape.save, damage: ActionSchema.shape.damage })
+      .object({
+        trigger: AreaTriggerSchema,
+        save: ActionSchema.shape.save,
+        damage: ActionSchema.shape.damage,
+        /** What its damage does at 0 Hit Points (a Sphere of Annihilation obliterates). */
+        drain: ActionSchema.shape.drain
+      })
       .strict()
       .optional(),
+    /** The creature in control of it until the start of its next turn (a Sphere of Annihilation). */
+    controllerId: z.uuid().optional(),
+    /** The creature that started its current turn in control of it, which a Talisman of the Sphere lets move it far. */
+    heldAtTurnStart: z.uuid().optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
     /** The damage type the caster chose at the cast (Conjure Elemental's element, Transmuted Spell's); absent, the
@@ -1389,6 +1418,65 @@ export const SpellZoneSchema = z
     heightened: z.uuid().optional(),
     /** Dice its damage has gained so far (Delayed Blast Fireball: 1d6 whenever its caster's turn ends). */
     grown: z.number().int().nonnegative().max(100).optional(),
+    /** Where it stood as its caster's turn began, waiting for the caster to steer its drift (Incendiary Cloud). */
+    driftFrom: z
+      .object({
+        origin: z.object({ x: z.number(), y: z.number() }).strict(),
+        target: z.object({ x: z.number(), y: z.number() }).strict()
+      })
+      .strict()
+      .optional(),
+    /** The carried lights (`actorId:itemId`) whose protected flame has had its chance to go out in it (Gust of
+     *  Wind's 50 percent for a lantern). */
+    windTried: z.array(z.string().max(240)).max(200).optional(),
+    /** Dice its damage has lost and height it has lost so far (Tsunami: 1d10 and 50 feet each turn it moved), and
+     *  whether it drifted this turn. */
+    faded: z.number().int().nonnegative().max(100).optional(),
+    driftedThisTurn: z.literal(true).optional(),
+    /** The spell's turn it is on, counted at its caster's turn starts from the cast's 1 (Storm of Vengeance). */
+    stage: z.number().int().positive().max(1000).optional(),
+    /** A glyph set off and glowing (Symbol). */
+    glowing: z.literal(true).optional(),
+    /** It was made while its caster's Time Stop ran, so it ends the Time Stop when it affects another creature. */
+    inTimeStop: z.literal(true).optional(),
+    /** The grid cells (`column,row`) left out of it: what its caster spared (Plant Growth) or fire burned away (Web). */
+    cut: z.array(z.string().max(24)).max(4000).optional(),
+    /** The cells burning now (Web), until the turn of `actorId` in `untilRound` begins. */
+    burning: z
+      .array(
+        z
+          .object({
+            cells: z.array(z.string().max(24)).max(400),
+            untilRound: z.number().int().positive(),
+            actorId: z.uuid().nullable()
+          })
+          .strict()
+      )
+      .max(50)
+      .optional(),
+    /** Where Fire damage landed on a creature standing in it since the last settle (Web), for the cells it sets
+     *  burning. */
+    fireAt: z
+      .array(z.object({ x: z.number(), y: z.number(), sizeCells: z.number().int().min(1).max(20) }).strict())
+      .max(50)
+      .optional(),
+    /** It burns away when fire reaches it (Web). */
+    flammable: z.literal(true).optional(),
+    /** Its heal, rolled with its caster's numbers (Conjure Celestial's "4d12 + 4"). */
+    healing: z.string().min(1).max(60).optional(),
+    /** The creature it is round, which it moves with (Antipathy/Sympathy's target). */
+    targetId: z.uuid().optional(),
+    /** The creature type its caster picked for it to act on (Antipathy/Sympathy's "kind of creature"). */
+    types: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(14)
+      .optional(),
     /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
      *  has raised the saves. */
     burstsOnEnd: z.literal(true).optional(),

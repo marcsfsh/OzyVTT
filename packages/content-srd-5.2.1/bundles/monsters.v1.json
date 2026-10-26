@@ -15937,7 +15937,17 @@
      }
     },
     "damage": [],
-    "reminder": "The whirlwind lasts while the djinni concentrates on it. The djinni can move it up to 20 feet at the start of each of its turns, and the Restrained creatures move with it; a creature it enters, or that enters it, makes the save once a turn.",
+    "reminder": "The djinni can move the whirlwind up to 20 feet at the start of each of its turns: drag its area, and the Restrained creatures move with it.",
+    "zone": {
+     "on": [
+      "enter"
+     ],
+     "oncePerTurn": true,
+     "atCast": true,
+     "concentration": true,
+     "carriesHeld": true,
+     "sparesUser": true
+    },
     "area": {
      "shape": "cylinder",
      "sizeFeet": 20,
@@ -23864,6 +23874,11 @@
    }
   },
   "traitMechanics": [
+   {
+    "kind": "difficult-ground",
+    "name": "Aberrant Ground",
+    "rangeFeet": 10
+   },
    {
     "kind": "aura",
     "name": "Gibbering",

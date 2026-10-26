@@ -230,6 +230,14 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const rolledHours = grant.hoursRolled
     ? Math.max(1, resolveDice(parseDiceFormula(grant.hoursRolled), ctx.deps.random).total)
     : null;
+  // A use paid from a pool of time lasts what it spent (Boots of Speed's rounds left), and gives back what is left when
+  // it is ended early.
+  const paid = action.timePool && ctx.plan.spendUse ? ctx.plan.spendUse : null;
+  const timed: EffectInstance["duration"] | null = paid
+    ? action.timePool === "hours"
+      ? { type: "minutes", remaining: paid.amount * 60 }
+      : { type: "rounds", remaining: paid.amount }
+    : null;
   const spell = spellOf(ctx);
   const castLevel = spell ? (ctx.plan.castLevel ?? spell.level) : null;
   // The choice made as it is granted (Fire Shield's warm or chill), and the weapon it binds to (Magic Weapon).
@@ -270,12 +278,14 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
           : rolledHours !== null
             ? { type: "minutes", remaining: rolledHours * 60 }
-            : grantDuration(
-                state,
-                grant.duration,
-                attacker.id,
-                spell && castLevel !== null ? { spell, castLevel } : null
-              ),
+            : timed
+              ? timed
+              : grantDuration(
+                  state,
+                  grant.duration,
+                  attacker.id,
+                  spell && castLevel !== null ? { spell, castLevel } : null
+                ),
       // A spell's effect outlasts its caster's fall; only Concentration ends it early. A die given to another creature
       // (Bardic Inspiration) is its own once given.
       endsWhenSourceDefeated:
@@ -327,7 +337,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // Every other way out the grant prints (bursting a Chain), beside its own end action.
       ...(grant.endedBy ? { endedBy: structuredClone(grant.endedBy) } : {}),
       ...anchorOf(state, recipient.id, grant.anchors),
-      ...(bound?.fields ?? {})
+      ...(bound?.fields ?? {}),
+      ...(paid ? { refundsUses: { key: paid.key } } : {})
     }),
     replaced,
     deps

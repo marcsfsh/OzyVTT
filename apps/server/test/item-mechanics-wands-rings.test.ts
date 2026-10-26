@@ -535,7 +535,7 @@ describe("the staffs that cast at their printed charge costs", () => {
     ).toEqual(["item-staff-of-power", "item-staff-of-power-thrown-improvised", "item-staff-of-power-two-handed"]);
   });
 
-  it("leaves Staff of the Magi its at-will casts and Ring of Shooting Stars its two cantrips and its own action", () => {
+  it("leaves Staff of the Magi its at-will casts and Ring of Shooting Stars its casts and its own actions", () => {
     const definition = definitionOf();
     const magi = fight(
       stateWith([
@@ -580,7 +580,9 @@ describe("the staffs that cast at their printed charge costs", () => {
     );
     expect(actions.map((entry) => entry.id).sort()).toEqual([
       "item-ring-of-shooting-stars-cast-dancing-lights",
+      "item-ring-of-shooting-stars-cast-faerie-fire",
       "item-ring-of-shooting-stars-cast-light",
+      "item-ring-of-shooting-stars-lightning-spheres",
       "item-ring-of-shooting-stars-shooting-stars"
     ]);
     // Shooting Stars is the ring's own printed effect: DC 15, 5d4 Radiant.

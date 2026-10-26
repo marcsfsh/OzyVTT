@@ -76,6 +76,34 @@ function circleArea(area: VisionArea, center: Point, radius: number): ResolvedAr
   };
 }
 
+/** A ringed wall's edge (Wall of Fire's ring): the band between two circles. The outline runs round the outer circle
+ *  and back round the inner one, so it is drawn and clipped with its middle left open. */
+function ringArea(area: VisionArea, center: Point, radius: number, thickness: number): ResolvedArea {
+  const inner = Math.max(0, radius - thickness);
+  const outer = circleOutline(center, radius);
+  const hole = circleOutline(center, inner).reverse();
+  const outline = [...outer, outer[0]!, ...hole, hole[0]!];
+  const segment = (a: Point, b: Point): Segment => ({ ax: a.x, ay: a.y, bx: b.x, by: b.y });
+  return {
+    id: area.id,
+    kind: area.kind,
+    sunlight: area.sunlight === true,
+    source: area.source,
+    sparedActorId: area.sparedActorId ?? null,
+    contains: (point) => {
+      const apart = distance(point, center);
+      return apart <= radius + 1e-6 && apart > inner;
+    },
+    // A sight line touches the band unless it stays wholly inside the ring or wholly outside it.
+    touches: (a, b) =>
+      distanceToSegment(center, segment(a, b)) <= radius + 1e-6 &&
+      Math.max(distance(a, center), distance(b, center)) > inner,
+    edges: [...edgesOf(outer), ...edgesOf(hole)],
+    outline,
+    rect: null
+  };
+}
+
 function polygonArea(area: VisionArea, outline: Polygon, rect: ResolvedArea["rect"]): ResolvedArea | null {
   if (outline.length < 3) return null;
   const edges = edgesOf(outline);
@@ -103,12 +131,18 @@ const rectOutline = (x: number, y: number, width: number, height: number): Point
 
 /** A template annotation's shape as the rules measure it (`area-targeting.ts`): a circle about its origin, a square
  *  between its corners, a cone as wide as it is long, a line of `widthFeet`. */
-function templateArea(area: VisionArea, annotation: Annotation, widthPx: number | null): ResolvedArea | null {
+function templateArea(
+  area: VisionArea,
+  annotation: Annotation,
+  widthPx: number | null,
+  ringPx: number | null
+): ResolvedArea | null {
   const { origin, target } = annotation.geometry;
   const length = distance(origin, target);
   switch (annotation.shape) {
     case "circle":
-      return length > 0 ? circleArea(area, origin, length) : null;
+      if (length <= 0) return null;
+      return ringPx !== null ? ringArea(area, origin, length, ringPx) : circleArea(area, origin, length);
     case "square": {
       const x = Math.min(origin.x, target.x);
       const y = Math.min(origin.y, target.y);
@@ -162,7 +196,12 @@ export function resolveAreas(
     else if (shape.type === "template") {
       const annotation = combat.annotations.find((candidate) => candidate.id === shape.annotationId);
       if (annotation)
-        piece = templateArea(area, annotation, shape.widthFeet === null ? null : shape.widthFeet * pixelsPerFoot);
+        piece = templateArea(
+          area,
+          annotation,
+          shape.widthFeet === null ? null : shape.widthFeet * pixelsPerFoot,
+          shape.ringFeet === undefined ? null : shape.ringFeet * pixelsPerFoot
+        );
     } else {
       const token = combat.tokens.find((candidate) => candidate.actorId === shape.actorId);
       if (token?.position)

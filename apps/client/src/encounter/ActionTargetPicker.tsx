@@ -14,6 +14,7 @@ import { revealInRegion } from "../lib/reveal";
 import { objectChoicesOf, weaponChoicesOf, type CarriedRow } from "./weapon-choices";
 import {
   clearTargeting,
+  pickedArea,
   placeAnotherTemplate,
   setBoundItem,
   setObjectItem,
@@ -133,7 +134,7 @@ export function ActionTargetPicker({
         <>
           {/* The area keeps the action's own size: the drag only places and points it. */}
           <p className="action-targeting-head">
-            <strong>{name}</strong> · {picking.action.area ? areaWords(picking.action.area) : "area"}
+            <strong>{name}</strong> · {pickedArea(picking) ? areaWords(pickedArea(picking)!) : "area"}
           </p>
           <p className="action-targeting-hint">
             {picking.template?.placed
