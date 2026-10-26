@@ -470,7 +470,8 @@ const SAVE_LIFETIME_KEYS = [
   "endsOutOfSight",
   "autoSuccess.**",
   "endedBy.**",
-  "atRest.**"
+  "atRest.**",
+  "successEndsSpell"
 ] as const;
 
 /** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
@@ -990,6 +991,37 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].explodingDice.**",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Sorcerous Burst), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].teleportOutcome",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Teleport), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].identifiesItem",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Identify), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].wishUses",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Wish), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].castLastsMinutes",
+    types: ACTION_CARRIERS,
+    reason:
+      "how long an item cast lasts in place of the spell's duration (Oil of Slipperiness' Grease) - synthesised from an item cast's `lastsMinutes`",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].darts",
     types: ACTION_CARRIERS,
     reason: "synthesised from a spell's cast model by the character build (Magic Missile), zero hand authors",
@@ -1341,6 +1373,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["equipment"],
     reason:
       "the effect an item's cast needs on its user (a Dragon Orb's control) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].lastsMinutes",
+    types: ["equipment"],
+    reason:
+      "how long an item cast lasts in place of the spell's duration (Oil of Slipperiness' Grease: 8 hours) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

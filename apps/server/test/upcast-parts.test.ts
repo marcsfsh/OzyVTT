@@ -66,7 +66,11 @@ const READ_ELSEWHERE: Readonly<Record<string, (record: SpellReference) => boolea
   // Three more willing creatures a slot level (`targets.perSlot` caps one or two, so the count is checked at the cast).
   etherealness: () => true,
   // The spell glyph's stored spell may be of the slot's level (`stored-casts.ts`).
-  "glyph-of-warding": () => true
+  "glyph-of-warding": () => true,
+  // The Cube grows 5 feet a slot level (`areaPerSlot`); the gallons are the GM's.
+  "create-or-destroy-water": (record) => record.effect?.areaPerSlot !== undefined,
+  // From a level 4 slot it lasts until dispelled with no Concentration (`spellDurationAt`).
+  "major-image": () => true
 };
 
 describe("every higher-level clause on a spell with a later action or a grant is read", () => {
@@ -88,6 +92,8 @@ describe("every higher-level clause on a spell with a later action or a grant is
         if (/damage/i.test(sentence)) {
           // Each later action's or zone's damage part, and each grant's extra damage, grows with the slot.
           for (const row of record.effect?.laterActions ?? []) {
+            // A zone that adds its dice by slot level (Conjure Celestial's light) scales as it is placed.
+            if (row.zone?.dicePerSlot !== undefined) continue;
             const base = laterAt(record, row.name, record.level);
             const up = laterAt(record, row.name, next);
             const named = /Bludgeoning damage increases/.test(sentence)
