@@ -41,7 +41,7 @@ import { walkThroughZones } from "../zone-stops.js";
 import { landJump } from "../jumping.js";
 import { askToStayMounted, carryRiders, mountOf, mountOrDismount, parted, ridersOf } from "../mounts.js";
 import { timeStopOutOfRange } from "../time-stop.js";
-import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
+import { applyMovementRules, carriedAlongBy, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
 import { swallowedBy } from "../swallow.js";
 import {
   creatureDistance,
@@ -201,9 +201,12 @@ export const mapCommands = [
           from !== null &&
           position !== null &&
           (mode === "walk" || mode === "fly" || mode === "swim" || mode === "climb" || mode === "burrow")
-            ? [...grappledBy(state, actorId), ...swallowedBy(state, actorId).map(({ prey }) => prey.id)].filter(
-                (heldId) => state.combat.tokens.find((token) => token.actorId === heldId)?.position
-              )
+            ? [
+                ...grappledBy(state, actorId),
+                ...swallowedBy(state, actorId).map(({ prey }) => prey.id),
+                // A Monk's Step of the Wind carries a willing ally along (Heightened Focus).
+                ...carriedAlongBy(state, actorId)
+              ].filter((heldId) => state.combat.tokens.find((token) => token.actorId === heldId)?.position)
             : [];
         moveEncounterToken(state, actorId, position, geometry);
         // The height it ends at, and what holds it up there; back in the tray it is on the ground.

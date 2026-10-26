@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import type { ActorDefinition, CharacterChoice } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
+import { setCondition } from "../src/actor-conditions.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -554,6 +555,10 @@ describe("species traits that act in play", () => {
     );
     dragon.use("draconic-flight");
     expect(specialSpeedsOf(dragon.hero, undefined, dragon.derivation()).fly).toBe(30);
+    // "Or have the Incapacitated condition": the wings are gone once it ends.
+    setCondition(dragon.state, dragon.hero.id, "stunned", true, undefined, { role: "gm" });
+    setCondition(dragon.state, dragon.hero.id, "stunned", false, undefined, { role: "gm" });
+    expect(specialSpeedsOf(dragon.hero, undefined, dragon.derivation()).fly).toBeUndefined();
     const goliathDefinition = build(
       fighter(5, {
         speciesId: "goliath",

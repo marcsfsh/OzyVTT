@@ -460,6 +460,7 @@ const SAVE_LIFETIME_KEYS = [
   "advantageIfFighting",
   "immuneOnSuccess",
   "endsWhenSourceDies",
+  "endsWhenSourceIncapacitated",
   "onlyCreatureTypes",
   "sparesAffected",
   "failureKills.**",
@@ -1269,6 +1270,54 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "effects[].voidWhileIncapacitated",
     types: FEATURE_CARRIERS,
     reason: "effect linkage vocabulary with no control: no program unit authors it",
+    status: "gap"
+  },
+  {
+    at: "effects[].endsOnIncapacitated",
+    types: FEATURE_CARRIERS,
+    reason:
+      "an effect that ends when its keeper has the Incapacitated condition (Superior Defense, Divine Sense, Draconic Flight) - authored in the class, species and item overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].oncePerCast",
+    types: FEATURE_CARRIERS,
+    reason:
+      "an extra-damage rider added to one damage roll of a cast, the first (Empowered Evocation, Elemental Affinity) - authored in the class overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].timing",
+    types: ACTION_CARRIERS,
+    reason:
+      "when in its user's own turn an action is taken (Superior Defense at the turn's start, Sacred Weapon in the Attack action) - authored in the class overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].vitality.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "Temporary Hit Points a cast gives once its damage lands (Improved Potent Spellcasting) - derived at read time from the Cleric's option, never authored",
+    status: "gap"
+  },
+  {
+    at: "actions[].damageDiceByAbility.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "damage dice counted by an ability modifier from a level (Sear Undead) - feature-carrier actions only, beside damageByLevel",
+    status: "gap"
+  },
+  {
+    at: "actions[].areaHeal.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "one creature picked in the area regains its own roll (Land's Aid) - authored in the class overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].areaHealByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason: "the area's healing growing with level (Land's Aid) - feature-carrier actions only, beside damageByLevel",
     status: "gap"
   },
   {

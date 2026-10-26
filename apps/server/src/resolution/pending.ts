@@ -35,6 +35,8 @@ import { objectFrom } from "../objects.js";
 import { areAllies } from "../creature-sides.js";
 import { chosenEffectOption } from "./effect-options.js";
 import { failureFormOf } from "./shape-shift.js";
+import { vitalityOfCast } from "./vitality.js";
+import { doesntSleep } from "../trance.js";
 import { objectRowOf } from "../row-penalties.js";
 
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
@@ -475,6 +477,8 @@ export function failureEffectFor(
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     // "Until the aboleth dies".
     ...(save.endsWhenSourceDies && !grapple ? { endsWhenSourceDefeated: true } : {}),
+    // Turn Undead: "if you have the Incapacitated condition".
+    ...(save.endsWhenSourceIncapacitated ? { endsOnIncapacitated: true as const } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
     ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),
@@ -786,12 +790,15 @@ export function parkActionSave(ctx: ResolveContext): void {
         singleTarget: ctx.targets.length === 1 && action.area === undefined && spell.area === null
       }
     : undefined;
+  const vitality = vitalityOfCast(ctx);
   const extra = {
     ...(onSuccessEffect ? { onSuccessEffect } : gmApplies ? { gmApplies: true as const } : {}),
     ...(action.save.breaksConcentration ? { breaksConcentration: true as const } : {}),
     ...(action.save.successEndsSpell ? { successEndsSpell: true as const } : {}),
     // Moonbeam: a shape-shifted creature that fails reverts to its true form.
     ...(action.save.failureEndsForm ? { endsForm: true as const } : {}),
+    // Improved Potent Spellcasting: the first save of the cast to deal damage gives the caster's pick its vitality.
+    ...(vitality ? { vitality } : {}),
     // "Failure by 5 or More": what a failure by that much does instead.
     ...(action.save.failureByMargin ? { failureByMargin: structuredClone(action.save.failureByMargin) } : {}),
     ...fatal
@@ -851,13 +858,7 @@ function autoSuccessOf(ctx: ResolveContext, target: ResolveContext["targets"][nu
   const type = creatureTypeOf(target, definition);
   if (rule.creatureTypes && type !== null && rule.creatureTypes.includes(type))
     return `${type[0]!.toUpperCase()}${type.slice(1)}`;
-  if (
-    rule.sleepless &&
-    (holdsFeature(definition, "elf-trance", "Trance") ||
-      definition?.character?.race?.id === "elf" ||
-      target.conditionImmunities.includes("exhaustion"))
-  )
-    return "doesn't sleep";
+  if (rule.sleepless && doesntSleep(target, definition)) return "doesn't sleep";
   // SRD Truesight: "Visual illusions appear transparent to you, and you automatically succeed on saving throws against
   // them." The illusion is where the creature is (a pattern around it, a phantasm in its mind), so any range reaches.
   if (rule.truesight) {

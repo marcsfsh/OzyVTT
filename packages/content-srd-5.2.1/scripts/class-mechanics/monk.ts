@@ -32,7 +32,7 @@ export const monk: ClassMechanicsModule = {
      * Focus Points read off the printed column; the shared `pool` lets all three 1-point actions (and
      * Stunning Strike) spend one counter. These are the paid forms; the free Disengage/Dash forms are in
      * the text. Flurry's strikes are a compound Bonus Action: resolving it opens a pool of Unarmed Strikes
-     * (two, three from Heightened Focus at 10) that each strike spends. Heightened Focus's other upgrades stay prose.
+     * (two, three from Heightened Focus at 10) that each strike spends.
      */
     "monks-focus": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -51,8 +51,14 @@ export const monk: ClassMechanicsModule = {
           name: "Patient Defense",
           activation: "bonus-action",
           description:
-            "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point.",
-          damage: []
+            "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point. From Monk level 10 (Heightened Focus), you also gain Temporary Hit Points equal to two rolls of your Martial Arts die.",
+          damage: [],
+          // Heightened Focus: two rolls of the Martial Arts die (d8 at 10, d10 at 11, d12 at 17).
+          healingByLevel: [
+            { level: 10, formula: "2d8", self: true, temporary: true },
+            { level: 11, formula: "2d10", self: true, temporary: true },
+            { level: 17, formula: "2d12", self: true, temporary: true }
+          ]
         },
         {
           id: "step-of-the-wind",
@@ -80,8 +86,8 @@ export const monk: ClassMechanicsModule = {
     },
     /**
      * Offered when a hit's damage includes Bludgeoning, Piercing or Slashing (any type from Deflect Energy at 13); the
-     * builder adds the Dexterity modifier and Monk level to the 1d10. The Focus Point redirect after reducing the
-     * damage to 0 stays prose.
+     * builder adds the Dexterity modifier and Monk level to the 1d10. A reduction to 0 spends a Focus Point on the
+     * redirect picked with the answer (deflect-redirect.ts).
      */
     "deflect-attacks": {
       actions: [
@@ -96,10 +102,14 @@ export const monk: ClassMechanicsModule = {
             trigger: "hit-by-attack",
             response: "reduce-damage",
             formula: "1d10",
-            damageTypes: ["bludgeoning", "piercing", "slashing"]
+            damageTypes: ["bludgeoning", "piercing", "slashing"],
+            redirectsAtZero: true
           },
           reactionByLevel: [
-            { level: 13, reaction: { trigger: "hit-by-attack", response: "reduce-damage", formula: "1d10" } }
+            {
+              level: 13,
+              reaction: { trigger: "hit-by-attack", response: "reduce-damage", formula: "1d10", redirectsAtZero: true }
+            }
           ],
           adds: { classLevel: 1, abilityModifier: "dex" }
         }
@@ -177,6 +187,7 @@ export const monk: ClassMechanicsModule = {
           id: "superior-defense",
           name: "Superior Defense",
           activation: "other",
+          timing: "turn-start",
           description:
             "At the start of your turn, expend 3 Focus Points to bolster yourself against harm for 1 minute or until you have the Incapacitated condition. During that time, you have Resistance to every damage type except Force.",
           damage: [],
@@ -185,7 +196,34 @@ export const monk: ClassMechanicsModule = {
             name: "Superior Defense",
             tags: ["superior-defense"],
             duration: { type: "rounds", rounds: 10 },
+            endsOnIncapacitated: true,
             modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_BUT_FORCE] }]
+          }
+        }
+      ]
+    },
+    /**
+     * Patient Defense's Temporary Hit Points ride its action above. Step of the Wind's carried ally is its own action
+     * on the turn the Monk Dashes: the ally moves with the Monk's moves until the turn ends (movement-rules.ts).
+     */
+    "heightened-focus": {
+      actions: [
+        {
+          id: "step-of-the-wind-carry",
+          name: "Step of the Wind: carry an ally",
+          activation: "other",
+          timing: "own-turn",
+          requiresEffectTag: "dashing",
+          description:
+            "When you use Step of the Wind, choose a willing creature within 5 feet of yourself that is Large or smaller. You move the creature with you until the end of your turn. The creature's movement doesn't provoke Opportunity Attacks.",
+          damage: [],
+          targets: { count: 1, rangeFeet: 5, maxSize: "large", who: "allies" },
+          grants: {
+            name: "Carried by Step of the Wind",
+            tags: ["carried-along"],
+            target: "target",
+            notSelf: true,
+            duration: { type: "until-source-turn-end" }
           }
         }
       ]
@@ -200,11 +238,8 @@ export const monk: ClassMechanicsModule = {
         { type: "ability-score", ability: "wis", amount: 4, maximum: 25 }
       ]
     }
-    // Not modeled here: Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`),
-    // but its die and Dexterity do not reach inventory Monk weapons. Martial-Arts-die features (Deflect
-    // Attacks' redirect, temp HP amounts), and Acrobatic Movement, Empowered Strikes, Self-Restoration
-    // and Perfect Focus stay prose. Evasion is read by the save outcome (`hasEvasion` in the server) from the
-    // held feature.
+    // Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`), and Evasion is read by the save
+    // outcome (`hasEvasion` in the server) from the held feature. Acrobatic Movement stays prose.
   },
   // The Unarmored Movement column's steps (+15 at 6, +20 at 10, +25 at 14, +30 at 18), each replacing the last.
   stages: [6, 10, 14, 18].map((level, index, levels) => ({
@@ -298,8 +333,8 @@ export const monk: ClassMechanicsModule = {
             ridesHit: {
               rides: "unarmed",
               applies: { name: "Quivering Palm", tags: ["quivering-palm"], onePerSource: true },
-              reminder:
-                "Quivering Palm: the vibrations last a number of days equal to the Monk's level. End the effect to end them harmlessly."
+              appliesDaysPerLevel: true,
+              reminder: "Quivering Palm: to end the vibrations harmlessly, end the effect from the creature's row."
             }
           },
           {
@@ -321,7 +356,6 @@ export const monk: ClassMechanicsModule = {
           }
         ]
       }
-      // Not modeled: Fleet Step (extra Bonus Action).
     }
   },
   liveResources: ["focus-points"]

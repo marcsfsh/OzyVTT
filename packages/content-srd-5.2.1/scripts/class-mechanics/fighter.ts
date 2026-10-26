@@ -85,8 +85,7 @@ export const fighter: ClassMechanicsModule = {
         }
       ]
     }
-    // Not modeled: Tactical Mind (retroactive check bonus with a refund), Tactical Shift and Tactical
-    // Master (movement, mastery swap).
+    // Tactical Mind, Tactical Shift and Tactical Master are read in the server by their feature ids.
   },
   subclasses: {
     champion: {
@@ -129,8 +128,8 @@ export const fighter: ClassMechanicsModule = {
         ]
       }
       // Heroic Warrior is applied at the start of the Champion's turn (`turn-boundaries.ts`), by its feature id.
-      // Not modeled: Survivor (Bloodied regen, death-save advantage has no reader). Additional Fighting Style's
-      // choice is already on the record.
+      // Survivor is read by its feature id (death-saves.ts, turn-boundaries.ts). Additional Fighting Style's choice is
+      // already on the record.
     }
   }
 };

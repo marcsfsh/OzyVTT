@@ -7,7 +7,7 @@ import { builtinBaseId } from "../builtin-actions.js";
 import { holdsFeature } from "../class-features.js";
 import { isIncapacitated } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
-import { addEffect, applyCondition, makeEffect, type EffectNarration } from "../effects.js";
+import { addEffect, applyCondition, hasEffectTag, makeEffect, type EffectNarration } from "../effects.js";
 import { sourceItemOf } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { upcastAction, UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
@@ -16,7 +16,15 @@ import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { SMITE_OF_PROTECTION_TAG } from "../paladin-auras.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
 import { useCostOf } from "../use-cost.js";
-import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
+import {
+  recordRoll,
+  sizeAtMost,
+  sizeRank,
+  tableLineOf,
+  type DefinitionAction,
+  type ResolveContext
+} from "./context.js";
+import { openUnarmedSave } from "./builtins.js";
 import { afterItemSpend } from "./charges.js";
 import { beginConcentration } from "./concentration.js";
 import { criticalExpression, RIDER_TYPE_PREFIX, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
@@ -25,6 +33,7 @@ import { applyHitOutcome, forceMove, grantHalfSpeedMove, openRiderSave, rollPlai
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
 import { dealsDamage } from "./on-hit.js";
 import { spendHitPointDie } from "./hit-point-die.js";
+import { dealt } from "./dealings.js";
 import { OUTLINED_TAG } from "./attack.js";
 
 /**
@@ -123,6 +132,9 @@ function qualifies(ctx: ResolveContext, rider: HitRider, action: DefinitionActio
       break;
   }
   if (rider.ownTurn && ctx.state.combat.turnActorId !== ctx.attacker.id) return false;
+  // Frenzy: while both its Rage and its Reckless Attack hold, on the first Strength-based hit of the turn.
+  if (rider.whileEffectTags && !rider.whileEffectTags.every((tag) => hasEffectTag(ctx.attacker, tag))) return false;
+  if (rider.firstHitOnTurn && dealt(ctx.state, ctx.attacker.id, "strength-hit")) return false;
   if (rider.declaredBeforeRoll && ctx.forgoneAdvantageBy !== action.id) return false;
   if (rider.maxTargetSize && !sizeAtMost(ctx.targets[0].size, rider.maxTargetSize)) return false;
   if (rider.sneakAttack) {
@@ -264,6 +276,39 @@ function diceOf(ctx: ResolveContext, action: DefinitionAction, rider: HitRider, 
   return `${dice.join(" + ")} ${types ? types.map(capitalised).join(" or ") : capitalised(action.damage[0]?.type ?? "")}`.trim();
 }
 
+/** Grappler's Punch and Grab. */
+export const PUNCH_AND_GRAB = "punch-and-grab";
+
+/** SRD Grappler, Punch and Grab: "When you hit a creature with an Unarmed Strike as part of the Attack action on your
+ *  turn, you can use both the Damage and the Grapple option. You can use this benefit only once per turn." The target
+ *  is one the Grapple option can take: no more than one size larger. */
+function punchAndGrabReady(ctx: ResolveContext): boolean {
+  const { state, attacker, action } = ctx;
+  if (!landed(ctx) || ctx.targets.length !== 1) return false;
+  if (builtinBaseId(action.id) !== UNARMED_STRIKE_ACTION_ID || action.activation !== "action" || fromFlurry(ctx))
+    return false;
+  if (state.combat.active && state.combat.turnActorId !== attacker.id) return false;
+  if (!holdsFeature(ctx.deps.definition, "grappler", "Grappler")) return false;
+  if ((state.combat.turn.turnUses[`${attacker.id}:${PUNCH_AND_GRAB}`] ?? 0) > 0) return false;
+  return sizeRank(ctx.targets[0]!.size) - sizeRank(attacker.size) <= 1;
+}
+
+/** Opens the Grapple's save on a Damage hit that took Punch and Grab, and spends the turn's use on the confirm. */
+function punchAndGrab(ctx: ResolveContext): void {
+  if (!punchAndGrabReady(ctx)) {
+    refuse(ctx, `${ctx.attacker.name} can't use Punch and Grab on this hit.`);
+    return;
+  }
+  openUnarmedSave(ctx, "grappled", "Punch and Grab");
+  if (ctx.state.combat.active && ctx.input.commit !== false) {
+    const key = `${ctx.attacker.id}:${PUNCH_AND_GRAB}`;
+    ctx.state.combat = {
+      ...ctx.state.combat,
+      turn: { ...ctx.state.combat.turn, turnUses: { ...ctx.state.combat.turn.turnUses, [key]: 1 } }
+    };
+  }
+}
+
 /** The extras a previewed hit may carry, for the card to offer. Empty unless the attack would land. */
 export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
   if (!landed(ctx) || ctx.targets.length !== 1) return [];
@@ -285,6 +330,14 @@ export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
       dice: ctx.action.damage[0]!.formula.replace(/\s*[+-]\s*\d+$/, ""),
       cost: "once per turn",
       rerolls: true
+    });
+  if (punchAndGrabReady(ctx))
+    offers.push({
+      id: PUNCH_AND_GRAB,
+      name: "Punch and Grab",
+      dice: "",
+      save: "The target makes a Strength or Dexterity saving throw against the Grapple DC, or has the Grappled condition.",
+      cost: "once per turn"
     });
   for (const action of ctx.siblings) {
     const rider = hitRiderOf(action);
@@ -408,9 +461,15 @@ function lessForgone(
 
 /** Rolls the chosen extras into the hit's damage and opens their saves. Their costs are spent after the hit's own
  *  (`spendHitOptions`). */
-export function rollHitOptions(ctx: ResolveContext): void {
+export function rollHitOptions(ctx: ResolveContext, diceOnly = false): void {
   const chosen = ctx.input.hitOptions ?? [];
   if (chosen.length === 0 || !landed(ctx) || ctx.targets.length !== 1) return;
+  // A look at the damage (`held-damage.ts`) throws the extras' dice and nothing else: the confirm checks and spends
+  // them, and reads the same dice back.
+  if (diceOnly) {
+    lookAtExtraDice(ctx, chosen);
+    return;
+  }
   const target = ctx.targets[0];
   const roll = (formula: string, type: string, source: string) => {
     const expression = parseDiceFormula(formula);
@@ -436,6 +495,10 @@ export function rollHitOptions(ctx: ResolveContext): void {
     if (choice.id === SAVAGE_ATTACKER || choice.id.startsWith(RIDER_TYPE_PREFIX)) continue;
     if (choice.id === "charge") {
       rollCharge(ctx, roll);
+      continue;
+    }
+    if (choice.id === PUNCH_AND_GRAB) {
+      punchAndGrab(ctx);
       continue;
     }
     const action = ctx.siblings.find((candidate) => candidate.id === choice.id);
@@ -512,6 +575,47 @@ export function rollHitOptions(ctx: ResolveContext): void {
       ...(slotLevel !== undefined ? { slotLevel } : {}),
       ...(pactSlot !== null ? { pactSlot } : {})
     });
+  }
+}
+
+/** The dice the chosen extras throw, in the order `rollHitOptions` throws them, for a look at the damage: an extra this
+ *  hit can't carry is left for the confirm to refuse. */
+function lookAtExtraDice(ctx: ResolveContext, chosen: readonly HitOptionChoice[]): void {
+  const roll = (formula: string, type: string, source: string) => {
+    const expression = parseDiceFormula(formula);
+    const rolled = resolveDice(ctx.crit ? criticalExpression(expression) : expression, ctx.deps.random);
+    ctx.damage.push({ formula: rolled.expression.source, type, total: rolled.total, source });
+  };
+  const hitDealsDamage = dealsDamage(ctx);
+  for (const choice of chosen) {
+    if (choice.id === "charge") {
+      for (const part of chargeOf(ctx)?.damage ?? []) roll(part.formula, part.type, "Charge");
+      continue;
+    }
+    const action = ctx.siblings.find((candidate) => candidate.id === choice.id);
+    const rider = action ? hitRiderOf(action) : undefined;
+    if (!action || !rider || qualifies(ctx, rider, action) === false) continue;
+    if (rider.dealsDamage && !hitDealsDamage) continue;
+    const effects = pickedEffects(ctx, rider, action, choice);
+    const slotLevel = action.spellSlot ? (choice.slotLevel ?? openSlots(ctx, action)[0]) : undefined;
+    const pactSlot = rider.pactSlotDie ? openPactSlot(ctx) : null;
+    const cast = riderAction(ctx, action, slotLevel);
+    const forgone = effects.reduce((sum, effect) => sum + (effect.forgoesDice ?? 0), 0);
+    const parts =
+      pactSlot !== null && rider.pactSlotDie
+        ? [{ formula: `${pactSlot + 1}${rider.pactSlotDie.slice(1)}`, type: cast.damage[0]?.type ?? "force" }]
+        : lessForgone(cast.damage, forgone, action, ctx);
+    const pick =
+      choice.damageType && rider.damageTypes?.includes(choice.damageType as never) ? choice.damageType : undefined;
+    const typeOf = (part: DefinitionAction["damage"][number]) =>
+      rider.weaponType ? (ctx.action.damage[0]?.type ?? part.type) : (pick ?? rider.damageTypes?.[0] ?? part.type);
+    const creatureType = ctx.riderFilters.targetCreatureType;
+    const spared = creatureType !== undefined && (rider.sparesCreatureTypes ?? []).includes(creatureType);
+    if (action.save) {
+      if (!spared) for (const part of parts) rollPlain(ctx, part.formula, typeOf(part), action.name);
+    } else if (!spared) for (const part of parts) roll(part.formula, typeOf(part), action.name);
+    if (rider.versus && creatureType !== undefined && rider.versus.creatureTypes.includes(creatureType))
+      roll(rider.versus.formula, cast.damage[0]?.type ?? "radiant", `${action.name} (${capitalised(creatureType)})`);
   }
 }
 

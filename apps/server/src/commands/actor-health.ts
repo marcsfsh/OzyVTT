@@ -35,15 +35,59 @@ import {
 } from "../hit-points.js";
 import { rechooseInLedger } from "../ledger-rechoice.js";
 import { spellbookOf } from "../spellbook.js";
-import { applyRest, hitDieSizesToSpend, spendHitDice, startOwnShortRest } from "../rests.js";
+import {
+  applyRest,
+  hitDieSizesToSpend,
+  holdHitDice,
+  rerollHitDice,
+  spendHitDice,
+  startOwnShortRest
+} from "../rests.js";
 import { restoreUses, spendUses } from "../use-pools.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { recordRoll } from "../roll-history.js";
-import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
+import { initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal } from "./kit.js";
+import type { Initiator } from "../authorization.js";
 import { defineCommand } from "./pipeline.js";
+
+/** A spend of Hit Point Dice, or a reroll of one, as the shared roll history records it: "2d10 + 1d6 + 4". */
+function hitDiceRecord(
+  rollId: string,
+  commandId: string,
+  principal: GamePrincipal,
+  initiator: Initiator,
+  actor: Readonly<{ id: string; name: string; visibility: string }>,
+  outcome: Readonly<{ healed: number; conModifier: number; dice: ReadonlyArray<{ sides: number; face: number }> }>,
+  kind: "spend" | "reroll"
+): RollRecord {
+  const sizes = outcome.dice.map((die) => die.sides);
+  const bonus = Math.abs(outcome.conModifier * outcome.dice.length);
+  // One term per die size, biggest first.
+  const dicePart = [...new Set(sizes)]
+    .map((sides) => `${sizes.filter((size) => size === sides).length}d${sides}`)
+    .join(" + ");
+  return {
+    id: rollId,
+    commandId,
+    initiatorSessionId: sessionIdOf(principal),
+    initiatorRole: initiator.role,
+    initiatorLabel: actor.name,
+    actorId: actor.id,
+    purpose: "manual",
+    ...(kind === "reroll" ? { label: "Hit Point Dice reroll" } : {}),
+    // Hidden actors stay GM-only.
+    visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
+    formula: `${dicePart}${outcome.conModifier !== 0 ? ` ${outcome.conModifier < 0 ? "-" : "+"} ${bonus}` : ""}`,
+    normalizedFormula: dicePart,
+    dice: outcome.dice.map((die) => ({ group: 0, sides: die.sides, face: die.face, kept: true, sign: 1 as const })),
+    modifiers: outcome.conModifier !== 0 ? [{ value: bonus, sign: outcome.conModifier < 0 ? -1 : 1 }] : [],
+    total: outcome.healed,
+    createdAt: new Date().toISOString()
+  };
+}
 
 // Hit points, conditions and rests.
 
@@ -560,13 +604,31 @@ export const actorHealthCommands = [
     type: "actor.spend-hit-dice",
     operationId: "spendHitDice",
     description:
-      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). A player session may target only their claimed character, and only while it is in the Short Rest under way (the party's, or one the player started with actor.rest), since a creature spends Hit Dice during a Short Rest; the GM any time outside a fight. The dice land in the shared roll history.",
+      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). A player session may target only their claimed character, and only while it is in the Short Rest under way (the party's, or one the player started with actor.rest), since a creature spends Hit Dice during a Short Rest; the GM any time outside a fight. The dice land in the shared roll history. `reroll` rerolls a die of the character's latest spend instead, while it is still the character's latest roll: a player spends Heroic Inspiration on the lowest die, the GM throws them all again, and the Hit Points are worked out afresh.",
     summary: "Spend Hit Point Dice to heal on a Short Rest (roll + Con modifier each, minimum 1).",
     schema: ActorSpendHitDiceSchema,
     malformed: "The hit-dice command is malformed.",
     async run({ principal, request, execute }, kit) {
       const initiator = initiatorOf(principal);
-      const { commandId, actorId, count } = request;
+      const { commandId, actorId, count, reroll } = request;
+      if (reroll === true) {
+        const rerollId = kit.context.newId();
+        let rerolled: ReturnType<typeof rerollHitDice> | null = null;
+        const { state, duplicate } = await execute((draft) => {
+          rerolled = rerollHitDice(draft, actorId, initiator, (sides) => kit.context.random(sides), rerollId);
+          const actor = draft.actors.find((candidate) => candidate.id === actorId)!;
+          recordRoll(draft, hitDiceRecord(rerollId, commandId, principal, initiator, actor, rerolled, "reroll"));
+        });
+        if (duplicate || !rerolled) return;
+        kit.publishRolls(state, commandId);
+        kit.context.appendLog({
+          kind: "heal",
+          text: `${kit.actorName(actorId)} rerolls a Hit Point Die and regains ${(rerolled as { healed: number }).healed} HP in all.`,
+          actorIds: [actorId],
+          gmOnly: kit.actorHidden(actorId)
+        });
+        return;
+      }
       // Roll before executing: a duplicate retry replays the stored outcome and must not consume fresh
       // randomness. The execute callback re-validates against live state.
       const snapshotActor = kit.read().actors.find((candidate) => candidate.id === actorId);
@@ -589,29 +651,17 @@ export const actorHealthCommands = [
         healed = outcome.healed;
         events = outcome.events;
         const actor = draft.actors.find((candidate) => candidate.id === actorId)!;
-        const bonus = Math.abs(outcome.conModifier * count);
-        // "2d10 + 1d6": one term per die size, biggest first.
-        const dicePart = [...new Set(sizes)]
-          .map((sides) => `${sizes.filter((size) => size === sides).length}d${sides}`)
-          .join(" + ");
-        // The dice land in shared roll history; hidden actors stay GM-only.
-        const record: RollRecord = {
-          id: rollId,
-          commandId,
-          initiatorSessionId: sessionIdOf(principal),
-          initiatorRole: initiator.role,
-          initiatorLabel: actor.name,
+        const dice = faces.map((face, index) => ({ sides: sizes[index]!, face }));
+        recordRoll(draft, hitDiceRecord(rollId, commandId, principal, initiator, actor, { ...outcome, dice }, "spend"));
+        // Held for Heroic Inspiration's reroll while it is the character's latest roll.
+        holdHitDice(draft, {
           actorId,
-          purpose: "manual",
-          visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
-          formula: `${dicePart}${outcome.conModifier !== 0 ? ` ${outcome.conModifier < 0 ? "-" : "+"} ${bonus}` : ""}`,
-          normalizedFormula: dicePart,
-          dice: faces.map((face, index) => ({ group: 0, sides: sizes[index], face, kept: true, sign: 1 as const })),
-          modifiers: outcome.conModifier !== 0 ? [{ value: bonus, sign: outcome.conModifier < 0 ? -1 : 1 }] : [],
-          total: outcome.healed,
-          createdAt: new Date().toISOString()
-        };
-        recordRoll(draft, record);
+          rollId,
+          dice,
+          conModifier: outcome.conModifier,
+          doubled: outcome.doubled,
+          before: outcome.before
+        });
       });
       if (duplicate) return;
       kit.publishRolls(state, commandId);

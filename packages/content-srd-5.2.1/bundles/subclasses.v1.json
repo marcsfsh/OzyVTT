@@ -261,9 +261,10 @@
       "area": {
        "shape": "sphere",
        "sizeFeet": 10,
-       "widthFeet": null
+       "widthFeet": null,
+       "rangeFeet": 60
       },
-      "description": "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet. Each creature of your choice in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking the damage below on a failure and half as much on a success. One creature of your choice in that area regains the same amount in Hit Points. The damage and healing increase at Druid levels 10 and 14.",
+      "description": "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet of yourself. Each creature of your choice in a 10-foot-radius Sphere centered on that point makes a Constitution saving throw against your spell save DC, taking 2d6 Necrotic damage on a failed save or half as much damage on a successful one. One creature of your choice in that area regains 2d6 Hit Points. The damage and healing increase by 1d6 at Druid levels 10 (3d6) and 14 (4d6).",
       "save": {
        "ability": "con",
        "dc": "spellcasting",
@@ -291,6 +292,20 @@
         "level": 14,
         "formula": "4d6",
         "type": "necrotic"
+       }
+      ],
+      "areaHealByLevel": [
+       {
+        "level": 3,
+        "formula": "2d6"
+       },
+       {
+        "level": 10,
+        "formula": "3d6"
+       },
+       {
+        "level": 14,
+        "formula": "4d6"
        }
       ]
      }
@@ -913,6 +928,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "acid",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -956,6 +972,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "cold",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -999,6 +1016,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "fire",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -1042,6 +1060,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "lightning",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -1085,6 +1104,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "poison",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -1299,6 +1319,7 @@
      {
       "type": "extra-damage",
       "abilityModifier": "int",
+      "oncePerCast": true,
       "when": [
        {
         "type": "on-damage-roll"
@@ -1811,7 +1832,11 @@
       "targets": {
        "count": 1,
        "seen": true,
-       "who": "others"
+       "who": "others",
+       "nearMark": {
+        "tag": "hunters-mark",
+        "feet": 30
+       }
       }
      }
     ]
@@ -2085,6 +2110,7 @@
       "id": "sacred-weapon",
       "name": "Channel Divinity: Sacred Weapon",
       "activation": "other",
+      "timing": "attack-action",
       "description": "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
       "damage": [],
       "grants": {
@@ -2290,7 +2316,49 @@
     "id": "frenzy",
     "name": "Frenzy",
     "level": 3,
-    "description": "If you use Reckless Attack while your Rage is active, you deal extra damage to the first target you hit on your turn with a Strength-based attack. To determine the extra damage, roll a number of d6s equal to your Rage Damage bonus, and add them together. The damage has the same type as the weapon or Unarmed Strike used for the attack."
+    "description": "If you use Reckless Attack while your Rage is active, you deal extra damage to the first target you hit on your turn with a Strength-based attack. To determine the extra damage, roll a number of d6s equal to your Rage Damage bonus, and add them together. The damage has the same type as the weapon or Unarmed Strike used for the attack.",
+    "actions": [
+     {
+      "id": "frenzy",
+      "name": "Frenzy",
+      "activation": "other",
+      "description": "If you use Reckless Attack while your Rage is active, you deal extra damage to the first target you hit on your turn with a Strength-based attack. To determine the extra damage, roll a number of d6s equal to your Rage Damage bonus and add them together. The damage has the same type as the weapon or Unarmed Strike used for the attack.",
+      "damage": [
+       {
+        "formula": "2d6",
+        "type": "bludgeoning"
+       }
+      ],
+      "damageByLevel": [
+       {
+        "level": 3,
+        "formula": "2d6",
+        "type": "bludgeoning"
+       },
+       {
+        "level": 9,
+        "formula": "3d6",
+        "type": "bludgeoning"
+       },
+       {
+        "level": 16,
+        "formula": "4d6",
+        "type": "bludgeoning"
+       }
+      ],
+      "ridesHit": {
+       "rides": "strength-attack",
+       "ownTurn": true,
+       "oncePerTurn": true,
+       "firstHitOnTurn": true,
+       "weaponType": true,
+       "whileEffectTags": [
+        "raging",
+        "reckless-attack"
+       ]
+      }
+     }
+    ]
    },
    {
     "id": "mindless-rage",
@@ -2591,7 +2659,8 @@
         ],
         "onePerSource": true
        },
-       "reminder": "Quivering Palm: the vibrations last a number of days equal to the Monk's level. End the effect to end them harmlessly."
+       "appliesDaysPerLevel": true,
+       "reminder": "Quivering Palm: to end the vibrations harmlessly, end the effect from the creature's row."
       }
      },
      {

@@ -4,6 +4,7 @@ import type { ActionReaction, ActorDefinition, DamageDrain } from "@vtt/schemas"
 import type { EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { halvedDamageParts, previewDamage } from "./hit-points.js";
+import { redirectChoicesFor } from "./deflect-redirect.js";
 import { offerableReaction } from "./reaction-offers.js";
 import type { DefinitionAction, LiveActor } from "./resolution/context.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
@@ -179,6 +180,7 @@ export function openDamageWindow(
   const weigh = (parts: readonly Part[]) =>
     previewDamage(state, held.target.id, { amount: 0, parts: [...parts] }, deps).totalApplied;
   const resisted = resistedTypeOf(held.parts);
+  const redirectChoices = redirectChoicesFor(state, held.target, offer.reaction, held.hitKinds, deps);
   const used =
     response.kind === "half"
       ? halvedDamageParts(held.parts)
@@ -205,7 +207,7 @@ export function openDamageWindow(
     ...(response.kind === "half" ? {} : { damageResponse: response }),
     ...(held.drain ? { drain: held.drain } : {}),
     ...(held.hitKinds.length > 0 ? { hitKinds: [...held.hitKinds] } : {}),
-    ...redirectChoicesOf(state, held.target, offer, deps),
+    ...(redirectChoices.length > 0 ? { redirectChoices } : redirectChoicesOf(state, held.target, offer, deps)),
     asked: [...held.asked, OWN_REACTION],
     createdAt: Date.parse(deps.now())
   };

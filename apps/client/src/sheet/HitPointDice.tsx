@@ -37,6 +37,7 @@ export function HitPointDice({
   constitution = null,
   boxes = false,
   canSpend = true,
+  canReroll = false,
   onFeedback
 }: Readonly<{
   actorId: string;
@@ -46,11 +47,27 @@ export function HitPointDice({
   boxes?: boolean;
   /** Whether Spend is offered now: the GM, or a player whose character is in a Short Rest. */
   canSpend?: boolean;
+  /** Whether a die of the spend just made may be rerolled: the GM's, or a player's with Heroic Inspiration. */
+  canReroll?: boolean;
   onFeedback: (text: string) => void;
 }>) {
   const [count, setCount] = useState(1);
   const [busy, setBusy] = useState(false);
+  // A spend made here, whose lowest die Heroic Inspiration may reroll while it is the character's latest roll.
+  const [justSpent, setJustSpent] = useState(false);
   const chosen = Math.max(1, Math.min(count, Math.max(1, hitDice.remaining)));
+  const reroll = () => {
+    setBusy(true);
+    void command("actor:spend-hit-dice", { actorId, count: 1, reroll: true }).then((result) => {
+      setBusy(false);
+      setJustSpent(false);
+      onFeedback(
+        result.ok
+          ? "Rerolled a Hit Point Die. The new healing is in the dice log."
+          : (result.message ?? "The Hit Point Die could not be rerolled.")
+      );
+    });
+  };
   const spend = () => {
     setBusy(true);
     void command("actor:spend-hit-dice", { actorId, count: chosen }).then((result) => {
@@ -61,6 +78,7 @@ export function HitPointDice({
           : (result.message ?? "The Hit Point Dice could not be spent.")
       );
       if (result.ok) setCount(1);
+      setJustSpent(result.ok);
     });
   };
   const each =
@@ -105,6 +123,11 @@ export function HitPointDice({
             Spend
           </Button>
         </div>
+      )}
+      {justSpent && canReroll && (
+        <Button size="sm" variant="secondary" disabled={busy} onClick={reroll}>
+          Reroll the lowest die · Heroic Inspiration
+        </Button>
       )}
     </div>
   );

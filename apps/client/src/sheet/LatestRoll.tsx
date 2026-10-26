@@ -58,7 +58,12 @@ export function LatestRoll({
         <span className="cs-lastroll-open">{body}</span>
       )}
       {canReroll && (
-        <Button size="sm" variant="secondary" disabled={rolls.rolling} onClick={() => void rolls.rerollCheck()}>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={rolls.rolling}
+          onClick={() => void (rolls.lastSave?.rollId === roll.id ? rolls.rerollSave() : rolls.rerollCheck())}
+        >
           {role === "gm" ? (
             "Reroll"
           ) : (

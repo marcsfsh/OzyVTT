@@ -93,6 +93,14 @@ export function releaseHeldDamage(state: GameState, actorId: string): void {
 const rollsDamageDice = (action: Pick<DefinitionAction, "damage">) =>
   action.damage.some((part) => /\d+d\d+/i.test(part.formula));
 
+/** Whether an action's dice are a heal's (Cure Wounds, a Potion of Healing): it rolls healing dice and no damage dice,
+ *  which Heroic Inspiration may reroll as it does damage dice ("reroll any die"). */
+export const rollsHealingDice = (action: Pick<DefinitionAction, "damage" | "healing">) =>
+  !rollsDamageDice(action) &&
+  action.healing !== undefined &&
+  action.healing.toMaximum !== true &&
+  /\d+d\d+/i.test(action.healing.formula);
+
 /** Whether Empowered Spell can answer this creature's spell damage now: it knows the option, and a Sorcery Point or this
  *  turn's free option (Arcane Apotheosis) pays for it. */
 function empoweredReady(
@@ -117,6 +125,7 @@ export function damageLookOffered(
   definition: ActorDefinition | undefined,
   siblings: ReadonlyArray<DefinitionAction>
 ): boolean {
+  if (rollsHealingDice(action)) return attacker.heroicInspiration;
   if (!rollsDamageDice(action)) return false;
   return attacker.heroicInspiration || empoweredReady(state, attacker, action, definition, siblings).ready;
 }
@@ -201,7 +210,7 @@ export function answerHeldDamage(
   for (const sides of [...new Set(picks.map((index) => dice[index]!.sides))]) {
     const faces = picks.filter((index) => dice[index]!.sides === sides).map((index) => dice[index]!.face);
     const rolled = resolveDice(parseDiceFormula(`${faces.length}d${sides}`), () => faces.shift()!);
-    recordRoll(ctx, rolled, "damage", `${action.name}: ${offer.name}`);
+    recordRoll(ctx, rolled, rollsHealingDice(action) ? "healing" : "damage", `${action.name}: ${offer.name}`);
   }
   return holdDamage(state, {
     actorId: held.actorId,
@@ -211,10 +220,11 @@ export function answerHeldDamage(
   });
 }
 
-/** The held dice as a look's reply shows them. */
+/** The held dice as a look's reply shows them; a heal's says what they restore. */
 export function heldDamageLook(
   ctx: Pick<ResolveContext, "state" | "attacker" | "action" | "deps" | "siblings">,
-  held: Pick<HeldDamage, "dice" | "answers">
+  held: Pick<HeldDamage, "dice" | "answers">,
+  healing?: number
 ): HeldDamageLook {
   const answered: RollAnswered[] = held.answers.map((answer) => ({
     name: answer.name,
@@ -223,6 +233,7 @@ export function heldDamageLook(
   return {
     dice: held.dice.map((die) => ({ ...die })),
     answered,
-    answers: damageAnswerOffers(ctx, held)
+    answers: damageAnswerOffers(ctx, held),
+    ...(healing !== undefined ? { healing } : {})
   };
 }

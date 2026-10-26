@@ -24,6 +24,9 @@ const HELD_LIMIT = 100;
  *  other key names one pending roll (a save, a death save, a reaction, a check), which keeps its die until answered. */
 const turnScoped = (key: string) => key.startsWith("attack:");
 
+/** A character's latest loose save (one rolled with nothing owed), held for Heroic Inspiration's reroll. */
+export const looseSaveKey = (actorId: string) => `loose-save:${actorId}`;
+
 /** The held dice for a roll, when they still belong to it. */
 export function heldRollFor(state: GameState, key: string): HeldRoll | undefined {
   const held = state.heldRolls.find((entry) => entry.key === key);

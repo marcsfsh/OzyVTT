@@ -21,7 +21,7 @@ import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { activeMoveGrant } from "../granted-moves.js";
-import { mapDistance, tokenCreatureDistance } from "../movement-narration.js";
+import { DISTANCE_TOLERANCE_FEET, mapDistance, tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
@@ -226,7 +226,7 @@ export const actionCommands = [
             area,
             templates,
             rangeFeet: !range
-              ? null
+              ? (area.rangeFeet ?? null)
               : range.unit === "miles" && range.distance !== null
                 ? range.distance * 5280
                 : spellRangeFeet(range),
@@ -261,6 +261,14 @@ export const actionCommands = [
           const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
           originAtCaster = casterOutside;
           areaOrigin = areaOriginPoint(snapped, placed.shape);
+          // An action's own point range, as no spell's range covers it (Land's Aid: "a point within 60 feet").
+          const pointRange = spell ? undefined : action.area?.rangeFeet;
+          const userAt = draft.combat.tokens.find((token) => token.actorId === actorId)?.position;
+          if (pointRange !== undefined && userAt) {
+            const apart = mapDistance(geometry!, userAt, areaOrigin)?.value ?? null;
+            if (apart !== null && apart > pointRange + DISTANCE_TOLERANCE_FEET)
+              throw new CommandRejectedError(`${action.name}'s area centres on a point within ${pointRange} feet.`);
+          }
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
@@ -520,6 +528,9 @@ export const actionCommands = [
             ...(request.itemId !== undefined ? { itemId: request.itemId } : {}),
             ...(request.objectItemId !== undefined ? { objectItemId: request.objectItemId } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
+            ...(request.mastery !== undefined ? { mastery: request.mastery } : {}),
+            ...(request.vitalityTo !== undefined ? { vitalityTo: request.vitalityTo } : {}),
+            ...(request.aidTo !== undefined ? { aidTo: request.aidTo } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),

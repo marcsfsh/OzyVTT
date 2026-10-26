@@ -77,8 +77,7 @@ export const cleric: ClassMechanicsModule = {
         ]
       }
     }
-
-    // Not modeled: Sear Undead (ability-scaled dice count).
+    // Sear Undead is Turn Undead's `damageDiceByAbility` in sources/authored/classes.json.
   },
   subclasses: {
     "life-domain": {

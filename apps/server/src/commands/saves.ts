@@ -2,7 +2,8 @@ import type { HeldRoll, LooseSaveOutcome, RollAnswered, RollAnswerOffer } from "
 import { aggregateRollMode, otherDiceOf } from "@vtt/rules-5e";
 import { GameAccessDeniedError, requireActorAccess, requireGm } from "../authorization.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "../condition-rules.js";
-import { DEATH_SAVE_FLOOR_TAG, rollDeathSave } from "../death-saves.js";
+import { holdsFeature } from "../class-features.js";
+import { DEATH_SAVE_FLOOR_TAG, rollDeathSave, SURVIVOR_CRITICAL } from "../death-saves.js";
 import { startStableRecovery, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { stabilizeCreature } from "../stabilize.js";
@@ -14,7 +15,7 @@ import {
   SaveRollSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
-import { heldRollFor, holdRoll, releaseHeldRoll, rollHeldTest } from "../held-rolls.js";
+import { heldRollFor, holdRoll, looseSaveKey, releaseHeldRoll, rollHeldTest } from "../held-rolls.js";
 import { damageAdjustmentDetail, healActor } from "../hit-points.js";
 import { recordRoll } from "../roll-history.js";
 import {
@@ -51,14 +52,14 @@ export const saveCommands = [
     type: "save.roll",
     operationId: "rollSave",
     description:
-      'Rolls a saving throw for one character. When a pending save is open for that character and ability, this answers it through the same path the encounter tracker uses (the damage and condition apply and the prompt closes) and acks `route: "answered"` with the `saveId`. With nothing open it rolls a loose, attributed save under the same rules the resolver uses (the modifier, Exhaustion, an ally Paladin\'s aura, the Advantage and Disadvantage the rules give, and the automatic failure of a Strength or Dexterity save while Paralyzed, Petrified, Stunned or Unconscious), and acks `route: "loose"` with the `outcome`. `face` is a typed d20 (a player only while the table lets players type their dice); `total` and `rollMode` are the GM\'s alone. GM-grade for anyone; a player session only for their own claimed character.',
+      "Rolls a saving throw for one character. When a pending save is open for that character and ability, this answers it through the same path the encounter tracker uses (the damage and condition apply and the prompt closes) and acks `route: \"answered\"` with the `saveId`. With nothing open it rolls a loose, attributed save under the same rules the resolver uses (the modifier, Exhaustion, an ally Paladin's aura, the Advantage and Disadvantage the rules give, and the automatic failure of a Strength or Dexterity save while Paralyzed, Petrified, Stunned or Unconscious), and acks `route: \"loose\"` with the `outcome`. `face` is a typed d20 (a player only while the table lets players type their dice); `total` and `rollMode` are the GM's alone. `reroll` throws the character's latest loose save of that ability again while it is still the character's latest roll: a player spends Heroic Inspiration to reroll one d20, the GM throws afresh. GM-grade for anyone; a player session only for their own claimed character.",
     summary:
       "Roll a saving throw: answers a matching pending save when one is open, otherwise rolls a loose, attributed save.",
     schema: SaveRollSchema,
     malformed: "The saving throw is malformed.",
     issueMessage: true,
     async run({ principal, request, dispatch, execute }, kit) {
-      const { commandId, actorId, ability, rollMode, face, total, expectedRevision } = request;
+      const { commandId, actorId, ability, rollMode, face, total, reroll, expectedRevision } = request;
       const initiator = initiatorOf(principal);
       const snapshot = kit.read();
       requireActorAccess(initiator, snapshot, actorId, "save");
@@ -69,7 +70,7 @@ export const saveCommands = [
       const pending = snapshot.combat.pendingSaves.find(
         (entry) => entry.targetActorId === actorId && entry.ability === ability
       );
-      if (pending) {
+      if (pending && reroll !== true) {
         const answered = await dispatch("save.answer", {
           commandId,
           saveId: pending.id,
@@ -89,7 +90,17 @@ export const saveCommands = [
       const { state, duplicate } = await execute((draft) => {
         const live = draft.actors.find((candidate) => candidate.id === actorId);
         if (!live) throw new CommandRejectedError("That combatant no longer exists.");
-        const label = `${ability.toUpperCase()} save`;
+        // A loose save is held under the character, so Heroic Inspiration can reroll it while it is the latest roll.
+        const key = looseSaveKey(actorId);
+        const held = heldRollFor(draft, key);
+        if (reroll === true) {
+          const latest = [...draft.rolls].reverse().find((roll) => roll.actorId === actorId);
+          if (held?.looseSave?.ability !== ability || !latest || latest.id !== held.rollId)
+            throw new CommandRejectedError(
+              `${live.name} has no ${ability.toUpperCase()} save to reroll: a reroll comes right after the roll.`
+            );
+        } else releaseHeldRoll(draft, key);
+        const label = `${ability.toUpperCase()} save${reroll === true ? " reroll" : ""}`;
         const visibility = live.visibility === "gm-only" ? ("gm-only" as const) : ("public" as const);
         const autoFailed = ability === "str" || ability === "dex" ? autoFailsPhysicalSaves(live) : null;
         if (total !== undefined) {
@@ -131,18 +142,26 @@ export const saveCommands = [
         const sources = saveRollSources(live, ability, derivation);
         const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
         const forced = initiator.role === "gm" ? rollMode : undefined;
-        // A loose save has no preview, so nothing is held: the key is its own roll.
         const test = rollHeldTest(
           draft,
-          `loose-save:${rollId}`,
+          key,
           live,
           initiator,
           forced ?? aggregated.mode,
           saveTotalFor(definition, live, ability, derivation) + aura,
           saveRiderDiceTerms(derivation, ability),
-          face === undefined ? {} : { face },
+          { ...(face === undefined ? {} : { face }), ...(reroll === true ? { reroll: true } : {}) },
           (sides) => kit.context.random(sides)
         );
+        holdRoll(draft, {
+          key,
+          actorId,
+          faces: test.faces,
+          others: otherDiceOf(test.resolution),
+          rollId,
+          typed: test.typed,
+          looseSave: { ability }
+        });
         recordSaveRoll(draft, test.resolution, {
           id: rollId,
           commandId,
@@ -383,7 +402,8 @@ export const saveCommands = [
             commit,
             test: { ...test, natural: read.natural },
             total: read.total,
-            ...(derivation.context.effectTags?.includes(DEATH_SAVE_FLOOR_TAG) ? { floor: 10 } : {})
+            ...(derivation.context.effectTags?.includes(DEATH_SAVE_FLOOR_TAG) ? { floor: 10 } : {}),
+            ...(holdsFeature(definition, "survivor", "Survivor") ? { criticalFrom: SURVIVOR_CRITICAL } : {})
           },
           {
             random: kit.context.random,
@@ -419,7 +439,9 @@ export const saveCommands = [
       if (commit) {
         const name = kit.actorName(actorId);
         const text = outcome.regainsOneHitPoint
-          ? `${name} rolled a natural 20 on a death save and regains 1 HP.`
+          ? roll.face < 20
+            ? `${name} rolled ${roll.face} on a death save, which counts as a 20 (Survivor), and regains 1 HP.`
+            : `${name} rolled a natural 20 on a death save and regains 1 HP.`
           : outcome.dead
             ? `${name} failed a third death save and dies.`
             : outcome.state.stable

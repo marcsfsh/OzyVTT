@@ -11,6 +11,7 @@ import {
   AbilitySchema,
   ActionSchema,
   DamageFormulaSchema,
+  DamageTypeSchema,
   DiceFormulaSchema,
   HealingFormulaSchema,
   EffectGrantSchema,
@@ -223,7 +224,13 @@ export const FeatureHitRiderSchema = HitRiderSchema.omit({ saveDc: true })
       .array(z.object({ level: ContentLevelSchema, choose: z.number().int().min(1).max(3) }).strict())
       .max(4)
       .optional()
-      .describe("How many effects one hit may carry from a class level on; the highest matching level wins")
+      .describe("How many effects one hit may carry from a class level on; the highest matching level wins"),
+    appliesDaysPerLevel: z
+      .literal(true)
+      .optional()
+      .describe(
+        "What the hit applies lasts a number of days equal to the class level, in game minutes (Quivering Palm's vibrations)"
+      )
   })
   .strict();
 
@@ -257,14 +264,47 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true,
       .describe(
         "Damage that grows with level (Sneak Attack, Divine Smite). The highest matching level replaces `damage`"
       ),
+    /** Damage dice counted by an ability modifier, from a class level on ("a number of d8s equal to your Wisdom modifier
+     *  (minimum of 1d8)", Sear Undead on Turn Undead). It replaces `damage` from that level. */
+    damageDiceByAbility: z
+      .object({
+        level: ContentLevelSchema,
+        ability: AbilitySchema,
+        die: z.enum(["d4", "d6", "d8", "d10", "d12"]),
+        type: DamageTypeSchema,
+        minimum: z.number().int().min(1).max(5).default(1)
+      })
+      .strict()
+      .optional()
+      .describe(
+        'Damage dice counted by an ability modifier from a class level on ("a number of d8s equal to your Wisdom modifier (minimum of 1d8)"), replacing `damage` from that level'
+      ),
     /** Healing that grows with level. It replaces `healing.formula` at the highest matching level (Divine Spark's heal,
      *  Wholeness of Body's Martial Arts die). */
     healingByLevel: z
+      .array(
+        z
+          .object({
+            level: ContentLevelSchema,
+            formula: HealingFormulaSchema,
+            self: z.literal(true).optional(),
+            temporary: z.literal(true).optional()
+          })
+          .strict()
+      )
+      .max(20)
+      .optional()
+      .describe(
+        "Healing that grows with level (Divine Spark's heal, Wholeness of Body's Martial Arts die). The highest matching level replaces `healing.formula`; a row with `self` or `temporary` gives an action with no healing below that level its own (Heightened Focus's Temporary Hit Points)"
+      ),
+    /** The area's healing that grows with level (Land's Aid: 2d6, 3d6 at 10, 4d6 at 14). The highest matching level
+     *  replaces `areaHeal.formula`. */
+    areaHealByLevel: z
       .array(z.object({ level: ContentLevelSchema, formula: HealingFormulaSchema }).strict())
       .max(20)
       .optional()
       .describe(
-        "Healing that grows with level (Divine Spark's heal, Wholeness of Body's Martial Arts die). The highest matching level replaces `healing.formula`"
+        "The area's healing that grows with level (Land's Aid). The highest matching level replaces `areaHeal`"
       ),
     /** What the built action adds to its first damage part and its healing, read off the character when it is built:
      *  a multiple of its level ("1d10 plus your Fighter level", "five times your Cleric level") and an ability

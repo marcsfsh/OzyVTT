@@ -64,6 +64,9 @@ describe("rule families", () => {
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
       ["economy.not-your-turn", "economy"],
+      ["economy.turn-start", "economy"],
+      ["economy.attack-action", "economy"],
+      ["economy.heavy-armor", "economy"],
       // Giving back a spent action, Bonus Action or Reaction lets a creature act twice.
       ["economy.spent-slot", "economy"],
       // No one acts while a wait-mode fight gathers initiative: the turn economy hasn't begun.

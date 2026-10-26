@@ -458,6 +458,7 @@ export function totalMinimumOf(
   for (const rider of riders) {
     const { type, roll: riderRoll, abilityScore } = rider.modifier;
     if (type !== "total-minimum" || riderRoll !== roll || abilityScore === undefined || !definition) continue;
+    if (abilityScore === "increased") continue;
     const score = definition.abilityScores[abilityScore];
     if (best === null || score > best.total) best = { total: score, label: rider.label };
   }

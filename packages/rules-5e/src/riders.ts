@@ -166,8 +166,11 @@ export type RiderModifier = Readonly<{
   minimum?: number;
   /** `d20-minimum`: only on a check that uses a proficiency (Reliable Talent). */
   proficientOnly?: boolean;
-  /** `total-minimum`: the ability whose score a lower total counts as (Indomitable Might's Strength). */
-  abilityScore?: RiderAbility;
+  /** `total-minimum`: the ability whose score a lower total counts as (Indomitable Might's Strength). `extra-damage`:
+   *  the ability whose score is added, `increased` naming the one the carrying feat increased. */
+  abilityScore?: RiderAbility | "increased";
+  /** `extra-damage`: one damage roll of a spell, its first. */
+  oncePerCast?: boolean;
   /** `ability-score-minimum`: the least the score counts as ("Your Strength is 19"). */
   score?: number;
   /** `ability-score`: the most an increase takes the score to (20 when absent). */

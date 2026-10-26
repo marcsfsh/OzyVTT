@@ -234,6 +234,8 @@ const PendingSaveEffectSchema = z
     speedZero: z.boolean().optional(),
     /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
     endsWhenSourceDefeated: z.boolean().optional(),
+    /** It ends when its source has the Incapacitated condition (Turn Undead). */
+    endsOnIncapacitated: EffectInstanceSchema.shape.endsOnIncapacitated,
     rangeFeet: EffectInstanceSchema.shape.rangeFeet,
     /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
      * once that has ended. */
@@ -438,6 +440,17 @@ export const PendingSaveSchema = z
     /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save
      *  card says so, so it never reads as if the engine did. */
     gmApplies: z.literal(true).optional(),
+    /** Temporary Hit Points the cast gives when its damage lands, to the creature its caster picked, once for the cast
+     *  (`key`): the first of its saves to deal damage gives them (Improved Potent Spellcasting). GM bookkeeping, never
+     *  projected. */
+    vitality: z
+      .object({
+        actorId: z.uuid(),
+        amount: z.number().int().min(1).max(100),
+        key: z.string().min(1).max(120)
+      })
+      .strict()
+      .optional(),
     /** The spell the save is against, its school and level, and whether it aimed at this creature alone, for what
      *  answers a save against a spell (Staff of Charming's Resist Enchantment). GM bookkeeping, never projected. */
     spell: z
@@ -541,6 +554,8 @@ export const HeldRollSchema = z
     readAs: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** The other creatures already asked to answer this roll (a check's Cutting Words), so each is asked once. */
     asked: z.array(z.string().min(1).max(300)).max(40).optional(),
+    /** A loose save's ability (one rolled from the sheet with nothing owed), so Heroic Inspiration can reroll it. */
+    looseSave: z.object({ ability: AbilityIdSchema }).strict().optional(),
     /** A check's subject and how it was made, so Heroic Inspiration can reroll it. */
     check: z
       .object({
@@ -886,7 +901,8 @@ export const PendingReactionSchema = z
     /** attack-targeted and a ward's attack-would-hit: the attack's target as it stands, by name. */
     targetName: z.string().min(1).max(120).optional(),
     /** attack-targeted (Redirect Attack): the allies the reactor may make the target instead, one picked with the
-     *  answer; hit-by-attack (a stone giant's Deflect Missile): the creatures it may turn the deflected force on. */
+     *  answer. hit-by-attack: the creatures a reduction to 0 may turn the attack's force on (a stone giant's Deflect
+     *  Missile, a Monk's Deflect Attacks for a Focus Point). */
     redirectChoices: z
       .array(z.object({ actorId: z.uuid(), name: z.string().min(1).max(120) }).strict())
       .min(1)
@@ -1582,6 +1598,14 @@ const sceneCombatShape = {
       /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
        *  bookkeeping, never projected. */
       attackRolled: z.boolean().optional(),
+      /** What creatures did to each other this turn: who attacked whom, who hit whom with a Strength-based attack, and
+       *  who damaged whom (Horde Breaker, Frenzy, Superior Hunter's Prey). Engine bookkeeping, never projected. */
+      dealings: z
+        .array(
+          z.object({ by: z.uuid(), target: z.uuid(), kind: z.enum(["attacked", "strength-hit", "damaged"]) }).strict()
+        )
+        .max(200)
+        .optional(),
       /** SRD Interacting with Things: the turn's actor has used its one free object interaction (a door opened, a
        *  weapon drawn), so the next takes the Utilize action. Engine bookkeeping, never projected. */
       objectInteractionUsed: z.boolean().optional(),
@@ -1609,7 +1633,13 @@ const sceneCombatShape = {
             .object({ actorId: z.uuid(), itemId: z.string().max(120), targetId: z.uuid() })
             .strict()
             .nullable()
-            .default(null)
+            .default(null),
+          /** Horde Breaker's opening: the weapon attack that opened it and its target. */
+          horde: z
+            .object({ actorId: z.uuid(), itemId: z.string().max(120), targetId: z.uuid() })
+            .strict()
+            .nullable()
+            .optional()
         })
         .strict()
         .optional(),
@@ -1798,6 +1828,22 @@ export const CombatStateSchema = z
       .strict()
       .nullable()
       .default(null),
+    /** Thief's Reflexes: the second turn of round 1 running now, at its creature's Initiative minus 10, and the turn
+     *  that comes after it (null at the round's end). Live table only; GM-only. */
+    secondTurn: z
+      .object({ actorId: z.uuid(), score: z.number().int(), resume: z.uuid().nullable() })
+      .strict()
+      .nullable()
+      .default(null),
+    /** The creatures that took their second turn of round 1. Live table only; GM-only. */
+    secondTurnsTaken: z.array(z.uuid()).max(200).default([]),
+    /** Alert's Initiative Swap offered by a character's player to a willing ally of another player, waiting for that
+     *  player to take it (`initiative.swap` naming the pair the other way round). Live table only; the two players see
+     *  the offers their characters are in. */
+    initiativeSwapOffers: z
+      .array(z.object({ actorId: z.uuid(), withActorId: z.uuid() }).strict())
+      .max(20)
+      .default([]),
     /** Creatures gone from the fight's plane (Banishment, Blink's Ethereal turns), with the space each left and its
      *  height there, so it comes back to that space or the nearest unoccupied one (`off-plane.ts`). Live table only;
      *  GM-only, since a creature the party never saw leave would be placed by it. */
@@ -2078,6 +2124,26 @@ export const GameStateSchema = z.object({
   heldRolls: z.array(HeldRollSchema).max(100).default([]),
   /** Damage rolls looked at before they count (see HeldDamageSchema). GM-only. */
   heldDamage: z.array(HeldDamageSchema).max(40).default([]),
+  /** Each character's latest spend of Hit Point Dice, which Heroic Inspiration may reroll a die of while it is the
+   *  character's latest roll: the dice, what each adds, and the Hit Points before it healed. GM-only. */
+  heldHitDice: z
+    .array(
+      z
+        .object({
+          actorId: z.uuid(),
+          rollId: z.uuid(),
+          dice: z
+            .array(z.object({ sides: z.number().int().min(2).max(20), face: z.number().int().min(1).max(20) }).strict())
+            .min(1)
+            .max(40),
+          conModifier: z.number().int().min(-5).max(10),
+          doubled: z.boolean(),
+          before: z.number().int().min(0).max(100000)
+        })
+        .strict()
+    )
+    .max(50)
+    .default([]),
   /** The GM's open calls for a roll. A player reads only their own part of each. */
   rollCalls: z.array(RollCallSchema).max(20).default([]),
   /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */

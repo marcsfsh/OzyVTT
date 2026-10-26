@@ -124,6 +124,48 @@ describe("an option picked as the action resolves", () => {
   });
 });
 
+describe("who a cantrip's Temporary Hit Points go to", () => {
+  const SACRED_FLAME = {
+    ...base,
+    id: "spell-sacred-flame",
+    name: "Sacred Flame",
+    saveAbility: "dex",
+    vitality: { rangeFeet: 60, amount: 10 }
+  } as unknown as ContentActionSummary;
+
+  it("starts on the caster and sends another creature picked", async () => {
+    beginTargeting(SACRED_FLAME, CASTER);
+    render(<Picker />);
+    const select = screen.getByRole("combobox", { name: "Temporary Hit Points to" }) as HTMLSelectElement;
+    expect([...select.options].map((option) => option.textContent)).toEqual(["You", "Goblin", "Orc"]);
+    expect(select.value).toBe(CASTER);
+    act(() => toggleTarget(GOBLIN));
+    fireEvent.change(select, { target: { value: ORC } });
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({ actionId: "spell-sacred-flame", vitalityTo: ORC });
+  });
+});
+
+describe("the creature an area's healing goes to", () => {
+  const LANDS_AID = {
+    id: "lands-aid",
+    name: "Land's Aid",
+    saveAbility: "con",
+    areaHeal: { formula: "2d6" }
+  } as unknown as ContentActionSummary;
+
+  it("starts on no one and sends the creature picked", async () => {
+    beginTargeting(LANDS_AID, CASTER);
+    render(<Picker />);
+    const select = screen.getByRole("combobox", { name: "Regains 2d6 Hit Points" }) as HTMLSelectElement;
+    expect(select.value).toBe("");
+    act(() => toggleTarget(GOBLIN));
+    fireEvent.change(select, { target: { value: ORC } });
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({ actionId: "lands-aid", aidTo: ORC });
+  });
+});
+
 describe("the weapon a grant binds to", () => {
   it("offers the carried weapons it fits and sends the one picked", async () => {
     beginTargeting(SHILLELAGH, CASTER);

@@ -1063,6 +1063,9 @@ export const ModifierSchema = z
           'One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008)'
         ),
         abilityModifier: AbilitySchema.optional(),
+        /** The bearer's score in an ability, added whole: `increased` is the one the feat carrying it increased
+         *  (Boon of Irresistible Offense's Overwhelming Strike). */
+        abilityScore: z.union([AbilitySchema, z.literal("increased")]).optional(),
         damageType: DamageTypeSchema.optional(),
         /** The types its bearer may pick from on each hit, `damageType` being the one it deals unpicked (Conjure Minor
          *  Elementals: "Acid, Cold, Fire, or Lightning (your choice when you make the attack)"). */
@@ -1070,6 +1073,8 @@ export const ModifierSchema = z
         doubleOnCritical: z.boolean().default(true),
         /** It is dealt once a turn at most, whoever's turn it is (Colossus Slayer). */
         oncePerTurn: z.literal(true).optional(),
+        /** It adds to one damage roll of a spell, the first: a spell's later rays don't take it (Empowered Evocation). */
+        oncePerCast: z.literal(true).optional(),
         ...riderGate
       })
       .strict()
@@ -1793,6 +1798,9 @@ export const EffectInstanceSchema = z
     endsWhenSourceDefeated: z.boolean().default(false),
     /** Dodge: the effect's modifiers stop applying while the bearer is Incapacitated or its Speed is 0 (SRD). */
     voidWhileIncapacitated: z.boolean().default(false),
+    /** It ends when the creature that keeps it (its source, or its bearer when it has none) gains the Incapacitated
+     *  condition or one that includes it, or drops to 0 Hit Points (Superior Defense, Turn Undead's turning). */
+    endsOnIncapacitated: z.literal(true).optional(),
     /** The source actor concentrates to sustain this (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
     concentration: z.boolean().default(false),
     /** Cascade: this effect ends when the actor no longer has any other effect carrying this tag (Frenzy's marker ends with the Rage). */
@@ -2841,6 +2849,14 @@ export const EffectGrantSchema = z
       .boolean()
       .default(false)
       .describe("Benefits lapse while the bearer is incapacitated or its Speed is 0 (Dodge)"),
+    /** It ends for good when the granter gains the Incapacitated condition ("for 1 minute or until you have the
+     *  Incapacitated condition"). */
+    endsOnIncapacitated: z
+      .literal(true)
+      .optional()
+      .describe(
+        "It ends when the granting creature has the Incapacitated condition or drops to 0 Hit Points (Superior Defense, Divine Sense)"
+      ),
     /** The granter concentrates to sustain the effect (SRD Concentration). */
     concentration: z.boolean().default(false),
     /** Its damage riders land this many times, then it ends (Basic Poison: one coated weapon's hit, or three
@@ -3430,6 +3446,12 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("The failure's conditions end when the source dies or is defeated"),
+  /** They end when the source has the Incapacitated condition (Turn Undead: "if you have the Incapacitated
+   *  condition"). */
+  endsWhenSourceIncapacitated: z
+    .literal(true)
+    .optional()
+    .describe("The failure's conditions end when the source has the Incapacitated condition or drops to 0 Hit Points"),
   /** Only creatures of these types make the save ("If the target is a Humanoid, it is subjected to the following
    *  effect"); any other is spared it. */
   onlyCreatureTypes: z
@@ -3532,6 +3554,9 @@ export const ActionAreaSchema = z
     contiguous: z.literal(true).optional(),
     /** How high a Cylinder rises from the ground it stands on ("5-foot-radius, 40-foot-high Cylinder"). */
     heightFeet: z.number().int().min(1).max(1000).optional(),
+    /** The point it centres on lies within this many feet of its user, for an action that is no spell (Land's Aid:
+     *  "choose a point within 60 feet of yourself"); a spell's range is its own. */
+    rangeFeet: z.number().int().min(5).max(1000).optional(),
     /** A Line that ends where it is aimed, no longer than `sizeFeet` ("a 5-foot-wide Line between you and the target",
      *  a Javelin of Lightning's bolt). */
     toTarget: z
@@ -3650,6 +3675,9 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       formula: DamageFormulaSchema,
       damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
       attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional(),
+      /** Deflect Attacks: a reduction to 0 may spend 1 Focus Point to turn the attack's force on a creature nearby,
+       *  which makes a Dexterity save against two Martial Arts dice plus the Dexterity modifier. */
+      redirectsAtZero: z.literal(true).optional(),
       /** When the reduction takes the damage to 0, the reactor turns this action's own save on one creature it picks
        *  within the action's range (a stone giant's Deflect Missile: "the giant can redirect some of the attack's
        *  force"). */
@@ -4045,7 +4073,7 @@ export const HitOutcomeSchema = z
     conditions: z.array(SaveConditionSchema).max(3).optional(),
     tags: z.array(EffectTagSchema).max(6).default([]),
     modifiers: EffectModifiersSchema.default([]),
-    /** Absent: until ended (Quivering Palm's vibrations, which last days). */
+    /** Absent: until ended. */
     duration: SaveFailureDurationSchema.optional(),
     /** A creature has one at a time, the most recent (Hamstring Blow): a new one replaces any other. */
     onePerTarget: z.literal(true).optional(),
@@ -4132,6 +4160,11 @@ export const HitRiderSchema = z
     dealsDamage: z.literal(true).optional(),
     /** Only against a target of at most this size (Hill's Tumble: Large or smaller). */
     maxTargetSize: SizeSchema.optional(),
+    /** Only while the bearer has an effect with each of these tags (Frenzy: its Rage and its Reckless Attack). */
+    whileEffectTags: z.array(EffectTagSchema).min(1).max(3).optional(),
+    /** Only on the first creature it hits on its turn with an attack this rider rides (Frenzy: "the first target you
+     *  hit on your turn with a Strength-based attack"). */
+    firstHitOnTurn: z.literal(true).optional(),
     /** Its damage takes the weapon's type (Sneak Attack, Brutal Strike). */
     weaponType: z.literal(true).optional(),
     /** The types its damage may take, picked when it is chosen (Divine Strike: Necrotic or Radiant). */
@@ -4216,6 +4249,12 @@ export const ActionTargetsSchema = z
     perceivesUser: z.literal(true).optional(),
     /** Only a Bloodied creature, at half its Hit Points or fewer (Preserve Life). */
     bloodied: z.literal(true).optional(),
+    /** Only a creature within `feet` of the one the user's own effect with this tag marks, other than that one, once
+     *  the user has damaged the marked creature this turn (Superior Hunter's Prey: 30 feet of Hunter's Mark's). */
+    nearMark: z
+      .object({ tag: EffectTagSchema, feet: z.number().int().min(5).max(120) })
+      .strict()
+      .optional(),
     /** Only a creature under this creature's effect from that action (one Restrained by an ettercap's Web Strand). */
     heldByAction: z
       .string()
@@ -5242,6 +5281,31 @@ export const ActionSchema = z
     grants: ActionGrantSchema.optional().describe(
       "Resolving this action grants an effect to the actor itself (Rage, Reckless Attack)"
     ),
+    /** When in its user's own turn it is taken: at the turn's start, before anything else (Superior Defense), as part
+     *  of the Attack action, before or between its attacks (Sacred Weapon), which it takes when nothing else has, or at
+     *  any point of it (Heightened Focus's carried ally). */
+    timing: z
+      .enum(["turn-start", "attack-action", "own-turn"])
+      .optional()
+      .describe(
+        "When in its user's own turn it is taken: at the start, before moving or acting (turn-start), as part of the Attack action (attack-action), or at any point of it (own-turn)"
+      ),
+    /** Once it deals damage to a creature, its user gives itself or a creature it picks within `rangeFeet` this many
+     *  Temporary Hit Points, once a use (Improved Potent Spellcasting on a Cleric cantrip). */
+    vitality: z
+      .object({ rangeFeet: z.number().int().min(5).max(300), amount: z.number().int().min(1).max(100) })
+      .strict()
+      .optional()
+      .describe(
+        "Once it deals damage, its user gives itself or a creature it picks within rangeFeet this many Temporary Hit Points (Improved Potent Spellcasting)"
+      ),
+    /** One creature its user picks in its area regains this many Hit Points, a roll of its own beside the area's save
+     *  (Land's Aid). */
+    areaHeal: z
+      .object({ formula: HealingFormulaSchema })
+      .strict()
+      .optional()
+      .describe("One creature its user picks in its area regains this many Hit Points, a roll of its own (Land's Aid)"),
     /** The action requires an active self effect carrying this tag (Frenzy requires "raging"). */
     requiresEffectTag: EffectTagSchema.optional().describe(
       'The action requires an active self effect carrying this tag (Frenzy requires "raging")'
@@ -5299,7 +5363,7 @@ export const ActionSchema = z
      *  Cleave's swing at a second creature (`cleave`), made with the inventory item `itemId`. */
     extraAttack: z
       .object({
-        kind: z.enum(["light", "cleave"]),
+        kind: z.enum(["light", "cleave", "horde-breaker"]),
         itemId: z
           .string()
           .regex(/^[a-z0-9-]+$/)

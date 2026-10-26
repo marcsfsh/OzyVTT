@@ -1,4 +1,4 @@
-import { picksFor, potentRangeFeet } from "./class-features.js";
+import { picksFor, potentRangeFeet, potentVitality } from "./class-features.js";
 import type { Actor } from "@vtt/domain";
 import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { abilityModifier, collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
@@ -31,13 +31,17 @@ export function effectiveActions(
   // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a level 3 spell slot).
   const taken = declared.map((action) =>
     withHeadCount(
-      withPotentRange(
-        withEmpoweredStrikes(
-          withAgonizingBlast(
-            withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
+      withPotentVitality(
+        withPotentRange(
+          withEmpoweredStrikes(
+            withAgonizingBlast(
+              withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
+              definition
+            ),
             definition
           ),
-          definition
+          definition,
+          catalog
         ),
         definition,
         catalog
@@ -105,6 +109,19 @@ function withPotentRange(
   const spell = catalog?.spellRecord?.(action.spellId);
   if (potentRangeFeet(definition, spell) === 0) return action;
   return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 300 } };
+}
+
+/** SRD Improved Blessed Strikes, Potent Spellcasting: "When you cast a Cleric cantrip and deal damage to a creature
+ *  with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of
+ *  Temporary Hit Points equal to twice your Wisdom modifier." */
+function withPotentVitality(
+  action: ActorAction,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): ActorAction {
+  if (action.spellId === undefined || action.damage.length === 0 || action.vitality) return action;
+  const amount = potentVitality(definition, catalog?.spellRecord?.(action.spellId));
+  return amount > 0 ? { ...action, vitality: { rangeFeet: 60, amount } } : action;
 }
 
 /** A later action of a spell its caster has up at a higher level, rolled at that level; anything else unchanged. */

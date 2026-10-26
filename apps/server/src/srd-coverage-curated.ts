@@ -256,8 +256,8 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   help: guided(
     "resolution/attack.ts gives the next attack roll by an ally against the distracted enemy Advantage. Help with a Check gives an ally Advantage on its next check with one of the helper's skill or tool proficiencies before the helper's next turn (help-assist.ts), in a fight or outside one from the sheet's Checks tab. Whether the ally is near enough to assist is the GM's."
   ),
-  "heroic-inspiration": guided(
-    "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown, initiative-reroll.ts an initiative die before the character's first turn, and resolution/held-damage.ts one die of an action's damage looked at before it counts. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). The dice of a hit's extras (Sneak Attack, a smite), a reaction's strike, healing and Hit Point Dice are the GM's to reroll."
+  "heroic-inspiration": enforced(
+    "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save (a pending one or a loose one from the sheet) or a death save while the roll is shown, initiative-reroll.ts an initiative die before the character's first turn, and resolution/held-damage.ts one die of an action's damage or healing looked at before it counts, a hit's extras (Sneak Attack, a smite) included. rests.ts rerolls the lowest die of a Hit Point Dice spend. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). The damage dice of a reaction's strike are the GM's to reroll."
   ),
   hide: enforced(
     "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it makes an attack roll or casts a spell with a Verbal component (resolution/release.ts), or an enemy's Search meets its total; a throw that asks for a save (a Net, a flask) keeps it hidden. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call."
@@ -1166,7 +1166,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "builtin-actions.ts offers Dash, Disengage and Hide as Bonus Actions, and each resolves as its action does."
   ),
   "feature:martial-arts": enforced(
-    "builtin-actions.ts offers an Unarmed Strike as a Bonus Action, and resolution/attack.ts rolls Unarmed Strikes and Monk weapons with the Martial Arts die and the better of Strength and Dexterity."
+    "builtin-actions.ts offers an Unarmed Strike as a Bonus Action, resolution/attack.ts rolls Unarmed Strikes and Monk weapons with the Martial Arts die and the better of Strength and Dexterity, and the Unarmed Strike's Grapple and Shove use the better of them for their DC (resolution/builtins.ts)."
   ),
   "feature:aura-of-protection": enforced(
     "saving-throws.ts adds the Paladin's Charisma modifier, at least 1, to its own saves and its allies' within 10 feet, while it isn't Incapacitated. A creature in two auras gets the better one."
@@ -1188,8 +1188,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:action-surge": enforced(
     "resolution/economy.ts gives one more action on the Fighter's own turn, once a turn, and refuses it for the Magic action."
   ),
-  "feature:heightened-focus": guided(
-    "Flurry of Blows makes three strikes from Monk level 10 (Monk's Focus carries it). The Temporary Hit Points from Patient Defense and the creature carried by Step of the Wind are the GM's."
+  "feature:heightened-focus": enforced(
+    "Flurry of Blows makes three strikes from Monk level 10 (Monk's Focus carries it), and the paid Patient Defense gives Temporary Hit Points of two Martial Arts dice (character-build.ts). After Step of the Wind's Dash, the Monk's own turn offers to carry a willing ally within 5 feet, Large or smaller: the Monk's moves on the map take it along as a drag does, which provokes no Opportunity Attacks, until the turn ends (movement-rules.ts)."
   ),
   "feature:two-weapon-fighting": enforced(
     "equipment-derivation.ts adds the ability modifier to the damage of the Light property's extra attack."
@@ -1216,6 +1216,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "feature:smite-of-protection": enforced(
     "resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts)."
+  ),
+  "feature:elf-trance": enforced(
+    "Magic can't put an elf to sleep: it succeeds without rolling against the Sleep spell and a brass dragon's Sleep Breath (resolution/pending.ts), and a magical sleep it fails into (Eyebite's Asleep) never lands (effects.ts). Its own Long Rest runs out 4 hours of its effects, and the party's Long Rest moves the clock 4 hours when every member holds Trance (rests.ts). Not needing sleep has no rule to read: the clock tracks no sleep."
   ),
   "feature:orc-relentless-endurance": enforced(
     "hit-points.ts holds an Orc reduced to 0 Hit Points, but not killed outright, at 1 Hit Point instead, once a Long Rest. It is taken the first time it can be."
@@ -1261,8 +1264,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:halfling-luck": enforced(
     "roll-answers.ts offers a reroll when the d20 of the Halfling's attack roll, check, save or death save shows a 1, and the new roll stands."
   ),
-  "feature:deflect-attacks": guided(
-    "A hit whose damage includes Bludgeoning, Piercing or Slashing opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the Dexterity modifier and Monk level off the damage before it lands. Redirecting the attack's force for a Focus Point after reducing it to 0 is the GM's."
+  "feature:deflect-attacks": enforced(
+    "A hit whose damage includes Bludgeoning, Piercing or Slashing opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the Dexterity modifier and Monk level off the damage before it lands. The prompt lists the creatures the force may be redirected at (within 5 feet after a melee hit; seen within 60 feet and not behind Total Cover after a ranged one); one picked with the answer takes a Dexterity save against two Martial Arts dice plus the Dexterity modifier when the roll brings the damage to 0, for a Focus Point (deflect-redirect.ts)."
   ),
   "feature:deflect-energy": enforced(
     "character-build.ts lets Deflect Attacks meet a hit of any damage type from Monk level 13 (damage-window.ts)."
@@ -1392,8 +1395,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:beast-spells": enforced(
     "transform/rules.ts lets a Druid 18 cast spells in a Wild Shape form, except one whose Material component has a cost or is consumed."
   ),
-  "feature:lands-aid": guided(
-    "The save and its Necrotic damage against the Druid's spell save DC are applied, and a use of Wild Shape is spent. Healing the creature it picks is the GM's."
+  "feature:lands-aid": enforced(
+    "A use of Wild Shape is spent, and the Sphere centres within 60 feet of the Druid (commands/actions.ts for a placed area, resolution/action-targets.ts for picked creatures). Its creatures save against the spell save DC for the Necrotic damage, and the one creature picked in the area regains its own 2d6 Hit Points, 3d6 at Druid 10 and 4d6 at 14 (resolution/area-heal.ts). A placed area catches every creature under it, so leaving one out of the save is the GM's."
   ),
   "feature:mindless-rage": enforced(
     "Immunity to Charmed and Frightened while raging is applied (equipment-derivation.ts), and either condition ends as the Rage starts (resolution/grant.ts)."
@@ -1416,8 +1419,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:open-hand-technique": enforced(
     "A Flurry of Blows hit carries Addle, Push or Topple (resolution/hit-options.ts): no Opportunity Attacks until the target's next turn, a Strength save against a 15-foot push, or a Dexterity save against Prone."
   ),
+  "feature:self-restoration": enforced(
+    "As the Monk's turn ends, self-restoration.ts ends one of its Charmed, Frightened or Poisoned conditions (the first in that order when it has several), with an effect that imposes nothing else, and going without food and drink gives it no Exhaustion (survival.ts)."
+  ),
   "feature:quivering-palm": enforced(
-    "An Unarmed Strike's hit can spend 4 Focus Points to set the vibrations on its target, one creature at a time (resolution/hit-rider-outcomes.ts). The ending action targets only that creature: a Constitution save for 10d12 Force, half on a success. The days they last are the GM's."
+    "An Unarmed Strike's hit can spend 4 Focus Points to set the vibrations on its target, one creature at a time (resolution/hit-rider-outcomes.ts). The vibrations last the Monk's level in days on the game clock (character-build.ts), and the Monk's player ends them harmlessly from the creature's row (effect.end lets a character's player end what it is the source of). The ending action targets only that creature: a Constitution save for 10d12 Force, half on a success."
   ),
   "feature:cunning-strike": enforced(
     "Sneak Attack's hit can trade dice for Poison (with a Poisoner's Kit), Trip or Withdraw, with saves against 8 + Dexterity + Proficiency Bonus (resolution/hit-options.ts). Withdraw's move of half the Rogue's Speed provokes no Opportunity Attacks (granted-moves.ts)."
@@ -1431,8 +1437,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:fast-hands": enforced(
     "As a Bonus Action the Thief takes the Utilize action for a tool's or gear's use on the sheet (tool-uses.ts) or at a door (doors.ts), a magic item's Magic action (fast-hands.ts), or a Dexterity (Sleight of Hand) check with Thieves' Tools or to pick a pocket. The server spends the Thief's Bonus Action for it."
   ),
-  "feature:supreme-sneak": guided(
-    "Stealth Attack joins Cunning Strike's effects, and the attack leaves the Rogue's Invisible from the Hide action on (resolution/release.ts). Whether it ends the turn behind Three-Quarters or Total Cover is the GM's, said with the hit."
+  "feature:alert": enforced(
+    "Initiative rolls add the Proficiency Bonus. Right after Initiative is rolled, before either has acted and neither Incapacitated, the holder's player offers to swap scores with an allied character, and the swap is made when that character's player takes it; the GM swaps any two at once (encounter.ts)."
+  ),
+  "feature:thiefs-reflexes": enforced(
+    "In the first round of a fight a Thief 17 takes a second turn, with a fresh action, Bonus Action and movement, when the order passes its Initiative minus 10 (encounter.ts, second-turns.ts)."
+  ),
+  "feature:supreme-sneak": enforced(
+    "Stealth Attack joins Cunning Strike's effects for 1d6: the attack keeps the Hide action's Invisible (resolution/release.ts), which ends at the end of the Rogue's turn unless it has Three-Quarters or Total Cover from every enemy on the map, measured from the walls and creatures or marked by the GM (supreme-sneak.ts, cover.ts). With dynamic vision off the cover is the GM's, said with the hit."
   ),
   "feature:hurl-through-hell": guided(
     "It rides an attack roll's hit once a Long Rest: the Charisma save, 8d10 Psychic unless the target is a Fiend, and Incapacitated off the map with nothing able to target it until the end of the Warlock's next turn, when it returns to the space it left or the nearest unoccupied one (off-plane.ts). conversions.ts restores the use with a Pact Magic slot."
@@ -1440,8 +1452,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:lay-on-hands": enforced(
     "The Bonus Action spends the points the Paladin picks to heal one creature it touches, within 5 feet (resolution/action-targets.ts), or 5 points to end Poisoned."
   ),
-  "feature:superior-hunters-prey": guided(
-    "The tap deals the mark's 1d6 Force (1d10 from Foe Slayer) to one other creature the Ranger can see, once a turn. That the marked creature took the Ranger's damage this turn, and the 30 feet from it, are the GM's."
+  "feature:superior-hunters-prey": enforced(
+    "Once a turn, after the Ranger's damage lands on the creature its Hunter's Mark marks, the mark's 1d6 Force (1d10 from Foe Slayer) goes to another creature the Ranger can see within 30 feet of the marked one (resolution/action-targets.ts, resolution/dealings.ts)."
   ),
   "feature:words-of-creation": enforced(
     "Power Word Heal and Power Word Kill are always prepared, and either may take a second creature within 10 feet of the first (resolution/action-targets.ts)."
@@ -1449,8 +1461,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:use-magic-device": enforced(
     "The fourth attuned item is applied (inventory.ts), and resolution/charges.ts rolls the d6 when an item's charges are spent, giving them back on a 6. Reading any Spell Scroll is the GM's."
   ),
-  "feature:grappler": guided(
-    "The ability score increase is applied, and attack rolls against a creature it grapples have Advantage (resolution/attack.ts). Punch and Grab and Fast Wrestler are the GM's."
+  "feature:grappler": enforced(
+    "The ability score increase is applied, attack rolls against a creature it grapples have Advantage (resolution/attack.ts), an Unarmed Strike hit in the Attack action both damages and grapples once a turn (Punch and Grab, resolution/hit-options.ts), and dragging a grappled creature its size or smaller costs no extra movement (Fast Wrestler, movement-rules.ts)."
+  ),
+  "feature:improved-blessed-strikes": enforced(
+    "Divine Strike deals 2d8 from Cleric 14 (its damage by level), or a Cleric cantrip that deals damage gives the Cleric or a creature it picks within 60 feet Temporary Hit Points equal to twice its Wisdom modifier, kept if higher, once a cast (resolution/vitality.ts)."
+  ),
+  "feature:sear-undead": enforced(
+    "From Cleric 5 Turn Undead's failed save deals d8s of Radiant damage equal to the Wisdom modifier, at least one (character-build.ts, resolution/pending.ts), and the turning goes on."
+  ),
+  "feature:tactical-master": enforced(
+    "A Fighter 9's attack with a weapon whose mastery it can use may take Push, Sap or Slow in place of that mastery, picked on the attack's preview (resolution/masteries.ts)."
+  ),
+  "feature:fleet-step": enforced(
+    "Right after another Bonus Action, an Open Hand Monk 11 takes Step of the Wind with no Bonus Action of its own (resolution/turn-windows.ts, resolution/economy.ts)."
   ),
   "feature:boon-of-combat-prowess": enforced(
     "The ability score increase is applied, and roll-answers.ts offers Peerless Aim on a missed attack roll: the attack hits, and the boon waits for the start of the creature's next turn."
@@ -1467,8 +1491,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:boon-of-fate": enforced(
     "The ability score increase is applied. roll-answers.ts offers Improve Fate on the holder's own D20 Test, and asks by a prompt about another creature's within 60 feet: 2d4 is added or taken off, and the use returns when Initiative is rolled or on a rest."
   ),
-  "feature:boon-of-irresistible-offense": guided(
-    "The ability score increase is applied, and its Bludgeoning, Piercing and Slashing damage ignores Resistance (hit-points.ts). The extra damage on a 20 is the GM's."
+  "feature:boon-of-irresistible-offense": enforced(
+    "The ability score increase is applied, Bludgeoning, Piercing and Slashing damage ignores Resistance (hit-points.ts), and a rolled 20 on an attack roll adds damage equal to the increased score, of the attack's type (resolution/damage.ts)."
   ),
   "feature:boon-of-spell-recall": enforced(
     "The ability score increase is applied, and resolution/spell-recall.ts rolls a d4 for a spell cast with a level 1 to 4 slot, keeping the slot when it matches the level."
@@ -1976,7 +2000,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A Fighter that misses a creature has Advantage on its next attack roll against it before the end of its next turn, which that roll spends (resolution/studied.ts)."
   ),
   "feature:survivor": enforced(
-    "A Champion 18 rolls death saves with Advantage (saving-throws.ts) and regains 5 plus its Constitution modifier at the start of each turn while Bloodied and above 0 (turn-boundaries.ts). An 18 or 19 on a death save counting as a 20 is the GM's."
+    "A Champion 18 rolls death saves with Advantage, an 18 or 19 counting as a 20 (death-saves.ts), and regains 5 plus its Constitution modifier at the start of each turn while Bloodied and above 0 (turn-boundaries.ts)."
   ),
   "spell:sleet-storm": enforced(
     "spell-zones.ts asks for the Dexterity save when a creature enters the Cylinder or starts its turn there, and a failure leaves it Prone and ends its Concentration. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the Cylinder Difficult Terrain of ice, and it is Heavily Obscured for dynamic vision (vision/cast-sight.ts). It douses a burning creature in it and the open flames carried there (zone-outcomes.ts, item-light.ts)."
@@ -2244,8 +2268,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:weapon-mastery": enforced(
     "equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue."
   ),
-  "feature:hunters-prey": guided(
-    "The option is picked at build and swapped after a Short or Long Rest (ledger-rechoice.ts). Colossus Slayer's extra 1d8 on a weapon hit against a creature missing any Hit Points is applied once a turn (resolution/damage.ts). Horde Breaker's attack is the GM's."
+  "feature:hunters-prey": enforced(
+    "The option is picked at build and swapped after a Short or Long Rest (ledger-rechoice.ts). Colossus Slayer's extra 1d8 on a weapon hit against a creature missing any Hit Points is applied once a turn (resolution/damage.ts). Horde Breaker opens one more attack with the same weapon once a turn, against a creature within 5 feet of the first target that it hasn't attacked this turn (resolution/extra-attacks.ts, resolution/economy.ts)."
   ),
   "feature:defensive-tactics": enforced(
     "Escape the Horde gives Opportunity Attacks against the Ranger Disadvantage, and Multiattack Defense marks a creature that hit it (resolution/struck.ts). The option is swapped after a Short or Long Rest (ledger-rechoice.ts)."
@@ -2259,11 +2283,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:potent-cantrip": enforced(
     "resolution/damage.ts deals half an Evoker's cantrip damage on a missed attack roll, and resolution/pending.ts halves it on a successful save, with no other effect."
   ),
-  "feature:empowered-evocation": guided(
-    "The Intelligence modifier is added to a Wizard Evocation spell's damage (resolution/damage.ts). A spell of several rolls (Scorching Ray's rays) gets it on each, which the GM trims to one."
+  "feature:empowered-evocation": enforced(
+    "The Intelligence modifier is added to one damage roll of a Wizard Evocation spell, the first a cast makes (resolution/damage.ts): Scorching Ray's first ray, not the others."
   ),
-  "feature:elemental-affinity": guided(
-    "Resistance to the chosen type is applied, and the Charisma modifier is added to a spell's damage of that type, never a weapon's (resolution/damage.ts). A spell of several rolls gets it on each, which the GM trims to one."
+  "feature:elemental-affinity": enforced(
+    "Resistance to the chosen type is applied, and the Charisma modifier is added to one damage roll of a spell that deals that type, the first a cast makes, never a weapon's (resolution/damage.ts)."
   ),
   "feature:overchannel": enforced(
     "The cast offers Overchannel beside Metamagic (resolution/metamagic.ts): it deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts)."

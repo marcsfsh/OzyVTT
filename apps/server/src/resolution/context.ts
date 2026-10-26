@@ -96,6 +96,12 @@ export type ResolveInput = Readonly<{
   attackKinds?: readonly AttackKind[];
   /** Push mastery's chosen distance (0 declines); absent pushes the most the mastery allows. */
   pushFeet?: number;
+  /** Who an action's `vitality` goes to (Improved Potent Spellcasting); absent, the user. */
+  vitalityTo?: string;
+  /** Who an action's `areaHeal` goes to (Land's Aid); absent, nobody. */
+  aidTo?: string;
+  /** Tactical Master's Push, Sap or Slow in place of the weapon's own mastery for this attack. */
+  mastery?: "push" | "sap" | "slow";
   /** An Evoker's Overchannel: the spell's damage dice deal their maximum (`resolution/overchannel.ts`). */
   overchannel?: boolean;
   /** The slot a spell is cast with; absent, its own level, else the lowest above it with a slot left. */

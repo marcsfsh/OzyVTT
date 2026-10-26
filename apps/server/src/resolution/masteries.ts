@@ -11,14 +11,57 @@ import {
   type MasterySwing
 } from "../weapon-mastery.js";
 import { endedEffect, sizeAtMost, type ResolveContext } from "./context.js";
+import type { ActionResolution } from "@vtt/domain";
+import { holdsFeature } from "../class-features.js";
+import { CommandRejectedError } from "../game-store.js";
+import { masteryProperty } from "../weapon-masteries.js";
 import { withArticle } from "@vtt/domain";
 
+/** SRD Tactical Master (Fighter 9): "When you attack with a weapon whose mastery property you can use, you can replace
+ *  that property with the Push, Sap, or Slow property for that attack." */
+export const TACTICAL_MASTERIES = ["push", "sap", "slow"] as const;
+
+/** Whether this swing may take Tactical Master's Push, Sap or Slow: a Fighter with the feature, attacking with a weapon
+ *  whose mastery it can use. */
+function tacticalMasterReady(ctx: ResolveContext): boolean {
+  return (
+    ctx.derivation.masteryByActionId[ctx.action.id] !== undefined &&
+    holdsFeature(ctx.deps.definition, "tactical-master", "Tactical Master")
+  );
+}
+
+/** Refuses a Tactical Master pick the swing can't take, before anything rolls. */
+export function checkTacticalMaster(ctx: ResolveContext): void {
+  if (ctx.input.mastery === undefined || tacticalMasterReady(ctx)) return;
+  throw new CommandRejectedError(
+    holdsFeature(ctx.deps.definition, "tactical-master", "Tactical Master")
+      ? `${ctx.attacker.name} can't use the mastery property of ${ctx.action.name}, so Tactical Master can't replace it.`
+      : `${ctx.attacker.name} doesn't have Tactical Master, so ${ctx.action.name} keeps its own mastery property.`
+  );
+}
+
+/** What a preview offers in place of the weapon's own mastery, and what this look picked. */
+export function tacticalMasterOffer(ctx: ResolveContext): ActionResolution["masteryOptions"] | undefined {
+  if (ctx.attack === null || !tacticalMasterReady(ctx)) return undefined;
+  const own = masteryProperty(ctx.derivation.masteryByActionId[ctx.action.id]!.id);
+  if (!own) return undefined;
+  return {
+    own: { id: own.id, name: own.name },
+    alternatives: TACTICAL_MASTERIES.filter((id) => id !== own.id).map((id) => ({
+      id,
+      name: masteryProperty(id)?.name ?? id
+    })),
+    ...(ctx.input.mastery !== undefined ? { picked: ctx.input.mastery } : {})
+  };
+}
+
 /** The weapon mastery in force on this swing (rules in `weapon-mastery.ts`); null unless a mastery
- *  applies to an attack that rolled. */
+ *  applies to an attack that rolled. Tactical Master's pick stands in for the weapon's own. */
 export function masterySwingOf(ctx: ResolveContext): MasterySwing | null {
   const { action, attack, attacker, deps, input, state } = ctx;
-  const mastery = ctx.derivation.masteryByActionId[action.id];
-  if (!mastery || attack === null) return null;
+  const own = ctx.derivation.masteryByActionId[action.id];
+  if (!own || attack === null) return null;
+  const mastery = input.mastery !== undefined && tacticalMasterReady(ctx) ? { ...own, id: input.mastery } : own;
   return {
     mastery,
     attack,

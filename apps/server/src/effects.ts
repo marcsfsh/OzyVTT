@@ -11,6 +11,7 @@ import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
 import { refreshArmorClass } from "./held-items.js";
+import { doesntSleep } from "./trance.js";
 import { knockedProneWhileMounted } from "./mounts.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
@@ -50,6 +51,15 @@ export const DODGE_ONLY_TAG = "dodge-only";
 export const CANT_STAND_TAG = "cant-stand";
 /** An Unconscious bearer another creature can shake awake with an action (Sleep, Eyebite's Asleep). */
 export const WAKEABLE_TAG = "wakeable";
+
+/** A magical sleep: Unconscious that another creature can wake it from (Eyebite's Asleep, a brass dragon's Sleep
+ *  Breath), which a creature that doesn't sleep never falls into. */
+export function isMagicalSleep(effect: Pick<EffectInstance, "linkedConditionIds" | "tags" | "endedBy">): boolean {
+  return (
+    effect.linkedConditionIds.includes("unconscious") &&
+    (effect.tags.includes(WAKEABLE_TAG) || [effect.endedBy ?? []].flat().some((ending) => ending.name === "Wake"))
+  );
+}
 /** Outlined only against its source: the bearer can't hide from the effect's source, and its Invisible condition
  *  gives no benefit against it (Mind Spike). */
 export const OUTLINED_TO_SOURCE_TAG = "outlined-to-source";
@@ -359,8 +369,9 @@ export function dropHeldRow(actor: Actor, rowId: string, source?: ConditionImmun
 /**
  * What gaining a condition does beyond itself, shared by every path that can impose one (a GM chip, a failed save,
  * an on-hit rider, an effect's linked conditions): an Incapacitated creature's grapples release and its
- * Concentration breaks (SRD Incapacitated, Grappling), and its Rage ends; an Unconscious one drops what it holds;
- * Exhaustion 6 is death. 0 HP is handled by the damage path, which ends everything the creature sustains.
+ * Concentration breaks (SRD Incapacitated, Grappling), and what lasts "until you have the Incapacitated condition"
+ * ends; an Unconscious one drops what it holds; Exhaustion 6 is death. 0 HP is handled by the damage path, which ends
+ * everything the creature sustains.
  */
 export function conditionGained(
   state: GameState,
@@ -376,16 +387,32 @@ export function conditionGained(
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
-    // Persistent Rage ends early only on Unconscious.
-    for (const rage of actor.effects.filter((effect) => effect.tags.includes(RAGING_TAG)))
-      if (!rage.tags.includes(PERSISTENT_RAGE_TAG) || conditionId === "unconscious")
-        endEffectInternal(state, actor, rage.id, events);
-    // Wild Shape: "until you ... have the Incapacitated condition".
-    for (const shaped of actor.effects.filter((effect) => effect.form?.endsOnIncapacitated === true))
-      endEffectInternal(state, actor, shaped.id, events);
+    events.push(...endWhatIncapacitationEnds(state, actor, conditionId));
   }
   if (conditionId === "exhaustion" && previousExhaustion < 6 && exhaustionLevel(actor) >= 6)
     events.push(...applyExhaustionDeath(state, actor));
+  return events;
+}
+
+/** Whether an effect ends when this creature is Incapacitated: its own Rage (Persistent Rage only on Unconscious) and
+ *  form (Wild Shape), and every effect, on any creature, kept by it with `endsOnIncapacitated` (Superior Defense,
+ *  Divine Sense, the Undead its Turn Undead turned, an Animated Shield). */
+function endsWithIncapacitation(keeper: Actor, bearer: Actor, effect: EffectInstance, conditionId: string): boolean {
+  if (effect.endsOnIncapacitated === true) return (effect.sourceActorId ?? bearer.id) === keeper.id;
+  if (bearer.id !== keeper.id) return false;
+  if (effect.tags.includes(RAGING_TAG))
+    return !effect.tags.includes(PERSISTENT_RAGE_TAG) || conditionId === "unconscious";
+  return effect.form?.endsOnIncapacitated === true;
+}
+
+/** SRD: what lasts "until you have the Incapacitated condition" ends once `keeper` has it (or one that includes it),
+ *  or drops to 0 Hit Points, which the damage path reports as Unconscious. */
+export function endWhatIncapacitationEnds(state: GameState, keeper: Actor, conditionId = "incapacitated") {
+  const events: EffectNarration[] = [];
+  for (const bearer of state.actors)
+    for (const effect of [...bearer.effects])
+      if (endsWithIncapacitation(keeper, bearer, effect, conditionId))
+        endEffectInternal(state, bearer, effect.id, events);
   return events;
 }
 
@@ -403,6 +430,19 @@ export function addEffect(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const existing = actor.effects.find((candidate) => candidate.id === effect.id);
   if (existing) return existing;
+  // SRD Trance: "magic can't put you to sleep" (Eyebite's Asleep, a brass dragon's Sleep Breath).
+  if (isMagicalSleep(effect)) {
+    const definition = actor.definitionId ? immunities?.resolveDefinition?.(actor.definitionId) : undefined;
+    if (doesntSleep(actor, definition)) {
+      events?.push({
+        kind: "condition",
+        text: `${actor.name} doesn't sleep, so ${effect.name} has no effect.`,
+        actorId,
+        immune: true
+      });
+      return effect;
+    }
+  }
   // SRD Concentration: one at a time, starting a new one ends the source's others. Effects of one cast share a
   // `castId` and are one Concentration.
   if (effect.concentration && effect.sourceActorId !== null) {
@@ -1054,12 +1094,13 @@ export function endEffectsAtLongRest(
   state: GameState,
   actorId: string,
   clockMoved = false,
-  holdsMaximum = false
+  holdsMaximum = false,
+  restMinutes = LONG_REST_MINUTES
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
-  if (!clockMoved) events.push(...ageEffects(state, new Set([actorId]), LONG_REST_MINUTES, false));
+  if (!clockMoved) events.push(...ageEffects(state, new Set([actorId]), restMinutes, false));
   // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal", unless a curse holds it down (a
   // mummy's: "its Hit Point maximum doesn't return to normal when finishing a Long Rest"). A gain kept until ended
   // (one from before gains counted game time) is spent by the rest's end too.

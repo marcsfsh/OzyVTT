@@ -40,13 +40,23 @@ export function DamageLook({
     setPicked((current) => (current.includes(index) ? current.filter((one) => one !== index) : [...current, index]));
   return (
     <div className="damage-look">
-      <p className="action-damage">
-        Damage: <strong>{result.damageTotal}</strong>
-        {breakdown ? ` (${breakdown})` : ""}
-        {result.crit ? " · a Critical Hit, its dice doubled" : ""}
-      </p>
+      {look.healing !== undefined ? (
+        <p className="action-damage">
+          Healing: <strong>{look.healing}</strong>
+        </p>
+      ) : (
+        <p className="action-damage">
+          Damage: <strong>{result.damageTotal}</strong>
+          {breakdown ? ` (${breakdown})` : ""}
+          {result.crit ? " · a Critical Hit, its dice doubled" : ""}
+        </p>
+      )}
       {look.dice.length > 0 && (
-        <span className="damage-look-dice" role="group" aria-label="Damage dice">
+        <span
+          className="damage-look-dice"
+          role="group"
+          aria-label={look.healing !== undefined ? "Healing dice" : "Damage dice"}
+        >
           {look.dice.map((die, index) => (
             <button
               key={index}

@@ -286,6 +286,8 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
+    ...(action.vitality ? { vitality: { ...action.vitality } } : {}),
+    ...(action.areaHeal ? { areaHeal: { ...action.areaHeal } } : {}),
     // What it asks for as it resolves; a self grant that asks is aimed at no one, so the pick comes before the tap.
     ...(actionChoicesOf(action) ? { choices: actionChoicesOf(action)! } : {}),
     ...(actionChoicesOf(action) && action.grants?.target === "self" ? { targeting: "none" as const } : {}),

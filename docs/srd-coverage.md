@@ -23,28 +23,28 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Spells (339) | 243 | 96 | 0 |
 | Monster actions (989) | 923 | 64 | 2 |
 | Monster traits (106) | 65 | 15 | 26 |
-| Barbarian features (23) | 22 | 0 | 1 |
+| Barbarian features (23) | 23 | 0 | 0 |
 | Bard features (16) | 16 | 0 | 0 |
-| Cleric features (19) | 17 | 1 | 1 |
-| Druid features (21) | 19 | 2 | 0 |
-| Fighter features (21) | 20 | 0 | 1 |
-| Monk features (30) | 25 | 2 | 3 |
+| Cleric features (19) | 19 | 0 | 0 |
+| Druid features (21) | 20 | 1 | 0 |
+| Fighter features (21) | 21 | 0 | 0 |
+| Monk features (30) | 29 | 0 | 1 |
 | Paladin features (26) | 25 | 1 | 0 |
-| Ranger features (22) | 20 | 2 | 0 |
-| Rogue features (23) | 21 | 1 | 1 |
-| Sorcerer features (18) | 17 | 1 | 0 |
+| Ranger features (22) | 22 | 0 | 0 |
+| Rogue features (23) | 23 | 0 | 0 |
+| Sorcerer features (18) | 18 | 0 | 0 |
 | Warlock features (20) | 18 | 2 | 0 |
-| Wizard features (15) | 13 | 1 | 1 |
-| Species traits (77) | 75 | 0 | 2 |
+| Wizard features (15) | 14 | 0 | 1 |
+| Species traits (77) | 76 | 0 | 1 |
 | Backgrounds (4) | 4 | 0 | 0 |
-| Feats (19) | 17 | 2 | 0 |
+| Feats (19) | 19 | 0 | 0 |
 | Magic items (270) | 175 | 76 | 19 |
 | Gear and tools (144) | 58 | 38 | 48 |
 | Weapons (38) | 38 | 0 | 0 |
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 15 | 0 | 0 |
-| Rules glossary (155) | 129 | 11 | 15 |
-| All records (2423) | 1988 | 315 | 120 |
+| Rules glossary (155) | 130 | 10 | 15 |
+| All records (2423) | 2007 | 303 | 113 |
 
 ## How records are classified
 
@@ -530,9 +530,7 @@ The number after each trait is how many stat blocks print it.
 
 ## Barbarian features
 
-**Enforced (22):** Ability Score Improvement · Barbarian Subclass · Brutal Strike · Danger Sense · Epic Boon · Extra Attack · Fast Movement · Feral Instinct · Improved Brutal Strike · Indomitable Might · Instinctive Pounce · Intimidating Presence (Path of the Berserker) · Mindless Rage (Path of the Berserker) · Persistent Rage · Primal Champion · Primal Knowledge · Rage · Reckless Attack · Relentless Rage · Retaliation (Path of the Berserker) · Unarmored Defense · Weapon Mastery
-
-**Reference (1):** Frenzy (Path of the Berserker)
+**Enforced (23):** Ability Score Improvement · Barbarian Subclass · Brutal Strike · Danger Sense · Epic Boon · Extra Attack · Fast Movement · Feral Instinct · Frenzy (Path of the Berserker) · Improved Brutal Strike · Indomitable Might · Instinctive Pounce · Intimidating Presence (Path of the Berserker) · Mindless Rage (Path of the Berserker) · Persistent Rage · Primal Champion · Primal Knowledge · Rage · Reckless Attack · Relentless Rage · Retaliation (Path of the Berserker) · Unarmored Defense · Weapon Mastery
 
 Notes on the curated rows:
 
@@ -568,11 +566,7 @@ Notes on the curated rows:
 
 ## Cleric features
 
-**Enforced (17):** Ability Score Improvement · Blessed Healer (Life Domain) · Blessed Strikes · Channel Divinity · Cleric Subclass · Disciple of Life (Life Domain) · Divine Intervention · Divine Order · Epic Boon · Greater Divine Intervention · Life Domain Spells (Level 5) (Life Domain) · Life Domain Spells (Level 7) (Life Domain) · Life Domain Spells (Level 9) (Life Domain) · Life Domain Spells (Life Domain) · Preserve Life (Life Domain) · Spellcasting · Supreme Healing (Life Domain)
-
-**Guided (1):** Improved Blessed Strikes
-
-**Reference (1):** Sear Undead
+**Enforced (19):** Ability Score Improvement · Blessed Healer (Life Domain) · Blessed Strikes · Channel Divinity · Cleric Subclass · Disciple of Life (Life Domain) · Divine Intervention · Divine Order · Epic Boon · Greater Divine Intervention · Improved Blessed Strikes · Life Domain Spells (Level 5) (Life Domain) · Life Domain Spells (Level 7) (Life Domain) · Life Domain Spells (Level 9) (Life Domain) · Life Domain Spells (Life Domain) · Preserve Life (Life Domain) · Sear Undead · Spellcasting · Supreme Healing (Life Domain)
 
 Notes on the curated rows:
 
@@ -581,14 +575,16 @@ Notes on the curated rows:
 | Divine Intervention | enforced | divine-intervention.ts gives the Cleric a cast of every Cleric spell of level 5 or lower that isn't cast with a Reaction, at the Cleric's numbers, and the sheet lists them under the feature's row to pick. The cast goes through the cast pipeline at once, whatever its casting time, with no spell slot and no Material components, and spends the feature's one use until a Long Rest. |
 | Divine Order | enforced | Protector's training and Thaumaturge's extra cantrip are applied, and Thaumaturge adds the Wisdom modifier, at least +1, to Arcana and Religion checks (ability-checks.ts). |
 | Greater Divine Intervention | enforced | Wish joins Divine Intervention's casts (divine-intervention.ts). Cast that way, the server rolls 2d4 and Divine Intervention stays spent through that many Long Rests (rests.ts). What the Wish does is as the spell's own row says. |
+| Improved Blessed Strikes | enforced | Divine Strike deals 2d8 from Cleric 14 (its damage by level), or a Cleric cantrip that deals damage gives the Cleric or a creature it picks within 60 feet Temporary Hit Points equal to twice its Wisdom modifier, kept if higher, once a cast (resolution/vitality.ts). |
 | Preserve Life (Life Domain) | enforced | A use of Channel Divinity divides up to five times the Cleric level in Hit Points among Bloodied creatures within 30 feet, as the Cleric splits them in the target picker or else evenly, none above half its Hit Point maximum (resolution/heal.ts). |
+| Sear Undead | enforced | From Cleric 5 Turn Undead's failed save deals d8s of Radiant damage equal to the Wisdom modifier, at least one (character-build.ts, resolution/pending.ts), and the turning goes on. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
 
 ## Druid features
 
-**Enforced (19):** Ability Score Improvement · Archdruid · Beast Spells · Circle of the Land Spells (Circle of the Land) · Circle of the Land Spells (Level 5) (Circle of the Land) · Circle of the Land Spells (Level 7) (Circle of the Land) · Circle of the Land Spells (Level 9) (Circle of the Land) · Druid Subclass · Druidic · Elemental Fury · Epic Boon · Improved Elemental Fury · Natural Recovery (Circle of the Land) · Nature's Ward (Circle of the Land) · Primal Order · Spellcasting · Wild Companion · Wild Resurgence · Wild Shape
+**Enforced (20):** Ability Score Improvement · Archdruid · Beast Spells · Circle of the Land Spells (Circle of the Land) · Circle of the Land Spells (Level 5) (Circle of the Land) · Circle of the Land Spells (Level 7) (Circle of the Land) · Circle of the Land Spells (Level 9) (Circle of the Land) · Druid Subclass · Druidic · Elemental Fury · Epic Boon · Improved Elemental Fury · Land's Aid (Circle of the Land) · Natural Recovery (Circle of the Land) · Nature's Ward (Circle of the Land) · Primal Order · Spellcasting · Wild Companion · Wild Resurgence · Wild Shape
 
-**Guided (2):** Land's Aid (Circle of the Land) · Nature's Sanctuary (Circle of the Land)
+**Guided (1):** Nature's Sanctuary (Circle of the Land)
 
 Notes on the curated rows:
 
@@ -598,7 +594,7 @@ Notes on the curated rows:
 | Beast Spells | enforced | transform/rules.ts lets a Druid 18 cast spells in a Wild Shape form, except one whose Material component has a cost or is consumed. |
 | Elemental Fury | enforced | Primal Strike's extra damage, of the type the Druid picks, rides a weapon attack or a Beast form's attack in Wild Shape once a turn (resolution/hit-riders.ts). Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp. |
 | Improved Elemental Fury | enforced | Primal Strike deals 2d8. Improved Potent Spellcasting adds 300 feet to a Druid cantrip of 10 feet or more (effective-actions.ts, resolution/spell-targets.ts). |
-| Land's Aid (Circle of the Land) | guided | The save and its Necrotic damage against the Druid's spell save DC are applied, and a use of Wild Shape is spent. Healing the creature it picks is the GM's. |
+| Land's Aid (Circle of the Land) | enforced | A use of Wild Shape is spent, and the Sphere centres within 60 feet of the Druid (commands/actions.ts for a placed area, resolution/action-targets.ts for picked creatures). Its creatures save against the spell save DC for the Necrotic damage, and the one creature picked in the area regains its own 2d6 Hit Points, 3d6 at Druid 10 and 4d6 at 14 (resolution/area-heal.ts). A placed area catches every creature under it, so leaving one out of the save is the GM's. |
 | Natural Recovery (Circle of the Land) | enforced | One level 1+ spell the Druid has prepared from its Circle Spells is cast with no slot, once per Long Rest: each land spell's free casting spends the one counter (character-build.ts). In the step a Short Rest opens, conversions.ts recovers spent slots of combined level up to half the Druid level (round up), none of level 6 or higher, once per Long Rest. |
 | Primal Order | enforced | Magician's extra cantrip and its Wisdom modifier, at least +1, on Arcana and Nature checks (ability-checks.ts), and Warden's training, are applied. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
@@ -608,9 +604,7 @@ Notes on the curated rows:
 
 ## Fighter features
 
-**Enforced (20):** Ability Score Improvement · Action Surge · Additional Fighting Style (Champion) · Epic Boon · Extra Attack · Fighter Subclass · Fighting Style · Heroic Warrior (Champion) · Improved Critical (Champion) · Indomitable · Remarkable Athlete (Champion) · Second Wind · Studied Attacks · Superior Critical (Champion) · Survivor (Champion) · Tactical Mind · Tactical Shift · Three Extra Attacks · Two Extra Attacks · Weapon Mastery
-
-**Reference (1):** Tactical Master
+**Enforced (21):** Ability Score Improvement · Action Surge · Additional Fighting Style (Champion) · Epic Boon · Extra Attack · Fighter Subclass · Fighting Style · Heroic Warrior (Champion) · Improved Critical (Champion) · Indomitable · Remarkable Athlete (Champion) · Second Wind · Studied Attacks · Superior Critical (Champion) · Survivor (Champion) · Tactical Master · Tactical Mind · Tactical Shift · Three Extra Attacks · Two Extra Attacks · Weapon Mastery
 
 Notes on the curated rows:
 
@@ -620,32 +614,33 @@ Notes on the curated rows:
 | Heroic Warrior (Champion) | enforced | turn-boundaries.ts gives the Champion Heroic Inspiration at the start of its turn in a fight when it has none. |
 | Indomitable | enforced | roll-answers.ts offers it on the Fighter's failed save: the save is rerolled with the Fighter level added, and the new roll stands. |
 | Studied Attacks | enforced | A Fighter that misses a creature has Advantage on its next attack roll against it before the end of its next turn, which that roll spends (resolution/studied.ts). |
-| Survivor (Champion) | enforced | A Champion 18 rolls death saves with Advantage (saving-throws.ts) and regains 5 plus its Constitution modifier at the start of each turn while Bloodied and above 0 (turn-boundaries.ts). An 18 or 19 on a death save counting as a 20 is the GM's. |
+| Survivor (Champion) | enforced | A Champion 18 rolls death saves with Advantage, an 18 or 19 counting as a 20 (death-saves.ts), and regains 5 plus its Constitution modifier at the start of each turn while Bloodied and above 0 (turn-boundaries.ts). |
+| Tactical Master | enforced | A Fighter 9's attack with a weapon whose mastery it can use may take Push, Sap or Slow in place of that mastery, picked on the attack's preview (resolution/masteries.ts). |
 | Tactical Mind | enforced | roll-answers.ts offers it on the Fighter's failed check: a Second Wind use adds 1d10 to the check, and the use is kept when the check still fails. |
 | Tactical Shift | enforced | Second Wind gives the Fighter a move of half its Speed for the turn that provokes no Opportunity Attacks (resolution/movement-grants.ts), charged to its own grant (movement-rules.ts). |
 | Weapon Mastery | enforced | equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue. |
 
 ## Monk features
 
-**Enforced (25):** Ability Score Improvement · Body and Mind · Deflect Energy · Disciplined Survivor · Empowered Strikes · Epic Boon · Evasion · Extra Attack · Martial Arts · Monk Subclass · Monk's Focus · Open Hand Technique (Warrior of the Open Hand) · Perfect Focus · Quivering Palm (Warrior of the Open Hand) · Slow Fall · Stunning Strike · Superior Defense · Unarmored Defense · Unarmored Movement (level 2) · Unarmored Movement (level 6) · Unarmored Movement (level 10) · Unarmored Movement (level 14) · Unarmored Movement (level 18) · Uncanny Metabolism · Wholeness of Body (Warrior of the Open Hand)
+**Enforced (29):** Ability Score Improvement · Body and Mind · Deflect Attacks · Deflect Energy · Disciplined Survivor · Empowered Strikes · Epic Boon · Evasion · Extra Attack · Fleet Step (Warrior of the Open Hand) · Heightened Focus · Martial Arts · Monk Subclass · Monk's Focus · Open Hand Technique (Warrior of the Open Hand) · Perfect Focus · Quivering Palm (Warrior of the Open Hand) · Self-Restoration · Slow Fall · Stunning Strike · Superior Defense · Unarmored Defense · Unarmored Movement (level 2) · Unarmored Movement (level 6) · Unarmored Movement (level 10) · Unarmored Movement (level 14) · Unarmored Movement (level 18) · Uncanny Metabolism · Wholeness of Body (Warrior of the Open Hand)
 
-**Guided (2):** Deflect Attacks · Heightened Focus
-
-**Reference (3):** Acrobatic Movement · Fleet Step (Warrior of the Open Hand) · Self-Restoration
+**Reference (1):** Acrobatic Movement
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
-| Deflect Attacks | guided | A hit whose damage includes Bludgeoning, Piercing or Slashing opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the Dexterity modifier and Monk level off the damage before it lands. Redirecting the attack's force for a Focus Point after reducing it to 0 is the GM's. |
+| Deflect Attacks | enforced | A hit whose damage includes Bludgeoning, Piercing or Slashing opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the Dexterity modifier and Monk level off the damage before it lands. The prompt lists the creatures the force may be redirected at (within 5 feet after a melee hit; seen within 60 feet and not behind Total Cover after a ranged one); one picked with the answer takes a Dexterity save against two Martial Arts dice plus the Dexterity modifier when the roll brings the damage to 0, for a Focus Point (deflect-redirect.ts). |
 | Deflect Energy | enforced | character-build.ts lets Deflect Attacks meet a hit of any damage type from Monk level 13 (damage-window.ts). |
 | Empowered Strikes | enforced | A Monk 6's Unarmed Strike deals Force or its normal type, its choice (builtin-actions.ts). |
 | Evasion | enforced | saving-throws.ts takes no damage on a successful Dexterity save for half damage and half on a failure, while the creature isn't Incapacitated. |
-| Heightened Focus | guided | Flurry of Blows makes three strikes from Monk level 10 (Monk's Focus carries it). The Temporary Hit Points from Patient Defense and the creature carried by Step of the Wind are the GM's. |
-| Martial Arts | enforced | builtin-actions.ts offers an Unarmed Strike as a Bonus Action, and resolution/attack.ts rolls Unarmed Strikes and Monk weapons with the Martial Arts die and the better of Strength and Dexterity. |
+| Fleet Step (Warrior of the Open Hand) | enforced | Right after another Bonus Action, an Open Hand Monk 11 takes Step of the Wind with no Bonus Action of its own (resolution/turn-windows.ts, resolution/economy.ts). |
+| Heightened Focus | enforced | Flurry of Blows makes three strikes from Monk level 10 (Monk's Focus carries it), and the paid Patient Defense gives Temporary Hit Points of two Martial Arts dice (character-build.ts). After Step of the Wind's Dash, the Monk's own turn offers to carry a willing ally within 5 feet, Large or smaller: the Monk's moves on the map take it along as a drag does, which provokes no Opportunity Attacks, until the turn ends (movement-rules.ts). |
+| Martial Arts | enforced | builtin-actions.ts offers an Unarmed Strike as a Bonus Action, resolution/attack.ts rolls Unarmed Strikes and Monk weapons with the Martial Arts die and the better of Strength and Dexterity, and the Unarmed Strike's Grapple and Shove use the better of them for their DC (resolution/builtins.ts). |
 | Open Hand Technique (Warrior of the Open Hand) | enforced | A Flurry of Blows hit carries Addle, Push or Topple (resolution/hit-options.ts): no Opportunity Attacks until the target's next turn, a Strength save against a 15-foot push, or a Dexterity save against Prone. |
 | Perfect Focus | enforced | When the Monk rolls Initiative with 3 Focus Points or fewer, initiative-hooks.ts brings them up to 4. |
-| Quivering Palm (Warrior of the Open Hand) | enforced | An Unarmed Strike's hit can spend 4 Focus Points to set the vibrations on its target, one creature at a time (resolution/hit-rider-outcomes.ts). The ending action targets only that creature: a Constitution save for 10d12 Force, half on a success. The days they last are the GM's. |
+| Quivering Palm (Warrior of the Open Hand) | enforced | An Unarmed Strike's hit can spend 4 Focus Points to set the vibrations on its target, one creature at a time (resolution/hit-rider-outcomes.ts). The vibrations last the Monk's level in days on the game clock (character-build.ts), and the Monk's player ends them harmlessly from the creature's row (effect.end lets a character's player end what it is the source of). The ending action targets only that creature: a Constitution save for 10d12 Force, half on a success. |
+| Self-Restoration | enforced | As the Monk's turn ends, self-restoration.ts ends one of its Charmed, Frightened or Poisoned conditions (the first in that order when it has several), with an effect that imposes nothing else, and going without food and drink gives it no Exhaustion (survival.ts). |
 | Stunning Strike | enforced | It rides a hit with a Monk weapon or an Unarmed Strike (resolution/hit-options.ts), never tapped alone: a target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. On a success resolution/pending.ts halves its Speed until then (speed.ts), and the next attack roll against it before then has Advantage and spends it (resolution/attack.ts). |
 | Uncanny Metabolism | enforced | When the Monk rolls Initiative, initiative-hooks.ts offers it: all Focus Points back and Hit Points equal to its Monk level plus a Martial Arts die, once per Long Rest (conversions.ts). |
 
@@ -674,9 +669,7 @@ Notes on the curated rows:
 
 ## Ranger features
 
-**Enforced (20):** Ability Score Improvement · Defensive Tactics (Hunter) · Deft Explorer · Epic Boon · Expertise · Extra Attack · Favored Enemy · Feral Senses · Fighting Style · Foe Slayer · Hunter's Lore (Hunter) · Nature's Veil · Precise Hunter · Ranger Subclass · Relentless Hunter · Roving · Spellcasting · Superior Hunter's Defense (Hunter) · Tireless · Weapon Mastery
-
-**Guided (2):** Hunter's Prey (Hunter) · Superior Hunter's Prey (Hunter)
+**Enforced (22):** Ability Score Improvement · Defensive Tactics (Hunter) · Deft Explorer · Epic Boon · Expertise · Extra Attack · Favored Enemy · Feral Senses · Fighting Style · Foe Slayer · Hunter's Lore (Hunter) · Hunter's Prey (Hunter) · Nature's Veil · Precise Hunter · Ranger Subclass · Relentless Hunter · Roving · Spellcasting · Superior Hunter's Defense (Hunter) · Superior Hunter's Prey (Hunter) · Tireless · Weapon Mastery
 
 Notes on the curated rows:
 
@@ -685,20 +678,16 @@ Notes on the curated rows:
 | Defensive Tactics (Hunter) | enforced | Escape the Horde gives Opportunity Attacks against the Ranger Disadvantage, and Multiattack Defense marks a creature that hit it (resolution/struck.ts). The option is swapped after a Short or Long Rest (ledger-rechoice.ts). |
 | Foe Slayer | enforced | A Ranger 20's Hunter's Mark deals 1d10 (resolution/grant.ts). |
 | Hunter's Lore (Hunter) | enforced | While a Hunter's Mark of the Ranger's lasts on a creature, its player's target list shows that creature's damage Immunities, Resistances and Vulnerabilities and its condition Immunities, which no other player receives (hunters-lore.ts, projections.ts). |
-| Hunter's Prey (Hunter) | guided | The option is picked at build and swapped after a Short or Long Rest (ledger-rechoice.ts). Colossus Slayer's extra 1d8 on a weapon hit against a creature missing any Hit Points is applied once a turn (resolution/damage.ts). Horde Breaker's attack is the GM's. |
+| Hunter's Prey (Hunter) | enforced | The option is picked at build and swapped after a Short or Long Rest (ledger-rechoice.ts). Colossus Slayer's extra 1d8 on a weapon hit against a creature missing any Hit Points is applied once a turn (resolution/damage.ts). Horde Breaker opens one more attack with the same weapon once a turn, against a creature within 5 feet of the first target that it hasn't attacked this turn (resolution/extra-attacks.ts, resolution/economy.ts). |
 | Relentless Hunter | enforced | hit-points.ts opens no Concentration save from damage when the only spell the Ranger concentrates on is Hunter's Mark. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
 | Superior Hunter's Defense (Hunter) | enforced | damage-window.ts offers it when the Ranger is about to take damage from a hit or a failed save. Using it gives Resistance to the damage's largest type, that damage included, until the end of the current turn. |
-| Superior Hunter's Prey (Hunter) | guided | The tap deals the mark's 1d6 Force (1d10 from Foe Slayer) to one other creature the Ranger can see, once a turn. That the marked creature took the Ranger's damage this turn, and the 30 feet from it, are the GM's. |
+| Superior Hunter's Prey (Hunter) | enforced | Once a turn, after the Ranger's damage lands on the creature its Hunter's Mark marks, the mark's 1d6 Force (1d10 from Foe Slayer) goes to another creature the Ranger can see within 30 feet of the marked one (resolution/action-targets.ts, resolution/dealings.ts). |
 | Weapon Mastery | enforced | equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue. |
 
 ## Rogue features
 
-**Enforced (21):** Ability Score Improvement · Cunning Action · Cunning Strike · Devious Strikes · Elusive · Epic Boon · Evasion · Expertise · Fast Hands (Thief) · Improved Cunning Strike · Reliable Talent · Rogue Subclass · Second-Story Work (Thief) · Slippery Mind · Sneak Attack · Steady Aim · Stroke of Luck · Thieves' Cant · Uncanny Dodge · Use Magic Device (Thief) · Weapon Mastery
-
-**Guided (1):** Supreme Sneak (Thief)
-
-**Reference (1):** Thief's Reflexes (Thief)
+**Enforced (23):** Ability Score Improvement · Cunning Action · Cunning Strike · Devious Strikes · Elusive · Epic Boon · Evasion · Expertise · Fast Hands (Thief) · Improved Cunning Strike · Reliable Talent · Rogue Subclass · Second-Story Work (Thief) · Slippery Mind · Sneak Attack · Steady Aim · Stroke of Luck · Supreme Sneak (Thief) · Thief's Reflexes (Thief) · Thieves' Cant · Uncanny Dodge · Use Magic Device (Thief) · Weapon Mastery
 
 Notes on the curated rows:
 
@@ -712,16 +701,15 @@ Notes on the curated rows:
 | Improved Cunning Strike | enforced | A Sneak Attack hit carries two Cunning Strike effects (resolution/hit-options.ts). |
 | Reliable Talent | enforced | ability-checks.ts treats a d20 of 9 or lower as a 10 on a check with a skill or tool the Rogue is proficient in. |
 | Stroke of Luck | enforced | roll-answers.ts offers it on the Rogue's failed D20 Test: the d20 becomes a 20, which makes an attack roll a Critical Hit, and the use returns on a Short or Long Rest. |
-| Supreme Sneak (Thief) | guided | Stealth Attack joins Cunning Strike's effects, and the attack leaves the Rogue's Invisible from the Hide action on (resolution/release.ts). Whether it ends the turn behind Three-Quarters or Total Cover is the GM's, said with the hit. |
+| Supreme Sneak (Thief) | enforced | Stealth Attack joins Cunning Strike's effects for 1d6: the attack keeps the Hide action's Invisible (resolution/release.ts), which ends at the end of the Rogue's turn unless it has Three-Quarters or Total Cover from every enemy on the map, measured from the walls and creatures or marked by the GM (supreme-sneak.ts, cover.ts). With dynamic vision off the cover is the GM's, said with the hit. |
+| Thief's Reflexes (Thief) | enforced | In the first round of a fight a Thief 17 takes a second turn, with a fresh action, Bonus Action and movement, when the order passes its Initiative minus 10 (encounter.ts, second-turns.ts). |
 | Uncanny Dodge | enforced | When an attacker the Rogue can see hits it with an attack roll, damage-window.ts offers its Reaction to halve the attack's damage before it lands. |
 | Use Magic Device (Thief) | enforced | The fourth attuned item is applied (inventory.ts), and resolution/charges.ts rolls the d6 when an item's charges are spent, giving them back on a 6. Reading any Spell Scroll is the GM's. |
 | Weapon Mastery | enforced | equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue. |
 
 ## Sorcerer features
 
-**Enforced (17):** Ability Score Improvement · Arcane Apotheosis · Draconic Resilience (Draconic Sorcery) · Draconic Spells (Draconic Sorcery) · Draconic Spells (Level 5) (Draconic Sorcery) · Draconic Spells (Level 7) (Draconic Sorcery) · Draconic Spells (Level 9) (Draconic Sorcery) · Dragon Companion (Draconic Sorcery) · Dragon Wings (Draconic Sorcery) · Epic Boon · Font of Magic · Innate Sorcery · Metamagic · Sorcerer Subclass · Sorcerous Restoration · Sorcery Incarnate · Spellcasting
-
-**Guided (1):** Elemental Affinity (Draconic Sorcery)
+**Enforced (18):** Ability Score Improvement · Arcane Apotheosis · Draconic Resilience (Draconic Sorcery) · Draconic Spells (Draconic Sorcery) · Draconic Spells (Level 5) (Draconic Sorcery) · Draconic Spells (Level 7) (Draconic Sorcery) · Draconic Spells (Level 9) (Draconic Sorcery) · Dragon Companion (Draconic Sorcery) · Dragon Wings (Draconic Sorcery) · Elemental Affinity (Draconic Sorcery) · Epic Boon · Font of Magic · Innate Sorcery · Metamagic · Sorcerer Subclass · Sorcerous Restoration · Sorcery Incarnate · Spellcasting
 
 Notes on the curated rows:
 
@@ -730,7 +718,7 @@ Notes on the curated rows:
 | Arcane Apotheosis | enforced | While Innate Sorcery is active, the first Metamagic option on each of the Sorcerer's turns in a fight costs no Sorcery Points (resolution/metamagic.ts). |
 | Dragon Companion (Draconic Sorcery) | enforced | Summon Dragon is cast with no Material component (resolution/components.ts reads the cast's waiver), free once a Long Rest, and any casting may go without Concentration, lasting 1 minute then (character-build.ts, summons.ts). |
 | Dragon Wings (Draconic Sorcery) | enforced | The Bonus Action gives a Fly Speed of 60 feet, once per Long Rest, and conversions.ts restores the use for 3 Sorcery Points. |
-| Elemental Affinity (Draconic Sorcery) | guided | Resistance to the chosen type is applied, and the Charisma modifier is added to a spell's damage of that type, never a weapon's (resolution/damage.ts). A spell of several rolls gets it on each, which the GM trims to one. |
+| Elemental Affinity (Draconic Sorcery) | enforced | Resistance to the chosen type is applied, and the Charisma modifier is added to one damage roll of a spell that deals that type, the first a cast makes, never a weapon's (resolution/damage.ts). |
 | Font of Magic | enforced | conversions.ts turns a spell slot into Sorcery Points equal to its level, and Sorcery Points into a slot at the SRD costs (2, 3, 5, 6 or 7 for levels 1 to 5, each at its Sorcerer level) as a Bonus Action. A created slot is gone after a Long Rest, which sets the slots to their maximum. |
 | Metamagic | enforced | A cast carries one Metamagic option the Sorcerer knows, paid in Sorcery Points and applied by the server (resolution/metamagic.ts, resolution/economy.ts). Seeking Spell is offered when a spell attack misses (roll-answers.ts), and Empowered Spell on a look at the spell's damage, where the Sorcerer picks up to the Charisma modifier of the spell's dice to reroll and the confirm deals them (resolution/held-damage.ts). The server refuses an option the spell can't take. Careful Spell covers the save the cast itself calls for (resolution/pending.ts). |
 | Sorcerous Restoration | enforced | In the step a Short Rest opens, conversions.ts restores Sorcery Points up to half the Sorcerer level, once per Long Rest. |
@@ -758,9 +746,7 @@ Notes on the curated rows:
 
 ## Wizard features
 
-**Enforced (13):** Ability Score Improvement · Arcane Recovery · Epic Boon · Evocation Savant (Evoker) · Memorize Spell · Overchannel (Evoker) · Potent Cantrip (Evoker) · Scholar · Sculpt Spells (Evoker) · Signature Spells · Spell Mastery · Spellcasting · Wizard Subclass
-
-**Guided (1):** Empowered Evocation (Evoker)
+**Enforced (14):** Ability Score Improvement · Arcane Recovery · Empowered Evocation (Evoker) · Epic Boon · Evocation Savant (Evoker) · Memorize Spell · Overchannel (Evoker) · Potent Cantrip (Evoker) · Scholar · Sculpt Spells (Evoker) · Signature Spells · Spell Mastery · Spellcasting · Wizard Subclass
 
 **Reference (1):** Ritual Adept
 
@@ -769,7 +755,7 @@ Notes on the curated rows:
 | Record | State | How |
 | --- | --- | --- |
 | Arcane Recovery | enforced | In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Wizard level, none of level 6 or higher, once per Long Rest. |
-| Empowered Evocation (Evoker) | guided | The Intelligence modifier is added to a Wizard Evocation spell's damage (resolution/damage.ts). A spell of several rolls (Scorching Ray's rays) gets it on each, which the GM trims to one. |
+| Empowered Evocation (Evoker) | enforced | The Intelligence modifier is added to one damage roll of a Wizard Evocation spell, the first a cast makes (resolution/damage.ts): Scorching Ray's first ray, not the others. |
 | Evocation Savant (Evoker) | enforced | Two Evocation spells of level 2 or lower go into the spellbook at Wizard 3 (character-build.ts), and one more Evocation spell goes in free each time a new level of spell slots opens, beside the two a Wizard level gives (spell-choices.ts). |
 | Memorize Spell | enforced | Finishing a Short Rest opens a prepare step with one change (rests.ts): one prepared spell swapped for another from the spellbook. |
 | Overchannel (Evoker) | enforced | The cast offers Overchannel beside Metamagic (resolution/metamagic.ts): it deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts). |
@@ -781,9 +767,9 @@ Notes on the curated rows:
 
 ## Species traits
 
-**Enforced (75):** Abyssal Legacy (Abyssal) · Adrenaline Rush (Orc) · Arcane Cantrip (High Elf) · Brave (Halfling) · Breath Weapon (Acid) (Black Dragon) · Breath Weapon (Acid) (Copper Dragon) · Breath Weapon (Cold) (Silver Dragon) · Breath Weapon (Cold) (White Dragon) · Breath Weapon (Dragonborn) · Breath Weapon (Fire) (Brass Dragon) · Breath Weapon (Fire) (Gold Dragon) · Breath Weapon (Fire) (Red Dragon) · Breath Weapon (Lightning) (Blue Dragon) · Breath Weapon (Lightning) (Bronze Dragon) · Breath Weapon (Poison) (Green Dragon) · Chthonic Legacy (Chthonic) · Damage Resistance (Acid) (Black Dragon) · Damage Resistance (Acid) (Copper Dragon) · Damage Resistance (Cold) (Silver Dragon) · Damage Resistance (Cold) (White Dragon) · Damage Resistance (Dragonborn) · Damage Resistance (Fire) (Brass Dragon) · Damage Resistance (Fire) (Gold Dragon) · Damage Resistance (Fire) (Red Dragon) · Damage Resistance (Lightning) (Blue Dragon) · Damage Resistance (Lightning) (Bronze Dragon) · Damage Resistance (Poison) (Green Dragon) · Dancing Lights (Drow) · Darkness (Drow) · Darkness (Infernal) · Darkvision (Dragonborn) · Darkvision (Dwarf) · Darkvision (Elf) · Darkvision (Gnome) · Darkvision (Orc) · Darkvision (Tiefling) · Detect Magic (High Elf) · Draconic Ancestry (Dragonborn) · Draconic Flight (Dragonborn) · Druidcraft (Wood Elf) · Dwarven Resilience (Dwarf) · Dwarven Toughness (Dwarf) · Elven Lineage (Elf) · Faerie Fire (Drow) · False Life (Chthonic) · Fey Ancestry (Elf) · Fiendish Legacy (Tiefling) · Fleet of Foot (Wood Elf) · Giant Ancestry (Goliath) · Gnomish Cunning (Gnome) · Gnomish Lineage (Gnome) · Halfling Nimbleness (Halfling) · Hellish Rebuke (Infernal) · Hold Person (Abyssal) · Infernal Legacy (Infernal) · Keen Senses (Elf) · Large Form (Goliath) · Longstrider (Wood Elf) · Luck (Halfling) · Minor Illusion (Forest Gnome) · Misty Step (High Elf) · Naturally Stealthy (Halfling) · Otherworldly Presence (Tiefling) · Pass without Trace (Wood Elf) · Powerful Build (Goliath) · Ray of Enfeeblement (Chthonic) · Ray of Sickness (Abyssal) · Relentless Endurance (Orc) · Resourceful (Human) · Rock Gnome Cantrips (Rock Gnome) · Skillful (Human) · Speak with Animals (Forest Gnome) · Stonecunning (Dwarf) · Superior Darkvision (Drow) · Versatile (Human)
+**Enforced (76):** Abyssal Legacy (Abyssal) · Adrenaline Rush (Orc) · Arcane Cantrip (High Elf) · Brave (Halfling) · Breath Weapon (Acid) (Black Dragon) · Breath Weapon (Acid) (Copper Dragon) · Breath Weapon (Cold) (Silver Dragon) · Breath Weapon (Cold) (White Dragon) · Breath Weapon (Dragonborn) · Breath Weapon (Fire) (Brass Dragon) · Breath Weapon (Fire) (Gold Dragon) · Breath Weapon (Fire) (Red Dragon) · Breath Weapon (Lightning) (Blue Dragon) · Breath Weapon (Lightning) (Bronze Dragon) · Breath Weapon (Poison) (Green Dragon) · Chthonic Legacy (Chthonic) · Damage Resistance (Acid) (Black Dragon) · Damage Resistance (Acid) (Copper Dragon) · Damage Resistance (Cold) (Silver Dragon) · Damage Resistance (Cold) (White Dragon) · Damage Resistance (Dragonborn) · Damage Resistance (Fire) (Brass Dragon) · Damage Resistance (Fire) (Gold Dragon) · Damage Resistance (Fire) (Red Dragon) · Damage Resistance (Lightning) (Blue Dragon) · Damage Resistance (Lightning) (Bronze Dragon) · Damage Resistance (Poison) (Green Dragon) · Dancing Lights (Drow) · Darkness (Drow) · Darkness (Infernal) · Darkvision (Dragonborn) · Darkvision (Dwarf) · Darkvision (Elf) · Darkvision (Gnome) · Darkvision (Orc) · Darkvision (Tiefling) · Detect Magic (High Elf) · Draconic Ancestry (Dragonborn) · Draconic Flight (Dragonborn) · Druidcraft (Wood Elf) · Dwarven Resilience (Dwarf) · Dwarven Toughness (Dwarf) · Elven Lineage (Elf) · Faerie Fire (Drow) · False Life (Chthonic) · Fey Ancestry (Elf) · Fiendish Legacy (Tiefling) · Fleet of Foot (Wood Elf) · Giant Ancestry (Goliath) · Gnomish Cunning (Gnome) · Gnomish Lineage (Gnome) · Halfling Nimbleness (Halfling) · Hellish Rebuke (Infernal) · Hold Person (Abyssal) · Infernal Legacy (Infernal) · Keen Senses (Elf) · Large Form (Goliath) · Longstrider (Wood Elf) · Luck (Halfling) · Minor Illusion (Forest Gnome) · Misty Step (High Elf) · Naturally Stealthy (Halfling) · Otherworldly Presence (Tiefling) · Pass without Trace (Wood Elf) · Powerful Build (Goliath) · Ray of Enfeeblement (Chthonic) · Ray of Sickness (Abyssal) · Relentless Endurance (Orc) · Resourceful (Human) · Rock Gnome Cantrips (Rock Gnome) · Skillful (Human) · Speak with Animals (Forest Gnome) · Stonecunning (Dwarf) · Superior Darkvision (Drow) · Trance (Elf) · Versatile (Human)
 
-**Reference (2):** Clockwork Devices (Rock Gnome) · Trance (Elf)
+**Reference (1):** Clockwork Devices (Rock Gnome)
 
 Notes on the curated rows:
 
@@ -800,6 +786,7 @@ Notes on the curated rows:
 | Powerful Build (Goliath) | enforced | The escape from a grapple rolls with Advantage (resolution/builtins.ts), and carrying.ts counts the character one size larger for its carrying capacity. |
 | Relentless Endurance (Orc) | enforced | hit-points.ts holds an Orc reduced to 0 Hit Points, but not killed outright, at 1 Hit Point instead, once a Long Rest. It is taken the first time it can be. |
 | Resourceful (Human) | enforced | rests.ts gives a Human Heroic Inspiration when it finishes a Long Rest. |
+| Trance (Elf) | enforced | Magic can't put an elf to sleep: it succeeds without rolling against the Sleep spell and a brass dragon's Sleep Breath (resolution/pending.ts), and a magical sleep it fails into (Eyebite's Asleep) never lands (effects.ts). Its own Long Rest runs out 4 hours of its effects, and the party's Long Rest moves the clock 4 hours when every member holds Trance (rests.ts). Not needing sleep has no rule to read: the clock tracks no sleep. |
 
 ## Backgrounds
 
@@ -807,22 +794,21 @@ Notes on the curated rows:
 
 ## Feats
 
-**Enforced (17):** Ability Score Improvement · Alert · Archery · Boon of Combat Prowess · Boon of Dimensional Travel · Boon of Fate · Boon of Spell Recall · Boon of the Night Spirit · Boon of Truesight · Defense · Great Weapon Fighting · Magic Initiate (Cleric) · Magic Initiate (Druid) · Magic Initiate (Wizard) · Savage Attacker · Skilled · Two-Weapon Fighting
-
-**Guided (2):** Boon of Irresistible Offense · Grappler
+**Enforced (19):** Ability Score Improvement · Alert · Archery · Boon of Combat Prowess · Boon of Dimensional Travel · Boon of Fate · Boon of Irresistible Offense · Boon of Spell Recall · Boon of the Night Spirit · Boon of Truesight · Defense · Grappler · Great Weapon Fighting · Magic Initiate (Cleric) · Magic Initiate (Druid) · Magic Initiate (Wizard) · Savage Attacker · Skilled · Two-Weapon Fighting
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Alert | enforced | Initiative rolls add the Proficiency Bonus. Right after Initiative is rolled, before either has acted and neither Incapacitated, the holder's player offers to swap scores with an allied character, and the swap is made when that character's player takes it; the GM swaps any two at once (encounter.ts). |
 | Boon of Combat Prowess | enforced | The ability score increase is applied, and roll-answers.ts offers Peerless Aim on a missed attack roll: the attack hits, and the boon waits for the start of the creature's next turn. |
 | Boon of Dimensional Travel | enforced | The ability score increase is applied, and once each Attack or Magic action is taken (after its last attack or ray) resolution/movement-grants.ts gives a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space the creature can see. |
 | Boon of Fate | enforced | The ability score increase is applied. roll-answers.ts offers Improve Fate on the holder's own D20 Test, and asks by a prompt about another creature's within 60 feet: 2d4 is added or taken off, and the use returns when Initiative is rolled or on a rest. |
-| Boon of Irresistible Offense | guided | The ability score increase is applied, and its Bludgeoning, Piercing and Slashing damage ignores Resistance (hit-points.ts). The extra damage on a 20 is the GM's. |
+| Boon of Irresistible Offense | enforced | The ability score increase is applied, Bludgeoning, Piercing and Slashing damage ignores Resistance (hit-points.ts), and a rolled 20 on an attack roll adds damage equal to the increased score, of the attack's type (resolution/damage.ts). |
 | Boon of Spell Recall | enforced | The ability score increase is applied, and resolution/spell-recall.ts rolls a d4 for a spell cast with a level 1 to 4 slot, keeping the slot when it matches the level. |
 | Boon of the Night Spirit | enforced | The ability score increase is applied. With dynamic vision on, Merge with Shadows makes the creature Invisible as a Bonus Action only in Dim Light or Darkness (resolution/validate.ts), until it next takes an action, a Bonus Action or a Reaction (resolution/release.ts), and hit-points.ts gives it Resistance to all damage but Psychic and Radiant there. |
 | Boon of Truesight | enforced | The ability score increase is applied, and Truesight 60 feet is a sense dynamic vision and attack rolls read (vision/senses.ts). |
-| Grappler | guided | The ability score increase is applied, and attack rolls against a creature it grapples have Advantage (resolution/attack.ts). Punch and Grab and Fast Wrestler are the GM's. |
+| Grappler | enforced | The ability score increase is applied, attack rolls against a creature it grapples have Advantage (resolution/attack.ts), an Unarmed Strike hit in the Attack action both damages and grapples once a turn (Punch and Grab, resolution/hit-options.ts), and dragging a grappled creature its size or smaller costs no extra movement (Fast Wrestler, movement-rules.ts). |
 | Savage Attacker | enforced | resolution/hit-options.ts offers it on a weapon hit once a turn. Chosen, resolution/damage.ts rolls the weapon's damage dice twice and uses the higher roll, the one an attacker always picks of the two. |
 | Two-Weapon Fighting | enforced | equipment-derivation.ts adds the ability modifier to the damage of the Light property's extra attack. |
 
@@ -1179,7 +1165,7 @@ Notes on the curated rows:
 | Healing | enforced | resolution/heal.ts restores Hit Points up to the maximum, and healing a dying character brings it back to consciousness. |
 | Heavily Obscured | enforced | With dynamic vision on, no one sees into a Heavily Obscured space (darkness beyond a creature's senses, a painted fog or foliage area, a spell's cloud) in vision/sight.ts, so an attack there is against an unseen target, a creature there may Hide, and a Perception check to find a creature there fails (ability-checks.ts). |
 | Help | guided | resolution/attack.ts gives the next attack roll by an ally against the distracted enemy Advantage. Help with a Check gives an ally Advantage on its next check with one of the helper's skill or tool proficiencies before the helper's next turn (help-assist.ts), in a fight or outside one from the sheet's Checks tab. Whether the ally is near enough to assist is the GM's. |
-| Heroic Inspiration | guided | held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown, initiative-reroll.ts an initiative die before the character's first turn, and resolution/held-damage.ts one die of an action's damage looked at before it counts. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). The dice of a hit's extras (Sneak Attack, a smite), a reaction's strike, healing and Hit Point Dice are the GM's to reroll. |
+| Heroic Inspiration | enforced | held-rolls.ts spends it to reroll the d20 of an attack, a check, a save (a pending one or a loose one from the sheet) or a death save while the roll is shown, initiative-reroll.ts an initiative die before the character's first turn, and resolution/held-damage.ts one die of an action's damage or healing looked at before it counts, a hit's extras (Sneak Attack, a smite) included. rests.ts rerolls the lowest die of a Hit Point Dice spend. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). The damage dice of a reaction's strike are the GM's to reroll. |
 | Hide | enforced | resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it makes an attack roll or casts a spell with a Verbal component (resolution/release.ts), or an enemy's Search meets its total; a throw that asks for a save (a Net, a flask) keeps it hidden. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call. |
 | High Jump | enforced | jumping.ts lets a jump rise up to 3 plus the Strength modifier with 10 feet moved this turn before it, half from a standing start, a foot of movement for each foot. Reaching up half its height more is the GM's. |
 | Hit Point Dice | enforced | rests.ts lets a creature spend them only during a Short Rest (its own or the party's), each healing its roll plus the Constitution modifier, and restores them all on a Long Rest. The GM may spend them any time. |

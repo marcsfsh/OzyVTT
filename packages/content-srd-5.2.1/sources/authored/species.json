@@ -57,7 +57,7 @@
             "id": "draconic-flight",
             "name": "Draconic Flight",
             "activation": "bonus-action",
-            "description": "Sprout spectral wings for 10 minutes, gaining a Fly Speed equal to your Speed.",
+            "description": "Sprout spectral wings for 10 minutes, gaining a Fly Speed equal to your Speed. The wings last until you retract them (no action required) or have the Incapacitated condition.",
             "damage": [],
             "grants": {
               "name": "Draconic Flight",
@@ -75,7 +75,7 @@
               ],
               "onEnd": [],
               "target": "self",
-              "voidWhileIncapacitated": true,
+              "endsOnIncapacitated": true,
               "concentration": false
             }
           }

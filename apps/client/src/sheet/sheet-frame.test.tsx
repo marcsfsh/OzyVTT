@@ -325,6 +325,16 @@ describe("the Hit Point Dice", () => {
     expect(screen.getByRole("img", { name: "1 of 2 d8" })).toBeTruthy();
   });
 
+  it("offers to reroll the lowest die of a spend with Heroic Inspiration", async () => {
+    const user = userEvent.setup();
+    render(<HitPointDice actorId={HERO} hitDice={corwin} canReroll onFeedback={() => {}} />);
+    const dice = within(screen.getByRole("group", { name: "Hit Point Dice" }));
+    expect(dice.queryByRole("button", { name: /Reroll the lowest die/ })).toBeNull();
+    await user.click(dice.getByRole("button", { name: "Spend" }));
+    await user.click(await dice.findByRole("button", { name: "Reroll the lowest die · Heroic Inspiration" }));
+    expect(sent("actor:spend-hit-dice").at(-1)).toEqual({ actorId: HERO, count: 1, reroll: true });
+  });
+
   it("offers no Spend outside a Short Rest, where the dice are spent", () => {
     render(<HitPointDice actorId={HERO} hitDice={corwin} constitution={2} canSpend={false} onFeedback={() => {}} />);
     const dice = within(screen.getByRole("group", { name: "Hit Point Dice" }));

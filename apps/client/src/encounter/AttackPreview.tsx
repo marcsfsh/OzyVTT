@@ -83,6 +83,41 @@ export function PushChoice({
   );
 }
 
+/** Tactical Master: the weapon's own mastery property, or Push, Sap or Slow in its place for this attack. */
+export function MasteryChoice({
+  options,
+  value,
+  busy,
+  onPick
+}: Readonly<{
+  options: NonNullable<ActionResolution["masteryOptions"]>;
+  value: "push" | "sap" | "slow" | undefined;
+  busy: boolean;
+  onPick: (mastery: "push" | "sap" | "slow" | undefined) => void;
+}>) {
+  const choices = [
+    { id: undefined, name: options.own.name },
+    ...options.alternatives.map((choice) => ({ id: choice.id, name: choice.name }))
+  ];
+  return (
+    <div className="push-choice" role="group" aria-label="Mastery property for this attack">
+      <span className="push-choice-label">Mastery</span>
+      {choices.map((choice) => (
+        <button
+          key={choice.id ?? "own"}
+          type="button"
+          className={`save-die-mode${value === choice.id ? " active" : ""}`}
+          aria-pressed={value === choice.id}
+          disabled={busy}
+          onClick={() => onPick(choice.id)}
+        >
+          {choice.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const titled = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
 /** An offer's button label: its name and the dice it adds, if any. */
@@ -267,19 +302,38 @@ export function AttackPreview({
   const [knockOut, setKnockOut] = useState(false);
   // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
   const [forced, setForced] = useState<DieMode | undefined>(undefined);
+  // Tactical Master's pick, sent with every later look and the confirm.
+  const mastery = look?.masteryOptions?.picked;
   // A reroll can change what is offered (a miss offers nothing), so only choices still offered are sent.
   const hitOptions = extras.filter((choice) => hitOffers.some((offer) => offer.id === choice.id));
   const resolve = (options: ResolveOptions) =>
     resolveWith({
+      ...(mastery ? { mastery } : {}),
       ...options,
       ...(forced ? { rollMode: forced } : {}),
       // Only a confirming call carries the push and extras; previews ignore them.
       ...(options.commit && pushFeet !== undefined ? { pushFeet } : {}),
-      ...(options.commit && hitOptions.length > 0 ? { hitOptions } : {}),
+      // A look at the damage throws the chosen extras' dice too, so Heroic Inspiration can reroll one of them.
+      ...((options.commit || options.damageLook) && hitOptions.length > 0 ? { hitOptions } : {}),
       ...(options.commit && knockOutOffered && knockOut ? { knockOut: true } : {})
     });
   return (
     <div className="action-preview">
+      {look?.masteryOptions && (
+        <MasteryChoice
+          options={look.masteryOptions}
+          value={mastery}
+          busy={busy}
+          onPick={(picked) =>
+            // A new look with the pick, so the card offers what that property does (Push's distance).
+            resolveWith({
+              commit: false,
+              ...(forced ? { rollMode: forced } : {}),
+              ...(picked ? { mastery: picked } : {})
+            })
+          }
+        />
+      )}
       {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
       {hitOffers.length > 0 && (
         <HitOfferChoices offers={hitOffers} chosen={hitOptions} busy={busy} onChange={setExtras} />

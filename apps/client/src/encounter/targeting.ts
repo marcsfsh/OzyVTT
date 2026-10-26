@@ -52,6 +52,11 @@ export type TargetingSession = Readonly<
     skill?: string;
     /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
     ability?: AbilityId;
+    /** Who a cantrip's Temporary Hit Points go to once its damage lands (Improved Potent Spellcasting); absent, the
+     *  caster. */
+    vitalityTo?: string;
+    /** Who regains an area's healing (Land's Aid); absent, nobody. */
+    aidTo?: string;
     /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
     conditionId?: string;
     /** The option picked for an action that offers several (Fire Shield's warm or chill); it starts on the first. */
@@ -385,6 +390,21 @@ export function setChosenAbility(ability: AbilityId) {
   session = { ...session, ability };
   emit();
 }
+
+/** Who the cast's Temporary Hit Points go to (Improved Potent Spellcasting); the caster when `actorId` is its own. */
+export function setVitalityTo(actorId: string) {
+  if (!session?.action.vitality) return;
+  const { vitalityTo: _old, ...rest } = session;
+  session = actorId === session.attackerId ? rest : { ...rest, vitalityTo: actorId };
+  emit();
+}
+/** Who regains an area's healing (Land's Aid); "" picks nobody. */
+export function setAidTo(actorId: string) {
+  if (!session?.action.areaHeal) return;
+  const { aidTo: _old, ...rest } = session;
+  session = actorId === "" ? rest : { ...rest, aidTo: actorId };
+  emit();
+}
 /** The picks of a cast's shaping that name creatures among its targets: Careful Spell's and Sculpt Spells' protected
  *  creatures, and Heightened Spell's one target when the spell has several. */
 export const SHAPING_CREATURE_PICKS: ReadonlySet<string> = new Set([
@@ -516,6 +536,8 @@ export type ResolveOptions = Readonly<{
   reroll?: boolean;
   /** How far Push mastery shoves on the confirmed hit (0 declines); absent pushes the full distance. */
   pushFeet?: number;
+  /** Tactical Master's Push, Sap or Slow in place of the weapon's own mastery, on every look and the confirm. */
+  mastery?: "push" | "sap" | "slow";
   /** Extras the confirmed hit carries (Sneak Attack, a smite), from the preview's offers. */
   hitOptions?: readonly HitOptionChoice[];
   /** The confirmed melee hit knocks its target out if it drops it to 0 (SRD Knocking Out a Creature). */
@@ -548,6 +570,8 @@ export function resolveTargeting(
     damageType,
     skill,
     ability,
+    vitalityTo,
+    aidTo,
     conditionId,
     shaping,
     summonPick,
@@ -588,6 +612,7 @@ export function resolveTargeting(
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
     ...(opts.reroll ? { reroll: true } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
+    ...(opts.mastery !== undefined ? { mastery: opts.mastery } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(opts.knockOut ? { knockOut: true } : {}),
     ...(opts.answer ? { answer: { ...opts.answer } } : {}),
@@ -607,6 +632,8 @@ export function resolveTargeting(
     ...(damageType !== undefined ? { damageType } : {}),
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
+    ...(vitalityTo !== undefined ? { vitalityTo } : {}),
+    ...(aidTo !== undefined ? { aidTo } : {}),
     ...(conditionId !== undefined ? { conditionId } : {}),
     ...(optionId !== undefined ? { optionId } : {}),
     // Only the picks for creatures still selected.

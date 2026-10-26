@@ -51,6 +51,7 @@ import {
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { settleTouchedZone } from "./zone-touch.js";
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
+import { giveVitality } from "./resolution/vitality.js";
 import { openDamageWindow } from "./damage-window.js";
 import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
 import { applyMarginCompanion, marginBandOf, withMarginBand } from "./save-margins.js";
@@ -558,6 +559,7 @@ export function applyFailureEffect(
     escapeDc: onFail.escapeDc,
     ...(onFail.repeatSave ? { repeatSave: armedRepeat(state, target.id, onFail.repeatSave) } : {}),
     ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
+    ...(onFail.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
     ...(onFail.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
     ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
     ...(onFail.endsOutOfSight ? { endsOutOfSight: true as const } : {}),
@@ -1242,6 +1244,8 @@ export function answerSave(
     // Keep the whole application along with its total.
     application = outcome.application;
     events.push(...outcome.events);
+    // The cast's damage landed: its caster's pick gains the vitality (Improved Potent Spellcasting).
+    if (appliedDamage > 0 && pending.vitality) events.push(...giveVitality(state, pending.vitality));
     // A spell area that stops after so much damage counts it (Guardian of Faith).
     events.push(...countZoneDamage(state, pending.zoneId, appliedDamage, deps.catalog));
   }

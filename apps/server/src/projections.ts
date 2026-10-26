@@ -262,6 +262,8 @@ const PENDING_SAVE_FIELDS = {
   regurgitates: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
+  // Who the caster's Temporary Hit Points go to is the caster's pick, told when they land.
+  vitality: "never",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
   spell: "never",
   // Who was asked to answer it would name them; the player is told only that it waits (`awaitingAnswer`).
@@ -283,6 +285,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   endsOnSourceSideDamage: "player",
   speedZero: "player",
   endsWhenSourceDefeated: "player",
+  // "If you have the Incapacitated condition" is the action's printed text (Turn Undead).
+  endsOnIncapacitated: "player",
   rangeFeet: "player",
   endsOnSpellHealing: "player",
   endsOutOfSight: "player",
@@ -396,6 +400,18 @@ function ordersFor(source: Actor): { orders?: CommandedOrders } {
 
 /** A creature this player acts for: their own character, or one their character commands (a summon, a dominated
  *  creature), whose saves, reactions and asks are theirs to answer. */
+/** Alert's Initiative Swap offers a player's own characters are in, both ends player characters; absent when there are
+ *  none. */
+function swapOffersFor(
+  state: GameState,
+  playerSessionId: string | undefined
+): Partial<Pick<PlayerCombatView, "initiativeSwapOffers">> {
+  const offers = state.combat.initiativeSwapOffers.filter(
+    (offer) => ownedBy(state, offer.actorId, playerSessionId) || ownedBy(state, offer.withActorId, playerSessionId)
+  );
+  return offers.length > 0 ? { initiativeSwapOffers: offers.map((offer) => ({ ...offer })) } : {};
+}
+
 function ownedBy(state: GameState, actorId: string, playerSessionId: string | undefined): boolean {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return false;
@@ -477,6 +493,8 @@ export function projectPlayerCombat(
     playerDamageMode: state.combat.playerDamageMode,
     // Filtered to public actors; a player checks for their own id to show the "Roll initiative" prompt.
     pendingInitiative: state.combat.pendingInitiative.filter((actorId) => publicActorIds.has(actorId)),
+    // An Initiative Swap offer names only the two characters in it, and reaches only their players.
+    ...swapOffersFor(state, playerSessionId),
     playerInitiativeMode: state.combat.playerInitiativeMode,
     underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),

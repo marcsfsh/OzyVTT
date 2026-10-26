@@ -11,6 +11,7 @@ import {
   type HealthBand
 } from "@vtt/domain";
 import { blessOnTheKill } from "./dark-ones-blessing.js";
+import { recordDealing } from "./resolution/dealings.js";
 import {
   adjustDamageParts,
   collectRiders,
@@ -41,6 +42,7 @@ import {
   endEffect,
   endEffectsOnDamage,
   endEffectsSustainedBy,
+  endWhatIncapacitationEnds,
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
@@ -512,6 +514,7 @@ function fallToZero(
   // concentration (SRD Concentration).
   events.push(...endEffectsSustainedBy(state, actor.id));
   events.push(...endConcentrationSustainedBy(state, actor.id));
+  events.push(...endWhatIncapacitationEnds(state, actor, "unconscious"));
   // A spell whose last creature just died has nothing left.
   events.push(...endConcentrationOnTheDead(state, actor));
   return { instantDeath, defeated };
@@ -949,6 +952,8 @@ export function applyDamageDetailed(
     events.push(...blessOnTheKill(state, actor, input.sourceActorId, deps));
   // A swallower counts the damage the creatures inside it deal this turn.
   tallyDamageFromInside(state, actor.id, input.sourceActorId, totalAdjusted);
+  // Who damaged whom this turn (Superior Hunter's Prey).
+  if (totalAdjusted > 0 && input.sourceActorId) recordDealing(state, input.sourceActorId, actor.id, "damaged");
   // Damage on a creature already Bloodied opens its dealer's Rampage.
   markBloodiedHit(state, input.sourceActorId, hpBefore, actor.hp.maximum, totalAdjusted);
   // A hydra's heads and a troll's limbs count the damage of each turn.

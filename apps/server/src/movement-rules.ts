@@ -25,11 +25,13 @@ import { areEnemies } from "./creature-sides.js";
 import { burrowsThroughWalls, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
 import { effectiveActions } from "./effective-actions.js";
 import {
+  endEffect,
   NO_OPPORTUNITY_ATTACKS_TAG,
   NO_REACTIONS_TAG,
   NO_TELEPORT_TAG,
   READIED_TAG,
-  releaseReadied
+  releaseReadied,
+  type EffectNarration
 } from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
@@ -252,6 +254,31 @@ function grantsOf(state: GameState, actor: GameState["actors"][number] | undefin
   };
 }
 
+/** On a willing ally a Monk's Step of the Wind carries (Heightened Focus): "You move the creature with you until the end
+ *  of your turn. The creature's movement doesn't provoke Opportunity Attacks." */
+export const CARRIED_ALONG_TAG = "carried-along";
+
+/** The creatures `moverId` carries along on its own turn (Heightened Focus), which its moves take with it. */
+export function carriedAlongBy(state: GameState, moverId: string): readonly string[] {
+  if (state.combat.turnActorId !== moverId) return [];
+  return state.actors
+    .filter((actor) =>
+      actor.effects.some((effect) => effect.tags.includes(CARRIED_ALONG_TAG) && effect.sourceActorId === moverId)
+    )
+    .map((actor) => actor.id);
+}
+
+/** "Until the end of your turn": what the creature carried ends as its turn does. */
+export function setDownCarried(state: GameState, actorId: string): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors)
+    for (const effect of actor.effects.filter(
+      (candidate) => candidate.tags.includes(CARRIED_ALONG_TAG) && candidate.sourceActorId === actorId
+    ))
+      events.push(...endEffect(state, actor.id, effect.id));
+  return events;
+}
+
 /** The creatures a grappler holds (its `grapple` effects on them). */
 export function grappledBy(state: GameState, grapplerId: string): readonly string[] {
   return state.actors
@@ -267,7 +294,7 @@ export const CARRIED_FREE_TAG = "carried-free";
 
 /** SRD Grappled: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot
  *  unless you are Tiny or two or more sizes smaller than it." A bugbear's Abduct: it "needn't spend extra movement to
- *  move a creature it is grappling". */
+ *  move a creature it is grappling", and Grappler's Fast Wrestler waives it for a creature its size or smaller. */
 export function dragCostsExtra(
   state: GameState,
   grapplerId: string,
@@ -285,8 +312,12 @@ export function dragCostsExtra(
       .find((actor) => actor.id === actorId)
       ?.effects.some((effect) => effect.sourceActorId === grapplerId && effect.tags.includes(CARRIED_FREE_TAG)) ===
     true;
+  // Grappler's Fast Wrestler: no extra movement "to move a creature Grappled by you if the creature is your size or
+  // smaller".
+  const wrestler = holdsFeature(definition, "grappler", "Grappler");
   return grappledIds.some((actorId) => {
     const size = state.actors.find((actor) => actor.id === actorId)?.size ?? "medium";
+    if (wrestler && rank(actorId) <= rank(grapplerId)) return false;
     return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2 && !carriedFree(actorId);
   });
 }

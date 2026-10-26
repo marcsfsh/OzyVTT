@@ -43,6 +43,7 @@ export function createPendingSaves(
       | "failureBanishes"
       | "endsForm"
       | "regurgitates"
+      | "vitality"
       | "spendsOnKill"
     >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
@@ -120,6 +121,7 @@ export function createPendingSaves(
     ...(input.extra?.failureByMargin ? { failureByMargin: structuredClone(input.extra.failureByMargin) } : {}),
     ...(input.extra?.objectPenalty ? { objectPenalty: { ...input.extra.objectPenalty } } : {}),
     ...(input.extra?.regurgitates ? { regurgitates: { ...input.extra.regurgitates } } : {}),
+    ...(input.extra?.vitality ? { vitality: { ...input.extra.vitality } } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),

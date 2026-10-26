@@ -10,6 +10,7 @@ import {
 import { holdsFeature } from "../class-features.js";
 import { endEffect } from "../effects.js";
 import { abilityModifier, endedEffect, recordRoll, type ResolveContext } from "./context.js";
+import { castInstanceOf } from "./metamagic.js";
 import { declaredBeforeRoll } from "./hit-riders.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
@@ -303,13 +304,17 @@ export function rollRiderDamage(ctx: ResolveContext): void {
         continue;
       }
       if (modifier.type !== "extra-damage" || already.has(modifier)) continue;
-      if (modifier.formula === undefined && modifier.abilityModifier === undefined) continue;
+      const score = modifier.abilityScore === "increased" ? undefined : modifier.abilityScore;
+      if (modifier.formula === undefined && modifier.abilityModifier === undefined && score === undefined) continue;
       if (modifier.oncePerTurn && !firstThisTurn(ctx, rider.label)) continue;
+      // "One damage roll of that spell": a later ray of the cast (its open instance) takes none.
+      if (modifier.oncePerCast && castInstanceOf(ctx.state, ctx.attacker, ctx.action) !== null) continue;
       already.add(modifier);
       // An ability-modifier amount (Agonizing Blast's "add your Charisma modifier") resolves against the
-      // bearer's sheet; it rolls no die and is never crit-doubled.
+      // bearer's sheet; it rolls no die and is never crit-doubled. A score is added whole (Overwhelming Strike).
       const abilityAmount =
-        modifier.abilityModifier === undefined ? 0 : abilityModifier(deps.definition, modifier.abilityModifier);
+        (modifier.abilityModifier === undefined ? 0 : abilityModifier(deps.definition, modifier.abilityModifier)) +
+        (score === undefined ? 0 : (deps.definition?.abilityScores[score] ?? 0));
       // A type the attacker picked for this hit (Conjure Minor Elementals), else the effect's own.
       const type =
         pickedRiderType(ctx, rider.sourceEffectId, modifier.damageTypes) ??
@@ -319,7 +324,9 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       if (modifier.formula === undefined) {
         if (abilityAmount === 0) continue; // a +0 modifier adds no entry and no noise to the card
         damage.push({ formula: String(abilityAmount), type, total: abilityAmount });
-        warnings.push(`${rider.label}: +${abilityAmount} ${type} (${modifier.abilityModifier!.toUpperCase()}).`);
+        warnings.push(
+          `${rider.label}: +${abilityAmount} ${type} (${(modifier.abilityModifier ?? score)!.toUpperCase()}).`
+        );
         continue;
       }
       const expression = parseDiceFormula(modifier.formula);
