@@ -247,7 +247,7 @@ describe("finding a trap", () => {
 });
 
 describe("making a trap safe", () => {
-  const thief = { kind: "player-character", definitionId: "thief", inventory: [] as unknown[] };
+  const thief = { kind: "player-character" as const, definitionId: "thief" };
   const THIEF_SHEET = {
     name: "Vex",
     armorClass: 14,

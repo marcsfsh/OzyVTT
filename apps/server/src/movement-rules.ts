@@ -965,10 +965,9 @@ function costOptions(
     slowed,
     options: {
       extraPerStep,
-      // SRD Swimming: "You ignore this extra cost if you have a Swim Speed and use it to swim."
-      ...(travel === "swim" && !travelCostsExtra(mover, moverDefinition, "swim", derivation, offTurn)
-        ? { swimsFree: true }
-        : {}),
+      // SRD Swimming: "You ignore this extra cost if you have a Swim Speed and use it to swim." A creature with one
+      // swims across the painted water on its way, however the move was asked.
+      ...(!travelCostsExtra(mover, moverDefinition, "swim", derivation, offTurn) ? { swimsFree: true } : {}),
       ...(walksOnLiquid(mover, derivation, offTurn) ? { walksOnWater: true } : {}),
       ...(formEffectOf(mover)?.form?.noLiquid ? { barredByWater: true } : {}),
       ...(movesFreelyOn(mover, "ice", input) ? { freeOnIce: true } : {}),
