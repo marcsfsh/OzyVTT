@@ -401,8 +401,15 @@ of a hidden thing. When in doubt, leave it out.
   is the GM's. A wall or door may be an object with AC and Hit Points (`VisionWall.object`), as is what holds a
   creature (`EffectInstance.heldBy`: a Net, a web, a rope). `object.attack` rolls an attack against one
   (`object-strikes.ts`), `object.damage` is the GM's, and at 0 Hit Points a wall or door is gone and a held
-  creature is freed (`objects.ts`). A spell's `walls` raise walls on its placed template, which go with what
-  keeps the spell (`spell-walls.ts`, `pruneEndedWalls`), or act on the door or wall a cast's `wallId` names
+  creature is freed (`objects.ts`). An object fails every save: an action whose targets take objects (Acid, Oil)
+  may be aimed at a door or a wall that is one, and an area that harms objects (Shatter, Earthquake's structures,
+  Clap of Thunder's `objectDamage`) deals its damage to each under it (`resolution/object-targets.ts`). Magic items
+  work on doors too (`resolution/door-work.ts`): an Immovable Rod, Sovereign Glue and Universal Solvent fasten and
+  free one, a Ring of the Ram breaks one open, a Wand of Secrets points at a secret door, and an Instant Fortress
+  raises a tower of object walls whose door opens only for its user (`resolution/tower.ts`). A spell's `walls` raise
+  walls on its placed template, in the form the cast picked (Wall of Force's globe, Wall of Stone's thin panels),
+  which go with what keeps the spell (`spell-walls.ts`, `pruneEndedWalls`, which also moves the creatures out of a
+  closing Passwall and opens Guards and Wards' locks), or act on the door or wall a cast's `wallId` names
   (`resolution/cast-walls.ts`). Players get no door state and no object numbers: a secret door goes as a wall,
   and a wall with a gap cut in it as the parts that stand (`vision/audience.ts`). On the map a door's handle
   opens its menu (`DoorMenu.tsx`), and while an action is aimed a tap on a wall or door makes it the target.
@@ -492,6 +499,17 @@ area does to the world settles after every command (`zone-outcomes.ts`): wind an
 flames and lanterns, and disperse the fog they reach, and fire burns flammable areas cell by cell (Web:
 `zone-fire.ts`). A stat block's ground trait (a gibbering mouther's Aberrant Ground) makes the ground round it
 Difficult Terrain as it moves (`zone-ground.ts`).
+
+A barrier zone can ward the creature types its cast picks (Magic Circle, Hallow: `resolution/zone-casts.ts`), bar
+teleporting in or out or offer a save to cross by teleport (`zone-barriers.ts`), take any of several parts the cast
+picks (Private Sanctum's, Hallow's extra effect: `picks`), be one-way or opaque at its edge and set the light inside
+(Tiny Hut, Private Sanctum: `vision/areas.ts`), end when its caster leaves it or its user is Incapacitated (Nature's
+Sanctuary, a feature's area), and hold Half Cover or a chosen Resistance for the creatures in it (`zone-auras.ts`).
+An Antimagic Field's aura keeps spells and Magic actions from being cast in it, suppresses magic items, ongoing spells
+and their conditions there, and winks out the creatures spells summoned (`antimagic.ts`). Poured oil is a zone that
+waits for fire (`zone-kindling.ts`). Reverse Gravity's failure lifts a creature to the top of its Cylinder and drops it
+when the spell ends (`falling.ts`), and Prismatic Wall's area reaches 20 feet past the wall for the creatures that see
+it, a creature passing into it making each layer's save (`resolution/prismatic.ts`).
 
 A spell's later actions scale with the slot it was cast with, part by part (`perSlot` on a damage part, a grant's
 `extraDamagePerSlot`, `upcastAction` in `item-actions.ts`). One taken with the cast itself (`withCast`, Arcane Hand's
