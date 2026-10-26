@@ -201,8 +201,10 @@ function combatantsOf(
     // Raising or shrinking a tower is something done (an Instant Fortress).
     action.raisesTower !== undefined ||
     action.dismissesTower === true ||
-    // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).
+    // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers), and rolling an item's table (a Wand of
+    // Wonder's d100).
     action.summons !== undefined ||
+    action.rollsOn !== undefined ||
     // An item's command releases whoever it holds (Iron Bands), and an oil remakes a carried row.
     action.endsItemEffects === true ||
     action.rebindsRow !== undefined ||
@@ -253,6 +255,7 @@ function combatantsOf(
     action.pull === undefined &&
     action.inflicts === undefined &&
     action.endsItemEffects !== true &&
+    action.rollsOn === undefined &&
     action.rebindsRow === undefined &&
     input.builtin !== true &&
     !(spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined))

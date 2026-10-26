@@ -184,6 +184,8 @@ import { stopReturnsAtRemains } from "./resolution/remains.js";
 import { THEN_HIDE_TAG } from "./granted-moves.js";
 import { damageSourceOf, withDamageSource } from "./resolution/damage-source.js";
 import { drawRangedAttack } from "./resolution/missile-attraction.js";
+import { rollOutcome, spendRolledOutcome } from "./item-outcomes.js";
+import { itemRowOfAction } from "./item-charges.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -195,6 +197,24 @@ export type { ResolveDependencies, ResolveInput };
  * context; builtin actions add their special cases through `resolution/builtins.ts`.
  */
 export function resolveDefinitionAction(
+  state: GameState,
+  declared: DefinitionAction,
+  declaredInput: ResolveInput,
+  declaredDeps: ResolveDependencies
+): ActionResolution {
+  // The row an item's table rolls for is read before the action could use the item up.
+  const item = declared.rollsOn
+    ? itemRowOfAction(declared.id, state.actors.find((actor) => actor.id === declaredInput.actorId)?.inventory ?? [])
+    : null;
+  const resolution = resolveOnce(state, declared, declaredInput, declaredDeps);
+  if (declaredInput.commit === false || resolution.preview || resolution.waitingOnReaction) return resolution;
+  spendRolledOutcome(state, declaredInput.actorId, declared.id);
+  return declared.rollsOn
+    ? rollOutcome(state, declared, declaredInput, declaredDeps, resolution, item, resolveDefinitionAction)
+    : resolution;
+}
+
+function resolveOnce(
   state: GameState,
   declared: DefinitionAction,
   declaredInput: ResolveInput,

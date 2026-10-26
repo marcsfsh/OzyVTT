@@ -837,10 +837,18 @@ export const ItemSpellCastSchema = z
     ),
     /** It is cast as this, whatever the spell's casting time says (a Necklace of Prayer Beads' bead: a Bonus Action). */
     activation: z
-      .enum(["action", "bonus-action"])
+      .enum(["action", "bonus-action", "other"])
       .optional()
       .describe(
-        "What casting it from the item takes, where the item says so in place of the spell's casting time (a prayer bead: a Bonus Action)"
+        "What casting it from the item takes, where the item says so in place of the spell's casting time (a prayer bead: a Bonus Action; a Wand of Wonder's rolled spell: nothing more)"
+      ),
+    /** Offered only as the outcome of its item's table (`rollsOn`), never from the carried row: a Wand of Wonder's
+     *  Fireball. */
+    grantedOnly: z
+      .literal(true)
+      .optional()
+      .describe(
+        "Offered only as the outcome of its item's table, never from the carried row (a Wand of Wonder's Fireball)"
       ),
     /** The spell's options the item's cast may pick, where the item limits them (Wand of Fear's Command: "flee or
      *  grovel only"). */

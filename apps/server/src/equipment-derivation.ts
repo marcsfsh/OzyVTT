@@ -596,7 +596,8 @@ export function deriveEquipment(
     for (const declared of record.actions)
       if (!declared.grantedOnly) actions.push(itemAction(item, declared, definition));
     for (const cast of record.casts)
-      actions.push(...itemCastActions(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
+      if (!cast.grantedOnly)
+        actions.push(...itemCastActions(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
     const read = record.spellScroll ? scrollCastAction(item, definition, catalog) : null;
     if (read) actions.push(read);
     // Depth 1: the feat's riders join this block, so unequipping removes them in one recomputation.

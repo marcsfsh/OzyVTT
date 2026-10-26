@@ -874,6 +874,18 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:feather-token": guided(
     "The GM says which token a found one is (item-records.ts). The Bird token is used up for a Roc that can't attack and obeys its user until it is dismissed with a Magic action or drops to 0 Hit Points (summons.ts). The Whip token is used up for a floating whip within 10 feet that lasts an hour, until dismissed or its user dies: its user's Bonus Action moves it up to 20 feet and strikes a creature within 10 feet of it at +9 for 1d6 + 5 Force, until its user is Incapacitated (summon-strikes.ts, granted-actions.ts). The Anchor, Fan, Swan Boat and Tree, which act on ships and the scenery, are the GM's."
   ),
+  "item:wand-of-wonder": guided(
+    "Its 7 charges (1d6 + 1 back at dawn, a 1 on the last one's d20 destroying it) each roll the d100 table, and its nested d10 and d4 (item-outcomes.ts). What lands on its user (Stunned, 1d6 Psychic, its own shrinking, Invisibility) happens at once; the spells at DC 15, the rain and the butterflies as obscured areas, the creature that appears, the burst of light and the creature turning to stone are its user's to place that turn at no further cost. Holding the point of origin chosen before the roll, the 120-foot range for shorter spells, and the closest creature as the target are the GM's to police; the grass, the leaves, the object sent to the Ethereal Plane and the gems' shared damage are the GM's."
+  ),
+  "item:hat-of-many-spells": guided(
+    "Only a Wizard attunes to it (attunement.ts), and it is an Arcane Focus for its Wizard spells. Unknown Spell's pick of a spell, its slot and its Arcana check are the GM's; on a failed check its user rolls the d100 table (item-outcomes.ts), whose spells at its user's own numbers, Stunned, Poisoned and Petrified, the creature that appears and the Hostile bats are applied. The butterflies, the objects pulled out, the portal and the magic item are the GM's."
+  ),
+  "item:deck-of-illusions": guided(
+    "A Magic action spends one of its 34 cards and rolls the d100 table, placing an illusion of that creature within 30 feet that can't attack or be touched, which its user moves with a Magic action and which goes when its user is farther than 120 feet (summons.ts). A found deck's missing cards, the drawer's own image on 97-00, the DC 15 Investigation that sees through it and Dispel Magic ending it are the GM's."
+  ),
+  "item:mysterious-deck": guided(
+    "The GM says whether a found deck holds 13 or 22 cards (item-records.ts), and each draw rolls that column of the d100 table (item-outcomes.ts): Euryale's -2 to saves, the Fool's and the Jester's 72 hours of Disadvantage or Advantage on D20 Tests, and the Knight who serves are applied, and every other card is told to the table for the GM, as are the declared count of draws and the Fool and Jester leaving the deck."
+  ),
   "item:dancing-sword": enforced(
     "A Bonus Action tosses it: it hovers in a space within 30 feet and attacks a creature within 5 feet of it with its wielder's attack roll and damage, and each later Bonus Action moves it up to 30 feet, to a spot within 30 feet of its wielder, and attacks again; after its fourth attack it flies back, and it falls if its wielder is more than 30 feet away (summon-strikes.ts, summons.ts). Catching it out of the air and a wielder with no hand free are the table's."
   ),

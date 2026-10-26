@@ -55,7 +55,8 @@ describe("the last charge's d20", () => {
       write(table, IDS.wizard, catalogRow(id, { attuned: true }));
       table.actor(IDS.wizard).actionUses = { [`${id}-charges`]: 6 };
       fight(table, IDS.wizard);
-      const used = resolveAt(table, IDS.wizard, actionId, [1]);
+      // The Wand of Wonder's charge still rolls its table (62: grass the GM settles).
+      const used = resolveAt(table, IDS.wizard, actionId, [1, 62]);
       expect(used.warnings?.join(" "), id).toMatch(/is destroyed/);
       expect(row(table, IDS.wizard, id), id).toBeUndefined();
     }

@@ -117,3 +117,23 @@ describe("a Feather Token's whip", () => {
     expect(positionOf(table, table.named("Floating Whip")[0]!.id)).toEqual(cell(8, 2));
   });
 });
+
+describe("a Deck of Illusions", () => {
+  it("draws a card on the d100 and throws an illusion within 30 feet that can't attack or be touched", async () => {
+    const table = await bootSummons(
+      cleanups,
+      carrying({ id: "deck-of-illusions", name: "Deck of Illusions", equipped: true })
+    );
+    const before = table.snapshot().actors.length;
+    const drawn = await table.resolve({ actionId: "item-deck-of-illusions-draw", summon: { at: cell(4, 2) } });
+    expect(drawn.status, await drawn.clone().text()).toBe(200);
+    const made = table.snapshot().actors.slice(before);
+    // A 97-00 shows the drawer, which the GM places; every other face is a creature.
+    expect(made.length).toBeLessThanOrEqual(1);
+    for (const illusion of made) {
+      expect(illusion.summon).toMatchObject({ by: CASTER, intangible: true });
+      expect(illusion.control).toMatchObject({ by: CASTER, noAttacks: true, commandedWith: "action" });
+    }
+    expect(table.actor(CASTER)!.actionUses["deck-of-illusions-cards"]).toBe(1);
+  });
+});

@@ -383,6 +383,8 @@ const LABELS: Readonly<Record<string, string>> = {
   daysShared: "days shared among those it takes",
   lapses: "when its magic stops",
   hurlsWeapon: "weapon it hurls",
+  rollsOn: "table it rolls on",
+  then: "what the row does",
   gmTakes: "only the GM takes it",
   keepsItem: "leaves the item unspent",
   refusedWithSlots: "spell slots that keep it from happening",

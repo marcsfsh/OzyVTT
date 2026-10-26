@@ -2,8 +2,7 @@ import type { Actor } from "@vtt/domain";
 import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
 import { laterSpellAction, upcastAction } from "./item-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import { itemAction } from "./item-actions.js";
-import { withVariant } from "./item-records.js";
+import { outcomeAction } from "./item-outcomes.js";
 
 /**
  * The actions a creature has from another creature's spell while its effect lasts (SRD Dragon's Breath: "the target
@@ -57,7 +56,7 @@ export function grantedItemActions(
       ...(granted.rowId !== granted.recordId ? { recordId: granted.recordId } : {}),
       ...(granted.variantId !== undefined ? { variantId: granted.variantId } : {})
     };
-    const declared = withVariant(base, row).actions.find((action) => action.id === granted.actionId);
-    return declared ? [itemAction(row, declared, definition)] : [];
+    const built = outcomeAction(row, granted.actionId, { catalog, definition });
+    return built ? [built] : [];
   });
 }

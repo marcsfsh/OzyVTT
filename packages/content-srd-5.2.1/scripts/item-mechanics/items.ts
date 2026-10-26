@@ -2706,6 +2706,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // The d100 effect table is GM-rolled; the charge is real, and a 1 on the last charge's d20 crumbles the wand.
+  // Each charge rolls the d100 table (`item-outcomes.ts`): what lands on its user (Stunned, 1d6 Psychic, its own shrinking
+  // and Invisibility) happens at once, and what has a point of origin (the spells at DC 15, the rain and the butterflies
+  // as obscured areas, the creature that appears, the burst of light, the creature turning to stone) is its user's to
+  // place this turn at no further cost. The grass, the leaves, the object sent to the Ethereal Plane and the gems' Line
+  // are told to the table for the GM.
   "wand-of-wonder": {
     charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
@@ -2715,7 +2720,229 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge and choose a point within 120 feet of yourself. That location becomes the point of origin of a spell or other magical effect determined by rolling on the Wand of Wonder Effects table in this item's description. Spells cast from the wand have a save DC of 15, and any spell whose maximum range is normally less than 120 feet has a range of 120 feet when cast from the wand.",
-        uses: { limit: 7, per: "long-rest", pool: "wand-of-wonder-charges" }
+        damage: [],
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-wonder-charges" },
+        rollsOn: {
+          die: 100,
+          rows: [
+            { from: 1, to: 20, name: "a spell from the chosen point (a d10 picks it)", then: "spell-surge" },
+            { from: 21, to: 25, name: "you are Stunned until the start of your next turn", then: "awestruck" },
+            { from: 26, to: 30, name: "Gust of Wind, its Line from you to the point", then: "cast-gust-of-wind" },
+            { from: 31, to: 35, name: "you take 1d6 Psychic damage", then: "backlash" },
+            { from: 36, to: 40, name: "heavy rain, Lightly Obscured, for 1 minute", then: "rain" },
+            { from: 41, to: 45, name: "a cloud of butterflies, Heavily Obscured, for 10 minutes", then: "butterflies" },
+            { from: 46, to: 50, name: "Lightning Bolt, its Line from you to the point", then: "cast-lightning-bolt" },
+            { from: 51, to: 55, name: "the creature closest to the point is enlarged", then: "cast-enlargereduce" },
+            { from: 56, to: 60, name: "a creature appears near the point (a d4 picks it)", then: "beast" },
+            { from: 61, to: 64, name: "grass covers a 60-foot-radius circle of ground near the point" },
+            {
+              from: 65,
+              to: 68,
+              name: "an object of the GM's choice within 120 feet of the point vanishes into the Ethereal Plane"
+            },
+            { from: 69, to: 72, name: "you shrink for 1 minute", then: "shrink" },
+            { from: 73, to: 77, name: "leaves grow from the creature nearest the point" },
+            {
+              from: 78,
+              to: 82,
+              name: "a burst of shimmering light around you: DC 15 Constitution or Blinded",
+              then: "light-burst"
+            },
+            { from: 83, to: 87, name: "you cast Invisibility on yourself", then: "cast-invisibility" },
+            {
+              from: 88,
+              to: 92,
+              name: "1d4 x 10 gems in a 30-foot Line toward the point, 1 Bludgeoning each, shared out among the creatures in it"
+            },
+            {
+              from: 93,
+              to: 97,
+              name: "Polymorph on the creature closest to the point (a d4 picks its form)",
+              then: "polymorph-surge"
+            },
+            { from: 98, to: 100, name: "the creature closest to the point begins to turn to stone", then: "stone" }
+          ]
+        }
+      },
+      {
+        id: "spell-surge",
+        name: "Wand of Wonder: Spell",
+        activation: "other",
+        description:
+          "Roll 1d10: Darkness, Faerie Fire, Fireball, Slow or Stinking Cloud, cast from the chosen point at DC 15.",
+        damage: [],
+        grantedOnly: true,
+        rollsOn: {
+          die: 10,
+          rows: [
+            { from: 1, to: 2, name: "Darkness", then: "cast-darkness" },
+            { from: 3, to: 4, name: "Faerie Fire", then: "cast-faerie-fire" },
+            { from: 5, to: 6, name: "Fireball", then: "cast-fireball" },
+            { from: 7, to: 8, name: "Slow", then: "cast-slow" },
+            { from: 9, to: 10, name: "Stinking Cloud", then: "cast-stinking-cloud" }
+          ]
+        }
+      },
+      {
+        id: "awestruck",
+        name: "Wand of Wonder: Awestruck",
+        activation: "other",
+        description:
+          "You have the Stunned condition until the start of your next turn, believing something awesome just happened.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Awestruck",
+          target: "self",
+          tags: ["awestruck"],
+          conditions: ["stunned"],
+          duration: { type: "until-bearer-next-turn" }
+        }
+      },
+      {
+        id: "backlash",
+        name: "Wand of Wonder: Backlash",
+        activation: "other",
+        description: "You take 1d6 Psychic damage.",
+        damage: [{ formula: "1d6", type: "psychic" }],
+        grantedOnly: true,
+        targets: { who: "self" }
+      },
+      {
+        id: "rain",
+        name: "Wand of Wonder: Heavy Rain",
+        activation: "other",
+        description:
+          "Heavy rain falls for 1 minute in a 120-foot-high, 60-foot-radius Cylinder centered on the chosen point. The area is Lightly Obscured.",
+        damage: [],
+        grantedOnly: true,
+        area: { shape: "cylinder", sizeFeet: 60, widthFeet: null },
+        sight: { area: { kind: "lightly-obscured" }, rounds: 10 }
+      },
+      {
+        id: "butterflies",
+        name: "Wand of Wonder: Butterflies",
+        activation: "other",
+        description:
+          "600 oversized butterflies fill a 60-foot-high, 30-foot-radius Cylinder centered on the chosen point for 10 minutes. The area is Heavily Obscured.",
+        damage: [],
+        grantedOnly: true,
+        area: { shape: "cylinder", sizeFeet: 30, widthFeet: null },
+        sight: { area: { kind: "heavily-obscured" }, rounds: 100 }
+      },
+      {
+        id: "beast",
+        name: "Wand of Wonder: Creature",
+        activation: "other",
+        description:
+          "A magically formed creature appears as close to the chosen point as possible: on a d4, 1 a Rhinoceros, 2 an Elephant, 3-4 a Rat. It isn't under your control, acts as it normally would, and disappears after 1 hour or at 0 Hit Points.",
+        damage: [],
+        grantedOnly: true,
+        summons: {
+          creatures: [
+            { monsterId: "rhinoceros", faces: { from: 1, to: 1 } },
+            { monsterId: "elephant", faces: { from: 2, to: 2 } },
+            { monsterId: "rat", faces: { from: 3, to: 4 } }
+          ],
+          die: 4,
+          rangeFeet: 120,
+          allegiance: "none",
+          lasts: { type: "minutes", minutes: 60 }
+        }
+      },
+      {
+        id: "shrink",
+        name: "Wand of Wonder: Shrink",
+        activation: "other",
+        description:
+          "You shrink as if you had cast Enlarge/Reduce on yourself for 1 minute: your size decreases by one category, you have Disadvantage on Strength checks and Strength saving throws, and your attacks with weapons or Unarmed Strikes deal 1d4 less damage.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Reduced (Wand of Wonder)",
+          target: "self",
+          tags: ["reduced"],
+          duration: { type: "rounds", rounds: 10 },
+          sizeChange: { step: -1 },
+          modifiers: [
+            ...strengthRolls("disadvantage"),
+            {
+              type: "damage-bonus",
+              amount: 0,
+              dice: "-1d4",
+              leavesOne: true,
+              when: [{ type: "on-damage-roll" }, { type: "attack-kind-is", kinds: ["weapon", "unarmed"] }]
+            }
+          ]
+        }
+      },
+      {
+        id: "light-burst",
+        name: "Wand of Wonder: Burst of Light",
+        activation: "other",
+        description:
+          "A burst of colorful, shimmering light extends from you in a 30-foot Emanation. Each creature in the area makes a DC 15 Constitution saving throw or has the Blinded condition for 1 minute, repeating the save at the end of each of its turns.",
+        damage: [],
+        grantedOnly: true,
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["blinded"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        area: { shape: "emanation", sizeFeet: 30, widthFeet: null }
+      },
+      {
+        id: "polymorph-surge",
+        name: "Wand of Wonder: Polymorph",
+        activation: "other",
+        description: "Roll 1d4 for the form: 1 a Black Bear, 2 a Giant Wasp, 3-4 a Frog.",
+        damage: [],
+        grantedOnly: true,
+        rollsOn: {
+          die: 4,
+          rows: [
+            { from: 1, to: 1, name: "a Black Bear", then: "cast-polymorph" },
+            { from: 2, to: 2, name: "a Giant Wasp", then: "cast-polymorph" },
+            { from: 3, to: 4, name: "a Frog", then: "cast-polymorph" }
+          ]
+        }
+      },
+      {
+        id: "stone",
+        name: "Wand of Wonder: Turn to Stone",
+        activation: "other",
+        description:
+          "The creature closest to the chosen point makes a DC 15 Constitution saving throw. On a failure it has the Restrained condition and begins to turn to stone, repeating the save at the end of its next turn: a success ends the effect, and a failure leaves it Petrified until Greater Restoration or similar magic frees it.",
+        damage: [],
+        grantedOnly: true,
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["restrained"],
+          repeatOnce: true,
+          secondFailure: { conditions: ["petrified"] }
+        },
+        targets: { count: 1, rangeFeet: 120 }
+      }
+    ],
+    casts: [
+      ...(
+        ["darkness", "faerie-fire", "fireball", "slow", "stinking-cloud", "gust-of-wind", "lightning-bolt"] as const
+      ).map((spellId) => ({ spellId, saveDc: 15, activation: "other" as const, grantedOnly: true as const })),
+      { spellId: "enlargereduce", saveDc: 15, activation: "other", grantedOnly: true },
+      { spellId: "invisibility", activation: "other", grantedOnly: true, targets: { who: "self" } },
+      {
+        spellId: "polymorph",
+        saveDc: 15,
+        activation: "other",
+        grantedOnly: true,
+        forms: { only: ["black-bear", "giant-wasp", "frog"] }
       }
     ]
   },
@@ -3482,6 +3709,412 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // the item it passes for until it is identified.
 
   // ---- Carried wondrous items (alphabetical, absences inline) ----------------------------------
+
+  // "Most (75 percent) of these decks have thirteen cards, but some have twenty-two": the GM says which a found deck is.
+  // Each draw rolls the deck's column of the d100 table (`item-outcomes.ts`): Euryale's curse of -2 to saves, the Fool's
+  // and the Jester's 72 hours of Disadvantage or Advantage on D20 Tests and the Knight who serves are applied; every
+  // other card is told to the table for the GM, and so are the count of draws declared, the Fool and Jester leaving the
+  // deck, and the Jester's two extra draws in place of its Advantage.
+  "mysterious-deck": {
+    actions: [
+      {
+        id: "euryale",
+        name: "Euryale's Curse",
+        activation: "other",
+        description:
+          "You take a -2 penalty to saving throws while cursed. Only a god or the Fates card can end the curse.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Euryale's Curse",
+          target: "self",
+          tags: ["euryale"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "save-bonus", amount: -2 }]
+        }
+      },
+      {
+        id: "fool",
+        name: "The Fool",
+        activation: "other",
+        description: "You have Disadvantage on D20 Tests for the next 72 hours.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "The Fool",
+          target: "self",
+          tags: ["the-fool"],
+          duration: { type: "minutes", minutes: 4320 },
+          modifiers: [
+            { type: "roll-mode", roll: "attack", mode: "disadvantage" },
+            { type: "roll-mode", roll: "check", mode: "disadvantage" },
+            { type: "roll-mode", roll: "save", mode: "disadvantage" }
+          ]
+        }
+      },
+      {
+        id: "jester",
+        name: "The Jester",
+        activation: "other",
+        description: "You have Advantage on D20 Tests for the next 72 hours.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "The Jester",
+          target: "self",
+          tags: ["the-jester"],
+          duration: { type: "minutes", minutes: 4320 },
+          modifiers: [
+            { type: "roll-mode", roll: "attack", mode: "advantage" },
+            { type: "roll-mode", roll: "check", mode: "advantage" },
+            { type: "roll-mode", roll: "save", mode: "advantage" }
+          ]
+        }
+      },
+      {
+        id: "knight",
+        name: "The Knight",
+        activation: "other",
+        description:
+          "A Knight magically appears in an unoccupied space you choose within 30 feet of you and serves you loyally until death.",
+        damage: [],
+        grantedOnly: true,
+        summons: { creatures: [{ monsterId: "knight" }], rangeFeet: 30, lasts: { type: "untimed" } }
+      }
+    ],
+    variants: [
+      {
+        id: "thirteen",
+        name: "Thirteen cards",
+        actions: [
+          {
+            id: "draw",
+            name: "Draw a Card",
+            activation: "other",
+            description:
+              "Draw one of the cards you declared: its magic takes effect as soon as it is drawn. Draw each no more than 1 hour after the last.",
+            damage: [],
+            rollsOn: {
+              die: 100,
+              rows: [
+                { from: 1, to: 8, name: "Euryale: a curse of -2 to your saving throws", then: "euryale" },
+                { from: 9, to: 16, name: "Flames: a powerful devil becomes your enemy" },
+                {
+                  from: 17,
+                  to: 24,
+                  name: "Jester: Advantage on D20 Tests for 72 hours, or two more draws",
+                  then: "jester"
+                },
+                { from: 25, to: 32, name: "Key: a Rare or rarer magic weapon you are proficient with appears on you" },
+                { from: 33, to: 40, name: "Knight: a Knight appears within 30 feet to serve you", then: "knight" },
+                { from: 41, to: 48, name: "Moon: you may cast Wish 1d3 times" },
+                { from: 49, to: 56, name: "Rogue: an NPC of the GM's choice becomes Hostile toward you" },
+                { from: 57, to: 64, name: "Ruin: all your wealth but magic items is lost" },
+                { from: 65, to: 72, name: "Skull: an Avatar of Death appears and attacks you" },
+                { from: 73, to: 80, name: "Star: raise one ability score by 2, to at most 24" },
+                { from: 81, to: 88, name: "Sun: a wondrous item and 50,000 XP" },
+                { from: 89, to: 96, name: "Throne: proficiency and Expertise in Persuasion, and a keep" },
+                { from: 97, to: 100, name: "Void: your soul is drawn away into an object in a place the GM chooses" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        id: "twenty-two",
+        name: "Twenty-two cards",
+        actions: [
+          {
+            id: "draw",
+            name: "Draw a Card",
+            activation: "other",
+            description:
+              "Draw one of the cards you declared: its magic takes effect as soon as it is drawn. Draw each no more than 1 hour after the last.",
+            damage: [],
+            rollsOn: {
+              die: 100,
+              rows: [
+                { from: 1, to: 5, name: "Balance: raise one score by 2 (to 22) and lower another by 2, or nothing" },
+                { from: 6, to: 10, name: "Comet: pick a foe when you next roll Initiative against Hostile creatures" },
+                {
+                  from: 11,
+                  to: 14,
+                  name: "Donjon: you are entombed in an extradimensional sphere and draw no more cards"
+                },
+                { from: 15, to: 18, name: "Euryale: a curse of -2 to your saving throws", then: "euryale" },
+                { from: 19, to: 23, name: "Fates: you may erase one event as if it never happened" },
+                { from: 24, to: 27, name: "Flames: a powerful devil becomes your enemy" },
+                {
+                  from: 28,
+                  to: 31,
+                  name: "Fool: Disadvantage on D20 Tests for 72 hours; draw another card",
+                  then: "fool"
+                },
+                { from: 32, to: 36, name: "Gem: 50,000 GP of jewelry or gems appear at your feet" },
+                {
+                  from: 37,
+                  to: 41,
+                  name: "Jester: Advantage on D20 Tests for 72 hours, or two more draws",
+                  then: "jester"
+                },
+                { from: 42, to: 46, name: "Key: a Rare or rarer magic weapon you are proficient with appears on you" },
+                { from: 47, to: 51, name: "Knight: a Knight appears within 30 feet to serve you", then: "knight" },
+                { from: 52, to: 56, name: "Moon: you may cast Wish 1d3 times" },
+                { from: 57, to: 60, name: "Puzzle: your Intelligence or Wisdom drops by 1d4 + 1; one more draw" },
+                { from: 61, to: 64, name: "Rogue: an NPC of the GM's choice becomes Hostile toward you" },
+                { from: 65, to: 68, name: "Ruin: all your wealth but magic items is lost" },
+                { from: 69, to: 73, name: "Sage: within a year, one question answered truthfully" },
+                { from: 74, to: 77, name: "Skull: an Avatar of Death appears and attacks you" },
+                { from: 78, to: 82, name: "Star: raise one ability score by 2, to at most 24" },
+                { from: 83, to: 87, name: "Sun: a wondrous item and 50,000 XP" },
+                { from: 88, to: 91, name: "Talons: every magic item you wear or carry disintegrates" },
+                { from: 92, to: 96, name: "Throne: proficiency and Expertise in Persuasion, and a keep" },
+                { from: 97, to: 100, name: "Void: your soul is drawn away into an object in a place the GM chooses" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+
+  // A Magic action draws a card at random, rolling the d100 table, and throws it within 30 feet: an illusion of that
+  // creature forms over it, which can't harm, attack or be touched, and which its user moves with a Magic action
+  // (`summons.ts`). The 34 cards are its charges, a found deck short 1d20 - 1 of them as the GM sets. A 97-00 shows the
+  // drawer, which the GM places; a Study and a DC 15 Investigation check seeing through it, and Dispel Magic or a moved
+  // card ending it, are the GM's.
+  "deck-of-illusions": {
+    actions: [
+      {
+        id: "draw",
+        name: "Draw an Illusion",
+        activation: "action",
+        description:
+          "Draw a card at random and throw it to the ground at a point within 30 feet of you. An illusion of the creature it shows forms over the card and remains until dispelled. It looks and behaves like a real creature of its kind, except that it can do no harm, and objects pass through it. While you are within 120 feet of it and can see it, a Magic action moves it anywhere within 30 feet of its card.",
+        damage: [],
+        uses: { limit: 34, per: "never", pool: "deck-of-illusions-cards" },
+        summons: {
+          creatures: [
+            { monsterId: "adult-red-dragon", faces: { from: 1, to: 3 } },
+            { monsterId: "archmage", faces: { from: 4, to: 6 } },
+            { monsterId: "assassin", faces: { from: 7, to: 9 } },
+            { monsterId: "bandit-captain", faces: { from: 10, to: 12 } },
+            { monsterId: "basilisk", faces: { from: 13, to: 15 } },
+            { monsterId: "berserker", faces: { from: 16, to: 18 } },
+            { monsterId: "bugbear-warrior", faces: { from: 19, to: 21 } },
+            { monsterId: "cloud-giant", faces: { from: 22, to: 24 } },
+            { monsterId: "druid", faces: { from: 25, to: 27 } },
+            { monsterId: "erinyes", faces: { from: 28, to: 30 } },
+            { monsterId: "ettin", faces: { from: 31, to: 33 } },
+            { monsterId: "fire-giant", faces: { from: 34, to: 36 } },
+            { monsterId: "frost-giant", faces: { from: 37, to: 39 } },
+            { monsterId: "gnoll-warrior", faces: { from: 40, to: 42 } },
+            { monsterId: "goblin-warrior", faces: { from: 43, to: 45 } },
+            { monsterId: "guardian-naga", faces: { from: 46, to: 48 } },
+            { monsterId: "hill-giant", faces: { from: 49, to: 51 } },
+            { monsterId: "hobgoblin-warrior", faces: { from: 52, to: 54 } },
+            { monsterId: "incubus", faces: { from: 55, to: 57 } },
+            { monsterId: "iron-golem", faces: { from: 58, to: 60 } },
+            { monsterId: "knight", faces: { from: 61, to: 63 } },
+            { monsterId: "kobold-warrior", faces: { from: 64, to: 66 } },
+            { monsterId: "lich", faces: { from: 67, to: 69 } },
+            { monsterId: "medusa", faces: { from: 70, to: 72 } },
+            { monsterId: "night-hag", faces: { from: 73, to: 75 } },
+            { monsterId: "ogre", faces: { from: 76, to: 78 } },
+            { monsterId: "oni", faces: { from: 79, to: 81 } },
+            { monsterId: "priest", faces: { from: 82, to: 84 } },
+            { monsterId: "succubus", faces: { from: 85, to: 87 } },
+            { monsterId: "troll", faces: { from: 88, to: 90 } },
+            { monsterId: "warrior-veteran", faces: { from: 91, to: 93 } },
+            { monsterId: "wyvern", faces: { from: 94, to: 96 } }
+          ],
+          die: 100,
+          rangeFeet: 30,
+          intangible: true,
+          noAttacks: true,
+          commandedWith: "action",
+          commandMove: 30,
+          leashFeet: 120,
+          lasts: { type: "untimed" }
+        }
+      }
+    ]
+  },
+
+  // Only a Wizard attunes to it, and it serves as an Arcane Focus. Unknown Spell's pick of a Wizard spell it doesn't
+  // know, its slot and its Intelligence (Arcana) check are the GM's to run; on a failed check its user rolls the hat's
+  // d100 table (`item-outcomes.ts`): its spells at its user's own numbers, Stunned, Poisoned or Petrified on its user,
+  // the creature that appears and the Hostile bats. The butterflies, the objects pulled out, the portal and the magic
+  // item are told to the table for the GM.
+  "hat-of-many-spells": {
+    servesAsFocus: "arcane-focus",
+    actions: [
+      {
+        id: "miscast",
+        name: "Unknown Spell Fails",
+        activation: "other",
+        description:
+          "When your Intelligence (Arcana) check to cast an unknown spell from the hat fails, you fail to cast the spell and a random effect occurs instead, rolled on the hat's table.",
+        damage: [],
+        rollsOn: {
+          die: 100,
+          rows: [
+            { from: 1, to: 50, name: "a random spell (a d10 picks it)", then: "spell-surge" },
+            { from: 51, to: 55, name: "you are Stunned until the end of your next turn", then: "awestruck" },
+            {
+              from: 56,
+              to: 60,
+              name: "a harmless swarm of butterflies fills a 10-foot Cube within 30 feet for 1 minute"
+            },
+            {
+              from: 61,
+              to: 65,
+              name: "you pull out a vial of Acid, a flask of Alchemist's Fire, a Crowbar or a lit Torch (1d4)"
+            },
+            { from: 66, to: 70, name: "magic sickness: you are Poisoned for 1 hour", then: "sickness" },
+            { from: 71, to: 75, name: "you are Petrified until the end of your next turn", then: "petrified" },
+            {
+              from: 76,
+              to: 80,
+              name: "you pull out a Dagger, a Rope with a Grappling Hook, a bag of Caltrops or a 50 GP gem (1d4)"
+            },
+            { from: 81, to: 85, name: "a creature appears beside you (a d4 picks it)", then: "creature" },
+            { from: 86, to: 90, name: "a Hostile Swarm of Bats flies out and attacks you", then: "bats" },
+            {
+              from: 91,
+              to: 95,
+              name: "a two-way portal to another plane opens within 30 feet until the end of your next turn"
+            },
+            { from: 96, to: 100, name: "you pull out a magic item the GM chooses (a d6 sets its rarity)" }
+          ]
+        }
+      },
+      {
+        id: "spell-surge",
+        name: "Hat of Many Spells: Spell",
+        activation: "other",
+        description:
+          "Roll 1d10: Enlarge/Reduce (enlarge), Enlarge/Reduce (reduce), Faerie Fire, Fireball, Gust of Wind, Invisibility on yourself, Lightning Bolt, Phantasmal Force, Polymorph or Stinking Cloud.",
+        damage: [],
+        grantedOnly: true,
+        rollsOn: {
+          die: 10,
+          rows: [
+            { from: 1, to: 1, name: "Enlarge/Reduce, enlarging", then: "cast-enlargereduce" },
+            { from: 2, to: 2, name: "Enlarge/Reduce, reducing", then: "cast-enlargereduce" },
+            { from: 3, to: 3, name: "Faerie Fire", then: "cast-faerie-fire" },
+            { from: 4, to: 4, name: "Fireball", then: "cast-fireball" },
+            { from: 5, to: 5, name: "Gust of Wind", then: "cast-gust-of-wind" },
+            { from: 6, to: 6, name: "Invisibility on yourself", then: "cast-invisibility" },
+            { from: 7, to: 7, name: "Lightning Bolt", then: "cast-lightning-bolt" },
+            { from: 8, to: 8, name: "Phantasmal Force", then: "cast-phantasmal-force" },
+            { from: 9, to: 9, name: "Polymorph", then: "cast-polymorph" },
+            { from: 10, to: 10, name: "Stinking Cloud", then: "cast-stinking-cloud" }
+          ]
+        }
+      },
+      {
+        id: "awestruck",
+        name: "Hat of Many Spells: Awestruck",
+        activation: "other",
+        description: "You have the Stunned condition until the end of your next turn.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Awestruck",
+          target: "self",
+          tags: ["awestruck"],
+          conditions: ["stunned"],
+          duration: { type: "until-source-turn-end" }
+        }
+      },
+      {
+        id: "sickness",
+        name: "Hat of Many Spells: Magic Sickness",
+        activation: "other",
+        description: "You have the Poisoned condition for 1 hour.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Magic Sickness",
+          target: "self",
+          tags: ["magic-sickness"],
+          conditions: ["poisoned"],
+          duration: { type: "minutes", minutes: 60 }
+        }
+      },
+      {
+        id: "petrified",
+        name: "Hat of Many Spells: Petrified",
+        activation: "other",
+        description: "You have the Petrified condition until the end of your next turn.",
+        damage: [],
+        grantedOnly: true,
+        targets: { who: "self" },
+        grants: {
+          name: "Petrified by the Hat",
+          target: "self",
+          tags: ["hat-petrified"],
+          conditions: ["petrified"],
+          duration: { type: "until-source-turn-end" }
+        }
+      },
+      {
+        id: "creature",
+        name: "Hat of Many Spells: Creature",
+        activation: "other",
+        description:
+          "A creature appears in an unoccupied space as close to you as possible: on a d4, 1 a Camel, 2 a Constrictor Snake, 3 an Elephant, 4 a Mule. It isn't under your control and disappears after 1 hour or at 0 Hit Points.",
+        damage: [],
+        grantedOnly: true,
+        summons: {
+          creatures: [
+            { monsterId: "camel", faces: { from: 1, to: 1 } },
+            { monsterId: "constrictor-snake", faces: { from: 2, to: 2 } },
+            { monsterId: "elephant", faces: { from: 3, to: 3 } },
+            { monsterId: "mule", faces: { from: 4, to: 4 } }
+          ],
+          die: 4,
+          rangeFeet: 10,
+          allegiance: "none",
+          lasts: { type: "minutes", minutes: 60 }
+        }
+      },
+      {
+        id: "bats",
+        name: "Hat of Many Spells: Swarm of Bats",
+        activation: "other",
+        description: "A Hostile Swarm of Bats flies out of the hat, occupies your space, and attacks you.",
+        damage: [],
+        grantedOnly: true,
+        summons: {
+          creatures: [{ monsterId: "swarm-of-bats" }],
+          rangeFeet: 5,
+          allegiance: "hostile"
+        }
+      }
+    ],
+    casts: [
+      ...(
+        [
+          "enlargereduce",
+          "faerie-fire",
+          "fireball",
+          "gust-of-wind",
+          "lightning-bolt",
+          "phantasmal-force",
+          "polymorph",
+          "stinking-cloud"
+        ] as const
+      ).map((spellId) => ({ spellId, activation: "other" as const, grantedOnly: true as const })),
+      { spellId: "invisibility", activation: "other", grantedOnly: true, targets: { who: "self" } }
+    ]
+  },
 
   // Opened and crewed, the barrel is a Large vehicle with its printed AC, Hit Points, speeds and immunities, which its
   // pilot works on the turn after its own: its claws swing at +8 for 2d6 Bludgeoning or close to grapple (escape DC

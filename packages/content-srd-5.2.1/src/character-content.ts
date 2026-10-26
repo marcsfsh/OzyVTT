@@ -502,7 +502,7 @@ export const featureRiders = {
     .describe("Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)"),
   actions: z
     .array(FeatureActionSchema)
-    .max(8)
+    .max(16)
     .default([])
     .describe("Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon)"),
   /** Effects the feature can grant, in the actor-side EffectGrant vocabulary (Rage, Bardic Inspiration). */

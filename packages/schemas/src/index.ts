@@ -5429,7 +5429,7 @@ export type SummonCreature = z.infer<typeof SummonCreatureSchema>;
 export const SummonSchema = z
   .object({
     /** The stat blocks it may bring. With several, its user picks (Find Familiar's forms), or the server rolls `die`. */
-    creatures: z.array(SummonCreatureSchema).min(1).max(24),
+    creatures: z.array(SummonCreatureSchema).min(1).max(40),
     /** The die the server rolls to pick one of `creatures` by its `faces` (a Bag of Tricks' d8). */
     die: z.number().int().min(2).max(100).optional(),
     /** Its user picks any stat block of this creature type up to this Challenge Rating as well ("or another Beast that
@@ -5578,6 +5578,33 @@ export const ActionSchema = z
     id: z.string().regex(/^[a-z0-9-]+$/),
     name: z.string().min(1).max(120),
     activation: z.enum(["action", "bonus-action", "reaction", "other"]),
+    /** Once it is done, the server rolls this die and takes the row it lands on (a Wand of Wonder's d100): `then` names
+     *  one of its item's own actions or casts (`cast-<spell>`), which happens at once when it acts on its user alone or
+     *  rolls a table of its own, and is otherwise its user's to place this turn at no cost; a row with no `then` is told
+     *  to the table. */
+    rollsOn: z
+      .object({
+        die: z.number().int().min(2).max(100),
+        rows: z
+          .array(
+            z
+              .object({
+                from: z.number().int().min(1).max(100),
+                to: z.number().int().min(1).max(100),
+                name: z.string().min(1).max(200),
+                then: z
+                  .string()
+                  .regex(/^[a-z0-9-]+$/)
+                  .max(120)
+                  .optional()
+              })
+              .strict()
+          )
+          .min(2)
+          .max(40)
+      })
+      .strict()
+      .optional(),
     /** Only the GM takes it: what it finishes is downtime the GM gives (a Manual of Golems' golem, after its days of
      *  work). */
     gmTakes: z.literal(true).optional(),
