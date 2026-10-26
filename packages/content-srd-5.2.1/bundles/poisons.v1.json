@@ -1,0 +1,1064 @@
+[
+ {
+  "id": "assassins-blood",
+  "name": "Assassin's Blood",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 150,
+  "weightLb": 0,
+  "description": "Ingested Poison. A creature subjected to Assassin's Blood makes a DC 10 Constitution saving throw. On a failed save, the creature takes 6 (1d12) Poison damage and has the Poisoned condition for 24 hours. On a successful save, the creature takes half as much damage only.",
+  "poison": {
+   "kind": "ingested",
+   "save": {
+    "ability": "con",
+    "dc": 10,
+    "successDamage": "half",
+    "failureConditions": [
+     "poisoned"
+    ],
+    "failureDuration": {
+     "type": "minutes",
+     "minutes": 1440
+    }
+   },
+   "damage": [
+    {
+     "formula": "1d12",
+     "type": "poison"
+    }
+   ]
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "feed",
+    "name": "Feed Assassin's Blood",
+    "activation": "action",
+    "description": "Feed a dose to a creature: a creature exposed to it suffers its effect.",
+    "damage": [
+     {
+      "formula": "1d12",
+      "type": "poison"
+     }
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 10,
+     "successDamage": "half",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 1440
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "burnt-othur-fumes",
+  "name": "Burnt Othur Fumes",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 500,
+  "weightLb": 0,
+  "description": "Inhaled Poison. A creature subjected to Burnt Othur Fumes must succeed on a DC 13 Constitution saving throw or take 10 (3d6) Poison damage, and it must repeat the save at the start of each of its turns. On each successive failed save, the creature takes 3 (1d6) Poison damage. After three successful saves, the poison ends.",
+  "poison": {
+   "kind": "inhaled",
+   "save": {
+    "ability": "con",
+    "dc": 13,
+    "successDamage": "none",
+    "failureConditions": [],
+    "repeatSave": true,
+    "repeatAtTurnStart": true,
+    "repeatFailureDamage": [
+     {
+      "formula": "1d6",
+      "type": "poison"
+     }
+    ],
+    "repeatTally": 3,
+    "repeatTallySuccessesOnly": true,
+    "failureEffect": {
+     "name": "Burnt Othur Fumes",
+     "tags": [
+      "burnt-othur-fumes"
+     ],
+     "modifiers": []
+    }
+   },
+   "damage": [
+    {
+     "formula": "3d6",
+     "type": "poison"
+    }
+   ]
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "release",
+    "name": "Release Burnt Othur Fumes",
+    "activation": "action",
+    "description": "Release it in a 5-foot Cube: a creature exposed to it suffers its effect.",
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "poison"
+     }
+    ],
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 5,
+     "widthFeet": null,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 13,
+     "successDamage": "none",
+     "failureConditions": [],
+     "repeatSave": true,
+     "repeatAtTurnStart": true,
+     "repeatFailureDamage": [
+      {
+       "formula": "1d6",
+       "type": "poison"
+      }
+     ],
+     "repeatTally": 3,
+     "repeatTallySuccessesOnly": true,
+     "failureEffect": {
+      "name": "Burnt Othur Fumes",
+      "tags": [
+       "burnt-othur-fumes"
+      ],
+      "modifiers": []
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "crawler-mucus",
+  "name": "Crawler Mucus",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 200,
+  "weightLb": 0,
+  "description": "Contact Poison. A creature subjected to Crawler Mucus must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 minute. The creature also has the Paralyzed condition while Poisoned in this way. The creature repeats the save at the end of each of its turns, ending the effect on itself on a success.",
+  "poison": {
+   "kind": "contact",
+   "save": {
+    "ability": "con",
+    "dc": 13,
+    "successDamage": "none",
+    "failureConditions": [
+     "poisoned",
+     "paralyzed"
+    ],
+    "failureDuration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "repeatSave": true
+   },
+   "damage": []
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "touch",
+    "name": "Bring Crawler Mucus",
+    "activation": "action",
+    "description": "Bring a creature into contact with it: a creature exposed to it suffers its effect.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 13,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned",
+      "paralyzed"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "essence-of-ether",
+  "name": "Essence of Ether",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 300,
+  "weightLb": 0,
+  "description": "Inhaled Poison. A creature subjected to Essence of Ether must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 8 hours. The creature also has the Unconscious condition while Poisoned in this way. The creature wakes up if it takes damage or if another creature takes an action to shake it awake.",
+  "poison": {
+   "kind": "inhaled",
+   "save": {
+    "ability": "con",
+    "dc": 15,
+    "successDamage": "none",
+    "failureConditions": [
+     "poisoned"
+    ],
+    "failureDuration": {
+     "type": "minutes",
+     "minutes": 480
+    },
+    "failureByMargin": {
+     "by": 1,
+     "whileFailed": {
+      "conditions": [
+       "unconscious"
+      ],
+      "endsOnDamage": true,
+      "endedBy": {
+       "name": "Wake",
+       "by": "others"
+      }
+     }
+    }
+   },
+   "damage": []
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "release",
+    "name": "Release Essence of Ether",
+    "activation": "action",
+    "description": "Release it in a 5-foot Cube: a creature exposed to it suffers its effect.",
+    "damage": [],
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 5,
+     "widthFeet": null,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 480
+     },
+     "failureByMargin": {
+      "by": 1,
+      "whileFailed": {
+       "conditions": [
+        "unconscious"
+       ],
+       "endsOnDamage": true,
+       "endedBy": {
+        "name": "Wake",
+        "by": "others"
+       }
+      }
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "malice",
+  "name": "Malice",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 250,
+  "weightLb": 0,
+  "description": "Inhaled Poison. A creature subjected to Malice must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 1 hour. The creature also has the Blinded condition while Poisoned in this way.",
+  "poison": {
+   "kind": "inhaled",
+   "save": {
+    "ability": "con",
+    "dc": 15,
+    "successDamage": "none",
+    "failureConditions": [
+     "poisoned",
+     "blinded"
+    ],
+    "failureDuration": {
+     "type": "minutes",
+     "minutes": 60
+    }
+   },
+   "damage": []
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "release",
+    "name": "Release Malice",
+    "activation": "action",
+    "description": "Release it in a 5-foot Cube: a creature exposed to it suffers its effect.",
+    "damage": [],
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 5,
+     "widthFeet": null,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned",
+      "blinded"
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 60
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "midnight-tears",
+  "name": "Midnight Tears",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 1500,
+  "weightLb": 0,
+  "description": "Ingested Poison. A creature that ingests Midnight Tears suffers no effect until the stroke of midnight. Any effect that ends the Poisoned condition neutralizes this poison. If the poison hasn't been neutralized before midnight, the creature makes a DC 17 Constitution saving throw, taking 31 (9d6) Poison damage on a failed save or half as much damage on a successful one.",
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "feed",
+    "name": "Feed Midnight Tears",
+    "activation": "action",
+    "description": "Feed a dose to a creature: a creature exposed to it suffers its effect.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "grants": {
+     "name": "Midnight Tears",
+     "tags": [
+      "latent-poison",
+      "midnight-tears"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "target",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "atRest": {
+      "at": "midnight",
+      "save": {
+       "ability": "con",
+       "dc": 17
+      },
+      "halfOnSuccess": true,
+      "damage": [
+       {
+        "formula": "9d6",
+        "type": "poison"
+       }
+      ],
+      "once": true
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "oil-of-taggit",
+  "name": "Oil of Taggit",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 400,
+  "weightLb": 0,
+  "description": "Contact Poison. A creature subjected to Oil of Taggit must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 24 hours. The creature also has the Unconscious condition while Poisoned in this way. It wakes up if it takes damage.",
+  "poison": {
+   "kind": "contact",
+   "save": {
+    "ability": "con",
+    "dc": 13,
+    "successDamage": "none",
+    "failureConditions": [
+     "poisoned"
+    ],
+    "failureDuration": {
+     "type": "minutes",
+     "minutes": 1440
+    },
+    "failureByMargin": {
+     "by": 1,
+     "whileFailed": {
+      "conditions": [
+       "unconscious"
+      ],
+      "endsOnDamage": true
+     }
+    }
+   },
+   "damage": []
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "touch",
+    "name": "Bring Oil of Taggit",
+    "activation": "action",
+    "description": "Bring a creature into contact with it: a creature exposed to it suffers its effect.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 13,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 1440
+     },
+     "failureByMargin": {
+      "by": 1,
+      "whileFailed": {
+       "conditions": [
+        "unconscious"
+       ],
+       "endsOnDamage": true
+      }
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "pale-tincture",
+  "name": "Pale Tincture",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 250,
+  "weightLb": 0,
+  "description": "Ingested Poison. A creature subjected to Pale Tincture must succeed on a DC 16 Constitution saving throw or take 3 (1d6) Poison damage and have the Poisoned condition. The Poisoned creature repeats the save every 24 hours, taking 3 (1d6) Poison damage on a failed save. The damage the poison deals can't be healed by any means while the creature remains Poisoned. After seven successful saves against the poison, the creature is no longer Poisoned.",
+  "poison": {
+   "kind": "ingested",
+   "save": {
+    "ability": "con",
+    "dc": 16,
+    "successDamage": "none",
+    "failureConditions": [
+     "poisoned"
+    ],
+    "atRest": {
+     "at": "day",
+     "save": {
+      "ability": "con",
+      "dc": 16
+     },
+     "successesNeeded": 7,
+     "damage": [
+      {
+       "formula": "1d6",
+       "type": "poison"
+      }
+     ],
+     "drainsMaximum": true
+    }
+   },
+   "damage": [
+    {
+     "formula": "1d6",
+     "type": "poison"
+    }
+   ]
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "feed",
+    "name": "Feed Pale Tincture",
+    "activation": "action",
+    "description": "Feed a dose to a creature: a creature exposed to it suffers its effect.",
+    "damage": [
+     {
+      "formula": "1d6",
+      "type": "poison"
+     }
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 16,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "atRest": {
+      "at": "day",
+      "save": {
+       "ability": "con",
+       "dc": 16
+      },
+      "successesNeeded": 7,
+      "damage": [
+       {
+        "formula": "1d6",
+        "type": "poison"
+       }
+      ],
+      "drainsMaximum": true
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "purple-worm-poison",
+  "name": "Purple Worm Poison",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 2000,
+  "weightLb": 0,
+  "description": "Injury Poison. A creature subjected to Purple Worm Poison makes a DC 21 Constitution saving throw, taking 35 (10d6) Poison damage on a failed save or half as much damage on a successful one.",
+  "poison": {
+   "kind": "injury",
+   "save": {
+    "ability": "con",
+    "dc": 21,
+    "successDamage": "half",
+    "failureConditions": []
+   },
+   "damage": [
+    {
+     "formula": "10d6",
+     "type": "poison"
+    }
+   ]
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "coat-weapon",
+    "name": "Coat a Weapon with Purple Worm Poison",
+    "activation": "bonus-action",
+    "description": "Coat one weapon you carry. The poison stays potent until delivered through a wound: the next hit with it that deals Piercing or Slashing damage exposes the creature hit.",
+    "damage": [],
+    "grants": {
+     "name": "Purple Worm Poison (weapon)",
+     "tags": [
+      "poison-coat",
+      "coat-purple-worm-poison"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "bindsWeapon": {}
+    }
+   },
+   {
+    "id": "coat-ammunition",
+    "name": "Coat a Piece of Ammunition with Purple Worm Poison",
+    "activation": "bonus-action",
+    "description": "Coat one piece of ammunition you carry. The poison stays potent until delivered through a wound: the next hit with it that deals Piercing or Slashing damage exposes the creature hit.",
+    "damage": [],
+    "grants": {
+     "name": "Purple Worm Poison (ammunition)",
+     "tags": [
+      "poison-coat",
+      "coat-purple-worm-poison"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "bindsWeapon": {
+      "ammunition": true
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "serpent-venom",
+  "name": "Serpent Venom",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 200,
+  "weightLb": 0,
+  "description": "Injury Poison. A creature subjected to Serpent Venom must succeed on a DC 11 Constitution saving throw, taking 10 (3d6) Poison damage on a failed save or half as much damage on a successful one.",
+  "poison": {
+   "kind": "injury",
+   "save": {
+    "ability": "con",
+    "dc": 11,
+    "successDamage": "half",
+    "failureConditions": []
+   },
+   "damage": [
+    {
+     "formula": "3d6",
+     "type": "poison"
+    }
+   ]
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "coat-weapon",
+    "name": "Coat a Weapon with Serpent Venom",
+    "activation": "bonus-action",
+    "description": "Coat one weapon you carry. The poison stays potent until delivered through a wound: the next hit with it that deals Piercing or Slashing damage exposes the creature hit.",
+    "damage": [],
+    "grants": {
+     "name": "Serpent Venom (weapon)",
+     "tags": [
+      "poison-coat",
+      "coat-serpent-venom"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "bindsWeapon": {}
+    }
+   },
+   {
+    "id": "coat-ammunition",
+    "name": "Coat a Piece of Ammunition with Serpent Venom",
+    "activation": "bonus-action",
+    "description": "Coat one piece of ammunition you carry. The poison stays potent until delivered through a wound: the next hit with it that deals Piercing or Slashing damage exposes the creature hit.",
+    "damage": [],
+    "grants": {
+     "name": "Serpent Venom (ammunition)",
+     "tags": [
+      "poison-coat",
+      "coat-serpent-venom"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "bindsWeapon": {
+      "ammunition": true
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "spiders-sting",
+  "name": "Spider's Sting",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 200,
+  "weightLb": 0,
+  "description": "Injury Poison. A creature subjected to Spider's Sting must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 hour. If the creature fails the save by 5 or more, the creature also has the Unconscious condition while Poisoned in this way. The creature wakes up if it takes damage or if another creature takes an action to shake it awake.",
+  "poison": {
+   "kind": "injury",
+   "save": {
+    "ability": "con",
+    "dc": 13,
+    "successDamage": "none",
+    "failureConditions": [
+     "poisoned"
+    ],
+    "failureDuration": {
+     "type": "minutes",
+     "minutes": 60
+    },
+    "failureByMargin": {
+     "by": 5,
+     "whileFailed": {
+      "conditions": [
+       "unconscious"
+      ],
+      "endsOnDamage": true,
+      "endedBy": {
+       "name": "Wake",
+       "by": "others"
+      }
+     }
+    }
+   },
+   "damage": []
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "coat-weapon",
+    "name": "Coat a Weapon with Spider's Sting",
+    "activation": "bonus-action",
+    "description": "Coat one weapon you carry. The poison stays potent until delivered through a wound: the next hit with it that deals Piercing or Slashing damage exposes the creature hit.",
+    "damage": [],
+    "grants": {
+     "name": "Spider's Sting (weapon)",
+     "tags": [
+      "poison-coat",
+      "coat-spiders-sting"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "bindsWeapon": {}
+    }
+   },
+   {
+    "id": "coat-ammunition",
+    "name": "Coat a Piece of Ammunition with Spider's Sting",
+    "activation": "bonus-action",
+    "description": "Coat one piece of ammunition you carry. The poison stays potent until delivered through a wound: the next hit with it that deals Piercing or Slashing damage exposes the creature hit.",
+    "damage": [],
+    "grants": {
+     "name": "Spider's Sting (ammunition)",
+     "tags": [
+      "poison-coat",
+      "coat-spiders-sting"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "bindsWeapon": {
+      "ammunition": true
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "torpor",
+  "name": "Torpor",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 600,
+  "weightLb": 0,
+  "description": "Ingested Poison. A creature subjected to Torpor poison must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 4d6 hours. The creature's Speed is halved while the creature is Poisoned in this way.",
+  "poison": {
+   "kind": "ingested",
+   "save": {
+    "ability": "con",
+    "dc": 15,
+    "successDamage": "none",
+    "failureConditions": [
+     "poisoned"
+    ],
+    "failureHoursRolled": "4d6",
+    "failureEffect": {
+     "name": "Torpor",
+     "tags": [
+      "speed-halved"
+     ],
+     "modifiers": []
+    }
+   },
+   "damage": []
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "feed",
+    "name": "Feed Torpor",
+    "activation": "action",
+    "description": "Feed a dose to a creature: a creature exposed to it suffers its effect.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureHoursRolled": "4d6",
+     "failureEffect": {
+      "name": "Torpor",
+      "tags": [
+       "speed-halved"
+      ],
+      "modifiers": []
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "truth-serum",
+  "name": "Truth Serum",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 150,
+  "weightLb": 0,
+  "description": "Ingested Poison. A creature subjected to Truth Serum must succeed on a DC 11 Constitution saving throw or have the Poisoned condition for 1 hour. The Poisoned creature can't knowingly communicate a lie.",
+  "poison": {
+   "kind": "ingested",
+   "save": {
+    "ability": "con",
+    "dc": 11,
+    "successDamage": "none",
+    "failureConditions": [
+     "poisoned"
+    ],
+    "failureDuration": {
+     "type": "minutes",
+     "minutes": 60
+    }
+   },
+   "damage": []
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "feed",
+    "name": "Feed Truth Serum",
+    "activation": "action",
+    "description": "Feed a dose to a creature: a creature exposed to it suffers its effect.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "save": {
+     "ability": "con",
+     "dc": 11,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 60
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "wyvern-poison",
+  "name": "Wyvern Poison",
+  "source": "srd",
+  "category": "poison",
+  "costGp": 1200,
+  "weightLb": 0,
+  "description": "Injury Poison. A creature subjected to Wyvern Poison makes a DC 14 Constitution saving throw, taking 24 (7d6) Poison damage on a failed save or half as much damage on a successful one.",
+  "poison": {
+   "kind": "injury",
+   "save": {
+    "ability": "con",
+    "dc": 14,
+    "successDamage": "half",
+    "failureConditions": []
+   },
+   "damage": [
+    {
+     "formula": "7d6",
+     "type": "poison"
+    }
+   ]
+  },
+  "isMagic": false,
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "coat-weapon",
+    "name": "Coat a Weapon with Wyvern Poison",
+    "activation": "bonus-action",
+    "description": "Coat one weapon you carry. The poison stays potent until delivered through a wound: the next hit with it that deals Piercing or Slashing damage exposes the creature hit.",
+    "damage": [],
+    "grants": {
+     "name": "Wyvern Poison (weapon)",
+     "tags": [
+      "poison-coat",
+      "coat-wyvern-poison"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "bindsWeapon": {}
+    }
+   },
+   {
+    "id": "coat-ammunition",
+    "name": "Coat a Piece of Ammunition with Wyvern Poison",
+    "activation": "bonus-action",
+    "description": "Coat one piece of ammunition you carry. The poison stays potent until delivered through a wound: the next hit with it that deals Piercing or Slashing damage exposes the creature hit.",
+    "damage": [],
+    "grants": {
+     "name": "Wyvern Poison (ammunition)",
+     "tags": [
+      "poison-coat",
+      "coat-wyvern-poison"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "bindsWeapon": {
+      "ammunition": true
+     }
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ }
+]

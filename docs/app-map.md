@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 17 GameState fields · 174 commands · 351 HTTP paths
+- 17 GameState fields · 180 commands · 357 HTTP paths
 
 ## GameState shape
 
@@ -38,7 +38,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `crafting`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `crafting`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `environment`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `trap`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -137,6 +137,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `c
 | `encounter.set-player-initiative-mode` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.start` | `combat:write` |
+| `environment.set` | `scene:write` |
 | `fog.paint` | `scene:write` |
 | `fog.reset` | `scene:write` |
 | `fog.set-enabled` | `scene:write` |
@@ -202,6 +203,11 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `c
 | `time.set-dawn` | `combat:write` |
 | `token.move` | `combat:write` |
 | `token.set-altitude` | `combat:write` |
+| `trap.disarm` | `combat:write` |
+| `trap.edit` | `scene:write` |
+| `trap.place` | `scene:write` |
+| `trap.remove` | `scene:write` |
+| `trap.spring` | `combat:write` |
 | `turn.end` | `combat:write` |
 | `turn.order` | `combat:write` |
 | `turn.use` | `combat:write` |
@@ -427,6 +433,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/encounter/player-initiative-mode`
 - `POST /api/v1/game/encounter/rules-mode`
 - `POST /api/v1/game/encounter/start`
+- `POST /api/v1/game/environment`
 - `POST /api/v1/game/experience/award`
 - `POST /api/v1/game/fog/enabled`
 - `POST /api/v1/game/fog/paint`
@@ -488,6 +495,11 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/time/pass`
 - `POST /api/v1/game/tokens/{actorId}/altitude`
 - `POST /api/v1/game/tokens/{actorId}/move`
+- `POST /api/v1/game/traps`
+- `POST /api/v1/game/traps/{trapId}/disarm`
+- `POST /api/v1/game/traps/{trapId}/edit`
+- `POST /api/v1/game/traps/{trapId}/remove`
+- `POST /api/v1/game/traps/{trapId}/spring`
 - `POST /api/v1/game/turn/end`
 - `POST /api/v1/game/turn/legendary`
 - `POST /api/v1/game/turn/order`
