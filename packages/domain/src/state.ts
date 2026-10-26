@@ -395,6 +395,16 @@ export const PendingSaveSchema = z
       .object({ withinFeet: z.number().int().min(5).max(30) })
       .strict()
       .optional(),
+    /** Where a failure sets the creature down, and how high, picked as the action was used (Telekinesis). GM
+     *  bookkeeping, never projected: the move is narrated when it lands. */
+    failureMovesTo: z
+      .object({
+        x: z.number().min(0).max(1_000_000),
+        y: z.number().min(0).max(1_000_000),
+        altitudeFeet: z.number().int().min(0).max(1000).optional()
+      })
+      .strict()
+      .optional(),
     /** SRD Mounted Combat: a failure throws the rider off this mount, landing Prone within 5 feet of it. GM
      *  bookkeeping, never projected: the fall is narrated when it lands. */
     unseats: z.uuid().optional(),

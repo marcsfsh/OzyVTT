@@ -76,8 +76,10 @@ export type TargetingSession = Readonly<
     summonType?: string;
     /** A Thief's Fast Hands takes this item action as a Bonus Action. */
     fastHands?: true;
-    /** The space a leap or a throw sets its creature down in (a bulette's Deadly Leap, a kraken's Fling). */
+    /** The space a leap or a throw sets its creature down in (a bulette's Deadly Leap, a kraken's Fling), or a failed
+     *  save moves its target to (Telekinesis), and how high it lifts it there. */
     destination?: AnnotationPoint;
+    destinationAltitudeFeet?: number;
   } & ShapeChoice
 >;
 
@@ -507,6 +509,13 @@ export function setDestination(point: AnnotationPoint) {
   session = { ...session, destination: point };
   emit();
 }
+/** Sets how high the action lifts its target at that space (Telekinesis), within the feet it moves it. */
+export function setDestinationAltitude(feet: number) {
+  const destination = session?.action.destination;
+  if (!session || !destination?.lifts) return;
+  session = { ...session, destinationAltitudeFeet: Math.max(0, Math.min(destination.feet, feet)) };
+  emit();
+}
 export function setTemplatePlacement(origin: AnnotationPoint, target: AnnotationPoint) {
   if (session?.template) {
     session = { ...session, template: { ...session.template, placed: { origin, target } } };
@@ -680,6 +689,9 @@ export function resolveTargeting(
     ...(itemId !== undefined ? { itemId } : {}),
     ...(objectItemId !== undefined ? { objectItemId } : {}),
     ...(session.destination ? { destination: session.destination } : {}),
+    ...(session.destination && action.destination?.lifts && (session.destinationAltitudeFeet ?? 0) > 0
+      ? { destinationAltitudeFeet: session.destinationAltitudeFeet }
+      : {}),
     ...(shaping && shaping.length > 0 ? { shaping: shaping.map((entry) => ({ ...entry })) } : {}),
     ...(summonPick || summonType
       ? {

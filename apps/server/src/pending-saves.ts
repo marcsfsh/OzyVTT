@@ -61,6 +61,8 @@ export function createPendingSaves(
     successPush?: ForcedPush;
     /** A success moves the creature out beside the source, or fails with no room (a gelatinous cube's Engulf). */
     successMovesOut?: PendingSave["successMovesOut"];
+    /** Where a failure sets the creature down, and how high (Telekinesis). */
+    failureMovesTo?: PendingSave["failureMovesTo"];
     /** A failure throws the rider off this mount (SRD Mounted Combat). */
     unseats?: string;
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
@@ -139,6 +141,7 @@ export function createPendingSaves(
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
     ...(input.successPush ? { successPush: { ...input.successPush } } : {}),
     ...(input.successMovesOut ? { successMovesOut: { ...input.successMovesOut } } : {}),
+    ...(input.failureMovesTo ? { failureMovesTo: { ...input.failureMovesTo } } : {}),
     ...(input.unseats ? { unseats: input.unseats } : {}),
     ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
     ...(input.disadvantageTypes ? { disadvantageTypes: [...input.disadvantageTypes] } : {}),

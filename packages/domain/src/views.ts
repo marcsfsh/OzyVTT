@@ -196,6 +196,7 @@ export type PlayerPendingSave = Omit<
   | "failurePush"
   | "successPush"
   | "successMovesOut"
+  | "failureMovesTo"
   | "unseats"
   | "advantageAtSize"
   | "disadvantageTypes"

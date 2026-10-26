@@ -279,6 +279,16 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     ...(action.legendary?.oncePerRound ? { legendaryOncePerRound: true as const } : {}),
     ...(action.move?.first ? { moveFirst: true as const } : {}),
     ...(action.destination ? { destination: { who: action.destination.who, feet: action.destination.feet } } : {}),
+    // Telekinesis: the space a failed save moves the target to, and how high it lifts it.
+    ...(action.failureMove
+      ? {
+          destination: {
+            who: "target" as const,
+            feet: action.failureMove.feet,
+            ...(action.failureMove.lifts ? { lifts: true as const } : {})
+          }
+        }
+      : {}),
     ...(action.replacesAttack ? { replacesAttack: true as const } : {}),
     ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
     ...(action.darts !== undefined ? { darts: action.darts } : {}),

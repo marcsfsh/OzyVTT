@@ -217,6 +217,10 @@ export const SpellLaterActionSchema = z
     endsSpell: z.literal(true).optional(),
     /** It names the direction the spell's creatures move on their next turns (Compulsion's Bonus Action). */
     setsHeading: ActionSchema.shape.setsHeading,
+    /** A failure moves its target to the space it picks, lifting it where it says so (Telekinesis). */
+    failureMove: ActionSchema.shape.failureMove,
+    /** The carried object it acts on (Telekinesis pulling a weapon from a creature's hands). */
+    object: ActionSchema.shape.object,
     /** It is taken only on the caster's own turn ("On each of your turns": Phantasmal Force). */
     ownTurnOnly: z.literal(true).optional(),
     /** Only the GM takes it, judging when the text's trigger has happened (Geas: "if it acts in a manner directly

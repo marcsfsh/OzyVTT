@@ -243,6 +243,7 @@ const PENDING_SAVE_FIELDS = {
   failurePush: "never",
   successPush: "never",
   successMovesOut: "never",
+  failureMovesTo: "never",
   unseats: "never",
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",

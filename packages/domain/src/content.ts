@@ -1088,9 +1088,12 @@ export type ContentActionSummary = Readonly<{
   /** Its own move comes before the rest of it ("moves up to half its Speed, and it makes one Rend attack"), so it can
    *  be taken move first: `action.resolve`'s `moveFirst`. */ moveFirst?: true;
   /** It sets a creature down in a space its use picks within `feet` of its user: the user itself (a bulette's Deadly
-   *  Leap) or its one target (a kraken's Fling); `action.resolve`'s `destination`. */ destination?: Readonly<{
+   *  Leap) or its one target (a kraken's Fling, or Telekinesis on a failed save, within `feet` of where it stands);
+   *  `action.resolve`'s `destination`. `lifts`: the use also names how high it lifts the target
+   *  (`destinationAltitudeFeet`). */ destination?: Readonly<{
     who: "user" | "target";
     feet: number;
+    lifts?: true;
   }>;
   /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
   /** Added to a hit and never taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;

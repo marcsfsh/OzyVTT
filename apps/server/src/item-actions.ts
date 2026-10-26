@@ -603,6 +603,9 @@ export function laterSpellAction(
     ...(later.breaksEnchantment ? { breaksEnchantment: structuredClone(later.breaksEnchantment) } : {}),
     ...(later.endsSpell ? { endsOwnSpell: true as const } : {}),
     ...(later.setsHeading ? { setsHeading: true as const } : {}),
+    // Where its failure moves its target, and the carried object it acts on (Telekinesis).
+    ...(later.failureMove ? { failureMove: { ...later.failureMove } } : {}),
+    ...(later.object ? { object: structuredClone(later.object) } : {}),
     spellId: spell.id
   };
 }

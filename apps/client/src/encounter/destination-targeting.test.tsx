@@ -14,6 +14,7 @@ import {
   picksDestination,
   resolveTargeting,
   setDestination,
+  setDestinationAltitude,
   targetingReady,
   toggleTarget,
   useTargeting
@@ -83,6 +84,33 @@ describe("a throw to a space", () => {
     act(() => setDestination({ x: 525, y: 75 }));
     resolveTargeting(undefined, () => {});
     expect(await lastResolve()).toMatchObject({ targetIds: [HERO], destination: { x: 525, y: 75 } });
+  });
+});
+
+describe("Telekinesis moving a creature", () => {
+  it("asks for the creature, the space it is moved to and how high it is lifted there", async () => {
+    const MOVE = {
+      ...LEAP,
+      id: "spell-telekinesis-then-move-a-creature",
+      name: "Telekinesis: move a creature",
+      saveAbility: "str",
+      damage: [],
+      destination: { who: "target", feet: 30, lifts: true }
+    } as ContentActionSummary;
+    beginTargeting(MOVE, MONSTER);
+    render(<Picker />);
+    expect(screen.getByText("Choose the creature to move, then tap the space it lands in.")).toBeTruthy();
+    act(() => toggleTarget(HERO));
+    expect(screen.queryByText("Lift (ft)")).toBeNull();
+    act(() => setDestination({ x: 300, y: 200 }));
+    expect(screen.getByText("Lift (ft)")).toBeTruthy();
+    act(() => setDestinationAltitude(45));
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({
+      targetIds: [HERO],
+      destination: { x: 300, y: 200 },
+      destinationAltitudeFeet: 30
+    });
   });
 });
 

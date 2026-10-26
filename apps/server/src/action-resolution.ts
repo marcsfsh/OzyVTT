@@ -73,6 +73,7 @@ import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import { applyRestoration, endNamedEffects } from "./resolution/restoration.js";
 import { breakEnchantment, endOwnSpell } from "./resolution/break-enchantment.js";
 import { designateHeading } from "./resolution/compel.js";
+import { releasePriorTarget } from "./resolution/telekinesis.js";
 import { mendOnCast } from "./resolution/mend.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
 import { raiseOnAction, reviveOnCast } from "./resolution/revival.js";
@@ -491,6 +492,7 @@ export function resolveDefinitionAction(
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
+  releasePriorTarget(ctx);
   parkActionSave(ctx);
   endTargetMarks(ctx);
   parkBurstSave(ctx);

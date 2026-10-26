@@ -1,6 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { HELD_BY_CARRIED_TAG, heldByCarried } from "../carried-objects.js";
 import { prismaticSpray } from "./prismatic.js";
+import { failureMoveOf } from "./telekinesis.js";
 import { SCRYING_PICKS, type PendingReaction, type PendingSave } from "@vtt/domain";
 import { catalogIdOf, DamageTypeSchema, type ActionReaction, type GrantOption, type InventoryItem } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
@@ -820,7 +821,16 @@ export function parkActionSave(ctx: ResolveContext): void {
       failed && input.currentTurnOf !== undefined && targetIds.includes(input.currentTurnOf)
         ? { ...failed, currentTurn: true as const }
         : failed;
-    const marked = objectRowId !== null ? { ...extra, objectPenalty: { rowId: objectRowId } } : extra;
+    // The object a failure marks (a rust monster's Antennae) or pulls from the creature's hands (Telekinesis).
+    const marked =
+      objectRowId === null
+        ? extra
+        : action.object?.does === "pulled-on-failure"
+          ? { ...extra, dropsRowId: objectRowId }
+          : { ...extra, objectPenalty: { rowId: objectRowId } };
+    // Where a failure moves its one target (Telekinesis).
+    const moved = ctx.targets.find((target) => target.id === targetIds[0]);
+    const failureMovesTo = action.failureMove && moved && targetIds.length === 1 ? failureMoveOf(ctx, moved) : undefined;
     createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -840,6 +850,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.successPush ? { successPush: action.save.successPush } : {}),
       ...(action.save.successMovesOut ? { successMovesOut: action.save.successMovesOut } : {}),
+      ...(failureMovesTo ? { failureMovesTo } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
       ...(action.save.disadvantageTypes ? { disadvantageTypes: action.save.disadvantageTypes } : {}),
       ...(against ? { spell: against } : {}),

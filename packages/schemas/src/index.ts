@@ -5572,6 +5572,16 @@ export const ActionSchema = z
       .literal(true)
       .optional()
       .describe("The cast picks its caster's knowledge of the target and connection to it, which modify the target's save"),
+    /** A failed save moves the target up to `feet` to the space its use picks (`destination`), within the action's
+     *  range of its user; with `lifts`, up into the air to the height the use names (`destinationAltitudeFeet`), where
+     *  it hangs while the failure lasts and falls once it ends (Telekinesis). */
+    failureMove: z
+      .object({ feet: z.number().int().min(5).max(120), lifts: z.literal(true).optional() })
+      .strict()
+      .optional()
+      .describe(
+        "A failed save moves the target up to `feet` to the space its use picks, within its range; with `lifts`, up to the height the use names, held there while the failure lasts"
+      ),
     /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
      *  The resolve's targets assign them in order, a target named twice taking two. */
     darts: z.number().int().min(2).max(20).optional(),
@@ -5963,7 +5973,9 @@ export const ActionSchema = z
           .min(1)
           .max(2),
         metal: z.literal(true).optional(),
-        does: z.enum(["penalty-on-failure"])
+        /** What a failed save does to it: a cumulative -1 (a rust monster's Antennae), or it is pulled from the
+         *  creature's hands (Telekinesis on a carried object). */
+        does: z.enum(["penalty-on-failure", "pulled-on-failure"])
       })
       .strict()
       .optional()

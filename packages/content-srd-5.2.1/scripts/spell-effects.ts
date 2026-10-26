@@ -258,7 +258,6 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   "spider-climb": { count: 1, perSlot: 1 },
   stoneskin: { count: 1 },
   suggestion: { count: 1 },
-  telekinesis: { count: 1 },
   "telepathic-bond": { count: 8 },
   teleport: { count: 9 },
   // Instant Health: "you and up to twenty other creatures"; Resistance and Spell Immunity take up to ten.
@@ -370,6 +369,9 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "flaming-sphere",
   "forcecage",
   "freedom-of-movement",
+  // Its Strength save belongs to the creature or object it is exerted on, the cast's own use and each later one
+  // (`LATER_ACTIONS`).
+  "telekinesis",
   "gaseous-form",
   "guardian-of-faith",
   "haste",
@@ -1379,6 +1381,40 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "action",
       when: "A Magic action shows the faint aura round each creature in sight within 30 feet that bears magic, and the school of the spells on it.",
       reveals: true,
+      damage: []
+    }
+  ],
+  // "When you cast the spell and as a Magic action on your later turns before the spell ends, you can exert your will on
+  // one creature or object that you can see within range ... Creature. You can try to move a Huge or smaller creature.
+  // The target must succeed on a Strength saving throw, or you move it up to 30 feet in any direction within the spell's
+  // range. Until the end of your next turn, the creature has the Restrained condition, and if you lift it into the air,
+  // it is suspended there ... Object ... If the object is worn or carried by a creature, that creature must succeed on a
+  // Strength saving throw, or you pull the object away". Fine control of objects is the table's.
+  telekinesis: [
+    {
+      name: "move a creature",
+      activation: "action",
+      withCast: true,
+      when: "With the cast and as a Magic action on later turns, a Huge or smaller creature you see within 60 feet makes a Strength save or is moved up to 30 feet to the space you pick, lifted if you choose, and Restrained until the end of your next turn.",
+      targets: { count: 1, rangeFeet: 60, seen: true, maxSize: "huge" },
+      save: {
+        ability: "str",
+        successDamage: "none",
+        failureConditions: ["restrained"],
+        failureDuration: { type: "until-source-turn-end" }
+      },
+      failureEffect: { name: "Telekinesis", tags: ["telekinetic", "suspended"], modifiers: [] },
+      failureMove: { feet: 30, lifts: true },
+      damage: []
+    },
+    {
+      name: "pull an object",
+      activation: "action",
+      withCast: true,
+      when: "With the cast and as a Magic action on later turns, a creature you see within 60 feet makes a Strength save or the weapon it holds is pulled from its hands.",
+      targets: { count: 1, rangeFeet: 60, seen: true },
+      object: { kinds: ["weapon"], does: "pulled-on-failure" },
+      save: { ability: "str", successDamage: "none", failureConditions: [] },
       damage: []
     }
   ],

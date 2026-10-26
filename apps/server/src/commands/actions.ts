@@ -588,6 +588,9 @@ export const actionCommands = [
             ...(request.ready === true ? { ready: true } : {}),
             ...(request.moveFirst === true ? { moveFirst: true } : {}),
             ...(request.destination ? { destination: request.destination } : {}),
+            ...(request.destinationAltitudeFeet !== undefined
+              ? { destinationAltitudeFeet: request.destinationAltitudeFeet }
+              : {}),
             // The rest of an action whose move was taken first was paid for then.
             ...(request.moveFirst !== true && activeMoveGrant(draft, attacker)?.owedActionId === action.id
               ? { owedPaid: true }

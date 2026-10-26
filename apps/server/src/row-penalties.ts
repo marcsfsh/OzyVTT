@@ -53,6 +53,8 @@ const isMetal = (row: InventoryItem) => !NOT_METAL.has(row.baseId ?? catalogIdOf
 
 /** Whether a row is an object of the kinds an action acts on. */
 function fits(row: InventoryItem, rule: NonNullable<ActorAction["object"]>, catalog: EquipmentCatalog | undefined) {
+  // Telekinesis pulls any weapon from a creature's hands, magic or not.
+  if (rule.does === "pulled-on-failure") return row.quantity > 0 && row.equipped && row.weapon !== undefined;
   if (row.quantity <= 0 || isMagicRow(row, catalog)) return false;
   if (rule.metal && !isMetal(row)) return false;
   return (

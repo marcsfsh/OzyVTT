@@ -1,4 +1,5 @@
 import { dropHeldRow } from "./effects.js";
+import { setAltitude } from "./altitude.js";
 import { ownSizeOf, takeForm } from "./transform/assume.js";
 import { revertOnFailure } from "./transform/rules.js";
 import { refreshSize } from "./transform/forms.js";
@@ -1418,6 +1419,17 @@ export function answerSave(
         ...(deps.catalog ? { catalog: deps.catalog } : {})
       })
     );
+  // Telekinesis: the creature is moved to the space picked, and up into the air where it was lifted.
+  if (!success && pending.failureMovesTo) {
+    const { altitudeFeet, ...at } = pending.failureMovesTo;
+    deps.placeToken?.(target.id, at);
+    if (altitudeFeet !== undefined) setAltitude(state, target.id, altitudeFeet, "fly");
+    events.push({
+      kind: "effect",
+      text: `${pending.actionName} moves ${target.name}${altitudeFeet ? `, lifting it ${altitudeFeet} feet into the air` : ""}.`,
+      actorId: target.id
+    });
+  }
   // A gibbering mouther's d8 decides what the creature does this turn.
   if (!success && pending.onFailEffect?.tags.includes(GIBBERING_TAG))
     events.push(

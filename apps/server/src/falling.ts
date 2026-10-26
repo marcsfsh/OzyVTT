@@ -33,6 +33,8 @@ export const FEATHER_FALL_TAG = "feather-fall";
 export const LEVITATING_TAG = "levitating";
 /** Reverse Gravity holds the creature at the top of its Cylinder; it falls when the spell ends. */
 export const GRAVITY_REVERSED_TAG = "gravity-reversed";
+/** On an effect, it holds its bearer up in the air where it hangs (Telekinesis), and as it ends the bearer falls. */
+export const SUSPENDED_TAG = "suspended";
 /** SRD Reverse Gravity: "a 50-foot-radius, 100-foot high Cylinder", whose top a creature falls up to. A ceiling lower
  *  than that is the GM's. */
 const REVERSED_TOP_FEET = 100;
@@ -70,6 +72,8 @@ const definitionOf = (actor: Actor, deps: Pick<FallDeps, "resolveDefinition">) =
  *  it is let go. */
 export function heldAloft(state: GameState, actorId: string): boolean {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
+  // Telekinesis: "if you lift it into the air, it is suspended there" while the spell holds it.
+  if (actor?.effects.some((effect) => effect.tags.includes(SUSPENDED_TAG))) return true;
   return (
     actor?.effects.some(
       (effect) =>
