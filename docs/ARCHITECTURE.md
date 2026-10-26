@@ -155,6 +155,11 @@ audience. There are five:
   Hunter's Mark, while that Hunter has Hunter's Lore, carries `knownDefences` in that player's projection alone:
   its damage Immunities, Resistances and Vulnerabilities and its condition Immunities, read live, gone when the mark
   ends (`hunters-lore.ts`).
+  A trap the party hasn't found never reaches a player or the table screen; a found one carries its name, area and
+  state, and for players the names of the ways to make it safe while it is armed, never its band of levels or a DC
+  (`playerTraps`, `visibleTraps` in `traps.ts`). What Find Traps senses reaches the initiator's reply alone, by
+  nature (`sensed`), while where each trap lies is a GM-only line. The scene's weather (`combat.environment`) and
+  a creature's exposure counters (`exposure`) are GM-only.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
   room that may hold non-players. It follows the live scene, before and during its fight, unless
   the GM paused it. Only public actors with a position become tokens; annotations
@@ -315,6 +320,20 @@ of a hidden thing. When in doubt, leave it out.
   `actor:movement` reply gives the preview the cells it changes for the mover, of the areas and the creatures the
   asker can see (`areaGround`, `zone-preview.ts`); the area itself is on the map. A cast's template grows with a higher slot as
   the availability row says (`areaPerSlot`), so the drawn template is the size the server places.
+- Water and ice are painted terrain kinds beside difficult terrain (`combat.terrain.water`, `runningWater`,
+  `ice`; one cell holds one kind). A step into water costs a foot more unless the mover has a Swim Speed
+  (`movementPath`'s `isWater` and `swimExtra`); Water Walk and a Monk's Acrobatic Movement on its own turn walk on
+  it, and a form that can't pass through liquid (a vampire's mist) finds it closed (the `actor:movement` reply's
+  `walksOnWater` and `barredByWater`, which the preview reads). `water.ts` reads what stands in it: Water
+  Susceptibility as a move ends, a vampire's Running Water as its turn ends, Shape-Shift and Misty Escape refused in
+  running water, and Limited Amphibiousness on the clock. Ice is Difficult Terrain, and `ice.ts` asks its Dexterity
+  save where a move first comes onto it and as a turn starts there.
+- Traps (`traps.ts`) are the Gameplay Toolbox's sample traps the GM sets over a dragged area (`combat.traps`),
+  hidden until the party finds one or one goes off. A move meets a trap on its way as it meets an area whose save
+  stops it (`map-hazards.ts`, read first by `walkThroughZones`): the move goes as far as the trap, which acts on its
+  mover or each creature in its blast, and a pit ends the move at the bottom (`walk.ends`), where its walls hold a
+  creature with no Climb Speed or climbing gear (`movement.pit`). A Search or Study meeting a way's DC within reach
+  finds it, and `trap.disarm` makes a found one safe, rolling a check with Thieves' Tools where the trap names one.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
   point is above the ground, and `airborne` says what holds it up in the air (flying, or a
   levitation); a creature on a ledge or a wall it climbs is up without being airborne. A space is as
@@ -544,6 +563,14 @@ While the GM tracks food and water (`rest.survival`), each midnight it crosses e
 character, which eats and drinks what it carries (Rations, then a Bead of Nourishment) and meets the hunger and
 thirst rules (`survival.ts`).
 A creature out of air counts its held breath down on the clock as it does at its turns' ends (`breath.ts`).
+The scene's climate and weather (`combat.environment`, set with `environment.set`) wear on the creatures placed on
+its map (`environment.ts`): the clock asks extreme cold's and extreme heat's Constitution saves at each hour's end
+(a Bedroll passes the cold, a Blanket gives Advantage), and frigid and deep water count minutes in the painted
+water, frigid water by the round in a fight. The counts live on the creature (`exposure`, GM-only). Heavy rain,
+snow and strong wind are an effect each placed creature holds, settled after every command, that puts out its
+open flames; a strong wind brings down a flier that ends its turn aloft. Time passed at a travel pace counts
+Extended Travel's hours past 8, twice as fast at high altitude, until a Long Rest. A sahuagin's time out of water
+counts on the clock too (`water.ts`).
 
 Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
 creature died: the fight's round while its fight runs, then the game clock. A rule that kills also says what killed
