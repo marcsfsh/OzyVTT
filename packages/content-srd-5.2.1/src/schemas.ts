@@ -215,6 +215,8 @@ export const SpellLaterActionSchema = z
     breaksEnchantment: ActionSchema.shape.breaksEnchantment,
     /** Taking it ends the spell (Dispel Evil and Good's special functions). */
     endsSpell: z.literal(true).optional(),
+    /** It names the direction the spell's creatures move on their next turns (Compulsion's Bonus Action). */
+    setsHeading: ActionSchema.shape.setsHeading,
     /** It is taken only on the caster's own turn ("On each of your turns": Phantasmal Force). */
     ownTurnOnly: z.literal(true).optional(),
     /** Only the GM takes it, judging when the text's trigger has happened (Geas: "if it acts in a manner directly

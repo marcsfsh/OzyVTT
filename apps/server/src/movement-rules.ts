@@ -47,6 +47,7 @@ import { DAZED_TAG } from "./resolution/economy.js";
 import type { MovementCost, MovementCostOptions } from "./terrain.js";
 import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
 import { fearSources } from "./vision/rules.js";
+import { compelledMoveRefusal } from "./compelled-moves.js";
 import {
   effectiveModeFor,
   familyModeFor,
@@ -617,6 +618,12 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       `${mover.name} is Frightened and can't willingly move closer to ${feared}.`,
       outcome
     );
+  // A move an effect compels on the creature's own turn goes its way (Fear's flight, Compulsion's heading).
+  const compelled =
+    counted && mode !== "teleport" && state.combat.turnActorId === mover.id
+      ? compelledMoveRefusal(state, mover, from, to, input)
+      : null;
+  if (compelled) police(state, input, "movement.compelled", compelled, outcome);
   // SRD Climber's Kit: "you can't move more than 25 feet from there without undoing the anchor".
   const tether = (counted || input.byPlayer || grant) && strainsAnchor(input, mover, to);
   if (tether) police(state, input, "movement.tether", tether, outcome);

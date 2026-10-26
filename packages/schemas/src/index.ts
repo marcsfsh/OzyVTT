@@ -1572,6 +1572,8 @@ export const RepeatSaveSchema = z
     unseenSource: z.literal(true).optional(),
     /** Only when the bearer ends its turn more than this many feet from the effect's source (Antipathy/Sympathy). */
     beyondFeet: z.number().int().min(5).max(5280).optional(),
+    /** Only at the end of a turn on which the effect compelled its move (Compulsion). */
+    afterCompelledMove: z.literal(true).optional(),
     /** A success makes the bearer immune to the effect's source for the rest of the fight (Antipathy/Sympathy). */
     immuneOnSuccess: z.literal(true).optional(),
     /** How long that immunity lasts on the game clock, in minutes (Antipathy/Sympathy's 1); absent, the fight. */
@@ -1825,6 +1827,36 @@ export const TeleportLandingSchema = z
   })
   .strict();
 export type TeleportLanding = z.infer<typeof TeleportLandingSchema>;
+/**
+ * How an effect makes its bearer move on its own turns (SRD 5.2.1 Fear: "takes the Dash action and moves away from you
+ * by the safest route on each of its turns"; Compulsion: "must use as much of its movement as possible to move in that
+ * direction"): each of its moves must go `away` from or `toward` the effect's source (or `point`, a spot on the map:
+ * a Symbol's glyph), or along `heading` (degrees clockwise from the map's top: 0 north, 90 east). `allMovement`: it
+ * uses all the movement it has that way; `minFeet`: at least that far, if able; `dashes`: it takes the Dash action.
+ * `fromArea`: the point is the area's origin, set as the effect lands. `once`: it binds only the bearer's next turn.
+ * `holdsNear`: within 5 feet of the source it can't willingly move away (Sympathy).
+ */
+export const CompelledMoveSchema = z
+  .object({
+    way: z.enum(["away", "toward", "heading"]),
+    point: z
+      .object({ x: z.number().min(0).max(1_000_000), y: z.number().min(0).max(1_000_000) })
+      .strict()
+      .optional(),
+    heading: z.number().int().min(0).max(359).optional(),
+    allMovement: z.literal(true).optional(),
+    minFeet: z.number().int().min(5).max(120).optional(),
+    dashes: z.literal(true).optional(),
+    fromArea: z.literal(true).optional(),
+    once: z.literal(true).optional(),
+    holdsNear: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "How the effect makes its bearer move on its turns: away from or toward its source (or a point), or along a heading in degrees; with all its movement, at least minFeet, after taking the Dash action, only on its next turn (once), or unable to move away once within 5 feet (holdsNear)"
+  );
+export type CompelledMove = z.infer<typeof CompelledMoveSchema>;
+
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
 export const EffectInstanceSchema = z
@@ -2161,6 +2193,14 @@ export const EffectInstanceSchema = z
      *  gives it back. */
     ownSize: z
       .object({ size: SizeSchema.optional(), sizeCells: z.number().int().min(1).max(4).optional() })
+      .strict()
+      .optional(),
+    /** How it makes its bearer move on its turns (Fear's flight, Compulsion's heading, Confusion's wander). */
+    compelled: CompelledMoveSchema.optional(),
+    /** The one creature its bearer's action may strike this turn, with one melee attack (Confusion's 7-8: "one melee
+     *  attack against a random creature within reach"), picked by the server. */
+    forcedAttack: z
+      .object({ targetId: z.uuid() })
       .strict()
       .optional()
   })
@@ -3033,7 +3073,9 @@ export const GrantOptionSchema = z
         ability: z.union([AbilitySchema, z.literal("spellcasting")])
       })
       .strict()
-      .optional()
+      .optional(),
+    /** How it makes the bearer move on its turns (Command's Flee, Eyebite's Panicked: away from the caster). */
+    compelled: CompelledMoveSchema.optional()
   })
   .strict();
 export type GrantOption = z.infer<typeof GrantOptionSchema>;
@@ -3575,6 +3617,12 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("The target repeats the save only when it ends its turn where it can't see the source"),
+  /** The target repeats the save at the end of a turn on which the effect compelled its move, and only then
+   *  (Compulsion: "After moving in this way, a target repeats the save"). */
+  repeatAfterCompelledMove: z
+    .literal(true)
+    .optional()
+    .describe("The target repeats the save at the end of a turn the effect compelled it to move on, and only then"),
   /** The failure ends when the target ends its turn out of the source's line of sight (Horror Nimbus). */
   endsOutOfSight: z
     .literal(true)
@@ -4035,7 +4083,9 @@ export const SaveFailureEffectSchema = z
     /** The light the creature sheds while it lasts (Faerie Fire: "Each creature ... sheds Dim Light"). */
     light: CarriedLightSchema.optional(),
     /** The creature's size while it lasts (Enlarge/Reduce: one size larger or smaller). */
-    sizeChange: SizeChangeSchema.optional()
+    sizeChange: SizeChangeSchema.optional(),
+    /** How it makes the creature move on its turns (Fear: Dash away from the caster on each of them). */
+    compelled: CompelledMoveSchema.optional()
   })
   .strict();
 
@@ -5140,6 +5190,12 @@ export const SummonCreatureSchema = z
           .array(z.string().regex(/^(?:darkvision|blindsight|tremorsense|truesight) \d{1,4} ft\.$/))
           .min(1)
           .max(4)
+          .optional(),
+        /** What it does beside its stat block's traits, run as theirs are (a Goat of Terror's fear while ridden). */
+        traits: z
+          .array(z.lazy(() => TraitMechanicSchema))
+          .min(1)
+          .max(3)
           .optional()
       })
       .strict()
@@ -5504,6 +5560,12 @@ export const ActionSchema = z
     /** Taking it ends the spell it belongs to, its user's Concentration on it included (Dispel Evil and Good's special
      *  functions). */
     endsOwnSpell: z.literal(true).optional().describe("Taking it ends its spell, and its user's Concentration on it"),
+    /** It names a compass direction (`optionId`) that each creature its spell compels must move on its next turn
+     *  (Compulsion: "you can take a Bonus Action to designate a direction that is horizontal to you"). */
+    setsHeading: z
+      .literal(true)
+      .optional()
+      .describe("It names the compass direction each creature its spell compels must move on its next turn"),
     /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
      *  The resolve's targets assign them in order, a target named twice taking two. */
     darts: z.number().int().min(2).max(20).optional(),
@@ -6427,6 +6489,9 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       seenOnly: z.literal(true).optional(),
       /** It acts only while the fight is underwater (an aboleth's Mucus Cloud). */
       underwaterOnly: z.literal(true).optional(),
+      /** It acts only while a creature rides its bearer, and what its failure leaves ends once none does (a Goat of
+       *  Terror: "While you ride the goat ... until you are no longer riding the goat"). */
+      whileRidden: z.literal(true).optional(),
       damage: TraitDamageSchema.optional(),
       save: TraitSaveSchema.optional(),
       /** The fire it sets (a fire elemental's Emanation): "start burning" (SRD Burning). */

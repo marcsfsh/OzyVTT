@@ -599,6 +599,7 @@ export function laterSpellAction(
     ...(later.targets ? { targets: structuredClone(later.targets) } : {}),
     ...(later.breaksEnchantment ? { breaksEnchantment: structuredClone(later.breaksEnchantment) } : {}),
     ...(later.endsSpell ? { endsOwnSpell: true as const } : {}),
+    ...(later.setsHeading ? { setsHeading: true as const } : {}),
     spellId: spell.id
   };
 }

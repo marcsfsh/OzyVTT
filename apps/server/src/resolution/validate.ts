@@ -189,8 +189,9 @@ function combatantsOf(
     (input.wallId !== undefined && (action.targets?.objects === true || action.doorWork !== undefined)) ||
     // An area that harms the objects under it may catch no creature (Clap of Thunder against a door).
     (action.objectDamage !== undefined && input.placedArea !== undefined) ||
-    // Pointing at what is hidden (a Wand of Secrets) is something done.
+    // Pointing at what is hidden (a Wand of Secrets) is something done, and so is naming a direction (Compulsion).
     action.pointsAtHidden !== undefined ||
+    action.setsHeading === true ||
     // Raising or shrinking a tower is something done (an Instant Fortress).
     action.raisesTower !== undefined ||
     action.dismissesTower === true ||
@@ -222,6 +223,7 @@ function combatantsOf(
     action.endsCurses === undefined &&
     action.restores === undefined &&
     action.breaksEnchantment === undefined &&
+    action.setsHeading === undefined &&
     !spendsALimitedUse &&
     !castsASpell &&
     !movesAnArea &&

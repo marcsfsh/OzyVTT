@@ -439,6 +439,8 @@ export function failureEffectFor(
     ].slice(0, 8),
     ...(shaped.form ? { form: structuredClone(shaped.form) } : {}),
     ...(declared?.sizeChange ? { sizeChange: { ...declared.sizeChange } } : {}),
+    // How it makes the creature move on its turns (Fear's flight, Command's Flee).
+    ...(parts.compelled || declared?.compelled ? { compelled: structuredClone(parts.compelled ?? declared!.compelled!) } : {}),
     modifiers: [...(declared?.modifiers ?? []), ...parts.modifiers],
     ...(option ? { optionId: option.id } : {}),
     ...(parts.conditionImmunities.length > 0 ? { conditionImmunities: [...parts.conditionImmunities] } : {}),

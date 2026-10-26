@@ -693,6 +693,11 @@ function act(
     conditionIds,
     content.spell ? { spell: content.spell, level: zone.level } : undefined
   );
+  // A flight from the area itself (a Symbol of Fear: "at least 30 feet away from the glyph") measures from its origin.
+  const origin = onFail?.compelled?.fromArea && zone.annotationId
+    ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)?.geometry.origin
+    : undefined;
+  if (onFail?.compelled && origin) onFail.compelled = { ...onFail.compelled, point: { x: origin.x, y: origin.y } };
   // A save at the start of the creature's own turn that lasts "until the end of that turn" ends with this one.
   const currentTurn = meeting === "starts its turn in" && save.failureDuration?.type === "until-bearer-turn-end";
   createPendingSaves(state, {

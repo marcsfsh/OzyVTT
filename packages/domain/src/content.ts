@@ -941,6 +941,17 @@ export const RESTORATION_PICKS: ReadonlyArray<Readonly<{ id: string; name: strin
   // What another effect's own text says Greater Restoration ends (Befuddlement, Contact Other Plane's Incapacitated).
   { id: "other", name: "Another effect it ends" }
 ];
+/** The horizontal directions a compelling spell can name (Compulsion), by eighths of a turn from north. */
+export const COMPASS_HEADINGS: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "north", name: "North" },
+  { id: "northeast", name: "Northeast" },
+  { id: "east", name: "East" },
+  { id: "southeast", name: "Southeast" },
+  { id: "south", name: "South" },
+  { id: "southwest", name: "Southwest" },
+  { id: "west", name: "West" },
+  { id: "northwest", name: "Northwest" }
+];
 /** Wish's uses, picked as it is cast: duplicating a spell, and the effects the spell lists. */
 export const WISH_USES: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
   { id: "duplicate", name: "Duplicate a spell" },
@@ -956,6 +967,7 @@ type ChoosingAction = Readonly<{
   teleportOutcome?: true;
   wishUses?: true;
   restores?: true;
+  setsHeading?: true;
   identifiesItem?: true;
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
@@ -982,7 +994,9 @@ export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
         ? { options: WISH_USES }
         : action.restores
           ? { options: RESTORATION_PICKS }
-          : action.save?.failureEffect;
+          : action.setsHeading
+            ? { options: COMPASS_HEADINGS }
+            : action.save?.failureEffect;
   const granted = action.grants?.bindsWeapon;
   // An oil that remakes a row asks for a Melee weapon or a stack of ammunition.
   const binds: ActionChoices["bindsWeapon"] = granted

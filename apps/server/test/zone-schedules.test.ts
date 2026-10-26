@@ -10,6 +10,7 @@ import { checkAimInArea, stageRefusal, withAreaDice } from "../src/zone-later.js
 import { zonesAfterMove, zonesAtTurnEnd } from "../src/spell-zones.js";
 import { deflectingWall } from "../src/zone-walls.js";
 import { build, catalog, druidInput, fight, FOE, FOE2, HERO, heroTurnAgain, view } from "./spell-casters.js";
+import { answer } from "./spell-lifetimes-kit.js";
 import {
   carry,
   cell,
@@ -117,11 +118,11 @@ describe("Symbol: a hidden glyph that glows when set off", () => {
   const wizard = wizardAt(13, ["symbol", "magic-missile"]);
 
   /** A Symbol of Stunning on the floor at (10,10), inscribed before the fight; the orc waits 25 feet from it. */
-  function glyph() {
+  function glyph(option = "stunning") {
     const caster = fight(wizard, { combat: false });
     place(caster.state, { [HERO]: cell(0, 0), [FOE]: cell(20, 10), [FOE2]: cell(15, 10) });
     carry(caster.state, HERO, "Diamond dust");
-    caster.resolve("spell-symbol", { targetIds: [], commandId: CAST, areaPlaced: true, option: "stunning" });
+    caster.resolve("spell-symbol", { targetIds: [], commandId: CAST, areaPlaced: true, option });
     drawArea(caster.state, CAST, [10, 10], 1);
     startEncounter(
       caster.state,
@@ -169,6 +170,20 @@ describe("Symbol: a hidden glyph that glows when set off", () => {
     expect(actor(state, HERO).effects.find((effect) => effect.spell?.id === "symbol")?.duration).toEqual({
       type: "rounds",
       remaining: 100
+    });
+  });
+
+  it("sends a creature its Fear frightens at least 30 feet away from the glyph on each of its turns", () => {
+    // "While Frightened, the target must move at least 30 feet away from the glyph on each of its turns, if able."
+    const { state } = glyph("fear");
+    zonesAfterMove(state, { moverId: FOE, path: [cell(20, 10), cell(15, 11), cell(11, 10)] }, zoneDeps());
+    answer(state, FOE, 2);
+    const origin = state.combat.annotations.find((annotation) => annotation.id === CAST)!.geometry.origin;
+    expect(actor(state, FOE).effects.find((effect) => effect.name === "Symbol of Fear")?.compelled).toEqual({
+      way: "away",
+      minFeet: 30,
+      fromArea: true,
+      point: { x: origin.x, y: origin.y }
     });
   });
 });

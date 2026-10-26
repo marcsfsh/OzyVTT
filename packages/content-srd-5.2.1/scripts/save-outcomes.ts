@@ -46,6 +46,7 @@ export type SaveOutcome = {
   advantageIfFighting?: true;
   immuneOnSuccess?: true;
   immuneMinutes?: number;
+  repeatAfterCompelledMove?: true;
   endsWhenSourceDies?: true;
   endedBy?: EndedBy;
   onlyCreatureTypes?: string[];
@@ -768,6 +769,9 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // "At the end of each of its turns, an affected target repeats the save, ending the spell on itself on a success",
   // with no condition named for the reader to hang it on.
   confusion: { repeatSave: true },
+  // "Each Charmed target must use as much of its movement as possible to move in that direction on its next turn ...
+  // After moving in this way, a target repeats the save, ending the spell on itself on a success."
+  compulsion: { repeatAfterCompelledMove: true },
   // "Another 5d4 Acid damage at the end of its next turn", with no condition for the reader to hang it on.
   "vitriolic-sphere": {
     ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }

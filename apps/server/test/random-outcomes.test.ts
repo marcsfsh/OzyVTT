@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { makeEffect } from "../src/effects.js";
 import { confusedTurn, gibberingTurn } from "../src/random-outcomes.js";
-import { actorOf, answer, cast, caster } from "./spell-lifetimes-kit.js";
-import { FOE, FOE2 } from "./spell-casters.js";
+import { builtinActionFor } from "../src/builtin-actions.js";
+import { actorOf, answer, cast, caster, resolveAs, wizard } from "./spell-lifetimes-kit.js";
+import { FOE, FOE2, HERO, heroTurnAgain } from "./spell-casters.js";
 
 // Tables the server rolls on (SRD 5.2.1): Prismatic Spray's ray per creature, Confusion's d10 each turn, Gibbering's
 // d8 and Chromatic Orb's leap.
@@ -67,9 +68,47 @@ describe("Confusion", () => {
       speedZero: true,
       duration: { type: "until-bearer-turn-end", skipsCurrentTurn: false }
     });
-    // A 1 sends it wandering in the d4's direction.
+    // A 1 sends it wandering in the d4's direction, with all its movement.
     const faces = [1, 3];
     expect(confusedTurn(fight.state, FOE, () => faces.shift()!)[0]?.text).toMatch(/move south\.$/);
+    expect(actorOf(fight.state, FOE).effects[1]?.compelled).toEqual({
+      way: "heading",
+      heading: 180,
+      allMovement: true,
+      once: true
+    });
+  });
+
+  it("picks a random creature within reach on a 7 or 8, and refuses any other swing", () => {
+    const fight = caster();
+    cast(fight, "confusion", { targetIds: [HERO] });
+    answer(fight.state, HERO, 2);
+    heroTurnAgain(fight.state);
+    // The Goblin stands within 5 feet of the wizard, the Orc 30 feet off: the d10 shows 7 and the pick is the first.
+    const faces = [7, 1];
+    const lashed = confusedTurn(fight.state, HERO, () => faces.shift()!, {
+      distanceFeet: (a, b) => (a === HERO && b === FOE ? 5 : 30)
+    });
+    expect(lashed[0]?.text).toBe(
+      "Ansel rolls 7 on the d10 for Confusion: it doesn't move, and its action is one melee attack against Goblin, picked at random within its reach."
+    );
+    const swing = builtinActionFor(wizard, "unarmed-strike")!;
+    expect(() => resolveAs(fight, swing, { targetIds: [FOE2], builtin: true }, [15])).toThrow(
+      "Ansel's action this turn is one melee attack against Goblin."
+    );
+    expect(() => cast(fight, "fire-bolt", { targetIds: [FOE] })).toThrow();
+    resolveAs(fight, swing, { targetIds: [FOE], builtin: true }, [15]);
+    expect(() => resolveAs(fight, swing, { targetIds: [FOE], builtin: true }, [15])).toThrow();
+  });
+
+  it("takes no action on a 7 with no creature within reach", () => {
+    const fight = caster();
+    cast(fight, "confusion", { targetIds: [HERO] });
+    answer(fight.state, HERO, 2);
+    const faces = [8];
+    expect(
+      confusedTurn(fight.state, HERO, () => faces.shift()!, { distanceFeet: () => 30 })[0]?.text
+    ).toBe("Ansel rolls 8 on the d10 for Confusion: it doesn't move, and no creature is within its reach, so it takes no action.");
   });
 });
 
@@ -87,11 +126,31 @@ describe("Gibbering", () => {
         duration: { type: "until-bearer-turn-end", skipsCurrentTurn: false }
       })
     ];
-    expect(gibberingTurn(goblin, () => 3)[0]?.text).toBe(
+    expect(gibberingTurn(fight.state, goblin, () => 3)[0]?.text).toBe(
       "Goblin rolls 3 on the d8 for Gibbering: it does nothing this turn."
     );
     expect(goblin.effects[0]).toMatchObject({ name: "Gibbering: does nothing", speedZero: true });
     expect(goblin.effects[0]?.tags).toEqual(expect.arrayContaining(["no-actions", "no-bonus-actions", "no-reactions"]));
+  });
+
+  it("wanders all its movement in a rolled direction on a 5 or 6, and swings at a rolled creature on a 7 or 8", () => {
+    const fight = caster();
+    const gibbering = () =>
+      makeEffect({
+        id: "g",
+        name: "Gibbering",
+        tags: ["gibbering"],
+        duration: { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+      });
+    const goblin = actorOf(fight.state, FOE);
+    goblin.effects = [gibbering()];
+    const wander = [5, 3];
+    expect(gibberingTurn(fight.state, goblin, () => wander.shift()!)[0]?.text).toMatch(/move east\.$/);
+    expect(goblin.effects[0]?.compelled).toMatchObject({ way: "heading", heading: 90, allMovement: true });
+    goblin.effects = [gibbering()];
+    const swing = [7, 1];
+    gibberingTurn(fight.state, goblin, () => swing.shift()!, { distanceFeet: (_a, b) => (b === HERO ? 5 : 40) });
+    expect(goblin.effects[0]?.forcedAttack).toEqual({ targetId: HERO });
   });
 });
 

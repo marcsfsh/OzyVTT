@@ -12,7 +12,7 @@ import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
 import { refreshArmorClass } from "./held-items.js";
 import { doesntSleep } from "./trance.js";
-import { knockedProneWhileMounted } from "./mounts.js";
+import { endWhileRidden, knockedProneWhileMounted, RIDING_TAG } from "./mounts.js";
 import { FREEDOM_OF_MOVEMENT_TAG } from "./speed.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
@@ -46,6 +46,9 @@ export const NO_BONUS_ACTIONS_TAG = "no-bonus-actions";
 export const CANT_ATTACK_TAG = "cant-attack";
 /** The bearer's only actions are Dash and the Magic action that ends this (Wind Walk's cloud form). */
 export const DASH_ONLY_TAG = "dash-only";
+/** Its bearer flees: for its action only the Dash, an escape from what holds it, or Dodge when it has nowhere to move
+ *  (a Mace of Terror's wave). */
+export const FLEE_ONLY_TAG = "flee-only";
 /** The bearer's action this turn is the Dodge action (Bestow Curse: "be forced to take the Dodge action on that turn"). */
 export const DODGE_ONLY_TAG = "dodge-only";
 /** The bearer can't end the Prone condition on itself while this lasts (Hideous Laughter). */
@@ -769,6 +772,9 @@ function endEffectInternal(
       events.push(...applyExhaustionDeath(state, actor));
   }
   if (effect.tags.includes(HASTED_TAG) && !sweeping) addLethargy(state, actor, effect, events);
+  // Dismounting ends what lasted only while the mount was ridden (a Goat of Terror's fear).
+  if (effect.tags.includes(RIDING_TAG) && effect.sourceActorId !== null)
+    endWhileRidden(state, effect.sourceActorId, events);
   // A flight that lowers its creature when it ends (Winged Boots: "you descend ... until you land") drifts it down;
   // Wind Walk's cloud "descends 60 feet per round for 1 minute until it lands", and falls the rest.
   if (effect.tags.includes(DESCENDS_SAFELY_TAG)) descendSafely(state, actor.id);

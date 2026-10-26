@@ -36,6 +36,7 @@ export type RepeatFields = Readonly<{
   repeatByAction?: true;
   repeatUnseenSource?: true;
   repeatBeyondFeet?: number;
+  repeatAfterCompelledMove?: true;
   immuneOnSuccess?: true;
   immuneMinutes?: number;
   repeatFailureDamage?: RepeatSave["failureDamage"];
@@ -64,6 +65,7 @@ export function repeatSaveOf(
     save.repeatOnce === true ||
     save.repeatTally !== undefined ||
     save.repeatUnseenSource === true ||
+    save.repeatAfterCompelledMove === true ||
     save.repeatBeyondFeet !== undefined;
   if (!atTurns && !save.repeatOnDamage && !save.repeatByAction && !save.repeatAtTurnStart) return undefined;
   const second = save.secondFailure;
@@ -76,6 +78,7 @@ export function repeatSaveOf(
     ...(save.repeatByAction ? { byAction: true as const } : {}),
     ...(save.repeatUnseenSource ? { unseenSource: true as const } : {}),
     ...(save.repeatBeyondFeet !== undefined ? { beyondFeet: save.repeatBeyondFeet } : {}),
+    ...(save.repeatAfterCompelledMove ? { afterCompelledMove: true as const } : {}),
     ...(save.immuneOnSuccess && save.repeatBeyondFeet !== undefined ? { immuneOnSuccess: true as const } : {}),
     ...(save.immuneOnSuccess && save.repeatBeyondFeet !== undefined && save.immuneMinutes !== undefined
       ? { immuneMinutes: save.immuneMinutes }
@@ -173,6 +176,8 @@ export function openRepeatSaves(
     // "If the creature ends its turn in a space where it doesn't have line of sight to you" (Fear).
     if (repeat.unseenSource && (effect.sourceActorId === null || seesSource(deps, actor.id, effect.sourceActorId)))
       continue;
+    // "After moving in this way, a target repeats the save" (Compulsion): only after a turn a direction bound.
+    if (repeat.afterCompelledMove && effect.compelled?.heading === undefined) continue;
     // "If the Frightened or Charmed creature ends its turn more than 120 feet away from the target" (Antipathy).
     if (repeat.beyondFeet !== undefined) {
       const apart =

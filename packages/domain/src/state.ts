@@ -293,7 +293,9 @@ const PendingSaveEffectSchema = z
     /** The form a failure shape-shifts the creature into (Polymorph's Beast), taken as the effect lands. */
     form: EffectInstanceSchema.shape.form,
     /** The creature's size while it lasts (Enlarge/Reduce). */
-    sizeChange: EffectInstanceSchema.shape.sizeChange
+    sizeChange: EffectInstanceSchema.shape.sizeChange,
+    /** How it makes the creature move on its turns (Fear's flight). */
+    compelled: EffectInstanceSchema.shape.compelled
   })
   .strict();
 

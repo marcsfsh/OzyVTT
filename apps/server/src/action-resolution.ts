@@ -72,6 +72,7 @@ import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import { applyRestoration, endNamedEffects } from "./resolution/restoration.js";
 import { breakEnchantment, endOwnSpell } from "./resolution/break-enchantment.js";
+import { designateHeading } from "./resolution/compel.js";
 import { mendOnCast } from "./resolution/mend.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
 import { raiseOnAction, reviveOnCast } from "./resolution/revival.js";
@@ -486,6 +487,7 @@ export function resolveDefinitionAction(
   wishStressOnCast(ctx);
   wishOnCast(ctx);
   breakEnchantment(ctx);
+  designateHeading(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);

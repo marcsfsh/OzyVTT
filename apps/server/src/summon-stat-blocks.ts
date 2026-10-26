@@ -164,6 +164,7 @@ function withExceptions(definition: ActorDefinition, except: NonNullable<SummonC
     ...(except.name ? { name: except.name } : {}),
     ...(except.speedFeet !== undefined ? { speedFeet: except.speedFeet } : {}),
     abilityScores: { ...definition.abilityScores, ...except.abilityScores },
+    ...(except.traits ? { traitMechanics: [...(definition.traitMechanics ?? []), ...structuredClone(except.traits)] } : {}),
     ...(except.conditionImmunities
       ? {
           conditionImmunities: [

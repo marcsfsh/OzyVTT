@@ -1,4 +1,4 @@
-import { RESTORATION_PICKS, TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
+import { COMPASS_HEADINGS, RESTORATION_PICKS, TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
 import { checkWishUse } from "./wish.js";
 import { abilityModifier, isMeleeWeapon } from "@vtt/rules-5e";
 import {
@@ -59,7 +59,9 @@ export function checkChoices(
         ? WISH_USES
         : action.restores
           ? RESTORATION_PICKS
-          : undefined);
+          : action.setsHeading
+            ? COMPASS_HEADINGS
+            : undefined);
   // End an Effect's pick is the way out it takes (`resolution/endings.ts`).
   const own = action.id === END_EFFECT_ACTION_ID ? [] : [input.optionId];
   const picks = [...own, ...Object.values(input.targetOptions ?? {})].filter(
@@ -146,13 +148,15 @@ export function optionParts(option: GrantOption | null): Readonly<{
   conditions: readonly string[];
   conditionImmunities: readonly string[];
   suppresses: readonly string[];
+  compelled?: GrantOption["compelled"];
 }> {
   return {
     tags: option?.tags ?? [],
     modifiers: option?.modifiers ?? [],
     conditions: option?.conditions ?? [],
     conditionImmunities: option?.conditionImmunities ?? [],
-    suppresses: option?.suppressesConditions ?? []
+    suppresses: option?.suppressesConditions ?? [],
+    ...(option?.compelled ? { compelled: option.compelled } : {})
   };
 }
 

@@ -595,6 +595,8 @@ export function applyFailureEffect(
     ...(onFail.conditionImmunities ? { conditionImmunities: [...onFail.conditionImmunities] } : {}),
     // The light it sheds while it lasts (Faerie Fire's Dim Light).
     ...(onFail.light ? { light: { ...onFail.light } } : {}),
+    // How it makes the creature move on its turns (Fear's flight).
+    ...(onFail.compelled ? { compelled: structuredClone(onFail.compelled) } : {}),
     // What holds it (a Net), whose destruction frees it.
     ...(onFail.heldBy ? { heldBy: { ...onFail.heldBy, hitPoints: { ...onFail.heldBy.hitPoints } } } : {}),
     // What it does while it lasts (Bane's -1d4).
@@ -1418,7 +1420,12 @@ export function answerSave(
     );
   // A gibbering mouther's d8 decides what the creature does this turn.
   if (!success && pending.onFailEffect?.tags.includes(GIBBERING_TAG))
-    events.push(...gibberingTurn(target, deps.random));
+    events.push(
+      ...gibberingTurn(state, target, deps.random, {
+        resolveDefinition: deps.resolveDefinition,
+        ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+      })
+    );
   // A Ring of Spell Turning's success leaves the spell nothing; otherwise what a success leaves instead (Heat Metal's
   // Disadvantage on a creature that keeps hold of the object).
   if (turnedBy !== null)

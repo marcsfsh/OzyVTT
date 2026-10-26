@@ -326,7 +326,9 @@ const ON_FAIL_EFFECT_FIELDS = {
   // The size a failure changes is the spell's own text (Enlarge/Reduce).
   sizeChange: "player",
   // The dice of its hours (Torpor's 4d6) are rolled as it lands; the landed effect shows what came of them.
-  hoursRolled: "never"
+  hoursRolled: "never",
+  // Where a failure makes the creature move names its source or a hidden glyph's spot; it is told as it binds.
+  compelled: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -676,6 +678,10 @@ function playerEffect(
     form,
     sizeChange: _sizeChange,
     ownSize: _ownSize,
+    // Where a compelled move must go names its source or a hidden glyph's spot, and a forced attack its pick; the
+    // server refuses any other move or attack and says why.
+    compelled: _compelled,
+    forcedAttack: _forcedAttack,
     ...rest
   } = effect;
   const visible = {

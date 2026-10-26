@@ -10,6 +10,7 @@ import { formsLapseAtTurnStart } from "./inventory.js";
 import { endEffect, expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
 import { confusedTurn } from "./random-outcomes.js";
+import { compelledTurnStart, releaseCompulsions } from "./compelled-moves.js";
 import { holyNimbusBurns } from "./paladin-auras.js";
 import { endEffectsOutOfSight, openEndingSave, openRepeatSaves } from "./save-stages.js";
 import { sceneSight, type SceneSight } from "./vision/sight.js";
@@ -86,6 +87,8 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
     events.push(...endEffectsOutOfSight(state, actorId, { ...deps, sees }));
     events.push(...openRepeatSaves(state, actorId, "turn-end", { ...deps, sees }));
   }
+  // A direction that bound only this turn is spent (Compulsion's), once its save after the move has opened.
+  if (actor) releaseCompulsions(actor);
   events.push(...setDownCarried(state, actorId));
   if (deps?.resolveDefinition) {
     events.push(...selfRestorationAtTurnEnd(state, actorId, deps.resolveDefinition));
@@ -220,7 +223,10 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
       })
     );
   // SRD Confusion: "it rolls 1d10 at the start of each of its turns to determine its behavior for that turn".
-  events.push(...confusedTurn(state, actorId, deps.rollDie));
+  events.push(...confusedTurn(state, actorId, deps.rollDie, deps));
+  // Where an effect makes the creature move this turn (Fear's Dash away, Antipathy's flight).
+  const turning = state.actors.find((candidate) => candidate.id === actorId);
+  if (turning) events.push(...compelledTurnStart(state, turning));
   // A Berserker Axe's berserk ends on a turn that starts with no creature within 60 feet.
   const calm = calmAtTurnStart(state, actorId, deps.distanceFeet);
   if (calm) events.push(...endEffect(state, actorId, calm));

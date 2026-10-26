@@ -2,7 +2,7 @@ import type { GameState } from "@vtt/domain";
 import { traitOf } from "./statblock-traits.js";
 import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
 import { altitudeOf, setAltitude } from "./altitude.js";
-import { applyCondition, makeEffect, type EffectNarration } from "./effects.js";
+import { applyCondition, endEffectIfPresent, makeEffect, type EffectNarration } from "./effects.js";
 import { followInInitiative } from "./encounter.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
@@ -50,6 +50,18 @@ export function mountOf(state: GameState, riderId: string): Actor | undefined {
   const rider = state.actors.find((actor) => actor.id === riderId);
   const mountId = rider?.effects.find((effect) => effect.tags.includes(RIDING_TAG))?.sourceActorId;
   return mountId ? state.actors.find((actor) => actor.id === mountId) : undefined;
+}
+
+/** On an effect, it lasts only while a creature rides its source (a Goat of Terror's fear). */
+export const WHILE_RIDDEN_TAG = "while-ridden";
+
+/** "Until you are no longer riding the goat": once no creature rides the mount, what its riders' fear held ends. */
+export function endWhileRidden(state: GameState, mountId: string, events: EffectNarration[]): void {
+  if (ridersOf(state, mountId).length > 0) return;
+  for (const actor of state.actors)
+    for (const effect of [...actor.effects])
+      if (effect.sourceActorId === mountId && effect.tags.includes(WHILE_RIDDEN_TAG))
+        events.push(...endEffectIfPresent(state, actor.id, effect.id));
 }
 
 /** The creatures riding a mount. */

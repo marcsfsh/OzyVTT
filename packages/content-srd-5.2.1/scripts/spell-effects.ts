@@ -516,8 +516,8 @@ function celestialLight(
 }
 
 /** Symbol's six glyphs, each a hidden glyph that glows when a creature comes onto it (SRD 5.2.1 text): Death,
- *  Discord, Fear, Pain, Sleep and Stunning. Fear's "must move at least 30 feet away from the glyph" is the
- *  Frightened creature's to obey. */
+ *  Discord, Fear, Pain, Sleep and Stunning. Fear's "must move at least 30 feet away from the glyph" binds the
+ *  Frightened creature's moves (`compelled-moves.ts`). */
 function symbolGlyphs(): Later[] {
   const MINUTE = { type: "rounds" as const, rounds: 10 };
   const glyph = (
@@ -575,11 +575,21 @@ function symbolGlyphs(): Later[] {
         }
       })
     ),
+    // "While Frightened, the target must move at least 30 feet away from the glyph on each of its turns, if able."
     glyph(
       "fear",
       "Fear",
-      "makes a Wisdom save or is Frightened for 1 minute.",
-      fails("wis", { failureConditions: ["frightened"], failureDuration: MINUTE })
+      "makes a Wisdom save or is Frightened for 1 minute, moving at least 30 feet away from the glyph on each of its turns.",
+      fails("wis", {
+        failureConditions: ["frightened"],
+        failureDuration: MINUTE,
+        failureEffect: {
+          name: "Symbol of Fear",
+          tags: [],
+          modifiers: [],
+          compelled: { way: "away", minFeet: 30, fromArea: true }
+        }
+      })
     ),
     glyph(
       "pain",
@@ -734,6 +744,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         immuneOnSuccess: true,
         immuneMinutes: 1
       },
+      // "The Frightened creature must use its movement on its turns to get as far away as possible from the target".
+      failureEffect: { name: "Antipathy", tags: [], modifiers: [], compelled: { way: "away", allMovement: true } },
       damage: [],
       zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
       option: { id: "antipathy", name: "Antipathy" }
@@ -750,6 +762,14 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         repeatOnDamage: { fromSourceOnly: true },
         immuneOnSuccess: true,
         immuneMinutes: 1
+      },
+      // "Must use its movement on its turns to get as close as possible to the target ... If the creature is within 5
+      // feet of the target, the creature can't willingly move away."
+      failureEffect: {
+        name: "Sympathy",
+        tags: [],
+        modifiers: [],
+        compelled: { way: "toward", allMovement: true, holdsNear: true }
       },
       damage: [],
       zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
@@ -1359,6 +1379,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "action",
       when: "A Magic action shows the faint aura round each creature in sight within 30 feet that bears magic, and the school of the spells on it.",
       reveals: true,
+      damage: []
+    }
+  ],
+  // "For the duration, you can take a Bonus Action to designate a direction that is horizontal to you."
+  compulsion: [
+    {
+      name: "direction",
+      activation: "bonus-action",
+      when: "A Bonus Action names a direction: each creature the spell charms uses as much of its movement as possible to move that way on its next turn, then repeats the save.",
+      setsHeading: true,
       damage: []
     }
   ],
@@ -3266,8 +3296,8 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
       option("indifferent", "Indifferent", { tags: ["indifferent"] })
     ]
   },
-  // "Follow the command on its next turn": Flee spends its turn on the Dash, Grovel is Prone and ends its turn, Halt
-  // neither moves nor acts. Approach and Drop are the GM's to move and drop.
+  // "Follow the command on its next turn": Flee spends its turn on the Dash away, Grovel is Prone and ends its turn,
+  // Halt neither moves nor acts. Approach and Drop are the GM's to move and drop.
   command: {
     name: "Command",
     tags: ["commanded"],
@@ -3276,7 +3306,8 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
     options: [
       option("approach", "Approach"),
       option("drop", "Drop", { tags: ["no-actions"] }),
-      option("flee", "Flee", { tags: ["dash-only"] }),
+      // "The target spends its turn moving away from you by the fastest available means."
+      option("flee", "Flee", { tags: ["dash-only"], compelled: { way: "away", dashes: true, allMovement: true } }),
       option("grovel", "Grovel", { conditions: ["prone"], tags: ["no-actions"], speedZero: true }),
       option("halt", "Halt", { tags: ["no-actions"], speedZero: true })
     ]
@@ -3289,7 +3320,12 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
     modifiers: [],
     options: [
       option("asleep", "Asleep", { conditions: ["unconscious"], tags: ["wakeable"], endsOnDamage: true }),
-      option("panicked", "Panicked", { conditions: ["frightened"], tags: ["dash-only"] }),
+      // "On each of its turns, the Frightened target must take the Dash action and move away from you".
+      option("panicked", "Panicked", {
+        conditions: ["frightened"],
+        tags: ["dash-only"],
+        compelled: { way: "away", dashes: true, minFeet: 5 }
+      }),
       option("sickened", "Sickened", { conditions: ["poisoned"] })
     ]
   },
@@ -3351,8 +3387,23 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   geas: { name: "Geas", tags: ["curse"], modifiers: [] },
   // "You create a phantasmal object, creature, or other phenomenon ... perceivable only to the target for the duration."
   "phantasmal-force": { name: "Phantasmal Force", tags: [], modifiers: [] },
-  // "Each target ... drops whatever it is holding and has the Frightened condition for the duration."
-  fear: { name: "Fear", tags: ["drops-held"], modifiers: [] },
+  // "Each target ... drops whatever it is holding and has the Frightened condition for the duration. A Frightened
+  // creature takes the Dash action and moves away from you by the safest route on each of its turns unless there is
+  // nowhere to move."
+  fear: {
+    name: "Fear",
+    tags: ["drops-held", "dash-only"],
+    modifiers: [],
+    compelled: { way: "away", dashes: true, minFeet: 5 }
+  },
+  // "Each Charmed target must use as much of its movement as possible to move in that direction on its next turn": the
+  // direction the caster's Bonus Action names (`LATER_ACTIONS`).
+  compulsion: {
+    name: "Compulsion",
+    tags: [],
+    modifiers: [],
+    compelled: { way: "heading", allMovement: true, once: true }
+  },
   // "Can't take Bonus Actions or Reactions, and it rolls 1d10 at the start of each of its turns" (`random-outcomes.ts`).
   confusion: { name: "Confusion", tags: ["confused", "no-bonus-actions", "no-reactions"], modifiers: [] },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
