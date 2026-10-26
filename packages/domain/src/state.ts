@@ -1688,6 +1688,13 @@ export const CombatStateSchema = z
       .default(null),
     /** The creatures that took their second turn of round 1. Live table only; GM-only. */
     secondTurnsTaken: z.array(z.uuid()).max(200).default([]),
+    /** Alert's Initiative Swap offered by a character's player to a willing ally of another player, waiting for that
+     *  player to take it (`initiative.swap` naming the pair the other way round). Live table only; the two players see
+     *  the offers their characters are in. */
+    initiativeSwapOffers: z
+      .array(z.object({ actorId: z.uuid(), withActorId: z.uuid() }).strict())
+      .max(20)
+      .default([]),
     /** Creatures gone from the fight's plane (Banishment, Blink's Ethereal turns), with the space each left and its
      *  height there, so it comes back to that space or the nearest unoccupied one (`off-plane.ts`). Live table only;
      *  GM-only, since a creature the party never saw leave would be placed by it. */

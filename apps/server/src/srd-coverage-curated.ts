@@ -1280,6 +1280,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:devious-strikes": enforced(
     "Daze (one of moving, an action or a Bonus Action, resolution/economy.ts), Knock Out (Unconscious that ends on damage, with repeat saves) and Obscure (Blinded) join Cunning Strike's effects. A Dazed creature's move after acting is the GM's."
   ),
+  "feature:alert": enforced(
+    "Initiative rolls add the Proficiency Bonus. Right after Initiative is rolled, before either has acted and neither Incapacitated, the holder's player offers to swap scores with an allied character, and the swap is made when that character's player takes it; the GM swaps any two at once (encounter.ts)."
+  ),
   "feature:thiefs-reflexes": enforced(
     "In the first round of a fight a Thief 17 takes a second turn, with a fresh action, Bonus Action and movement, when the order passes its Initiative minus 10 (encounter.ts, second-turns.ts)."
   ),

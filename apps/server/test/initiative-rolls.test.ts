@@ -5,10 +5,12 @@ import {
   nextInitiativeTurn,
   rollRemainingInitiative,
   rollSelfInitiative,
+  offerInitiativeSwap,
   setInitiativeScore,
   startEncounter,
   swapInitiative
 } from "../src/encounter.js";
+import type { ActorDefinition } from "@vtt/schemas";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
 import { rerollInitiative } from "../src/initiative-reroll.js";
 import { makeEffect } from "../src/effects.js";
@@ -251,6 +253,51 @@ describe("Alert's Initiative Swap", () => {
     nextInitiativeTurn(game); // Beta now acts
     nextInitiativeTurn(game);
     expect(() => swapInitiative(game, PC, PC2)).toThrow(/before either has acted/);
+  });
+});
+
+describe("Alert's Initiative Swap from a player", () => {
+  /** Alpha holds Alert; the two characters belong to different players. */
+  const ALERT = {
+    name: "Alpha",
+    abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+    proficiencyBonus: 2,
+    hitPoints: { maximum: 20 },
+    armorClass: 12,
+    extensions: { test: { traits: [{ name: "Alert" }] } },
+    actions: []
+  } as unknown as ActorDefinition;
+  const resolveDefinition = (id: string) => (id === "alert" ? ALERT : undefined);
+  const table = () => {
+    const game = started("immediate", [8, 5, 20]); // Alpha 10, Beta 5, Goblin 20
+    rollRemainingInitiative(game);
+    game.actors[0]!.definitionId = "alert";
+    return game;
+  };
+  const player = (sessionId: string) => ({ role: "player", sessionId }) as const;
+
+  it("is offered by the Alert holder's player and made when the ally's player takes it", () => {
+    const game = table();
+    expect(offerInitiativeSwap(game, player(OWNER), PC, PC2, resolveDefinition)).toBe("offered");
+    expect(scoreOf(game, PC)).toBe(10);
+    expect(game.combat.initiativeSwapOffers).toEqual([{ actorId: PC, withActorId: PC2 }]);
+    expect(offerInitiativeSwap(game, player(OWNER2), PC2, PC, resolveDefinition)).toBe("swapped");
+    expect(scoreOf(game, PC)).toBe(5);
+    expect(scoreOf(game, PC2)).toBe(10);
+    expect(game.combat.initiativeSwapOffers).toEqual([]);
+  });
+
+  it("refuses a character without Alert, another player's character, and an enemy", () => {
+    const game = table();
+    expect(() => offerInitiativeSwap(game, player(OWNER2), PC2, PC, resolveDefinition)).toThrow(/doesn't have/);
+    expect(() => offerInitiativeSwap(game, player(OWNER2), PC, PC2, resolveDefinition)).toThrow(/your own/);
+    expect(() => offerInitiativeSwap(game, player(OWNER), PC, MON, resolveDefinition)).toThrow(/willing ally/);
+  });
+
+  it("is still the GM's to make at once", () => {
+    const game = table();
+    expect(offerInitiativeSwap(game, { role: "gm" }, PC2, MON, resolveDefinition)).toBe("swapped");
+    expect(scoreOf(game, PC2)).toBe(20);
   });
 });
 

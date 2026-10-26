@@ -13,7 +13,7 @@ import {
   orderTiedCharacters,
   setInitiativeScore,
   startEncounter,
-  swapInitiative
+  offerInitiativeSwap
 } from "../encounter.js";
 import {
   AddCombatantSchema,
@@ -325,17 +325,24 @@ export const encounterCommands = [
     type: "initiative.swap",
     operationId: "swapInitiative",
     description:
-      "Swaps two combatants' initiative (GM-grade only): the Alert feat's Initiative Swap, made right after initiative is rolled and before either has acted. Refused while either is Incapacitated.",
-    summary: "Swap two combatants' initiative, as Alert's Initiative Swap (GM).",
+      "The Alert feat's Initiative Swap, made right after initiative is rolled and before either combatant has acted, and refused while either is Incapacitated. GM-grade swaps any two at once. A player session offers it for its own claimed character that holds Alert to a willing ally, and is refused for a character without Alert or a creature that isn't its ally; the ally's player takes the offer by sending the pair the other way round, and an ally the same player controls swaps at once.",
+    summary: "Swap two combatants' initiative, as Alert's Initiative Swap: the GM at once, a player by offer.",
     schema: InitiativeSwapSchema,
     malformed: "The Initiative swap is malformed.",
-    gmOnly: "Only the GM can swap Initiative.",
-    async run({ request, execute }, kit) {
-      const { duplicate } = await execute((state) => swapInitiative(state, request.actorId, request.withActorId));
+    async run({ principal, request, execute }, kit) {
+      let made: "swapped" | "offered" = "swapped";
+      const { duplicate } = await execute((state) => {
+        made = offerInitiativeSwap(state, initiatorOf(principal), request.actorId, request.withActorId, (id) =>
+          kit.resolveDefinitionIn(state, id)
+        );
+      });
       if (duplicate) return;
       kit.context.appendLog({
         kind: "encounter",
-        text: `${kit.actorName(request.actorId)} and ${kit.actorName(request.withActorId)} swapped initiative.`,
+        text:
+          made === "swapped"
+            ? `${kit.actorName(request.actorId)} and ${kit.actorName(request.withActorId)} swapped initiative.`
+            : `${kit.actorName(request.actorId)} offers to swap initiative with ${kit.actorName(request.withActorId)} (Alert).`,
         actorIds: [request.actorId, request.withActorId],
         gmOnly: kit.actorHidden(request.actorId) || kit.actorHidden(request.withActorId)
       });

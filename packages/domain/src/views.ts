@@ -276,6 +276,9 @@ export type PlayerCombatView = Readonly<{
   pendingReactions: readonly PlayerPendingReaction[];
   /** The player's own parked Ask-the-GM questions only. */ pendingRuleAsks: readonly PlayerPendingRuleAsk[];
   /** What happens at once as their own character's turn starts or ends, waiting for them to order it. */ turnSteps?: PlayerTurnSteps | null;
+  /** Alert's Initiative Swap offers their own characters are in: made by them, or waiting for them to take. */ initiativeSwapOffers?: ReadonlyArray<
+    Readonly<{ actorId: string; withActorId: string }>
+  >;
   /** True while the GM has the table viewing an earlier turn (no labels, since those can name hidden combatants). */ rewound: boolean;
 }>;
 /** The steps of a turn's start or end a player orders: each named, with the creature it lands on when they see it. */

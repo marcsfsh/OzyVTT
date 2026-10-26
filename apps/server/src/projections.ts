@@ -468,6 +468,12 @@ export function projectPlayerCombat(
     playerDamageMode: state.combat.playerDamageMode,
     // Filtered to public actors; a player checks for their own id to show the "Roll initiative" prompt.
     pendingInitiative: state.combat.pendingInitiative.filter((actorId) => publicActorIds.has(actorId)),
+    // An Initiative Swap offer names only the two characters in it, and reaches only their players.
+    initiativeSwapOffers: state.combat.initiativeSwapOffers
+      .filter(
+        (offer) => ownedBy(state, offer.actorId, playerSessionId) || ownedBy(state, offer.withActorId, playerSessionId)
+      )
+      .map((offer) => ({ ...offer })),
     playerInitiativeMode: state.combat.playerInitiativeMode,
     underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),

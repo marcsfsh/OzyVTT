@@ -11,6 +11,7 @@ import { proneInSharedSpace } from "./occupied-space.js";
 import { blinkAway } from "./off-plane.js";
 import { timeStopGoesOn } from "./time-stop.js";
 import { secondTurnDue } from "./second-turns.js";
+import { areAllies } from "./creature-sides.js";
 import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
@@ -415,6 +416,7 @@ export function startEncounter(
     initiativeWindow: [],
     secondTurn: null,
     secondTurnsTaken: [],
+    initiativeSwapOffers: [],
     // A fresh fight starts live; the handler captures this start state as the rewind baseline.
     historyCursor: null,
     historyDirty: false
@@ -628,6 +630,75 @@ export function orderTiedCharacters(state: GameState, scope: Initiator, actorId:
 /** SRD Alert, Initiative Swap: right after initiative is rolled, two combatants trade scores. Not while either
  *  is Incapacitated, and only before the first of them has taken a turn in this fight. */
 export function swapInitiative(state: GameState, actorId: string, withActorId: string) {
+  const [first, second] = swapEntries(state, actorId, withActorId);
+  const swapped = state.combat.initiative.map((entry) =>
+    entry.actorId === actorId
+      ? { ...entry, score: second.score, tieBreaker: second.tieBreaker }
+      : entry.actorId === withActorId
+        ? { ...entry, score: first.score, tieBreaker: first.tieBreaker }
+        : entry
+  );
+  state.combat = {
+    ...state.combat,
+    initiative: reorderMidRound(state, swapped),
+    // A swap made settles every offer either was in.
+    initiativeSwapOffers: state.combat.initiativeSwapOffers.filter(
+      (offer) => ![offer.actorId, offer.withActorId].some((id) => id === actorId || id === withActorId)
+    )
+  };
+}
+
+/**
+ * Alert's Initiative Swap from a player: "you can swap your Initiative with the Initiative of one willing ally". The
+ * character's player offers it, and the swap is made when the ally's player takes the offer (the same command naming
+ * the pair the other way round), or at once when that player controls the ally too. The GM swaps any two at once.
+ * Returns whether the swap was made, or only offered.
+ */
+export function offerInitiativeSwap(
+  state: GameState,
+  scope: Initiator,
+  actorId: string,
+  withActorId: string,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): "swapped" | "offered" {
+  if (scope.role === "gm") {
+    swapInitiative(state, actorId, withActorId);
+    return "swapped";
+  }
+  requireActorAccess(scope, state, actorId, "edit", "You can only swap your own character's Initiative.");
+  const taken = state.combat.initiativeSwapOffers.some(
+    (offer) => offer.actorId === withActorId && offer.withActorId === actorId
+  );
+  if (taken) {
+    swapInitiative(state, withActorId, actorId);
+    return "swapped";
+  }
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const ally = state.actors.find((candidate) => candidate.id === withActorId);
+  const definition = actor?.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  if (!actor || !holdsFeature(definition, "alert", "Alert"))
+    throw new CommandRejectedError(`${actor?.name ?? "That character"} doesn't have the Alert feat's Initiative Swap.`);
+  if (!ally || !areAllies(actor, ally, resolveDefinition))
+    throw new CommandRejectedError(
+      `Initiative Swap is made with a willing ally, and ${ally?.name ?? "that creature"} isn't one.`
+    );
+  swapEntries(state, actorId, withActorId);
+  if (ally.ownerSessionId === actor.ownerSessionId) {
+    swapInitiative(state, actorId, withActorId);
+    return "swapped";
+  }
+  state.combat = {
+    ...state.combat,
+    initiativeSwapOffers: [
+      ...state.combat.initiativeSwapOffers.filter((offer) => offer.actorId !== actorId),
+      { actorId, withActorId }
+    ].slice(-20)
+  };
+  return "offered";
+}
+
+/** The two entries an Initiative Swap trades, refused when it can't be made now. */
+function swapEntries(state: GameState, actorId: string, withActorId: string): [InitiativeEntry, InitiativeEntry] {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before swapping Initiative.");
   if (actorId === withActorId) throw new CommandRejectedError("Pick another combatant to swap with.");
   const entries = [actorId, withActorId].map((id) => state.combat.initiative.find((entry) => entry.actorId === id));
@@ -648,15 +719,7 @@ export function swapInitiative(state: GameState, actorId: string, withActorId: s
     throw new CommandRejectedError(
       "Initiative Swap happens right after initiative is rolled, before either has acted."
     );
-  const [first, second] = entries as InitiativeEntry[];
-  const swapped = state.combat.initiative.map((entry) =>
-    entry.actorId === actorId
-      ? { ...entry, score: second.score, tieBreaker: second.tieBreaker }
-      : entry.actorId === withActorId
-        ? { ...entry, score: first.score, tieBreaker: first.tieBreaker }
-        : entry
-  );
-  state.combat = { ...state.combat, initiative: reorderMidRound(state, swapped) };
+  return entries as [InitiativeEntry, InitiativeEntry];
 }
 
 /** A claimed player rolls their own initiative (or supplies `natural`, a physical die) and clears their
