@@ -13451,6 +13451,10 @@
     "kind": "berserk",
     "name": "Berserk",
     "on": 6
+   },
+   {
+    "kind": "immutable-form",
+    "name": "Immutable Form"
    }
   ],
   "extensions": {
@@ -19230,6 +19234,10 @@
     }
    },
    {
+    "kind": "immutable-form",
+    "name": "Immutable Form"
+   },
+   {
     "kind": "absorbs",
     "name": "Lightning Absorption",
     "damageType": "lightning"
@@ -19915,7 +19923,6 @@
       "type": "acid"
      }
     ],
-    "reminder": "A creature that escapes or is pulled free enters the nearest unoccupied space: move its token there.",
     "targets": {
      "entered": true
     },
@@ -19952,6 +19959,11 @@
     "kind": "engulfs-entrants",
     "name": "Ooze Cube",
     "actionId": "engulf"
+   },
+   {
+    "kind": "transparent",
+    "name": "Transparent",
+    "dc": 15
    }
   ],
   "extensions": {
@@ -29474,6 +29486,13 @@
    "poison",
    "psychic"
   ],
+  "traitMechanics": [
+   {
+    "kind": "form-at-rest",
+    "name": "Succubus Form",
+    "monsterId": "succubus"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -29843,6 +29862,10 @@
     "kind": "absorbs",
     "name": "Fire Absorption",
     "damageType": "fire"
+   },
+   {
+    "kind": "immutable-form",
+    "name": "Immutable Form"
    }
   ],
   "extensions": {
@@ -33368,6 +33391,17 @@
   "conditionImmunities": [
    "prone"
   ],
+  "traitMechanics": [
+   {
+    "kind": "adhesive",
+    "name": "Adhesive (Object Form Only)",
+    "maxSize": "huge",
+    "escapeDc": 13,
+    "forms": [
+     "object"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -34737,6 +34771,15 @@
      "per": "long-rest"
     },
     "needsObject": "soul-bag",
+    "castRiders": {
+     "fromEthereal": true,
+     "failsUnder": [
+      "protection-from-evil-and-good",
+      "magic-circle"
+     ],
+     "drainsMaximum": true,
+     "trapsSoul": true
+    },
     "castsSpells": {
      "ability": "int",
      "saveDc": 14,
@@ -34933,6 +34976,11 @@
    "fire"
   ],
   "traitMechanics": [
+   {
+    "kind": "confers-resistance",
+    "name": "Confer Fire Resistance",
+    "damageType": "fire"
+   },
    {
     "kind": "light",
     "name": "Illumination",
@@ -40662,6 +40710,14 @@
    "acid",
    "cold"
   ],
+  "traitMechanics": [
+   {
+    "kind": "controls-kind",
+    "name": "Shark Telepathy",
+    "nameHas": "shark",
+    "withinFeet": 120
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -43124,6 +43180,13 @@
    "actionsInLair": 4,
    "resistancesInLair": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "inscrutable",
+    "name": "Inscrutable",
+    "skill": "insight"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -43493,6 +43556,13 @@
    "actionsInLair": 4,
    "resistancesInLair": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "inscrutable",
+    "name": "Inscrutable",
+    "skill": "insight"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
@@ -44899,6 +44969,12 @@
    "petrified",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "immutable-form",
+    "name": "Immutable Form"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -45329,6 +45405,13 @@
    "fire",
    "poison",
    "psychic"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "form-at-rest",
+    "name": "Incubus Form",
+    "monsterId": "incubus"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -46585,6 +46668,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 6
   },
+  "traitMechanics": [
+   {
+    "kind": "reflective-carapace",
+    "name": "Reflective Carapace"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 30,
