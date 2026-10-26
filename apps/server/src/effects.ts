@@ -219,7 +219,9 @@ function freeOfMagicalHolds(actor: Actor, source: ConditionImmunitySource | unde
   if (actor.effects.some((effect) => effect.tags.includes(FREEDOM_OF_MOVEMENT_TAG))) return true;
   if (!source?.catalog) return false;
   const definition = actor.definitionId ? source.resolveDefinition?.(actor.definitionId) : undefined;
-  return (deriveEquipment(actor, definition, source.catalog).context.effectTags ?? []).includes(FREEDOM_OF_MOVEMENT_TAG);
+  return (deriveEquipment(actor, definition, source.catalog).context.effectTags ?? []).includes(
+    FREEDOM_OF_MOVEMENT_TAG
+  );
 }
 
 /** SRD condition immunity: innate, granted by what the actor carries when a catalog is supplied, Petrified's own

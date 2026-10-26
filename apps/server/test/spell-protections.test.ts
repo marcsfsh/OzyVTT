@@ -189,7 +189,7 @@ describe("Befuddlement", () => {
     use(state, castOf("befuddlement"), [FOE]);
     answer(state, FOE, 1);
     const befuddled = actor(state, FOE).effects[0]!;
-    expect(befuddled).toMatchObject({ name: "Befuddlement", tags: ["no-spells"] });
+    expect(befuddled).toMatchObject({ name: "Befuddlement", tags: ["no-spells", "restorable", "cured-by-heal"] });
     const caster = fight(wizard);
     actor(caster.state, HERO).effects = [{ ...befuddled, id: "befuddled" }];
     expect(() => caster.resolve("spell-fire-bolt", {})).toThrowError(

@@ -106,9 +106,9 @@ describe("Confusion", () => {
     cast(fight, "confusion", { targetIds: [HERO] });
     answer(fight.state, HERO, 2);
     const faces = [8];
-    expect(
-      confusedTurn(fight.state, HERO, () => faces.shift()!, { distanceFeet: () => 30 })[0]?.text
-    ).toBe("Ansel rolls 8 on the d10 for Confusion: it doesn't move, and no creature is within its reach, so it takes no action.");
+    expect(confusedTurn(fight.state, HERO, () => faces.shift()!, { distanceFeet: () => 30 })[0]?.text).toBe(
+      "Ansel rolls 8 on the d10 for Confusion: it doesn't move, and no creature is within its reach, so it takes no action."
+    );
   });
 });
 

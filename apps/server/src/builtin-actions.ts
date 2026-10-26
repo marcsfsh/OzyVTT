@@ -2,7 +2,6 @@ import { endingsOf, type ActorDefinition, type EffectInstance } from "@vtt/schem
 import { DETACH_FEET, DETACHES_ITSELF_TAG } from "./attachments.js";
 import { ENDED_BY_PREFIX, endingSlug } from "./ending-actions.js";
 
-
 type BuiltinAction = ActorDefinition["actions"][number];
 
 /** The live creature taking the action, whose effects can offer actions of their own (Expeditious Retreat's Dash as a

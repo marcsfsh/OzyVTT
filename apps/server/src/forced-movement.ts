@@ -28,7 +28,9 @@ import { moveEncounterToken, snappedTokenPosition, type TokenMapGeometry } from 
 /** On an effect, nothing moves its bearer (Imprisonment's Chaining: "can't be moved by any means"). */
 export const UNMOVABLE_TAG = "unmovable";
 const unmovable = (state: GameState, actorId: string) =>
-  state.actors.some((actor) => actor.id === actorId && actor.effects.some((effect) => effect.tags.includes(UNMOVABLE_TAG)));
+  state.actors.some(
+    (actor) => actor.id === actorId && actor.effects.some((effect) => effect.tags.includes(UNMOVABLE_TAG))
+  );
 
 export type ForcedMove = Readonly<{
   /** Who is moved. */

@@ -2199,10 +2199,7 @@ export const EffectInstanceSchema = z
     compelled: CompelledMoveSchema.optional(),
     /** The one creature its bearer's action may strike this turn, with one melee attack (Confusion's 7-8: "one melee
      *  attack against a random creature within reach"), picked by the server. */
-    forcedAttack: z
-      .object({ targetId: z.uuid() })
-      .strict()
-      .optional()
+    forcedAttack: z.object({ targetId: z.uuid() }).strict().optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -5571,7 +5568,9 @@ export const ActionSchema = z
     scryingModifiers: z
       .literal(true)
       .optional()
-      .describe("The cast picks its caster's knowledge of the target and connection to it, which modify the target's save"),
+      .describe(
+        "The cast picks its caster's knowledge of the target and connection to it, which modify the target's save"
+      ),
     /** A failed save moves the target up to `feet` to the space its use picks (`destination`), within the action's
      *  range of its user; with `lifts`, up into the air to the height the use names (`destinationAltitudeFeet`), where
      *  it hangs while the failure lasts and falls once it ends (Telekinesis). */

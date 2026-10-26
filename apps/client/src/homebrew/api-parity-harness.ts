@@ -476,11 +476,13 @@ const SAVE_LIFETIME_KEYS = [
   "atRest.**",
   "successEndsSpell",
   "repeatTallySuccessesOnly",
-  "failureHoursRolled"
+  "failureHoursRolled",
+  "immuneMinutes",
+  "repeatAfterCompelledMove"
 ] as const;
 
 /** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
-const DEATH_SAVE_KEYS = ["failureByHitPoints[].**", "failureBanishes"] as const;
+const DEATH_SAVE_KEYS = ["failureByHitPoints[].**", "failureBanishes", "banishedForGood"] as const;
 /** The save-block keys for a failure by a margin and the creatures a failure spares (`SaveOutcomeFields`). */
 const MARGIN_SAVE_KEYS = ["failureByMargin.**", "sparesCreatureTypes", "sparesSpecies"] as const;
 
@@ -547,6 +549,48 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "a cure that ends the one condition its user picks (Lesser Restoration) - copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].restores",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast that asks which harm it ends (Greater Restoration) - copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].breaksEnchantment.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a touch that ends what some creature types charmed, frightened or possessed (Dispel Evil and Good) - copied from the spell's later actions; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsOwnSpell",
+    types: ACTION_CARRIERS,
+    reason:
+      "a later action that ends its own spell once used (Dispel Evil and Good) - copied from the spell's later actions; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].setsHeading",
+    types: ACTION_CARRIERS,
+    reason:
+      "a later action that names the direction a compelled creature moves (Compulsion) - copied from the spell's later actions; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].scryingModifiers",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast that asks its caster's knowledge of and connection to the target (Scrying) - copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].failureMove.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "how far a failed save moves the target to the space picked, and whether it lifts it (Telekinesis) - copied from the spell's later actions; no editor control yet",
     status: "gap"
   },
   {

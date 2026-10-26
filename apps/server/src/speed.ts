@@ -76,9 +76,7 @@ function multipliedSpeed(actor: Actor, feet: number, derivation?: EquipmentDeriv
   }
   const multiplied = [...multipliers.values()].reduce((total, factor) => total * factor, feet);
   const warded = speedWardedFromMagic(actor, derivation);
-  return actor.effects.some(
-    (effect) => effect.tags.includes(SPEED_HALVED_TAG) && !(warded && magicalEffect(effect))
-  )
+  return actor.effects.some((effect) => effect.tags.includes(SPEED_HALVED_TAG) && !(warded && magicalEffect(effect)))
     ? Math.floor(multiplied / 2)
     : multiplied;
 }

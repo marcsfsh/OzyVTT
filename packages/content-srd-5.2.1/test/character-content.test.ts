@@ -308,7 +308,9 @@ describe("character-builder content records", () => {
       failureDuration: { type: "rounds", rounds: 10 },
       endsOnDamage: true,
       endsWhenSourceIncapacitated: true,
-      endsWhenSourceDies: true
+      endsWhenSourceDies: true,
+      // "it tries to move as far from you as it can on its turns".
+      failureEffect: { name: "Turned", tags: [], modifiers: [], compelled: { way: "away", allMovement: true } }
     });
     // Divine Order is a level-1 choice between the two printed sacred roles.
     const order = cleric.features.find((feature) => feature.id === "divine-order")!;

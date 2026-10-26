@@ -145,7 +145,7 @@ export function ActionTargetPicker({
           max={destination.feet}
           step={5}
           disabled={busy}
-          aria-label={`How high ${name} lifts the creature`}
+          aria-label={`How high ${name} lifts it`}
           className="action-targeting-spend"
         />
       )}

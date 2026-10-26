@@ -441,7 +441,9 @@ export function failureEffectFor(
     ...(shaped.form ? { form: structuredClone(shaped.form) } : {}),
     ...(declared?.sizeChange ? { sizeChange: { ...declared.sizeChange } } : {}),
     // How it makes the creature move on its turns (Fear's flight, Command's Flee).
-    ...(parts.compelled || declared?.compelled ? { compelled: structuredClone(parts.compelled ?? declared!.compelled!) } : {}),
+    ...(parts.compelled || declared?.compelled
+      ? { compelled: structuredClone(parts.compelled ?? declared!.compelled!) }
+      : {}),
     modifiers: [...(declared?.modifiers ?? []), ...parts.modifiers],
     ...(option ? { optionId: option.id } : {}),
     ...(parts.conditionImmunities.length > 0 ? { conditionImmunities: [...parts.conditionImmunities] } : {}),
@@ -692,11 +694,12 @@ export function parkActionSave(ctx: ResolveContext): void {
   const parts = rider ? [] : damagePartsOf(ctx);
   const heightened = heightenedTarget(ctx);
   const onSuccessEffect = successEffectFor(ctx, cast);
-  // A spell's save whose outcome the engine applies nothing of (Resilient Sphere, Telekinesis): the card and the GM's
-  // result say the GM applies it, so it never reads as if the server had.
+  // A spell's save whose outcome the engine applies nothing of (Seeming): the card and the GM's result say the
+  // GM applies it, so it never reads as if the server had. An object pulled away is the server's (Telekinesis).
   const fatal = fatalFailureOf(action.save);
   const gmApplies =
     action.spellId !== undefined &&
+    action.object?.does !== "pulled-on-failure" &&
     parts.every((part) => part.amount <= 0) &&
     action.damage.length === 0 &&
     conditionIds.length === 0 &&
@@ -733,9 +736,9 @@ export function parkActionSave(ctx: ResolveContext): void {
             )
         )
       : // Scrying: "modified ... by how well you know the target and the sort of physical connection you have to it".
-        (action.scryingModifiers
-          ? (SCRYING_PICKS.find((pick) => pick.id === input.optionId)?.bonus ?? 0)
-          : 0);
+        action.scryingModifiers
+        ? (SCRYING_PICKS.find((pick) => pick.id === input.optionId)?.bonus ?? 0)
+        : 0;
   // "It does so with Advantage if you or your allies are fighting it" (Charm Person): in a fight, a target on the other
   // side from the source.
   const fightingOf = (target: (typeof targets)[number]) =>
@@ -830,7 +833,8 @@ export function parkActionSave(ctx: ResolveContext): void {
           : { ...extra, objectPenalty: { rowId: objectRowId } };
     // Where a failure moves its one target (Telekinesis).
     const moved = ctx.targets.find((target) => target.id === targetIds[0]);
-    const failureMovesTo = action.failureMove && moved && targetIds.length === 1 ? failureMoveOf(ctx, moved) : undefined;
+    const failureMovesTo =
+      action.failureMove && moved && targetIds.length === 1 ? failureMoveOf(ctx, moved) : undefined;
     createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,

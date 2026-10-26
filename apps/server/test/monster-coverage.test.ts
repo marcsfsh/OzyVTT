@@ -38,6 +38,7 @@ describe("the coverage of a monster's action", () => {
 
   it("gives a cast of one spell that spell's state", () => {
     expect(row("Archmage: Misty Step (3/Day)").state).toBe("enforced");
-    expect(row("Adult Black Dragon: Frightful Presence").state).toBe("guided");
+    expect(row("Adult Black Dragon: Frightful Presence").state).toBe("enforced");
+    expect(row("Doppelganger: Read Thoughts").state).toBe("guided");
   });
 });

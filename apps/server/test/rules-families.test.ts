@@ -53,6 +53,7 @@ describe("rule families", () => {
       ["movement.altitude", "movement"],
       ["movement.jump", "movement"],
       ["movement.toward-fear", "movement"],
+      ["movement.compelled", "movement"],
       ["movement.mount", "movement"],
       // Dropping Prone on another's turn, and moving past a climbing anchor's tether.
       ["movement.drop-prone", "movement"],
@@ -85,6 +86,7 @@ describe("rule families", () => {
       // Command's Flee): like Slow's no Reactions.
       ["condition.cant-attack", "economy"],
       ["condition.dash-only", "economy"],
+      ["condition.forced-attack", "economy"],
       ["condition.one-thing-a-turn", "economy"],
       ["legendary.own-turn", "economy"],
       ["legendary.after-a-turn", "economy"],

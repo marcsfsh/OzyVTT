@@ -164,10 +164,10 @@ describe("a spell's range", () => {
 describe("a save the engine applies nothing of", () => {
   it("tells the GM and the save card that the GM applies it", () => {
     const { state } = beasts();
-    // Telekinesis's Strength save decides whether the creature is moved, which is the GM's.
-    const resolution = cast(state, "telekinesis", { targetIds: [FOE2] });
+    // Seeming's Charisma save decides whether an unwilling creature is disguised, which is the GM's.
+    const resolution = cast(state, "seeming", { targetIds: [FOE2] });
     expect(resolution.warnings).toContain(
-      "The server applies nothing of Telekinesis's save. Apply what a failure or a success does from the spell's text."
+      "The server applies nothing of Seeming's save. Apply what a failure or a success does from the spell's text."
     );
     const pending = state.combat.pendingSaves.find((save) => save.targetActorId === FOE2)!;
     expect(pending.gmApplies).toBe(true);

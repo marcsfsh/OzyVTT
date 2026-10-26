@@ -460,7 +460,13 @@ describe("auras", () => {
     expect(pendingOn(state, IDS.hero)).toEqual([]);
     // A rider on the goat: the hero, the goat's enemy, starts its next turn within 30 feet.
     actor(state, IDS.ally).effects.push(
-      makeEffect({ id: "ridden", name: "Riding", tags: ["riding"], sourceActorId: IDS.foe, duration: { type: "manual" } })
+      makeEffect({
+        id: "ridden",
+        name: "Riding",
+        tags: ["riding"],
+        sourceActorId: IDS.foe,
+        duration: { type: "manual" }
+      })
     );
     for (let turn = 0; turn < 3; turn += 1) advance(state, [], reach);
     const [pending] = pendingOn(state, IDS.hero);

@@ -313,7 +313,9 @@ function openOnHitSave(
   const name = rider.name ? `${action.name}: ${rider.name}` : action.name;
   // "Success: The target is immune to this werewolf's curse for 24 hours."
   if (save.immuneOnSuccess && targets[0] && immuneToActionOf(targets[0], ctx.attacker.id, name)) {
-    ctx.warnings.push(`${targets[0].name} is immune to ${ctx.attacker.name}'s ${rider.name ?? action.name}, so it makes no save.`);
+    ctx.warnings.push(
+      `${targets[0].name} is immune to ${ctx.attacker.name}'s ${rider.name ?? action.name}, so it makes no save.`
+    );
     return;
   }
   const failureDamage = (save.failureDamage ?? []).map((part) => rollPlain(ctx, part.formula, part.type, action.name));

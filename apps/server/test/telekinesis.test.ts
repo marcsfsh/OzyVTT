@@ -144,6 +144,8 @@ describe("Telekinesis", () => {
       { catalog, role: "gm" }
     );
     exert(table, laterAction("telekinesis", "pull an object"), { objectItemId: "scimitar" });
+    // The pull is the server's to make, so the save card never says the GM applies it.
+    expect(table.state.combat.pendingSaves[0]?.gmApplies).toBeUndefined();
     fail(table, FOE);
     expect(actorOf(table.state, FOE).inventory[0]).toMatchObject({ id: "scimitar", equipped: false });
   });
