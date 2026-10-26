@@ -66,9 +66,10 @@ function found(state: GameState, actor: Actor, detects: Detects, content: SightC
   }
   if (kinds.includes("poison")) {
     if (actor.effects.some((effect) => effect.spell?.id === "contagion")) return "a magical contagion";
-    if (poisonous(definition)) return `a venomous ${definition?.name ?? "creature"}`;
+    // The creature's type and the catalog's name, never a stat block's or a row's own name, which can name someone.
+    if (poisonous(definition)) return `a venomous ${creatureTypeOf(actor, definition) ?? "creature"}`;
     const poison = actor.inventory.find((row) => row.quantity > 0 && POISON_ITEMS.has(catalogIdOf(row)));
-    if (poison) return `poison: ${poison.name}`;
+    if (poison) return `poison: ${catalogIdOf(poison) === "basic-poison" ? "Basic Poison" : "Potion of Poison"}`;
   }
   if (kinds.includes("minds") && (definition?.abilityScores.int ?? 0) >= 4) return "a mind";
   return null;

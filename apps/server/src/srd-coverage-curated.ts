@@ -732,7 +732,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed Wisdom save leaves the target Charmed for the spell's duration at its slot (resolution/pending.ts). When it acts directly counter to the command, the GM deals it the 5d10 Psychic damage, which a player can't take, at most once a day of game time (lasting-spells.ts, use-pools.ts). Remove Curse ends it, and Greater Restoration ends it as that spell's own row says. Whether the creature defies or understands the command is the GM's."
   ),
   "spell:detect-thoughts": guided(
-    "The cast holds Concentration and opens no save. On a later turn a Magic action probes the target's mind: it makes the Wisdom save, and a success ends the spell; on a failure it may take an action for an Intelligence (Arcana) check against the spell save DC, which ends the spell (lasting-spells.ts, ending-actions.ts, spell-endings.ts). Sensing the thinking creatures within 30 feet is the GM's until detection reads more than creature types, and what the caster reads in a mind is the GM's."
+    "The cast holds Concentration and opens no save; its player is shown the minds (Intelligence 4 or more) within 30 feet, not through a wall (vision/detect.ts). On a later turn a Magic action probes the target's mind: it makes the Wisdom save, and a success ends the spell; on a failure it may take an action for an Intelligence (Arcana) check against the spell save DC, which ends the spell (lasting-spells.ts, ending-actions.ts, spell-endings.ts). What the caster reads in a mind is the GM's."
   ),
   "spell:ensnaring-strike": enforced(
     "The hit's target makes the Strength save, with Advantage if Large or larger, or is Restrained while the caster concentrates, taking 1d6 Piercing, 1d6 more a slot level, at the start of each of its turns (resolution/pending.ts, turn-boundaries.ts). It, or a creature within reach of it with End an Effect, breaks free with a Strength (Athletics) check against the spell save DC (ending-actions.ts)."
@@ -776,8 +776,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:find-steed": enforced(
     "The Otherworldly Steed at the slot's level, a Celestial, Fey or Fiend, appears within 30 feet and acts right after the caster (summons.ts); it can be ridden (mounts.ts). It disappears at 0 Hit Points or when the caster dies, and a new casting replaces it."
   ),
-  "spell:floating-disk": castOnly(
-    "The disk, what it carries and how it follows the caster are the GM's: weight isn't tracked."
+  "spell:floating-disk": guided(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. The disk is a marker within 30 feet that stays put while its caster is within 20 feet and follows to stay within 20 feet as it moves away, ending more than 100 feet apart (summons.ts). What it carries, its 500-pound limit and an elevation change of 10 feet it can't cross are the GM's: its load isn't a container."
   ),
   "spell:giant-insect": enforced(
     "A Giant Insect at the slot's level in the form picked appears within 60 feet and acts right after the caster with its spell attack modifier and save DC (summons.ts); uncommanded, it takes the Dodge action (summon-turns.ts). It disappears at 0 Hit Points or when the Concentration ends."
@@ -845,8 +845,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:staff-of-swarming-insects": enforced(
     "Insect Cloud fills a 30-foot Emanation that is Heavily Obscured for everyone but its holder for 10 minutes (vision/cast-sight.ts). Giant Insect costs 4 charges and brings the insect (summons.ts), and Insect Plague costs 5. A strong wind dispersing the cloud is the GM's."
   ),
-  "action:Aboleth/dominate-mind": guided(
-    "The DC 16 Wisdom save and Charmed are applied, and a failure puts the target under the aboleth's command and on its side (summons.ts), so its player can't move it or act for it; it repeats the save whenever it takes damage, and the Charm ends when the aboleth dies (save-stages.ts). That the control reaches only 60 feet, and the save after each day spent a mile away, are the GM's."
+  "action:Aboleth/dominate-mind": enforced(
+    "The DC 16 Wisdom save and Charmed are applied, and a failure puts the target under the aboleth's command and on its side (summons.ts) while it is within 60 feet of the aboleth, its player acting for it beyond that; it repeats the save whenever it takes damage, and the domination ends when the aboleth dies or either is on another plane (save-stages.ts, off-plane.ts). The telepathic talk and the save after each day spent a mile away are the GM's."
   ),
   "action:Treant/animate-trees": enforced(
     "Two trees animate within 60 feet from the Treant stat block with Intelligence and Charisma 1 and no Animate Trees, under the treant's command and on its side, acting right after it (summons.ts). They stop after a day, at 0 Hit Points, when the treant dies or more than 120 feet from it. Which trees stand where is the GM's."
@@ -855,8 +855,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:misty-step": enforced(
     "granted-moves.ts gives the caster a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space it can see and refuses beyond its range."
   ),
-  "spell:dimension-door": guided(
-    "granted-moves.ts gives the caster a 500-foot teleport for the turn to any space, seen or not; arriving where a creature it didn't perceive stands fails and deals it 4d6 Force damage. Taking a willing creature along is the GM's."
+  "spell:dimension-door": enforced(
+    "granted-moves.ts gives the caster a 500-foot teleport for the turn to any space, seen or not, and one willing creature within 5 feet named at the cast goes too, arriving in an unoccupied space within 5 feet of the caster's (teleport-company.ts). Arriving where a creature stands, or with no space for the passenger, fails for both and deals each 4d6 Force damage. A destination off this map is the GM's to place."
   ),
   "spell:jump": enforced(
     "Each target can leap up to 30 feet for 10 feet of movement once on each of its turns for 1 minute (jumping.ts)."
@@ -864,14 +864,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:levitate": enforced(
     "A creature on the caster's side rises 20 feet with no save, and any other creature only on a failed Constitution save (falling.ts); while levitating it moves only as if climbing (altitude.ts), and it floats gently down when the spell ends. On the caster's turn a Magic action raises or lowers it 20 feet, kept within 60 feet of the caster, and a caster levitating itself rises or sinks as part of its move with no action (resolution/later-steps.ts). A smaller change of height is set with the GM's height control, and a levitated object has no token, so it is the GM's."
   ),
-  "spell:banishment": guided(
-    "A failed save Incapacitates the target and takes it off the map while the caster concentrates (off-plane.ts); it can't be targeted, and it returns to the space it left or the nearest unoccupied one. An extraplanar creature that stays gone after the full minute is the GM's."
+  "spell:banishment": enforced(
+    "A failed Charisma save Incapacitates the target and takes it off the map while the caster concentrates (off-plane.ts), one more target a slot level; it returns to the space it left or the nearest unoccupied one, and an Aberration, Celestial, Elemental, Fey or Fiend still gone when the full minute is up leaves the fight instead. Where on its plane it lands is the GM's."
   ),
-  "spell:etherealness": guided(
-    "The caster leaves the map for the Border Ethereal until it ends the spell (off-plane.ts), out of reach of the creatures on the plane, and returns to the space it left or the nearest unoccupied one. Moving while ethereal, the Force damage of being shunted and the creatures an upcast takes along are the GM's."
+  "spell:etherealness": enforced(
+    "The caster, and two more willing creatures within 10 feet for each slot level above 7, step onto the Border Ethereal for up to 8 hours until the caster ends it: their tokens stay on the map, unseen but by Truesight or See Invisibility, out of reach of the creatures on the plane both ways, moving in any direction through walls and creatures, each foot up or down costing an extra foot (ethereal.ts, movement-rules.ts). Each returns where its token stands, shunted to the nearest unoccupied space with 2 Force damage a foot from a filled one (off-plane.ts). What it perceives of the plane it left is description."
   ),
-  "spell:blink": guided(
-    "The server rolls the d6 as the caster's turn ends; on a 4 or more the caster leaves the map until the start of its next turn (off-plane.ts) and returns to the space it left or the nearest unoccupied one. Picking another space within 10 feet is the GM's."
+  "spell:blink": enforced(
+    "The server rolls the d6 as the caster's turn ends; on a 4 or more the caster steps onto the Border Ethereal until the start of its next turn, its token kept on the map, unseen but by Truesight or See Invisibility and out of reach (ethereal.ts). It returns where it stood, the nearest unoccupied space from a filled one, and may then teleport to an unoccupied space it sees within 10 feet (off-plane.ts, granted-moves.ts). What it perceives of the plane it left is description."
   ),
   "spell:maze": enforced(
     "The target leaves the map while the caster concentrates (off-plane.ts) and returns to the space it left or the nearest unoccupied one. It may take an action for a DC 20 Intelligence (Investigation) check, which ends the spell on a success (resolution/builtins.ts)."
@@ -894,8 +894,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:broom-of-flying": enforced(
     "The action gives the rider a Fly Speed of 50 feet with hover, which ends when it lands (falling.ts) or when it gets off on the sheet. Its slower 30 feet while it carries over 200 pounds needs the rider's body weight, which no sheet records, and sending it alone to a place within a mile is story."
   ),
-  "item:cape-of-the-mountebank": guided(
-    "The cast of Dimension Door, once a dawn, teleports the wearer on the map (granted-moves.ts). The smoke cloud is the GM's."
+  "item:cape-of-the-mountebank": enforced(
+    "Its Dimension Door, once a dawn, teleports the wearer on the map with a willing creature beside it (granted-moves.ts, teleport-company.ts) and leaves the space it left Lightly Obscured until the end of its next turn (vision areas)."
   ),
   "action:Giant Hyena/rampage-1-day": enforced(
     "It is offered only right after the hyena damages a creature that was already Bloodied (bloodied-hits.ts). Taken move first, the use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes its Bite."
@@ -966,11 +966,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Balor/teleport": enforced(
     "A 60-foot teleport is granted to the balor, or to the one demon within 10 feet it names instead (resolution/movement-grants.ts, resolution/action-targets.ts). Whether that demon is willing is its player's or the GM's."
   ),
-  "action:Phase Spider/ethereal-jaunt": guided(
-    "The spider leaves the map for the Ethereal Plane, out of reach of the creatures on the plane, and the next Ethereal Jaunt brings it back to the space it left or the nearest unoccupied one (off-plane.ts). Moving while ethereal, to come back elsewhere, is the GM's."
+  "action:Phase Spider/ethereal-jaunt": enforced(
+    "The spider steps onto the Border Ethereal as a Bonus Action: its token stays on the map, unseen but by Truesight or See Invisibility, out of reach of the creatures on the plane, moving through walls and creatures (ethereal.ts); the next Ethereal Jaunt brings it back where its token stands, the nearest unoccupied space from a filled one (off-plane.ts)."
   ),
-  "action:Nightmare/ethereal-stride": guided(
-    "The nightmare and up to three creatures within 5 feet leave the map for the Ethereal Plane, and the next Ethereal Stride brings them back to the spaces they left (off-plane.ts). Moving while ethereal, and whether a creature taken along is willing, are the GM's."
+  "action:Nightmare/ethereal-stride": enforced(
+    "The nightmare and up to three willing creatures within 5 feet (its side) step onto the Border Ethereal: their tokens stay on the map, unseen but by Truesight or See Invisibility, out of reach of the creatures on the plane, moving through walls and creatures (ethereal.ts). The next Ethereal Stride brings them back where their tokens stand, the nearest unoccupied space from a filled one (off-plane.ts)."
   ),
   "action:Dryad/tree-stride": guided(
     "A teleport of up to 65 feet is granted (granted-moves.ts). Whether a Large tree stands at each end is the GM's, since trees aren't on the map."
@@ -1011,7 +1011,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:mending": castOnly("The repair is the GM's."),
   "spell:message": castOnly("The whisper and its reply are the table's."),
-  "spell:prestidigitation": castOnly("Its minor tricks are the GM's."),
+  "spell:prestidigitation": guided(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. Fire Play lights or puts out a flame within 10 feet: a light the GM set on the map, or the burning light a targeted creature carries (resolution/cast-lights.ts). The sensory effects, cleaning, marks, flavours and trinkets are the GM's, with up to three lasting at once."
+  ),
   "spell:shillelagh": enforced(
     "The cast binds to the Club or Quarterstaff the caster picks (resolution/grant-extras.ts): its attack and damage rolls use the better of Strength and the spellcasting ability, its die becomes a d8 (d10 at level 5, d12 at 11, 2d6 at 17), and a hit deals Force or its own type (item-actions.ts). Casting it again moves it, and it ends once the weapon leaves the pack (bound-weapons.ts)."
   ),
@@ -1598,7 +1600,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:iron-bands": enforced(
     "The throw's attack roll is applied, and a hit Restrains the target until its user's Bonus Action command releases it (resolution/endings.ts releaseItemEffects). A DC 20 Strength (Athletics) check, its action, breaks the bands and destroys them, and a failure keeps that creature from trying again for 24 hours (resolution/endings.ts)."
   ),
-  "item:iron-flask": guided("The command's save is applied. Trapping the creature in the flask is the GM's."),
+  "item:iron-flask": guided(
+    "Its Magic action's DC 17 Wisdom save against a Celestial, Elemental, Fey or Fiend it sees within 60 feet traps a failing one off the map in the flask, one at a time (resolution/held-creatures.ts, off-plane.ts); the release action brings it back beside its user, obeying the user for 1 hour (summons.ts). A creature trapped before saving with Advantage, a found flask holding a creature and what a released one does after the hour are the GM's."
+  ),
   "item:luck-blade": guided(
     "The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish casts on 1d3 charges rolled when it is added, which never come back, and once a dawn (resolution/economy.ts). What a Wish does is the GM's."
   ),
@@ -1629,8 +1633,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:robe-of-scintillating-colors": enforced(
     "Its 3 charges (1d3 back at dawn) each make the robe shed Bright Light 30 feet and Dim Light 30 more until the end of the wearer's next turn, give Disadvantage to attackers that see it, and Stun until then a creature within 30 feet that sees it and fails the DC 15 Wisdom save (resolution/pending.ts, vision/rules.ts)."
   ),
-  "item:robe-of-stars": guided(
-    "The +1 to saving throws is applied, and its six stars each cast a level 5 Magic Missile, 1d6 coming back at dusk or a Long Rest. The trip to the Astral Plane is the GM's."
+  "item:robe-of-stars": enforced(
+    "The +1 to saving throws is applied, its six stars each cast a level 5 Magic Missile with 1d6 coming back at dusk or a Long Rest, and its Magic action takes the wearer off the map to the Astral Plane until the action again brings it back to its last space or the nearest unoccupied one (off-plane.ts). What it finds on the Astral Plane is story."
   ),
   "item:rod-of-alertness": enforced(
     "Advantage on Initiative and Wisdom (Perception) checks, and its detection casts, are applied. The Protective Aura once a dawn plants the rod's light where its user stands for 10 minutes, and while in its 60 feet of Bright Light the user and its allies have +1 to AC and saves and See Invisibility there (zone-auras.ts). Pulling the rod out is the GM's, who ends its area."
@@ -1678,7 +1682,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "It swings as a +3 Mace; Drain Life (healing its wielder half the Necrotic damage a failed save deals) and Paralyze ride a melee hit and Terrify is an action, each once a day. Its buttons are forms its holder picks for a Bonus Action (inventory.ts setItemForm): a flaming Longsword or Shortsword with 2d6 Fire and its light, a +3 Battleaxe or Spear, a pole or a battering ram (+10 to break through). The pole's length and anchoring, magnetic north and the depth or height it tells are story."
   ),
   "item:sun-blade": enforced(
-    "It swings as a +2 Finesse Longsword that deals Radiant damage, with 1d8 Radiant more against an Undead, and its blade sheds its sunlight. A Bonus Action puts the blade away to the hilt or brings it back (inventory.ts setItemForm). The radius its Magic action adjusts is the GM's."
+    "It swings as a +2 Finesse Longsword that deals Radiant damage, with 1d8 Radiant more against an Undead, and its blade sheds sunlight whose Bright and Dim radii a Magic action sets 5 feet wider or narrower between 10 and 30 feet (resolution/cast-lights.ts, vision/senses.ts). A Bonus Action puts the blade away to the hilt or brings it back (inventory.ts setItemForm)."
   ),
   "item:sword-of-sharpness": enforced(
     "A rolled 20 against a creature adds 14 Slashing damage and a level of Exhaustion (resolution/damage.ts, resolution/on-hit.ts), and its damage dice against an object are maximized (object-strikes.ts)."
@@ -2153,7 +2157,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed Wisdom save turns the target into a Beast of its Challenge Rating or lower that the caster picks (transform/options.ts): the Beast's statistics with the target's own Hit Points and creature type, Temporary Hit Points equal to the Beast's Hit Points, no speech or spells, and gear melded. It ends with Concentration, when those Temporary Hit Points run out, or at death (transform/rules.ts)."
   ),
   "spell:true-polymorph": guided(
-    "Creature into Creature is applied: an unwilling target saves, a willing one doesn't, and it takes a stat block of its Challenge Rating or lower with Temporary Hit Points equal to its Hit Points, no speech or spells. Object into Creature, Creature into Object and the transformation made permanent after an hour of Concentration are the GM's."
+    "Creature into Creature is applied (transform/): an unwilling target saves, a willing one doesn't, and it takes a stat block of its Challenge Rating or lower with Temporary Hit Points equal to its Hit Points, no speech or spells. Held for the full hour of Concentration, the form lasts until dispelled (effects.ts). Object into Creature and Creature into Object are the GM's: neither an object nor an object form is a game piece yet."
   ),
   "spell:shapechange": enforced(
     "The caster takes a form of its level or Challenge Rating or lower, not a Construct or an Undead, keeping its mind, proficiencies and Spellcasting, with Temporary Hit Points from the first form. A Magic action takes a new form while the spell lasts, and the caster picks whether its gear is worn or melds."
@@ -2170,8 +2174,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:wind-walk": enforced(
     "Each willing target becomes a cloud with a Fly Speed of 300 feet that hovers, Immunity to Prone and Resistance to Bludgeoning, Piercing and Slashing damage; it can only Dash or take the Magic action that ends the form, which leaves it Stunned for 1 minute. While the spell lasts each target keeps a Magic action that makes it a cloud again, Stunned for the minute of the change (resolution/shape-shift.ts, granted-actions.ts). A cloud whose form ends in the air drifts down safely, and one more than 600 feet up falls the rest (altitude.ts, falling.ts)."
   ),
-  "spell:magic-jar": castOnly(
-    "The container, the possession of a host and the return to the body are the GM's: control of one creature passing to another is not modeled."
+  "spell:magic-jar": guided(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. The caster's catatonic body, the possession of a Humanoid (its Charisma save, the host's physical statistics over the caster's, the host's soul held in the container) and the returns and deaths that follow are the GM's: possession over a composed form and command has no vocabulary yet."
   ),
   "item:potion-of-growth": enforced(
     "Drinking it makes the drinker one size larger for 10 minutes, with Advantage on Strength checks and saves and 1d4 more damage with weapons and Unarmed Strikes. The token takes the new size (transform/forms.ts)."
@@ -2418,7 +2422,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Aimed at a door on the map the caster touches, it seals the door shut so that no check opens it; aimed at a wall, it cuts a lasting 5-foot passage through it (spell-walls.ts, doors.ts). The other shapes it makes are the GM's."
   ),
   "spell:elementalism": guided(
-    "Beckon Air aimed at a door on the map within 30 feet slams it shut (resolution/cast-walls.ts). The other options are the GM's."
+    "Beckon Air aimed at a door on the map within 30 feet slams it shut (resolution/cast-walls.ts), and Beckon Fire lights a flame the GM set on the map, or the light a targeted creature carries, within 30 feet (resolution/cast-lights.ts). Beckon Earth, Beckon Water, Sculpt Element and the smoke's scent are harmless descriptions."
   ),
   "spell:resilient-sphere": enforced(
     "A failed Dexterity save shuts the target in the sphere while the caster concentrates (enclosures.ts). An attack or spell on it from outside, or from it on anything outside, meets Total Cover's refusal, and an area leaves it out. Disintegrate aimed at it destroys the sphere, harms nothing inside and ends the spell. Rolling the sphere along, and a willing target, are the GM's."
@@ -2466,7 +2470,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Its compartments hold 60 pieces of ammunition, 18 javelins or similar, and 6 long objects such as bows or staffs, picked in the Gear tab; it weighs 2 pounds whatever it holds, and ammunition is fired from it (containers.ts, ammunition.ts)."
   ),
   "item:portable-hole": guided(
-    "As a container it weighs nothing whatever it holds, and putting it in another extradimensional space destroys both (containers.ts). Opening the hole on a surface, and the creatures and air inside it, are the GM's."
+    "As a container it weighs nothing whatever it holds, and putting it in another extradimensional space destroys both (containers.ts). Folding it shut holds the creatures in the open hole off the map until each forces its way out with an action and a DC 10 Strength (Athletics) check, coming back beside it (off-plane.ts). The open hole on the map and its air are the GM's."
   ),
   "item:oil-of-sharpness": enforced(
     "Applying it outside a fight makes one carried Slashing or Piercing weapon, or up to 20 pieces of ammunition, a +3 Weapon or +3 Ammunition (resolution/rebind.ts), and the vial is spent."
@@ -2519,5 +2523,74 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "action:Ettercap/web-strand": enforced(
     "The DC 12 Dexterity save leaves a target Restrained, held by a strand that is an object with AC 10, 5 Hit Points, Vulnerability to Fire damage and Immunity to Bludgeoning damage. An attack that breaks it frees the target (objects.ts)."
+  ),
+  "action:Ghost/etherealness": enforced(
+    "Casts Etherealness with no components (monster-spells.ts): the ghost's token stays on the map on the Border Ethereal, seen from the Material Plane as its text says but out of reach of the creatures there, moving in any direction through walls and creatures, and back where its token stands when it ends the spell, shunted with 2 Force damage a foot from a filled space (ethereal.ts, off-plane.ts). Which planes border which is story."
+  ),
+  "action:Incubus/spellcasting": enforced(
+    "Casts its listed spells at the stat block's numbers (monster-spells.ts); Etherealness keeps it on the Border Ethereal on the map (ethereal.ts), and Dream, Disguise Self and Hypnotic Pattern apply as their own rows say, the incubus being Dream's messenger."
+  ),
+  "action:Night Hag/spellcasting": guided(
+    "Casts its listed spells at the stat block's numbers (monster-spells.ts); Etherealness keeps it on the Border Ethereal on the map (ethereal.ts). Plane Shift's journey off the scene to another plane is the GM's."
+  ),
+  "item:oil-of-etherealness": guided(
+    "Applying it covers one Medium or smaller creature within reach and is used up: the creature steps onto the Border Ethereal for 1 hour, as the Etherealness spell (ethereal.ts, off-plane.ts). The 10 minutes the application takes are the GM's to pass on the game clock."
+  ),
+  "item:plate-armor-of-etherealness": enforced(
+    "Its Magic action, once a dawn (a Long Rest), puts the wearer on the Border Ethereal as the Etherealness spell for up to 8 hours (ethereal.ts); repeating the command word ends it with no new use, and taking the armor off ends it (inventory.ts)."
+  ),
+  "spell:meld-into-stone": guided(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. The caster merges with the stone for 8 hours: off the map, unseen and untouchable from outside and blind to it, casting only on itself, its Wisdom (Perception) checks to hear outside at Disadvantage, and back where it entered (off-plane.ts). Stepping out with 5 feet of movement is the GM's ending of the effect until an effect can be ended with movement; whether the stone is damaged enough to expel it (6d6 or 50 Force and Prone) is the GM's call, the stone not being on the map."
+  ),
+  "spell:rope-trick": enforced(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. Up to eight willing Medium or smaller creatures beside the rope, named at the cast, climb into its space for the hour: off the map, where nothing passes in or out (off-plane.ts), and they drop out where each left when it ends. Where the rope hangs, and a creature climbing in later, are the GM's."
+  ),
+  "spell:transport-via-plants": guided(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. The two plants, which ones qualify, and the creatures stepping from one to the other for 5 feet of movement are the GM's: plants aren't map pieces, and a teleport offered to any creature beside a marker has no vocabulary yet."
+  ),
+  "spell:tree-stride": enforced(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. Once on each of the caster's turns while it concentrates it may teleport up to 500 feet, seen or not, from one tree to another for 10 feet of movement (granted-moves.ts, movement-rules.ts). Where the trees stand and which share a kind are the GM's: trees aren't map pieces."
+  ),
+  "spell:simulacrum": guided(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. The copy of a Beast or Humanoid (a Construct with half its Hit Point maximum under the caster's command), its repair at 100 GP a Hit Point during a Long Rest and its end at 0 Hit Points or on a new casting are the GM's: a summon copied from a creature on the roster has no vocabulary yet."
+  ),
+  "spell:clairvoyance": enforced(
+    "The cast takes its 10 minutes and needs a 100 GP focus (resolution/components.ts). On this map the Invisible sensor is a marker that stays put and that its caster's player sees through while it lasts (summons.ts, vision/audience.ts), seen by Truesight or See Invisibility, and a creature a Divination ward guards (Nondetection) isn't seen through it. A sensor elsewhere, choosing hearing in place of sight and what it hears are the GM's."
+  ),
+  "spell:druidcraft": guided(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. Fire Play lights or snuffs a flame within 30 feet: a light the GM set on the map, tapped while aiming, or the burning light a targeted creature carries (resolution/cast-lights.ts). Weather Sensor, Bloom and the Sensory Effect are harmless descriptions."
+  ),
+  "spell:darkness": enforced(
+    "Magical Darkness fills a 15-foot Sphere at a point, or cast on a creature an Emanation round the object it carries that moves with it, which Darkvision can't see through and nonmagical light can't brighten, and it dispels spell light of level 2 or lower it overlaps (vision/cast-sight.ts). An object covered by a bowl or helm is the table's to say."
+  ),
+  "item:frost-brand": enforced(
+    "The extra 1d6 Cold on a hit and Resistance to Fire while held are applied, and drawing it can put out the nonmagical flames within 30 feet, the GM's lights on the map and the burning lights creatures carry, once an hour of game time (resolution/cast-lights.ts). Its light in freezing cold depends on weather the app doesn't track."
+  ),
+  "spell:detect-magic": enforced(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. For the duration the caster senses magic within 30 feet, blocked by walls (vision/detect.ts); its later Magic action shows its player a faint aura on each creature in sight bearing a magic item or a spell's effect, with those spells' schools. Magic in scenery that isn't a game piece (a warded wall, a hidden glyph) is the GM's to describe."
+  ),
+  "spell:detect-poison-and-disease": enforced(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. For the duration its player is shown, within 30 feet and not through a wall, each creature carrying a poison, each poisonous or venomous creature and each with a magical contagion, with the kind (vision/detect.ts). Poisons in scenery and food that aren't game pieces are the GM's."
+  ),
+  "item:wand-of-enemy-detection": enforced(
+    "Its 7 charges (1d6 + 1 back at dawn, a 1 on the last one's d20 destroying it) each show its holder's player, for a minute, the direction of the nearest Hostile creature within 60 feet, hidden or not, but not its distance (vision/detect.ts); it ends when the wand is put away."
+  ),
+  "item:bag-of-devouring": guided(
+    "The 50 percent pull of a creature that reaches in, the creature inside escaping with a DC 15 Strength (Athletics) check or being pulled out with DC 20, and its devouring at the start of its turn are the GM's until random outcomes and a death at a turn's start are vocabulary; what it eats and what it spits to another plane are story."
+  ),
+  "item:mirror-of-life-trapping": guided(
+    "The hung mirror as an object, the DC 15 Charisma save of a creature that sees its reflection within 30 feet, the twelve cells off the map, freeing a named creature and its shattering are the GM's: a sight-gated area save from an object on a wall has no vocabulary yet. Talking with a trapped creature is story."
+  ),
+  "item:rod-of-security": guided(
+    "Its Magic action takes its user and up to 20 willing creatures it sees off the map to its demiplane, and the action again brings every visitor back to the space it left or the nearest unoccupied one; it then waits 240 hours of game time (off-plane.ts, clock-pools.ts). The hourly healing as a spent Hit Point Die, the days the visitors may stay and more than 20 visitors are the GM's; the demiplane is story."
+  ),
+  "item:dimensional-shackles": enforced(
+    "Its Utilize action places them on an Incapacitated creature of Large size or smaller within reach: it can't teleport or leave the plane by its own means (ethereal.ts, movement-rules.ts). The action again on it removes them, and its DC 30 Strength (Athletics) check breaks them (builtin-actions.ts). That the check comes once in 30 days, a creature its user names removing them, and the broken shackles' loss are the GM's."
+  ),
+  "item:hat-of-disguise": guided(
+    "Its Disguise Self cast leaves the disguise on its wearer, which ends when the hat is taken off (inventory.ts). How the disguise looks and who sees through it are the GM's."
+  ),
+  "spell:disguise-self": guided(
+    "The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. The disguise is an effect on the caster for the hour. How it looks, and who sees through it with a Study action, are the GM's."
   )
 };

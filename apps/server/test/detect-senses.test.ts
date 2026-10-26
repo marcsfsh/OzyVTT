@@ -138,7 +138,7 @@ describe("Detect Poison and Disease", () => {
       sensedBy(game, [HERO], content, nobodyShown)
         .map((found) => found.sense)
         .sort()
-    ).toEqual(["a venomous Giant Spider", "poison: Basic Poison"]);
+    ).toEqual(["a venomous beast", "poison: Basic Poison"]);
   });
 });
 
