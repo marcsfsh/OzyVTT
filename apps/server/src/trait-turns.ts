@@ -570,6 +570,7 @@ function aurasStartedIn(state: GameState, actor: Actor, deps: TraitTurnDeps, eve
               }
             : {}),
         ...(save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+        ...(save.immuneMinutes !== undefined ? { immuneMinutes: save.immuneMinutes } : {}),
         newSaveId: deps.newId,
         createdAt: Date.parse((deps.now ?? (() => new Date().toISOString()))())
       });

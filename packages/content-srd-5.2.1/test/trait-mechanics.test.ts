@@ -103,7 +103,8 @@ describe("trait mechanics in the monster bundle", () => {
           successDamage: "none",
           failureConditions: ["frightened"],
           failureDuration: { type: "until-bearer-next-turn" },
-          immuneOnSuccess: true
+          immuneOnSuccess: true,
+          immuneMinutes: 1440
         }
       },
       { kind: "restoration", name: "Diabolical Restoration", bodyGoes: true }
@@ -111,7 +112,7 @@ describe("trait mechanics in the monster bundle", () => {
     // The hezrou's Stench grants no immunity on a success, the ghast's does.
     expect(mechanicsOf("hezrou")[0]).toMatchObject({ rangeFeet: 10, save: { dc: 16 } });
     expect(mechanicsOf("hezrou")[0]).not.toHaveProperty("save.immuneOnSuccess");
-    expect(mechanicsOf("ghast")[0]).toMatchObject({ save: { immuneOnSuccess: true } });
+    expect(mechanicsOf("ghast")[0]).toMatchObject({ save: { immuneOnSuccess: true, immuneMinutes: 24 * 60 } });
     // The mouther's ground is Difficult Terrain round it, and its failure is a d8 table the server rolls.
     expect(mechanicsOf("gibbering-mouther")[0]).toEqual({
       kind: "difficult-ground",
@@ -141,7 +142,8 @@ describe("trait mechanics in the monster bundle", () => {
           successDamage: "none",
           failureConditions: ["frightened"],
           failureDuration: { type: "until-bearer-next-turn" },
-          immuneOnSuccess: true
+          immuneOnSuccess: true,
+          immuneMinutes: 1440
         }
       }
     ]);

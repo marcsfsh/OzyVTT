@@ -191,6 +191,7 @@ export type PlayerPendingSave = Omit<
   | "zoneId"
   | "magical"
   | "immuneOnSuccess"
+  | "immuneMinutes"
   | "drain"
   | "failurePush"
   | "successPush"

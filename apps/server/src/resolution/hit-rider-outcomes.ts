@@ -105,6 +105,9 @@ export type RiderSave = Readonly<{
   /** Damage a failure deals, none on a success (Hurl Through Hell's 8d10 Psychic), or half with `halfOnSuccess`. */
   failureDamage?: ReadonlyArray<Readonly<{ amount: number; type: string }>>;
   halfOnSuccess?: true;
+  /** A success makes the target immune to this rider of the attacker, for these minutes of game time or the fight. */
+  immuneOnSuccess?: true;
+  immuneMinutes?: number;
 }>;
 
 /** Opens the save on the target as its own prompt, sourced by the attacker: what a failure and a success leave are
@@ -149,6 +152,8 @@ export function openRiderSave(ctx: ResolveContext, target: LiveActor, action: De
     ...(onFailEffect ? { onFailEffect } : {}),
     ...(onSuccessEffect ? { extra: { onSuccessEffect } } : {}),
     ...(save.failurePush ? { failurePush: save.failurePush } : {}),
+    ...(save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+    ...(save.immuneOnSuccess && save.immuneMinutes !== undefined ? { immuneMinutes: save.immuneMinutes } : {}),
     // What its damage drains as it lands (a Rod of Lordly Might's Drain Life heals its wielder half).
     ...(action.drain ? { drain: action.drain } : {}),
     replaceExisting: false,

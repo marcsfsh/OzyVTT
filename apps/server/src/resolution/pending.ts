@@ -841,6 +841,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(advantageFrom !== "" ? { advantageFrom } : {}),
       ...(autoSucceeds !== "" ? { autoSucceeds } : {}),
       ...(action.save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+      ...(action.save.immuneMinutes !== undefined ? { immuneMinutes: action.save.immuneMinutes } : {}),
       ...(action.save.failureKills ? { failureKills: { ...action.save.failureKills } } : {}),
       // Heightened Spell: "one target of the spell [has] Disadvantage on saves against the spell", its repeats too.
       ...(heightened !== null ? { disadvantage: { targetId: heightened, from: "Heightened Spell" } } : {}),

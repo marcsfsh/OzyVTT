@@ -50,6 +50,8 @@ export function createPendingSaves(
     magical?: boolean;
     /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
     immuneOnSuccess?: boolean;
+    /** How long that immunity lasts on the game clock, in minutes; absent, the fight. */
+    immuneMinutes?: number;
     /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). */
     drain?: DamageDrain;
     /** Where a failure pushes the creature (Thunderwave). */
@@ -130,6 +132,7 @@ export function createPendingSaves(
     ...(input.extra?.vitality ? { vitality: { ...input.extra.vitality } } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
+    ...(input.immuneOnSuccess && input.immuneMinutes !== undefined ? { immuneMinutes: input.immuneMinutes } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
     ...(input.successPush ? { successPush: { ...input.successPush } } : {}),

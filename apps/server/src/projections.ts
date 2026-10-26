@@ -237,6 +237,7 @@ const PENDING_SAVE_FIELDS = {
   magical: "never",
   // What a success earns is the stat block's text, the GM's knowledge.
   immuneOnSuccess: "never",
+  immuneMinutes: "never",
   // What the damage drains, and where a failure pushes, are narrated when they land.
   drain: "never",
   failurePush: "never",

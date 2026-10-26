@@ -716,7 +716,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ],
   // "A creature of the chosen kind makes a Wisdom saving throw when it comes within 120 feet of the target": the area is
   // round the targeted creature and moves with it, acting on the creature type picked with the form. A creature that
-  // ends its turn more than 120 feet from the target saves again; a success frees it and leaves it immune for now.
+  // ends its turn more than 120 feet from the target saves again; a success frees it and leaves it immune for 1 minute.
   antipathysympathy: [
     {
       name: "antipathy",
@@ -727,7 +727,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         successDamage: "none",
         failureConditions: ["frightened"],
         repeatBeyondFeet: 120,
-        immuneOnSuccess: true
+        immuneOnSuccess: true,
+        immuneMinutes: 1
       },
       damage: [],
       zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
@@ -743,7 +744,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         failureConditions: ["charmed"],
         repeatBeyondFeet: 120,
         repeatOnDamage: { fromSourceOnly: true },
-        immuneOnSuccess: true
+        immuneOnSuccess: true,
+        immuneMinutes: 1
       },
       damage: [],
       zone: { on: ["enter"], around: "target", feet: 120, picksType: true },

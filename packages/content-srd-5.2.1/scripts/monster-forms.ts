@@ -151,8 +151,9 @@ export const lycanthropyTag = (slug: string) => `lycanthropy-${slug}`;
 /**
  * A lycanthrope's Bite: "If the target is a Humanoid, it is subjected to the following effect. Constitution Saving
  * Throw: DC 12. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a
- * Werewolf under the DM's control and has 10 Hit Points." The save opens on the hit, against Humanoids only; the curse
- * is an effect whose tag the engine reads at 0 Hit Points. The success's 24-hour immunity stays the GM's.
+ * Werewolf under the DM's control and has 10 Hit Points. Success: The target is immune to this werewolf's curse for 24
+ * hours." The save opens on the hit, against Humanoids only; the curse is an effect tagged as one, so Remove Curse ends
+ * it, and its lycanthropy tag is read at 0 Hit Points. A success holds off this lycanthrope's bite for 24 game hours.
  */
 export function lycanthropeCurseOf(slug: string, name: string, description: string): OnHitRider | null {
   const match = description.match(
@@ -162,9 +163,8 @@ export function lycanthropeCurseOf(slug: string, name: string, description: stri
   return {
     conditions: [],
     name: `Lycanthropy (${name})`.slice(0, 60),
-    tags: [lycanthropyTag(slug)],
+    tags: [lycanthropyTag(slug), "curse"],
     creatureTypes: ["humanoid"],
-    save: { ability: "con", dc: Number.parseInt(match[1]!, 10) },
-    reminder: `A creature that succeeds is immune to this ${name.toLowerCase()}'s curse for 24 hours.`
+    save: { ability: "con", dc: Number.parseInt(match[1]!, 10), immuneOnSuccess: true, immuneMinutes: 24 * 60 }
   };
 }

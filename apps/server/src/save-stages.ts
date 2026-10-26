@@ -36,6 +36,7 @@ export type RepeatFields = Readonly<{
   repeatUnseenSource?: true;
   repeatBeyondFeet?: number;
   immuneOnSuccess?: true;
+  immuneMinutes?: number;
   repeatFailureDamage?: RepeatSave["failureDamage"];
   repeatTally?: number;
   repeatTallySuccessesOnly?: true;
@@ -75,6 +76,9 @@ export function repeatSaveOf(
     ...(save.repeatUnseenSource ? { unseenSource: true as const } : {}),
     ...(save.repeatBeyondFeet !== undefined ? { beyondFeet: save.repeatBeyondFeet } : {}),
     ...(save.immuneOnSuccess && save.repeatBeyondFeet !== undefined ? { immuneOnSuccess: true as const } : {}),
+    ...(save.immuneOnSuccess && save.repeatBeyondFeet !== undefined && save.immuneMinutes !== undefined
+      ? { immuneMinutes: save.immuneMinutes }
+      : {}),
     ...(save.repeatFailureDamage
       ? { failureDamage: save.repeatFailureDamage.map((part) => ({ ...part })) }
       : again && again.length > 0
@@ -265,6 +269,7 @@ export function openEndingSave(
     magical: effect.magical === true,
     // A success leaves the bearer immune to the effect's source (Antipathy/Sympathy).
     ...(repeat?.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+    ...(repeat?.immuneMinutes !== undefined ? { immuneMinutes: repeat.immuneMinutes } : {}),
     ...(advantageFrom ? { advantageFrom } : {}),
     newSaveId: deps.newId,
     createdAt: Date.parse(deps.now())

@@ -45,6 +45,7 @@ export type SaveOutcome = {
   failureExhaustion?: number;
   advantageIfFighting?: true;
   immuneOnSuccess?: true;
+  immuneMinutes?: number;
   endsWhenSourceDies?: true;
   endedBy?: EndedBy;
   onlyCreatureTypes?: string[];
@@ -396,9 +397,9 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
       : {}),
     ...(exhaustion ? { failureExhaustion: Number.parseInt(exhaustion[1]!, 10) } : {}),
     ...(onDamage ? { repeatOnDamage: onDamage } : {}),
-    // "Success: The target is immune to this cloaker's Moan for the next 24 hours."
+    // "Success: The target is immune to this cloaker's Moan for the next 24 hours", on the game clock.
     ...(/(?<!or )\bSuccess:\s*The target is immune to this\b/.test(description)
-      ? { immuneOnSuccess: true as const }
+      ? { immuneOnSuccess: true as const, ...immunityMinutesOf(description) }
       : {}),
     ...(dies ? { failureKills: dies[1] ? { sourceRegains: dies[1] } : {} } : {}),
     ...(only && only[1] !== "Creature" ? { onlyCreatureTypes: [only[1]!.toLowerCase()] } : {}),
@@ -806,3 +807,11 @@ export function spellSaveOutcomeFor(spellId: string, description: string): SaveO
 
 /** Every override must still name a spell, so a renamed id fails the build out loud. */
 export const SPELL_SAVE_OVERRIDE_IDS: readonly string[] = Object.keys(SPELL_SAVE_OVERRIDES);
+
+/** How long a printed immunity lasts, in minutes of the game clock ("immune to this ghast's Stench for 24 hours"). */
+export function immunityMinutesOf(text: string): { immuneMinutes?: number } {
+  const timed = /\bimmune to [^.]*? for (?:the next )?(\d+) (hours?|minutes?)\b/.exec(text);
+  if (!timed) return {};
+  const count = Number.parseInt(timed[1]!, 10);
+  return { immuneMinutes: timed[2]!.startsWith("hour") ? count * 60 : count };
+}

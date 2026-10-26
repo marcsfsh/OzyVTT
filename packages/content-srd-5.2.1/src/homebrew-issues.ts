@@ -233,6 +233,7 @@ const LABELS: Readonly<Record<string, string>> = {
   failureExhaustion: "Exhaustion a failure adds",
   advantageIfFighting: "Advantage in a fight with the source",
   immuneOnSuccess: "immunity after a success",
+  immuneMinutes: "how long that immunity lasts",
   sparesCreatureTypes: "creature types a failure spares",
   sparesSpecies: "species a failure spares",
   failureByMargin: "what a failure by a margin does",

@@ -4565,7 +4565,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           failureConditions: ["frightened"],
           failureDuration: { type: "rounds", rounds: 10 },
           repeatSave: true,
-          immuneOnSuccess: true
+          immuneOnSuccess: true,
+          immuneMinutes: 24 * 60
         },
         uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" },
         targets: { rangeFeet: 30 }

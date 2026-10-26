@@ -194,6 +194,11 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     ],
     reminder: null
   },
+  "lamia/corrupting-touch": {
+    why: "the failure's conditions are a curse, which the save reader doesn't mark",
+    // "The target is cursed for 1 hour. Until the curse ends, the target has the Charmed and Poisoned conditions."
+    save: { failureEffect: { name: "Cursed", tags: ["curse"], modifiers: [] } }
+  },
   "invisible-stalker/vortex": {
     why: "the grapple also keeps the target from casting spells with a Verbal component",
     // "Until the grapple ends, the target can't cast spells with a Verbal component."
@@ -263,7 +268,8 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     save: {
       failureConditions: ["frightened"],
       failureDuration: { type: "until-bearer-turn-end" },
-      immuneOnSuccess: true
+      immuneOnSuccess: true,
+      immuneMinutes: 24 * 60
     }
   }
 };

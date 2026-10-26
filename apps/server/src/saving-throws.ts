@@ -49,6 +49,7 @@ import {
   type AnswerTarget
 } from "./roll-answers.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
+import { immunityDuration } from "./save-immunity.js";
 import { settleTouchedZone } from "./zone-touch.js";
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
 import { giveVitality } from "./resolution/vitality.js";
@@ -1486,7 +1487,7 @@ export function answerSave(
       (condition) =>
         pending.conditionIds.includes(condition.id) || pending.onFailEffect?.linkedConditionIds.includes(condition.id)
     );
-  // "Success: The target is immune to this ghast's Stench for 24 hours", held for the fight.
+  // "Success: The target is immune to this ghast's Stench for 24 hours": on the game clock where the text prints a time.
   if (success && pending.immuneOnSuccess && pending.sourceActorId !== null)
     addEffect(
       state,
@@ -1499,7 +1500,7 @@ export function answerSave(
         sourceName: pending.sourceName,
         sourceActionId: traitActionId(pending.actionName),
         startedRound: state.combat.round,
-        duration: { type: "encounter" }
+        duration: immunityDuration(pending.immuneMinutes)
       })
     );
   // A repeated save that succeeds ends the effect it was repeated for (Hold Person ends on that target), unless the text

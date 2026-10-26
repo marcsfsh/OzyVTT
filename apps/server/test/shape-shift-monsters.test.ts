@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { isDead } from "@vtt/domain";
-import { CANT_SPEAK_TAG, endEffect } from "../src/effects.js";
+import { canInitiateForActor } from "../src/authorization.js";
+import { sideOf } from "../src/creature-sides.js";
+import { CANT_SPEAK_TAG, endEffect, endEncounterEffects } from "../src/effects.js";
+import { endEncounter } from "../src/encounter.js";
+import { passGameTime } from "../src/game-time.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
+import { endCursesOn } from "../src/spell-endings.js";
 import {
   answerSaveOf,
   catalog,
@@ -109,6 +114,63 @@ describe("a werewolf's Shape-Shift", () => {
     expect(turned.conditions.some((condition) => condition.id === "unconscious")).toBe(false);
     expect(fight.actor(HERO).effects.find((effect) => effect.form)?.form?.statBlockId).toBe("werewolf");
     expect(fight.actor(HERO).size).toBe("medium");
+  });
+
+  it("marks the bite's curse as one, which Remove Curse's ending lifts, the turned form with it", () => {
+    const fight = table(goliathFighter(1), { [FOE]: "werewolf" });
+    turnOf(fight, FOE);
+    fight.resolve(FOE, "shape-shift", { form: "wolf" });
+    nextTurnOf(fight, FOE);
+    fight.resolve(FOE, "bite", { targetIds: [HERO] }, [18, 4, 4]);
+    answerSaveOf(fight, HERO, 3);
+    expect(fight.actor(HERO).effects.find((effect) => effect.tags.includes("lycanthropy-werewolf"))?.tags).toContain(
+      "curse"
+    );
+    damage(fight, HERO, fight.actor(HERO).hp.current + fight.actor(HERO).hp.temporary);
+    expect(fight.actor(HERO).effects.find((effect) => effect.form)?.tags).toContain("curse");
+    endCursesOn(fight.state, HERO);
+    expect(fight.actor(HERO).effects.filter((effect) => effect.tags.includes("curse"))).toEqual([]);
+    expect(fight.actor(HERO).effects.some((effect) => effect.form)).toBe(false);
+  });
+
+  it("leaves a creature that saves immune to this werewolf's curse for 24 hours of the game clock", () => {
+    const fight = table(goliathFighter(1), { [FOE]: "werewolf" });
+    turnOf(fight, FOE);
+    fight.resolve(FOE, "shape-shift", { form: "wolf" });
+    nextTurnOf(fight, FOE);
+    fight.resolve(FOE, "bite", { targetIds: [HERO] }, [18, 4, 4]);
+    answerSaveOf(fight, HERO, 20);
+    expect(fight.actor(HERO).effects.map((effect) => effect.duration)).toEqual([{ type: "minutes", remaining: 1440 }]);
+    nextTurnOf(fight, FOE);
+    const bitten = fight.resolve(FOE, "bite", { targetIds: [HERO] }, [18, 4, 4]);
+    expect(fight.state.combat.pendingSaves).toEqual([]);
+    expect(bitten.warnings).toContain("Brakka is immune to Werewolf's Lycanthropy (Werewolf), so it makes no save.");
+    endEncounterEffects(fight.state, [HERO, FOE]);
+    endEncounter(fight.state);
+    passGameTime(fight.state, 23 * 60);
+    expect(fight.actor(HERO).effects).toHaveLength(1);
+    passGameTime(fight.state, 60);
+    expect(fight.actor(HERO).effects).toEqual([]);
+  });
+
+  it("puts the cursed creature it turns at 0 Hit Points under the GM's control, against the party", () => {
+    const fight = table(goliathFighter(1), { [FOE]: "werewolf" });
+    const hero = fight.actor(HERO);
+    hero.ownerSessionId = "30000000-0000-4000-8000-0000000000b1";
+    turnOf(fight, FOE);
+    fight.resolve(FOE, "shape-shift", { form: "wolf" });
+    nextTurnOf(fight, FOE);
+    fight.resolve(FOE, "bite", { targetIds: [HERO] }, [18, 4, 4]);
+    answerSaveOf(fight, HERO, 3);
+    const player = { role: "player", sessionId: "30000000-0000-4000-8000-0000000000b1" } as const;
+    expect(canInitiateForActor(player, fight.state, HERO, "attack")).toEqual({ ok: true });
+    damage(fight, HERO, fight.actor(HERO).hp.current + fight.actor(HERO).hp.temporary);
+    expect(canInitiateForActor(player, fight.state, HERO, "attack")).toEqual({
+      ok: false,
+      message: "Brakka is under the GM's control."
+    });
+    expect(canInitiateForActor(player, fight.state, HERO, "save")).toEqual({ ok: true });
+    expect(sideOf(fight.actor(HERO))).toBe("foes");
   });
 
   it("opens no curse on a creature that isn't a Humanoid", () => {

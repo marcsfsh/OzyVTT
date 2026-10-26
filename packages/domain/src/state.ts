@@ -14,6 +14,7 @@ import {
   HealthDisplaySchema,
   HitPointBandSchema,
   InventoryItemSchema,
+  MAX_EFFECT_MINUTES,
   ObjectStatsSchema,
   SaveFailureDurationSchema,
   StoredCastSchema
@@ -379,6 +380,8 @@ export const PendingSaveSchema = z
     /** A success makes the target immune to this source's trait for the rest of the fight ("immune to this ghast's
      * Stench for 24 hours"). */
     immuneOnSuccess: z.literal(true).optional(),
+    /** How long that immunity lasts on the game clock, in minutes ("for 24 hours"); absent, the fight. */
+    immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional(),
     /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). GM bookkeeping, never projected. */
     drain: DamageDrainSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */

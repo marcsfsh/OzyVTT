@@ -721,6 +721,7 @@ function act(
     ...(save.failurePush ? { failurePush: save.failurePush } : {}),
     // "A creature that successfully saves against this effect is immune to it" (Antipathy/Sympathy).
     ...(save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+    ...(save.immuneMinutes !== undefined ? { immuneMinutes: save.immuneMinutes } : {}),
     // A Sphere of Annihilation obliterates a creature its damage drops to 0.
     ...(action.drain ? { drain: structuredClone(action.drain) } : {}),
     // Heightened Spell's target has Disadvantage on every save against the spell.

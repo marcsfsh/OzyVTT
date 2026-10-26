@@ -1574,6 +1574,8 @@ export const RepeatSaveSchema = z
     beyondFeet: z.number().int().min(5).max(5280).optional(),
     /** A success makes the bearer immune to the effect's source for the rest of the fight (Antipathy/Sympathy). */
     immuneOnSuccess: z.literal(true).optional(),
+    /** How long that immunity lasts on the game clock, in minutes (Antipathy/Sympathy's 1); absent, the fight. */
+    immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional(),
     failureDamage: RepeatFailureDamageSchema.optional(),
     tally: z
       .object({
@@ -3604,6 +3606,15 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("A success makes the target immune to this action of its source, held for the rest of the fight"),
+  /** How long that immunity lasts on the game clock, in minutes ("for 24 hours": 1440), through the fight and past it;
+   *  absent, the rest of the fight. */
+  immuneMinutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_EFFECT_MINUTES)
+    .optional()
+    .describe('How long the immunity after a success lasts on the game clock, in minutes ("for 24 hours": 1440)'),
   /** The failure's conditions end when the source dies ("until the aboleth dies"). */
   endsWhenSourceDies: z
     .literal(true)
@@ -4168,7 +4179,11 @@ export const OnHitRiderSchema = z
         /** A success takes half the failure's damage (Ammunition of Slaying's 6d10 Force). */
         halfOnSuccess: z.literal(true).optional(),
         repeatSave: z.literal(true).optional(),
-        endsOnDamage: z.literal(true).optional()
+        endsOnDamage: z.literal(true).optional(),
+        /** A success makes the target immune to this rider of its attacker for `immuneMinutes` of the game clock, or
+         *  for the fight ("immune to this werewolf's curse for 24 hours"). */
+        immuneOnSuccess: z.literal(true).optional(),
+        immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional()
       })
       .strict()
       .optional(),
