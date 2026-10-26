@@ -174,7 +174,16 @@ export const ObjectStatsSchema = ObjectPrintSchema.extend({
       current: z.number().int().min(0).max(100000),
       maximum: z.number().int().min(1).max(100000)
     })
+    .strict(),
+  /** Covered in oil from a thrown flask until the oil dries: through this round of the fight, or to this game-clock
+   *  minute. Fire damage to it meanwhile burns for 5 more. */
+  oiledUntil: z
+    .object({
+      round: z.number().int().positive().optional(),
+      minute: z.number().int().min(0).max(1_000_000_000).optional()
+    })
     .strict()
+    .optional()
 }).strict();
 export type ObjectStats = z.infer<typeof ObjectStatsSchema>;
 
@@ -3375,6 +3384,8 @@ export const SaveOutcomeFields = {
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
   advantageAtSize: SizeSchema.optional(),
+  /** A creature of these types has Disadvantage on the save (Shatter: "A Construct has Disadvantage on the save"). */
+  disadvantageTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
   /** "Repeats the save at the end of its next turn", once (a basilisk's gaze, Sleep): the failure holds until then, a
    *  success ends it, and a failure brings `secondFailure`. */
   repeatOnce: z
@@ -4314,11 +4325,14 @@ export const ActionTargetsSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(120)
-      .optional()
+      .optional(),
+    /** "Target one creature or object": it may be aimed at a door or a wall on the map that is an object instead,
+     *  which fails its save and takes the damage (Acid, Alchemist's Fire); its area catches such objects too. */
+    objects: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions (or conditions from the user's own effect), in the user's space, enemies, allies, others or only the user itself, a creature the user marked, one at 0 Hit Points, a Bloodied one, one with a special speed, or one that can see or hear the user."
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions (or conditions from the user's own effect), in the user's space, enemies, allies, others or only the user itself, a creature the user marked, one at 0 Hit Points, a Bloodied one, one with a special speed, or one that can see or hear the user. `objects`: a door or a wall on the map that is an object may be its target instead, failing its save."
   );
 export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 

@@ -242,6 +242,7 @@ const PENDING_SAVE_FIELDS = {
   unseats: "never",
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
+  disadvantageTypes: "never",
   advantageFrom: "never",
   // What a failure does beyond conditions is narrated when it lands, and an automatic success when it is answered.
   failureKills: "never",

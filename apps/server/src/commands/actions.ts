@@ -9,6 +9,7 @@ import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { requireStartOrdered } from "../simultaneous-effects.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
 import { areaLeavesOut } from "../resolution/action-targets.js";
+import { objectsUnder } from "../resolution/object-targets.js";
 import { withPickedDamageTypes } from "../statblock-picks.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -322,10 +323,19 @@ export const actionCommands = [
             action.healing !== undefined ||
             action.grants !== undefined ||
             action.endsConditions !== undefined;
+          // An area that harms objects may be placed over a door alone (Shatter).
+          const harmsAnObject =
+            (spell?.effect?.harmsObjects === true || action.targets?.objects === true) &&
+            objectsUnder(
+              draft,
+              { shape: placed.shape, origin: snapped.origin, target: snapped.target },
+              action.area?.widthFeet ?? null
+            ).length > 0;
           if (
             !resolvedTargetIds.some((id) => !unseen.has(id)) &&
             !(spell && (zoneRowOf(spell) || !catches)) &&
-            !leavesArea
+            !leavesArea &&
+            !harmsAnObject
           )
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
@@ -555,6 +565,15 @@ export const actionCommands = [
               ? {
                   placedArea: (({ origin, target }) => ({ shape: placed.shape, origin, target }))(
                     shapeGeometry(geometry.calibration, placed.shape, placed.origin, placed.target)
+                  )
+                }
+              : {}),
+            ...(morePlaced.length > 0 && geometry?.calibration
+              ? {
+                  morePlacedAreas: morePlaced.map((more) =>
+                    (({ origin, target }) => ({ shape: more.shape, origin, target }))(
+                      shapeGeometry(geometry.calibration!, more.shape, more.origin, more.target)
+                    )
                   )
                 }
               : {}),

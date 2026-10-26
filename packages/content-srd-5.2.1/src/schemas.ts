@@ -461,7 +461,10 @@ export const SpellEffectSchema = z
      *  a higher slot: "The creatures must be within 10 feet of you"). */
     companionFeet: z.number().int().min(5).max(60).optional(),
     /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
-    areaPerSlot: z.number().int().min(5).max(100).optional()
+    areaPerSlot: z.number().int().min(5).max(100).optional(),
+    /** "A nonmagical object that isn't being worn or carried also takes the damage if it's in the spell's area"
+     *  (Shatter, Meteor Swarm): the doors and walls on the map that are objects under its area take its full damage. */
+    harmsObjects: z.literal(true).optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;

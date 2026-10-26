@@ -173,6 +173,8 @@ function combatantsOf(
     action.sight !== undefined ||
     // A door or a wall is what it acts on (Knock, Passwall, Disintegrate aimed at a wall of force).
     (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined)) ||
+    // An object on the map in place of a creature (Acid thrown at a door).
+    (input.wallId !== undefined && action.targets?.objects === true) ||
     // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).
     action.summons !== undefined ||
     // An item's command releases whoever it holds (Iron Bands), and an oil remakes a carried row.

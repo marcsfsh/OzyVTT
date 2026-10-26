@@ -829,6 +829,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
+      ...(action.save.disadvantageTypes ? { disadvantageTypes: action.save.disadvantageTypes } : {}),
       ...(against ? { spell: against } : {}),
       ...(advantageFrom !== "" ? { advantageFrom } : {}),
       ...(autoSucceeds !== "" ? { autoSucceeds } : {}),

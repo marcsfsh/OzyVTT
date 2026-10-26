@@ -11,6 +11,7 @@ import { adjustDamageParts, normalizeDamageType, type DamagePart } from "@vtt/ru
 import type { ObjectPrint, ObjectStats } from "@vtt/schemas";
 import { endEffectIfPresent, type EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
+import { clockMinutesOf } from "./game-time.js";
 
 /**
  * Objects (SRD 5.2.1 Rules Glossary: Object, Breaking Objects, Damage Threshold): one model that a door or a stretch of
@@ -88,6 +89,15 @@ export function weighObjectDamage(
   };
 }
 
+/** Whether the oil a thrown flask left on an object is still wet: through its round in this fight, or its minute on the
+ *  game clock. */
+function oilStillWet(state: GameState, stats: ObjectStats): boolean {
+  const until = stats.oiledUntil;
+  if (!until) return false;
+  if (state.combat.active && until.round !== undefined) return state.combat.round <= until.round;
+  return until.minute !== undefined && clockMinutesOf(state) < until.minute;
+}
+
 /** A door the GM gave no statistics: a Medium, resilient wooden one (AC 15, 18 Hit Points). */
 export const WOODEN_DOOR: ObjectStats = objectOf("Door", "wood", "medium", "resilient");
 
@@ -134,9 +144,17 @@ export function damageObject(
 ): ObjectHit {
   const found = findObject(state, ref);
   if (!found) throw new CommandRejectedError("That object is no longer there.");
-  const damage = weighObjectDamage(found.stats, parts, options);
+  // SRD Oil: "If the target takes Fire damage before the oil dries (after 1 minute), the target takes an extra 5 Fire
+  // damage from burning oil." The oil burns off as it does.
+  const oiled = oilStillWet(state, found.stats);
+  const burning = oiled && parts.some((part) => part.amount > 0 && part.type.trim().toLowerCase() === "fire");
+  const damage = weighObjectDamage(found.stats, burning ? [...parts, { amount: 5, type: "fire" }] : parts, options);
   const left = Math.max(0, found.stats.hitPoints.current - damage.total);
-  const stats: ObjectStats = { ...found.stats, hitPoints: { ...found.stats.hitPoints, current: left } };
+  const { oiledUntil: _oil, ...dry } = found.stats;
+  const stats: ObjectStats = {
+    ...(burning || !oiled ? dry : found.stats),
+    hitPoints: { ...found.stats.hitPoints, current: left }
+  };
   const destroyed = left === 0 && damage.total > 0;
   const events: EffectNarration[] = [];
   if (found.wall) {

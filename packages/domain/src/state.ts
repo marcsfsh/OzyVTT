@@ -382,6 +382,18 @@ export const PendingSaveSchema = z
     unseats: z.uuid().optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** A creature of these types has Disadvantage on the save (Shatter's Constructs). GM bookkeeping, never projected:
+     *  the roll card names the Disadvantage. */
+    disadvantageTypes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(6)
+      .optional(),
     /** What gives the save Advantage beyond the target's own riders, as the roll card names it: the damage that opened
      *  it (Hideous Laughter), or a fight with its source's side (Charm Person). */
     advantageFrom: z.string().min(1).max(120).optional(),

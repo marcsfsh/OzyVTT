@@ -792,7 +792,9 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   },
   // "If the creature is shape-shifted (as a result of the Polymorph spell, for example), it reverts to its true form and
   // can't shape-shift until it leaves the Cylinder."
-  moonbeam: { failureEndsForm: true }
+  moonbeam: { failureEndsForm: true },
+  // "A Construct has Disadvantage on the save."
+  shatter: { disadvantageTypes: ["construct"] }
 };
 
 /** `spellSaveOutcome` with the reviewed corrections applied. Unset fields an override names are dropped. */

@@ -195,6 +195,7 @@ export type PlayerPendingSave = Omit<
   | "failurePush"
   | "unseats"
   | "advantageAtSize"
+  | "disadvantageTypes"
   | "spell"
   | "confirmed"
   | "spendsOnKill"

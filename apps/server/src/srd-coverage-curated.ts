@@ -123,7 +123,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/economy.ts allows one Bonus Action on a turn, and only from a feature, spell or item that offers one."
   ),
   "breaking-objects": enforced(
-    "A door or wall on the map, and what holds a creature (a Net, a web, a rope), can be an object with an Armor Class, Hit Points and a damage threshold (objects.ts); the GM's door editor sets them from the substance and size tables. object.attack rolls a creature's attack against it (object-strikes.ts) and object.damage deals the GM's damage. Poison and Psychic damage do nothing, and at 0 Hit Points a wall or door is gone and a held creature is freed."
+    "A door or wall on the map, and what holds a creature (a Net, a web, a rope), can be an object with an Armor Class, Hit Points and a damage threshold (objects.ts); the GM's door editor sets them from the substance and size tables. object.attack rolls a creature's attack against it (object-strikes.ts), an action that targets a creature or object (Acid, Alchemist's Fire, Oil) can be aimed at it, and a spell whose area harms objects (Shatter, Meteor Swarm) deals its damage to each one under the area; the object fails the save and takes all of it (resolution/object-targets.ts). object.damage deals the GM's damage. Poison and Psychic damage do nothing, and at 0 Hit Points a wall or door is gone and a held creature is freed. Objects the map doesn't hold (furniture, chests) and an object left burning are the GM's."
   ),
   "bright-light": enforced(
     "With dynamic vision on, vision/sight.ts gives Bright Light under the scene's bright ambient light, in a painted bright area and within a light's bright radius, and a creature sees normally there."
@@ -323,7 +323,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   monster: reference("A definition; there is nothing to apply."),
   "nonplayer-character": reference("A definition; there is nothing to apply."),
   object: enforced(
-    "Doors and walls on the map, and the nets, webs and ropes that hold creatures, can carry an object's Armor Class and Hit Points (objects.ts). An object takes damage from attacks (object.attack). It fails every saving throw, so an area's full damage on one is the GM's to deal with object.damage."
+    "Doors and walls on the map, and the nets, webs and ropes that hold creatures, can carry an object's Armor Class and Hit Points (objects.ts). An object takes damage from attacks (object.attack), and it fails every saving throw: an action aimed at it, or the area of a spell that harms objects, deals it the whole of its damage (resolution/object-targets.ts)."
   ),
   "occupied-space": enforced(
     "movement-rules.ts refuses a move that ends in another creature's space, unless one of them can share it, and occupied-space.ts leaves a creature that ends its turn in another's space Prone unless it is Tiny or larger than the other."
@@ -1548,6 +1548,12 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:cloak-of-arachnida": enforced(
     "Resistance to Poison damage and a Climb Speed equal to its wearer's Speed are applied. The webs of a Web spell can't hold the wearer (spell-zones.ts), and its Web cast is DC 13 over a 40-foot Cube once a Long Rest. Climbing upside down on ceilings is the GM's to allow."
   ),
+  "item:acid": enforced(
+    "Thrown in place of an attack at a creature or object the thrower sees within 20 feet: a creature makes the Dexterity save (DC 8 plus the thrower's Dexterity modifier and Proficiency Bonus) or takes 2d6 Acid damage, and a door or a wall on the map that is an object fails it and takes the damage (resolution/object-targets.ts, objects.ts)."
+  ),
+  "item:alchemists-fire": enforced(
+    "Thrown in place of an attack at a creature or object the thrower sees within 20 feet: a creature makes the Dexterity save or takes 1d4 Fire damage and starts burning, 1d4 Fire damage at the start of each of its turns until it puts the fire out (hazards.ts). A door or a wall on the map that is an object fails the save and takes the 1d4 Fire (resolution/object-targets.ts); an object has no turns, so its burning after that is the GM's."
+  ),
   "item:caltrops": enforced(
     "Spreading them from the pack places a 5-foot square that rolls nothing as it lands (resolution/concentration.ts). spell-zones.ts asks a creature that enters it for the DC 15 Dexterity save, once a turn: 1 Piercing damage and a Speed of 0 until the start of its next turn on a failure. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). The square stays until the GM ends it, which is gathering them up."
   ),
@@ -2067,7 +2073,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The cast places up to ten 10-foot Cubes, each touching another and within 150 feet of the caster (multi-templates.ts), and each creature under any of them makes the Dexterity save once against 7d10 Fire damage, half on a success. Setting flammable objects alight is the GM's."
   ),
   "spell:meteor-swarm": enforced(
-    "The cast places up to four 40-foot-radius Spheres at different points within range (multi-templates.ts), and a creature in more than one makes the Dexterity save once, against 20d6 Fire and 20d6 Bludgeoning damage, half on a success. Setting objects alight is the GM's."
+    "The cast places up to four 40-foot-radius Spheres at different points within range (multi-templates.ts), and a creature in more than one makes the Dexterity save once, against 20d6 Fire and 20d6 Bludgeoning damage, half on a success. A door or a wall on the map that is an object under the Spheres takes the whole of it, once (resolution/object-targets.ts). Setting objects alight is the GM's."
+  ),
+  "spell:shatter": enforced(
+    "The cast's Constitution save against 3d8 Thunder damage, half on a success, is asked of each creature in the 10-foot-radius Sphere, a Construct making it with Disadvantage (saving-throws.ts). A door or a wall on the map that is an object under the Sphere takes the whole of the damage (resolution/object-targets.ts)."
   ),
   "spell:flaming-sphere": enforced(
     "spell-zones.ts asks for the Dexterity save against 2d6 Fire damage when a creature ends its turn within 5 feet of the sphere. The Bonus Action moves the sphere up to 30 feet (zone-moves.ts), and a creature it rams makes the save. It sheds its light for dynamic vision (vision/cast-sight.ts)."

@@ -1764,6 +1764,8 @@ const STABILIZES: ReadonlySet<string> = new Set(["spare-the-dying"]);
 const RANGE_DOUBLES: ReadonlySet<string> = new Set(["spare-the-dying"]);
 /** "No sound can be created within or pass through" its area: no spell with a Verbal component is cast inside it. */
 const SILENCES_AREA: ReadonlySet<string> = new Set(["silence"]);
+/** "A nonmagical object that isn't being worn or carried also takes the damage if it's in the spell's area." */
+const HARMS_OBJECTS: ReadonlySet<string> = new Set(["shatter", "meteor-swarm"]);
 /** Area spells whose caster picks the creatures in the area it affects ("each creature of your choice in a 30-foot
  *  Sphere"), so the cast picks them; the rest of the area's creatures are spared. */
 const PICKS_IN_AREA: ReadonlySet<string> = new Set([
@@ -3433,6 +3435,7 @@ export function spellEffectFor(
     ...(TARGET_ABILITY_MAX[id] ? { targetAbilityMax: { ...TARGET_ABILITY_MAX[id] } } : {}),
     ...(WILLING_TARGETS.has(id) ? { willingTargets: true as const } : {}),
     ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {}),
+    ...(HARMS_OBJECTS.has(id) ? { harmsObjects: true as const } : {}),
     ...(COMPANION_FEET[id] !== undefined ? { companionFeet: COMPANION_FEET[id] } : {}),
     ...(KINDLES[id] ? { kindles: { ...KINDLES[id] } } : {}),
     // "If you maintain Concentration on this spell for the full duration, the spell lasts until dispelled."

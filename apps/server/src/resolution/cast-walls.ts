@@ -8,6 +8,7 @@ import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { cutWall, disintegrateWall, nearestPointOf, raiseSpellWalls } from "../spell-walls.js";
 import { policeBarrier } from "../zone-barriers.js";
 import { pickedZoneRow } from "../spell-zones.js";
+import { aimsAtObject } from "./object-targets.js";
 import { distance, type Point } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
@@ -48,7 +49,8 @@ function wallsOf(ctx: ResolveContext): { spell: SpellReference; walls: Walls; la
  *  is spent. */
 export function checkWallTarget(ctx: ResolveContext): void {
   const { input, state, attacker } = ctx;
-  if (input.wallId === undefined) return;
+  // An action that takes an object as its target checks it itself (`object-targets.ts`).
+  if (input.wallId === undefined || aimsAtObject(ctx)) return;
   const cast = wallsOf(ctx);
   if (!cast || (!cast.walls.door && !cast.walls.cuts && !cast.walls.disintegrates))
     throw new CommandRejectedError(`${ctx.action.name} doesn't act on a door or a wall.`);
