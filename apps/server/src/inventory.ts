@@ -693,6 +693,35 @@ export { itemIsActive };
 
 export type ItemFormChange = Readonly<{ actorId: string; itemId: string; variantId: string | null }>;
 
+/** A form that lasts until its holder's next turn starts (a Defender's bonus moved to AC) returns to the item's own as
+ *  that turn starts, for its holder to pick again with its first attack. */
+export function formsLapseAtTurnStart(
+  state: GameState,
+  actorId: string,
+  catalog: EquipmentCatalog,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  const lapsed = actor.inventory.filter(
+    (row) =>
+      row.variantId !== undefined && catalog.equipmentRecord(catalogIdOf(row))?.variantChoice?.untilTurnStart === true
+  );
+  if (lapsed.length === 0) return [];
+  actor.inventory = actor.inventory.map((row) => {
+    if (!lapsed.includes(row)) return row;
+    const { variantId: _form, weapon: _weapon, ...own } = row;
+    const weapon = rowWeaponFor(catalog, catalog.equipmentRecord(catalogIdOf(row))!, own);
+    return weapon ? { ...own, weapon } : own;
+  });
+  reconcileEquipment(actor, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined, { catalog });
+  return lapsed.map((row) => ({
+    kind: "effect" as const,
+    text: `${actor.name}'s ${row.name} returns to its own form.`,
+    actorId
+  }));
+}
+
 /** Its holder puts the item in another form (a Rod of Lordly Might's button, a Quarterstaff of the Acrobat turned into
  *  a pole), or back in its own with null, spending what the record says it costs. Returns the table's sentence. */
 export function setItemForm(
@@ -716,6 +745,19 @@ export function setItemForm(
   if (variant === undefined) throw new CommandRejectedError(`${row.name} has no form "${change.variantId}".`);
   if ((row.variantId ?? null) === (variant?.id ?? null))
     throw new CommandRejectedError(`${row.name} is already in that form.`);
+  // A Defender's split is made with the first attack of its wielder's turn and holds until its next turn starts.
+  if (
+    record.variantChoice?.untilTurnStart &&
+    state.combat.active &&
+    state.combat.initiative.some((entry) => entry.actorId === actor.id)
+  ) {
+    if (state.combat.turnActorId !== actor.id)
+      throw new CommandRejectedError(`${actor.name} changes ${row.name}'s form only on its own turn.`);
+    if (state.combat.turn.attackRolled === true)
+      throw new CommandRejectedError(
+        `${actor.name} has attacked this turn, so ${row.name} keeps its form until the start of its next turn.`
+      );
+  }
   if (record.variantChoice?.activation === "bonus-action")
     spendBonusAction(state, actor, initiator, `Change the form of ${row.name}`);
   const { variantId: _old, weapon: _weapon, ...rest } = row;

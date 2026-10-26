@@ -1,6 +1,6 @@
 import { policeConditionRule } from "../actor-conditions.js";
 import { canInitiateForActor, GameAccessDeniedError, requireActorAccess, type Initiator } from "../authorization.js";
-import { addEffect, endEffect, makeEffect, type EffectNarration } from "../effects.js";
+import { addEffect, endEffect, makeEffect, refundUnspentTime, type EffectNarration } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
 import { EffectAddSchema, EffectEndSchema } from "@vtt/domain/commands";
 import type { GameState } from "@vtt/domain";
@@ -139,8 +139,13 @@ export const effectCommands = [
           events,
           kit.hiddenFor(initiator, state)
         );
+        const ending = state.actors
+          .find((candidate) => candidate.id === actorId)
+          ?.effects.find((effect) => effect.id === effectId);
         // Ending fires onEnd and clears linked conditions.
         events.push(...endEffect(state, actorId, effectId));
+        const refunded = ending ? refundUnspentTime(state, ending) : null;
+        if (refunded) events.push({ kind: "effect", text: refunded, actorId });
       });
       if (!duplicate) kit.publishNarrations(events);
     }

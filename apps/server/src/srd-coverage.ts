@@ -360,6 +360,8 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     item.weaponChanges !== undefined ||
     item.bonusActionAttack === true ||
     item.magicSaveAura !== undefined ||
+    item.savesNegateSpells !== undefined ||
+    item.servesAsFocus !== undefined ||
     ridersApply(item) ||
     // A kind or form that carries riders of its own (an Ioun Stone's, a Rod of Lordly Might's battleaxe).
     kinds.some((kind) => ridersApply(kind) || kind.weapon !== undefined || (kind.onHit?.length ?? 0) > 0);

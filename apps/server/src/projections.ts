@@ -240,6 +240,8 @@ const PENDING_SAVE_FIELDS = {
   advantageFrom: "never",
   // What a failure does beyond conditions is narrated when it lands, and an automatic success when it is answered.
   failureKills: "never",
+  // Which of the source's pools a kill spends names its item.
+  spendsOnKill: "never",
   autoSucceeds: "never",
   disadvantageFrom: "never",
   // A failure's return to a creature's true form is narrated when it lands.
@@ -617,6 +619,8 @@ function playerEffect(
     grantedSpellAction: _grantedSpellAction,
     endAction: _endAction,
     usedOnTurn: _usedOnTurn,
+    // The pool it was paid from is its source's sheet, an exact quantity.
+    refundsUses: _refundsUses,
     shrinksEachLongRest: _shrinksEachLongRest,
     unarmedStrike: _unarmedStrike,
     // What a hit on the bearer costs its attacker names a save's DC; the server applies it.

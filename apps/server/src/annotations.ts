@@ -149,7 +149,7 @@ export function annotationShapeOfArea(shape: ActionArea["shape"]): AnnotationSha
 export function templateOfArea(
   calibration: SquareGridCalibration,
   template: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>,
-  area: Pick<ActionArea, "shape" | "sizeFeet">
+  area: Pick<ActionArea, "shape" | "sizeFeet" | "toTarget">
 ): Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> {
   const shape = annotationShapeOfArea(area.shape);
   const cells = Math.max(1, Math.round(area.sizeFeet / calibration.distancePerCell));
@@ -166,7 +166,9 @@ export function templateOfArea(
   const dx = placed.target.x - placed.origin.x;
   const dy = placed.target.y - placed.origin.y;
   const length = Math.hypot(dx, dy) || 1;
-  const reach = cells * calibration.cellSizePx;
+  // A Line aimed at its target stops there, never past its own length.
+  const reach =
+    area.toTarget === true ? Math.min(length, cells * calibration.cellSizePx) : cells * calibration.cellSizePx;
   return {
     shape,
     origin: placed.origin,

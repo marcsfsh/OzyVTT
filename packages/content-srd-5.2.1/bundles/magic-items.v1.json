@@ -359,7 +359,17 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "plane-shift",
+    "consumesSpellSlot": false,
+    "check": {
+     "ability": "int",
+     "skill": "arcana",
+     "dc": 15
+    }
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -474,7 +484,43 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "metal-shell",
+    "name": "Metal Shell",
+    "activation": "action",
+    "description": "Give yourself Immunity to Bludgeoning, Piercing, and Slashing damage for 10 minutes or until you are no longer wearing the armor. Once this property is used, it can't be used again until the next dawn.",
+    "damage": [],
+    "grants": {
+     "name": "Metal Shell",
+     "tags": [
+      "metal-shell"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     },
+     "modifiers": [
+      {
+       "type": "damage-immunity",
+       "damageTypes": [
+        "bludgeoning",
+        "piercing",
+        "slashing"
+       ]
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
+   }
+  ],
   "effects": [],
   "grants": {
    "skills": [],
@@ -837,9 +883,59 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "nonmagical",
+   "starting": "3d4"
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "dump",
+    "name": "Dump Beans",
+    "activation": "action",
+    "description": "Dump one or more beans out of the bag: they explode in a 10-foot-radius Sphere centered on them and are destroyed. Each creature in the Sphere, including you, makes a DC 15 Dexterity saving throw, taking 5d4 Force damage on a failure or half as much on a success.",
+    "damage": [
+     {
+      "formula": "5d4",
+      "type": "force"
+     }
+    ],
+    "useCost": "chosen",
+    "targets": {
+     "rangeFeet": 5
+    },
+    "uses": {
+     "limit": 12,
+     "per": "never",
+     "pool": "bag-of-beans-beans"
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 10,
+     "widthFeet": null
+    },
+    "save": {
+     "ability": "dex",
+     "dc": 15,
+     "successDamage": "half",
+     "failureConditions": []
+    }
+   },
+   {
+    "id": "plant",
+    "name": "Plant a Bean",
+    "activation": "action",
+    "description": "Remove a bean, plant it in dirt or sand and water it: 1 minute later it produces an effect from where it was planted, which the GM picks or rolls on the bag's d100 table.",
+    "damage": [],
+    "uses": {
+     "limit": 12,
+     "per": "never",
+     "pool": "bag-of-beans-beans"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1600,7 +1696,7 @@
     "id": "levitate",
     "name": "Levitate (Self)",
     "activation": "action",
-    "description": "Cast Levitate on yourself: you rise up to 20 feet and stay suspended, moving only by pushing or pulling along a surface as if climbing. You can move up or down as part of your move. When it ends, you float gently to the ground. End it on your sheet.",
+    "description": "Cast Levitate on yourself: you rise up to 20 feet and stay suspended for up to 10 minutes while you keep Concentration, moving only by pushing or pulling along a surface as if climbing. You can move up or down as part of your move. When it ends, you float gently to the ground.",
     "damage": [],
     "grants": {
      "name": "Levitate",
@@ -1615,7 +1711,7 @@
      "onEnd": [],
      "target": "self",
      "voidWhileIncapacitated": false,
-     "concentration": false
+     "concentration": true
     }
    }
   ],
@@ -1651,6 +1747,7 @@
     "activation": "bonus-action",
     "description": "The boots double your Speed, and any creature that makes an Opportunity Attack against you has Disadvantage on the attack roll. Click your heels again to end it. When you've used the boots for a total of 10 minutes, they cease to function for you until you finish a Long Rest.",
     "damage": [],
+    "timePool": "rounds",
     "grants": {
      "name": "Boots of Speed",
      "tags": [
@@ -1685,8 +1782,9 @@
      "speedMultiplier": 2
     },
     "uses": {
-     "limit": 1,
-     "per": "long-rest"
+     "limit": 100,
+     "per": "long-rest",
+     "pool": "boots-of-speed-rounds"
     }
    }
   ],
@@ -2047,12 +2145,13 @@
     "id": "ride",
     "name": "Ride the Broom",
     "activation": "action",
-    "description": "Stand astride the broom and speak its command word: it hovers beneath you with a Fly Speed of 50 feet (30 feet while carrying over 200 pounds). It stops hovering when you land; end it on your sheet.",
+    "description": "Stand astride the broom and speak its command word: it hovers beneath you with a Fly Speed of 50 feet (30 feet while carrying over 200 pounds). It stops hovering when you land or when you're no longer riding it.",
     "damage": [],
     "grants": {
      "name": "Broom of Flying",
      "tags": [
-      "broom-of-flying"
+      "broom-of-flying",
+      "ends-on-landing"
      ],
      "duration": {
       "type": "manual"
@@ -2086,6 +2185,7 @@
   "light": {
    "brightFeet": 0,
    "dimFeet": 30,
+   "ridersWhileLit": true,
    "burnHours": 4
   },
   "weapon": null,
@@ -2099,12 +2199,62 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "gate",
+    "uses": {
+     "limit": 1,
+     "per": "never",
+     "pool": "candle-of-invocation-gate"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "attack",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     }
+    ]
+   },
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     }
+    ]
+   },
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     }
+    ]
+   },
+   {
+    "type": "roll-mode",
+    "roll": "initiative",
+    "mode": "advantage"
+   }
+  ]
  },
  {
   "id": "cape-of-the-mountebank",
@@ -2161,6 +2311,163 @@
   },
   "cursed": false,
   "casts": [],
+  "variants": [
+   {
+    "id": "3x5",
+    "name": "3 ft. by 5 ft. (Fly Speed 80 feet)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "fly-3x5",
+      "name": "Fly the Carpet",
+      "activation": "action",
+      "description": "Speak the carpet's command word: it hovers and flies with you aboard, at a Fly Speed of 80 feet, moving as you direct while you are within 30 feet of it. It carries up to 200 pounds at that speed, and up to twice that at half the speed. It stops flying when it lands.",
+      "damage": [],
+      "grants": {
+       "name": "Carpet of Flying",
+       "tags": [
+        "carpet-of-flying",
+        "ends-on-landing"
+       ],
+       "duration": {
+        "type": "manual"
+       },
+       "modifiers": [
+        {
+         "type": "special-speed",
+         "movement": "fly",
+         "feet": 80,
+         "hover": true
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "4x6",
+    "name": "4 ft. by 6 ft. (Fly Speed 60 feet)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "fly-4x6",
+      "name": "Fly the Carpet",
+      "activation": "action",
+      "description": "Speak the carpet's command word: it hovers and flies with you aboard, at a Fly Speed of 60 feet, moving as you direct while you are within 30 feet of it. It carries up to 400 pounds at that speed, and up to twice that at half the speed. It stops flying when it lands.",
+      "damage": [],
+      "grants": {
+       "name": "Carpet of Flying",
+       "tags": [
+        "carpet-of-flying",
+        "ends-on-landing"
+       ],
+       "duration": {
+        "type": "manual"
+       },
+       "modifiers": [
+        {
+         "type": "special-speed",
+         "movement": "fly",
+         "feet": 60,
+         "hover": true
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "5x7",
+    "name": "5 ft. by 7 ft. (Fly Speed 40 feet)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "fly-5x7",
+      "name": "Fly the Carpet",
+      "activation": "action",
+      "description": "Speak the carpet's command word: it hovers and flies with you aboard, at a Fly Speed of 40 feet, moving as you direct while you are within 30 feet of it. It carries up to 600 pounds at that speed, and up to twice that at half the speed. It stops flying when it lands.",
+      "damage": [],
+      "grants": {
+       "name": "Carpet of Flying",
+       "tags": [
+        "carpet-of-flying",
+        "ends-on-landing"
+       ],
+       "duration": {
+        "type": "manual"
+       },
+       "modifiers": [
+        {
+         "type": "special-speed",
+         "movement": "fly",
+         "feet": 40,
+         "hover": true
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "6x9",
+    "name": "6 ft. by 9 ft. (Fly Speed 30 feet)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "fly-6x9",
+      "name": "Fly the Carpet",
+      "activation": "action",
+      "description": "Speak the carpet's command word: it hovers and flies with you aboard, at a Fly Speed of 30 feet, moving as you direct while you are within 30 feet of it. It carries up to 800 pounds at that speed, and up to twice that at half the speed. It stops flying when it lands.",
+      "damage": [],
+      "grants": {
+       "name": "Carpet of Flying",
+       "tags": [
+        "carpet-of-flying",
+        "ends-on-landing"
+       ],
+       "duration": {
+        "type": "manual"
+       },
+       "modifiers": [
+        {
+         "type": "special-speed",
+         "movement": "fly",
+         "feet": 30,
+         "hover": true
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   }
+  ],
+  "variantChoice": {
+   "by": "gm"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -2671,6 +2978,12 @@
     "spellId": "scrying",
     "saveDc": 17,
     "consumesSpellSlot": false
+   },
+   {
+    "spellId": "detect-thoughts",
+    "saveDc": 17,
+    "consumesSpellSlot": false,
+    "through": "scrying"
    }
   ],
   "grantsFeatIds": [],
@@ -2703,6 +3016,16 @@
     "spellId": "scrying",
     "saveDc": 17,
     "consumesSpellSlot": false
+   },
+   {
+    "spellId": "suggestion",
+    "saveDc": 17,
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "consumesSpellSlot": false,
+    "through": "scrying"
    }
   ],
   "grantsFeatIds": [],
@@ -2765,6 +3088,16 @@
   "casts": [
    {
     "spellId": "mage-armor",
+    "saveDc": 17,
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "cube-of-force-charges"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "shield",
     "saveDc": 17,
     "uses": {
      "limit": 10,
@@ -3196,7 +3529,8 @@
    }
   ],
   "variantChoice": {
-   "by": "holder"
+   "by": "holder",
+   "untilTurnStart": true
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -3306,10 +3640,73 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "cure-wounds",
+    "atLevel": 9,
+    "uses": {
+     "limit": 7,
+     "per": "long-rest",
+     "pool": "dragon-orb-charges"
+    },
+    "useCost": 4,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "daylight",
+    "uses": {
+     "limit": 7,
+     "per": "long-rest",
+     "pool": "dragon-orb-charges"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "death-ward",
+    "uses": {
+     "limit": 7,
+     "per": "long-rest",
+     "pool": "dragon-orb-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "detect-magic",
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "scrying",
+    "saveDc": 18,
+    "uses": {
+     "limit": 7,
+     "per": "long-rest",
+     "pool": "dragon-orb-charges"
+    },
+    "useCost": 3,
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "1d4 + 3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "call-dragons",
+    "name": "Call Dragons",
+    "activation": "action",
+    "description": "While you control the orb, it issues a telepathic call for 40 miles in every direction. Chromatic dragons in range feel compelled to come to the orb as soon as possible by the most direct route, and might be Hostile toward you for compelling them. It can't be used again for 1 hour.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "time",
+     "afterHours": "1"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3347,7 +3744,19 @@
   ],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "sense-dragon",
+    "name": "Sense the Nearest Dragon",
+    "activation": "action",
+    "description": "Focus your senses to discern the distance and direction to the closest dragon within 30 miles of yourself that is of the same type as the armor. This action can't be used again until the next dawn.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
+   }
+  ],
   "effects": [],
   "grants": {
    "skills": [],
@@ -3383,6 +3792,9 @@
       "creatureTypes": [
        "dragon"
       ]
+     },
+     {
+      "type": "versus-breath-weapon"
      }
     ]
    }
@@ -3800,6 +4212,65 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "nonmagical"
+  },
+  "variants": [
+   {
+    "id": "unopened",
+    "name": "Never opened",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "servant",
+    "name": "Bottled servant",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "open-servant",
+      "name": "Open the Bottle",
+      "activation": "action",
+      "description": "Remove the stopper: the Efreeti appears in an unoccupied space within 30 feet, understands your languages and obeys your commands for 1 hour, then returns to the bottle. The stopper can't be removed again for 24 hours. It comes twice more after the first opening; the fourth time it escapes and the bottle loses its magic.",
+      "damage": [],
+      "alsoUses": {
+       "limit": 2,
+       "per": "never"
+      },
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "24"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "efreeti",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 30,
+       "turn": "after-user",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "waitsFromEnd": true
+      }
+     }
+    ],
+    "casts": [],
+    "effects": [],
+    "suspendsActions": true
+   }
+  ],
+  "variantChoice": {
+   "by": "gm"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -3807,7 +4278,7 @@
     "id": "open",
     "name": "Open the Bottle",
     "activation": "action",
-    "description": "Remove the stopper: an Efreeti appears in an unoccupied space within 30 feet, and the d10 says what it does. 1: it attacks you, and disappears after fighting for 5 rounds. 2-9: it understands your languages and obeys your commands for 1 hour. 10: it can cast Wish once for you, and disappears when it grants the wish or after 1 hour.",
+    "description": "Remove the stopper: an Efreeti appears in an unoccupied space within 30 feet, and the d10 says what it does. 1: it attacks you, disappears after fighting for 5 rounds, and the bottle loses its magic. 2-9: it understands your languages and obeys your commands for 1 hour, then returns to the bottle, which holds it from then on. 10: it can cast Wish once for you, disappears when it grants the wish or after 1 hour, and the bottle loses its magic.",
     "damage": [],
     "summons": {
      "creatures": [
@@ -3819,7 +4290,8 @@
         "to": 1
        },
        "allegiance": "hostile",
-       "rounds": 5
+       "rounds": 5,
+       "itemBecomes": "nonmagical"
       },
       {
        "monsterId": "efreeti",
@@ -3827,6 +4299,9 @@
        "faces": {
         "from": 2,
         "to": 9
+       },
+       "itemBecomes": {
+        "variantId": "servant"
        }
       },
       {
@@ -3835,7 +4310,8 @@
        "faces": {
         "from": 10,
         "to": 10
-       }
+       },
+       "itemBecomes": "nonmagical"
       }
      ],
      "die": 10,
@@ -4438,7 +4914,7 @@
   "category": "wondrous-item",
   "costGp": null,
   "weightLb": null,
-  "description": "Wondrous Item, Rarity Varies. A Figurine of Wondrous Power is a statuette small enough to fit in a pocket. If you take a Magic action to throw the figurine to a point on the ground within 60 feet of yourself, the figurine becomes a living creature specified in the figurine's description below. If the space where the creature would appear is occupied by other creatures or objects, or if there isn't enough space for the creature, the figurine doesn't become a creature. The creature is Friendly to you and your allies. It understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. If you issue no commands, the creature defends itself but takes no other actions. The creature exists for a duration specific to each figurine. At the end of the duration, the creature reverts to its figurine form. It reverts to a figurine early if its creature form drops to 0 Hit Points or if you take a Magic action while touching the creature to make it revert to figurine form. When the creature becomes a figurine again, its property can't be used again until a certain amount of time has passed, as specified in the figurine's description. Bronze Griffon (Rare). This bronze statuette is of a griffon rampant. It can become a Griffon for up to 6 hours. Once it has been used, it can't be used again until 5 days have passed. Ebony Fly (Rare). This ebony statuette, carved in the likeness of a horsefly, can become a Giant Fly (see the accompanying stat block) for up to 12 hours and can be ridden as a mount. Once it has been used, it can't be used again until 2 days have passed.",
+  "description": "Wondrous Item, Rarity Varies. A Figurine of Wondrous Power is a statuette small enough to fit in a pocket. If you take a Magic action to throw the figurine to a point on the ground within 60 feet of yourself, the figurine becomes a living creature specified in the figurine's description below. If the space where the creature would appear is occupied by other creatures or objects, or if there isn't enough space for the creature, the figurine doesn't become a creature. The creature is Friendly to you and your allies. It understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. If you issue no commands, the creature defends itself but takes no other actions. The creature exists for a duration specific to each figurine. At the end of the duration, the creature reverts to its figurine form. It reverts to a figurine early if its creature form drops to 0 Hit Points or if you take a Magic action while touching the creature to make it revert to figurine form. When the creature becomes a figurine again, its property can't be used again until a certain amount of time has passed, as specified in the figurine's description. Bronze Griffon (Rare). This bronze statuette is of a griffon rampant. It can become a Griffon for up to 6 hours. Once it has been used, it can't be used again until 5 days have passed. Ebony Fly (Rare). This ebony statuette, carved in the likeness of a horsefly, can become a Giant Fly (see the accompanying stat block) for up to 12 hours and can be ridden as a mount. Once it has been used, it can't be used again until 2 days have passed. Golden Lions (Rare). These gold statuettes of lions are always created in pairs. You can use one figurine or both simultaneously. Each can become a Lion for up to 1 hour. Once a lion has been used, it can't be used again until 7 days have passed. Ivory Goats (Rare). These ivory statuettes of goats are always created in sets of three. Each goat looks unique and functions differently from the others. Their properties are as follows: Goat of Terror. This figurine can become a Giant Goat for up to 3 hours. The goat can't attack, but you can (harmlessly) remove its horns and use them as weapons. One horn becomes a +1 Lance, and the other becomes a +2 Longsword. Removing a horn requires a Magic action, and the weapons disappear and the horns return when the goat reverts to figurine form. While you ride the goat, any Hostile creature that starts its turn within a 30-foot Emanation originating from the goat must succeed on a DC 15 Wisdom saving throw or have the Frightened condition for 1 minute, until you are no longer riding the goat, or until the goat reverts to figurine form. The Frightened creature repeats the save at the end of each of its turns, ending the effect on itself on a success. Once it succeeds on the save, a creature is immune to this effect for the next 24 hours. Once the figurine has been used, it can't be used again until 15 days have passed. Goat of Traveling. This figurine can become a Large goat with the same statistics as a Riding Horse. It has 24 charges, and each hour or portion thereof it spends in goat form costs 1 charge. While it has charges, you can use it as often as you wish. When it runs out of charges, it reverts to a figurine and can't be used again until 7 days have passed, when it regains all expended charges. Goat of Travail. This figurine can become a Giant Goat for up to 3 hours. Once it has been used, it can't be used again until 30 days have passed. Marble Elephant (Rare). This marble statuette resembles a trumpeting elephant. It can become an Elephant for up to 24 hours. Once it has been used, it can't be used again until 7 days have passed. Obsidian Steed (Very Rare). This polished obsidian horse can become a Nightmare for up to 24 hours. The nightmare fights only to defend itself. Once it has been used, it can't be used again until 5 days have passed. The figurine has a 10 percent chance each time you use it to ignore your orders, including a command to revert to figurine form. If you mount the nightmare while it is ignoring your orders, you and the nightmare are instantly transported to a random location on the plane of Hades, where the nightmare reverts to figurine form. Onyx Dog (Rare). This onyx statuette of a dog can become a Mastiff for up to 6 hours. The mastiff has an Intelligence of 8 and can speak Common. It also has Blindsight with a range of 60 feet. Once it has been used, it can't be used again until 7 days have passed. Serpentine Owl (Rare). This serpentine statuette of an owl can become a Giant Owl for up to 8 hours. The owl can communicate telepathically with you at any range if you and it are on the same plane of existence. Once it has been used, it can't be used again until 2 days have passed. Silver Raven (Uncommon). This silver statuette of a raven can become a Raven for up to 12 hours. Once it has been used, it can't be used again until 2 days have passed. While in raven form, the figurine grants you the ability to cast Animal Messenger on it.",
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
@@ -4461,7 +4937,7 @@
       "id": "bronze-griffon",
       "name": "Throw the Bronze Griffon",
       "activation": "action",
-      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Griffon for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Griffon for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 5 days have passed.",
       "damage": [],
       "uses": {
        "limit": 1,
@@ -4483,7 +4959,8 @@
         "minutes": 360
        },
        "allegiance": "user",
-       "dismiss": "action"
+       "dismiss": "action",
+       "waitsFromEnd": true
       }
      }
     ],
@@ -4499,7 +4976,7 @@
       "id": "ebony-fly",
       "name": "Throw the Ebony Fly",
       "activation": "action",
-      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Fly for up to 12 hours, which can be ridden as a mount. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Fly for up to 12 hours, which can be ridden as a mount. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 2 days have passed.",
       "damage": [],
       "uses": {
        "limit": 1,
@@ -4521,7 +4998,8 @@
         "minutes": 720
        },
        "allegiance": "user",
-       "dismiss": "action"
+       "dismiss": "action",
+       "waitsFromEnd": true
       }
      }
     ],
@@ -4534,21 +5012,22 @@
     "modifiers": [],
     "actions": [
      {
-      "id": "golden-lions",
-      "name": "Throw the Golden Lions",
+      "id": "golden-lion-first",
+      "name": "Throw the First Golden Lion",
       "activation": "action",
-      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour, one for each figurine of the pair thrown. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "description": "Throw one figurine of the pair to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, that lion can't be used again until 7 days have passed.",
       "damage": [],
       "uses": {
        "limit": 1,
        "per": "time",
+       "pool": "golden-lion-first",
        "afterHours": "168"
       },
       "summons": {
        "creatures": [
         {
          "monsterId": "lion",
-         "count": 2
+         "count": 1
         }
        ],
        "rangeFeet": 60,
@@ -4559,7 +5038,39 @@
         "minutes": 60
        },
        "allegiance": "user",
-       "dismiss": "action"
+       "dismiss": "action",
+       "waitsFromEnd": true
+      }
+     },
+     {
+      "id": "golden-lion-second",
+      "name": "Throw the Second Golden Lion",
+      "activation": "action",
+      "description": "Throw one figurine of the pair to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, that lion can't be used again until 7 days have passed.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "pool": "golden-lion-second",
+       "afterHours": "168"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "lion",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "dismiss": "action",
+       "waitsFromEnd": true
       }
      }
     ],
@@ -4572,35 +5083,24 @@
     "modifiers": [],
     "actions": [
      {
-      "id": "ivory-goats",
-      "name": "Throw the Ivory Goats",
+      "id": "goat-of-terror",
+      "name": "Throw the Goat of Terror",
       "activation": "action",
-      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes the goat it is: the Goat of Terror a Giant Goat that can't attack, the Goat of Travail a Giant Goat, the Goat of Traveling a Large goat with the statistics of a Riding Horse; each for up to 3 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Goat for up to 3 hours, which can't attack. You can remove its horns as a Magic action: one becomes a +1 Lance and the other a +2 Longsword until it reverts. While you ride it, a Hostile creature that starts its turn within 30 feet of it makes a DC 15 Wisdom save or is Frightened. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 15 days have passed.",
       "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "pool": "goat-of-terror",
+       "afterHours": "360"
+      },
       "summons": {
        "creatures": [
         {
          "monsterId": "giant-goat",
          "count": 1,
-         "form": "terror",
          "except": {
           "name": "Goat of Terror"
-         }
-        },
-        {
-         "monsterId": "giant-goat",
-         "count": 1,
-         "form": "travail",
-         "except": {
-          "name": "Goat of Travail"
-         }
-        },
-        {
-         "monsterId": "riding-horse",
-         "count": 1,
-         "form": "traveling",
-         "except": {
-          "name": "Goat of Traveling"
          }
         }
        ],
@@ -4612,7 +5112,74 @@
         "minutes": 180
        },
        "allegiance": "user",
-       "dismiss": "action"
+       "noAttacks": true,
+       "dismiss": "action",
+       "waitsFromEnd": true
+      }
+     },
+     {
+      "id": "goat-of-travail",
+      "name": "Throw the Goat of Travail",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Goat for up to 3 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 30 days have passed.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "pool": "goat-of-travail",
+       "afterHours": "720"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "giant-goat",
+         "count": 1,
+         "except": {
+          "name": "Goat of Travail"
+         }
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 180
+       },
+       "allegiance": "user",
+       "dismiss": "action",
+       "waitsFromEnd": true
+      }
+     },
+     {
+      "id": "goat-of-traveling",
+      "name": "Throw the Goat of Traveling",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Large goat with the statistics of a Riding Horse. It has 24 charges, and each hour or part of one it spends as a goat costs 1. While it has charges you can use it as often as you wish; when they run out it reverts, and it can't be used again until 7 days have passed, when it regains them all. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "damage": [],
+      "timePool": "hours",
+      "uses": {
+       "limit": 24,
+       "per": "time",
+       "pool": "goat-of-traveling",
+       "afterHours": "168"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "riding-horse",
+         "count": 1,
+         "except": {
+          "name": "Goat of Traveling"
+         }
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "allegiance": "user",
+       "dismiss": "action",
+       "waitsFromEnd": true
       }
      }
     ],
@@ -4628,7 +5195,7 @@
       "id": "marble-elephant",
       "name": "Throw the Marble Elephant",
       "activation": "action",
-      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes an Elephant for up to 24 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes an Elephant for up to 24 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 7 days have passed.",
       "damage": [],
       "uses": {
        "limit": 1,
@@ -4650,7 +5217,8 @@
         "minutes": 1440
        },
        "allegiance": "user",
-       "dismiss": "action"
+       "dismiss": "action",
+       "waitsFromEnd": true
       }
      }
     ],
@@ -4666,7 +5234,7 @@
       "id": "obsidian-steed",
       "name": "Throw the Obsidian Steed",
       "activation": "action",
-      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Nightmare for up to 24 hours, which fights only to defend itself. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Nightmare for up to 24 hours, which fights only to defend itself. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Each time you use it, there is a 10 percent chance it ignores your orders. Once it reverts, it can't be used again until 5 days have passed.",
       "damage": [],
       "uses": {
        "limit": 1,
@@ -4677,9 +5245,23 @@
        "creatures": [
         {
          "monsterId": "nightmare",
-         "count": 1
+         "count": 1,
+         "faces": {
+          "from": 1,
+          "to": 1
+         },
+         "allegiance": "none"
+        },
+        {
+         "monsterId": "nightmare",
+         "count": 1,
+         "faces": {
+          "from": 2,
+          "to": 10
+         }
         }
        ],
+       "die": 10,
        "rangeFeet": 60,
        "turn": "after-user",
        "dodgesUncommanded": true,
@@ -4688,7 +5270,8 @@
         "minutes": 1440
        },
        "allegiance": "user",
-       "dismiss": "action"
+       "dismiss": "action",
+       "waitsFromEnd": true
       }
      }
     ],
@@ -4704,7 +5287,7 @@
       "id": "onyx-dog",
       "name": "Throw the Onyx Dog",
       "activation": "action",
-      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Mastiff with an Intelligence of 8 for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Mastiff for up to 6 hours, with an Intelligence of 8, Blindsight with a range of 60 feet, and the Common language. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 7 days have passed.",
       "damage": [],
       "uses": {
        "limit": 1,
@@ -4719,7 +5302,10 @@
          "except": {
           "abilityScores": {
            "int": 8
-          }
+          },
+          "senses": [
+           "blindsight 60 ft."
+          ]
          }
         }
        ],
@@ -4731,7 +5317,8 @@
         "minutes": 360
        },
        "allegiance": "user",
-       "dismiss": "action"
+       "dismiss": "action",
+       "waitsFromEnd": true
       }
      }
     ],
@@ -4747,7 +5334,7 @@
       "id": "serpentine-owl",
       "name": "Throw the Serpentine Owl",
       "activation": "action",
-      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Owl for up to 8 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Owl for up to 8 hours, which can speak with you telepathically at any range on the same plane. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 2 days have passed.",
       "damage": [],
       "uses": {
        "limit": 1,
@@ -4769,7 +5356,8 @@
         "minutes": 480
        },
        "allegiance": "user",
-       "dismiss": "action"
+       "dismiss": "action",
+       "waitsFromEnd": true
       }
      }
     ],
@@ -4780,8 +5368,44 @@
     "id": "silver-raven",
     "name": "Silver Raven",
     "modifiers": [],
-    "actions": [],
-    "casts": [],
+    "actions": [
+     {
+      "id": "silver-raven",
+      "name": "Throw the Silver Raven",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Raven for up to 12 hours, and while it is a raven you can cast Animal Messenger on it. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 2 days have passed.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "48"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "raven",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 720
+       },
+       "allegiance": "user",
+       "dismiss": "action",
+       "waitsFromEnd": true
+      }
+     }
+    ],
+    "casts": [
+     {
+      "spellId": "animal-messenger",
+      "consumesSpellSlot": false
+     }
+    ],
     "effects": []
    }
   ],
@@ -5001,6 +5625,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "nonmagical"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -5631,7 +6259,57 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "daylight",
+    "saveDc": 18,
+    "uses": {
+     "limit": 40,
+     "per": "never",
+     "pool": "helm-of-brilliance-opals"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "fireball",
+    "saveDc": 18,
+    "uses": {
+     "limit": 30,
+     "per": "never",
+     "pool": "helm-of-brilliance-fire-opals"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "prismatic-spray",
+    "saveDc": 18,
+    "uses": {
+     "limit": 10,
+     "per": "never",
+     "pool": "helm-of-brilliance-diamonds"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "wall-of-fire",
+    "saveDc": 18,
+    "uses": {
+     "limit": 20,
+     "per": "never",
+     "pool": "helm-of-brilliance-rubies"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "lastChargeRoll": false,
+   "startingByPool": {
+    "helm-of-brilliance-diamonds": "1d10",
+    "helm-of-brilliance-rubies": "2d10",
+    "helm-of-brilliance-fire-opals": "3d10",
+    "helm-of-brilliance-opals": "4d10"
+   }
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -5871,6 +6549,13 @@
   "description": "Wondrous Item, Rare. You can take a Magic action to blow the horn, which emits a thunderous blast in a 30-foot Cone that is audible out to 600 feet. Each creature in the Cone makes a DC 15 Constitution saving throw. On a failed save, a creature takes 5d8 Thunder damage and has the Deafened condition for 1 minute. On a successful save, a creature takes half as much damage only. Glass or crystal objects in the Cone that aren't being worn or carried take 10d8 Thunder damage. Each use of the horn's magic has a 20 percent chance of causing the horn to explode. The explosion deals 10d6 Force damage to the user and destroys the horn.",
   "weapon": null,
   "armor": null,
+  "breaks": {
+   "percent": 20,
+   "damage": {
+    "formula": "10d6",
+    "type": "force"
+   }
+  },
   "slot": "wondrous",
   "appliesTo": null,
   "rarity": "rare",
@@ -5883,7 +6568,37 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "blast",
+    "name": "Blow the Horn",
+    "activation": "action",
+    "description": "Blow the horn: a thunderous blast in a 30-foot Cone, audible out to 600 feet. Each creature in the Cone makes a DC 15 Constitution saving throw, taking 5d8 Thunder damage and having the Deafened condition for 1 minute on a failure, or half as much damage only on a success. Glass or crystal objects in the Cone that aren't worn or carried take 10d8 Thunder damage. Each use has a 20 percent chance of causing the horn to explode, dealing 10d6 Force damage to you and destroying it.",
+    "damage": [
+     {
+      "formula": "5d8",
+      "type": "thunder"
+     }
+    ],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "successDamage": "half",
+     "failureConditions": [
+      "deafened"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -6115,7 +6830,22 @@
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
-  "effects": [],
+  "effects": [
+   {
+    "name": "Horseshoes of a Zephyr",
+    "tags": [
+     "ignores-difficult-terrain"
+    ],
+    "duration": {
+     "type": "manual"
+    },
+    "modifiers": [],
+    "onEnd": [],
+    "target": "self",
+    "voidWhileIncapacitated": false,
+    "concentration": false
+   }
+  ],
   "modifiers": []
  },
  {
@@ -6576,7 +7306,8 @@
     "area": {
      "shape": "line",
      "sizeFeet": 120,
-     "widthFeet": 5
+     "widthFeet": 5,
+     "toTarget": true
     },
     "save": {
      "ability": "dex",
@@ -6664,7 +7395,10 @@
      "per": "never",
      "pool": "luck-blade-wish"
     },
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "alsoUses": {
+     "limit": 1
+    }
    }
   ],
   "charges": {
@@ -7359,6 +8093,7 @@
      "per": "never",
      "pool": "necklace-of-fireballs-beads"
     },
+    "chargesRaiseLevel": 5,
     "consumesSpellSlot": false
    }
   ],
@@ -7465,6 +8200,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "starting": "1d8 + 1"
+  },
   "onHit": [
    {
     "conditions": [],
@@ -7473,6 +8212,10 @@
      "dc": 15
     },
     "naturalTwenty": true,
+    "spendsCharge": {
+     "pool": "nine-lives-stealer-charges",
+     "limit": 9
+    },
     "kills": {
      "hitPointsUnder": 100,
      "exceptCreatureTypes": [
@@ -7694,9 +8437,47 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "apply",
+    "name": "Apply Oil of Slipperiness",
+    "activation": "other",
+    "description": "Spend 10 minutes covering one Medium or smaller creature, with what it wears and carries: it gains the effect of the Freedom of Movement spell for 8 hours. Poured on the ground as a Magic action instead, it duplicates the Grease spell there for 8 hours.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "grants": {
+     "name": "Freedom of Movement (Oil of Slipperiness)",
+     "tags": [
+      "freedom-of-movement"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 480
+     },
+     "modifiers": [
+      {
+       "type": "special-speed",
+       "movement": "swim",
+       "equalToSpeed": true
+      }
+     ],
+     "onEnd": [],
+     "target": "target",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "conditionImmunities": [
+      "paralyzed",
+      "restrained"
+     ]
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7950,7 +8731,8 @@
       "type": "rounds",
       "rounds": 10
      },
-     "repeatSave": true
+     "repeatSave": true,
+     "immuneOnSuccess": true
     }
    }
   ],
@@ -8270,6 +9052,24 @@
          "type": "ability-is",
          "abilities": [
           "str"
+         ]
+        }
+       ]
+      },
+      {
+       "type": "damage-bonus",
+       "amount": 0,
+       "dice": "-1d4",
+       "leavesOne": true,
+       "when": [
+        {
+         "type": "on-damage-roll"
+        },
+        {
+         "type": "attack-kind-is",
+         "kinds": [
+          "weapon",
+          "unarmed"
          ]
         }
        ]
@@ -9189,9 +9989,33 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Mind Reading",
+    "activation": "bonus-action",
+    "description": "Drink it: you gain the effect of the Detect Thoughts spell (save DC 13) for 10 minutes, with no Concentration required.",
+    "damage": [],
+    "grants": {
+     "name": "Detect Thoughts (Potion of Mind Reading)",
+     "tags": [
+      "mind-reading"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -9779,9 +10603,33 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Water Breathing",
+    "activation": "bonus-action",
+    "description": "Drink it: you can breathe underwater for 24 hours.",
+    "damage": [],
+    "grants": {
+     "name": "Potion of Water Breathing",
+     "tags": [
+      "water-breathing"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 1440
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -10028,7 +10876,9 @@
       "minutes": 60,
       "concentration": true
      },
-     "allegiance": "user"
+     "allegiance": "user",
+     "waitsFromEnd": true,
+     "itemEndsAtZero": "nonmagical"
     }
    }
   ],
@@ -10509,7 +11359,22 @@
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
-  "effects": [],
+  "effects": [
+   {
+    "name": "Free Action",
+    "tags": [
+     "freedom-of-movement"
+    ],
+    "duration": {
+     "type": "manual"
+    },
+    "modifiers": [],
+    "onEnd": [],
+    "target": "self",
+    "voidWhileIncapacitated": false,
+    "concentration": false
+   }
+  ],
   "modifiers": []
  },
  {
@@ -10852,6 +11717,9 @@
   "description": "Ring, Legendary (Requires Attunement). While wearing this ring, you have Advantage on saving throws against spells. If you succeed on the save for a spell of level 7 or lower, the spell has no effect on you. If that spell targeted only you and didn't create an area of effect, you can take a Reaction to deflect the spell back at the spell's caster; the caster must make a saving throw against the spell using their own spell save DC.",
   "weapon": null,
   "armor": null,
+  "savesNegateSpells": {
+   "maxLevel": 7
+  },
   "slot": "ring",
   "appliesTo": null,
   "rarity": "legendary",
@@ -10965,9 +11833,109 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "ram-1",
+    "name": "Ram (1 charge)",
+    "activation": "action",
+    "description": "Expend 1 charge: a spectral ram's head makes a ranged spell attack with a +7 bonus against one creature you can see within 60 feet. On a hit, it takes 2d10 Force damage and is pushed 5 feet away from you.",
+    "damage": [
+     {
+      "formula": "2d10",
+      "type": "force"
+     }
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "onHitPush": {
+     "feet": 5
+    },
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "ring-of-the-ram-charges"
+    },
+    "attack": {
+     "ability": "spellcasting",
+     "proficient": true,
+     "rangeFeet": 60,
+     "bonus": 7
+    }
+   },
+   {
+    "id": "ram-2",
+    "name": "Ram (2 charges)",
+    "activation": "action",
+    "description": "Expend 2 charges: a spectral ram's head makes a ranged spell attack with a +7 bonus against one creature you can see within 60 feet. On a hit, it takes 4d10 Force damage and is pushed 10 feet away from you.",
+    "damage": [
+     {
+      "formula": "4d10",
+      "type": "force"
+     }
+    ],
+    "useCost": 2,
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "onHitPush": {
+     "feet": 10
+    },
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "ring-of-the-ram-charges"
+    },
+    "attack": {
+     "ability": "spellcasting",
+     "proficient": true,
+     "rangeFeet": 60,
+     "bonus": 7
+    }
+   },
+   {
+    "id": "ram-3",
+    "name": "Ram (3 charges)",
+    "activation": "action",
+    "description": "Expend 3 charges: a spectral ram's head makes a ranged spell attack with a +7 bonus against one creature you can see within 60 feet. On a hit, it takes 6d10 Force damage and is pushed 15 feet away from you.",
+    "damage": [
+     {
+      "formula": "6d10",
+      "type": "force"
+     }
+    ],
+    "useCost": 3,
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "onHitPush": {
+     "feet": 15
+    },
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "ring-of-the-ram-charges"
+    },
+    "attack": {
+     "ability": "spellcasting",
+     "proficient": true,
+     "rangeFeet": 60,
+     "bonus": 7
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -11001,6 +11969,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "nonmagical"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -11247,6 +12219,9 @@
      "limit": 3,
      "per": "long-rest",
      "pool": "robe-of-scintillating-colors-charges"
+    },
+    "sight": {
+     "seenBy": "user"
     },
     "save": {
      "ability": "wis",
@@ -11713,6 +12688,10 @@
       "type": "necrotic"
      }
     ],
+    "drain": {
+     "heals": "half",
+     "failedSaveOnly": true
+    },
     "uses": {
      "limit": 1,
      "per": "long-rest"
@@ -11724,8 +12703,7 @@
      "failureConditions": []
     },
     "ridesHit": {
-     "rides": "melee-this-weapon",
-     "reminder": "On a failed save you regain Hit Points equal to half the Necrotic damage it takes."
+     "rides": "melee-this-weapon"
     }
    },
    {
@@ -13081,6 +14059,10 @@
   "charges": {
    "regain": "2d8 + 4",
    "lastChargeRoll": true,
+   "lastCharge": {
+    "becomes": "weapon-2",
+    "baseId": "quarterstaff"
+   },
    "lastChargeTwenty": "1d8 + 2"
   },
   "grantsFeatIds": [],
@@ -13145,7 +14127,10 @@
   "casts": [],
   "charges": {
    "regain": "1d6 + 4",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": {
+    "becomes": "quarterstaff"
+   }
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -13550,8 +14535,13 @@
     "id": "snake",
     "name": "Throw the Staff",
     "activation": "action",
-    "description": "Throw the staff so that it lands in an unoccupied space within 10 feet, where it becomes a Giant Constrictor Snake under your control. It shares your Initiative count and takes its turn immediately after yours. You command it while it is within 60 feet of you; absent commands, it defends itself. A Bonus Action turns it back into the staff.",
+    "description": "Throw the staff so that it lands in an unoccupied space within 10 feet, where it becomes a Giant Constrictor Snake under your control. It shares your Initiative count and takes its turn immediately after yours. You command it while it is within 60 feet of you; absent commands, it defends itself. A Bonus Action turns it back into the staff, which can't be used again for 1 hour. If the snake drops to 0 Hit Points, it dies and the staff shatters.",
     "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "time",
+     "afterHours": "1"
+    },
     "summons": {
      "creatures": [
       {
@@ -13564,7 +14554,9 @@
      "commandFeet": 60,
      "dodgesUncommanded": true,
      "allegiance": "user",
-     "dismiss": "bonus-action"
+     "dismiss": "bonus-action",
+     "waitsFromEnd": true,
+     "itemEndsAtZero": "destroyed"
     }
    }
   ],
@@ -13853,6 +14845,11 @@
      "limit": 1,
      "per": "long-rest"
     },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 120,
+     "widthFeet": 5
+    },
     "save": {
      "ability": "dex",
      "dc": 17,
@@ -13973,6 +14970,10 @@
         "failureEffect": {
          "name": "Withered",
          "tags": [],
+         "duration": {
+          "type": "minutes",
+          "minutes": 60
+         },
          "modifiers": [
           {
            "type": "roll-mode",
@@ -14347,6 +15348,10 @@
    {
     "conditions": [],
     "name": "Wounded",
+    "duration": {
+     "type": "minutes",
+     "minutes": 60
+    },
     "tags": [
      "no-healing"
     ],
@@ -14380,6 +15385,7 @@
   "description": "Wondrous Item, Legendary (Requires Attunement by a Cleric or Paladin). This talisman is a mighty symbol of goodness. A Fiend or an Undead that touches the talisman takes 8d6 Radiant damage and takes the damage again each time it ends its turn holding or carrying the talisman. Holy Symbol. You can use the talisman as a Holy Symbol. You gain a +2 bonus to spell attack rolls while you wear or hold it. Pure Rebuke. The talisman has 7 charges. While wearing or holding the talisman, you can take a Magic action to expend 1 charge and target one creature you can see on the ground within 120 feet of yourself. A flaming fissure opens under the target, and the target makes a DC 20 Dexterity saving throw. If the target is a Fiend or an Undead, it has Disadvantage on the save. On a failed save, the target falls into the fissure and is destroyed, leaving no remains. On a successful save, the target isn't cast into the fissure but takes 4d6 Psychic damage from the ordeal. In either case, the fissure then closes, leaving no trace of its existence. When you expend the last charge, the talisman disperses into motes of golden light and is destroyed.",
   "weapon": null,
   "armor": null,
+  "servesAsFocus": "holy-symbol",
   "slot": "neck",
   "appliesTo": null,
   "rarity": "legendary",
@@ -14393,9 +15399,31 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "rebuke",
+    "name": "Pure Rebuke",
+    "activation": "action",
+    "description": "Expend 1 charge and target one creature you can see on the ground within 120 feet. A fissure opens under it, and it makes a DC 20 Dexterity saving throw. If the target is a Fiend or an Undead, it has Disadvantage on the save. On a failure it falls into the fissure and is destroyed, leaving no remains; on a success it takes 4d6 Psychic damage. When you expend the last charge, the talisman is destroyed.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
+    "uses": {
+     "limit": 7,
+     "per": "never",
+     "pool": "talisman-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -14440,6 +15468,7 @@
   "description": "Wondrous Item, Legendary (Requires Attunement). This item symbolizes unrepentant evil. A creature that isn't a Fiend or an Undead that touches the talisman takes 8d6 Necrotic damage and takes the damage again each time it ends its turn holding or carrying the talisman. Holy Symbol. You can use the talisman as a Holy Symbol. You gain a +2 bonus to spell attack rolls while you wear or hold it. Ultimate End. The talisman has 6 charges. While wearing or holding the talisman, you can take a Magic action to expend 1 charge and target one creature you can see on the ground within 120 feet of yourself. A flaming fissure opens under the target, and the target makes a DC 20 Dexterity saving throw. If the target is a Celestial, it has Disadvantage on the save. On a failed save, the target falls into the fissure and is destroyed, leaving no remains. On a successful save, the target isn't cast into the fissure but takes 4d6 Psychic damage from the ordeal. In either case, the fissure then closes, leaving no trace of its existence. When you expend the last charge, the talisman dissolves into foul-smelling slime and is destroyed.",
   "weapon": null,
   "armor": null,
+  "servesAsFocus": "holy-symbol",
   "slot": "neck",
   "appliesTo": null,
   "rarity": "legendary",
@@ -14450,9 +15479,31 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "rebuke",
+    "name": "Ultimate End",
+    "activation": "action",
+    "description": "Expend 1 charge and target one creature you can see on the ground within 120 feet. A fissure opens under it, and it makes a DC 20 Dexterity saving throw. If the target is a Celestial, it has Disadvantage on the save. On a failure it falls into the fissure and is destroyed, leaving no remains; on a success it takes 4d6 Psychic damage. When you expend the last charge, the talisman is destroyed.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
+    "uses": {
+     "limit": 6,
+     "per": "never",
+     "pool": "talisman-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -14939,7 +15990,8 @@
   "casts": [],
   "charges": {
    "regain": "1d6 + 1",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -14988,7 +16040,27 @@
      "per": "long-rest",
      "pool": "wand-of-fear-charges"
     },
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "optionIds": [
+     "flee",
+     "grovel"
+    ]
+   },
+   {
+    "spellId": "fear",
+    "saveDc": 15,
+    "uses": {
+     "limit": 7,
+     "per": "long-rest",
+     "pool": "wand-of-fear-charges"
+    },
+    "useCost": 3,
+    "consumesSpellSlot": false,
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
+    }
    }
   ],
   "charges": {
@@ -15198,7 +16270,8 @@
   "casts": [],
   "charges": {
    "regain": "1d6 + 1",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -15272,7 +16345,8 @@
   ],
   "charges": {
    "regain": "1d6 + 1",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -15533,7 +16607,8 @@
   "casts": [],
   "charges": {
    "regain": "1d6 + 1",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -15881,7 +16956,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "open-portal",
+    "name": "Open a Portal",
+    "activation": "action",
+    "description": "Unfold the cloth on a solid surface: it forms a two-way, 6-foot-diameter, circular portal to another world or plane of existence, which the GM chooses. The portal stays open until a creature within 5 feet of it takes a Magic action to close it. Once it has opened a portal, the Well can't do so again for 1d8 hours.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "time",
+     "afterHours": "1d8"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -15895,6 +16983,11 @@
   "description": "Wondrous Item, Uncommon. While holding this fan, you can cast Gust of Wind (save DC 13) from it. Each subsequent time the fan is used before the next dawn, it has a cumulative 20 percent chance of not working; if the fan fails to work, it tears into useless, nonmagical tatters.",
   "weapon": null,
   "armor": null,
+  "breaks": {
+   "percent": 20,
+   "cumulative": true,
+   "failsUse": true
+  },
   "slot": "wondrous",
   "appliesTo": null,
   "rarity": "uncommon",
@@ -15904,7 +16997,18 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "gust-of-wind",
+    "saveDc": 13,
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "wind-fan-uses"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],

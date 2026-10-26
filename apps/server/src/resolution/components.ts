@@ -91,12 +91,23 @@ function focusKinds(
   return { kinds, books };
 }
 
-/** The rows a cast can use as its Spellcasting Focus. */
-function focusRows(inventory: readonly InventoryItem[], kinds: readonly string[], books: readonly string[]) {
+/** The rows a cast can use as its Spellcasting Focus, a magic item that serves as one among them (a Talisman of Pure
+ *  Good is a Holy Symbol). */
+function focusRows(
+  inventory: readonly InventoryItem[],
+  kinds: readonly string[],
+  books: readonly string[],
+  catalog: EquipmentCatalog | undefined
+) {
   return inventory.filter((row) => {
     if (!carried(row)) return false;
     const id = catalogIdOf(row);
-    return books.includes(id) || kinds.some((kind) => FOCUS_ROWS[kind]?.(id) ?? id === kind);
+    const servesAs = row.dormant === true ? undefined : catalog?.equipmentRecord(id)?.servesAsFocus;
+    return (
+      books.includes(id) ||
+      kinds.some((kind) => FOCUS_ROWS[kind]?.(id) ?? id === kind) ||
+      (servesAs !== undefined && kinds.includes(servesAs))
+    );
   });
 }
 
@@ -193,7 +204,7 @@ export function readComponents(
   const freeHand = hands.free;
   const { kinds, books } = focusKinds(definition, spell.id, catalog);
   // A weapon a binding lends as a focus serves too (a pact weapon).
-  const focuses = [...focusRows(attacker.inventory, kinds, books), ...boundFocusRows(attacker)];
+  const focuses = [...focusRows(attacker.inventory, kinds, books, catalog), ...boundFocusRows(attacker)];
   // An emblem borne on a Shield serves with no hand of its own, and the Shield's hand makes the gestures.
   const emblem = hands.shield && focuses.some((row) => equipped(row) && catalogIdOf(row) === EMBLEM_ID);
   const costly = material ? (spell.components.costly ?? []) : [];

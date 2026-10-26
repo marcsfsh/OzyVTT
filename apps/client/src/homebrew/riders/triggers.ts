@@ -53,6 +53,7 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "versus-creature-type": "A target's kind",
   "by-effect-source": "The creature that put this effect on",
   "source-creature-type-is": "The other creature's kind",
+  "versus-breath-weapon": "Against a breath weapon",
   "versus-effect-source": "Against the creature that put this effect on",
   "versus-marked": "A target it marked",
   "versus-hurt": "A target missing Hit Points",

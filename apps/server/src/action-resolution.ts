@@ -28,7 +28,7 @@ import {
   spendUntilItActs,
   spendUntilOwnAttack
 } from "./resolution/attack.js";
-import { rollLastCharge } from "./resolution/charges.js";
+import { breaksBeforeUse, rollLastCharge } from "./resolution/charges.js";
 import { recallSpellSlot } from "./resolution/spell-recall.js";
 import { rollForAnAnswer } from "./resolution/divinations.js";
 import { prayerShortRest, refuseThePrayedFor } from "./resolution/prayer-of-healing.js";
@@ -57,7 +57,7 @@ import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { applySummons } from "./resolution/summon.js";
-import { readScroll } from "./resolution/scroll.js";
+import { failsCastCheck, readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import { mendOnCast } from "./resolution/mend.js";
@@ -224,6 +224,16 @@ export function resolveDefinitionAction(
   if (readScroll(ctx)) {
     commitEconomy(ctx);
     useUpConsumable(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // So does a failed check an item's cast asks first (an Amulet of the Planes).
+  if (failsCastCheck(ctx)) {
+    commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // An item that breaks as it fails to work (a Wind Fan) is gone with its pool, and its action is spent.
+  if (breaksBeforeUse(ctx)) {
+    commitEconomy({ ...ctx, plan: { ...ctx.plan, spendUse: null } });
     return { ...resolutionOf(ctx), save: null };
   }
   // Spread Caltrops or a set trap acts on whoever meets it later, so nothing is rolled now.

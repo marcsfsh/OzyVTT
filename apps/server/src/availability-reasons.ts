@@ -1,7 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState, PassiveOption } from "@vtt/domain";
 import { conditionLabel, incapacitatingCondition } from "./condition-rules.js";
-import { hasEffectTag, NO_ACTIONS_TAG, SLOWED_TAG } from "./effects.js";
+import { concentrationOn, hasEffectTag, NO_ACTIONS_TAG, SLOWED_TAG, spellWords } from "./effects.js";
 import { laterRowOf } from "./item-actions.js";
 import { castSlot, useLimitFor } from "./resolution/economy.js";
 import type { DefinitionAction, LiveActor } from "./resolution/context.js";
@@ -88,6 +88,8 @@ function actionSpentReason({ state, attacker, siblings }: ReasonFacts): string {
 function requiresReason({ attacker, action, spell }: ReasonFacts): string {
   if (action.requiresEffectTag && !hasEffectTag(attacker, action.requiresEffectTag))
     return `Only while ${conditionLabel(action.requiresEffectTag)}.`;
+  if (action.castThrough && !concentrationOn(attacker, action.castThrough))
+    return `Only while you concentrate on ${spellWords(action.castThrough)}.`;
   if (spell && markMoveOf(spell, action.id)) return `You aren't concentrating on ${spell.name}.`;
   if (spell && laterRowOf(spell, action.id)) return `Cast ${spell.name} first.`;
   if (action.id === END_EFFECT_ACTION_ID) return NO_ENDING_OPTION;

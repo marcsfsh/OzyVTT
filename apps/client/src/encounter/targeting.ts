@@ -25,6 +25,8 @@ export type TargetingTemplate = Readonly<{
   /** How many areas one use places (Fire Storm's ten Cubes), and the ones already set down beside the one moving. */
   count?: number;
   others?: ReadonlyArray<Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>>;
+  /** A Line that stops where it is aimed, never past `sizeFeet` (a Javelin of Lightning's bolt). */
+  toTarget?: true;
 }>;
 export type TargetingSession = Readonly<
   {
@@ -186,7 +188,8 @@ export function beginTargeting(
         ),
         widthFeet: area.widthFeet,
         placed: null,
-        ...(area.count !== undefined ? { count: area.count, others: [] } : {})
+        ...(area.count !== undefined ? { count: area.count, others: [] } : {}),
+        ...(area.toTarget ? { toTarget: true as const } : {})
       },
       ...slot
     };

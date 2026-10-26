@@ -15,7 +15,9 @@ export function gesturePreview(
   gesture: Gesture | null,
   annotationAt: (id: string) => Annotation | PlayerAnnotation | null,
   /** While an area template is placed: the area's own size, which the drag doesn't change. */
-  templateFeet?: number
+  templateFeet?: number,
+  /** The area is a Line that stops where it is dragged, never past its size. */
+  templateUpTo = false
 ): { data: AnnotationGlyphData; snap: SnappedGeometry } | null {
   if (!calibration || !gesture) return null;
   if (gesture.kind === "measure") {
@@ -29,7 +31,7 @@ export function gesturePreview(
     const shape = gesture.kind;
     const snap =
       templateFeet !== undefined
-        ? sizedShapePreview(calibration, shape, gesture.origin, gesture.current, templateFeet)
+        ? sizedShapePreview(calibration, shape, gesture.origin, gesture.current, templateFeet, templateUpTo)
         : snapShapePreview(calibration, shape, gesture.origin, gesture.current);
     return { snap, data: { kind: "shape", shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet } };
   }

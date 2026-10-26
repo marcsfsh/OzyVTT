@@ -581,13 +581,18 @@ species, a spellcaster or another item attuned) the character meets (`attunement
 What a worn item's own action gave its user (a Ring of Invisibility's Invisible) ends when it is taken off,
 unattuned or put away. A cast spends its printed cost (`useCost`), and one whose extra charges raise its
 level (`chargesRaiseLevel`, a Wand of Fireballs) is one action for each cost. A pool that never comes back
-(`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`).
-A Long Rest gives back the item's printed dice (`charges.regain`), not every charge; when the GM keeps a dawn hour
-(`time.set-dawn`) the clock's dawn gives them back instead (`clock-pools.ts`). Spending the last charge rolls the
-SRD's d20, and the record says what a 1 does (destroyed, or a plain item it becomes) and what a 20 gives back
-(`resolution/charges.ts`, which also rolls a Thief's Use Magic Device d6). A pool spent for a time (`per: "time"`,
-Wings of Flying) waits `afterHours` of game time from its first use (`readyAt` on the actor) and comes back as
-`passGameTime` passes it. Ammunition is
+(`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`,
+or `charges.startingByPool` for a Helm of Brilliance's kinds of gem). A use may count against a second limit too
+(`alsoUses`: a Luck Blade's Wish once a dawn). A Long Rest gives back the item's printed dice (`charges.regain`), not
+every charge; when the GM keeps a dawn hour (`time.set-dawn`) the clock's dawn gives them back instead
+(`clock-pools.ts`). Spending the last charge rolls the SRD's d20, and the record says what a 1 does (destroyed,
+nonmagical with its row kept dormant, or a plain item it becomes) and what a 20 gives back; a pool that never comes
+back ends the item with no roll (`resolution/charges.ts` and `item-spent.ts`; the former also rolls a Thief's Use
+Magic Device d6, and the d100 of an item that may break as it is used, `item-breaks.ts`). A pool spent for a time
+(`per: "time"`, Wings of Flying) waits `afterHours` of game time from its first use, or from when the creature it
+brought leaves (`waitsFromEnd`, a figurine), with `readyAt` on the actor, and comes back as `passGameTime` passes it.
+A pool of time (`timePool`: Boots of Speed's rounds, a Goat of Traveling's hours) is spent whole by a use, and what is
+left when the use ends early comes back. Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
 kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only

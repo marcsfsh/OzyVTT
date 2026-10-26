@@ -9,7 +9,6 @@ import type { DamageType, Modifier } from "@vtt/schemas";
 import type { ItemMechanics, ItemMechanicsModule } from "./overlay.js";
 import { MISTY_CLOUD } from "../spell-effects.js";
 
-/** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
 /** Extra damage when the weapon hits a creature of one of these types ("an extra 3d6 damage of the weapon's type if the
  *  target is a Dragon"); with no `damageType` it is the weapon's own. */
 function versusTypes(formula: string, creatureTypes: string[], damageType?: DamageType): Modifier {
@@ -22,6 +21,12 @@ function versusTypes(formula: string, creatureTypes: string[], damageType?: Dama
   };
 }
 
+/** How a figurine is used, and what its creature does, shared by the Ivory Goats' three actions. */
+const GOAT_THROW = "Throw the figurine to a point on the ground within 60 feet:";
+const FIGURINE_OBEYS =
+  "The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.";
+
+/** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
 const RESISTANCE_TABLE = [
   "acid",
   "cold",
@@ -94,7 +99,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // The dragon's kind sets the type; fire (a red dragon) until the GM picks. "Advantage on saving throws against the
-  // Breath Weapons of Dragons" is read as Advantage on a save a Dragon forces; the dragon sense is the GM's.
+  // breath weapons of Dragons": a save a Dragon's breath forces. Sensing the nearest dragon is a Magic action once a
+  // dawn; the distance and direction it tells are the GM's.
   "dragon-scale-mail": {
     grants: { damageResistances: ["fire"] },
     damageTypeChoice: ["acid", "cold", "fire", "lightning", "poison"],
@@ -104,7 +110,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "save",
         mode: "advantage",
-        when: [{ type: "on-saving-throw" }, { type: "source-creature-type-is", creatureTypes: ["dragon"] }]
+        when: [
+          { type: "on-saving-throw" },
+          { type: "source-creature-type-is", creatureTypes: ["dragon"] },
+          { type: "versus-breath-weapon" }
+        ]
+      }
+    ],
+    actions: [
+      {
+        id: "sense-dragon",
+        name: "Sense the Nearest Dragon",
+        activation: "action",
+        description:
+          "Focus your senses to discern the distance and direction to the closest dragon within 30 miles of yourself that is of the same type as the armor. This action can't be used again until the next dawn.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" }
       }
     ]
   },
@@ -116,8 +137,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // "The GM chooses the type or determines it randomly": lightning (the d10 table's row 5) until the GM picks.
   "armor-of-resistance": { grants: { damageResistances: ["lightning"] }, damageTypeChoice: RESISTANCE_TABLE },
 
-  // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
-  "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
+  // Metal Shell is an effect on the wearer for 10 minutes, once a dawn; taking the armor off ends it.
+  "armor-of-invulnerability": {
+    grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] },
+    actions: [
+      {
+        id: "metal-shell",
+        name: "Metal Shell",
+        activation: "action",
+        description:
+          "Give yourself Immunity to Bludgeoning, Piercing, and Slashing damage for 10 minutes or until you are no longer wearing the armor. Once this property is used, it can't be used again until the next dawn.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        grants: {
+          name: "Metal Shell",
+          tags: ["metal-shell"],
+          duration: { type: "rounds", rounds: 100 },
+          modifiers: [{ type: "damage-immunity", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+        }
+      }
+    ]
+  },
 
   // Resistance to the type the GM picks per copy (bludgeoning until then), and the curse: attuning locks the armor
   // on and leaves Vulnerability to the other two while the curse holds, worn or not.
@@ -247,10 +287,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "weapon-of-warning": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
 
   // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Wish casts on 1d3
-  // charges rolled when the blade is added, which never come back; its once-a-dawn limit is the GM's.
+  // charges rolled when the blade is added, which never come back, and once a dawn.
   "luck-blade": {
     charges: { starting: "1d3" },
-    casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "luck-blade-wish" } }],
+    casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "luck-blade-wish" }, alsoUses: { limit: 1 } }],
     modifiers: [
       { type: "save-bonus", amount: 1 },
       { type: "attack-bonus", amount: 1 },
@@ -345,15 +385,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "You can transfer some or all of the weapon's bonus to your Armor Class": one form for each split, picked by its
-  // wielder as it attacks. When it picks one (the first attack of its turn) and holding it to the start of its next
-  // turn are the wielder's to keep.
+  // "The first time you attack with the weapon on each of your turns, you can transfer some or all of the weapon's
+  // bonus to your Armor Class": one form for each split, picked on its wielder's turn before it attacks and held until
+  // its next turn starts, and the AC only while it holds the weapon.
   defender: {
     modifiers: [
       { type: "attack-bonus", amount: 3 },
       { type: "damage-bonus", amount: 3 }
     ],
-    variantChoice: { by: "holder" },
+    variantChoice: { by: "holder", untilTurnStart: true },
     variants: [
       {
         id: "ac-1",
@@ -410,8 +450,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Life Stealing: a rolled 20 against a creature under 100 Hit Points asks a DC 15 Constitution save, a failure
-  // slaying it; Constructs and Undead succeed. Its 1d8 + 1 charges, one spent per slaying, are the GM's to count.
+  // slaying it; Constructs and Undead succeed. Each slaying spends one of its 1d8 + 1 charges, rolled when the sword is
+  // added, and with none left it slays no more.
   "nine-lives-stealer": {
+    charges: { starting: "1d8 + 1" },
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 }
@@ -421,6 +463,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         conditions: [],
         naturalTwenty: true,
         save: { ability: "con", dc: 15 },
+        spendsCharge: { pool: "nine-lives-stealer-charges", limit: 9 },
         kills: { hitPointsUnder: 100, exceptCreatureTypes: ["construct", "undead"] }
       }
     ]
@@ -597,12 +640,18 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     light: { brightFeet: 40, dimFeet: 40, ridersWhileLit: true }
   },
 
-  // The DC 15 Constitution save against healing, repeated at the end of each of the target's turns. Its hour outlasts
-  // any fight, so the effect lasts until the save ends it.
+  // The DC 15 Constitution save against healing for 1 hour, repeated at the end of each of the target's turns; the
+  // hour runs on the game clock once the fight ends.
   "sword-of-wounding": {
     modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }],
     onHit: [
-      { conditions: [], name: "Wounded", tags: ["no-healing"], save: { ability: "con", dc: 15, repeatSave: true } }
+      {
+        conditions: [],
+        name: "Wounded",
+        tags: ["no-healing"],
+        duration: { type: "minutes", minutes: 60 },
+        save: { ability: "con", dc: 15, repeatSave: true }
+      }
     ]
   },
 
@@ -636,8 +685,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "Each time you ... hit, you can have it deal Lightning damage instead of Piercing damage." Lightning Bolt, once a
-  // dawn: a 5-foot-wide Line of 120 feet (to a target no farther), DC 13 Dexterity, 4d6 Lightning, half on a success,
-  // with the javelin back in hand.
+  // dawn: a 5-foot-wide Line from its thrower to a target no farther than 120 feet, ending there, DC 13 Dexterity,
+  // 4d6 Lightning, half on a success, with the javelin back in hand.
   "javelin-of-lightning": {
     weaponChanges: { damageTypeOptions: ["lightning"] },
     actions: [
@@ -649,7 +698,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Throw the javelin at a target no farther than 120 feet and turn it into a bolt of lightning: a 5-foot-wide Line from you to the target. The target and each other creature in the Line make a DC 13 Dexterity saving throw, taking 4d6 Lightning damage on a failed save or half as much on a success. The javelin reappears in your hand. It can't be used this way again until the next dawn.",
         damage: [{ formula: "4d6", type: "lightning" }],
         save: { ability: "dex", dc: 13, successDamage: "half", failureConditions: [] },
-        area: { shape: "line", sizeFeet: 120, widthFeet: 5 },
+        area: { shape: "line", sizeFeet: 120, widthFeet: 5, toTarget: true },
         uses: { limit: 1, per: "long-rest" }
       }
     ]
@@ -824,20 +873,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ==== Wands, staffs, rods, rings and the spell scroll ===========================================
   //
-  // Recurring limits:
-  //   - One use spends exactly one charge, so only one-charge properties are authored.
-  //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a Long Rest, and "if you
-  //     expend the last charge, roll 1d20" is `charges.lastChargeRoll`. Charges count per carried copy.
-  //   - Use pools are capped at 20.
+  // How these read:
+  //   - A use spends one charge, or `useCost` of them (a Staff of Fire's Fireball: 3), from a pool counted per carried
+  //     copy. "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, and "if you expend the last
+  //     charge, roll 1d20" is `charges.lastChargeRoll`, with `charges.lastCharge` saying what a 1 does.
   //   - A staff wielded as a Quarterstaff and the Rod of Lordly Might carry their base's weapon block
   //     (`build-magic-items.ts`), so "+N to attack and damage rolls made with it" is scoped to them, and a hit property
   //     is an action that rides the item's own melee hits (`ridesHit: melee-this-weapon`).
-  //   - An item action's to-hit is ability-derived; a printed flat attack bonus cannot be said.
-  //   - `castAction` takes a cast's damage and attack from the spell record's `damage`/`attackRoll`
-  //     columns, which describe the spell's text as a whole: healing spells become Force
-  //     damage, Magic Missile rolls one dart, Web always deals its fire damage, and Faerie Fire,
-  //     Protection from Evil and Good and Ray of Enfeeblement gain an attack roll. Those casts are not
-  //     authored.
+  //   - An item action's to-hit comes from an ability, or from the item where it prints one (`attack.bonus`).
   //   - `spell-attack-bonus` lands on the bearer's spell attacks while the item is held.
 
   // ---- Rings -----------------------------------------------------------------------------------
@@ -864,9 +907,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The djinni within 120 feet, Friendly and obeying the wearer while the wearer keeps Concentration, up to 1 hour; then
-  // 24 hours before it can be summoned again. "If you fail to command it, the djinni defends itself against attackers but takes no other actions." The ring
-  // becoming nonmagical when the djinni dies is the table's.
+  // The djinni within 120 feet, Friendly and obeying the wearer while the wearer keeps Concentration, up to 1 hour,
+  // defending itself when uncommanded. The 24 hours before it can be summoned again count from when it departs, and
+  // the ring loses its magic if the djinni dies.
   "ring-of-djinni-summoning": {
     actions: [
       {
@@ -880,7 +923,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           creatures: [{ monsterId: "djinni" }],
           rangeFeet: 120,
           lasts: { type: "minutes", minutes: 60, concentration: true },
-          dodgesUncommanded: true
+          dodgesUncommanded: true,
+          waitsFromEnd: true,
+          itemEndsAtZero: "nonmagical"
         }
       }
     ]
@@ -1071,8 +1116,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling." */
   "ring-of-feather-falling": { modifiers: [{ type: "movement", rule: "safe-fall" }] },
 
-  // `ring-of-free-action` - a condition immunity cannot be limited to magical sources, and an absolute
-  // one would refuse ordinary Restrained/Paralyzed effects. Ignoring difficult terrain is not modeled.
+  // "Difficult Terrain doesn't cost you extra movement": the Freedom of Movement tag the movement rules read. Magic
+  // neither reducing its Speeds nor Paralyzing or Restraining its wearer wait on a magical-source immunity, which an
+  // absolute one would overreach (a net would no longer restrain).
+  "ring-of-free-action": {
+    effects: [
+      {
+        name: "Free Action",
+        tags: ["freedom-of-movement"],
+        duration: { type: "manual" },
+        modifiers: [],
+        onEnd: [],
+        voidWhileIncapacitated: false,
+        concentration: false
+      }
+    ]
+  },
 
   // "You can take a Magic action to give yourself the Invisible condition. You remain Invisible until the ring is
   // removed or until you take a Bonus Action to become visible again": its wearer ends it from the sheet.
@@ -1148,8 +1207,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `ring-of-spell-storing` - needs per-copy storage and the original caster's numbers.
-  // "You have Advantage on saving throws against spells." Turning a spell back on its caster is the GM's.
+  // "You have Advantage on saving throws against spells", and a success against a spell of level 7 or lower leaves it
+  // no effect on the wearer. Turning a spell back on its caster is the GM's.
   "ring-of-spell-turning": {
+    savesNegateSpells: { maxLevel: 7 },
     modifiers: [
       {
         type: "roll-mode",
@@ -1165,10 +1226,28 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "While wearing this ring, you can cast Telekinesis from it." At will, no charges, no DC override. */
   "ring-of-telekinesis": { casts: [{ spellId: "telekinesis" }] },
 
-  // `ring-of-the-ram` - a flat +7 attack bonus and per-charge damage are not expressible.
-  /** "you can expend 1 of its 3 charges to cast Wish from it": three Wishes in all, which never come back. The ring
-   *  becoming nonmagical at the last is the GM's. */
+  // One action for each number of charges spent: a ranged spell attack at +7 against a creature it sees within 60 feet,
+  // 2d10 Force and a 5-foot push for each charge. 3 charges, 1d3 back at dawn. Breaking an object with its Strength
+  // check is the GM's.
+  "ring-of-the-ram": {
+    charges: { regain: "1d3" },
+    actions: ([1, 2, 3] as const).map((spent) => ({
+      id: `ram-${spent}`,
+      name: `Ram (${spent} charge${spent === 1 ? "" : "s"})`,
+      activation: "action" as const,
+      description: `Expend ${spent} charge${spent === 1 ? "" : "s"}: a spectral ram's head makes a ranged spell attack with a +7 bonus against one creature you can see within 60 feet. On a hit, it takes ${2 * spent}d10 Force damage and is pushed ${5 * spent} feet away from you.`,
+      attack: { ability: "spellcasting" as const, bonus: 7, rangeFeet: 60 },
+      damage: [{ formula: `${2 * spent}d10`, type: "force" as const }],
+      onHitPush: { feet: 5 * spent },
+      targets: { count: 1, rangeFeet: 60, seen: true as const },
+      uses: { limit: 3, per: "long-rest" as const, pool: "ring-of-the-ram-charges" },
+      ...(spent > 1 ? { useCost: spent } : {})
+    }))
+  },
+  /** "you can expend 1 of its 3 charges to cast Wish from it": three Wishes in all, which never come back, and "the
+   *  ring becomes nonmagical when you use the last charge". */
   "ring-of-three-wishes": {
+    charges: { lastCharge: "nonmagical" },
     casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "ring-of-three-wishes-charges" } }]
   },
 
@@ -1251,8 +1330,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // A +3 Mace, Drain Life and Paralyze on its melee hits, and Terrify. Its buttons are forms its holder picks with a
   // Bonus Action: a flaming Longsword or Shortsword (2d6 Fire, its light, no +3), a +3 Battleaxe or Spear, a climbing
   // pole or a battering ram (+10 to Strength (Athletics) checks to break through barriers); its own form is the Mace.
-  // Not modeled: the pole's length and weight, and the north and depth it tells (button 6). Drain Life's healing is
-  // said with the hit.
+  // Drain Life heals its wielder half the Necrotic damage a failed save deals. The pole's length and weight, and the
+  // north and depth it tells (button 6), are the table's.
   "rod-of-lordly-might": {
     variantChoice: { by: "holder", activation: "bonus-action" },
     variants: [
@@ -1369,11 +1448,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "When you hit a creature with a melee attack using the rod, force it to make a DC 17 Constitution saving throw. On a failed save, it takes an extra 4d6 Necrotic damage, and you regain Hit Points equal to half that damage.",
         save: { ability: "con", dc: 17, successDamage: "none", failureConditions: [] },
         damage: [{ formula: "4d6", type: "necrotic" }],
+        drain: { heals: "half", failedSaveOnly: true },
         uses: { limit: 1, per: "long-rest" },
-        ridesHit: {
-          rides: "melee-this-weapon",
-          reminder: "On a failed save you regain Hit Points equal to half the Necrotic damage it takes."
-        }
+        ridesHit: { rides: "melee-this-weapon" }
       },
       {
         id: "paralyze",
@@ -1534,8 +1611,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /**
    * The +2 Quarterstaff, the AC, save and spell attack bonuses, and the spells at their printed charge costs on 20
-   * charges; a 20 on the last charge's d20 gives back 1d8 + 2, and a 1 (keeping only the +2 to attack and damage) is
-   * the GM's. Not authored: Retributive Strike (damage from the live charge count).
+   * charges; a 20 on the last charge's d20 gives back 1d8 + 2, and a 1 leaves a +2 Quarterstaff with no other magic.
+   * Retributive Strike, whose damage counts the charges left and whose breaker may travel to another plane, is the
+   * GM's.
    */
   "staff-of-power": {
     modifiers: [
@@ -1545,7 +1623,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { type: "save-bonus", amount: 2 },
       { type: "spell-attack-bonus", amount: 2 }
     ],
-    charges: { regain: "2d8 + 4", lastChargeRoll: true, lastChargeTwenty: "1d8 + 2" },
+    charges: {
+      regain: "2d8 + 4",
+      lastChargeRoll: true,
+      lastChargeTwenty: "1d8 + 2",
+      lastCharge: { becomes: "weapon-2", baseId: "quarterstaff" }
+    },
     casts: [
       { spellId: "cone-of-cold", useCost: 5, uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" } },
       {
@@ -1574,9 +1657,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // A +3 Quarterstaff whose melee hit can spend 1, 2 or 3 charges for 1d6 Force each: one rider per count on the one
-  // pool, of which a hit takes one.
+  // pool, of which a hit takes one. A 1 on the last charge's d20 leaves a nonmagical Quarterstaff.
   "staff-of-striking": {
-    charges: { regain: "1d6 + 4", lastChargeRoll: true },
+    charges: { regain: "1d6 + 4", lastChargeRoll: true, lastCharge: { becomes: "quarterstaff" } },
     modifiers: [
       { type: "attack-bonus", amount: 3 },
       { type: "damage-bonus", amount: 3 }
@@ -1667,8 +1750,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Thrown within 10 feet, it becomes a Giant Constrictor Snake that shares its user's Initiative and acts right after,
-  // commanded within 60 feet, defending itself otherwise; a Bonus Action turns it back into the staff. The hour before
-  // it can be used again, and the staff shattering when the snake dies, are the table's.
+  // commanded within 60 feet, defending itself otherwise; a Bonus Action turns it back into the staff, which then
+  // can't be used for an hour. If the snake dies, the staff shatters.
   "staff-of-the-python": {
     actions: [
       {
@@ -1676,13 +1759,16 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Throw the Staff",
         activation: "action",
         description:
-          "Throw the staff so that it lands in an unoccupied space within 10 feet, where it becomes a Giant Constrictor Snake under your control. It shares your Initiative count and takes its turn immediately after yours. You command it while it is within 60 feet of you; absent commands, it defends itself. A Bonus Action turns it back into the staff.",
+          "Throw the staff so that it lands in an unoccupied space within 10 feet, where it becomes a Giant Constrictor Snake under your control. It shares your Initiative count and takes its turn immediately after yours. You command it while it is within 60 feet of you; absent commands, it defends itself. A Bonus Action turns it back into the staff, which can't be used again for 1 hour. If the snake drops to 0 Hit Points, it dies and the staff shatters.",
+        uses: { limit: 1, per: "time", afterHours: "1" },
         summons: {
           creatures: [{ monsterId: "giant-constrictor-snake" }],
           rangeFeet: 10,
           commandFeet: 60,
           dodgesUncommanded: true,
-          dismiss: "bonus-action"
+          dismiss: "bonus-action",
+          waitsFromEnd: true,
+          itemEndsAtZero: "destroyed"
         }
       }
     ]
@@ -1795,6 +1881,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "A bolt of lightning leaps from the staff's tip in a Line 5 feet wide and 120 feet long. Each creature in that Line makes a DC 17 Dexterity saving throw, taking 9d6 Lightning damage on a failed save or half as much damage on a successful one.",
+        area: { shape: "line", sizeFeet: 120, widthFeet: 5 },
         save: { ability: "dex", dc: 17, successDamage: "half", failureConditions: [] },
         damage: [{ formula: "9d6", type: "lightning" }],
         uses: { limit: 1, per: "long-rest" }
@@ -1819,8 +1906,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // A Quarterstaff whose hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save. The failure's hour of
-  // Disadvantage on Strength and Constitution checks and saves outlasts a fight, so it lasts until the GM ends it.
+  // A Quarterstaff whose hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save, a failure leaving an
+  // hour of Disadvantage on Strength and Constitution checks and saves.
   "staff-of-withering": {
     charges: { regain: "1d3" },
     actions: [
@@ -1844,6 +1931,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
                 ability: "con",
                 failureEffect: {
                   name: "Withered",
+                  duration: { type: "minutes", minutes: 60 },
                   modifiers: [
                     {
                       type: "roll-mode",
@@ -1888,9 +1976,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The detection is GM information; the charge is real.
+  // The detection is GM information; the charge is real, and a 1 on the last charge's d20 crumbles the wand.
   "wand-of-enemy-detection": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
       {
         id: "detect-enemies",
@@ -1903,10 +1991,24 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Command at the wand's printed DC. Fear (3 charges) is multi-charge.
+  // Command (Flee or Grovel only) for 1 charge and Fear in a 60-foot Cone for 3, at the wand's printed DC 15.
   "wand-of-fear": {
     charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
-    casts: [{ spellId: "command", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" } }]
+    casts: [
+      {
+        spellId: "command",
+        saveDc: 15,
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" },
+        optionIds: ["flee", "grovel"]
+      },
+      {
+        spellId: "fear",
+        saveDc: 15,
+        useCost: 3,
+        area: { shape: "cone", sizeFeet: 60, widthFeet: null },
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" }
+      }
+    ]
   },
 
   /** Fireball at the printed DC 15 off a 7-charge pool: level 3 for 1 charge, one level higher for each charge after,
@@ -1954,9 +2056,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The wand's own effect.
+  // The wand's own effect; a 1 on the last charge's d20 crumbles the wand.
   "wand-of-paralysis": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
       {
         id: "paralyzing-ray",
@@ -1978,9 +2080,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  /** "expend 1 charge to cast Polymorph (save DC 15) from it." One charge, one spell, printed DC. Complete. */
+  /** "expend 1 charge to cast Polymorph (save DC 15) from it." One charge, one spell, printed DC; a 1 on the last
+   *  charge's d20 crumbles the wand. */
   "wand-of-polymorph": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     casts: [
       { spellId: "polymorph", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-polymorph-charges" } }
     ]
@@ -2012,9 +2115,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "web", saveDc: 13, uses: { limit: 7, per: "long-rest", pool: "wand-of-web-charges" } }]
   },
 
-  // The d100 effect table is GM-rolled; the charge is real.
+  // The d100 effect table is GM-rolled; the charge is real, and a 1 on the last charge's d20 crumbles the wand.
   "wand-of-wonder": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
       {
         id: "wild-surge",
@@ -2033,13 +2136,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   - Check advantage fires only on checks the server rolls with a matching narrow: Hide carries
   //     `{dex, stealth}`, while Search/Study/Influence carry only an ability. "Advantage on Dexterity
   //     (Stealth) checks" is authorable; qualified clauses ("that rely on sight") are not.
-  //   - `speed`, `darkvision` and `sense` reach nothing from an item (the overlay refuses them).
-  //   - A save cannot be narrowed to what it is against, so "Advantage on saves against spells" or
-  //     "to avoid the Poisoned condition" would apply to every save.
-  //   - No `per` value means "never recharges", so consumable charges (beads, crumbling scarabs,
-  //     talismans destroyed on the last charge) cannot be authored.
-  //   - Spell records describe the spell's text as a whole (see the wands section), and there
-  //     is no healing in the spell model.
+  //   - Charges that never come back are `per: "never"`, and the last one ends the item as `charges.lastCharge`
+  //     says (a scarab crumbles, a talisman is destroyed).
   //   - `spell-save-dc` raises every save-bearing action on the sheet, including other items' printed
   //     DCs as well as the wearer's spell save DC.
   //   - `ability-score` and `hit-points-per-level` are refused on items.
@@ -2100,8 +2198,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "You can cast Levitate on yourself at will": the levitation lands on the wearer with no save to make against its
-  // own boots, and the movement rules raise it 20 feet and let it move only as if climbing (`falling.ts`). It lasts
-  // the spell's 10 minutes; ending it sooner (the spell's Concentration) is the wearer's, on the sheet.
+  // own boots, and the movement rules raise it 20 feet and let it move only as if climbing (`falling.ts`). It is the
+  // spell, so it lasts up to 10 minutes on the wearer's Concentration.
   "boots-of-levitation": {
     actions: [
       {
@@ -2109,19 +2207,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Levitate (Self)",
         activation: "action",
         description:
-          "Cast Levitate on yourself: you rise up to 20 feet and stay suspended, moving only by pushing or pulling along a surface as if climbing. You can move up or down as part of your move. When it ends, you float gently to the ground. End it on your sheet.",
+          "Cast Levitate on yourself: you rise up to 20 feet and stay suspended for up to 10 minutes while you keep Concentration, moving only by pushing or pulling along a surface as if climbing. You can move up or down as part of your move. When it ends, you float gently to the ground.",
         damage: [],
         grants: {
           name: "Levitate",
           tags: ["levitating"],
           duration: { type: "minutes", minutes: 10 },
-          modifiers: []
+          modifiers: [],
+          concentration: true
         }
       }
     ]
   },
-  // A Bonus Action clicks the heels: Speed doubled and Disadvantage on Opportunity Attacks against the wearer, for its 10
-  // minutes a Long Rest. Clicking again ends it, and the minutes left over are the GM's to count.
+  // A Bonus Action clicks the heels: Speed doubled and Disadvantage on Opportunity Attacks against the wearer. Its 10
+  // minutes a Long Rest are 100 rounds: a click lasts all that is left, and ending it early gives the rest back.
   "boots-of-speed": {
     actions: [
       {
@@ -2131,7 +2230,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         description:
           "The boots double your Speed, and any creature that makes an Opportunity Attack against you has Disadvantage on the attack roll. Click your heels again to end it. When you've used the boots for a total of 10 minutes, they cease to function for you until you finish a Long Rest.",
         damage: [],
-        uses: { limit: 1, per: "long-rest" },
+        uses: { limit: 100, per: "long-rest", pool: "boots-of-speed-rounds" },
+        timePool: "rounds",
         grants: {
           name: "Boots of Speed",
           tags: ["boots-of-speed"],
@@ -2320,8 +2420,32 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "Your Intelligence is 19 while you wear this headband", or no change from a higher one. */
   "headband-of-intellect": { modifiers: [{ type: "ability-score-minimum", ability: "int", score: 19 }] },
-  // `helm-of-brilliance` - auras, toggled fire damage, a resistance gated on gem count, gem-cost
-  //     spells and a random self-destruct; nothing is expressible.
+  // Its gems, each kind counted when the helm is added (1d10 diamonds, 2d10 rubies, 3d10 fire opals, 4d10 opals) and
+  // never coming back, and its spells at DC 18, each spending one gem of its kind. Diamond Light, Fire Opal Flames and
+  // Ruby Resistance while a gem of their kind is left, the helm losing its magic once every gem is gone, and the d20
+  // that destroys it when Fire from a spell lands are the GM's.
+  "helm-of-brilliance": {
+    charges: {
+      startingByPool: {
+        "helm-of-brilliance-diamonds": "1d10",
+        "helm-of-brilliance-rubies": "2d10",
+        "helm-of-brilliance-fire-opals": "3d10",
+        "helm-of-brilliance-opals": "4d10"
+      }
+    },
+    casts: (
+      [
+        ["daylight", "opals", 40],
+        ["fireball", "fire-opals", 30],
+        ["prismatic-spray", "diamonds", 10],
+        ["wall-of-fire", "rubies", 20]
+      ] as const
+    ).map(([spellId, gems, limit]) => ({
+      spellId,
+      saveDc: 18,
+      uses: { limit, per: "never" as const, pool: `helm-of-brilliance-${gems}` }
+    }))
+  },
 
   // Unlimited cast, as printed. (Compare the belt's Dwarvish: a cast reaches the action list, a language grant does not.)
   "helm-of-comprehending-languages": { casts: [{ spellId: "comprehend-languages" }] },
@@ -2353,7 +2477,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "amulet-of-proof-against-detection-and-location": {
     modifiers: [{ type: "spell-ward", schools: ["divination"], alliesAllowed: true }]
   },
-  // `amulet-of-the-planes` - a cast gated on an Arcana check with a d100 failure table.
+  // Plane Shift after a DC 15 Intelligence (Arcana) check. On a failure the wearer and everything within 15 feet go
+  // to a random destination: the d100 table and the journey are the GM's.
+  "amulet-of-the-planes": {
+    casts: [{ spellId: "plane-shift", check: { ability: "int", skill: "arcana", dc: 15 } }]
+  },
 
   // Immunity to Magic Missile damage only (not all Force) is not expressible.
   "brooch-of-shielding": { grants: { damageResistances: ["force"] } },
@@ -2371,13 +2499,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // "Advantage on saving throws made to avoid or end the Poisoned condition"; breathing anywhere is the GM's.
   "necklace-of-adaptation": { modifiers: [poisonedSaves()] },
-  /** 1d6 + 3 beads rolled when the necklace is added, each a level 3 Fireball (DC 15) that never comes back. Hurling
-   *  several beads at once for more damage is the GM's. */
+  /** 1d6 + 3 beads rolled when the necklace is added, each a level 3 Fireball (DC 15) that never comes back. Several
+   *  hurled at once add 1d6 each to 12d6, which is Fireball's own 1d6 a level: five beads cast it at level 7. */
   "necklace-of-fireballs": {
     charges: { starting: "1d6 + 3", lastCharge: "destroyed" },
-    casts: [{ spellId: "fireball", saveDc: 15, uses: { limit: 9, per: "never", pool: "necklace-of-fireballs-beads" } }]
+    casts: [
+      {
+        spellId: "fireball",
+        saveDc: 15,
+        chargesRaiseLevel: 5,
+        uses: { limit: 9, per: "never", pool: "necklace-of-fireballs-beads" }
+      }
+    ]
   },
-  // `necklace-of-prayer-beads` - the bead composition is per copy, and Cure Wounds has no healing.
+  // `necklace-of-prayer-beads` - the GM picks each bead's kind per copy, and a row holds no count for each kind.
   // A Magic action regains 2d4 + 2 Hit Points once a dawn, and saves to avoid or end Poisoned have Advantage.
   "periapt-of-health": {
     modifiers: [poisonedSaves()],
@@ -2447,10 +2582,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The +2 to spell attack rolls. The touch damage by creature type and the charges that destroy a creature are not
-  // authored.
-  "talisman-of-pure-good": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
-  "talisman-of-ultimate-evil": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
+  // A Holy Symbol for its bearer's spells, with +2 to spell attack rolls. Its rebuke spends one of its charges, which
+  // never come back, and the last destroys it; the rebuke's save (Disadvantage for some creature types, a failure
+  // destroying the target, a success dealing 4d6 Psychic) and the damage the talisman deals to the creatures it
+  // repels are the GM's.
+  "talisman-of-pure-good": talisman(
+    "Pure Rebuke",
+    7,
+    "If the target is a Fiend or an Undead, it has Disadvantage on the save."
+  ),
+  "talisman-of-ultimate-evil": talisman(
+    "Ultimate End",
+    6,
+    "If the target is a Celestial, it has Disadvantage on the save."
+  ),
   // `talisman-of-the-sphere` - Arcana advantage only against a Sphere of Annihilation, which the engine does not hold.
 
   // ---- Shoulders -------------------------------------------------------------------------------
@@ -2554,9 +2699,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * A real DC 15 Wisdom save that Stuns until the end of the wearer's next turn, at creatures within 30 feet, and the
-   * robe's light and the Disadvantage of attackers that can see the wearer until the end of its next turn. Not modeled:
-   * the save only for those in the Bright Light that see it.
+   * A DC 15 Wisdom save that Stuns until the end of the wearer's next turn, made by each creature within the robe's 30
+   * feet of Bright Light that can see its wearer, and the robe's light and the Disadvantage of attackers that can see
+   * the wearer until the end of its next turn.
    */
   "robe-of-scintillating-colors": {
     charges: { regain: "1d3" },
@@ -2576,6 +2721,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         },
         uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" },
         targets: { rangeFeet: 30 },
+        sight: { seenBy: "user" },
         grants: {
           name: "Scintillating Colors",
           tags: ["scintillating-colors"],
@@ -2620,7 +2766,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `robe-of-useful-items` - per-copy patches that become objects and creatures.
+  // `robe-of-useful-items` - per-copy patches, picked or rolled on a d100 table, that become objects and creatures.
 
   // The wings last up to an hour and then can't be used for 1d12 hours, so the wait runs 1d12 + 1 hours from the
   // use. Ending them early doesn't start the wait sooner. Falling when they disappear is the GM's.
@@ -2646,31 +2792,55 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ==== Carried wondrous items (slot wondrous), potions and oils ==================================
   //
-  // Recurring limits:
-  //   - A consumed item is `consumedOnUse`: each use of its actions takes one from the stack. An item with
-  //     several charges that it spends as it goes (beads, dust pinches) still has no `per` value to say so.
-  //   - `itemAction` keeps `attack`, `save`, `damage`, `healing`, `uses`, `grants`, `area` and
-  //     `replacesAttack`; `onHit` and the rest are dropped, so an item action cannot apply an on-hit condition.
-  //   - An item's `effects` ignore `duration`, so "Resistance for 1 hour" would be permanent.
-  //   - Spell records describe the spell's text as a whole (see the wands section), and there
-  //     is no temporary-HP rider.
-  //   - One use spends one charge, and pools are capped at 20.
+  // How these read:
+  //   - A consumed item is `consumedOnUse`: each use of its actions takes one from the stack. What an item spends as it
+  //     goes (beads, pinches) is a pool that never comes back (`per: "never"`), counted from `charges.starting` when
+  //     the copy is added.
   //   - `ability-score` is refused on items.
-  //   - Item actions only resolve inside an encounter. Outside one, the loose route rolls them and spends the
-  //     charge, as `action.use` says.
+  //   - Outside a fight, an item action that rolls against creatures and names none goes the loose route, which
+  //     rolls it and spends the charge, as `action.use` says.
   //
   // A charged item may be authored for its charge alone (count and recharge exact) when the GM can
   // already produce what the charge buys: the elemental summons, `bag-of-tricks`, `gem-of-seeing`,
   // `pipes-of-the-sewers`, `cubic-gate` and `iron-bands`. Not when the sheet would then be wrong
   // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a Long Rest.
   //
-  // Trap items (`bag-of-devouring`, `potion-of-poison`, `dust-of-sneezing-and-choking`) are not
-  // authored: a button naming the real effect would spoil the trap.
+  // Trap items (`bag-of-devouring`, `dust-of-sneezing-and-choking`) are not authored: a button naming the real effect
+  // would spoil the trap. A Potion of Poison is the GM's to name.
 
   // ---- Carried wondrous items (alphabetical, absences inline) ----------------------------------
 
   // `apparatus-of-the-crab`: a vehicle, outside the rider model.
-  // `bag-of-beans` - a GM-rolled table (temp HP and an ability score among its rows).
+  // 3d4 beans when found, which never come back; with none left the bag is a plain one. Dumped beans explode in a
+  // 10-foot-radius Sphere (DC 15 Dexterity, 5d4 Force, half on a success), the dumper included. A planted bean's
+  // d100 table is the GM's.
+  "bag-of-beans": {
+    charges: { starting: "3d4", lastCharge: "nonmagical" },
+    actions: [
+      {
+        id: "dump",
+        name: "Dump Beans",
+        activation: "action",
+        description:
+          "Dump one or more beans out of the bag: they explode in a 10-foot-radius Sphere centered on them and are destroyed. Each creature in the Sphere, including you, makes a DC 15 Dexterity saving throw, taking 5d4 Force damage on a failure or half as much on a success.",
+        damage: [{ formula: "5d4", type: "force" }],
+        area: { shape: "sphere", sizeFeet: 10, widthFeet: null },
+        targets: { rangeFeet: 5 },
+        save: { ability: "dex", dc: 15, successDamage: "half" },
+        uses: { limit: 12, per: "never", pool: "bag-of-beans-beans" },
+        useCost: "chosen"
+      },
+      {
+        id: "plant",
+        name: "Plant a Bean",
+        activation: "action",
+        description:
+          "Remove a bean, plant it in dirt or sand and water it: 1 minute later it produces an effect from where it was planted, which the GM picks or rolls on the bag's d100 table.",
+        damage: [],
+        uses: { limit: 12, per: "never", pool: "bag-of-beans-beans" }
+      }
+    ]
+  },
   // `bag-of-devouring` - a trap with a percentage pull and instant death.
   // `bag-of-holding` - no capacity/container model (also `handy-haversack`, `efficient-quiver`, `portable-hole`).
 
@@ -2846,9 +3016,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "It hovers beneath you and can be ridden in the air. It has a Fly Speed of 50 feet"; 30 feet carrying over 200
-  // pounds, which carried weight doesn't track. The carpet's speed depends on its size, so it stays the GM's, and so do
-  // the horseshoes.
+  // "It hovers beneath you and can be ridden in the air. It has a Fly Speed of 50 feet", and "The broom stops hovering
+  // when you land": a flight that ends once its rider comes down to the ground. Its 30 feet carrying over 200 pounds
+  // needs its rider's body weight, which no sheet records.
   "broom-of-flying": {
     actions: [
       {
@@ -2856,11 +3026,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Ride the Broom",
         activation: "action",
         description:
-          "Stand astride the broom and speak its command word: it hovers beneath you with a Fly Speed of 50 feet (30 feet while carrying over 200 pounds). It stops hovering when you land; end it on your sheet.",
+          "Stand astride the broom and speak its command word: it hovers beneath you with a Fly Speed of 50 feet (30 feet while carrying over 200 pounds). It stops hovering when you land or when you're no longer riding it.",
         damage: [],
         grants: {
           name: "Broom of Flying",
-          tags: ["broom-of-flying"],
+          tags: ["broom-of-flying", "ends-on-landing"],
           duration: { type: "manual" },
           modifiers: [{ type: "special-speed", movement: "fly", feet: 50, hover: true }]
         }
@@ -2868,9 +3038,54 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Its light: "the candle sheds Dim Light in a 30-foot radius" for its 4 hours of burning. Not modeled: Advantage on
-  // D20 Tests and slot-free level 1 spells within that light, and the Gate it can open.
-  "candle-of-invocation": { light: { brightFeet: 0, dimFeet: 30, burnHours: 4 } },
+  // The GM says which of the four sizes a carpet is. A Magic action makes it hover and fly at its size's Fly Speed with
+  // its riders aboard, and its flight ends when it lands. Its weight limits, and steering it from 30 feet away, are the
+  // GM's.
+  "carpet-of-flying": {
+    variants: (
+      [
+        ["3x5", "3 ft. by 5 ft.", 80, 200],
+        ["4x6", "4 ft. by 6 ft.", 60, 400],
+        ["5x7", "5 ft. by 7 ft.", 40, 600],
+        ["6x9", "6 ft. by 9 ft.", 30, 800]
+      ] as const
+    ).map(([id, size, feet, pounds]) => ({
+      id,
+      name: `${size} (Fly Speed ${feet} feet)`,
+      actions: [
+        {
+          id: `fly-${id}`,
+          name: "Fly the Carpet",
+          activation: "action" as const,
+          description: `Speak the carpet's command word: it hovers and flies with you aboard, at a Fly Speed of ${feet} feet, moving as you direct while you are within 30 feet of it. It carries up to ${pounds} pounds at that speed, and up to twice that at half the speed. It stops flying when it lands.`,
+          damage: [],
+          grants: {
+            name: "Carpet of Flying",
+            tags: ["carpet-of-flying", "ends-on-landing"],
+            duration: { type: "manual" as const },
+            modifiers: [{ type: "special-speed" as const, movement: "fly" as const, feet, hover: true as const }]
+          }
+        }
+      ]
+    })),
+    variantChoice: { by: "gm" }
+  },
+
+  // Its light: "the candle sheds Dim Light in a 30-foot radius" for its 4 hours of burning, and while it burns its
+  // attuned bearer has Advantage on D20 Tests. It can cast Gate once, which destroys it. Whether an alignment matches
+  // the candle's, others in its light, the slot-free level 1 spells, Gate only at the first lighting, and the minutes
+  // a snuffed candle has left are the GM's.
+  "candle-of-invocation": {
+    light: { brightFeet: 0, dimFeet: 30, burnHours: 4, ridersWhileLit: true },
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "advantage", when: [{ type: "on-attack-roll" }] },
+      { type: "roll-mode", roll: "save", mode: "advantage", when: [{ type: "on-saving-throw" }] },
+      { type: "roll-mode", roll: "check", mode: "advantage", when: [{ type: "on-ability-check" }] },
+      { type: "roll-mode", roll: "initiative", mode: "advantage" }
+    ],
+    charges: { lastCharge: "destroyed" },
+    casts: [{ spellId: "gate", uses: { limit: 1, per: "never", pool: "candle-of-invocation-gate" } }]
+  },
 
   // One of the four elemental-commanding items; see the bowl.
   "censer-of-controlling-air-elementals": {
@@ -2903,21 +3118,26 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * loadout raises this, since that rider applies to every save-bearing action. The sensor and the
    * save-modifier table stay prose.
    *
-   * The Mind Reading and Telepathy orbs' second spells are cast through an active Scrying's sensor;
-   * nothing can gate a cast on another cast or a target on a sensor, so they are not authored.
+   * The Mind Reading and Telepathy orbs cast their second spell through the Scrying their holder concentrates on: no
+   * Concentration of its own, ending with the Scrying. Which creatures stand within 30 feet of the sensor is the GM's.
    */
   "crystal-ball": {
     casts: [{ spellId: "scrying", saveDc: 17 }]
   },
 
-  // Not modeled: Detect Thoughts through the sensor, and waiving its Concentration.
   "crystal-ball-of-mind-reading": {
-    casts: [{ spellId: "scrying", saveDc: 17 }]
+    casts: [
+      { spellId: "scrying", saveDc: 17 },
+      { spellId: "detect-thoughts", saveDc: 17, through: "scrying" }
+    ]
   },
 
-  // Not modeled: Suggestion through the sensor, and telepathy near the sensor.
+  // Suggestion through the sensor once a dawn. Speaking telepathically with creatures near the sensor is the GM's.
   "crystal-ball-of-telepathy": {
-    casts: [{ spellId: "scrying", saveDc: 17 }]
+    casts: [
+      { spellId: "scrying", saveDc: 17 },
+      { spellId: "suggestion", saveDc: 17, through: "scrying", uses: { limit: 1, per: "long-rest" } }
+    ]
   },
 
   // Truesight around the sensor is not modeled.
@@ -2925,12 +3145,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "scrying", saveDc: 17 }]
   },
 
-  /** Five faces at their printed charge costs and DC 17, on 10 charges that regain 1d6 at dawn. The Shield face is
-   *  the GM's: a Reaction spell from an item isn't offered on its trigger. */
+  /** Six faces at their printed charge costs and DC 17, on 10 charges that regain 1d6 at dawn. The Shield face is a
+   *  Reaction cast, offered when its holder is hit. */
   "cube-of-force": {
     charges: { regain: "1d6" },
     casts: [
       { spellId: "mage-armor", saveDc: 17, uses: { limit: 10, per: "long-rest", pool: "cube-of-force-charges" } },
+      { spellId: "shield", saveDc: 17, uses: { limit: 10, per: "long-rest", pool: "cube-of-force-charges" } },
       {
         spellId: "tiny-hut",
         saveDc: 17,
@@ -2985,7 +3206,40 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `deck-of-illusions` - illusions and card state are not modeled.
   // `dimensional-shackles` - prevents extradimensional movement, which is not modeled.
-  // `dragon-orb` - multi-charge spells, a healing cast, a self-charm on attunement and a curse.
+  // Its spells at their printed charge costs on 7 charges (1d4 + 3 back at dawn), Detect Magic at no cost, Scrying at
+  // DC 18, and Call Dragons once an hour. Peering into it (the DC 15 Charisma save, the orb's Charm and its Suggestion
+  // while attuned), the spells being usable only by one who controls it, and its AC 20 are the GM's.
+  "dragon-orb": {
+    charges: { regain: "1d4 + 3" },
+    casts: [
+      {
+        spellId: "cure-wounds",
+        atLevel: 9,
+        useCost: 4,
+        uses: { limit: 7, per: "long-rest", pool: "dragon-orb-charges" }
+      },
+      { spellId: "daylight", uses: { limit: 7, per: "long-rest", pool: "dragon-orb-charges" } },
+      { spellId: "death-ward", useCost: 2, uses: { limit: 7, per: "long-rest", pool: "dragon-orb-charges" } },
+      { spellId: "detect-magic" },
+      {
+        spellId: "scrying",
+        saveDc: 18,
+        useCost: 3,
+        uses: { limit: 7, per: "long-rest", pool: "dragon-orb-charges" }
+      }
+    ],
+    actions: [
+      {
+        id: "call-dragons",
+        name: "Call Dragons",
+        activation: "action",
+        description:
+          "While you control the orb, it issues a telepathic call for 40 miles in every direction. Chromatic dragons in range feel compelled to come to the orb as soon as possible by the most direct route, and might be Hostile toward you for compelling them. It can't be used again for 1 hour.",
+        damage: [],
+        uses: { limit: 1, per: "time", afterHours: "1" }
+      }
+    ]
+  },
 
   // `dust-of-disappearance` - single use, rolled duration, area effect.
   // 1d6 + 4 pinches. A pinch on an Elemental of water within 5 feet: DC 13 Constitution, 10d6 Necrotic, half on a
@@ -3032,23 +3286,56 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
   // `efficient-quiver` - a container.
-  // Opened, an Efreeti appears within 30 feet and the server rolls the d10: on a 1 it attacks its user and leaves after 5
-  // rounds; on 2 to 9 it obeys for 1 hour; on a 10 it grants a Wish (the GM's) and leaves within the hour. That the
-  // first roll sets every later opening, the 24 hours between openings and the bottle losing its magic are the
-  // table's.
+  // Opened the first time, an Efreeti appears within 30 feet and the server rolls the d10, which settles the bottle for
+  // good: on a 1 it attacks its user and leaves after 5 rounds, and on a 10 it grants a Wish (the GM's) and leaves
+  // within the hour, the bottle's magic gone either way; on 2 to 9 it obeys for 1 hour, and the bottle holds a servant
+  // from then on. The servant comes twice more, each opening 24 hours after it returns, and then the bottle is spent.
   "efreeti-bottle": {
+    charges: { lastCharge: "nonmagical" },
+    variantChoice: { by: "gm" },
+    variants: [
+      { id: "unopened", name: "Never opened" },
+      {
+        id: "servant",
+        name: "Bottled servant",
+        suspendsActions: true,
+        actions: [
+          {
+            id: "open-servant",
+            name: "Open the Bottle",
+            activation: "action",
+            description:
+              "Remove the stopper: the Efreeti appears in an unoccupied space within 30 feet, understands your languages and obeys your commands for 1 hour, then returns to the bottle. The stopper can't be removed again for 24 hours. It comes twice more after the first opening; the fourth time it escapes and the bottle loses its magic.",
+            uses: { limit: 1, per: "time", afterHours: "24" },
+            alsoUses: { limit: 2, per: "never" },
+            summons: {
+              creatures: [{ monsterId: "efreeti" }],
+              rangeFeet: 30,
+              lasts: { type: "minutes", minutes: 60 },
+              waitsFromEnd: true
+            }
+          }
+        ]
+      }
+    ],
     actions: [
       {
         id: "open",
         name: "Open the Bottle",
         activation: "action",
         description:
-          "Remove the stopper: an Efreeti appears in an unoccupied space within 30 feet, and the d10 says what it does. 1: it attacks you, and disappears after fighting for 5 rounds. 2-9: it understands your languages and obeys your commands for 1 hour. 10: it can cast Wish once for you, and disappears when it grants the wish or after 1 hour.",
+          "Remove the stopper: an Efreeti appears in an unoccupied space within 30 feet, and the d10 says what it does. 1: it attacks you, disappears after fighting for 5 rounds, and the bottle loses its magic. 2-9: it understands your languages and obeys your commands for 1 hour, then returns to the bottle, which holds it from then on. 10: it can cast Wish once for you, disappears when it grants the wish or after 1 hour, and the bottle loses its magic.",
         summons: {
           creatures: [
-            { monsterId: "efreeti", faces: { from: 1, to: 1 }, allegiance: "hostile", rounds: 5 },
-            { monsterId: "efreeti", faces: { from: 2, to: 9 } },
-            { monsterId: "efreeti", faces: { from: 10, to: 10 } }
+            {
+              monsterId: "efreeti",
+              faces: { from: 1, to: 1 },
+              allegiance: "hostile",
+              rounds: 5,
+              itemBecomes: "nonmagical"
+            },
+            { monsterId: "efreeti", faces: { from: 2, to: 9 }, itemBecomes: { variantId: "servant" } },
+            { monsterId: "efreeti", faces: { from: 10, to: 10 }, itemBecomes: "nonmagical" }
           ],
           die: 10,
           rangeFeet: 30,
@@ -3188,12 +3475,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { id: "whip", name: "Whip" }
     ]
   },
-  // One action for each figurine (the Ivory Goats' three in one, picked by goat): thrown within 60 feet, it becomes its
-  // creature for its time, on its user's side and acting right after its user, defending itself when uncommanded; a
-  // Magic action turns it back, and then the figurine waits its days. The Ivory Goats' waits (one action for three
-  // goats with three waits), the Goat of Traveling's hourly charges, the Goat of Terror's fear and horns, the Onyx Dog's
-  // Blindsight and speech, the Obsidian Steed ignoring orders, and the Silver Raven (an item holds eight actions) are
-  // the table's.
+  // One action for each figurine (each lion and each goat its own): thrown within 60 feet, it becomes its creature for
+  // its time, on its user's side and acting right after its user, defending itself when uncommanded; a Magic action
+  // turns it back, and its days of waiting start when it reverts. The Goat of Traveling spends its 24 hourly charges as
+  // it goes and waits its 7 days only once they are spent. The Obsidian Steed's d10 shows 1 one time in ten, and the
+  // nightmare then answers to no one. The Goat of Terror's horns and fear, the Onyx Dog's speech, the steed's ride to
+  // Hades and the owl's telepathy are the table's.
   "figurine-of-wondrous-power": {
     variants: [
       {
@@ -3205,14 +3492,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Bronze Griffon",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Griffon for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Griffon for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 5 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "120" },
             summons: {
               creatures: [{ monsterId: "griffon" }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 360 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3226,14 +3514,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Ebony Fly",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Fly for up to 12 hours, which can be ridden as a mount. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Fly for up to 12 hours, which can be ridden as a mount. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 2 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "48" },
             summons: {
               creatures: [{ monsterId: "giant-fly" }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 720 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3241,44 +3530,71 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         id: "golden-lions",
         name: "Golden Lions",
-        actions: [
-          {
-            id: "golden-lions",
-            name: "Throw the Golden Lions",
-            activation: "action",
-            description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour, one for each figurine of the pair thrown. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-            uses: { limit: 1, per: "time", afterHours: "168" },
-            summons: {
-              creatures: [{ monsterId: "lion", count: 2 }],
-              rangeFeet: 60,
-              lasts: { type: "minutes", minutes: 60 },
-              dodgesUncommanded: true,
-              dismiss: "action"
-            }
+        actions: (["first", "second"] as const).map((lion) => ({
+          id: `golden-lion-${lion}`,
+          name: `Throw the ${lion === "first" ? "First" : "Second"} Golden Lion`,
+          activation: "action" as const,
+          description:
+            "Throw one figurine of the pair to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, that lion can't be used again until 7 days have passed.",
+          uses: { limit: 1, per: "time" as const, afterHours: "168", pool: `golden-lion-${lion}` },
+          summons: {
+            creatures: [{ monsterId: "lion" }],
+            rangeFeet: 60,
+            lasts: { type: "minutes" as const, minutes: 60 },
+            dodgesUncommanded: true as const,
+            dismiss: "action" as const,
+            waitsFromEnd: true as const
           }
-        ]
+        }))
       },
       {
         id: "ivory-goats",
         name: "Ivory Goats",
         actions: [
           {
-            id: "ivory-goats",
-            name: "Throw the Ivory Goats",
+            id: "goat-of-terror",
+            name: "Throw the Goat of Terror",
             activation: "action",
-            description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes the goat it is: the Goat of Terror a Giant Goat that can't attack, the Goat of Travail a Giant Goat, the Goat of Traveling a Large goat with the statistics of a Riding Horse; each for up to 3 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+            description: `${GOAT_THROW} it becomes a Giant Goat for up to 3 hours, which can't attack. You can remove its horns as a Magic action: one becomes a +1 Lance and the other a +2 Longsword until it reverts. While you ride it, a Hostile creature that starts its turn within 30 feet of it makes a DC 15 Wisdom save or is Frightened. ${FIGURINE_OBEYS} Once it reverts, it can't be used again until 15 days have passed.`,
+            uses: { limit: 1, per: "time", afterHours: "360", pool: "goat-of-terror" },
             summons: {
-              creatures: [
-                { monsterId: "giant-goat", form: "terror", except: { name: "Goat of Terror" } },
-                { monsterId: "giant-goat", form: "travail", except: { name: "Goat of Travail" } },
-                { monsterId: "riding-horse", form: "traveling", except: { name: "Goat of Traveling" } }
-              ],
+              creatures: [{ monsterId: "giant-goat", except: { name: "Goat of Terror" } }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 180 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              noAttacks: true,
+              dismiss: "action",
+              waitsFromEnd: true
+            }
+          },
+          {
+            id: "goat-of-travail",
+            name: "Throw the Goat of Travail",
+            activation: "action",
+            description: `${GOAT_THROW} it becomes a Giant Goat for up to 3 hours. ${FIGURINE_OBEYS} Once it reverts, it can't be used again until 30 days have passed.`,
+            uses: { limit: 1, per: "time", afterHours: "720", pool: "goat-of-travail" },
+            summons: {
+              creatures: [{ monsterId: "giant-goat", except: { name: "Goat of Travail" } }],
+              rangeFeet: 60,
+              lasts: { type: "minutes", minutes: 180 },
+              dodgesUncommanded: true,
+              dismiss: "action",
+              waitsFromEnd: true
+            }
+          },
+          {
+            id: "goat-of-traveling",
+            name: "Throw the Goat of Traveling",
+            activation: "action",
+            description: `${GOAT_THROW} it becomes a Large goat with the statistics of a Riding Horse. It has 24 charges, and each hour or part of one it spends as a goat costs 1. While it has charges you can use it as often as you wish; when they run out it reverts, and it can't be used again until 7 days have passed, when it regains them all. ${FIGURINE_OBEYS}`,
+            uses: { limit: 24, per: "time", afterHours: "168", pool: "goat-of-traveling" },
+            timePool: "hours",
+            summons: {
+              creatures: [{ monsterId: "riding-horse", except: { name: "Goat of Traveling" } }],
+              rangeFeet: 60,
+              dodgesUncommanded: true,
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3292,14 +3608,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Marble Elephant",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes an Elephant for up to 24 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes an Elephant for up to 24 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 7 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "168" },
             summons: {
               creatures: [{ monsterId: "elephant" }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 1440 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3313,14 +3630,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Obsidian Steed",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Nightmare for up to 24 hours, which fights only to defend itself. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Nightmare for up to 24 hours, which fights only to defend itself. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Each time you use it, there is a 10 percent chance it ignores your orders. Once it reverts, it can't be used again until 5 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "120" },
             summons: {
-              creatures: [{ monsterId: "nightmare" }],
+              creatures: [
+                { monsterId: "nightmare", faces: { from: 1, to: 1 }, allegiance: "none" },
+                { monsterId: "nightmare", faces: { from: 2, to: 10 } }
+              ],
+              die: 10,
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 1440 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3334,14 +3656,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Onyx Dog",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Mastiff with an Intelligence of 8 for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Mastiff for up to 6 hours, with an Intelligence of 8, Blindsight with a range of 60 feet, and the Common language. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 7 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "168" },
             summons: {
-              creatures: [{ monsterId: "mastiff", except: { abilityScores: { int: 8 } } }],
+              creatures: [
+                { monsterId: "mastiff", except: { abilityScores: { int: 8 }, senses: ["blindsight 60 ft."] } }
+              ],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 360 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3355,27 +3680,51 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Serpentine Owl",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Owl for up to 8 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Owl for up to 8 hours, which can speak with you telepathically at any range on the same plane. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 2 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "48" },
             summons: {
               creatures: [{ monsterId: "giant-owl" }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 480 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
       },
-      { id: "silver-raven", name: "Silver Raven" }
+      {
+        id: "silver-raven",
+        name: "Silver Raven",
+        actions: [
+          {
+            id: "silver-raven",
+            name: "Throw the Silver Raven",
+            activation: "action",
+            description:
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Raven for up to 12 hours, and while it is a raven you can cast Animal Messenger on it. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 2 days have passed.",
+            uses: { limit: 1, per: "time", afterHours: "48" },
+            summons: {
+              creatures: [{ monsterId: "raven" }],
+              rangeFeet: 60,
+              lasts: { type: "minutes", minutes: 720 },
+              dodgesUncommanded: true,
+              dismiss: "action",
+              waitsFromEnd: true
+            }
+          }
+        ],
+        casts: [{ spellId: "animal-messenger" }]
+      }
     ]
   },
   // `folding-boat` - a vehicle.
   // Its first command's light ("Bright Light in a 30-foot radius and Dim Light for an additional 30 feet"), lit and put
-  // out on the row, and its beam (1 charge) and flare (5) on 50 charges that never return. The gem turning
-  // nonmagical when they are gone is the GM's.
+  // out on the row, and its beam (1 charge) and flare (5) on 50 charges that never return. With the last spent it is
+  // a nonmagical jewel, whose light no longer lights.
   "gem-of-brightness": {
     light: { brightFeet: 30, dimFeet: 30 },
+    charges: { lastCharge: "nonmagical" },
     actions: [
       {
         id: "beam",
@@ -3439,8 +3788,30 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `handy-haversack` - a container.
   // `hat-of-many-spells` - a cast gated on an Arcana check outcome with a wild-magic table.
-  // `horn-of-blasting` - authorable except its 20% chance to explode and damage the user; authoring
-  //     only the blast would make it strictly better than printed.
+  // A blast in a 30-foot Cone: DC 15 Constitution, 5d8 Thunder and Deafened for 1 minute on a failure, half on a
+  // success. Each use has a 20 percent chance of exploding the horn for 10d6 Force to its user. The glass and crystal
+  // it shatters are the GM's.
+  "horn-of-blasting": {
+    breaks: { percent: 20, damage: { formula: "10d6", type: "force" } },
+    actions: [
+      {
+        id: "blast",
+        name: "Blow the Horn",
+        activation: "action",
+        description:
+          "Blow the horn: a thunderous blast in a 30-foot Cone, audible out to 600 feet. Each creature in the Cone makes a DC 15 Constitution saving throw, taking 5d8 Thunder damage and having the Deafened condition for 1 minute on a failure, or half as much damage only on a success. Glass or crystal objects in the Cone that aren't worn or carried take 10d8 Thunder damage. Each use has a 20 percent chance of causing the horn to explode, dealing 10d6 Force damage to you and destroying it.",
+        damage: [{ formula: "5d8", type: "thunder" }],
+        area: { shape: "cone", sizeFeet: 30, widthFeet: null },
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "half",
+          failureConditions: ["deafened"],
+          failureDuration: { type: "rounds", rounds: 10 }
+        }
+      }
+    ]
+  },
   // One action for each metal: its number of Berserkers within 60 feet for 1 hour, obeying the user who meets the
   // horn's requirement (checked on the sheet) and attacking one who doesn't, immune to Charmed and Frightened; then 7
   // days before it sounds again.
@@ -3535,7 +3906,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // `horseshoes-of-a-zephyr` - movement and travel are not modeled.
+  // All four worn by a horse (its own token, as the Horseshoes of Speed): it "ignores Difficult Terrain". Floating over
+  // water or lava waits on water areas on the map; leaving no tracks and the 12 hours of travel are overland travel.
+  "horseshoes-of-a-zephyr": {
+    effects: [
+      {
+        name: "Horseshoes of a Zephyr",
+        tags: ["ignores-difficult-terrain"],
+        duration: { type: "manual" },
+        modifiers: [],
+        onEnd: [],
+        voidWhileIncapacitated: false,
+        concentration: false
+      }
+    ]
+  },
   // "While all four horseshoes are attached to the same creature, its Speed is increased by 30 feet": the horse carries
   // them, worn, on its own token.
   "horseshoes-of-speed": { modifiers: [{ type: "speed", amount: 30 }] },
@@ -3668,7 +4053,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /**
    * Spends a charge and puts a real DC 15 Wisdom save on the target that Frightens on a failure for 1 minute,
-   * repeating the save at the end of each of its turns. Not modeled: the 24-hour immunity after a success.
+   * repeating the save at the end of each of its turns; a creature that succeeds is immune to the pipes after.
    */
   "pipes-of-haunting": {
     charges: { regain: "1d3" },
@@ -3685,7 +4070,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           successDamage: "none",
           failureConditions: ["frightened"],
           failureDuration: { type: "rounds", rounds: 10 },
-          repeatSave: true
+          repeatSave: true,
+          immuneOnSuccess: true
         },
         uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" },
         targets: { rangeFeet: 30 }
@@ -3786,8 +4172,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `universal-solvent` - consumed ounces.
-  // `well-of-many-worlds` - a rolled 1d8-hour cooldown and planar travel.
-  // `wind-fan` - each reuse risks tearing it; authoring the cast alone would remove the risk.
+
+  // Opening a portal starts its 1d8-hour wait on the game clock; where the portal leads is the GM's.
+  "well-of-many-worlds": {
+    actions: [
+      {
+        id: "open-portal",
+        name: "Open a Portal",
+        activation: "action",
+        description:
+          "Unfold the cloth on a solid surface: it forms a two-way, 6-foot-diameter, circular portal to another world or plane of existence, which the GM chooses. The portal stays open until a creature within 5 feet of it takes a Magic action to close it. Once it has opened a portal, the Well can't do so again for 1d8 hours.",
+        damage: [],
+        uses: { limit: 1, per: "time", afterHours: "1d8" }
+      }
+    ]
+  },
+  // Gust of Wind at DC 13. Each use after the first before the next dawn has a 20 percent chance more of failing, and a
+  // fan that fails tears to tatters: by its sixth use since a Long Rest it is sure to.
+  "wind-fan": {
+    casts: [{ spellId: "gust-of-wind", saveDc: 13, uses: { limit: 6, per: "long-rest", pool: "wind-fan-uses" } }],
+    breaks: { percent: 20, cumulative: true, failsUse: true }
+  },
 
   // ---- Potions -----------------------------------------------------------------------------------
 
@@ -3850,7 +4255,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "You gain the 'reduce' effect of the Enlarge/Reduce spell for 1d4 hours (no Concentration required)": one size
-  // smaller and Disadvantage on Strength checks and saves. Its 1d4 less weapon damage is the GM's.
+  // smaller, Disadvantage on Strength checks and saves, and 1d4 less weapon and Unarmed Strike damage, never below 1.
   "potion-of-diminution": {
     consumedOnUse: true,
     actions: [
@@ -3867,7 +4272,16 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           duration: { type: "manual" },
           hoursRolled: "1d4",
           sizeChange: { step: -1 },
-          modifiers: strengthRolls("disadvantage")
+          modifiers: [
+            ...strengthRolls("disadvantage"),
+            {
+              type: "damage-bonus",
+              amount: 0,
+              dice: "-1d4",
+              leavesOne: true,
+              when: [{ type: "on-damage-roll" }, { type: "attack-kind-is", kinds: ["weapon", "unarmed"] }]
+            }
+          ]
         }
       }
     ]
@@ -4061,6 +4475,61 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
+  // "You gain the effect of the Detect Thoughts spell (save DC 13) for 10 minutes (no Concentration required)": the
+  // drinker bears it for its 10 minutes, and the thoughts it reads are the GM's.
+  "potion-of-mind-reading": {
+    consumedOnUse: true,
+    actions: [
+      drink(
+        "Potion of Mind Reading",
+        "Drink it: you gain the effect of the Detect Thoughts spell (save DC 13) for 10 minutes, with no Concentration required.",
+        {
+          name: "Detect Thoughts (Potion of Mind Reading)",
+          tags: ["mind-reading"],
+          duration: { type: "rounds", rounds: 100 }
+        }
+      )
+    ]
+  },
+
+  // Applied over 10 minutes, Freedom of Movement's effect for 8 hours: a Swim Speed equal to its Speed, and no
+  // Paralyzed or Restrained. Pouring it as a Grease for 8 hours is the GM's, since a cast lasts the spell's minute.
+  "oil-of-slipperiness": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "apply",
+        name: "Apply Oil of Slipperiness",
+        activation: "other",
+        description:
+          "Spend 10 minutes covering one Medium or smaller creature, with what it wears and carries: it gains the effect of the Freedom of Movement spell for 8 hours. Poured on the ground as a Magic action instead, it duplicates the Grease spell there for 8 hours.",
+        damage: [],
+        targets: { count: 1, rangeFeet: 5 },
+        grants: {
+          name: "Freedom of Movement (Oil of Slipperiness)",
+          tags: ["freedom-of-movement"],
+          target: "target",
+          duration: { type: "minutes", minutes: 480 },
+          modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }],
+          conditionImmunities: ["paralyzed", "restrained"]
+        }
+      }
+    ]
+  },
+
+  // "You can breathe underwater for 24 hours after drinking this potion": the Water Breathing spell's tag, which the
+  // breath rules read.
+  "potion-of-water-breathing": {
+    consumedOnUse: true,
+    actions: [
+      drink("Potion of Water Breathing", "Drink it: you can breathe underwater for 24 hours.", {
+        name: "Potion of Water Breathing",
+        tags: ["water-breathing"],
+        duration: { type: "minutes", minutes: 1440 }
+      })
+    ]
+  },
+
   // "It removes any Exhaustion levels you have and ends the Poisoned condition on you." Its 24 hours of full Hit Point
   // Dice are the GM's.
   "potion-of-vitality": {
@@ -4159,6 +4628,27 @@ type ItemAction = NonNullable<ItemMechanics["actions"]>[number];
 type Grant = NonNullable<ItemAction["grants"]>;
 
 /** A potion drunk as a Bonus Action that puts its effect on its drinker. */
+/** A talisman of good or evil: a Holy Symbol with +2 to spell attack rolls, and its rebuke on charges that never come
+ *  back, the last destroying it. */
+function talisman(rebuke: string, charges: number, disadvantage: string): ItemMechanics {
+  return {
+    servesAsFocus: "holy-symbol",
+    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
+    charges: { lastCharge: "destroyed" },
+    actions: [
+      {
+        id: "rebuke",
+        name: rebuke,
+        activation: "action",
+        description: `Expend 1 charge and target one creature you can see on the ground within 120 feet. A fissure opens under it, and it makes a DC 20 Dexterity saving throw. ${disadvantage} On a failure it falls into the fissure and is destroyed, leaving no remains; on a success it takes 4d6 Psychic damage. When you expend the last charge, the talisman is destroyed.`,
+        damage: [],
+        targets: { count: 1, rangeFeet: 120, seen: true },
+        uses: { limit: charges, per: "never", pool: "talisman-charges" }
+      }
+    ]
+  };
+}
+
 function drink(name: string, description: string, grants: Grant): ItemAction {
   return { id: "drink", name: `Drink ${name}`, activation: "bonus-action", description, damage: [], grants };
 }
