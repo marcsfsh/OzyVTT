@@ -25,10 +25,12 @@ const SPELL_SIGHT: Readonly<Record<string, SightEffect>> = {
   darkness: { area: { kind: "magical-darkness" }, dispels: { kind: "light", upToLevel: 2 } },
   // "This spell dispels Darkness in its area that was created by any spell."
   sunburst: { dispels: { kind: "darkness" } },
-  "fog-cloud": { area: { kind: "heavily-obscured" } },
-  "stinking-cloud": { area: { kind: "heavily-obscured" } },
-  cloudkill: { area: { kind: "heavily-obscured" } },
-  "incendiary-cloud": { area: { kind: "heavily-obscured" } },
+  // "Until a strong wind (such as one created by Gust of Wind) disperses it": fog (Fog Cloud, Cloudkill) also goes when
+  // Destroy Water destroys it.
+  "fog-cloud": { area: { kind: "heavily-obscured", dispersedBy: ["wind", "water"] } },
+  "stinking-cloud": { area: { kind: "heavily-obscured", dispersedBy: ["wind"] } },
+  cloudkill: { area: { kind: "heavily-obscured", dispersedBy: ["wind", "water"] } },
+  "incendiary-cloud": { area: { kind: "heavily-obscured", dispersedBy: ["wind"] } },
   "sleet-storm": { area: { kind: "heavily-obscured" } },
   "insect-plague": { area: { kind: "lightly-obscured" } },
   web: { area: { kind: "lightly-obscured" } },

@@ -139,6 +139,43 @@ const subscribe = (listener: () => void) => {
   };
 };
 
+/** The template an area is drawn as: the SRD shape as a drawable one (sphere, cylinder and emanation as a circle, cube
+ *  as a square), grown with a higher slot where the spell says so (Fog Cloud), as the server will place it. */
+function templateOf(
+  action: ContentActionSummary,
+  area: NonNullable<ContentActionSummary["area"]>,
+  slotLevel: number | undefined
+): TargetingTemplate {
+  const shape: AnnotationShapeKind =
+    area.shape === "sphere" || area.shape === "cylinder" || area.shape === "emanation"
+      ? "circle"
+      : area.shape === "cube"
+        ? "square"
+        : area.shape;
+  return {
+    shape,
+    // A higher slot grows the area where the spell says so (Fog Cloud), as the server will place it.
+    sizeFeet: Math.min(
+      1000,
+      area.sizeFeet +
+        (slotLevel !== undefined && action.areaPerSlot
+          ? action.areaPerSlot.feet * Math.max(0, slotLevel - action.areaPerSlot.level)
+          : 0)
+    ),
+    widthFeet: area.widthFeet,
+    placed: null,
+    ...(area.count !== undefined ? { count: area.count, others: [] } : {}),
+    ...(area.toTarget ? { toTarget: true as const } : {})
+  };
+}
+
+/** The area a use is placed as: the picked option's (Wall of Fire's ring), else the action's own. */
+export function pickedArea(
+  picking: Readonly<{ action: ContentActionSummary; option?: string }>
+): ContentActionSummary["area"] {
+  return picking.action.options?.find((entry) => entry.id === picking.option)?.area ?? picking.action.area;
+}
+
 export function beginTargeting(
   action: ContentActionSummary,
   attackerId: string,
@@ -147,7 +184,8 @@ export function beginTargeting(
   shaping?: readonly CastShaping[],
   options: Readonly<{ fastHands?: boolean }> = {}
 ) {
-  const area = action.area;
+  // An option starts on the first, and so does the area it is placed as.
+  const area = pickedArea({ action, ...(action.options?.[0] ? { option: action.options[0].id } : {}) });
   const dartTotal = dartsAtSlot ?? action.darts;
   // A check action starts on its usual skill; Escape a Grapple starts on the better of its two, the server's pick.
   const usualSkill = action.id === "escape-grapple" ? undefined : action.checkSkills?.[0]?.id;
@@ -164,33 +202,12 @@ export function beginTargeting(
     ...startingShapeChoice(action)
   };
   if (area) {
-    // Map the SRD area shape onto a drawable annotation shape (sphere/cylinder/emanation → circle, cube → square).
-    const shape: AnnotationShapeKind =
-      area.shape === "sphere" || area.shape === "cylinder" || area.shape === "emanation"
-        ? "circle"
-        : area.shape === "cube"
-          ? "square"
-          : area.shape;
     session = {
       action,
       attackerId,
       mode: "template",
       selected: [],
-      template: {
-        shape,
-        // A higher slot grows the area where the spell says so (Fog Cloud), as the server will place it.
-        sizeFeet: Math.min(
-          1000,
-          area.sizeFeet +
-            (slotLevel !== undefined && action.areaPerSlot
-              ? action.areaPerSlot.feet * Math.max(0, slotLevel - action.areaPerSlot.level)
-              : 0)
-        ),
-        widthFeet: area.widthFeet,
-        placed: null,
-        ...(area.count !== undefined ? { count: area.count, others: [] } : {}),
-        ...(area.toTarget ? { toTarget: true as const } : {})
-      },
+      template: templateOf(action, area, slotLevel),
       ...slot
     };
   } else {
@@ -346,10 +363,19 @@ export function setShapeGear(gear: "merged" | "worn") {
   session = { ...session, gear };
   emit();
 }
-/** Picks which of its effects a use takes (Enlarge or Reduce). */
+/** Picks which of its effects a use takes (Enlarge or Reduce), or the form of the area a cast leaves; a form with its
+ *  own area (Wall of Fire's ring) is drawn as that area, placed afresh. */
 export function setEffectOption(option: string) {
   if (!session?.action.options?.some((entry) => entry.id === option)) return;
-  session = { ...session, option };
+  const before = pickedArea(session);
+  const after = pickedArea({ action: session.action, option });
+  session = {
+    ...session,
+    option,
+    ...(session.mode === "template" && after && after !== before
+      ? { template: templateOf(session.action, after, session.slotLevel) }
+      : {})
+  };
   emit();
 }
 /** Picks the ability a cast chooses (Hex). */

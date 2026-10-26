@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ActionAreaSchema,
   ActionReactionSchema,
   CastShapingIdSchema,
   CharacterChoiceSchema,
@@ -601,8 +602,9 @@ export const ActionAvailabilitySchema = z.strictObject({
     .describe(
       "The forms a shape-shift may take now, sent back as the resolve's `form` (or `targetForms`, one per target, when `perTarget`); `gearChoice` lets the user say whether its gear melds or is worn. For Wild Shape, the Beasts its user may learn (`learnable`), how many it knows (`knownLimit`) and whether one may be replaced now (`swapOpen`)"
     ),
-  /** The effects a use picks one of (Enlarge or Reduce), sent back as the resolve's `option`. */
-  options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
+  /** The effects a use picks one of (Enlarge or Reduce), or the form of the area a cast leaves (Wall of Fire's ring),
+   *  sent back as the resolve's `option`; an option with an `area` is placed as that area. */
+  options: z.array(z.strictObject({ id: z.string(), name: z.string(), area: ActionAreaSchema.optional() })).optional(),
   /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
    *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
    *  (a spell area's later save). */
@@ -1006,10 +1008,15 @@ export const ActorMovementReplySchema = z.strictObject({
   /** The ground the spell areas the asker can see change for this mover, in grid cells near it, as the server charges
    *  it: Difficult Terrain (each cell), and where its footprint (named by its top-left cell) has its Speed halved,
    *  costs double again on the ground (Plant Growth), or pays double for a step toward an area's caster (Gust of
-   *  Wind's Line, the caster's position in image pixels). */
+   *  Wind's Line, the caster's position in image pixels). `cleared`: cells whose painted Difficult Terrain an area lifts
+   *  (Speak with Plants). */
   areaGround: z
     .strictObject({
       difficult: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      cleared: z
+        .array(z.strictObject({ column: z.number().int(), row: z.number().int() }))
+        .max(4000)
+        .optional(),
       halved: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
       costlyGround: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
       toward: z

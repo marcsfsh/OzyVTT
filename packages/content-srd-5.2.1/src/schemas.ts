@@ -141,7 +141,12 @@ export const SpellLaterActionSchema = z
     /** Conditions its hit lands (Conjure Fey's spirit: Frightened until the start of the caster's next turn). */
     onHit: z.array(OnHitRiderSchema).max(2).optional(),
     save: z
-      .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
+      .object({
+        ability: AbilityShortSchema,
+        ...SaveOutcomeFields,
+        /** What a failure leaves besides conditions (a Symbol of Discord's Disadvantage). */
+        failureEffect: SaveFailureEffectSchema.optional()
+      })
       .strict()
       .optional(),
     damage: SpellDamageSchema,
@@ -163,7 +168,44 @@ export const SpellLaterActionSchema = z
       .object({
         feet: z.number().int().min(5).max(300),
         /** The area is placed again from its caster, pointing a new way (Gust of Wind's Line, turned). */
-        fromCaster: z.literal(true).optional()
+        fromCaster: z.literal(true).optional(),
+        /** It goes to any spot within `feet` of its caster, however far that is from where it stood (Silent Image:
+         *  "move to any spot within range"). */
+        anywhereInRange: z.literal(true).optional(),
+        /** Only while its caster is within `feet` of it (Major Image: "If you are within range of the illusion"). */
+        casterInRange: z.literal(true).optional(),
+        /** Only on its caster's turn once the caster has moved, once a turn and at no cost (Conjure Animals: "when you
+         *  move on your turn, you can also move the pack up to 30 feet"). */
+        withCasterMove: z.literal(true).optional(),
+        /** To a spot no creature's space covers (Conjure Animals' pack: "to an unoccupied space"). */
+        unoccupied: z.literal(true).optional(),
+        /** It is the drift its caster steers at the start of its turn (Incendiary Cloud): exactly `feet` from where the
+         *  area stood as the turn began, farther from the caster, once that turn. */
+        steersDrift: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** Its template leaves the ground it covers out of the spell's area (Plant Growth: "You can exclude one or more areas
+     *  of any size within the spell's area from being affected"), taken by the caster as the spell is cast. */
+    cutsArea: z.literal(true).optional(),
+    /** Its template's point, or each creature it targets, must be inside the area the spell left (Call Lightning's
+     *  bolt "under the cloud", Storm of Vengeance's bolts "beneath it"). */
+    inArea: z.literal(true).optional(),
+    /** How many creatures it strikes (Storm of Vengeance's six bolts). */
+    targetCount: z.number().int().min(1).max(10).optional(),
+    /** It is taken only while the spell's area stands as this row of its schedule, once (Storm of Vengeance's bolts on
+     *  its third turn). */
+    atRow: z.string().min(1).max(60).optional(),
+    /** The cast leaves this row's zone only when its caster picks this option as it casts (Wall of Fire's ring, a
+     *  Symbol's glyph); a cast that picks none leaves the first such row's. With an `area`, the cast is placed as that
+     *  area. */
+    option: z
+      .object({
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60),
+        name: z.string().min(1).max(60)
       })
       .strict()
       .optional()
@@ -226,7 +268,7 @@ export const SpellEffectSchema = z
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),
-    laterActions: z.array(SpellLaterActionSchema).min(1).max(3).optional(),
+    laterActions: z.array(SpellLaterActionSchema).min(1).max(8).optional(),
     /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
     darts: z.number().int().min(2).max(20).optional(),
     /** How many creatures one cast targets (Bless: up to three), plus `perSlot` more for each slot level above the

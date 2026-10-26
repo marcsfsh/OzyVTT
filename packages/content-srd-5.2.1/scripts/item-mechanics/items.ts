@@ -1184,24 +1184,51 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "ring-of-resistance": { grants: { damageResistances: ["fire"] }, damageTypeChoice: RESISTANCE_TABLE },
 
   /**
-   * The two cantrips are at will; Shooting Stars is the ring's own effect, at its one-charge size.
-   * Not authored: Faerie Fire (its spell record would add an attack roll), Lightning Spheres and the
-   * 2-3 charge Shooting Stars (multi-charge).
+   * The two cantrips are at will, and Faerie Fire costs a charge at its wearer's DC. Shooting Stars places a Cube for
+   * each charge spent, up to 3. The Lightning Spheres, for 2 charges, are up to four areas held on the wearer's
+   * Concentration for a minute, each discharging once at the first creature within 5 feet of it, for less damage the
+   * more were made. Not modeled: the spheres' Dim Light, and their Bonus Action move, which is a drag of their area.
    */
   "ring-of-shooting-stars": {
     charges: { regain: "1d6" },
-    casts: [{ spellId: "dancing-lights" }, { spellId: "light" }],
+    casts: [
+      { spellId: "dancing-lights" },
+      { spellId: "light" },
+      { spellId: "faerie-fire", uses: { limit: 6, per: "long-rest", pool: "ring-of-shooting-stars-charges" } }
+    ],
     actions: [
       {
         id: "shooting-stars",
         name: "Shooting Stars",
         activation: "action",
-        area: { shape: "cube", sizeFeet: 15, widthFeet: null },
+        area: { shape: "cube", sizeFeet: 15, widthFeet: null, count: 3, eachCostsAUse: true },
         description:
-          "Expend 1 charge to launch a glowing mote of light at a point within 60 feet. Each creature in a 15-foot Cube originating from that point makes a DC 15 Dexterity saving throw, taking 5d4 Radiant damage on a failed save or half as much damage on a successful one.",
+          "Expend 1 to 3 charges. For every charge you expend, launch a glowing mote of light at a point within 60 feet. Each creature in a 15-foot Cube originating from that point makes a DC 15 Dexterity saving throw, taking 5d4 Radiant damage on a failed save or half as much damage on a successful one.",
         save: { ability: "dex", dc: 15, successDamage: "half", failureConditions: [] },
         damage: [{ formula: "5d4", type: "radiant" }],
         uses: { limit: 6, per: "long-rest", pool: "ring-of-shooting-stars-charges" }
+      },
+      {
+        id: "lightning-spheres",
+        name: "Lightning Spheres",
+        activation: "action",
+        area: { shape: "sphere", sizeFeet: 5, widthFeet: null, count: 4 },
+        description:
+          "Expend 2 charges to create up to four spheres of lightning within 120 feet, lasting while you keep Concentration, up to 1 minute. The first time a sphere comes within 5 feet of a creature other than you, it discharges at that creature and disappears: a DC 15 Dexterity saving throw, taking Lightning damage by the number of spheres made (one 4d12, two 5d4, three 2d6, four 2d4) on a failure, or half on a success. As a Bonus Action, move each sphere up to 30 feet.",
+        save: { ability: "dex", dc: 15, successDamage: "half", failureConditions: [] },
+        damage: [{ formula: "4d12", type: "lightning" }],
+        useCost: 2,
+        uses: { limit: 6, per: "long-rest", pool: "ring-of-shooting-stars-charges" },
+        zone: {
+          on: ["enter"],
+          around: "point",
+          feet: 5,
+          once: true,
+          sparesUser: true,
+          concentration: true,
+          lastsRounds: 10,
+          damageByCount: ["4d12", "5d4", "2d6", "2d4"]
+        }
       }
     ]
   },
@@ -1294,8 +1321,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `rod-of-absorption` - needs per-copy storage and a spell slot refund.
 
   /**
-   * Initiative and Wisdom (Perception) advantage, four at-will detection casts, and the Protective Aura's
-   * once-per-dawn counter (the ally buff is prose).
+   * Initiative and Wisdom (Perception) advantage, four at-will detection casts, and the Protective Aura once a dawn:
+   * the planted rod's light and the area it holds its user and allies in.
    */
   "rod-of-alertness": {
     modifiers: [
@@ -1322,7 +1349,24 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Plant the haft end of the rod in the ground. Its head sheds Bright Light in a 60-foot radius and Dim Light for an additional 60 feet. While in that Bright Light, you and your allies gain a +1 bonus to Armor Class and saving throws and can sense the location of any Invisible creature that is also in the Bright Light. Ends after 10 minutes or when a creature pulls the rod from the ground.",
         uses: { limit: 1, per: "long-rest" },
         // The planted rod's light, set down where its holder stands for 10 minutes.
-        sight: { light: { on: "point", brightFeet: 60, dimFeet: 60 }, rounds: 100 }
+        sight: { light: { on: "point", brightFeet: 60, dimFeet: 60 }, rounds: 100 },
+        // Its Bright Light gives its user and allies in it +1 to AC and saves, and shows them the Invisible creatures
+        // there, while it stays planted where its user stood.
+        zone: {
+          on: [],
+          around: "caster",
+          feet: 60,
+          stays: true,
+          affects: "allies",
+          lastsRounds: 100,
+          holds: {
+            armorClassBonus: 1,
+            modifiers: [
+              { type: "save-bonus", amount: 1 },
+              { type: "sense", sense: "see-invisibility", feet: 60 }
+            ]
+          }
+        }
       }
     ]
   },
@@ -2596,7 +2640,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     6,
     "If the target is a Celestial, it has Disadvantage on the save."
   ),
-  // `talisman-of-the-sphere` - Arcana advantage only against a Sphere of Annihilation, which the engine does not hold.
+  // `talisman-of-the-sphere` - read by Control the Sphere (Advantage) and Move the Sphere (Talisman) while attuned
+  // (`zone-sphere.ts`); it carries nothing of its own.
 
   // ---- Shoulders -------------------------------------------------------------------------------
 
@@ -4141,7 +4186,26 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `sovereign-glue` - consumed ounces, GM fiat.
-  // `sphere-of-annihilation` - a map hazard controlled by an Arcana check.
+
+  // The sphere set on the map by whoever has it: a creature whose space it enters, or that enters its space, makes the
+  // DC 19 Dexterity save or takes 8d10 Force damage, obliterated at 0 Hit Points. Control the Sphere and Move the
+  // Sphere are generic actions (`zone-sphere.ts`). Its meetings with portals are the GM's.
+  "sphere-of-annihilation": {
+    actions: [
+      {
+        id: "set",
+        name: "Set the Sphere",
+        activation: "other",
+        area: { shape: "cube", sizeFeet: 5, widthFeet: null },
+        description:
+          "Set the Sphere of Annihilation in a space on the map, where it hovers until someone takes control of it. Any creature whose space the sphere enters must succeed on a DC 19 Dexterity saving throw or be touched by it, taking 8d10 Force damage; a creature reduced to 0 Hit Points by this damage is obliterated, leaving its possessions behind but no other physical remains.",
+        save: { ability: "dex", dc: 19, successDamage: "none", failureConditions: [] },
+        damage: [{ formula: "8d10", type: "force" }],
+        drain: { killsAtZero: { cause: "obliterated by a Sphere of Annihilation", bodyGone: true } },
+        zone: { on: ["enter"], controlled: { dc: 25, withinFeet: 60, pullFeet: 10 } }
+      }
+    ]
+  },
 
   // One of the four elemental-commanding items; this one's wording differs (no languages, placed within 30 feet).
   "stone-of-controlling-earth-elementals": {

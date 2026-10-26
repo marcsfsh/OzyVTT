@@ -228,6 +228,7 @@ const PENDING_SAVE_FIELDS = {
   failureNote: "never",
   breaksConcentration: "never",
   zoneId: "never",
+  touchedZone: "never",
   // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
   magical: "never",
   // What a success earns is the stat block's text, the GM's knowledge.

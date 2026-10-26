@@ -250,6 +250,40 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     damage: []
   },
   {
+    id: "touch-bead",
+    name: "Touch the Bead",
+    activation: "action",
+    description:
+      "Touch a Delayed Blast Fireball's bead within 5 feet and make a Dexterity saving throw. On a failure, the bead explodes. On a success, you throw it at the creature you choose, up to 40 feet away, and it explodes there; choose yourself to set it back down. (SRD 5.2.1 Delayed Blast Fireball)",
+    damage: []
+  },
+  {
+    id: "control-sphere",
+    name: "Control the Sphere",
+    activation: "action",
+    description:
+      "Within 60 feet of a Sphere of Annihilation, make a DC 25 Intelligence (Arcana) check. On a success, you control the sphere until the start of your next turn; on a failure, it moves 10 feet toward you. (SRD 5.2.1 Sphere of Annihilation)",
+    damage: []
+  },
+  {
+    id: "move-sphere",
+    name: "Move the Sphere",
+    activation: "bonus-action",
+    description:
+      "Move the Sphere of Annihilation you control toward the creature you choose, up to 5 times your Intelligence modifier in feet (minimum 5). A creature whose space it enters makes a DC 19 Dexterity saving throw or takes 8d10 Force damage. (SRD 5.2.1 Sphere of Annihilation)",
+    damage: [],
+    // Brought forward on the sheet while its user controls a sphere.
+    requiresEffectTag: "sphere-control"
+  },
+  {
+    id: "move-sphere-far",
+    name: "Move the Sphere (Talisman)",
+    activation: "action",
+    description:
+      "Holding a Talisman of the Sphere and having started your turn in control of a Sphere of Annihilation, move it toward the creature you choose, up to 10 feet plus 10 times your Intelligence modifier. (SRD 5.2.1 Talisman of the Sphere)",
+    damage: []
+  },
+  {
     id: "extinguish-fire",
     name: "Put Out the Fire",
     activation: "action",
@@ -491,5 +525,8 @@ export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   "unarmed-grapple-bonus": "single",
   "unarmed-shove-prone-bonus": "single",
   "unarmed-shove-push-bonus": "single",
-  "shake-awake": "single"
+  "shake-awake": "single",
+  "touch-bead": "single",
+  "move-sphere": "single",
+  "move-sphere-far": "single"
 };

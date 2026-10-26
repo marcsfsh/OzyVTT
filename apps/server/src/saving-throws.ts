@@ -48,6 +48,7 @@ import {
   type AnswerTarget
 } from "./roll-answers.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
+import { settleTouchedZone } from "./zone-touch.js";
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
 import { openDamageWindow } from "./damage-window.js";
 import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
@@ -1323,6 +1324,8 @@ export function answerSave(
       ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
     });
   if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
+  // Delayed Blast Fireball's bead: fumbled, it goes off where it is; caught, it goes off where it is thrown.
+  if (pending.touchedZone) events.push(...settleTouchedZone(state, pending.touchedZone, target, success));
   // "The target dies, and the wisp regains 10 (3d6) Hit Points."
   if (!success && pending.failureKills) events.push(...killOnFailure(state, target, pending, deps));
   // A swallower that fails to hold on lets out what it swallowed.
