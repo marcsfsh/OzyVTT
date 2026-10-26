@@ -10,6 +10,7 @@ import {
   templateOfArea,
   type AnnotationActor
 } from "../annotations.js";
+import { carriedSourcesOf } from "../attachments.js";
 import type { GameState } from "@vtt/domain";
 import { pointInRects } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -206,7 +207,9 @@ export const mapCommands = [
                 ...grappledBy(state, actorId),
                 ...swallowedBy(state, actorId).map(({ prey }) => prey.id),
                 // A Monk's Step of the Wind carries a willing ally along (Heightened Focus).
-                ...carriedAlongBy(state, actorId)
+                ...carriedAlongBy(state, actorId),
+                // A darkmantle attached to the mover moves with it.
+                ...carriedSourcesOf(state, actorId)
               ].filter((heldId) => state.combat.tokens.find((token) => token.actorId === heldId)?.position)
             : [];
         moveEncounterToken(state, actorId, position, geometry);

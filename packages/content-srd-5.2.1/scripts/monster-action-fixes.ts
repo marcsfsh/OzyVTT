@@ -71,16 +71,19 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
         conditions: [],
         name: "Attached",
         // "While attached to a target, the darkmantle can attack only the target but has Advantage on its attack
-        // rolls."
-        tags: ["attached", "source-attacks-only-bearer"],
+        // rolls. Its Speed becomes 0 ... and it moves with the target. ... On its turn, the darkmantle can detach itself
+        // by using 5 feet of movement."
+        tags: ["attached", "source-attacks-only-bearer", "carries-source", "detaches-itself"],
+        // "If the target is a Medium or smaller creature and the darkmantle had Advantage on the attack roll, it covers
+        // the target, which has the Blinded condition and is suffocating while the darkmantle is attached in this way."
+        advantageAdds: { conditions: ["blinded"], tags: ["smothering"], maxTargetSize: "medium" },
         endsWhenSourceDies: true,
         // "A creature can take an action to try to detach the darkmantle from itself, doing so with a successful DC 13
         // Strength (Athletics) check."
         endedBy: { name: "Detach the darkmantle", by: "bearer", check: { ability: "str", skill: "athletics", dc: 13 } }
       }
     ],
-    reminder:
-      "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached. While attached, the darkmantle's Speed is 0 and it moves with the target, and it detaches itself with 5 feet of its movement."
+    reminder: null
   },
   "stirge/proboscis": {
     why: "while attached the stirge can't use its Proboscis again, which the hit's text prints",
@@ -88,14 +91,15 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       {
         conditions: [],
         name: "Attached",
-        // "While attached, the stirge can't make Proboscis attacks."
-        tags: ["attached", "source-no-repeat"],
+        // "While attached, the stirge can't make Proboscis attacks. ... The stirge can detach itself by spending 5 feet
+        // of its movement."
+        tags: ["attached", "source-no-repeat", "detaches-itself"],
         ongoingDamage: { damage: [{ formula: "2d4", type: "necrotic" }], at: "source-turn-start" },
         // "The target or a creature within 5 feet of it can detach the stirge as an action."
         endedBy: { name: "Detach", by: "either" }
       }
     ],
-    reminder: "The stirge detaches itself by spending 5 feet of its movement."
+    reminder: null
   },
   "cloaker/attach": {
     why: "while attached the cloaker can Attach only to its target, and it is pulled off with an action and a check",
@@ -104,16 +108,34 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
         conditions: [{ id: "blinded" }],
         name: "Attached",
         maxTargetSize: "large",
-        // "The cloaker can't make Attach attacks against other targets."
-        tags: ["attached", "source-target-only"],
+        // "The cloaker can't make Attach attacks against other targets. ... While the cloaker is attached, it halves the
+        // damage it takes (round down), and the target takes the same amount. The cloaker can detach itself by spending
+        // 5 feet of movement."
+        tags: ["attached", "source-target-only", "shares-source-damage", "detaches-itself"],
         endsWhenSourceDies: true,
         // "The target or a creature within 5 feet of it can take an action to try to detach the cloaker, doing so by
         // succeeding on a DC 14 Strength (Athletics) check."
         endedBy: { name: "Detach the cloaker", by: "either", check: { ability: "str", skill: "athletics", dc: 14 } }
       }
     ],
-    reminder:
-      "While attached, the cloaker halves the damage it takes (round down), and the target takes the same amount; the cloaker detaches itself by spending 5 feet of movement."
+    reminder: null
+  },
+  "animated-rug-of-smothering/smother": {
+    why: "the smothering, one creature at a time, and the shared damage follow the hit's grapple",
+    onHit: [
+      {
+        conditions: [{ id: "grappled" }, { id: "blinded" }, { id: "restrained" }],
+        name: "Smothered",
+        escapeDc: 13,
+        maxTargetSize: "medium",
+        ongoingDamage: { damage: [{ formula: "2d6 + 3", type: "bludgeoning" }], at: "bearer-turn-start" },
+        insteadOfDamage: true,
+        // "Is suffocating ... The rug can smother only one creature at a time. While grappling the target, the rug can't
+        // take this action, the rug halves the damage it takes (round down), and the target takes the same amount."
+        tags: ["smothering", "source-no-repeat", "shares-source-damage"]
+      }
+    ],
+    reminder: null
   },
   "otyugh/bite": {
     why: "the save comes after each Long Rest, and its failure lowers the Hit Point maximum until the poison ends",

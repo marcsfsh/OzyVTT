@@ -7356,6 +7356,7 @@
         "id": "restrained"
        }
       ],
+      "name": "Smothered",
       "escapeDc": 13,
       "maxTargetSize": "medium",
       "ongoingDamage": {
@@ -7367,10 +7368,14 @@
        ],
        "at": "bearer-turn-start"
       },
-      "insteadOfDamage": true
+      "insteadOfDamage": true,
+      "tags": [
+       "smothering",
+       "source-no-repeat",
+       "shares-source-damage"
+      ]
      }
-    ],
-    "reminder": "The rug smothers one creature at a time. While it grapples the target, the target is suffocating, and the rug halves the damage it takes (round down) while the target takes the same amount."
+    ]
    }
   ],
   "token": {
@@ -13595,7 +13600,9 @@
       "maxTargetSize": "large",
       "tags": [
        "attached",
-       "source-target-only"
+       "source-target-only",
+       "shares-source-damage",
+       "detaches-itself"
       ],
       "endsWhenSourceDies": true,
       "endedBy": {
@@ -13608,8 +13615,7 @@
        }
       }
      }
-    ],
-    "reminder": "While attached, the cloaker halves the damage it takes (round down), and the target takes the same amount; the cloaker detaches itself by spending 5 feet of movement."
+    ]
    },
    {
     "id": "phantasms-recharge-after-a-short-or-long-rest",
@@ -15207,8 +15213,19 @@
       "name": "Attached",
       "tags": [
        "attached",
-       "source-attacks-only-bearer"
+       "source-attacks-only-bearer",
+       "carries-source",
+       "detaches-itself"
       ],
+      "advantageAdds": {
+       "conditions": [
+        "blinded"
+       ],
+       "tags": [
+        "smothering"
+       ],
+       "maxTargetSize": "medium"
+      },
       "endsWhenSourceDies": true,
       "endedBy": {
        "name": "Detach the darkmantle",
@@ -15220,8 +15237,7 @@
        }
       }
      }
-    ],
-    "reminder": "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached. While attached, the darkmantle's Speed is 0 and it moves with the target, and it detaches itself with 5 feet of its movement."
+    ]
    },
    {
     "id": "darkness-aura",
@@ -41841,6 +41857,11 @@
   ],
   "traitMechanics": [
    {
+    "kind": "shares-wearer-damage",
+    "name": "Bound",
+    "withinFeet": 60
+   },
+   {
     "kind": "regeneration",
     "name": "Regeneration",
     "hitPoints": 10,
@@ -44378,7 +44399,8 @@
       "name": "Attached",
       "tags": [
        "attached",
-       "source-no-repeat"
+       "source-no-repeat",
+       "detaches-itself"
       ],
       "ongoingDamage": {
        "damage": [
@@ -44394,8 +44416,7 @@
        "by": "either"
       }
      }
-    ],
-    "reminder": "The stirge detaches itself by spending 5 feet of its movement."
+    ]
    }
   ],
   "token": {

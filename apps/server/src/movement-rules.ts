@@ -1,4 +1,5 @@
 import { reactionSpent } from "./commanded-reactions.js";
+import { riddenBearerOf } from "./attachments.js";
 import { formEffectOf } from "./transform/forms.js";
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
@@ -542,6 +543,19 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     }
     if (teleport && refusal && input.byPlayer) police(state, input, "movement.teleport", refusal, outcome);
   }
+  // "Its Speed becomes 0 ... and it moves with the target" (a darkmantle attached).
+  const ridden =
+    mode !== "teleport" && (movementCounts(state, actorId) || input.byPlayer)
+      ? riddenBearerOf(state, mover.id)
+      : undefined;
+  if (ridden)
+    police(
+      state,
+      input,
+      "movement.no-movement-remaining",
+      `${mover.name} is attached to ${ridden.name}, so its Speed is 0 and it moves only with it.`,
+      outcome
+    );
   const grant = mode === "teleport" ? null : fittingMoveGrant(state, input, mover, mode, fromAltitude, toAltitude);
   readied = !grant && readiedMove(state, mover, mode);
   const counted = movementCounts(state, actorId) || readied;

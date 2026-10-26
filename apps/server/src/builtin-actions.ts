@@ -1,4 +1,5 @@
 import { endingsOf, type ActorDefinition, type EffectInstance } from "@vtt/schemas";
+import { DETACH_FEET, DETACHES_ITSELF_TAG } from "./attachments.js";
 import { ENDED_BY_PREFIX, endingSlug } from "./ending-actions.js";
 
 type BuiltinAction = ActorDefinition["actions"][number];
@@ -545,7 +546,25 @@ export function builtinActionsFor(
   const variants = [...bonusSources(definition, bearer)].map(([base, source]) =>
     bonusVariant(base, source, definition)
   );
-  return [...BUILTIN_ACTIONS, ...variants, ...endEffectActions(bearer)];
+  return [...BUILTIN_ACTIONS, ...variants, ...endEffectActions(bearer), ...selfDetach(definition)];
+}
+
+/** "The stirge can detach itself by spending 5 feet of its movement": offered to a creature whose hits attach it so. */
+function selfDetach(definition: ActorDefinition | undefined): BuiltinAction[] {
+  const detaches = (definition?.actions ?? []).some((action) =>
+    (action.onHit ?? []).some((rider) => rider.tags?.includes(DETACHES_ITSELF_TAG))
+  );
+  return detaches
+    ? [
+        {
+          id: "detach-self",
+          name: "Detach",
+          activation: "other",
+          description: `Let go of the creature it is attached to, spending ${DETACH_FEET} feet of its movement and no action.`,
+          damage: []
+        }
+      ]
+    : [];
 }
 
 /** One generic action this combatant can take, by id. */

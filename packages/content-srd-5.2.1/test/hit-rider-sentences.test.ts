@@ -11,8 +11,37 @@ const condition = (action: ActorAction, id: string) =>
   (action.onHit ?? []).some((rider) => rider.conditions.some((entry) => entry.id === id)) ||
   (action.conditionalDamage ?? []).some((variant) => variant.conditions?.includes(id));
 
+/** Whether a hit's effect carries a tag, with what Advantage adds (a darkmantle's cover). */
+const riderTag = (action: ActorAction, tag: string) =>
+  (action.onHit ?? []).some((rider) => rider.tags?.includes(tag) || rider.advantageAdds?.tags?.includes(tag));
+
 /** What each kind of rider sentence is read into. */
 const READERS: readonly Check[] = [
+  { pattern: /\bis suffocating\b/, read: (action) => riderTag(action, "smothering") },
+  {
+    pattern: /\bcan smother only one creature at a time\b|\bcan[’']t take this action\b/,
+    read: (action) => riderTag(action, "source-no-repeat")
+  },
+  {
+    pattern: /\bhalves the damage it takes \(round down\), and the target takes the same amount\b/,
+    read: (action) => riderTag(action, "shares-source-damage")
+  },
+  {
+    pattern: /\bcan detach itself by (?:spending|using) 5 feet of (?:its )?movement\b/,
+    read: (action) => riderTag(action, "detaches-itself")
+  },
+  {
+    pattern: /\bcan (?:take an action to try to )?detach the [a-z]+\b/,
+    read: (action) => (action.onHit ?? []).some((rider) => rider.endedBy !== undefined)
+  },
+  {
+    pattern: /\bhad Advantage on the attack roll, it covers the target\b/,
+    read: (action) => (action.onHit ?? []).some((rider) => rider.advantageAdds !== undefined)
+  },
+  {
+    pattern: /\bIts Speed becomes 0\b.*\bmoves with the target\b/,
+    read: (action) => riderTag(action, "carries-source")
+  },
   { pattern: /\bhas the Grappled condition \(escape DC \d+\)/, read: (action) => condition(action, "grappled") },
   { pattern: /\bgive it the Grappled condition\b/, read: (action) => condition(action, "grappled") },
   {

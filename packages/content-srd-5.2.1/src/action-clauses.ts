@@ -37,6 +37,8 @@ const CARRIED: Readonly<Record<ActionClause, (action: ActorAction, effects: read
   speed: (_action, effects) =>
     effects.some((effect) => effect.speedZero === true) ||
     tagged(effects, "speed-halved") ||
+    // "Its Speed becomes 0 ... and it moves with the target" (a darkmantle attached).
+    tagged(effects, "carries-source") ||
     modified(effects, (modifier) => modifier.type === "speed"),
   disadvantage: (action, effects) =>
     modified(effects, (modifier) => modifier.type === "roll-mode" && modifier.mode === "disadvantage") ||
@@ -51,7 +53,10 @@ const CARRIED: Readonly<Record<ActionClause, (action: ActorAction, effects: read
     action.onHitPush?.maxTargetSize !== undefined ||
     action.pull?.maxTargetSize !== undefined ||
     (action.onHit ?? []).some(
-      (rider) => rider.maxTargetSize !== undefined || rider.pull?.maxTargetSize !== undefined
+      (rider) =>
+        rider.maxTargetSize !== undefined ||
+        rider.pull?.maxTargetSize !== undefined ||
+        rider.advantageAdds?.maxTargetSize !== undefined
     ) ||
     (action.conditionalDamage ?? []).some((entry) => entry.maxTargetSize !== undefined),
   "not-type": (action) =>

@@ -1,4 +1,5 @@
 import { bondCasterOf } from "./warding-bond.js";
+import { damageShares } from "./shared-damage.js";
 import { formsAfterDamage } from "./transform/rules.js";
 import { lycanthropyAtZero } from "./transform/at-zero.js";
 import {
@@ -113,7 +114,8 @@ export type DamageInput = Readonly<{
   nonlethal?: boolean;
   /** What the damage drains as it lands (a Life Drain's lower Hit Point maximum, Vampiric Touch's healing). */
   drain?: DamageDrain;
-  /** A Warding Bond caster's share of its ward's damage, which is not shared on again. */
+  /** A share of another creature's damage (Warding Bond's caster, a cloaker's target, a shield guardian), which is
+   *  not shared on again. */
   bondShare?: true;
 }>;
 export type DamageDeps = Readonly<{
@@ -774,13 +776,14 @@ export function applyDamageDetailed(
   const actor = adjustableActor(state, actorId, scope);
   const events: EffectNarration[] = [];
   const rolling = reductionRolling(state, actor, deps?.rollDie);
-  const { totalRequested, totalAdjusted, flatReduction, parts, oilIgnited } = weighDamage(
-    state,
-    actor,
-    input,
-    deps,
-    rolling
-  );
+  const weighed = weighDamage(state, actor, input, deps, rolling);
+  const { totalRequested, flatReduction, parts, oilIgnited } = weighed;
+  // A holder that halves its damage onto what it holds, or a guardian that takes half its wearer's (`shared-damage.ts`).
+  const sharing =
+    input.bondShare === true
+      ? { kept: weighed.totalAdjusted, shares: [] }
+      : damageShares(state, actor, weighed.totalAdjusted, deps);
+  const totalAdjusted = sharing.kept;
   // A once-a-turn reduction that helped is spent for this turn (Resistance).
   if (rolling?.turnKey !== undefined && rolling.used.length > 0)
     actor.effects = actor.effects.map((effect) =>
@@ -1041,6 +1044,26 @@ export function applyDamageDetailed(
         actorId: bondCaster
       },
       ...shared.events
+    );
+  }
+
+  // What the holder or the guardian passes on (`shared-damage.ts`), untyped and not passed on again.
+  for (const share of sharing.shares) {
+    const passed = applyDamageDetailed(
+      state,
+      share.actorId,
+      { amount: share.amount, sourceName: share.via, bondShare: true },
+      { role: "gm" },
+      deps
+    );
+    const name = state.actors.find((candidate) => candidate.id === share.actorId)?.name ?? "Another creature";
+    events.push(
+      {
+        kind: "damage",
+        text: `${name} takes ${passed.application.totalApplied} of ${actor.name}'s damage (${share.via}).`,
+        actorId: share.actorId
+      },
+      ...passed.events
     );
   }
 

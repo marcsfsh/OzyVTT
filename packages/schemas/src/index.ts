@@ -4057,6 +4057,17 @@ export const OnHitRiderSchema = z
     /** The effect lands on the attacker instead of the target (a pirate captain's Advantage on its next attack). Its
      *  `until-source-turn-end` duration then means the end of this turn. */
     self: z.literal(true).optional(),
+    /** What the effect also carries when the attack roll had Advantage and the target is `maxTargetSize` or smaller (a
+     *  darkmantle's Crush: "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it
+     *  covers the target, which has the Blinded condition and is suffocating while the darkmantle is attached"). */
+    advantageAdds: z
+      .object({
+        conditions: z.array(ConditionIdSchema).max(2),
+        tags: z.array(EffectTagSchema).max(2).optional(),
+        maxTargetSize: SizeSchema.optional()
+      })
+      .strict()
+      .optional(),
     /** Modifiers the effect carries while it lasts: a Speed cut (a frost giant's Great Bow), Disadvantage on the
      *  target's next attack roll (an ettin's Morningstar, with the `until-own-attack` tag). */
     modifiers: EffectModifiersSchema.optional(),
@@ -6425,6 +6436,15 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
         .string()
         .regex(/^[a-z0-9-]+$/)
         .max(80)
+    })
+    .strict(),
+  /** A shield guardian's Bound: "If the guardian is within 60 feet of the amulet's wearer, half of any damage the wearer
+   *  takes (round up) is transferred to the guardian." The wearer is the creature that commands it. */
+  z
+    .object({
+      kind: z.literal("shares-wearer-damage"),
+      name: TraitNameSchema,
+      withinFeet: z.number().int().min(5).max(300)
     })
     .strict(),
   /** A shield guardian's Spell Storing: its commander, wearing its amulet, casts a spell of `maxLevel` or lower on it

@@ -393,6 +393,16 @@ function spellStoring(trait: Trait): TraitMechanic | null {
   return match ? { kind: "spell-storing", name: trait.name, maxLevel: Number(match[1]) } : null;
 }
 
+/** "If the guardian is within 60 feet of the amulet's wearer, half of any damage the wearer takes (round up) is
+ *  transferred to the guardian" (Bound). */
+function sharesWearerDamage(trait: Trait): TraitMechanic | null {
+  const match =
+    /\bIf the [\w -]+? is within (\d+) feet of the amulet[\u2019']s wearer, half of any damage the wearer takes \(round up\) is transferred to the [\w -]+?\./.exec(
+      trait.description
+    );
+  return match ? { kind: "shares-wearer-damage", name: trait.name, withinFeet: Number(match[1]) } : null;
+}
+
 /** "The ground in a 10-foot Emanation originating from the mouther is Difficult Terrain." */
 function difficultGround(trait: Trait): TraitMechanic | null {
   const match = /^The ground in a (\d+)-foot Emanation originating from the [\w -]+? is Difficult Terrain\.$/.exec(
@@ -436,6 +446,7 @@ function skillPick(trait: Trait): TraitMechanic | null {
 
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   spellStoring,
+  sharesWearerDamage,
   damageTypePick,
   skillPick,
   regeneration,
