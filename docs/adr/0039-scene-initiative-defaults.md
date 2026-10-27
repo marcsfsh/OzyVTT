@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Needs the owner's sign-off before any server code.
+Accepted on 2026-10-27.
 
 ## Context and decision drivers
 
@@ -26,7 +26,7 @@ until the GM sets a default.
 
 ## Decision
 
-These are the choices to confirm.
+The owner confirmed these choices.
 
 - **Field.** `Scene.initiativeDefaults?: { playersRollInitiative?: boolean; groupMonsters?: boolean }`, optional,
   strict, and GM-only like the rest of the scene. Nothing else is stored.

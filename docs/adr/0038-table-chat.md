@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Needs the owner's sign-off before any server code.
+Accepted on 2026-10-27, with GM whispers added at the owner's choice.
 
 ## Context and decision drivers
 
@@ -26,13 +26,19 @@ way to inject markup; phones first-class; no new store when the existing one fit
 
 ## Decision
 
-These are the choices to confirm.
+The owner confirmed these choices.
 
-- **Audience.** Every chat line is public to the GM and every player session. No whispers, no GM-only chat and no
-  line for one character in this version. The table screen never shows chat: the viewer feed is unchanged.
-- **Command.** A new game command `chat:send` with `{ commandId, text, actorId? }`, defined the shared way (domain
+- **Audience.** A chat line is public to the GM and every player session, unless it is a whisper. The table screen
+  never shows chat: the viewer feed is unchanged.
+- **GM whispers.** A whisper is between the GM and one party character, either way: the GM whispers to a character,
+  or a player whispers to the GM as their character. It reaches the GM and every session that plays that character
+  when the line is read, on any device. Other players get nothing: no line, no gap in the feed ids and no count, as
+  with a `self-only` roll. Players can't whisper to each other. A character that changes hands carries its whispers
+  to its new player, the same as its sheet.
+- **Command.** A new game command `chat:send` with `{ commandId, text, actorId?, whisperTo? }`, defined the shared way (domain
   schema, typed socket event, a `GAME_COMMANDS` entry, a `defineCommand` handler), with the same integration scope
-  as `dice:roll`. The `commandId` makes a resend idempotent through the existing receipts.
+  as `dice:roll`. The `commandId` makes a resend idempotent through the existing receipts. `whisperTo` is a party
+  character's id from the GM, or `"gm"` from a player; any other value is refused.
 - **Attribution.** The server stamps the author from the token. A player's line is their character's: `actorId`
   must be a character their session has claimed, and is required when they hold more than one. A session with no
   claimed character can't send. The GM's lines read "GM". The stored row keeps the author's name as it was when
@@ -53,22 +59,24 @@ These are the choices to confirm.
   twice that.
 - **Retention.** Chat rows share the feed's 2,000-row cap with narration and rolls.
 - **Storage.** Rows of `kind: "chat"` in `combat_log`, using the columns it has: `text`, `actor_id`,
-  `initiator_session_id`, and `payload_json` for the author's name. No SQL migration is expected; if review finds a
+  `initiator_session_id`, `visibility` (`whisper` on a whisper), and `payload_json` for the author's name and the
+  whispered character. No SQL migration is expected; if review finds a
   column is needed, it is migration 2 in `combat-log.ts`.
 - **Projection.** `CombatLogEntry` gains `kind: "chat"` and `author: { name, role, actorId? }`. `projectFeedRow`
-  passes chat rows to every reader. A projection test pins that no session id, visibility or other reader's data
+  passes a public chat row to every reader, and a whisper to the GM and to a session that plays its character, with
+  `whisper: { characterId, name }` on it. A projection test pins that no session id and no other character's whisper
   reaches a player.
 
 ## Consequences and tradeoffs
 
 - One feed keeps rolls and words in the order they happened, and the existing backfill and dedupe cover chat.
 - Busy chat pushes old narration out of the 2,000-row window sooner.
-- No whispers: a private word stays a conversation away from the table, which matches a home group in one room.
+- Whispers are only between the GM and one character, so the GM sees every private word at the table.
 
 ## Mobile, security, and visibility impact
 
-- Public only, so nothing in a chat line is new information to any audience that can read it. The table screen is
-  untouched.
+- A public line is public to everyone who can read it; a whisper reaches only the GM and that character's player,
+  and leaves no trace for anyone else. The table screen is untouched.
 - Attribution and authorization come from the token; a player can't speak as another character or as the GM.
 - Text is rendered as text on every client; the server never builds HTML from it.
 - The composer is the drawn one at 390px: the field, Send, and the quick dice.

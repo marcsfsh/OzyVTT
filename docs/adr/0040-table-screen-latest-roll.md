@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Needs the owner's sign-off before any server code.
+Accepted on 2026-10-27.
 
 ## Context and decision drivers
 
@@ -26,7 +26,7 @@ identical; keep pairing and revocation as they are; no stored data when a derive
 
 ## Decision
 
-These are the choices to confirm.
+The owner confirmed these choices.
 
 - **Field.** The feed gains `latestRoll: ViewerRollCard | null`, built in the coordinator from `GameState.rolls` and
   the screen's audience at send time. `ViewerRollCard` holds only: `id` (an opaque id for the card, not the roll's),
