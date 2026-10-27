@@ -10,7 +10,7 @@ import {
   writeMapFilters
 } from "../maps/map-lists";
 import { backPathOf, pathForMap, pathForScene } from "./routes";
-import { drawnLine, factsOf, lightLine, needsOf, tokensLine } from "./sceneFacts";
+import { drawnLine, factsOf, lightLine, needsOf, readinessOf, tokensLine } from "./sceneFacts";
 import {
   DEFAULT_SCENE_SORT,
   NO_SCENE_FILTERS,
@@ -198,5 +198,33 @@ describe("the Scenes tab's addresses", () => {
     expect(backPathOf(new URLSearchParams(`back=/scenes/${IDS.ambush}`))).toBe(`/scenes/${IDS.ambush}`);
     expect(backPathOf(new URLSearchParams("back=https://example.com"))).toBeNull();
     expect(backPathOf(new URLSearchParams("back=/settings"))).toBeNull();
+  });
+});
+
+describe("whether a scene is ready to go", () => {
+  const placedAll = factsOf(
+    view,
+    {
+      ...AMBUSH,
+      combat: {
+        ...AMBUSH.combat,
+        tokens: AMBUSH.combat.tokens.map((t) => ({ ...t, position: t.position ?? { x: 9, y: 9 } }))
+      }
+    },
+    MAPS
+  );
+  it("puts Live first, then the map, then Ready only when nothing needs the GM", () => {
+    expect(readinessOf(factsOf(gmView([AMBUSH], IDS.ambush), AMBUSH, MAPS), MAPS)).toBe("live");
+    expect(readinessOf(placedAll, MAPS)).toBe("ready");
+    // The boss still waits in the tray; the camp has nobody; the chase's map has no grid.
+    expect(readinessOf(ambush, MAPS)).toBe("draft");
+    expect(readinessOf(camp, MAPS)).toBe("draft");
+    expect(readinessOf(chase, MAPS)).toBe("draft");
+  });
+
+  it("says the map is loading, or gone, rather than calling the scene ready", () => {
+    expect(readinessOf(factsOf(view, AMBUSH, null), null)).toBe("loading-map");
+    const gone = MAPS.filter((map) => map.id !== IDS.crypt);
+    expect(readinessOf(factsOf(view, AMBUSH, gone), gone)).toBe("map-unavailable");
   });
 });

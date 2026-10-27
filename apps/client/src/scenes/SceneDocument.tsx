@@ -4,8 +4,9 @@ import {
   Button,
   IconChevronLeft,
   IconEye,
+  IconButton,
   IconCopy,
-  IconList,
+  IconMap,
   IconPencil,
   IconPlay,
   IconTrash,
@@ -23,7 +24,9 @@ import { useScenes } from "./context";
 import { pathForScene, SCENES_PATHS, type SceneStep } from "./routes";
 import { useSceneActions } from "./sceneActions";
 import { factsOf, needsOf, type SceneFacts } from "./sceneFacts";
-import { SceneListFlyout, StateChip } from "./pieces";
+import { StateChip } from "./pieces";
+import { SceneEncounterTab } from "./SceneEncounterTab";
+import { SceneListColumn } from "./SceneListColumn";
 import { ScenePreview, type SeeAs } from "./ScenePreview";
 import { SceneCodex, SceneTokens, SceneHistory, SceneLight, SceneMapFacts, SceneSound } from "./SceneQuestions";
 import "./scene-page.css";
@@ -66,7 +69,6 @@ function Section({
 export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
   const { state, token, maps, go, narrow, phone } = useScenes();
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId) ?? null;
-  const [listOpen, setListOpen] = useState(false);
   const [seeAs, setSeeAs] = useState<SeeAs>("gm");
   const splitRef = useRef<HTMLDivElement | null>(null);
   const [mapShare, moveSplit] = useMomentShare(null);
@@ -75,7 +77,7 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
     onDeleted: () => go(SCENES_PATHS.list),
     onDuplicated: (copyId) => go(pathForScene(copyId))
   });
-  const [tab, setTab] = useRememberedTab("vtt.scene-tab", ["scene", "tokens"], "scene", sceneId);
+  const [tab, setTab] = useRememberedTab("vtt.scene-tab", ["encounter", "scene", "tokens"], "encounter", sceneId);
   if (!scene)
     return (
       <div className="sc-missing">
@@ -90,16 +92,16 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
 
   const header = (
     <header className={cx("table-header sc-scene-head", seeAs !== "gm" && "is-preview")} aria-label="The scene">
-      {narrow ? (
+      {/* A laptop lists the scenes beside the page; a narrow screen goes back to them. */}
+      {narrow && (
         <Button variant="ghost" size="sm" onClick={() => go(SCENES_PATHS.list)} aria-label="Back to the scenes">
           <IconChevronLeft />
         </Button>
-      ) : (
-        <Button variant="ghost" size="sm" onClick={() => setListOpen(true)} aria-expanded={listOpen}>
-          <IconList /> Scenes
-        </Button>
       )}
       <h2 className="sc-scene-title">{scene.name}</h2>
+      <IconButton label={`Rename ${scene.name}`} size="sm" onClick={() => void actions.rename(scene)}>
+        <IconPencil />
+      </IconButton>
       <StateChip facts={facts} />
       <span className="sc-grow" />
       {/* A phone has no room for the choice beside the name, so its views are in the menu. */}
@@ -127,6 +129,11 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
             ))}
           </Select>
         </label>
+      )}
+      {!phone && (
+        <Button variant="secondary" size="sm" onClick={() => go(pathForScene(scene.id, "map"))}>
+          <IconMap /> Edit map
+        </Button>
       )}
       <Menu trigger="⋯" label={`${scene.name} actions`} align="end" hideCaret>
         {phone && (
@@ -248,18 +255,24 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
     </div>
   );
 
+  // Making this scene live parks the one that is live now, which the line under Make live says.
+  const liveNow = state.combat.scenes.find((candidate) => candidate.id === state.combat.activeSceneId) ?? null;
   const footer = facts.live ? (
     <Button variant="primary" onClick={() => go(pathForGmTab("table"))}>
       <IconPlay /> Go to the table
     </Button>
   ) : (
-    <Button variant="primary" onClick={() => void actions.makeLive(scene)}>
-      <IconPlay /> Make live
-    </Button>
+    <div className="sc-make-live">
+      <Button variant="primary" block onClick={() => void actions.makeLive(scene)}>
+        Make live
+      </Button>
+      {liveNow && <p className="sc-make-live-note">{liveNow.name} stops being live.</p>}
+    </div>
   );
 
   return (
-    <div className={cx("table-bench gm sc-scene-bench", !facts.live && "is-staging")}>
+    <div className={cx("table-bench gm sc-scene-bench", !facts.live && "is-staging", !narrow && "has-list")}>
+      {!narrow && <SceneListColumn currentId={scene.id} />}
       {header}
       <div
         className="table-bench-split"
@@ -275,6 +288,7 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
           <TablePanel
             label={`About ${scene.name}`}
             tabs={[
+              { id: "encounter", label: "Fight", content: <SceneEncounterTab facts={facts} /> },
               { id: "scene", label: "Scene", content: sceneTab },
               {
                 id: "tokens",
@@ -298,7 +312,6 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
           />
         </div>
       </div>
-      {!narrow && <SceneListFlyout open={listOpen} onClose={() => setListOpen(false)} currentId={scene.id} />}
       {actions.dialogs}
     </div>
   );

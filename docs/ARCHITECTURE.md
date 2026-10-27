@@ -1081,7 +1081,11 @@ the scene and map tables, a scene or a map as one document, or the steps that ma
 `TablePanel`, the tray) and edit the parked scene with its `sceneId`, so the table itself always shows the live
 scene. Placing on any map is a button and then a press on it (`armPlacement` in `scene/tableGeometry.ts`), or the
 spot menu a right-click or long press opens (`scene/MapSpotMenu.tsx`). The grid's calibration keeps its logic in
-`maps/useCalibration.tsx`, which returns its parts (note, body, actions, canvas) for the map's steps to place.
+`maps/useCalibration.tsx`, which returns its parts (note, body, actions, canvas) for the map's steps to place. On a
+laptop a scene's page lists the scenes down its left (`scenes/SceneListColumn.tsx`) with whether each is ready to go
+(`readinessOf` in `scenes/sceneFacts.ts`, worked out from the facts, never stored), and its panel leads with Fight
+(`scenes/SceneEncounterTab.tsx`): the monsters and the difficulty meter (`encounter/EncounterMeter.tsx`, the SRD budget
+for the staged party, with no reading when the catalog gives a monster no XP) and Ready to go.
 
 The character sheet lives in `sheet/` (ADR-0030). `CharacterSheet.tsx` is one component for every place it sits: a
 page (My character, `/characters/<id>`, `sheet.html`), the GM's dialog, or the table panel's Me and Sheet tabs. It

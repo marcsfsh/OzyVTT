@@ -180,6 +180,15 @@ describe("a scene's page", () => {
     const user = userEvent.setup();
     renderTab(`/scenes/${IDS.ambush}`);
     expect(await screen.findByRole("heading", { name: "Crypt ambush" })).toBeInTheDocument();
+    // The Encounter tab leads: Ready to go lists what applies, the walls too since vision is on.
+    const ready = within(screen.getByRole("region", { name: "Ready to go" }));
+    await waitFor(() => expect(ready.getByText("Sunken crypt is set, with its grid.")).toBeInTheDocument());
+    expect(ready.getByText("1 token waits in the tray, off the map.")).toBeInTheDocument();
+    expect(ready.getByText("Vision is on with 2 walls and doors drawn.")).toBeInTheDocument();
+    // The scene's list beside the page says which scenes are ready to go.
+    const list = within(screen.getByRole("navigation", { name: "Scenes" }));
+    expect(list.getAllByText("Draft").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("tab", { name: "Scene" }));
     expect(
       screen.getByText("Prepared. Players and the table screen see none of it until you make it live.")
     ).toBeInTheDocument();
@@ -225,7 +234,9 @@ describe("a scene's page", () => {
   });
 
   it("names the Codex session that stages it", async () => {
+    const user = userEvent.setup();
     renderTab(`/scenes/${IDS.ambush}`);
+    await user.click(await screen.findByRole("tab", { name: "Scene" }));
     expect(await screen.findByText("Session 6")).toBeInTheDocument();
   });
 

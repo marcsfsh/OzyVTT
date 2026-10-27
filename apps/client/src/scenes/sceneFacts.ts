@@ -181,3 +181,26 @@ export function whenLabel(at: number | string | null, now: number = Date.now()):
   if (days === 1) return "Yesterday";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
+
+/** Whether a scene can be made live as it stands, for Prep's list and checklist. A presentation of the facts; nothing
+ *  stored. Live comes first; then the map: none chosen, the library still loading, or chosen and gone from it; then
+ *  Ready when the grid is known and nothing needs the GM, Draft otherwise. A parked fight or a replay keeps its own label
+ *  beside this one. */
+export type Readiness = "live" | "ready" | "draft" | "needs-map" | "loading-map" | "map-unavailable";
+
+export const READINESS_LABEL: Readonly<Record<Readiness, string>> = {
+  live: "Live",
+  ready: "Ready",
+  draft: "Draft",
+  "needs-map": "Needs a map",
+  "loading-map": "Loading map",
+  "map-unavailable": "Map unavailable"
+};
+
+export function readinessOf(facts: SceneFacts, maps: readonly MapAsset[] | null): Readiness {
+  if (facts.live) return "live";
+  if (!facts.scene.mapAssetId) return "needs-map";
+  if (maps === null) return "loading-map";
+  if (!facts.map) return "map-unavailable";
+  return facts.grid !== "unknown" && needsOf(facts).length === 0 ? "ready" : "draft";
+}
