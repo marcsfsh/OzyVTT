@@ -36,7 +36,7 @@
     "id": "remarkable-athlete",
     "name": "Remarkable Athlete",
     "level": 3,
-    "description": "You have Advantage on Initiative rolls and Strength (Athletics) checks. In addition, immediately after you score a Critical Hit, you can move up to half your Speed without provoking Opportunity Attacks.",
+    "description": "Thanks to your athleticism, you have Advantage on Initiative rolls and Strength (Athletics) checks. In addition, immediately after you score a Critical Hit, you can move up to half your Speed without provoking Opportunity Attacks.",
     "modifiers": [
      {
       "type": "roll-mode",
@@ -88,7 +88,7 @@
     "id": "superior-critical",
     "name": "Superior Critical",
     "level": 15,
-    "description": "Your attack rolls with weapons and Unarmed Strikes can now score a Critical Hit on a roll of 18-20 on the d20.",
+    "description": "Your attack rolls with weapons and Unarmed Strikes can now score a Critical Hit on a roll of 18–20 on the d20.",
     "replacesFeatureId": "improved-critical",
     "modifiers": [
      {
@@ -113,7 +113,14 @@
     "id": "survivor",
     "name": "Survivor",
     "level": 18,
-    "description": "You attain the pinnacle of resilience in battle. You have Advantage on Death Saving Throws, and at the start of each of your turns you regain Hit Points equal to 5 plus your Constitution modifier if you are Bloodied and have at least 1 Hit Point."
+    "description": "You attain the pinnacle of resilience in battle, giving you these benefits. Defy Death. You have Advantage on Death Saving Throws. Moreover, when you roll 18–20 on a Death Saving Throw, you gain the benefit of rolling a 20 on it. Heroic Rally. At the start of each of your turns, you regain Hit Points equal to 5 plus your Constitution modifier if you are Bloodied and have at least 1 Hit Point.",
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "death-save",
+      "mode": "advantage"
+     }
+    ]
    }
   ]
  },
@@ -254,9 +261,10 @@
       "area": {
        "shape": "sphere",
        "sizeFeet": 10,
-       "widthFeet": null
+       "widthFeet": null,
+       "rangeFeet": 60
       },
-      "description": "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet. Each creature of your choice in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking the damage below on a failure and half as much on a success. One creature of your choice in that area regains the same amount in Hit Points. The damage and healing increase at Druid levels 10 and 14.",
+      "description": "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet of yourself. Each creature of your choice in a 10-foot-radius Sphere centered on that point makes a Constitution saving throw against your spell save DC, taking 2d6 Necrotic damage on a failed save or half as much damage on a successful one. One creature of your choice in that area regains 2d6 Hit Points. The damage and healing increase by 1d6 at Druid levels 10 (3d6) and 14 (4d6).",
       "save": {
        "ability": "con",
        "dc": "spellcasting",
@@ -285,6 +293,20 @@
         "formula": "4d6",
         "type": "necrotic"
        }
+      ],
+      "areaHealByLevel": [
+       {
+        "level": 3,
+        "formula": "2d6"
+       },
+       {
+        "level": 10,
+        "formula": "3d6"
+       },
+       {
+        "level": 14,
+        "formula": "4d6"
+       }
       ]
      }
     ],
@@ -301,7 +323,21 @@
     "id": "natural-recovery",
     "name": "Natural Recovery",
     "level": 6,
-    "description": "You can cast one of the level 1+ spells that you have prepared from your Circle Spells feature without expending a spell slot, and you must finish a Long Rest before you do so again. In addition, when you finish a Short Rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your Druid level (round up), and none of them can be level 6+. For example, if you're a level 6 Druid, you can recover up to three levels' worth of spell slots. You can recover a level 3 spell slot, a level 2 and a level 1 spell slot, or three level 1 spell slots. Once you recover spell slots with this feature, you can't do so again until you finish a Long Rest."
+    "description": "You can cast one of the level 1+ spells that you have prepared from your Circle Spells feature without expending a spell slot, and you must finish a Long Rest before you do so again. In addition, when you finish a Short Rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your Druid level (round up), and none of them can be level 6+. For example, if you're a level 6 Druid, you can recover up to three levels' worth of spell slots. You can recover a level 3 spell slot, a level 2 and a level 1 spell slot, or three level 1 spell slots. Once you recover spell slots with this feature, you can't do so again until you finish a Long Rest.",
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "natural-recovery-cast"
+    },
+    "freeCastOf": {
+     "features": [
+      "circle-of-the-land-spells",
+      "circle-of-the-land-spells-5",
+      "circle-of-the-land-spells-7",
+      "circle-of-the-land-spells-9"
+     ],
+     "minLevel": 1
+    }
    },
    {
     "id": "natures-ward",
@@ -392,7 +428,18 @@
        "widthFeet": null
       },
       "description": "As a Magic action, expend a use of your Wild Shape to make spectral trees and vines appear in a 15-foot Cube on the ground within 120 feet of yourself. They last 1 minute or until you have the Incapacitated condition or die. You and your allies have Half Cover while in that area, and your allies gain the current Resistance of your Nature's Ward there. As a Bonus Action you can move the Cube up to 60 feet to ground within 120 feet of yourself.",
-      "damage": []
+      "damage": [],
+      "zone": {
+       "on": [],
+       "affects": "allies",
+       "lastsRounds": 10,
+       "endsWhenUserIncapacitated": true,
+       "naturesWard": true,
+       "holds": {
+        "cover": "half",
+        "chosenDamage": "resistance"
+       }
+      }
      }
     ],
     "uses": {
@@ -698,7 +745,39 @@
       "name": "Cutting Words",
       "activation": "reaction",
       "description": "When a creature you can see within 60 feet makes a damage roll or succeeds on an ability check or attack roll, take a Reaction to expend one use of your Bardic Inspiration; roll your Bardic Inspiration die and subtract the number rolled from the creature's roll, reducing the damage or potentially turning the success into a failure.",
-      "damage": []
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "attack",
+        "check",
+        "damage"
+       ],
+       "whose": "other",
+       "rangeFeet": 60,
+       "when": "success",
+       "effect": {
+        "kind": "subtract",
+        "amount": "1d6"
+       }
+      },
+      "answerAmountByLevel": [
+       {
+        "level": 1,
+        "amount": "1d6"
+       },
+       {
+        "level": 5,
+        "amount": "1d8"
+       },
+       {
+        "level": 10,
+        "amount": "1d10"
+       },
+       {
+        "level": 15,
+        "amount": "1d12"
+       }
+      ]
      }
     ],
     "uses": {
@@ -720,7 +799,14 @@
      "kind": "spell",
      "choose": 2,
      "fromCatalog": "cleric-spells-or-druid-spells-or-wizard-spells"
-    }
+    },
+    "replaces": [
+     {
+      "offer": "feature:magical-discoveries",
+      "when": "level-up",
+      "amount": 1
+     }
+    ]
    },
    {
     "id": "peerless-skill",
@@ -733,7 +819,37 @@
       "name": "Peerless Skill",
       "activation": "other",
       "description": "When you make an ability check or attack roll and fail, expend one use of Bardic Inspiration; roll the Bardic Inspiration die and add the number rolled to the d20, potentially turning a failure into a success. On a failure, the Bardic Inspiration isn't expended.",
-      "damage": []
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "check",
+        "attack"
+       ],
+       "when": "failure",
+       "effect": {
+        "kind": "add",
+        "amount": "1d6",
+        "keepUseOnFailure": true
+       }
+      },
+      "answerAmountByLevel": [
+       {
+        "level": 1,
+        "amount": "1d6"
+       },
+       {
+        "level": 5,
+        "amount": "1d8"
+       },
+       {
+        "level": 10,
+        "amount": "1d10"
+       },
+       {
+        "level": 15,
+        "amount": "1d12"
+       }
+      ]
      }
     ],
     "uses": {
@@ -823,6 +939,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "acid",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -831,6 +948,21 @@
            "type": "damage-type-is",
            "damageTypes": [
             "acid"
+           ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
            ]
           }
          ]
@@ -851,6 +983,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "cold",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -859,6 +992,21 @@
            "type": "damage-type-is",
            "damageTypes": [
             "cold"
+           ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
            ]
           }
          ]
@@ -879,6 +1027,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "fire",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -887,6 +1036,21 @@
            "type": "damage-type-is",
            "damageTypes": [
             "fire"
+           ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
            ]
           }
          ]
@@ -907,6 +1071,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "lightning",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -915,6 +1080,21 @@
            "type": "damage-type-is",
            "damageTypes": [
             "lightning"
+           ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
            ]
           }
          ]
@@ -935,6 +1115,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "poison",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -943,6 +1124,21 @@
            "type": "damage-type-is",
            "damageTypes": [
             "poison"
+           ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
            ]
           }
          ]
@@ -974,7 +1170,8 @@
         "dragon-wings"
        ],
        "duration": {
-        "type": "manual"
+        "type": "minutes",
+        "minutes": 60
        },
        "modifiers": [
         {
@@ -1001,7 +1198,13 @@
       {
        "id": "summon-dragon",
        "level": 5,
-       "withoutSlot": "free"
+       "withoutSlot": "free",
+       "waives": [
+        "material"
+       ],
+       "summon": {
+        "concentrationOptional": true
+       }
       }
      ]
     },
@@ -1094,7 +1297,7 @@
     "id": "evocation-savant",
     "name": "Evocation Savant",
     "level": 3,
-    "description": "Choose two Wizard spells from the Evocation school, each of which must be level 1 or 2, and add them to your spellbook for free.",
+    "description": "Choose two Wizard spells from the Evocation school, each of which must be no higher than level 2, and add them to your spellbook for free. In addition, whenever you gain access to a new level of spell slots in this class, you can add one Wizard spell from the Evocation school to your spellbook for free. The chosen spell must be of a level for which you have spell slots.",
     "tags": [
      "spellbook"
     ],
@@ -1110,29 +1313,49 @@
     "id": "potent-cantrip",
     "name": "Potent Cantrip",
     "level": 3,
-    "description": "Your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the damage (if any) but suffers no additional effect from the cantrip."
+    "description": "Your damaging cantrips affect even creatures that avoid the brunt of the effect. When you cast a cantrip at a creature and you miss with the attack roll or the target succeeds on a saving throw against the cantrip, the target takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip."
    },
    {
     "id": "sculpt-spells",
     "name": "Sculpt Spells",
     "level": 6,
-    "description": "You can create pockets of relative safety within the effects of your evocations. When you cast an Evocation spell that affects other creatures you can see, you can choose a number of them equal to 1 plus the spell's level; the chosen creatures automatically succeed on their saving throws against the spell and take no damage if they would normally take half damage on a successful save."
+    "description": "You can create pockets of relative safety within the effects of your evocations. When you cast an Evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 plus the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save."
    },
    {
     "id": "empowered-evocation",
     "name": "Empowered Evocation",
     "level": 10,
-    "description": "You can add your Intelligence modifier to one damage roll of any Wizard Evocation spell you cast."
+    "description": "Whenever you cast a Wizard spell from the Evocation school, you can add your Intelligence modifier to one damage roll of that spell.",
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "abilityModifier": "int",
+      "oncePerCast": true,
+      "when": [
+       {
+        "type": "on-damage-roll"
+       },
+       {
+        "type": "spell-school-is",
+        "schools": [
+         "evocation"
+        ]
+       },
+       {
+        "type": "spell-class-is",
+        "classIds": [
+         "wizard"
+        ]
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "overchannel",
     "name": "Overchannel",
     "level": 14,
-    "description": "You can increase the power of your spells. When you cast a Wizard spell of levels 1-5 that deals damage, you can deal maximum damage with it. The first time you do so, you suffer no adverse effect; using it again before you finish a Long Rest deals necrotic damage to you.",
-    "uses": {
-     "limit": 1,
-     "per": "long-rest"
-    }
+    "description": "You can increase the power of your spells. When you cast a Wizard spell with a spell slot of levels 1–5 that deals damage, you can deal maximum damage with that spell on the turn you cast it. The first time you do so, you suffer no adverse effect. If you use this feature again before you finish a Long Rest, you take 2d12 Necrotic damage for each level of the spell slot immediately after you cast it. This damage ignores Resistance and Immunity. Each time you use this feature again before finishing a Long Rest, the Necrotic damage per spell level increases by 1d12."
    }
   ]
  },
@@ -1189,7 +1412,28 @@
       "minimum": 1
      },
      "per": "long-rest"
-    }
+    },
+    "actions": [
+     {
+      "id": "dark-ones-own-luck",
+      "name": "Dark One's Own Luck",
+      "activation": "other",
+      "description": "When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before any of its effects occur, no more than once per roll.",
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "check",
+        "save",
+        "death-save"
+       ],
+       "when": "any",
+       "effect": {
+        "kind": "add",
+        "amount": "1d10"
+       }
+      }
+     }
+    ]
    },
    {
     "id": "fiendish-resilience",
@@ -1344,7 +1588,7 @@
       "id": "hurl-through-hell",
       "name": "Hurl Through Hell",
       "activation": "other",
-      "description": "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
+      "description": "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or disappear and hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to the space it left or the nearest unoccupied one. Choose it on the hit's result.",
       "save": {
        "ability": "cha",
        "dc": "spellcasting",
@@ -1354,6 +1598,12 @@
        ],
        "failureDuration": {
         "type": "until-source-turn-end"
+       },
+       "failureEffect": {
+        "name": "Hurled Through Hell",
+        "tags": [
+         "off-plane"
+        ]
        }
       },
       "damage": [
@@ -1361,7 +1611,14 @@
         "formula": "8d10",
         "type": "psychic"
        }
-      ]
+      ],
+      "ridesHit": {
+       "rides": "attack-roll",
+       "oncePerTurn": true,
+       "sparesCreatureTypes": [
+        "fiend"
+       ]
+      }
      }
     ]
    },
@@ -1456,6 +1713,13 @@
     "name": "Hunter's Prey",
     "level": 3,
     "description": "You gain one of the following feature options of your choice. Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one. Colossus Slayer. Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn. Horde Breaker. Once on each of your turns when you make an attack with a weapon, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target, that is within the weapon's range, and that you haven't attacked this turn.",
+    "replaces": [
+     {
+      "offer": "feature:hunters-prey",
+      "when": "short-rest",
+      "amount": 1
+     }
+    ],
     "choice": {
      "kind": "hunters-prey",
      "choose": 1,
@@ -1463,7 +1727,28 @@
       {
        "id": "colossus-slayer",
        "name": "Colossus Slayer",
-       "description": "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn."
+       "description": "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn.",
+       "modifiers": [
+        {
+         "type": "extra-damage",
+         "formula": "1d8",
+         "oncePerTurn": true,
+         "when": [
+          {
+           "type": "on-hit"
+          },
+          {
+           "type": "attack-kind-is",
+           "kinds": [
+            "weapon"
+           ]
+          },
+          {
+           "type": "versus-hurt"
+          }
+         ]
+        }
+       ]
       },
       {
        "id": "horde-breaker",
@@ -1478,6 +1763,13 @@
     "name": "Defensive Tactics",
     "level": 7,
     "description": "You gain one of the following feature options of your choice. Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one. Escape the Horde. Opportunity Attacks have Disadvantage against you. Multiattack Defense. When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn.",
+    "replaces": [
+     {
+      "offer": "feature:defensive-tactics",
+      "when": "short-rest",
+      "amount": 1
+     }
+    ],
     "choice": {
      "kind": "defensive-tactics",
      "choose": 1,
@@ -1517,13 +1809,66 @@
     "id": "superior-hunters-prey",
     "name": "Superior Hunter's Prey",
     "level": 11,
-    "description": "Once per turn when you deal damage to a creature marked by your Hunter's Mark, you can also deal that spell's extra damage to a different creature that you can see within 30 feet of the first creature."
+    "description": "Once per turn when you deal damage to a creature marked by your Hunter's Mark, you can also deal that spell's extra damage to a different creature that you can see within 30 feet of the first creature.",
+    "actions": [
+     {
+      "id": "superior-hunters-prey",
+      "name": "Superior Hunter's Prey",
+      "activation": "other",
+      "description": "Once per turn when you deal damage to a creature marked by your Hunter's Mark, deal that spell's extra damage to a different creature you can see within 30 feet of the first creature.",
+      "damage": [
+       {
+        "formula": "1d6",
+        "type": "force"
+       }
+      ],
+      "damageByLevel": [
+       {
+        "level": 11,
+        "formula": "1d6",
+        "type": "force"
+       },
+       {
+        "level": 20,
+        "formula": "1d10",
+        "type": "force"
+       }
+      ],
+      "uses": {
+       "limit": 1,
+       "per": "turn",
+       "pool": "superior-hunters-prey"
+      },
+      "targets": {
+       "count": 1,
+       "seen": true,
+       "who": "others",
+       "nearMark": {
+        "tag": "hunters-mark",
+        "feet": 30
+       }
+      }
+     }
+    ]
    },
    {
     "id": "superior-hunters-defense",
     "name": "Superior Hunter's Defense",
     "level": 15,
-    "description": "When you take damage, you can take a Reaction to give yourself Resistance to that damage and any other damage of the same type until the end of the current turn."
+    "description": "When you take damage, you can take a Reaction to give yourself Resistance to that damage and any other damage of the same type until the end of the current turn.",
+    "actions": [
+     {
+      "id": "superior-hunters-defense",
+      "name": "Superior Hunter's Defense",
+      "activation": "reaction",
+      "description": "When you take damage, take a Reaction to give yourself Resistance to that damage and any other damage of the same type until the end of the current turn.",
+      "damage": [],
+      "reaction": {
+       "trigger": "takes-damage",
+       "response": "resist-type"
+      }
+     }
+    ]
    }
   ]
  },
@@ -1540,7 +1885,7 @@
     "id": "life-domain-spells",
     "name": "Life Domain Spells",
     "level": 3,
-    "description": "Your connection to this divine domain ensures you always have certain spells ready. When you reach a Cleric level specified in the Life Domain Spells table, you thereafter always have the listed spells prepared. Cleric level 3: Aid, Bless, Cure Wounds, Lesser Restoration. Level 5: Mass Healing Word, Revivify. Level 7: Aura of Life, Death Ward. Level 9: Greater Restoration, Mass Cure Wounds.",
+    "description": "Your connection to this divine domain ensures you always have certain spells ready. When you reach a Cleric level specified in the Life Domain Spells table, you thereafter always have the listed spells prepared. Life Domain Spells Cleric Level 3: Aid, Bless, Cure Wounds, Lesser Restoration; Cleric Level 5: Mass Healing Word, Revivify; Cleric Level 7: Aura of Life, Death Ward; Cleric Level 9: Greater Restoration, Mass Cure Wounds.",
     "tags": [
      "spellcasting"
     ],
@@ -1642,7 +1987,19 @@
     "id": "disciple-of-life",
     "name": "Disciple of Life",
     "level": 3,
-    "description": "When a spell you cast with a spell slot restores Hit Points to a creature, that creature regains additional Hit Points on the turn you cast the spell. The additional Hit Points equal 2 plus the spell slot's level."
+    "description": "When a spell you cast with a spell slot restores Hit Points to a creature, that creature regains additional Hit Points on the turn you cast the spell. The additional Hit Points equal 2 plus the spell slot's level.",
+    "modifiers": [
+     {
+      "type": "healing-bonus",
+      "amount": 2,
+      "perSlotLevel": true,
+      "when": [
+       {
+        "type": "on-healing"
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "preserve-life",
@@ -1657,7 +2014,7 @@
       "id": "preserve-life",
       "name": "Channel Divinity: Preserve Life",
       "activation": "action",
-      "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet (up to half each target's Hit Point maximum). The engine splits it evenly among the creatures you pick.",
+      "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet, which can include you, as you choose. None regains past half its Hit Point maximum.",
       "damage": [],
       "healing": {
        "formula": "0",
@@ -1666,6 +2023,10 @@
       },
       "adds": {
        "classLevel": 5
+      },
+      "targets": {
+       "rangeFeet": 30,
+       "bloodied": true
       }
      }
     ],
@@ -1679,13 +2040,36 @@
     "id": "blessed-healer",
     "name": "Blessed Healer",
     "level": 6,
-    "description": "The healing spells you cast on others heal you as well. Immediately after you cast a spell with a spell slot that restores Hit Points to one or more creatures other than yourself, you regain Hit Points equal to 2 plus the spell slot's level."
+    "description": "The healing spells you cast on others heal you as well. Immediately after you cast a spell with a spell slot that restores Hit Points to one or more creatures other than yourself, you regain Hit Points equal to 2 plus the spell slot's level.",
+    "modifiers": [
+     {
+      "type": "healing-bonus",
+      "amount": 2,
+      "perSlotLevel": true,
+      "self": true,
+      "when": [
+       {
+        "type": "on-healing"
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "supreme-healing",
     "name": "Supreme Healing",
     "level": 17,
-    "description": "When you would normally roll one or more dice to restore Hit Points to a creature with a spell or Channel Divinity, don't roll those dice for the healing; instead use the highest number possible for each die. For example, instead of restoring 2d6 Hit Points to a creature with a spell, you restore 12."
+    "description": "When you would normally roll one or more dice to restore Hit Points to a creature with a spell or Channel Divinity, don't roll those dice for the healing; instead use the highest number possible for each die. For example, instead of restoring 2d6 Hit Points to a creature with a spell, you restore 12.",
+    "modifiers": [
+     {
+      "type": "healing-dice-maximized",
+      "when": [
+       {
+        "type": "on-healing"
+       }
+      ]
+     }
+    ]
    }
   ]
  },
@@ -1736,8 +2120,38 @@
       "id": "sacred-weapon",
       "name": "Channel Divinity: Sacred Weapon",
       "activation": "other",
+      "timing": "attack-action",
       "description": "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
-      "damage": []
+      "damage": [],
+      "grants": {
+       "name": "Sacred Weapon",
+       "tags": [
+        "sacred-weapon"
+       ],
+       "duration": {
+        "type": "rounds",
+        "rounds": 100
+       },
+       "modifiers": [],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false,
+       "bindsWeapon": {
+        "melee": true,
+        "attackBonusAbility": {
+         "ability": "cha",
+         "minimum": 1
+        },
+        "damageTypes": [
+         "radiant"
+        ]
+       },
+       "light": {
+        "brightFeet": 20,
+        "dimFeet": 20
+       }
+      }
      }
     ]
    },
@@ -1795,6 +2209,11 @@
        "duration": {
         "type": "rounds",
         "rounds": 100
+       },
+       "light": {
+        "brightFeet": 30,
+        "dimFeet": 0,
+        "sunlight": true
        }
       }
      }
@@ -1907,7 +2326,49 @@
     "id": "frenzy",
     "name": "Frenzy",
     "level": 3,
-    "description": "If you use Reckless Attack while your Rage is active, you deal extra damage to the first target you hit on your turn with a Strength-based attack. To determine the extra damage, roll a number of d6s equal to your Rage Damage bonus, and add them together. The damage has the same type as the weapon or Unarmed Strike used for the attack."
+    "description": "If you use Reckless Attack while your Rage is active, you deal extra damage to the first target you hit on your turn with a Strength-based attack. To determine the extra damage, roll a number of d6s equal to your Rage Damage bonus, and add them together. The damage has the same type as the weapon or Unarmed Strike used for the attack.",
+    "actions": [
+     {
+      "id": "frenzy",
+      "name": "Frenzy",
+      "activation": "other",
+      "description": "If you use Reckless Attack while your Rage is active, you deal extra damage to the first target you hit on your turn with a Strength-based attack. To determine the extra damage, roll a number of d6s equal to your Rage Damage bonus and add them together. The damage has the same type as the weapon or Unarmed Strike used for the attack.",
+      "damage": [
+       {
+        "formula": "2d6",
+        "type": "bludgeoning"
+       }
+      ],
+      "damageByLevel": [
+       {
+        "level": 3,
+        "formula": "2d6",
+        "type": "bludgeoning"
+       },
+       {
+        "level": 9,
+        "formula": "3d6",
+        "type": "bludgeoning"
+       },
+       {
+        "level": 16,
+        "formula": "4d6",
+        "type": "bludgeoning"
+       }
+      ],
+      "ridesHit": {
+       "rides": "strength-attack",
+       "ownTurn": true,
+       "oncePerTurn": true,
+       "firstHitOnTurn": true,
+       "weaponType": true,
+       "whileEffectTags": [
+        "raging",
+        "reckless-attack"
+       ]
+      }
+     }
+    ]
    },
    {
     "id": "mindless-rage",
@@ -2020,7 +2481,18 @@
     "id": "second-story-work",
     "name": "Second-Story Work",
     "level": 3,
-    "description": "You've trained to get into especially hard-to-reach places, granting you these benefits. Climber. You gain a Climb Speed equal to your Speed. Jumper. You can determine your jump distance using your Dexterity rather than your Strength."
+    "description": "You've trained to get into especially hard-to-reach places, granting you these benefits. Climber. You gain a Climb Speed equal to your Speed. Jumper. You can determine your jump distance using your Dexterity rather than your Strength.",
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "climb",
+      "equalToSpeed": true
+     },
+     {
+      "type": "movement",
+      "rule": "jump-by-dexterity"
+     }
+    ]
    },
    {
     "id": "supreme-sneak",
@@ -2061,7 +2533,61 @@
     "id": "open-hand-technique",
     "name": "Open Hand Technique",
     "level": 3,
-    "description": "Whenever you hit a creature with an attack granted by your Flurry of Blows, you can impose one of the following effects on that target. Addle. The target can't make Opportunity Attacks until the start of its next turn. Push. The target must succeed on a Strength saving throw or be pushed up to 15 feet away from you. Topple. The target must succeed on a Dexterity saving throw or have the Prone condition."
+    "description": "Whenever you hit a creature with an attack granted by your Flurry of Blows, you can impose one of the following effects on that target. Addle. The target can't make Opportunity Attacks until the start of its next turn. Push. The target must succeed on a Strength saving throw or be pushed up to 15 feet away from you. Topple. The target must succeed on a Dexterity saving throw or have the Prone condition.",
+    "actions": [
+     {
+      "id": "open-hand-technique",
+      "name": "Open Hand Technique",
+      "activation": "other",
+      "description": "Whenever you hit a creature with an attack granted by your Flurry of Blows, impose one effect on it. Addle: it can't make Opportunity Attacks until the start of its next turn. Push: it makes a Strength saving throw or is pushed up to 15 feet away from you. Topple: it makes a Dexterity saving throw or has the Prone condition. Choose it on the hit's result.",
+      "damage": [],
+      "ridesHit": {
+       "rides": "flurry-of-blows",
+       "saveDc": {
+        "base": 8,
+        "ability": "wis",
+        "proficiencyBonus": true
+       },
+       "effectRequired": true,
+       "effects": [
+        {
+         "id": "addle",
+         "name": "Addle",
+         "applies": {
+          "name": "Addled",
+          "tags": [
+           "no-opportunity-attacks"
+          ],
+          "duration": {
+           "type": "until-bearer-next-turn"
+          }
+         }
+        },
+        {
+         "id": "push",
+         "name": "Push",
+         "save": {
+          "ability": "str",
+          "failurePush": {
+           "feet": 15,
+           "upTo": true
+          }
+         }
+        },
+        {
+         "id": "topple",
+         "name": "Topple",
+         "save": {
+          "ability": "dex",
+          "failureConditions": [
+           "prone"
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
    },
    {
     "id": "wholeness-of-body",
@@ -2128,17 +2654,42 @@
     },
     "actions": [
      {
+      "id": "quivering-palm-start",
+      "name": "Quivering Palm: start",
+      "activation": "other",
+      "description": "When you hit a creature with an Unarmed Strike, expend 4 Focus Points to start imperceptible vibrations in it, which last a number of days equal to your Monk level. Only one creature at a time can have them. Choose it on the hit's result.",
+      "damage": [],
+      "useCost": 4,
+      "ridesHit": {
+       "rides": "unarmed",
+       "applies": {
+        "name": "Quivering Palm",
+        "tags": [
+         "quivering-palm"
+        ],
+        "onePerSource": true
+       },
+       "appliesDaysPerLevel": true,
+       "reminder": "Quivering Palm: to end the vibrations harmlessly, end the effect from the creature's row."
+      }
+     },
+     {
       "id": "quivering-palm",
       "name": "Quivering Palm",
       "activation": "action",
-      "description": "End the vibrations you set in a creature. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one.",
+      "description": "End the vibrations you set in a creature, as an action or in place of one attack of the Attack action. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one. You and the target must be on the same plane of existence.",
       "damage": [
        {
         "formula": "10d12",
         "type": "force"
        }
       ],
-      "useCost": 4,
+      "replacesAttack": true,
+      "spendsNoUses": true,
+      "targets": {
+       "count": 1,
+       "markedBy": "quivering-palm"
+      },
       "save": {
        "ability": "con",
        "dc": {

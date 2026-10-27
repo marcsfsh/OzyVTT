@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import type { CastShaping } from "@vtt/schemas";
 import {
   resolveSpellcasting,
   type ActorDefinition,
@@ -61,26 +62,40 @@ const STATE_WORDS: Readonly<Record<RowState, string>> = {
   book: "Only in the spellbook"
 };
 
-/** One pool's slots as tappable pips: a filled pip spends down to it, an empty one restores up to it. */
+/** One pool's slots as tappable pips: a filled pip spends down to it, and for the GM an empty one restores up to it.
+ *  A player's empty pip only shows: a slot comes back by a rest or a feature, whose own control the server checks. A
+ *  slot made above the maximum (Font of Magic) is one more pip. */
 function SlotPips({
   label,
   pipLabel,
   pool,
   busy,
+  restore,
   onSet
-}: Readonly<{ label: string; pipLabel: string; pool: SlotPool; busy: boolean; onSet: (remaining: number) => void }>) {
+}: Readonly<{
+  label: string;
+  pipLabel: string;
+  pool: SlotPool;
+  busy: boolean;
+  restore: boolean;
+  onSet: (remaining: number) => void;
+}>) {
   return (
     <span className="cs-slotpips" role="group" aria-label={`${label} (${pool.remaining} of ${pool.max} left)`}>
-      {Array.from({ length: pool.max }, (_, index) => (
-        <button
-          key={index}
-          type="button"
-          className={`cs-pip interactive${index < pool.remaining ? " is-on" : ""}`}
-          disabled={busy}
-          aria-label={`${index < pool.remaining ? "Spend" : "Restore"} ${pipLabel}`}
-          onClick={() => onSet(index < pool.remaining ? index : index + 1)}
-        />
-      ))}
+      {Array.from({ length: Math.max(pool.max, pool.remaining) }, (_, index) =>
+        index < pool.remaining || restore ? (
+          <button
+            key={index}
+            type="button"
+            className={`cs-pip interactive${index < pool.remaining ? " is-on" : ""}`}
+            disabled={busy}
+            aria-label={`${index < pool.remaining ? "Spend" : "Restore"} ${pipLabel}`}
+            onClick={() => onSet(index < pool.remaining ? index : index + 1)}
+          />
+        ) : (
+          <span key={index} className="cs-pip is-spent" aria-hidden="true" />
+        )
+      )}
       <span className="cs-count">
         {pool.remaining}/{pool.max}
       </span>
@@ -132,7 +147,7 @@ export function SpellsTab({
   /** Hands a spell with no slot action to the turn's targeting; false when it has none now. */
   routeSpell: (spell: SheetSpellEntry) => boolean;
   /** Casts a spell through its action (with a slot, or a grant's free casting); the server spends it. */
-  castSpellAction: (actionId: string, slotLevel?: number) => void;
+  castSpellAction: (actionId: string, slotLevel?: number, shaping?: readonly CastShaping[]) => void;
   /** The server's sum of standing spell-save-DC riders (an item, a feat). */
   spellSaveDcBonus?: number;
   /** Whether a cast with no slot left, or of a spell not prepared, is refused here. */
@@ -262,10 +277,21 @@ export function SpellsTab({
         })
       : [];
 
+  /** A cast through an action, at a slot level when one is picked, shaped when its caster chose Metamagic. */
+  const castThrough = (actionId: string, slotLevel: number | undefined, shaping: readonly CastShaping[]) => {
+    if (shaping.length > 0) castSpellAction(actionId, slotLevel, shaping);
+    else if (slotLevel !== undefined) castSpellAction(actionId, slotLevel);
+    else castSpellAction(actionId);
+  };
   /** A slot cast: through the spell's action when it has one, else the slot is spent here and its dice rolled. */
-  const castAtSlot = (spell: SheetSpellEntry, content: ContentSpellSummary | undefined, slotLevel: number) => {
+  const castAtSlot = (
+    spell: SheetSpellEntry,
+    content: ContentSpellSummary | undefined,
+    slotLevel: number,
+    shaping: readonly CastShaping[] = []
+  ) => {
     if (spell.actionId && definition.actions.some((action) => action.id === spell.actionId && action.spellSlot)) {
-      castSpellAction(spell.actionId, slotLevel);
+      castThrough(spell.actionId, slotLevel, shaping);
       return;
     }
     // A Pact Magic slot goes first at its level, as the server spends them.
@@ -295,9 +321,13 @@ export function SpellsTab({
     });
   };
   /** A cantrip: through its action, else its die rolled here or a note that it was cast. */
-  const castCantrip = (spell: SheetSpellEntry, content: ContentSpellSummary | undefined) => {
+  const castCantrip = (
+    spell: SheetSpellEntry,
+    content: ContentSpellSummary | undefined,
+    shaping: readonly CastShaping[] = []
+  ) => {
     if (spell.actionId) {
-      castSpellAction(spell.actionId);
+      castThrough(spell.actionId, undefined, shaping);
       return;
     }
     if (routeSpell(spell)) return;
@@ -306,18 +336,21 @@ export function SpellsTab({
     if (formula) void rolls.rollFlat(formula, "damage", `${spell.name}${types}`);
     else onFeedback(`Cast ${spell.name}.`);
   };
-  const castWith = (row: SpellRow, choice: CastOption) => {
+  const castWith = (row: SpellRow, choice: CastOption, shaping: readonly CastShaping[] = []) => {
     const spell = row.spell!;
     setCasting(null);
-    if (choice.kind === "cantrip") castCantrip(spell, row.content);
-    else if (choice.kind === "free" && spell.freeActionId) castSpellAction(spell.freeActionId);
-    else if (choice.kind === "ritual" && spell.ritualActionId) castSpellAction(spell.ritualActionId);
-    else castAtSlot(spell, row.content, choice.level);
+    if (choice.kind === "cantrip") castCantrip(spell, row.content, shaping);
+    else if (choice.kind === "free" && spell.freeActionId) castThrough(spell.freeActionId, undefined, shaping);
+    else if (choice.kind === "ritual" && spell.ritualActionId) castThrough(spell.ritualActionId, undefined, shaping);
+    else castAtSlot(spell, row.content, choice.level, shaping);
   };
   /** A tap on Cast: one way to cast it goes at once, several open the cast detail. */
   const startCast = (row: SpellRow) => {
     const choices = choicesOf(row);
-    if (choices.length === 1 && choices[0]!.available && choices[0]!.kind !== "slot") castWith(row, choices[0]!);
+    // A spell its caster may shape (Metamagic) opens its cast, where the options are offered.
+    const shapeable = (actionOf(row.spell?.actionId)?.shaping?.options.length ?? 0) > 0;
+    if (choices.length === 1 && choices[0]!.available && choices[0]!.kind !== "slot" && !shapeable)
+      castWith(row, choices[0]!);
     else setCasting(row.id);
   };
   const setPrepared = (row: SpellRow, prepared: boolean) =>
@@ -361,7 +394,7 @@ export function SpellsTab({
       aimed={aimed}
       busy={busy}
       onBack={() => setCasting(null)}
-      onCast={(choice) => castWith(castingRow, choice)}
+      onCast={(choice, shaping) => castWith(castingRow, choice, shaping)}
     />
   ) : null;
   const bookPanel =
@@ -398,7 +431,23 @@ export function SpellsTab({
         </button>
       );
     if (!castable) return null;
-    if (row.state === "book") return <span className="cs-spell-where">In the book</span>;
+    if (row.state === "book") {
+      // A Wizard's Ritual Adept casts a ritual from the book unprepared; the server lists that cast while it may.
+      const ritualId = `spell-${row.id}-ritual`;
+      if (row.ritual && serverActions.some((action) => action.id === ritualId))
+        return (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            aria-label={`Cast ${row.name} as a Ritual`}
+            onClick={() => castSpellAction(ritualId)}
+          >
+            Ritual
+          </Button>
+        );
+      return <span className="cs-spell-where">In the book</span>;
+    }
     if (row.state === "unprepared" && keepsList) {
       if (row.spell?.ritualActionId)
         return (
@@ -456,14 +505,17 @@ export function SpellsTab({
         <section className="cs-card cs-caution" role="group" aria-label="Change prepared spells">
           <strong>Change your prepared spells</strong>
           <p className="cs-sub">
-            The Long Rest opened this step.
+            {actor.restStep?.after === "short-rest"
+              ? "The Short Rest opened this step: Memorize Spell swaps one prepared spell."
+              : "The Long Rest opened this step."}
             {keepsList && cap > 0 ? ` ${counted} of ${cap} are prepared; turn one off to prepare another.` : ""}
             {actor.preparation?.changesLeft != null
               ? ` ${actor.preparation.changesLeft} ${actor.preparation.changesLeft === 1 ? "change is" : "changes are"} left.`
               : ""}
           </p>
           {rechoices
-            .filter((choice) => choice.per === "long-rest")
+            // A pick of several is swapped in the rest step on the Features tab; none waits on a Short Rest here.
+            .filter((choice) => choice.per === "long-rest" && !choice.held && actor.restStep?.after !== "short-rest")
             .map((choice) => (
               <label key={choice.offer} className="cs-field">
                 <span className="cs-eyebrow">{choice.label}</span>
@@ -565,6 +617,7 @@ export function SpellsTab({
             pipLabel="a Pact Magic slot"
             pool={pact}
             busy={busy}
+            restore={role === "gm"}
             onSet={(next) =>
               void edit("character:set-slot", { actorId: actor.id, level: pact.level, remaining: next, pact: true })
             }
@@ -591,6 +644,7 @@ export function SpellsTab({
                   pipLabel={`a level ${spellLevel} slot`}
                   pool={pool}
                   busy={busy}
+                  restore={role === "gm"}
                   onSet={(next) =>
                     void edit("character:set-slot", { actorId: actor.id, level: spellLevel, remaining: next })
                   }
@@ -644,9 +698,9 @@ export function SpellsTab({
         <section className="cs-group" role="group" aria-label="Spellbook">
           <span className="cs-eyebrow">Spellbook</span>
           <div className="cs-chiprow">
-            {book.freeLeft > 0 && (
+            {book.freeLeft + (book.freeOfSchool?.left ?? 0) > 0 && (
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => setPanel("add")}>
-                Add from your levels ({book.freeLeft})
+                Add from your levels ({book.freeLeft + (book.freeOfSchool?.left ?? 0)})
               </Button>
             )}
             <Button size="sm" variant="secondary" disabled={busy} onClick={() => setPanel("copy")}>

@@ -1,3 +1,6 @@
+import { formEffectOf, gearMerged, isFormDefinitionId } from "./transform/forms.js";
+import { transparentEffects } from "./transparent.js";
+import { carriedObjectEffects } from "./carried-objects.js";
 import { makeHitDicePool, type Actor, type ActorDefinition, type GameState, type HitDiceEntry } from "@vtt/domain";
 import type { ActorAction } from "@vtt/schemas";
 import {
@@ -16,8 +19,10 @@ import {
   type UnarmoredDefense
 } from "@vtt/rules-5e";
 import { withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
+import { withStatBlockSpellcasting } from "./statblock-spellcasting.js";
 import { storedClassSequence } from "./character-offers.js";
-import { endEffectsSustainedBy } from "./effects.js";
+import { syncBookOfShadows } from "./book-of-shadows.js";
+import { endEffect, endEffectsSustainedBy } from "./effects.js";
 import { actionPools, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -219,11 +224,30 @@ export function unarmoredDefensesOf(definition: ActorDefinition, catalog?: Equip
  * Defenses) only one applies at a time (SRD Multiclassing): the best.
  */
 export function storedArmorClass(actor: Actor, definition: ActorDefinition, catalog?: EquipmentCatalog): number {
+  return armorClassWith(actor, definition, catalog, []);
+}
+
+/** `storedArmorClass` with more ways to work out base AC while no armor is worn (Mage Armor's 13 + Dexterity). */
+function armorClassWith(
+  actor: Actor,
+  definition: ActorDefinition,
+  catalog: EquipmentCatalog | undefined,
+  extra: readonly UnarmoredDefense[]
+): number {
   if (actor.armorClassOverride !== undefined) return actor.armorClassOverride;
   const derivation = deriveEquipment(actor, definition, catalog);
   const dex = abilityModifier(definition.abilityScores.dex);
-  const items = withResolvedSlots(actor.inventory, catalog);
-  const unarmored = unarmoredDefensesOf(definition, catalog);
+  // Gear melded into a form is worn by nothing. Armor acid or rust marked offers that much less AC (`row-penalties.ts`).
+  const items = gearMerged(actor)
+    ? []
+    : withResolvedSlots(actor.inventory, catalog).map((item) =>
+        item.penalty !== undefined && item.armor
+          ? { ...item, armor: { ...item.armor, acBase: item.armor.acBase - item.penalty } }
+          : item
+      );
+  // An item's base AC while no armor is worn (Robe of the Archmagi) is one more way, chosen as Unarmored Defense is.
+  const fromItems = derivation.baseArmorClasses.map((base) => ({ bonus: base - 10, allowShield: true }));
+  const unarmored = [...unarmoredDefensesOf(definition, catalog), ...extra, ...fromItems];
   const training = { shield: derivation.untrainedShield === null };
   const worn = [null, ...unarmored]
     .map((option) => armorClassFromEquipment(dex, items, option, training))
@@ -232,8 +256,36 @@ export function storedArmorClass(actor: Actor, definition: ActorDefinition, cata
   if (armorClassFromLoadout(definition))
     return (equipmentAc ?? 10 + dex + Math.max(0, ...unarmored.map((option) => option.bonus))) + derivation.armorClass;
   const base =
-    equipmentAc !== null && wornBodyArmor(items) ? equipmentAc + armorClassRiderOf(definition) : definition.armorClass;
+    equipmentAc !== null && wornBodyArmor(items)
+      ? equipmentAc + armorClassRiderOf(definition)
+      : Math.max(definition.armorClass, ...[...extra, ...fromItems].map((option) => 10 + dex + option.bonus));
   return base + derivation.armorClass;
+}
+
+/**
+ * A live effect's way to work out base AC (SRD Mage Armor: "base AC becomes 13 plus its Dexterity modifier") is chosen
+ * like Unarmored Defense: the creature's AC with it is the best of its ways, and its other AC bonuses (a Ring of
+ * Protection, a Shield) add to it as they add to any. What it raises the stored AC by is kept on the effect as its AC
+ * bonus, and worked out again whenever the stored AC is (equipment, content). True when any changed.
+ */
+export function refreshBaseArmorClass(
+  actor: Actor,
+  definition: ActorDefinition,
+  catalog: EquipmentCatalog | undefined
+): boolean {
+  if (!actor.effects.some((effect) => effect.baseArmorClass !== undefined)) return false;
+  const without = storedArmorClass(actor, definition, catalog);
+  let changed = false;
+  actor.effects = actor.effects.map((effect) => {
+    if (effect.baseArmorClass === undefined) return effect;
+    const option = { bonus: effect.baseArmorClass - 10, allowShield: true };
+    const gain = Math.min(10, armorClassWith(actor, definition, catalog, [option]) - without);
+    const { armorClassBonus: _old, ...rest } = effect;
+    const next: typeof effect = gain > 0 ? { ...rest, armorClassBonus: gain } : rest;
+    if (next.armorClassBonus !== effect.armorClassBonus) changed = true;
+    return next;
+  });
+  return changed;
 }
 
 /** Re-derives every stored AC from current content. Inventory writes reconcile AC, but a homebrew publish or a
@@ -248,6 +300,7 @@ export function reconcileArmorClasses(
   for (const actor of state.actors) {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
     if (!definition) continue;
+    if (refreshBaseArmorClass(actor, definition, catalog)) changed = true;
     const next = storedArmorClass(actor, definition, catalog);
     if (actor.armorClass === next) continue;
     actor.armorClass = next;
@@ -325,8 +378,16 @@ function instantiate(
     armorClass: storedArmorClass(seed, definition, catalog),
     initiative: definition.initiativeBonus + derivation.initiative,
     ownerSessionId: null,
-    conditions: [],
-    effects: [],
+    // A stat block that says it "has the Invisible condition" (an invisible stalker) joins the roster with it.
+    conditions: (definition.traitMechanics ?? []).some((trait) => trait.kind === "invisible")
+      ? [{ id: "invisible" as const }]
+      : [],
+    // What it carries with statistics of its own (a night hag's soul bag, a mummy lord's heart), and a gelatinous
+    // cube's Transparent, which starts it unnoticed.
+    effects: [
+      ...carriedObjectEffects(id, definition.name, definition),
+      ...transparentEffects(id, definition.name, definition)
+    ],
     deathSaves: null,
     actionUses: {},
     heroicInspiration: false,
@@ -341,6 +402,8 @@ function instantiate(
     preparedSpellIds: seedPreparedSpellIds(definition),
     spellbook: [],
     preparation: null,
+    restStep: null,
+    readyAt: {},
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,
@@ -366,6 +429,19 @@ export function addActorFromDefinition(
   instantiate(state, definition, id, visibility, "monster", definition.source.externalId, catalog);
 }
 
+/** A summoned creature's actor (`summons.ts`): a creature from `definition`, a bundled stat block by its id or the
+ *  scaled copy the summon stored under `definitionId`. */
+export function addSummonedActor(
+  state: GameState,
+  definition: ActorDefinition,
+  id: string,
+  visibility: "public" | "gm-only",
+  definitionId: string,
+  catalog?: EquipmentCatalog
+) {
+  instantiate(state, definition, id, visibility, "monster", definitionId, catalog);
+}
+
 /** Imports a canonical ActorDefinition and instantiates a live actor; characters become claimable. */
 export function importActorDefinition(
   state: GameState,
@@ -374,7 +450,7 @@ export function importActorDefinition(
   visibility: "public" | "gm-only",
   catalog?: EquipmentCatalog
 ) {
-  if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS)
+  if (state.definitions.filter((entry) => !isFormDefinitionId(entry.id)).length >= MAX_IMPORTED_DEFINITIONS)
     throw new CommandRejectedError("The imported-sheet library is full. Remove unused combatants first.");
   const definitionId = `import-${actorId}`;
   const kind = definition.schemaId === "vtt.actor-character" ? ("player-character" as const) : ("monster" as const);
@@ -383,12 +459,18 @@ export function importActorDefinition(
   state.definitions = [...state.definitions, { id: definitionId, definition: filled }];
 }
 
-/** The definition with its actions' prose facts filled (`withProseFacts`), as it enters the campaign. */
+/** The definition with its actions' prose facts filled (`withProseFacts`), as it enters the campaign, and for a stat
+ *  block the spells its Spellcasting and casting actions name (`castsSpells`), read as the SRD bundle's are. */
 export function withDefinitionProseFacts(definition: ActorDefinition): ActorDefinition {
-  const actions = definition.actions.map((action) => withProseFacts(action));
-  return actions.every((action, index) => action === definition.actions[index])
-    ? definition
-    : { ...definition, actions };
+  const prose = definition.actions.map((action) => withProseFacts(action));
+  const actions = definition.schemaId === "vtt.actor-monster" ? withStatBlockSpellcasting(prose, definition) : prose;
+  const unchanged =
+    actions.length === definition.actions.length &&
+    actions.every(
+      (action, index) =>
+        action === definition.actions[index] || JSON.stringify(action) === JSON.stringify(definition.actions[index])
+    );
+  return unchanged ? definition : { ...definition, actions };
 }
 
 /** Fills prose facts on stored definitions imported before the fields existed. True when any changed. */
@@ -434,6 +516,17 @@ export function assertNotArchived(state: GameState, actorId: string) {
   if (actor?.archived) throw new CommandRejectedError(`${actor.name} is archived. Restore ${actor.name} first.`);
 }
 
+/** The fight a combatant is in: the live one, a paused one in a prepared scene (whose action ids and pools a rebuild
+ *  would invalidate), or none. */
+export function fightHolding(state: GameState, actorId: string): "live" | "paused" | null {
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) return "live";
+  return state.combat.scenes.some(
+    (scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId)
+  )
+    ? "paused"
+    : null;
+}
+
 /**
  * Rebuilds one character in place (level up/down, respec) from a definition built by
  * `buildCharacterDefinition`. Keeps table identity and campaign state (conditions, effects, notes,
@@ -453,6 +546,9 @@ export function rebuildActorDefinition(
   if (!actor) throw new CommandRejectedError("That character no longer exists.");
   if (actor.kind !== "player-character") throw new CommandRejectedError("Only characters can be rebuilt.");
   const definitionId = `import-${actorId}`;
+  // The sheet a form replaced comes back when the form ends; rebuilding it under the form would be lost then.
+  const form = formEffectOf(actor);
+  if (form) throw new CommandRejectedError(`${actor.name} is in ${form.name}. End it before changing the sheet.`);
   // A bundled/example definition is not ours to rewrite.
   if (actor.definitionId !== definitionId)
     throw new CommandRejectedError("That character was not built here, so it can't be rebuilt.");
@@ -461,17 +557,10 @@ export function rebuildActorDefinition(
       "Finish reviewing the combat history before rebuilding a character.",
       "history_review"
     );
-  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) {
-    throw new CommandRejectedError("End the encounter before rebuilding a character who is in it.");
-  }
-  // A parked scene can hold a paused fight whose action ids and pools this rebuild would invalidate.
-  if (
-    state.combat.scenes.some(
-      (scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId)
-    )
-  ) {
+  const fight = fightHolding(state, actorId);
+  if (fight === "live") throw new CommandRejectedError("End the encounter before rebuilding a character who is in it.");
+  if (fight === "paused")
     throw new CommandRejectedError("End the paused encounter in the prepared scene that uses this character first.");
-  }
 
   // Carry over the old sheet's `hp-roll` rows for levels the new build doesn't cover, so levelling back
   // up restores the original rolls.
@@ -484,6 +573,9 @@ export function rebuildActorDefinition(
   const rebuilt = rememberHitPointRolls(previous, definition);
 
   const inventory = actor.inventory.map((item) => ({ ...item }));
+  const previousPools = previous
+    ? new Set(actionPools(effectiveActions(previous, { ...actor, inventory }, catalog)).map((pool) => pool.id))
+    : new Set<string>();
   const armorClass = storedArmorClass({ ...actor, inventory } as Actor, definition, catalog);
   const derivation = deriveEquipment({ ...actor, inventory } as Actor, definition, catalog);
   const previousMaximum = actor.hp.maximum;
@@ -506,9 +598,14 @@ export function rebuildActorDefinition(
   );
   actor.pactSlots = carriedPactSlots(actor.pactSlots, pactSlotMaximum(previous), seedPactSlots(definition));
   actor.preparedSpellIds = carriedPreparedSpells(actor.preparedSpellIds, previous, definition);
-  actor.actionUses = carriedUses(actor.actionUses, effectiveActions(definition, { ...actor, inventory }, catalog));
+  actor.actionUses = carriedUses(
+    actor.actionUses,
+    effectiveActions(definition, { ...actor, inventory }, catalog),
+    previousPools
+  );
   actor.size = definition.size;
   actor.sizeCells = Math.max(definition.token.footprint.width, definition.token.footprint.height);
+  syncBookOfShadows(state, actor, previous, definition);
   state.definitions = state.definitions.map((entry) =>
     entry.id === definitionId ? { id: definitionId, definition: rebuilt } : entry
   );
@@ -530,13 +627,23 @@ function dropsAClass(previous: ActorDefinition | undefined, next: ActorDefinitio
   return before.some((entry) => !kept.has(entry.id) && !(sequence !== null && sequence.indexOf(entry.id) + 1 > level));
 }
 
-/** Spent counts kept against the new limits; a pool the new sheet no longer has is dropped. */
-function carriedUses(spent: Actor["actionUses"], actions: readonly ActorAction[]): Actor["actionUses"] {
+/**
+ * Spent counts kept against the new limits; a pool the new sheet no longer has is dropped. A key that was no pool
+ * of the old sheet is a counter a rule keeps (Relentless Rage's DC, Overchannel's uses, a Healer's Kit's spent uses,
+ * a once-per-rest conversion), so it is kept as it stands.
+ */
+function carriedUses(
+  spent: Actor["actionUses"],
+  actions: readonly ActorAction[],
+  previousPools: ReadonlySet<string>
+): Actor["actionUses"] {
   const limits = new Map(actionPools(actions).map((pool) => [pool.id, pool.limit]));
   const carried: Record<string, number> = {};
   for (const [key, used] of Object.entries(spent)) {
+    if (used <= 0) continue;
     const limit = limits.get(key);
-    if (limit !== undefined && used > 0) carried[key] = Math.min(used, limit);
+    if (limit !== undefined) carried[key] = Math.min(used, limit);
+    else if (!previousPools.has(key)) carried[key] = used;
   }
   return carried;
 }
@@ -616,6 +723,9 @@ export function removeActor(state: GameState, actorId: string) {
     if (!actor.archived) throw new CommandRejectedError("Release that character's claim before removing it.");
     actor.ownerSessionId = null;
   }
+  // A creature leaves the roster in its true form, so its own sheet goes with it and no form is left stored.
+  const form = formEffectOf(actor);
+  if (form) endEffect(state, actorId, form.id);
   if (actor.kind === "player-character" && !actor.definitionId?.startsWith("import-"))
     throw new CommandRejectedError("Player characters can't be removed from the roster.");
   // A recorded snapshot may reference this actor; make the GM leave history review first.

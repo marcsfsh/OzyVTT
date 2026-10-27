@@ -8,6 +8,7 @@ import { command } from "../lib/command";
 import { FaceEntry, RerollControl } from "./RollControls";
 import { SavePrompt } from "./SavePrompt";
 import { checkLine } from "../sheet/useSheetRolls";
+import { CallSituations, toggled } from "../dice/CallSituations";
 import "../dice/roll-calls.css";
 
 type Entry = PlayerRollCall["entries"][number];
@@ -106,6 +107,8 @@ export function RollCallCard({
   // The answer was typed from a physical die, so a Heroic Inspiration reroll is typed too.
   const [typed, setTyped] = useState(false);
   const [rerolled, setRerolled] = useState<CheckRollResult | null>(null);
+  // The situations the player turned on for this check (a Book's topic).
+  const [picked, setPicked] = useState<readonly string[]>([]);
   const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
   const name = actor?.name ?? "Your character";
   const inspired = actor?.heroicInspiration === true;
@@ -118,7 +121,8 @@ export function RollCallCard({
     const result = await command("roll-call:answer", {
       callId: call.id,
       actorId: entry.actorId,
-      ...(face !== undefined ? { face } : {})
+      ...(face !== undefined ? { face } : {}),
+      ...(picked.length > 0 ? { situations: [...picked] } : {})
     });
     setBusy(false);
     if (!result.ok) toast(result.message ?? "That roll was refused.", { tone: "error" });
@@ -181,19 +185,27 @@ export function RollCallCard({
           <p className="roll-call-waiting">Waiting for the save.</p>
         )
       ) : (
-        <span className="save-prompt-actions">
-          <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => void answer()}>
-            Roll {label}
-          </button>
-          {mayType && (
-            <FaceEntry
-              label={`Your d20 for the ${label}`}
-              busy={busy}
-              onFace={(face) => void answer(face)}
-              onInvalid={(message) => toast(message, { tone: "error" })}
-            />
-          )}
-        </span>
+        <>
+          <CallSituations
+            situations={entry.situations}
+            picked={picked}
+            busy={busy}
+            onToggle={(situation) => setPicked((current) => toggled(current, situation))}
+          />
+          <span className="save-prompt-actions">
+            <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => void answer()}>
+              Roll {label}
+            </button>
+            {mayType && (
+              <FaceEntry
+                label={`Your d20 for the ${label}`}
+                busy={busy}
+                onFace={(face) => void answer(face)}
+                onInvalid={(message) => toast(message, { tone: "error" })}
+              />
+            )}
+          </span>
+        </>
       )}
     </article>
   );

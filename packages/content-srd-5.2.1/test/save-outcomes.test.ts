@@ -23,7 +23,12 @@ function saveBlocksIn(file: string): Array<{ path: string; save: SaveBlock }> {
       const record = node as Record<string, unknown>;
       if (record.save && typeof record.save === "object")
         found.push({ path: `${path}${record.id ? `(${String(record.id)})` : ""}`, save: record.save as SaveBlock });
-      for (const [key, child] of Object.entries(record)) walk(child, `${path}.${key}`);
+      // A hit rider's save (a Cunning Strike's Trip, Giant Slayer's) does nothing on a success by its own shape, and so
+      // does the save a melee hit on an aura's bearer costs its attacker (Holy Aura's Blinded); a rest trigger's (an
+      // otyugh's poison after a Long Rest) ends its effect on a success.
+      for (const [key, child] of Object.entries(record))
+        if (key !== "ridesHit" && key !== "onHit" && key !== "struck" && key !== "atRest")
+          walk(child, `${path}.${key}`);
     }
   };
   walk(JSON.parse(readFileSync(join(bundlesDir, file), "utf8")), file);
@@ -48,7 +53,7 @@ describe("save outcomes in the shipped content", () => {
     expect(blocks.length).toBeGreaterThan(300);
     const incomplete = blocks.filter(
       ({ save }) =>
-        (save.successDamage !== "half" && save.successDamage !== "none") ||
+        (save.successDamage !== "half" && save.successDamage !== "none" && save.successDamage !== "full") ||
         !(
           Array.isArray(save.failureConditions) &&
           save.failureConditions.every((id: unknown) => SaveConditionSchema.safeParse(id).success)
@@ -173,12 +178,14 @@ describe("save outcomes in the shipped content", () => {
   });
 
   it("reads 'while X, also Y', Speed 0 and ending on damage", () => {
+    // A creature with Truesight sees through the pattern and succeeds outright.
     expect(spellSave("hypnotic-pattern")).toEqual({
       ability: "wis",
       successDamage: "none",
       failureConditions: ["charmed", "incapacitated"],
       endsOnDamage: true,
-      speedZero: true
+      speedZero: true,
+      autoSuccess: { truesight: true }
     });
     expect(monsterAction("chuul", "paralyzing-tentacles").save).toMatchObject({
       failureConditions: ["poisoned", "paralyzed"]
@@ -209,32 +216,41 @@ describe("save outcomes in the shipped content", () => {
     ]);
     // A rider that waits on a charge stays prose.
     expect(monsterAction("elk", "ram").onHit).toBeUndefined();
-    // No end printed in the hit's sentence: it lasts until ended (the otyugh's save after a Long Rest is the GM's).
-    expect(monsterAction("otyugh", "bite").onHit).toEqual([{ conditions: [{ id: "poisoned" }] }]);
+    // No end printed in the hit's sentence: it lasts until a save after a Long Rest ends it.
+    expect(monsterAction("otyugh", "bite").onHit).toEqual([
+      {
+        conditions: [{ id: "poisoned" }],
+        name: "Poisoned",
+        atRest: { at: "long-rest", save: { ability: "con", dc: 15 }, maximumLoss: "1d10" }
+      }
+    ]);
   });
 
   it("reads damage a failure brings at the start of each turn, and leaves it out of the GM's reminder", () => {
     expect(monsterAction("behir", "swallow")).toMatchObject({
       save: {
         failureConditions: ["blinded", "restrained"],
-        ongoingDamage: { damage: [{ formula: "6d6", type: "acid" }], at: "source-turn-start" }
+        ongoingDamage: { damage: [{ formula: "6d6", type: "acid" }], at: "source-turn-start" },
+        failureEffect: { name: "Swallowed", tags: ["swallowed"] }
       },
-      reminder:
-        "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir."
+      swallow: { capacity: 1, regurgitate: { damage: 30, dc: 14, withinFeet: 10 } }
     });
+    // The engine runs the swallowed creature's conditions and cover, so no reminder is left.
+    expect(monsterAction("behir", "swallow")).not.toHaveProperty("reminder");
     expect(monsterAction("remorhaz", "swallow").save?.ongoingDamage?.damage).toEqual([
       { formula: "3d6", type: "acid" },
       { formula: "3d6", type: "fire" }
     ]);
+    // The no-healing rides the poison's own effect and the engine repeats the save, so nothing is left to remind.
     expect(monsterAction("pit-fiend", "bite")).toMatchObject({
       save: {
         failureConditions: ["poisoned"],
         repeatSave: true,
-        ongoingDamage: { damage: [{ formula: "6d6", type: "poison" }], at: "bearer-turn-start" }
-      },
-      reminder:
-        "While Poisoned, the target can't regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
+        ongoingDamage: { damage: [{ formula: "6d6", type: "poison" }], at: "bearer-turn-start" },
+        failureEffect: { name: "Poisoned", tags: ["no-healing"] }
+      }
     });
+    expect(monsterAction("pit-fiend", "bite").reminder).toBeUndefined();
     // A reminder that was only the damage goes.
     expect(monsterAction("vrock", "spores").save?.ongoingDamage?.at).toBe("bearer-turn-start");
     expect(monsterAction("vrock", "spores").reminder).toBeUndefined();
@@ -258,5 +274,74 @@ describe("a failure's push", () => {
     // A hit's push is the attack's own.
     const giant = loadMonsterDefinitions().find((entry) => entry.source.externalId === "fire-giant")!;
     expect(giant.actions.find((action) => action.id === "hammer-throw")?.onHitPush).toEqual({ feet: 15, upTo: true });
+  });
+});
+
+describe("what a stat block's failure does beyond its first conditions", () => {
+  it("reads a second failure, after one repeat at the end of the target's next turn", () => {
+    expect(monsterAction("adult-brass-dragon", "sleep-breath").save).toMatchObject({
+      failureConditions: ["incapacitated"],
+      failureDuration: { type: "until-bearer-turn-end" },
+      repeatOnce: true,
+      secondFailure: { conditions: ["unconscious"], duration: { type: "rounds", rounds: 100 }, endsOnDamage: true }
+    });
+    expect(monsterAction("silver-dragon-wyrmling", "paralyzing-breath").save?.secondFailure).toEqual({
+      conditions: ["paralyzed"],
+      duration: { type: "rounds", rounds: 10 },
+      repeatSave: true
+    });
+    expect(monsterAction("basilisk", "petrifying-gaze-recharge-4-6").save).toMatchObject({
+      failureConditions: ["restrained"],
+      repeatOnce: true,
+      secondFailure: { conditions: ["petrified"] }
+    });
+    expect(monsterAction("cockatrice", "petrifying-bite").save?.secondFailure).toEqual({
+      conditions: ["petrified"],
+      duration: { type: "minutes", minutes: 1440 }
+    });
+  });
+
+  it("reads immunity after a success, a repeat on damage, an Exhaustion level and a kill", () => {
+    expect(monsterAction("cloaker", "moan").save?.immuneOnSuccess).toBe(true);
+    expect(monsterAction("harpy", "luring-song").save).toMatchObject({
+      immuneOnSuccess: true,
+      repeatOnDamage: { notFromSource: true }
+    });
+    expect(monsterAction("aboleth", "dominate-mind").save).toMatchObject({
+      repeatOnDamage: {},
+      endsWhenSourceDies: true
+    });
+    expect(monsterAction("sphinx-of-valor", "weight-of-years").save?.failureExhaustion).toBe(1);
+    expect(monsterAction("will-o-wisp", "consume-life").save?.failureKills).toEqual({ sourceRegains: "3d6" });
+  });
+
+  it("reads a failure that restricts with no condition as one effect", () => {
+    expect(monsterAction("young-copper-dragon", "slowing-breath").save).toMatchObject({
+      failureEffect: { name: "Slowing Breath", tags: ["no-reactions", "speed-halved", "action-or-bonus"] },
+      failureDuration: { type: "until-bearer-turn-end" }
+    });
+    const weakening = monsterAction("ancient-gold-dragon", "weakening-breath");
+    expect(weakening.save).toMatchObject({
+      sparesAffected: true,
+      repeatSave: true,
+      failureDuration: { type: "rounds", rounds: 10 },
+      failureEffect: { name: "Weakening Breath" }
+    });
+    // "Subtracts 5 (1d10) from its damage rolls."
+    expect(weakening.save?.failureEffect?.modifiers).toHaveLength(4);
+    expect(weakening.save?.failureEffect?.modifiers).toContainEqual({
+      type: "damage-bonus",
+      amount: 0,
+      dice: "-1d10",
+      when: [{ type: "on-damage-roll" }]
+    });
+    expect(weakening).not.toHaveProperty("reminder");
+  });
+
+  it("keeps the words a source tag stood beside", () => {
+    expect(monsterAction("rakshasa", "cursed-touch").description).toMatch(
+      /While cursed, the target gains no benefit from finishing a Short or Long Rest\.$/
+    );
+    expect(monsterAction("behir", "swallow").description).toMatch(/Restrained conditions, has Total Cover against/);
   });
 });

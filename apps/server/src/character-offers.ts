@@ -38,6 +38,8 @@ import type { CharacterCreateRequestInput } from "./character-build.js";
 import type { ContentView } from "./content-library.js";
 import type { CharacterFeatureRef } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
+import { SHEET_PROFICIENCIES_KIND } from "./sheet-proficiency-edits.js";
+import { STUDIED_ITEM_KIND } from "./study-ledger.js";
 
 /**
  * The offer survey: everything the content asks a build to pick, with its legal options, and the ledger
@@ -218,6 +220,10 @@ export type ChoiceOffer = {
   minSpellLevel: number | null;
   /** The ceiling an ability-score pick from this offer may reach; null = the SRD's 20 (epic boons say 30). */
   maximum: number | null;
+  /** Its picks must be in the character's spellbook (Spell Mastery), which the commands that make them check. */
+  fromSpellbook: boolean;
+  /** The answer the build takes when the ledger holds none (the High Elf's Prestidigitation). */
+  defaultId: string | null;
   label: string;
   /** The character level(s) this offer's picks belong to, one per grant (`[4, 8, 12, 16]` for an ASI).
    *  Not used for validation; writers record it so `level-ledger.ts` can prefill level-up. */
@@ -257,6 +263,8 @@ function offerOf(
     maxSpellLevel: null,
     minSpellLevel: null,
     maximum: null,
+    fromSpellbook: false,
+    defaultId: null,
     repeatable: false,
     levels: [1],
     classId: null,
@@ -297,6 +305,28 @@ export function levelOfPick(offer: Pick<ChoiceOffer, "levels" | "capacity">, ind
   return offer.levels[Math.min(offer.levels.length - 1, Math.floor(index / perGrant))] ?? 1;
 }
 
+/** The casting times a spell pick's `castingTime` names, as the spell records print them. */
+const CASTING_TIMES: Readonly<Record<string, RegExp>> = {
+  action: /^action\b/i,
+  "bonus-action": /^bonus action\b/i,
+  reaction: /^reaction\b/i
+};
+
+/** Which spells a pick's casting-time and Ritual filters let through, or null when it names neither. */
+export function spellPickFits(
+  choice: Readonly<{ castingTime?: string; ritual?: true }>,
+  catalogs: Pick<CatalogChoiceCatalogs, "spells">
+): ((id: string) => boolean) | null {
+  if (choice.castingTime === undefined && choice.ritual === undefined) return null;
+  const time = choice.castingTime !== undefined ? CASTING_TIMES[choice.castingTime] : undefined;
+  const spells = new Map(catalogs.spells.map((spell) => [spell.id, spell]));
+  return (id) => {
+    const spell = spells.get(id);
+    if (!spell) return false;
+    return (time === undefined || time.test(spell.castingTime.trim())) && (choice.ritual !== true || spell.ritual);
+  };
+}
+
 // Whether an option lies inside the offer's spell-level window (ceiling, floor or both); unknown level reads as 0.
 const withinSpellWindow = (
   offer: Pick<ChoiceOffer, "optionLevels" | "maxSpellLevel" | "minSpellLevel">,
@@ -333,7 +363,8 @@ function optionAsFeature(option: FeatureOption): FeatureRecord {
     ...(option.uses ? { uses: option.uses } : {}),
     ...(option.grants ? { grants: option.grants } : {}),
     // Options cannot nest further options; restate `from` because the feature-level type requires it.
-    ...(option.choice ? { choice: { ...option.choice, from: option.choice.from } } : {})
+    ...(option.choice ? { choice: { ...option.choice, from: option.choice.from } } : {}),
+    ...(option.choices ? { choices: option.choices.map((choice) => ({ ...choice, from: choice.from })) } : {})
   };
 }
 
@@ -516,6 +547,8 @@ type PlacedChoices = Readonly<{
 }>;
 
 export const CLASS_CANTRIP_BUDGET: NamedPickBudget = "class-cantrips";
+/** The ledger row naming the item a starting kit lets its taker pick (the Bard's instrument). */
+export const KIT_ITEM_KIND = "kit-item";
 /** The pick of the ability a species' or a feat's spells are cast with (Elven Lineage, Magic Initiate). */
 export const SPELLCASTING_ABILITY_KIND = "spellcasting-ability";
 export const CLASS_SPELL_BUDGET: NamedPickBudget = "class-spells";
@@ -1029,6 +1062,9 @@ function placeChoices(
         unresolvable = error.message;
       }
     }
+    // A spell pick narrowed by its casting time or the Ritual tag (Spell Mastery, Pact of the Tome's rituals).
+    const fits = spellPickFits(choice, catalogs);
+    if (fits) options = new Set([...options].filter(fits));
     /** Options gated on an earlier answer: unmet gates drop out, and if the survivors exactly fill the
      *  capacity they are adopted without pushing an offer. An option above this build's level (its class's level,
      *  for a class feature: "Level 9+ Warlock") is not offered. */
@@ -1081,6 +1117,8 @@ function placeChoices(
           (choice.kind === "spell" && site.classId !== null && highestSlotLevel > 0 ? highestSlotLevel : null),
         minSpellLevel: choice.minSpellLevel ?? null,
         maximum: choice.maximum ?? null,
+        fromSpellbook: choice.fromSpellbook === true,
+        defaultId: choice.default ?? null,
         // The ability pick shares its record with the lineage or the feat's spells, so it names itself.
         label:
           choice.kind === SPELLCASTING_ABILITY_KIND
@@ -1169,12 +1207,18 @@ function placeChoices(
           : `"${row.id}" is level ${spellLevel}, above the maximum spell level (${outOfWindow.maxSpellLevel}) for "${outOfWindow.label}".`
       );
     }
+    // A pick held once may be held again only where the choice or the option says it repeats; two offers of one key (a
+    // repeatable option's own picks) count as one ("choose a different eligible cantrip").
+    const heldUnder = (key: string) => scoped.some((other) => other.key === key && other.taken.includes(row.id));
+    const repeats = (candidate: ChoiceOffer) =>
+      candidate.repeatable ||
+      candidate.optionRecords?.some((option) => option.id === row.id && option.repeatable === true) === true;
     const offer = scoped.find(
       (candidate) =>
         candidate.options.has(row.id) &&
         withinSpellWindow(candidate, row.id) &&
         candidate.taken.length < candidate.capacity &&
-        (candidate.repeatable || !candidate.taken.includes(row.id))
+        (repeats(candidate) || !heldUnder(candidate.key))
     );
     if (!offer) {
       const anyHolds = scoped.some((candidate) => candidate.options.has(row.id));
@@ -1219,8 +1263,10 @@ function placeChoices(
   /** Inline options answered to a feat-kinded pick (Blessed Warrior, Druidic Warrior), with the class they scale with. */
   const chosenInlineStyles: Array<{ record: FeatureRecord; classId: string | null }> = [];
   const asiLevels: number[] = [];
-  for (const row of choices) {
-    if (!FEAT_KINDS.has(row.kind)) continue;
+  /** A feat row answering a pick only a chosen option makes (Lessons of the First Ones' Origin feat), placed once pass
+   *  A2 has made that option's offers. */
+  const deferredFeatRows: CharacterChoice[] = [];
+  const placeFeatRow = (row: CharacterChoice): void =>
     place(() => {
       if (row.kind === "asi-or-feat" && row.id === "asi") {
         const offer =
@@ -1271,13 +1317,24 @@ function placeChoices(
       chosenFeats.push(feat);
       chosenFeatSites.push(siteOfPick(matched, row));
     });
+  for (const row of choices) {
+    if (!FEAT_KINDS.has(row.kind)) continue;
+    const tag = featureTagOf(row);
+    const offered = (offer: ChoiceOffer) =>
+      offer.kind === row.kind && (offer.featureId === tag || offer.featureAliases.includes(tag ?? ""));
+    if (tag !== null && !offers.some(offered)) deferredFeatRows.push(row);
+    else placeFeatRow(row);
   }
-  // Chosen feats' features join the granted set: their choices become offers for pass B.
-  for (const [index, feat] of chosenFeats.entries()) {
-    granted.push({ record: feat.feature, count: 1, origin: null, classId: null }); // recorded on `character.feats`
-    featureOffer(feat.feature, 1, [], chosenFeatSites[index]);
-  }
-  for (const feat of chosenFeats) grantExtraPicks(feat.feature, 1, null);
+  /** Chosen feats' features join the granted set from `from` on: their choices become offers for pass B. */
+  const joinChosenFeats = (from: number) => {
+    for (const [index, feat] of chosenFeats.entries()) {
+      if (index < from) continue;
+      granted.push({ record: feat.feature, count: 1, origin: null, classId: null }); // recorded on `character.feats`
+      featureOffer(feat.feature, 1, [], chosenFeatSites[index]);
+    }
+    for (const feat of chosenFeats.slice(from)) grantExtraPicks(feat.feature, 1, null);
+  };
+  joinChosenFeats(0);
   for (const { record, classId } of chosenInlineStyles) grantExtraPicks(record, 1, classId);
 
   // Pass A2: picks whose options carry their own mechanics (Divine Order, Giant Ancestry, Blessed
@@ -1313,6 +1370,10 @@ function placeChoices(
   }
   // Folded after the loop so the result does not depend on ledger order.
   for (const { record, classId } of chosenOptionFeatures) grantExtraPicks(record, 1, classId);
+  // Pass A3: the feats chosen options ask for, now that their offers exist.
+  const featsBefore = chosenFeats.length;
+  for (const row of deferredFeatRows) placeFeatRow(row);
+  joinChosenFeats(featsBefore);
 
   // A budget key that names nothing is an authoring error and fails loudly; checked against this
   // build's real offers plus each casting class's two printed columns. A draft still missing part of its
@@ -1349,8 +1410,18 @@ function placeChoices(
   }
 
   // Pass B: everything else. Class spells/cantrips (step 9), equipment, size and the subclass row aren't
-  // offers. `hp-roll`, `ability-scores` and `class-levels` rows are build output, so an echoed ledger is accepted.
-  const separateKinds = new Set(["equipment", "size", "hp-roll", "ability-scores", CLASS_LEVELS_KIND]);
+  // offers. `hp-roll`, `ability-scores` and `class-levels` rows are build output, so an echoed ledger is accepted. A
+  // sheet's hand edit and its studied books are the sheet's own records.
+  const separateKinds = new Set([
+    "equipment",
+    KIT_ITEM_KIND,
+    "size",
+    "hp-roll",
+    "ability-scores",
+    CLASS_LEVELS_KIND,
+    SHEET_PROFICIENCIES_KIND,
+    STUDIED_ITEM_KIND
+  ]);
   const casterIds = casters.map(({ entry }) => entry.record.id);
   const classSpellRows = new Map<string, { cantrips: CharacterChoice[]; spells: CharacterChoice[] }>();
   const strayClassSpellRows: CharacterChoice[] = [];

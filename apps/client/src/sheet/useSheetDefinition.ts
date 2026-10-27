@@ -3,6 +3,7 @@ import type {
   ActorDefinition,
   ActorDerivedSheet,
   ContentActionSummary,
+  ConversionOffer,
   GmActor,
   PlayerActor,
   Rechoice,
@@ -50,12 +51,26 @@ export type AvailabilityRow = Readonly<{
   darts?: number | null;
   damageTypes?: ContentActionSummary["damageTypes"] | null;
   checkSkills?: ContentActionSummary["checkSkills"];
+  /** An option, one for each target, or the carried weapon it asks for as it resolves. */
+  choices?: ContentActionSummary["choices"];
   /** Why it can't be used now, in one plain sentence; present exactly when it isn't available. */
   reason?: string;
   /** A row that never goes on the turn list: a rider chosen with a roll, a rest's feature, or one the server runs. */
   passive?: "rider" | "rest" | "automatic";
   /** The Weapon Mastery property this character applies with the swing. */
   mastery?: Readonly<{ id: string; name: string }>;
+  /** The ways the caster may shape this spell's cast (Metamagic, Sculpt Spells). */
+  shaping?: ContentActionSummary["shaping"];
+  /** Its damage may be looked at before it counts (Empowered Spell, Heroic Inspiration). */
+  damageLook?: true;
+  /** The forms a shape-shift may take now, and for Wild Shape the Beasts its user may learn. */
+  forms?: ContentActionSummary["forms"];
+  /** The effects a use picks one of (Enlarge or Reduce). */
+  options?: ContentActionSummary["options"];
+  /** The creature types a barrier's cast may ward (Magic Circle). */
+  wardTypes?: ContentActionSummary["wardTypes"];
+  /** A Thief's Fast Hands can take this item action as a Bonus Action: whether now, and why not. */
+  fastHands?: Readonly<{ available: boolean; reason?: string }>;
 }>;
 
 /** What the server says of one row now: whether it can be used, why not, and what a weapon's swing masters. */
@@ -64,6 +79,8 @@ export type RowFacts = Readonly<{
   reason: string | null;
   passive: AvailabilityRow["passive"] | null;
   mastery: string | null;
+  /** Fast Hands' Bonus Action form of an item's action: whether it can be used now, and why not. */
+  fastHands?: Readonly<{ available: boolean; reason: string | null }>;
 }>;
 
 /** The row's facts, with the first rule's message for an older server that sends no reason. */
@@ -71,7 +88,8 @@ export const factsOf = (row: AvailabilityRow): RowFacts => ({
   available: row.available,
   reason: row.available ? null : (row.reason ?? row.violations?.[0]?.message ?? null),
   passive: row.passive ?? null,
-  mastery: row.mastery?.name ?? null
+  mastery: row.mastery?.name ?? null,
+  ...(row.fastHands ? { fastHands: { available: row.fastHands.available, reason: row.fastHands.reason ?? null } } : {})
 });
 
 /** A spell's later action whose spell isn't up on its caster (Spiritual Weapon's attack before the cast), which
@@ -114,7 +132,18 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     ...(row.darts ? { darts: row.darts } : {}),
     ...(row.damageTypes ? { damageTypes: row.damageTypes } : {}),
     // Search, Study and the like pick the skill they are made with.
-    ...(row.checkSkills ? { checkSkills: row.checkSkills } : {})
+    ...(row.checkSkills ? { checkSkills: row.checkSkills } : {}),
+    // Fire Shield's warm or chill, Bestow Curse's curse, the weapon Magic Weapon is cast on.
+    ...(row.choices ? { choices: row.choices } : {}),
+    // A spell's cast offers the Metamagic its caster knows.
+    ...(row.shaping ? { shaping: row.shaping } : {}),
+    // Its damage may be looked at first, for Empowered Spell or Heroic Inspiration.
+    ...(row.damageLook ? { damageLook: true as const } : {}),
+    // A shape-shift picks its form (Wild Shape), and Enlarge/Reduce which of its effects.
+    ...(row.forms ? { forms: row.forms } : {}),
+    ...(row.options ? { options: row.options } : {}),
+    // A barrier's cast picks the creature types it wards (Magic Circle).
+    ...(row.wardTypes ? { wardTypes: row.wardTypes } : {})
   };
 }
 
@@ -155,6 +184,8 @@ export function useSheetDefinition(
   const [rechoices, setRechoices] = useState<readonly Rechoice[]>([]);
   /** What a prepared caster may swap in after a Long Rest, and a Wizard's spellbook, from the same read. */
   const [spellChoices, setSpellChoices] = useState<SpellChoices | null>(null);
+  /** What the character's features turn into what, and recover, with why not now, from the same read. */
+  const [conversions, setConversions] = useState<readonly ConversionOffer[]>([]);
   const loadoutSignature = [
     (actor.inventory ?? [])
       .map(
@@ -175,7 +206,12 @@ export function useSheetDefinition(
     // A pick re-made into the ledger rebuilds the sheet: its actions and re-choices are read again.
     (ownDefinition?.character?.choices ?? []).map((row) => `${row.kind}:${row.id}`).join(","),
     // A spell added to a Wizard's spellbook changes what can be prepared from it.
-    (actor.spellbook ?? []).map((entry) => entry.id).join(",")
+    (actor.spellbook ?? []).map((entry) => entry.id).join(","),
+    // What is spent, and the step a rest opened, decide which conversions can be used now.
+    JSON.stringify(actor.actionUses ?? {}),
+    (actor.spellSlots ?? []).map((slot) => `${slot.level}:${slot.remaining}`).join(","),
+    actor.pactSlots ? `${actor.pactSlots.level}:${actor.pactSlots.remaining}` : "",
+    actor.restStep?.after ?? ""
   ].join("|");
   useEffect(() => {
     if (!definitionId) {
@@ -185,6 +221,7 @@ export function useSheetDefinition(
       setDerived(null);
       setRechoices([]);
       setSpellChoices(null);
+      setConversions([]);
       return;
     }
     let live = true;
@@ -201,6 +238,7 @@ export function useSheetDefinition(
       if (result.derived) setDerived(result.derived);
       setRechoices(result.rechoices ?? []);
       setSpellChoices(result.spellChoices ?? null);
+      setConversions(result.conversions ?? []);
     });
     return () => {
       live = false;
@@ -223,5 +261,16 @@ export function useSheetDefinition(
     sheetCache.set(definitionId, next);
     setFetched(next);
   };
-  return { definitionId, definition, serverActions, facts, common, derived, rechoices, spellChoices, showEdited };
+  return {
+    definitionId,
+    definition,
+    serverActions,
+    facts,
+    common,
+    derived,
+    rechoices,
+    spellChoices,
+    conversions,
+    showEdited
+  };
 }

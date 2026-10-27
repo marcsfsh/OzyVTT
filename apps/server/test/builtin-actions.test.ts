@@ -27,18 +27,28 @@ describe("builtin action catalog", () => {
 
   it("keeps the frozen id set (journal replay contract)", () => {
     expect(BUILTIN_ACTIONS.map((action) => action.id).sort()).toEqual([
+      "control-sphere",
       "dash",
       "disengage",
       "dodge",
+      "end-an-effect",
       "escape-grapple",
       "extinguish-fire",
       "help",
+      "help-check",
       "hide",
+      "improvised-weapon",
+      "improvised-weapon-thrown",
       "influence",
       "magic",
+      "move-sphere",
+      "move-sphere-far",
+      "pass-the-surface",
       "ready",
       "search",
+      "shake-awake",
       "study",
+      "touch-bead",
       "unarmed-grapple",
       "unarmed-shove-prone",
       "unarmed-shove-push",
@@ -70,7 +80,10 @@ describe("builtin action catalog", () => {
         ]
       }
     });
-    const forms = builtinActionsFor(rogueMonk).filter((action) => action.activation === "bonus-action");
+    // The forms the features give, beside the catalog's own Bonus Actions (Move the Sphere).
+    const forms = builtinActionsFor(rogueMonk).filter(
+      (action) => action.activation === "bonus-action" && !BUILTIN_ACTIONS.some((base) => base.id === action.id)
+    );
     expect(forms.map((action) => action.id)).toEqual([
       "dash-bonus",
       "disengage-bonus",

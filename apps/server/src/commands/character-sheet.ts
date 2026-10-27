@@ -1,3 +1,4 @@
+import { setKnownForms } from "../transform/known-forms.js";
 import { randomUUID } from "node:crypto";
 import type { GameState } from "@vtt/domain";
 import { catalogIdOf, type InventoryItem } from "@vtt/schemas";
@@ -11,6 +12,7 @@ import {
   CharacterRecoverAmmunitionSchema,
   CharacterSetCurrencySchema,
   CharacterSetFavouritesSchema,
+  CharacterSetKnownFormsSchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterFinishPreparingSchema,
@@ -19,12 +21,14 @@ import {
   CharacterSetPreparedSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
+  CharacterStudyItemSchema,
   CommandIdentitySchema
 } from "@vtt/domain/commands";
 import { recoverAmmunition } from "../ammunition.js";
 import type { EffectNarration } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
 import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
+import { studyItem, type StudyOutcome } from "../item-study.js";
 import { setFavourites } from "../option-uses.js";
 import { finishPreparing, setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
 import { addToSpellbook, swapClassSpell } from "../spell-choices.js";
@@ -111,8 +115,8 @@ export const characterSheetCommands = [
     type: "character.set-slot",
     operationId: "setSpellSlot",
     description:
-      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum), to spend or restore a slot during play. With `pact`, it sets the Warlock's Pact Magic slots at that level instead. Player sessions may target only their claimed character.",
-    summary: "Spend or restore a character's spell slots for one level (clamped to the sheet maximum).",
+      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum). With `pact`, it sets the Warlock's Pact Magic slots at that level instead. The GM sets them freely. A player session may target only their claimed character and may only spend (lower) them: a slot comes back by a rest or by a feature's own command (`actor.convert`), which checks that feature's rule.",
+    summary: "Spend a character's spell slots for one level; the GM may also restore them.",
     schema: CharacterSetSlotSchema,
     malformed: "The spell-slot command is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -126,7 +130,8 @@ export const characterSheetCommands = [
           remaining,
           (definitionId) => kit.resolveDefinitionIn(state, definitionId),
           kit.equipmentCatalog(),
-          pact === true
+          pact === true,
+          isGmGrade(principal) ? "gm" : "player"
         );
       });
     }
@@ -160,14 +165,14 @@ export const characterSheetCommands = [
     type: "character.finish-preparing",
     operationId: "finishPreparing",
     description:
-      "Closes the prepare step a Long Rest opened for a character: its prepared spells stand until the next Long Rest. Player sessions may target only their claimed character.",
-    summary: "Close a character's prepare step after a Long Rest.",
+      "Closes the prepare step a Long Rest opened for a character: its prepared spells stand until the next Long Rest. With `rest`, it closes the step a finished rest opened instead: what a feature does when a rest finishes (Arcane Recovery, a re-choice) waits for the next rest. Player sessions may target only their claimed character.",
+    summary: "Close a character's prepare step after a Long Rest, or the step a finished rest opened.",
     schema: CharacterFinishPreparingSchema,
     malformed: "The finish-preparing command is malformed.",
     async run({ principal, request, execute }) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "resource");
-        finishPreparing(state, request.actorId);
+        finishPreparing(state, request.actorId, request.rest === true);
       });
     }
   }),
@@ -257,7 +262,8 @@ export const characterSheetCommands = [
         ended = setInventoryItem(state, actorId, item, (definitionId) => kit.resolveDefinitionIn(state, definitionId), {
           catalog: kit.equipmentCatalog(),
           role: initiatorOf(principal).role,
-          pickableSpell: (spellId) => kit.catalogFor(principal).spellRecord(spellId)
+          pickableSpell: (spellId) => kit.catalogFor(principal).spellRecord(spellId),
+          random: (sides) => kit.context.random(sides)
         });
       });
       if (!duplicate) kit.publishNarrations(ended);
@@ -296,6 +302,37 @@ export const characterSheetCommands = [
           actorIds: [actorId, toActorId],
           gmOnly: kit.actorHidden(actorId) || kit.actorHidden(toActorId)
         });
+    }
+  }),
+
+  defineCommand({
+    type: "character.study-item",
+    operationId: "studyItem",
+    description:
+      "Marks a carried manual or tome studied by the character carrying it (GM-grade only, since the hours of study are downtime the GM gives). SRD 5.2.1: \"If you spend 48 hours over a period of 6 days or fewer studying the book's contents and practicing its guidelines, your Constitution increases by 2, to a maximum of 30. The manual then loses its magic but regains it in a century.\" The increase is recorded in the character's choices ledger and the sheet is rebuilt from it, so the Hit Point maximum, modifiers, save DCs and every later rebuild follow; the copy studied is marked `dormant`, so no one else gains from it. Refused for an item with no study, a dormant copy, a score already at the most the book gives, a character in a fight, and a sheet that doesn't record how it was built. The game clock doesn't move: the GM passes the time.",
+    summary: "Mark a carried manual or tome studied: its score rises for good and the copy's magic is spent (GM).",
+    schema: CharacterStudyItemSchema,
+    malformed: "The study command is malformed.",
+    gmOnly: "Only the GM marks a book studied. Ask your GM.",
+    async run({ request, execute }, kit) {
+      const { actorId, itemId } = request;
+      let outcome: StudyOutcome | null = null;
+      const { duplicate } = await execute((state) => {
+        outcome = studyItem(state, actorId, itemId, {
+          library: kit.playCatalog(),
+          policy: state.builderPolicy,
+          catalog: kit.equipmentCatalog()
+        });
+      });
+      const done = outcome as StudyOutcome | null;
+      if (!duplicate && done)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `${kit.actorName(actorId)} studies the ${done.item}. ${done.ability} rises from ${done.before} to ${done.after}.`,
+          actorIds: [actorId],
+          gmOnly: kit.actorHidden(actorId)
+        });
+      return done ? { ability: done.ability, before: done.before, after: done.after } : {};
     }
   }),
 
@@ -368,6 +405,32 @@ export const characterSheetCommands = [
   }),
 
   defineCommand({
+    type: "character.set-known-forms",
+    operationId: "setKnownForms",
+    description:
+      "Sets the Beast forms a Druid knows for Wild Shape, as bestiary ids: at most the Beast Shapes table's count for its Druid level, each a Beast of that level's Challenge Rating or lower, with a Fly Speed only from Druid level 8. A player fills an empty place at any time and replaces one known form after each Long Rest; the GM may set any. The GM for any character; a player session only for their claimed character.",
+    summary: "Set a Druid's known Wild Shape forms (the GM for anyone; a player for their own claimed character).",
+    schema: CharacterSetKnownFormsSchema,
+    malformed: "The known forms command is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
+        setKnownForms(
+          state,
+          request.actorId,
+          request.formIds,
+          {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+            catalog: kit.equipmentCatalog()
+          },
+          isGmGrade(principal)
+        );
+      });
+    }
+  }),
+
+  defineCommand({
     type: "character.set-identity",
     operationId: "setIdentity",
     description:
@@ -401,7 +464,10 @@ export const characterSheetCommands = [
     async run({ principal, request, execute }, kit) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
-        setCharacterProficiencies(state, request.actorId, request.proficiencies, kit.equipmentCatalog());
+        setCharacterProficiencies(state, request.actorId, request.proficiencies, kit.equipmentCatalog(), {
+          library: kit.playCatalog(),
+          policy: state.builderPolicy
+        });
       });
     }
   })

@@ -10,9 +10,10 @@ import {
   removeCombatant,
   rollRemainingInitiative,
   rollSelfInitiative,
+  orderTiedCharacters,
   setInitiativeScore,
   startEncounter,
-  swapInitiative
+  offerInitiativeSwap
 } from "../encounter.js";
 import {
   AddCombatantSchema,
@@ -24,14 +25,19 @@ import {
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
   InitiativeSwapSchema,
+  InitiativeOrderTieSchema,
   RemoveCombatantSchema,
   TurnLegendarySchema,
+  TurnOrderSchema,
   TurnReactionSchema,
   TurnUseSchema
 } from "@vtt/domain/commands";
+import { checkOrder } from "../simultaneous-effects.js";
+import { askEndOrder, playStartSteps } from "../turn-boundaries.js";
 import { CommandRejectedError, type JournalEntry } from "../game-store.js";
 import { requireTypedDie } from "../held-rolls.js";
-import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
+import { rerollInitiative } from "../initiative-reroll.js";
+import { endTurn, ownsTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
 import { initiatorOf, isGmGrade, principalTag, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 import { refreshVisionMeasure } from "../vision/edit.js";
@@ -64,6 +70,8 @@ export const encounterCommands = [
         throw new CommandRejectedError("Select an uploaded battlemap before starting the encounter.");
       const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative, groupMonsters } = request;
       const tokenGeometry = await kit.context.tokenGeometryFor(mapAssetId);
+      // Where the staged creatures stand, for an aura that reaches Initiative (a Weapon of Warning).
+      const distance = await mappedDistance(kit);
       // Omitted `entries` means "start the fight staged here", derived from live state and never from the client.
       // No refusal here, so `startEncounter`'s own guards keep their order and wording.
       const stagedEntries = (state: GameState): readonly EncounterStartEntry[] => {
@@ -74,12 +82,13 @@ export const encounterCommands = [
           state.combat.scenes.some((candidate) => candidate.id === state.combat.activeSceneId);
         return live ? state.combat.initiative.map((entry) => ({ actorId: entry.actorId })) : [];
       };
+      let regains: EffectNarration[] = [];
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         const entries = request.entries ?? stagedEntries(draft);
         // Hidden from the table before the new fight: one this start leaves off the map stays unknown.
         const unseenBefore = hiddenCombatants(draft, kit.sightContent());
         // A fresh fight starts from the table's standing rules policy unless this command names its own.
-        startEncounter(
+        regains = startEncounter(
           draft,
           {
             mapAssetId,
@@ -94,7 +103,9 @@ export const encounterCommands = [
           (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
           Date.now(),
           kit.equipmentCatalog(),
-          kit.initiativeRollSink(draft, commandId, principal)
+          kit.initiativeRollSink(draft, commandId, principal),
+          (sides) => kit.context.random(sides),
+          (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
         );
         // The fight may be on another map than the one the walls were drawn on: keep feet and pixels in step.
         refreshVisionMeasure(draft, tokenGeometry);
@@ -121,6 +132,7 @@ export const encounterCommands = [
             gmOnly: kit.actorHidden(entry.actorId)
           });
       }
+      kit.publishNarrations(regains);
       kit.context.logTurnBegin(state);
     }
   }),
@@ -229,8 +241,9 @@ export const encounterCommands = [
       if (!mapAssetId) throw new CommandRejectedError("Start an encounter before adding a combatant.");
       const { commandId, actorId, score } = request;
       const geometry = await kit.context.tokenGeometryFor(mapAssetId);
-      const { state, duplicate } = await execute((draft) =>
-        addCombatant(
+      let regains: EffectNarration[] = [];
+      const { state, duplicate } = await execute((draft) => {
+        regains = addCombatant(
           draft,
           actorId,
           score,
@@ -239,9 +252,11 @@ export const encounterCommands = [
           Date.now(),
           kit.initiativeRollSink(draft, commandId, principal),
           kit.initiativeRollDeps(draft)
-        )
-      );
-      if (!duplicate) kit.publishRolls(state, commandId);
+        );
+      });
+      if (duplicate) return;
+      kit.publishRolls(state, commandId);
+      kit.publishNarrations(regains);
     }
   }),
 
@@ -313,19 +328,48 @@ export const encounterCommands = [
     type: "initiative.swap",
     operationId: "swapInitiative",
     description:
-      "Swaps two combatants' initiative (GM-grade only): the Alert feat's Initiative Swap, made right after initiative is rolled and before either has acted. Refused while either is Incapacitated.",
-    summary: "Swap two combatants' initiative, as Alert's Initiative Swap (GM).",
+      "The Alert feat's Initiative Swap, made right after initiative is rolled and before either combatant has acted, and refused while either is Incapacitated. GM-grade swaps any two at once. A player session offers it for its own claimed character that holds Alert to a willing ally, and is refused for a character without Alert or a creature that isn't its ally; the ally's player takes the offer by sending the pair the other way round, and an ally the same player controls swaps at once.",
+    summary: "Swap two combatants' initiative, as Alert's Initiative Swap: the GM at once, a player by offer.",
     schema: InitiativeSwapSchema,
     malformed: "The Initiative swap is malformed.",
-    gmOnly: "Only the GM can swap Initiative.",
-    async run({ request, execute }, kit) {
-      const { duplicate } = await execute((state) => swapInitiative(state, request.actorId, request.withActorId));
+    async run({ principal, request, execute }, kit) {
+      let made: "swapped" | "offered" = "swapped";
+      const { duplicate } = await execute((state) => {
+        made = offerInitiativeSwap(state, initiatorOf(principal), request.actorId, request.withActorId, (id) =>
+          kit.resolveDefinitionIn(state, id)
+        );
+      });
       if (duplicate) return;
       kit.context.appendLog({
         kind: "encounter",
-        text: `${kit.actorName(request.actorId)} and ${kit.actorName(request.withActorId)} swapped initiative.`,
+        text:
+          made === "swapped"
+            ? `${kit.actorName(request.actorId)} and ${kit.actorName(request.withActorId)} swapped initiative.`
+            : `${kit.actorName(request.actorId)} offers to swap initiative with ${kit.actorName(request.withActorId)} (Alert).`,
         actorIds: [request.actorId, request.withActorId],
         gmOnly: kit.actorHidden(request.actorId) || kit.actorHidden(request.withActorId)
+      });
+    }
+  }),
+
+  defineCommand({
+    type: "initiative.order-tie",
+    operationId: "orderTiedCharacters",
+    description:
+      "Puts a character directly ahead of another character tied with it on the same initiative score (SRD Initiative: the players decide the order among tied characters), before either has taken a turn in this fight. GM-grade for any character; a player session only for their own claimed character.",
+    summary: "Order your character before another character tied on initiative.",
+    schema: InitiativeOrderTieSchema,
+    malformed: "The tie order is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { duplicate } = await execute((state) =>
+        orderTiedCharacters(state, initiatorOf(principal), request.actorId, request.beforeActorId)
+      );
+      if (duplicate) return;
+      kit.context.appendLog({
+        kind: "encounter",
+        text: `${kit.actorName(request.actorId)} goes before ${kit.actorName(request.beforeActorId)} on their tied initiative.`,
+        actorIds: [request.actorId, request.beforeActorId],
+        gmOnly: kit.actorHidden(request.actorId) || kit.actorHidden(request.beforeActorId)
       });
     }
   }),
@@ -334,7 +378,7 @@ export const encounterCommands = [
     type: "initiative.roll-self",
     operationId: "rollOwnInitiative",
     description:
-      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; a player may type one only while the table's typedRolls is open), adds its initiative modifier, sets its score, and clears its pending flag. The rules set the roll mode (Surprise, conditions such as Poisoned, features, Dexterity check riders) and Exhaustion's penalty; `rollMode` is honoured only from a GM-grade session. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
+      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; a player may type one only while the table's typedRolls is open), adds its initiative modifier, sets its score, and clears its pending flag. The dice are held, so `reroll` throws one again before the character's first turn (a player spends Heroic Inspiration; the GM rerolls freely), with `natural` the face a typed reroll shows. The rules set the roll mode (Surprise, conditions such as Poisoned, features, Dexterity check riders) and Exhaustion's penalty; `rollMode` is honoured only from a GM-grade session. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
     summary: "Roll your own claimed character's initiative (GM anyone); the server rolls unless a manual d20 is given.",
     schema: InitiativeRollSelfSchema,
     malformed: "The initiative roll is malformed.",
@@ -344,6 +388,18 @@ export const encounterCommands = [
       const { state, duplicate } = await execute((draft) => {
         // A player rolls only their own claimed character's initiative; the GM (integration) anyone's.
         requireActorAccess(initiatorOf(principal), draft, actorId, "check");
+        if (request.reroll === true) {
+          score = rerollInitiative(
+            draft,
+            actorId,
+            initiatorOf(principal),
+            natural,
+            () => kit.context.random(20),
+            kit.initiativeRollSink(draft, commandId, principal),
+            kit.initiativeRollDeps(draft)
+          );
+          return;
+        }
         // A typed d20 only while the table lets players type their dice.
         if (natural !== undefined) requireTypedDie(draft, initiatorOf(principal), undefined, natural);
         score = rollSelfInitiative(
@@ -405,8 +461,14 @@ export const encounterCommands = [
       const geometry = await kit.liveGeometry();
       const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
+        const deps = { ...kit.turnAdvanceDeps(draft, geometry, distance), askOrder: true };
+        // What happens at once as the turn ends waits for its creature's controller to order it.
+        if (askEndOrder(draft, effectEvents, { ...deps, newId: kit.context.newId })) return;
         outcome = planNextTurn(draft, timeline, request.confirmRewrite === true, (advancing) =>
-          nextInitiativeTurn(advancing, effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
+          nextInitiativeTurn(advancing, effectEvents, {
+            ...kit.turnAdvanceDeps(advancing, geometry, distance),
+            askOrder: true
+          })
         );
       });
       if (duplicate) return;
@@ -446,6 +508,7 @@ export const encounterCommands = [
     async run({ principal, executeTimeline }, kit) {
       // End Turn is a live forward step like the GM's Next. Players cannot advance while the table is rewound.
       const effectEvents: EffectNarration[] = [];
+      let waiting = false;
       const geometry = await kit.liveGeometry();
       const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
@@ -454,8 +517,66 @@ export const encounterCommands = [
             "The GM is reviewing an earlier turn. Try again once play resumes.",
             "history_review"
           );
+        const initiator = initiatorOf(principal);
+        // What happens at once as the turn ends waits for its creature's controller to order it.
+        if (
+          ownsTurn(draft, initiator) &&
+          askEndOrder(draft, effectEvents, {
+            ...kit.turnAdvanceDeps(draft, geometry, distance),
+            newId: kit.context.newId
+          })
+        ) {
+          waiting = true;
+          return;
+        }
         planNextTurn(draft, timeline, false, (advancing) =>
-          endTurn(advancing, initiatorOf(principal), effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
+          endTurn(advancing, initiator, effectEvents, {
+            ...kit.turnAdvanceDeps(advancing, geometry, distance),
+            askOrder: true
+          })
+        );
+      });
+      if (duplicate) return;
+      if (!waiting) kit.context.logTurnBegin(state);
+      kit.publishNarrations(effectEvents);
+    }
+  }),
+
+  defineCommand({
+    type: "turn.order",
+    operationId: "orderTurnSteps",
+    description:
+      "Puts in order what happens at once as a turn starts or ends (SRD Simultaneous Effects): ongoing damage, Hit Points or Temporary Hit Points regained, a trait that burns or regenerates. The GM may answer for any creature; a player only for their own claimed character. `order` names every waiting step's key once, first to last. An answer to a turn's start plays the steps out now; an answer to a turn's end plays them out and passes the turn.",
+    summary: "Order what happens at once as a turn starts or ends (GM anyone; a player their own character).",
+    schema: TurnOrderSchema,
+    malformed: "The order is malformed.",
+    async run({ principal, request, execute, executeTimeline }, kit) {
+      const initiator = initiatorOf(principal);
+      const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
+      const distance = await mappedDistance(kit);
+      const boundary = kit.read().combat.turnSteps?.boundary;
+      if (boundary === "start") {
+        const { duplicate } = await execute((draft) => {
+          checkOrder(draft, initiator, request.stepsId, request.order);
+          effectEvents.push(...playStartSteps(draft, kit.turnAdvanceDeps(draft, geometry, distance), request.order));
+        });
+        if (!duplicate) kit.publishNarrations(effectEvents);
+        return;
+      }
+      const { state, duplicate } = await executeTimeline((draft, timeline) => {
+        if (draft.combat.historyCursor !== null)
+          throw new CommandRejectedError(
+            "The GM is reviewing an earlier turn. Try again once play resumes.",
+            "history_review"
+          );
+        const waiting = checkOrder(draft, initiator, request.stepsId, request.order);
+        draft.combat = { ...draft.combat, turnSteps: { ...waiting, order: [...request.order] } };
+        planNextTurn(draft, timeline, false, (advancing) =>
+          nextInitiativeTurn(advancing, effectEvents, {
+            ...kit.turnAdvanceDeps(advancing, geometry, distance),
+            askOrder: true
+          })
         );
       });
       if (duplicate) return;

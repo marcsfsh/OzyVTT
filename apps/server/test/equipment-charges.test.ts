@@ -30,13 +30,14 @@ const spent = (table: Table, actorId: string, key: string) => table.actor(actorI
 describe("a charged item counts its own charges", () => {
   it("gives two Wands of Fireballs a pool each, so firing one leaves the other full", () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() });
-    write(table, IDS.wizard, wand());
+    // One copy of an item can be attuned at a time, so the second wand is the one in use.
+    write(table, IDS.wizard, wand({ attuned: false }));
     write(table, IDS.wizard, wand(SECOND));
-    expect(actionOf(table, IDS.wizard, "item-wand-of-fireballs-cast-fireball").uses?.pool).toBe(
-      "wand-of-fireballs-charges"
-    );
     expect(actionOf(table, IDS.wizard, "item-wand-of-fireballs-2-cast-fireball").uses?.pool).toBe(
       "wand-of-fireballs-2-charges"
+    );
+    expect(() => write(table, IDS.wizard, edit(table, IDS.wizard, "wand-of-fireballs", { attuned: true }))).toThrow(
+      /more than one copy/
     );
 
     fight(table, IDS.wizard);
@@ -125,12 +126,13 @@ describe("the charge commands over HTTP", () => {
 
     expect((await use("item-wand-of-enemy-detection-detect-enemies")).status).toBe(200);
     expect(server.store.snapshot.rolls).toHaveLength(1);
+    // Its sense is an effect on its holder, so the use resolves as the action does in a fight and labels the roll so.
     expect(server.store.snapshot.rolls[0]).toMatchObject({
-      label: "Wand of Enemy Detection: last charge",
+      label: "Detect Enemies",
       formula: "1d20",
       actorId: IDS.wizard
     });
-    expect((await log()).some((text) => text.startsWith("Wand of Enemy Detection's last charge is spent"))).toBe(true);
+    expect((await log()).some((text) => text.includes("Wand of Enemy Detection's last charge is spent"))).toBe(true);
   });
 
   it("lets the GM hand a wand over, and refuses a player", async () => {

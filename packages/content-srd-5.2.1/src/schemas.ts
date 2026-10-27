@@ -10,20 +10,32 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionAreaSchema,
+  AreaTriggerSchema,
+  type AreaTrigger,
   ActionGrantSchema,
   AmmunitionKindSchema,
   BurstSchema,
   ActionReactionSchema,
+  ActionTeleportSchema,
   ActionSchema,
+  ActionTargetsSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   DamageFormulaSchema,
   DamageTypeSchema,
+  DiceFormulaSchema,
+  DispelSchema,
+  RegainHitPointsSchema,
+  FormKeepSchema,
+  EffectGrantSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
+  ObjectPrintSchema,
   OnHitRiderSchema,
   SaveFailureEffectSchema,
-  SaveOutcomeFields
+  SaveOutcomeFields,
+  SightEffectSchema,
+  SummonSchema
 } from "@vtt/schemas";
 import {
   BackgroundReferenceSchema,
@@ -31,9 +43,12 @@ import {
   ContentIdSchema,
   ContentSourceSchema,
   FeatReferenceSchema,
+  FeatureActionSchema,
+  FeatureGrantsSchema,
   FeatureUsesSchema,
   ITEM_REFUSED_MODIFIER_MESSAGE,
   ITEM_REFUSED_MODIFIER_TYPES,
+  ModifierSchema,
   SpeciesReferenceSchema,
   SpellListReferenceSchema,
   SubclassReferenceSchema,
@@ -69,35 +84,85 @@ const SpellAttackRangeSchema = z
  *  ability modifier (Spiritual Weapon's 1d8 + it). */
 const SpellDamageSchema = z
   .array(
-    z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema, addsModifier: z.boolean().optional() }).strict()
+    z
+      .object({
+        formula: DamageFormulaSchema,
+        type: DamageTypeSchema,
+        addsModifier: z.boolean().optional(),
+        /** The dice it gains for each slot level above the spell's, where its own scaling clause names this part
+         *  (Arcane Hand's Clenched Fist: 2d8; Glyph of Warding's explosive rune: 1d8). Without it, a part scales only
+         *  when it is the spell's own roll. */
+        perSlot: z
+          .string()
+          .regex(/^\d{1,2}d(?:4|6|8|10|12)$/)
+          .optional()
+      })
+      .strict()
   )
   .max(4);
 
+/** Where and when the area a spell leaves acts (`AreaTriggerSchema`, shared with the actions of items and creatures). */
+export const SpellZoneSchema = AreaTriggerSchema;
+export type SpellZone = AreaTrigger;
+
 /**
- * Where and when what a spell leaves behind acts on a creature, so the server raises the save or deals the damage:
- * a creature entering it (or the area moving onto the creature), starting or ending its turn there, or travelling in
- * it (Spike Growth's damage for every 5 feet). The area is the one the cast places on the map, or within `feet` of
- * the caster (an Emanation) or of the point the spell is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A
- * creature makes this save only once per turn" (entering counts once a turn anyway); `affects` "enemies" spares the
- * caster's allies (Guardian of Faith; spirits that harm the creatures the caster chooses); `damageCap` ends it once
- * it has dealt that much (Guardian of Faith's 60).
+ * What a spell does to the map's walls and doors (SRD 5.2.1 Wall of Force, Wall of Stone, Knock, Passwall), which the
+ * server applies on the live map (`apps/server/src/spell-walls.ts`). `raises`: the walls its placed area raises while
+ * it lasts: along a Line's far side, round a circle's edge or a Cube's sides, as `wall` (sight, light and movement:
+ * Wall of Stone), `window` (movement, and the lines an attack or an area needs: Wall of Force's Invisible force) or
+ * `bars` (movement alone: Forcecage's cage). `door`: what its cast does to the door it is aimed at. `cuts`: the gap it
+ * opens in the wall it is aimed at, for its duration (Passwall) or for good (Stone Shape). `disintegrates`: it destroys
+ * the object or creation of force it is aimed at (Disintegrate).
  */
-export const SpellZoneSchema = z
+export const SpellWallsSchema = z
   .object({
-    on: z
-      .array(z.enum(["enter", "start-turn", "end-turn", "travel"]))
-      .min(1)
-      .max(3),
-    oncePerTurn: z.literal(true).optional(),
-    around: z.enum(["caster", "point"]).optional(),
-    feet: z.number().int().min(5).max(120).optional(),
-    affects: z.literal("enemies").optional(),
-    damageCap: z.number().int().min(1).max(1000).optional(),
-    /** The creatures it affects move at half Speed inside it (Spirit Guardians). */
-    halvesSpeed: z.literal(true).optional()
+    raises: z
+      .object({
+        kind: z.enum(["wall", "window", "bars"]),
+        /** Each panel's length in feet, each its own object (Wall of Ice's 10-foot sections). */
+        panelFeet: z.number().int().min(5).max(100).optional(),
+        /** Each panel's statistics as an object; absent, nothing but what names it (Disintegrate) breaks it. */
+        panel: ObjectPrintSchema.optional(),
+        /** A creature whose space it cuts is pushed to one side. */
+        pushes: z.literal(true).optional(),
+        /** It stays for good once its caster's Concentration lasts the spell's full duration (Wall of Stone). */
+        permanentAfterFull: z.literal(true).optional(),
+        /** A creation of magical force, which Disintegrate destroys whole (Wall of Force). */
+        force: z.literal(true).optional(),
+        /** The panels a form its cast picks raises instead (Wall of Stone's 10-by-20-foot panels, 3 inches thick), by
+         *  the option of the spell's zone row that names the form. */
+        forms: z
+          .array(
+            z
+              .object({
+                option: z
+                  .string()
+                  .regex(/^[a-z0-9-]+$/)
+                  .max(60),
+                panelFeet: z.number().int().min(5).max(100).optional(),
+                panel: ObjectPrintSchema.optional()
+              })
+              .strict()
+          )
+          .min(1)
+          .max(4)
+          .optional()
+      })
+      .strict()
+      .optional(),
+    door: z.enum(["knock", "arcane-lock", "open-or-close", "close", "seal"]).optional(),
+    cuts: z
+      .object({ feet: z.number().int().min(1).max(20), lasting: z.boolean() })
+      .strict()
+      .optional(),
+    disintegrates: z.literal(true).optional(),
+    /** Every door in its placed area is locked as by Arcane Lock for as long as the spell lasts, for its caster and its
+     *  allies (Guards and Wards: "All doors in the warded area are magically locked, as if sealed by the Arcane Lock
+     *  spell"). */
+    locksDoorsInArea: z.literal(true).optional()
   })
   .strict();
-export type SpellZone = z.infer<typeof SpellZoneSchema>;
+export type SpellWalls = z.infer<typeof SpellWallsSchema>;
 
 /** Something a spell lets its caster do after the cast, as an action of its own: Produce Flame's hurl, Spiritual
  *  Weapon's later attacks, or the save a creature makes when it enters Spirit Guardians (`activation` "other": no
@@ -114,23 +179,151 @@ export const SpellLaterActionSchema = z
     /** Conditions its hit lands (Conjure Fey's spirit: Frightened until the start of the caster's next turn). */
     onHit: z.array(OnHitRiderSchema).max(2).optional(),
     save: z
-      .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
+      .object({
+        ability: AbilityShortSchema,
+        ...SaveOutcomeFields,
+        /** What a failure leaves besides conditions (a Symbol of Discord's Disadvantage). */
+        failureEffect: SaveFailureEffectSchema.optional()
+      })
       .strict()
       .optional(),
     damage: SpellDamageSchema,
     area: ActionAreaSchema.optional(),
     /** It moves the cast's `grant` from a creature at 0 Hit Points to its own target (Hunter's Mark, Hex). */
     movesGrant: z.literal(true).optional(),
+    /** It shows what the spell's sense finds in detail (Detect Magic: "take the Magic action to see a faint aura around
+     *  any visible creature ... that bears the magic, and ... learn the spell's school of magic"). */
+    reveals: z.literal(true).optional(),
     /** It is taken only on the caster's turns after the one it cast the spell on ("As a Bonus Action on your later
      *  turns": Spiritual Weapon, Heat Metal). */
     laterTurnsOnly: z.literal(true).optional(),
+    /** The cast itself takes one of the rows that say this, at no further cost, on the turn it is cast ("When you cast
+     *  the spell and as a Bonus Action on your later turns": Arcane Hand). */
+    withCast: z.literal(true).optional(),
+    /** It takes only a creature that bears an effect of this caster's spell (Arcane Hand's crush: the creature the
+     *  hand grapples; Phantasmal Force's harm: the creature that perceives the phantasm). */
+    bearerOnly: z.literal(true).optional(),
+    /** Its failure's push goes this many feet farther for each point of the caster's spellcasting ability modifier
+     *  (Arcane Hand's Forceful Hand: 5 feet plus five times the modifier). */
+    pushPerModifier: z.number().int().min(5).max(10).optional(),
+    /** The hand stands between the caster and harm: Half Cover from its space, which is Difficult Terrain for the
+     *  caster's enemies, until another of its effects (Arcane Hand's Interposing Hand). */
+    interposes: z.literal(true).optional(),
+    /** How often it can be taken (Phantasmal Force's harm: once a turn; Geas's 5d10: once a day of game time). */
+    uses: ActionSchema.shape.uses,
+    /** Whom it may target, when not the spell's own targets (Dispel Evil and Good's Dismissal: one creature of the
+     *  warded types within 5 feet that the caster sees). */
+    targets: ActionTargetsSchema.optional(),
+    /** It ends the Charmed, Frightened and possession creatures of these types gave its target (Break Enchantment). */
+    breaksEnchantment: ActionSchema.shape.breaksEnchantment,
+    /** Taking it ends the spell (Dispel Evil and Good's special functions). */
+    endsSpell: z.literal(true).optional(),
+    /** It names the direction the spell's creatures move on their next turns (Compulsion's Bonus Action). */
+    setsHeading: ActionSchema.shape.setsHeading,
+    /** A failure moves its target to the space it picks, lifting it where it says so (Telekinesis). */
+    failureMove: ActionSchema.shape.failureMove,
+    /** The carried object it acts on (Telekinesis pulling a weapon from a creature's hands). */
+    object: ActionSchema.shape.object,
+    /** It is taken only on the caster's own turn ("On each of your turns": Phantasmal Force). */
+    ownTurnOnly: z.literal(true).optional(),
+    /** Only the GM takes it, judging when the text's trigger has happened (Geas: "if it acts in a manner directly
+     *  counter to your command"). */
+    gmOnly: z.literal(true).optional(),
+    /** What its save's failure leaves on the creature (Detect Thoughts' probe: the mind it can push out). */
+    failureEffect: SaveFailureEffectSchema.optional(),
+    /** It raises (more than 0) or lowers the creature this caster's levitation holds by this many feet, never below
+     *  the ground (Levitate: "You can change the target's altitude by up to 20 feet in either direction on your
+     *  turn"). The caster's own levitation moves as part of its move, with no action. */
+    liftFeet: z.number().int().min(-60).max(60).optional(),
     /** What its damage drains as it lands (Vampiric Touch's later touches). */
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
-    zone: SpellZoneSchema.optional()
+    zone: SpellZoneSchema.optional(),
+    /** It shape-shifts a creature again while the spell lasts (Shapechange's new form, Animal Shapes' transforming). */
+    shapeShift: ActionSchema.shape.shapeShift,
+    /** It moves the area the spell left up to this many feet, to where its template is placed (Moonbeam's Magic
+     *  action: 60 feet; Flaming Sphere's ram: 30). Its save, if any, falls on the creatures the area moves onto. */
+    movesArea: z
+      .object({
+        feet: z.number().int().min(5).max(300),
+        /** The area is placed again from its caster, pointing a new way (Gust of Wind's Line, turned). */
+        fromCaster: z.literal(true).optional(),
+        /** It goes to any spot within `feet` of its caster, however far that is from where it stood (Silent Image:
+         *  "move to any spot within range"). */
+        anywhereInRange: z.literal(true).optional(),
+        /** Only while its caster is within `feet` of it (Major Image: "If you are within range of the illusion"). */
+        casterInRange: z.literal(true).optional(),
+        /** Only on its caster's turn once the caster has moved, once a turn and at no cost (Conjure Animals: "when you
+         *  move on your turn, you can also move the pack up to 30 feet"). */
+        withCasterMove: z.literal(true).optional(),
+        /** To a spot no creature's space covers (Conjure Animals' pack: "to an unoccupied space"). */
+        unoccupied: z.literal(true).optional(),
+        /** It is the drift its caster steers at the start of its turn (Incendiary Cloud): exactly `feet` from where the
+         *  area stood as the turn began, farther from the caster, once that turn. */
+        steersDrift: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** Its template leaves the ground it covers out of the spell's area (Plant Growth: "You can exclude one or more areas
+     *  of any size within the spell's area from being affected"), taken by the caster as the spell is cast. */
+    cutsArea: z.literal(true).optional(),
+    /** Its template's point, or each creature it targets, must be inside the area the spell left (Call Lightning's
+     *  bolt "under the cloud", Storm of Vengeance's bolts "beneath it"). */
+    inArea: z.literal(true).optional(),
+    /** How many creatures it strikes (Storm of Vengeance's six bolts). */
+    targetCount: z.number().int().min(1).max(10).optional(),
+    /** It is taken only while the spell's area stands as this row of its schedule, once (Storm of Vengeance's bolts on
+     *  its third turn). */
+    atRow: z.string().min(1).max(60).optional(),
+    /** The cast leaves this row's zone only when its caster picks this option as it casts (Wall of Fire's ring, a
+     *  Symbol's glyph); a cast that picks none leaves the first such row's. With an `area`, the cast is placed as that
+     *  area. */
+    option: z
+      .object({
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60),
+        name: z.string().min(1).max(60)
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
+
+/** The most game time a revival reaches back, in minutes: True Resurrection's 200 years. */
+export const MAX_REVIVAL_MINUTES = 200 * 365 * 24 * 60;
+
+/** What a cast that brings the dead back does: which dead creature it can take, and how that creature returns. */
+export const SpellRevivalSchema = z
+  .object({
+    /** It returns with 1 Hit Point (`one`) or all of them (`all`). */
+    hitPoints: z.enum(["one", "all"]),
+    /** The longest the creature may have been dead, in minutes of game time (Revivify's 1, Raise Dead's 10 days). */
+    withinMinutes: z.number().int().min(1).max(MAX_REVIVAL_MINUTES),
+    /** It can't take a creature that was Undead when it died (Raise Dead, Resurrection). */
+    notUndead: z.literal(true).optional(),
+    /** It makes a new body, so a creature whose body is gone comes back (True Resurrection). */
+    newBody: z.literal(true).optional(),
+    /** It restores missing body parts, so a creature that lost its head comes back (Resurrection). Without this or
+     *  `newBody`, such a creature can't be revived (Raise Dead: "the spell automatically fails"). */
+    restoresParts: z.literal(true).optional(),
+    /** "Coming back from the dead is an ordeal": the creature takes this penalty to D20 Tests, reduced by 1 each time
+     *  it finishes a Long Rest (Raise Dead's and Resurrection's -4). */
+    d20Penalty: z.number().int().min(-10).max(-1).optional(),
+    /** It neutralizes the poison that affected the creature: its Poisoned condition ends (Raise Dead). */
+    endsPoison: z.literal(true).optional(),
+    /** It lifts the curses on the creature and cures its magical contagions (True Resurrection). */
+    endsCurses: z.literal(true).optional(),
+    /** Bringing back a creature dead at least this many minutes taxes the caster until it finishes a Long Rest: it
+     *  can't cast spells and has Disadvantage on D20 Tests (Resurrection's 365 days). */
+    taxesCasterAfterMinutes: z.number().int().min(1).max(MAX_REVIVAL_MINUTES).optional(),
+    /** The new body's species is rolled on the spell's d10 table (Reincarnate). */
+    rollsSpecies: z.literal(true).optional()
+  })
+  .strict();
+export type SpellRevival = z.infer<typeof SpellRevivalSchema>;
 
 /** One cast's mechanical effect; see `SpellReference.effect`. */
 export const SpellEffectSchema = z
@@ -150,11 +343,27 @@ export const SpellEffectSchema = z
     /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
     damage: SpellDamageSchema,
     /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */
-    damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    damageTypes: z.array(DamageTypeSchema).min(2).max(13).optional(),
+    /** Each of its damage dice that rolls its highest face adds another such die, up to the caster's spellcasting
+     *  ability modifier in dice for the cast (Sorcerous Burst: "If you roll an 8 on a d8 for this spell, you can roll
+     *  another d8"). */
+    explodingDice: z.literal(true).optional(),
+    /** The caster picks how familiar the destination is and the d100 is rolled on the Teleportation Outcome table
+     *  (Teleport). */
+    teleportOutcome: z.literal(true).optional(),
+    /** The cast names an item its caster carries and learns its properties (Identify). */
+    identifiesItem: z.literal(true).optional(),
+    /** The caster senses the traps within `feet` in its line of sight, and their nature (Find Traps). */
+    sensesTraps: z
+      .object({ feet: z.number().int().min(5).max(1000) })
+      .strict()
+      .optional(),
+    /** The cast picks one of Wish's uses, and every use but duplicating a spell stresses its caster (`wish.ts`). */
+    wishUses: z.literal(true).optional(),
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),
-    laterActions: z.array(SpellLaterActionSchema).min(1).max(3).optional(),
+    laterActions: z.array(SpellLaterActionSchema).min(1).max(8).optional(),
     /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
     darts: z.number().int().min(2).max(20).optional(),
     /** How many creatures one cast targets (Bless: up to three), plus `perSlot` more for each slot level above the
@@ -189,11 +398,163 @@ export const SpellEffectSchema = z
     grant: ActionGrantSchema.optional(),
     /** What a failed save against the cast leaves on the creature (Bane's -1d4, Faerie Fire's outline). */
     failureEffect: SaveFailureEffectSchema.optional(),
+    /** What a successful save leaves on the creature instead (Flesh to Stone's Speed 0 until the start of the caster's
+     *  next turn, Ray of Enfeeblement's Disadvantage on the next attack roll). */
+    successEffect: SaveFailureEffectSchema.optional(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
-    reaction: ActionReactionSchema.optional()
+    reaction: ActionReactionSchema.optional(),
+    /** The teleport the cast gives its caster (Misty Step's 30 feet), taken on the map at once with no GM ask. */
+    teleport: ActionTeleportSchema.optional(),
+    /** The creatures the cast brings onto the map (Summon Dragon's spirit, Animate Dead's undead), see `SummonSchema`. */
+    summons: SummonSchema.optional(),
+    /** The caster makes the spell's save itself, at this DC whatever its own (Contact Other Plane's DC 15). */
+    selfSave: z
+      .object({ dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    /** The cast ends spells on its target (Dispel Magic). */
+    dispel: DispelSchema.optional(),
+    /** The cast ends the curses on its target and its Attunement to cursed items (Remove Curse). */
+    endsCurses: z.literal(true).optional(),
+    /** The cast ends one harm the caster picks on its target (Greater Restoration). */
+    restores: ActionSchema.shape.restores,
+    /** The cast picks the knowledge and connection that modify its target's save (Scrying). */
+    scryingModifiers: ActionSchema.shape.scryingModifiers,
+    /** Dispel Magic ends what it leaves only when cast from a slot of this level or higher, with no check below it
+     *  (Imprisonment: "only if it is cast with a level 9 spell slot"). */
+    dispelledFromSlot: z.number().int().min(1).max(9).optional(),
+    /** The spell keeps something of its own besides what it leaves on creatures (Entangle's tangled ground, an
+     *  earthquake's fissures), so its Concentration holds when no creature is affected any more. */
+    persistsWithoutTargets: z.literal(true).optional(),
+    /** Its targets are creatures the caster can see ("a creature you can see within range"): with the map's vision on,
+     *  the server refuses one the caster can't see. */
+    seenTargets: z.literal(true).optional(),
+    /** The creature types it can target (Hold Person: a Humanoid). A creature of another type picked as its target is
+     *  refused, and one caught in its area is left out of it. */
+    targetTypes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(6)
+      .optional(),
+    /** The caster picks its targets among the creatures in its area ("up to six creatures of your choice in a 40-foot
+     *  Cube", Mass Cure Wounds' Sphere), so a cast picks creatures that one such area can hold within range; `targets`
+     *  caps how many. Without it, an area's targets are every creature its template covers. */
+    picksInArea: z.literal(true).optional(),
+    /** Its targets after the first stand within this many feet of the first (Chain Lightning's leaping bolts). */
+    chainFeet: z.number().int().min(5).max(300).optional(),
+    /** The cast makes a creature at 0 Hit Points that isn't dead Stable (Spare the Dying). */
+    stabilizes: z.literal(true).optional(),
+    /** The cast brings a dead creature back to life (Revivify, Raise Dead, Resurrection, True Resurrection, Reincarnate). */
+    revives: SpellRevivalSchema.optional(),
+    /** The cast touches a corpse and keeps it from decay, so the days it lasts don't count against a revival's time
+     *  limit (Gentle Repose). */
+    reposes: z.literal(true).optional(),
+    /** A target with this many Hit Points or fewer dies, with no damage and no save; one with more takes the cast's
+     *  damage (Power Word Kill's 100). */
+    killsAtHitPoints: z.number().int().min(1).max(1000).optional(),
+    /** A cantrip whose range doubles at character levels 5, 11 and 17 (Spare the Dying's 15 feet). */
+    rangeDoubles: z.literal(true).optional(),
+    /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell
+     *  with a Verbal component while the spell lasts. */
+    silencesArea: z.literal(true).optional(),
+    /** The cast shape-shifts a creature (Polymorph's Beast, Shapechange's form), as `ActionSchema.shapeShift`. */
+    shapeShift: ActionSchema.shape.shapeShift,
+    /** Effects the cast picks one of (Enlarge/Reduce), as `ActionSchema.effectOptions`. */
+    effectOptions: ActionSchema.shape.effectOptions,
+    /** Only an unwilling creature makes the cast's save; one on the caster's side takes its effect with no save. */
+    unwillingOnly: z.literal(true).optional(),
+    /** What the cast does to each target with no roll (Awaken's Charmed for 30 days), as `ActionSchema.inflicts`. */
+    inflicts: ActionSchema.shape.inflicts,
+    /** Its targets are this size or smaller (Animal Messenger: "A Tiny Beast"); a larger creature picked is refused. */
+    targetMaxSize: ActionTargetsSchema.shape.maxSize,
+    /** Its target has this ability score or less (Awaken: "a Beast or Plant creature with an Intelligence of 3 or
+     *  less"); a creature with more picked is refused. */
+    targetAbilityMax: z
+      .object({ ability: AbilitySchema, score: z.number().int().min(1).max(30) })
+      .strict()
+      .optional(),
+    /** Its target is the caster or a willing creature, which the server takes to be one on the caster's side (Light:
+     *  "an object that isn't being worn or carried by someone else"; Nondetection: "a willing creature"). */
+    willingTargets: z.literal(true).optional(),
+    /** Held with Concentration for its full duration, what it made lasts until dispelled (True Polymorph). */
+    permanentAfterFull: z.literal(true).optional(),
+    /** It lights (with `snuffs`, or puts out) one nonmagical flame within `feet`: a light set on the map, or the light a
+     *  creature it targets carries (Druidcraft's and Prestidigitation's Fire Play, Elementalism's Beckon Fire). */
+    kindles: z
+      .object({ feet: z.number().int().min(5).max(120), snuffs: z.literal(true).optional() })
+      .strict()
+      .optional(),
+    /** A spell of Self range whose other targets stand within this many feet of the caster as it casts (Etherealness from
+     *  a higher slot: "The creatures must be within 10 feet of you"). */
+    companionFeet: z.number().int().min(5).max(60).optional(),
+    /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
+    areaPerSlot: z.number().int().min(5).max(100).optional(),
+    /** "A nonmagical object that isn't being worn or carried also takes the damage if it's in the spell's area"
+     *  (Shatter, Meteor Swarm): the doors and walls on the map that are objects under its area take its full damage. */
+    harmsObjects: z.literal(true).optional(),
+    /** The damage the doors and walls on the map that are objects under its area take at the cast, and as its caster's
+     *  turns end while a lasting area stays (Earthquake: "50 Bludgeoning damage to any structure in contact with the
+     *  ground in the area when you cast the spell and at the end of each of your turns"). */
+    objectDamage: z
+      .array(z.object({ formula: z.string().min(1).max(40), type: z.string().min(1).max(40) }).strict())
+      .min(1)
+      .max(2)
+      .optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;
+
+/** A spell's duration from a higher spell slot, as its higher-level text prints it: from `level` up, the spell lasts
+ *  `duration` (in the grammar of the spell's own: "10 minutes", "8 hours", "until dispelled"), and needs Concentration
+ *  only when `concentration` says so (Bestow Curse from a level 5 slot needs none). */
+export const UpcastDurationSchema = z
+  .object({
+    level: z.number().int().min(1).max(9),
+    duration: z.string().min(1).max(120),
+    concentration: z.boolean()
+  })
+  .strict();
+export type UpcastDuration = z.infer<typeof UpcastDurationSchema>;
+
+/**
+ * A material a cast needs in hand that a Component Pouch or a Spellcasting Focus can't stand in for (SRD Components):
+ * one with a printed worth, or one the spell consumes. A carried item is that material when it is one of `itemIds`
+ * (Holy Water) or its name holds one of `matches` ("diamond"); the GM judges its worth. `coins` are paid from the purse
+ * instead (Gentle Repose's 2 Copper Pieces).
+ */
+export const SpellMaterialSchema = z
+  .object({
+    /** What the text names ("a diamond"), for the reason a cast is refused. */
+    name: z.string().min(1).max(80),
+    matches: z.array(z.string().min(2).max(40)).max(6).optional(),
+    itemIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      )
+      .max(4)
+      .optional(),
+    /** Its printed worth in GP for each one ("worth 300+ GP"); null when the text prints none. */
+    costGp: z.number().min(0).max(100_000).nullable(),
+    /** How many the cast needs ("four ivory strips"); with `perTarget`, for each creature it targets. */
+    count: z.number().int().min(1).max(20).optional(),
+    perTarget: z.literal(true).optional(),
+    /** The spell consumes it ("which the spell consumes"), so the cast uses it up. */
+    consumed: z.boolean(),
+    coins: z
+      .object({ unit: z.enum(["cp", "sp", "ep", "gp", "pp"]), amount: z.number().int().min(1).max(10_000) })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type SpellMaterial = z.infer<typeof SpellMaterialSchema>;
 
 export const SpellReferenceSchema = z
   .object({
@@ -229,10 +590,22 @@ export const SpellReferenceSchema = z
       somatic: z.boolean(),
       material: z.boolean(),
       materialText: z.string().nullable(),
-      materialConsumed: z.boolean()
+      materialConsumed: z.boolean(),
+      /** The materials of `materialText` a cast needs in hand, read from it when the bundle is built: each one with a
+       *  worth or that the spell consumes. Absent, a Component Pouch or a Spellcasting Focus stands in for the material. */
+      costly: z.array(SpellMaterialSchema).min(1).max(4).optional()
     }),
     duration: z.string().min(1).max(120),
     concentration: z.boolean(),
+    /** How a higher slot changes the duration and the Concentration, lowest slot first (Dominate Beast from a level 5
+     *  slot lasts 10 minutes). Absent: every slot lasts `duration`. */
+    upcastDurations: z
+      .array(UpcastDurationSchema)
+      .max(8)
+      .optional()
+      .describe(
+        "How a higher spell slot changes the duration and whether it needs Concentration, lowest slot first. Absent: every slot lasts the spell's own duration"
+      ),
     ritual: z.boolean(),
     /** The caster makes a spell attack roll, when it casts or on a later turn: read from the cast model for the SRD,
      *  since the source marks every spell whose text mentions an attack roll (Bless, Shining Smite). */
@@ -264,6 +637,11 @@ export const SpellReferenceSchema = z
      *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against") and no single cast. A zone, a summons or a
      *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
     effect: SpellEffectSchema.nullable().default(null),
+    /** What the spell does to light and sight while it lasts (Light, Darkness, Fog Cloud, Daylight), which dynamic
+     *  vision reads. */
+    sight: SightEffectSchema.optional(),
+    /** What the spell does to the map's walls and doors (Wall of Force, Knock, Passwall). */
+    walls: SpellWallsSchema.optional(),
     classes: z
       .array(z.string())
       .describe(
@@ -332,6 +710,8 @@ export const WeaponReferenceSchema = z.object({
   /** What an Ammunition weapon fires (`Ammunition (Range 150/600; Arrow)`); absent on other weapons. */
   ammunition: AmmunitionKindSchema.optional(),
   improvised: z.boolean(),
+  /** The Weapons table's price in gold pieces, which crafting reads. Absent = not recorded. */
+  costGp: z.number().nonnegative().max(1_000_000).optional(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
   rangeFeet: z.number().int().positive().nullable(),
   longRangeFeet: z.number().int().positive().nullable(),
@@ -369,6 +749,8 @@ export const ArmorReferenceSchema = z.object({
   acBase: z.number().int().min(2).max(25),
   /** The Armor table's band. Used to resolve magic-item eligibility ("Any Medium or Heavy"). */
   category: z.enum(["light", "medium", "heavy", "shield"]).optional(),
+  /** The Armor table's price in gold pieces, which crafting reads. Absent = not recorded. */
+  costGp: z.number().nonnegative().max(1_000_000).optional(),
   addDexModifier: z.boolean(),
   dexModifierCap: z.number().int().nullable(),
   stealthDisadvantage: z.boolean(),
@@ -405,11 +787,154 @@ export const ItemSpellCastSchema = z
       .describe('A flat printed DC ("save DC 15"). It overrides any derivation'),
     /** Charges. Share one pool across several casts with `uses.pool`. */
     uses: FeatureUsesSchema.optional().describe("Charges. Share one pool across several casts with `uses.pool`"),
+    /** Charges one cast spends, when more than one (Staff of Fire's Fireball: 3). */
+    useCost: z
+      .number()
+      .int()
+      .min(2)
+      .max(50)
+      .optional()
+      .describe("Charges one cast spends, when more than one (Staff of Fire's Fireball: 3)"),
+    /** The most charges one cast may spend, each charge after the first casting it one level higher (Wand of
+     *  Fireballs: 3, for levels 3 to 5). The sheet offers each as its own cast. */
+    chargesRaiseLevel: z
+      .number()
+      .int()
+      .min(2)
+      .max(9)
+      .optional()
+      .describe(
+        "The most charges one cast may spend, each charge after the first casting it one level higher (Wand of Fireballs: 3, for levels 3 to 5). Each becomes its own cast on the sheet"
+      ),
     /** Whether casting it also spends one of the bearer's own spell slots. */
     consumesSpellSlot: z
       .boolean()
       .default(false)
-      .describe("Whether casting it also spends one of the bearer's own spell slots")
+      .describe("Whether casting it also spends one of the bearer's own spell slots"),
+    /** Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear: Beasts only). */
+    targets: ActionTargetsSchema.optional().describe(
+      "Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear affects Beasts only), checked on the server"
+    ),
+    /** The area the item's cast covers in place of the spell's own (Wand of Fear's 60-foot Cone, Cloak of Arachnida's
+     *  Web filling twice its area). */
+    area: ActionAreaSchema.optional().describe(
+      "The area the item's cast covers in place of the spell's own (a wand's 60-foot Cone of Fear), placed as the template"
+    ),
+    /** A flat printed attack bonus for the cast's spell attacks ("with a +5 bonus to hit", Circlet of Blasting). */
+    attackBonus: z
+      .number()
+      .int()
+      .min(-5)
+      .max(20)
+      .optional()
+      .describe(
+        "A flat printed attack bonus for the cast's spell attacks (Circlet of Blasting's +5). It overrides any derivation"
+      ),
+    /** The teleport its cast gives in place of the spell's own, with what the item adds (a Cape of the Mountebank's
+     *  Dimension Door leaves smoke in the space it left). */
+    teleport: ActionTeleportSchema.optional().describe(
+      "The teleport the item's cast gives in place of the spell's own, with what the item adds (a Cape of the Mountebank's smoke)"
+    ),
+    /** It is cast as this, whatever the spell's casting time says (a Necklace of Prayer Beads' bead: a Bonus Action). */
+    activation: z
+      .enum(["action", "bonus-action", "other"])
+      .optional()
+      .describe(
+        "What casting it from the item takes, where the item says so in place of the spell's casting time (a prayer bead: a Bonus Action; a Wand of Wonder's rolled spell: nothing more)"
+      ),
+    /** Offered only as the outcome of its item's table (`rollsOn`), never from the carried row: a Wand of Wonder's
+     *  Fireball. */
+    grantedOnly: z
+      .literal(true)
+      .optional()
+      .describe(
+        "Offered only as the outcome of its item's table, never from the carried row (a Wand of Wonder's Fireball)"
+      ),
+    /** The spell's options the item's cast may pick, where the item limits them (Wand of Fear's Command: "flee or
+     *  grovel only"). */
+    optionIds: z
+      .array(ContentIdSchema)
+      .min(2)
+      .max(6)
+      .optional()
+      .describe(
+        "The spell's options this cast may pick, where the item limits them (a Wand of Fear's Command: \"flee or grovel only\"); the server refuses any other"
+      ),
+    /** A second limit each cast counts against, of casts a Long Rest restores (a Luck Blade's Wish: once a dawn, from
+     *  charges that never come back). */
+    alsoUses: z
+      .object({ limit: z.number().int().min(1).max(20) })
+      .strict()
+      .optional()
+      .describe(
+        "A second limit each cast counts against, of casts a Long Rest restores (a Luck Blade's Wish: once a dawn, from charges that never come back)"
+      ),
+    /** It is cast through this spell, cast from the item too, while its user concentrates on it: it needs no
+     *  Concentration of its own and ends when that spell does (a Crystal Ball's Detect Thoughts through Scrying). */
+    through: ContentIdSchema.optional().describe(
+      "It is cast through this spell while its user concentrates on it: it needs no Concentration of its own and ends when that spell does (a Crystal Ball's Detect Thoughts through Scrying)"
+    ),
+    /** A check its user makes first: a failure spends the use and the spell is not cast (an Amulet of the Planes' DC 15
+     *  Intelligence (Arcana) before Plane Shift). */
+    check: z
+      .object({
+        ability: AbilitySchema,
+        skill: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+          .optional(),
+        dc: z.number().int().min(1).max(40)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A check its user makes first: a failure spends the use and the spell is not cast (an Amulet of the Planes' DC 15 Intelligence (Arcana) before Plane Shift)"
+      ),
+    /** It can be cast only while its user has an effect with this tag (a Dragon Orb's spells, for the one who controls
+     *  it). */
+    requiresEffectTag: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(40)
+      .optional()
+      .describe(
+        "It can be cast only while its user has an effect with this tag (a Dragon Orb's spells, for the one who controls it)"
+      ),
+    /** The forms its shape-shift may take, by stat block id, and what its creature keeps besides what the spell keeps
+     *  (a Cloak of the Bat's Polymorph: a Bat, keeping Intelligence, Wisdom and Charisma). */
+    forms: z
+      .object({
+        only: z.array(ContentIdSchema).min(1).max(8),
+        keeps: z.array(FormKeepSchema).min(1).max(5).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "The forms its shape-shift may take, by stat block id, and what its creature keeps beside the spell's own (a Cloak of the Bat's Bat, keeping its mental scores)"
+      ),
+    /** It can be cast only while its user stands in Dim Light or Darkness (a Cloak of the Bat). */
+    inDimLightOrDarkness: z
+      .literal(true)
+      .optional()
+      .describe("It can be cast only while its user stands in Dim Light or Darkness (a Cloak of the Bat)"),
+    /** What it leaves on its user ends when the item is taken off or put away (a Hat of Disguise: "The spell ends if
+     *  the hat is removed"). */
+    endsWithItem: z
+      .literal(true)
+      .optional()
+      .describe("What it leaves on its user ends when the item is taken off or put away"),
+    /** What it leaves lasts this many minutes, whatever the spell's own duration (Oil of Slipperiness' Grease: 8
+     *  hours). */
+    lastsMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(14400)
+      .optional()
+      .describe(
+        "What it leaves lasts this many minutes, whatever the spell's own duration (Oil of Slipperiness' Grease)"
+      )
   })
   .strict()
   .describe(
@@ -422,19 +947,62 @@ export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
  * Long Rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
  * d20 when the last charge is spent, whose 1 does what the item's text says (most crumble).
  */
+/** A charge count as the SRD prints one: dice ("1d6 + 1"; a d3 is a die of its own here) or a flat number ("1"). */
+const ChargeCountSchema = z
+  .string()
+  .regex(
+    /^(?:\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?|\d{1,2})$/i,
+    "Use a dice formula such as 1d6 + 1, or a number."
+  );
+
 export const ItemChargesSchema = z
   .object({
     // The SRD's own grammar here includes a d3 ("regains 1d3 expended charges"), which the dice roller lacks.
-    regain: z
-      .string()
-      .regex(/^\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?$/i, "Use a dice formula such as 1d6 + 1.")
-      .optional(),
-    lastChargeRoll: z.boolean().default(false)
+    regain: ChargeCountSchema.optional(),
+    lastChargeRoll: z.boolean().default(false),
+    /** What spending the last charge does to the item: with `lastChargeRoll`, on a d20 of 1, and otherwise always (a
+     *  Chime of Opening cracks). `destroyed` takes the row away; `nonmagical` keeps the row with its magic spent for
+     *  good (a Gem of Brightness is a plain jewel); `becomes` turns it into that item (a Staff of Striking becomes a
+     *  Quarterstaff), bound to `baseId` where that item is a template (a Staff of Power keeps a +2 Quarterstaff).
+     *  Absent: the GM is told, and decides. */
+    lastCharge: z
+      .union([
+        z.literal("destroyed"),
+        z.literal("nonmagical"),
+        z.object({ becomes: ContentIdSchema, baseId: ContentIdSchema.optional() }).strict()
+      ])
+      .optional()
+      .describe(
+        "What spending the last charge does to the item: with lastChargeRoll on a d20 of 1, otherwise always. destroyed takes the row away; nonmagical keeps the row with its magic spent for good; becomes turns it into that item, bound to baseId when that item is a template. Absent: the GM is told"
+      ),
+    /** With `lastChargeRoll`, the charges a d20 of 20 gives back (Staff of Power: 1d8 + 2). */
+    lastChargeTwenty: ChargeCountSchema.optional().describe(
+      "With lastChargeRoll, the charges a d20 of 20 gives back (Staff of Power: 1d8 + 2)"
+    ),
+    /** The charges a copy holds when it is added, rolled then (a Necklace of Fireballs' 1d6 + 3 beads). Its pools
+     *  count from there. */
+    starting: ChargeCountSchema.optional().describe(
+      "The charges a copy holds when it is added, rolled then (a Necklace of Fireballs' 1d6 + 3 beads); its pools count from there"
+    ),
+    /** Each named pool's own count when a copy is added, in place of `starting` (a Helm of Brilliance's 1d10 diamonds
+     *  and 4d10 opals). */
+    startingByPool: z
+      .record(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        ChargeCountSchema
+      )
+      .optional()
+      .describe(
+        "Each named pool's own count when a copy is added, in place of starting (a Helm of Brilliance's 1d10 diamonds and 4d10 opals)"
+      )
   })
   .strict();
 export type ItemCharges = z.infer<typeof ItemChargesSchema>;
 
-/** Attunement. `restrictedTo` is advisory: shown on the sheet, never enforced. */
+/** Attunement, and who may attune: a player attunes only a creature that meets one of `restrictedTo`. */
 export const ItemAttunementSchema = z
   .object({
     required: z.boolean().default(false),
@@ -442,11 +1010,13 @@ export const ItemAttunementSchema = z
       .array(ContentIdSchema)
       .max(8)
       .default([])
-      .describe("Class or species ids the item is meant for. Advisory only")
+      .describe(
+        "Who may attune, any one of: a class id, a species id, spellcaster, or creature-attuned-to-a-<item id>. Empty: anyone"
+      )
   })
   .strict()
   .describe(
-    'Attunement. `restrictedTo` matches class ids or a species id and is advisory: shown on the sheet ("Requires attunement by a cleric"), never a block: it is an open slug set, blocking on a fuzzy match would be wrong, and a GM handing a player a restricted item on purpose is a normal table event, with nothing to refuse.'
+    'Attunement. `restrictedTo` is the printed prerequisite ("Requires Attunement by a Cleric or Paladin"), any one of which lets a creature attune: a class it has a level in, its species or lineage id, `spellcaster` (a sheet with spellcasting), or `creature-attuned-to-a-<item id>` (attuned to that item). The sheet shows it beside the Attune control, and a player\'s attune is refused when the character meets none. The GM may attune anyone, so handing a restricted item over on purpose still works.'
   );
 export type ItemAttunement = z.infer<typeof ItemAttunementSchema>;
 
@@ -506,13 +1076,178 @@ const EquipmentWeaponStatsSchema = z.object({
 });
 
 /** The light a lit item sheds, as its description prints it: Bright Light out to `brightFeet` and Dim Light for
- *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights a carried one while it is equipped (ADR-0023). */
+ *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights its bearer while it is lit and equipped (ADR-0023). */
 const ItemLightSchema = z
   .object({
     brightFeet: z.number().int().min(0).max(240),
-    dimFeet: z.number().int().min(0).max(240)
+    dimFeet: z.number().int().min(0).max(240),
+    /** The light is a Cone the bearer aims (a Bullseye Lantern). */
+    cone: z.literal(true).optional(),
+    /** With its hood lowered (a Hooded Lantern): "reducing the light to Dim Light in a 5-foot radius". */
+    hooded: z
+      .object({ brightFeet: z.number().int().min(0).max(240), dimFeet: z.number().int().min(0).max(240) })
+      .strict()
+      .optional(),
+    /** Its Bright Light is sunlight (a Sun Blade). */
+    sunlight: z.literal(true).optional(),
+    /** Invisible creatures in its Bright Light are seen (a Lantern of Revealing). */
+    revealsInvisible: z.literal(true).optional(),
+    /** It sheds its light whenever it is held, with nothing to light (a Mace of Disruption). */
+    always: z.literal(true).optional(),
+    /** Its other riders apply only while it is lit (a Flame Tongue's 2d6 Fire while ablaze). */
+    ridersWhileLit: z.literal(true).optional(),
+    /** How long it burns once lit, in hours: a Torch or Candle is used up, and a Lamp or Lantern spends a flask of
+     *  `fuel` (Oil). */
+    burnHours: z.number().int().min(1).max(24).optional(),
+    fuel: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
+  })
+  .strict()
+  .describe(
+    "The light the item sheds while it is lit and equipped: Bright Light out to `brightFeet` and Dim Light for `dimFeet` more, a Cone with `cone`, less with its hood down (`hooded`), sunlight with `sunlight`, and revealing Invisible creatures in its Bright Light with `revealsInvisible`. `burnHours` is how long it burns once lit, spending a `fuel` item when it names one. With `always` it shines whenever it is held, and with `ridersWhileLit` its other riders apply only while it is lit."
+  );
+export type ItemLight = z.infer<typeof ItemLightSchema>;
+
+/** One part of a container that holds its own load (a Handy Haversack's pouches, an Efficient Quiver's compartments):
+ *  pounds, or a count of things, and what kind of thing it takes. */
+const ContainerCompartmentSchema = z
+  .object({
+    id: ContentIdSchema,
+    name: z.string().min(1).max(60),
+    capacityLb: z.number().positive().max(10_000).optional(),
+    /** How many things it takes: pieces of ammunition, or items (an Efficient Quiver's 18 Javelins). */
+    count: z.number().int().min(1).max(1000).optional(),
+    /** Only ammunition, or only weapons. */
+    holds: z.enum(["ammunition", "weapons"]).optional()
   })
   .strict();
+
+/**
+ * What a container holds (SRD 5.2.1 Adventuring Gear and Magic Items): up to `capacityLb` pounds (a Backpack's 30), or
+ * `pieces` of ammunition of `kinds` (a Quiver's 20 Arrows), or a load in each of its `compartments` (a Handy Haversack's
+ * pouches). `weighsLb`: it weighs this whatever it holds (a Bag of Holding's 5 pounds). `retrieval`: what
+ * taking a thing out costs in a fight beyond the free object interaction (a Bag of Holding's Utilize action, a Handy
+ * Haversack's Utilize action or Bonus Action). `overloadDestroys`: overloaded, it is destroyed with what it holds.
+ * `extradimensional`: one put inside another destroys both (a Bag of Holding in a Portable Hole). `drawsAmmunition`:
+ * pieces in it are drawn as part of an attack (a Quiver).
+ */
+export const ItemContainerSchema = z
+  .object({
+    capacityLb: z.number().positive().max(10_000).optional(),
+    pieces: z
+      .object({
+        count: z.number().int().min(1).max(1000),
+        kinds: z.array(AmmunitionKindSchema).min(1).max(5).optional()
+      })
+      .strict()
+      .optional(),
+    compartments: z.array(ContainerCompartmentSchema).min(2).max(4).optional(),
+    weighsLb: z.number().nonnegative().max(1000).optional(),
+    retrieval: z.enum(["utilize", "utilize-or-bonus-action"]).optional(),
+    overloadDestroys: z.literal(true).optional(),
+    extradimensional: z.literal(true).optional(),
+    drawsAmmunition: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "What a container holds: up to `capacityLb` pounds, `pieces` of ammunition of `kinds` (a Quiver's 20 Arrows), or a load in each of its `compartments` (a Handy Haversack's pouches). `weighsLb`: it weighs this many pounds whatever it holds. `retrieval`: what taking a thing out costs in a fight beyond the free object interaction. `overloadDestroys`: overloaded, it is destroyed with its contents. `extradimensional`: one put inside another destroys both. `drawsAmmunition`: pieces in it are drawn as part of an attack"
+  );
+export type ItemContainer = z.infer<typeof ItemContainerSchema>;
+
+/**
+ * One kind of an item whose record covers several (an Ioun Stone's fourteen stones, a Belt of Giant Strength's six
+ * giants), or one form its holder can put it in (a Rod of Lordly Might's buttons). Its riders join the record's while a
+ * carried copy is that kind (`InventoryItem.variantId`); a `weapon` block is how the copy swings in that form, and
+ * null leaves it no weapon there.
+ */
+export const ItemVariantSchema = z
+  .object({
+    id: ContentIdSchema,
+    name: z.string().min(1).max(80),
+    modifiers: z.array(ModifierSchema).max(8).default([]),
+    grants: FeatureGrantsSchema.optional(),
+    actions: z.array(FeatureActionSchema).max(8).default([]),
+    casts: z.array(ItemSpellCastSchema).max(12).default([]),
+    effects: z.array(EffectGrantSchema).max(4).default([]),
+    light: ItemLightSchema.optional(),
+    weapon: EquipmentWeaponStatsSchema.nullable().optional(),
+    onHit: z.array(OnHitRiderSchema).max(4).optional(),
+    /** Hit Points a copy of this kind gives back as time passes (an Ioun Stone of Regeneration). */
+    regainsHitPoints: RegainHitPointsSchema.optional(),
+    /** In this form its own modifiers, hit riders and light stand in for the record's (a Rod of Lordly Might's flame
+     *  blade: 2d6 Fire, not the Mace's +3); the record's actions and casts stay. */
+    replacesRiders: z.literal(true).optional(),
+    /** The record's own actions and casts can't be used in this form (a Quarterstaff of the Acrobat's Attack
+     *  Deflection is in its Quarterstaff form only). */
+    suspendsActions: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "One kind or form of the item, with the riders it adds to the record's own while a carried copy is that kind. With `replacesRiders` its modifiers, hit riders and light stand in for the record's instead, and the record's actions, casts, effects and grants stay; with `suspendsActions` the record's actions and casts are not offered in this form. A `weapon` block is how the copy swings in that form; null leaves it no weapon there."
+  );
+export type ItemVariant = z.infer<typeof ItemVariantSchema>;
+
+/** Who picks a copy's kind: the GM ("The GM chooses the type", what was found) or its holder, at the action it costs
+ *  (pressing one of the rod's buttons is a Bonus Action). */
+export const ItemVariantChoiceSchema = z
+  .object({
+    by: z.enum(["gm", "holder"]),
+    activation: z.enum(["bonus-action", "action"]).optional(),
+    /** In a fight its holder picks a form only on its own turn before it has made an attack roll, and the form lasts
+     *  until the start of its next turn (a Defender's bonus moved to AC "the first time you attack with the weapon on
+     *  each of your turns"). */
+    untilTurnStart: z
+      .literal(true)
+      .optional()
+      .describe(
+        "In a fight its holder picks a form only on its own turn before its first attack roll, and the form lasts until the start of its next turn (a Defender)"
+      )
+  })
+  .strict()
+  .describe(
+    "Who picks which of the item's kinds a copy is: the GM (what was found) or its holder, who changes it at the cost of `activation` in a fight"
+  );
+
+/** What a magic weapon changes about the base it is bound to: its damage type (an Energy Bow's Force), properties it
+ *  adds or loses (a Dwarven Thrower's Thrown, an Energy Bow needing no ammunition) and its range. */
+export const ItemWeaponChangesSchema = z
+  .object({
+    damageType: DamageTypeSchema.optional(),
+    addProperties: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40)
+      )
+      .min(1)
+      .max(4)
+      .optional(),
+    removeProperties: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40)
+      )
+      .min(1)
+      .max(4)
+      .optional(),
+    rangeFeet: z.number().int().min(5).max(600).optional(),
+    longRangeFeet: z.number().int().min(5).max(1200).optional(),
+    /** Damage types its wielder may deal on a hit in place of the weapon's own (a Javelin of Lightning: Lightning). */
+    damageTypeOptions: z.array(DamageTypeSchema).min(1).max(2).optional(),
+    /** Thrown, it flies back to its thrower's hand (a Dwarven Thrower), so a throw leaves it carried. */
+    returns: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "What the item changes about the base weapon it is bound to, copied onto the bound row: its damage type, properties added or taken away, and a normal and long range (a Dwarven Thrower's Thrown 20/60). `damageTypeOptions` are types its wielder may pick on each hit in place of the weapon's own (a Javelin of Lightning's Lightning). `returns`: thrown, it flies back to its thrower's hand"
+  );
+export type ItemWeaponChanges = z.infer<typeof ItemWeaponChangesSchema>;
 
 /**
  * The base weapons or armors a template item may bind to: the SRD's printed qualifier (`label`) and
@@ -589,8 +1324,107 @@ export const EquipmentReferenceSchema = z
       .optional()
       .describe("Populated for armor and shields only"),
 
+    /** A poison (SRD 5.2.1 Gameplay Toolbox, Sample Poisons): how it is delivered, and the save and damage a creature
+     *  exposed to it meets. An injury poison is coated on a weapon or a piece of ammunition, and the next hit with it
+     *  that deals Piercing or Slashing damage brings this on the creature hit. */
+    poison: z
+      .object({
+        kind: z.enum(["contact", "ingested", "inhaled", "injury"]),
+        save: ActionSchema.shape.save,
+        damage: ActionSchema.shape.damage
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A poison's delivery and what a creature exposed to it meets; an injury poison's coat brings it on the next Piercing or Slashing hit"
+      ),
+
     // ---- the magic-item vocabulary ---------------------------------------------------------------
 
+    /** It serves as this kind of Spellcasting Focus while carried (a Talisman of Pure Good is a Holy Symbol). */
+    servesAsFocus: z
+      .enum(["arcane-focus", "druidic-focus", "holy-symbol"])
+      .optional()
+      .describe(
+        "It serves as this kind of Spellcasting Focus while carried (a Talisman of Pure Good is a Holy Symbol)"
+      ),
+    /** While it is active, a successful save against a spell of this level or lower leaves the spell no effect on its
+     *  bearer: no half damage, nothing the success would leave (a Ring of Spell Turning, level 7). */
+    savesNegateSpells: z
+      .object({ maxLevel: z.number().int().min(0).max(9) })
+      .strict()
+      .optional()
+      .describe(
+        "While it is active, a successful save against a spell of this level or lower leaves the spell no effect on its bearer (a Ring of Spell Turning, level 7)"
+      ),
+    /** Hit Points its wearer regains as time passes while it is worn (`RegainHitPointsSchema`). */
+    regainsHitPoints: RegainHitPointsSchema.optional().describe(
+      "Hit Points its wearer regains as time passes while it is worn and has at least 1 (a Ring of Regeneration's 1d6 every 10 minutes)"
+    ),
+    /** It and its allies within `feet` of its attuned bearer have Advantage on Initiative (a Weapon of Warning). */
+    initiativeAura: z
+      .object({
+        feet: z.number().int().min(5).max(120),
+        /** As a fight begins it wakes each of them sleeping naturally (Alarm). */
+        wakesSleepers: z.literal(true).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Its bearer and its allies within this many feet have Advantage on Initiative, and with wakesSleepers each of them sleeping naturally wakes as a fight begins (a Weapon of Warning)"
+      ),
+    /** Its wearer's Unarmed Strikes deal this die of this type instead of the usual Bludgeoning damage (Demon Armor's
+     *  clawed gauntlets: 1d8 Slashing). */
+    unarmedStrike: z
+      .object({ dice: DiceFormulaSchema, damageType: DamageTypeSchema })
+      .strict()
+      .optional()
+      .describe(
+        "Its wearer's Unarmed Strikes deal this die of this type instead of the usual Bludgeoning damage (Demon Armor's claws: 1d8 Slashing)"
+      ),
+    /** Its riders stop while its bearer's Speed is 0 (`atSpeedZero`), and from the moment its bearer takes damage until
+     *  the start of the bearer's next turn (`onDamage`): a Cloak of Displacement. */
+    lapses: z
+      .object({ onDamage: z.literal(true).optional(), atSpeedZero: z.literal(true).optional() })
+      .strict()
+      .optional()
+      .describe(
+        "Its riders stop while its bearer's Speed is 0, and from the moment its bearer takes damage until the start of its next turn (a Cloak of Displacement)"
+      ),
+    /** To its holder it is this other item until it is identified (a Potion of Poison passes for a Potion of Healing). */
+    disguisedAs: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
+      .describe(
+        "To its holder it is this other item until Identify reveals it: a Potion of Poison passes for a Potion of Healing"
+      ),
+    /** While its bearer is attuned, a Ranged weapon attack at another creature within `feet` of the bearer targets the
+     *  bearer instead, held or not (a Shield of Missile Attraction's curse). */
+    attractsMissiles: z
+      .object({ feet: z.number().int().min(5).max(60) })
+      .strict()
+      .optional()
+      .describe(
+        "While its bearer is attuned, a Ranged weapon attack at another creature within this many feet of the bearer targets the bearer instead (a Shield of Missile Attraction's curse)"
+      ),
+    /** Each use of its actions or casts may break it: `percent` chance a use, times the uses of its pool since the last
+     *  Long Rest before this one when `cumulative` (a Wind Fan's 20 percent more each time). With `failsUse` the use
+     *  that breaks it does nothing (the fan fails to work); otherwise it breaks once the use is done, dealing `damage`
+     *  to its user (a Horn of Blasting's 10d6 Force). A broken item is destroyed. */
+    breaks: z
+      .object({
+        percent: z.number().int().min(1).max(100),
+        cumulative: z.literal(true).optional(),
+        failsUse: z.literal(true).optional(),
+        damage: z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema }).strict().optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Each use of its actions or casts may break it: percent chance a use (times the uses of its pool since the last Long Rest before this one when cumulative, a Wind Fan). With failsUse the use that breaks it does nothing; otherwise it breaks after the use, dealing damage to its user (a Horn of Blasting). A broken item is destroyed"
+      ),
     /** Where it is worn or held. Absent = fall back to `category` for the three the engine already knows. */
     slot: ItemSlotSchema.optional().describe(
       "Where it is worn or held: the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield)"
@@ -618,7 +1452,8 @@ export const EquipmentReferenceSchema = z
       ),
     casts: z
       .array(ItemSpellCastSchema)
-      .max(8)
+      // A Staff of the Magi casts 18 spells.
+      .max(24)
       .default([])
       .describe("Spells the item can cast (Amulet of Message, Wand of Fireballs)"),
     charges: ItemChargesSchema.optional().describe(
@@ -657,6 +1492,21 @@ export const EquipmentReferenceSchema = z
       .describe(
         "A Spell Scroll: each carried copy bears one spell of these levels (0 is a cantrip), stored as the row's `spellId` and checked by the server when it is added. Reading it casts the spell at its level with the Spell Scroll table's save DC and attack bonus, no spell slot and no Material components, and uses it up; a reader whose spell list lacks the spell can't read it, and one above the reader's levels needs a check first. Needs `consumedOnUse`"
       ),
+    /** A manual or tome: studied for its reading time, it raises its reader's score for good, and its magic then
+     *  sleeps. */
+    study: z
+      .object({
+        ability: AbilityShortSchema,
+        amount: z.number().int().min(1).max(4),
+        maximum: z.number().int().min(20).max(30),
+        hours: z.number().int().min(1).max(1000),
+        days: z.number().int().min(1).max(365)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A manual or tome (\"If you spend 48 hours over a period of 6 days or fewer studying the book's contents and practicing its guidelines, your Constitution increases by 2, to a maximum of 30\"): `hours` of study within `days`, after which the reader's `ability` rises by `amount`, never above `maximum`, for good. The GM marks the study done (the time is downtime the GM gives); the server records it in the reader's build, so a rebuild keeps it, and the copy's magic is spent, so no one else gains from it"
+      ),
     /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
      *  replaces the printed default in `grants.damageResistances` for that carried copy. */
     damageTypeChoice: z
@@ -675,6 +1525,101 @@ export const EquipmentReferenceSchema = z
       .describe(
         "Armor of Vulnerability's curse: while the bearer is attuned, worn or not, Vulnerability to every `damageTypeChoice` type except the one it resists. Needs `cursed` and `damageTypeChoice`"
       ),
+    /** What a hit with this weapon does beside its damage (Giant Slayer's save against Prone, a Sword of Wounding's
+     *  stopped healing, a Sword of Sharpness's Exhaustion on a rolled 20). */
+    onHit: z
+      .array(OnHitRiderSchema)
+      .max(4)
+      .optional()
+      .describe(
+        "What a hit with this weapon does beside its damage: each rider rides every attack the item makes (both grips, its Light extra attack) and lands as the monster on-hit riders do, a save at its DC (Giant Slayer), a rolled 20 only (Sword of Sharpness), a creature type only, or the coat its own action put on (Dagger of Venom). Needs a `weapon` block or `appliesTo`"
+      ),
+    /** The kinds one record covers, one per carried copy (an Ioun Stone's fourteen), or the forms its holder can put
+     *  it in (a Rod of Lordly Might's buttons). */
+    variants: z
+      .array(ItemVariantSchema)
+      .min(2)
+      .max(16)
+      .optional()
+      .describe(
+        "The kinds this record covers, of which each carried copy is one (an Ioun Stone's fourteen stones, a Potion of Resistance's ten types), or the forms its holder puts it in (a Rod of Lordly Might's buttons). The copy's pick is `InventoryItem.variantId`; until one is picked the copy has the record's own riders alone"
+      ),
+    variantChoice: ItemVariantChoiceSchema.optional().describe(
+      "Who picks a copy's kind: the GM (absent, or by gm) or its holder (by holder), paying `activation` in a fight"
+    ),
+    /** "While you hold the drawn weapon, it creates a 10-foot Emanation originating from you. You and all creatures
+     *  Friendly to you in the Emanation have Advantage on saving throws against spells and other magical effects"
+     *  (Holy Avenger). */
+    magicSaveAura: z
+      .object({
+        feet: z.number().int().min(5).max(60),
+        /** A wider Emanation from a class level ("If you have 17 or more levels in the Paladin class, the size of the
+         *  Emanation increases to 30 feet"). */
+        widerAt: z
+          .object({
+            classId: ContentIdSchema,
+            level: z.number().int().min(1).max(20),
+            feet: z.number().int().min(5).max(120)
+          })
+          .strict()
+          .optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "While the item is in use, its bearer and the creatures allied with it within `feet` have Advantage on saving throws against spells and other magical effects (Holy Avenger); `widerAt` widens it from a class level. Read as each save is rolled, from the map's distances"
+      ),
+    /** What an equipment pack holds ("A Dungeoneer's Pack contains ... 10 Torches"): carried, it is these rows. */
+    contents: z
+      .array(z.object({ id: ContentIdSchema, quantity: z.number().int().min(1).max(100) }).strict())
+      .min(1)
+      .max(16)
+      .optional()
+      .describe(
+        "What the item holds, which it is unpacked into wherever a character comes by it (its starting equipment, or adding it to the sheet): each record id and how many (an Explorer's Pack's 10 Torches)"
+      ),
+    /** It holds other carried things (a Backpack's 30 pounds, a Quiver's 20 Arrows, a Bag of Holding). */
+    container: ItemContainerSchema.optional(),
+    /** While its bearer has an effect with this tag, the bearer can't end its attunement (a Dragon Orb's charm: "you
+     *  can't voluntarily end your Attunement to it"). */
+    attunementHeldBy: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(40)
+      .optional()
+      .describe(
+        "An effect tag: while its bearer has an effect with it, the bearer can't end attunement to the item (a Dragon Orb's charm)"
+      ),
+    /** What the item does when its carrier takes the Utilize action, with the check it takes ("As a Utilize action,
+     *  you can throw the Grappling Hook ... DC 13 Dexterity (Acrobatics) check"). A tool's own Utilize line is read
+     *  from its description. */
+    utilize: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(80),
+            ability: AbilityShortSchema,
+            skill: ContentIdSchema.optional(),
+            dc: z.number().int().min(1).max(40)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(4)
+      .optional()
+      .describe(
+        "What the item does when its carrier takes the Utilize action, each with the check it takes and its DC (a Grappling Hook's catch: DC 13 Dexterity (Acrobatics)). The sheet offers each one while the item is carried; in a fight it takes the Utilize action. A tool's own Utilize line is read from its description"
+      ),
+    /** "You can make one attack with it as a Bonus Action on each of your turns" (Scimitar of Speed). */
+    bonusActionAttack: z
+      .literal(true)
+      .optional()
+      .describe(
+        "Its wielder can make one attack with it as a Bonus Action on each of their turns (Scimitar of Speed), offered beside its own attack. Needs a `weapon` block or `appliesTo`"
+      ),
+    weaponChanges: ItemWeaponChangesSchema.optional().describe(
+      "What a magic weapon changes about its base: the bound row deals this damage type, gains or loses these properties and has this range (a Dwarven Thrower is Thrown 20/60, an Energy Bow deals Force and needs no ammunition)"
+    ),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z
       .array(ContentIdSchema)
@@ -721,6 +1666,24 @@ export const EquipmentReferenceSchema = z
         path: ["vulnerableToOtherChoices"],
         message: "Vulnerability to the other choices needs a cursed item whose resistance the GM chooses."
       });
+    if (item.variants) {
+      const ids = item.variants.map((variant) => variant.id);
+      if (new Set(ids).size !== ids.length)
+        context.addIssue({ code: "custom", path: ["variants"], message: "Each kind of the item needs its own id." });
+    }
+    if (item.variantChoice && !item.variants)
+      context.addIssue({
+        code: "custom",
+        path: ["variantChoice"],
+        message: "Who picks the item's kind needs kinds to pick from: give it variants."
+      });
+    // A hit rider rides the item's own attacks, so the item has to make one.
+    if (item.onHit && !item.weapon && !item.appliesTo)
+      context.addIssue({
+        code: "custom",
+        path: ["onHit"],
+        message: "What a hit does needs a weapon to hit with: give the item weapon stats or a base weapon."
+      });
     // Enforced on the item carrier only: the identical rider on a feat is valid.
     item.modifiers.forEach((modifier, index) => {
       if (ITEM_REFUSED_MODIFIER_TYPES.includes(modifier.type)) {
@@ -755,6 +1718,111 @@ export const GlossaryEntrySchema = z.object({
   description: z.string().min(1).max(20000)
 });
 export type GlossaryEntry = z.infer<typeof GlossaryEntrySchema>;
+
+/** How a trap is found (SRD 5.2.1 Gameplay Toolbox, Detect and Disarm): a Search with Wisdom (Perception) or a Study
+ *  with Intelligence (Investigation) against `dc`, by a creature within `withinFeet` of the trapped area, finds `finds`
+ *  ("the trip wire"). */
+export const TrapDetectSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    action: z.enum(["search", "study"]),
+    skill: z.enum(["perception", "investigation"]),
+    dc: z.number().int().min(1).max(40),
+    finds: z.string().min(1).max(80),
+    withinFeet: z.number().int().min(5).max(60).optional()
+  })
+  .strict();
+export type TrapDetect = z.infer<typeof TrapDetectSchema>;
+
+/** A way to make a found trap safe, once `after` has found it: cutting a trip wire or plugging holes (no check), wedging
+ *  an Iron Spike under a plate or a lid (`spends` one), defacing a glyph with a sharp tool, or a check (`check`) that
+ *  sets the trap off on a failure where `failureSprings` says so. Each takes an action (the Utilize action). */
+export const TrapDisarmSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    name: z.string().min(1).max(60),
+    after: z.string().regex(/^[a-z0-9-]+$/),
+    spends: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .optional(),
+    check: z
+      .object({
+        ability: AbilitySchema,
+        skill: z.string().regex(/^[a-z-]+$/),
+        dc: z.number().int().min(1).max(40),
+        failureSprings: z.boolean()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type TrapDisarm = z.infer<typeof TrapDisarmSchema>;
+
+/** A trap at one band of character levels (the SRD's At Higher Levels table): its save and damage, the darts that each
+ *  failure takes (Poisoned Darts' 1d3), and a pit's depth, whose fall deals the Bludgeoning damage. */
+export const TrapTierSchema = z
+  .object({
+    levels: z.string().min(1).max(20),
+    save: ActionSchema.shape.save,
+    damage: ActionSchema.shape.damage,
+    darts: z.string().min(1).max(20).optional(),
+    pitFeet: z.number().int().min(5).max(500).optional(),
+    /** A Huge or larger creature succeeds on the save automatically (a falling Net). */
+    hugeSucceeds: z.literal(true).optional()
+  })
+  .strict();
+export type TrapTier = z.infer<typeof TrapTierSchema>;
+
+/**
+ * What a trap does on the map (`traps.ts`): what sets it off (`enter`: a creature moving onto its area, a pressure plate
+ * or a trip wire; `enter-or-start`: also a creature starting its turn there; `manual`: the GM, for a lock or a door),
+ * whom it acts on (the creature that set it off, or each creature in its blast), whether it resets at the start of the
+ * next turn and how often, and what it leaves (rubble that is Difficult Terrain, an open pit, a fallen Net).
+ */
+export const TrapMechanicsSchema = z
+  .object({
+    severity: z.enum(["nuisance", "deadly"]),
+    trigger: z.enum(["enter", "enter-or-start", "manual"]),
+    targets: z.enum(["triggerer", "area"]),
+    resets: z
+      .object({ maxActivations: z.number().int().min(1).max(100).optional() })
+      .strict()
+      .optional(),
+    rubble: z.literal(true).optional(),
+    pit: z.literal(true).optional(),
+    /** Once found, it is stepped over or avoided with no check (a trip wire), so it no longer goes off. */
+    avoidable: z.literal(true).optional(),
+    /** It acts somewhere other than where it is set off (a statue's Cone, the darts' path), which the GM marks. */
+    blast: z.literal(true).optional(),
+    /** It rolls Initiative and acts on its own turns once set off (Rolling Stone), which the GM runs. */
+    rolls: z.literal(true).optional(),
+    detect: z.array(TrapDetectSchema).min(1).max(3),
+    disarm: z.array(TrapDisarmSchema).max(3),
+    tiers: z.array(TrapTierSchema).min(1).max(4)
+  })
+  .strict();
+export type TrapMechanics = z.infer<typeof TrapMechanicsSchema>;
+
+/** One record of the SRD 5.2.1 Gameplay Toolbox (`toolbox.v1.json`): a trap, a poison, an environmental effect, a
+ *  contagion, a curse or one of the chapter's other sections, with its text from the vendored chapter. A trap carries
+ *  its mechanics; a poison names the consumable it is (`poisons.v1.json`). */
+export const ToolboxRecordSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    name: z.string().min(1).max(80),
+    kind: z.enum(["trap", "poison", "environment", "contagion", "curse", "section"]),
+    section: z.string().min(1).max(80),
+    subtitle: z.string().min(1).max(80).nullable(),
+    description: z.string().min(1).max(20000),
+    trap: TrapMechanicsSchema.optional(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .optional()
+  })
+  .strict();
+export type ToolboxRecord = z.infer<typeof ToolboxRecordSchema>;
 
 export const ContentAttributionSchema = z.object({
   license: z.literal("CC-BY-4.0"),

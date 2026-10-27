@@ -341,9 +341,24 @@ describe("the generated magic-item bundle", () => {
     const catalog = loadEquipment();
     expect(catalog.filter((item) => item.isMagic)).toHaveLength(rows.length);
     // The fold gives every row the uniform `weapon`/`armor`-present shape the other three have; only a
-    // shield carries a block of its own (see below).
+    // shield carries an armor block of its own (see below), and only what is wielded as a weapon of its own a weapon
+    // block (a staff as a Quarterstaff, the Rod of Lordly Might as a Mace, the Sun Blade as a Longsword).
     const magic = catalog.filter((item) => item.isMagic);
-    expect(magic.filter((item) => item.weapon !== null)).toEqual([]);
+    expect(
+      magic
+        .filter((item) => item.weapon !== null)
+        .map((item) => item.id)
+        .sort()
+    ).toEqual([
+      "rod-of-lordly-might",
+      "staff-of-power",
+      "staff-of-striking",
+      "staff-of-the-magi",
+      "staff-of-the-woodlands",
+      "staff-of-thunder-and-lightning",
+      "staff-of-withering",
+      "sun-blade"
+    ]);
     expect(magic.filter((item) => item.armor !== null && item.slot !== "shield")).toEqual([]);
     const wand = catalog.find((item) => item.id === "wand-of-the-war-mage-1")!;
     expect(wand).toMatchObject({
@@ -383,6 +398,7 @@ describe("the eligibility column", () => {
       "dragon-slayer": "Any Simple or Martial",
       "dwarven-plate": "Half Plate Armor or Plate Armor",
       "dwarven-thrower": "Warhammer",
+      "energy-bow": "Longbow or Shortbow",
       "elven-chain": "Chain Mail or Chain Shirt",
       "flame-tongue": "Any Melee Weapon",
       "frost-brand": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
@@ -590,14 +606,14 @@ describe("the eligibility column", () => {
 
   it("is total on weapons, body armor and ammunition, and absent everywhere else", () => {
     const templates = new Set(["weapon", "armor", "ammunition"]);
-    // Sun Blade and Energy Bow are more than their base (damage type conversion), so binding them to a
-    // bare base would derive a wrong attack. Not bound until weapon-swing overrides exist.
+    // The Sun Blade is a hilt that is its own blade, not a base made magic. The Energy Bow binds to its bow and changes
+    // what it shoots (`weaponChanges`).
     expect(
       rows
         .filter((row) => templates.has(row.category) && !row.appliesTo)
         .map((row) => row.id)
         .sort()
-    ).toEqual(["energy-bow", "sun-blade"]);
+    ).toEqual(["sun-blade"]);
     expect(rows.filter((row) => !templates.has(row.category) && row.appliesTo)).toEqual([]);
     // Magic ammunition is a piece of one kind, picked like a magic weapon's base; a shield carries its own block.
     expect(
@@ -606,5 +622,39 @@ describe("the eligibility column", () => {
         .map((row) => row.id)
         .sort()
     ).toEqual(["ammunition-1", "ammunition-2", "ammunition-3", "ammunition-of-slaying"]);
+  });
+});
+
+describe("what a spent last charge does", () => {
+  it("declares the outcome of every last charge's d20 whose 1 the SRD text prints", () => {
+    const rolled = rows.filter((row) => row.charges?.lastChargeRoll);
+    for (const row of rolled) {
+      const printsOne = /roll 1d20\. On a 1\b/.test(row.description ?? "");
+      expect(row.charges?.lastCharge !== undefined, `${row.id}: lastCharge`).toBe(printsOne);
+    }
+    // The Staff of the Magi's d20 prints only a 20.
+    expect(rolled.filter((row) => row.charges?.lastCharge === undefined).map((row) => row.id)).toEqual([
+      "staff-of-the-magi"
+    ]);
+  });
+
+  it("ends the item where its text says the last charge or use does, with no d20", () => {
+    const outcomes = Object.fromEntries(
+      rows
+        .filter((row) => row.charges?.lastCharge !== undefined && !row.charges.lastChargeRoll)
+        .map((row) => [row.id, row.charges!.lastCharge])
+    );
+    expect(outcomes).toEqual({
+      "bag-of-beans": "nonmagical",
+      "candle-of-invocation": "destroyed",
+      "chime-of-opening": "destroyed",
+      "efreeti-bottle": "nonmagical",
+      "gem-of-brightness": "nonmagical",
+      "necklace-of-fireballs": "destroyed",
+      "ring-of-three-wishes": "nonmagical",
+      "scarab-of-protection": "destroyed",
+      "talisman-of-pure-good": "destroyed",
+      "talisman-of-ultimate-evil": "destroyed"
+    });
   });
 });

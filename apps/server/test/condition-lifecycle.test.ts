@@ -7,6 +7,7 @@ import { setCondition } from "../src/actor-conditions.js";
 import {
   addEffect,
   endEffect,
+  endEffectIfPresent,
   endEncounterEffects,
   makeEffect,
   releaseGrapplesOutOfRange,
@@ -139,6 +140,21 @@ function answer(state: GameState, targetId: string, total: number): EffectNarrat
   if (!pending) throw new Error("no pending save");
   return answerSave(state, nextId(), pending.id, "manual", total, true, GM, saveDeps([])).events;
 }
+/** The foe holds the hero in a grapple, as its Bite or its tentacles would. */
+const heldByFoe = (state: GameState) =>
+  addEffect(
+    state,
+    IDS.hero,
+    makeEffect({
+      id: "held",
+      name: "Grappled by Foe",
+      tags: ["grapple"],
+      sourceActorId: IDS.foe,
+      sourceName: "Foe",
+      duration: { type: "manual" },
+      linkedConditionIds: ["grappled"]
+    })
+  );
 /** Hands the turn to `actorId` with a fresh action economy. */
 const setTurn = (state: GameState, actorId: string) => {
   state.combat = {
@@ -226,6 +242,8 @@ describe("save-imposed conditions end per their text", () => {
   it("an otyugh's stun ends at the start of the otyugh's next turn", () => {
     const state = game("otyugh");
     setTurn(state, IDS.foe);
+    // Tentacle Slam strikes each creature the otyugh grapples.
+    heldByFoe(state);
     resolveDefinitionAction(
       state,
       monsterAction("otyugh", "tentacle-slam"),
@@ -233,6 +251,7 @@ describe("save-imposed conditions end per their text", () => {
       resolveDeps([5, 5, 5], "otyugh")
     );
     answer(state, IDS.hero, 1);
+    endEffectIfPresent(state, IDS.hero, "held");
     expect(conditionIds(state, IDS.hero)).toEqual(["stunned"]);
     advance(state); // ally
     advance(state); // hero
@@ -643,16 +662,20 @@ describe("the fight's end and a Long Rest end only what they should", () => {
 });
 
 describe("damage an effect deals at the start of a turn", () => {
-  /** The foe's `actionId` lands on the hero through a failed save. */
+  /** The foe's `actionId` lands on the hero through a failed save; one that targets only a creature the foe grapples
+   *  (a swallow) finds the hero held, and the hold is let go after. */
   function failed(state: GameState, slug: string, actionId: string) {
     setTurn(state, IDS.foe);
+    const action = monsterAction(slug, actionId);
+    if (action.targets?.grappledBySource) heldByFoe(state);
     resolveDefinitionAction(
       state,
-      monsterAction(slug, actionId),
+      action,
       { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextId() },
       resolveDeps([], slug)
     );
     answer(state, IDS.hero, 1);
+    endEffectIfPresent(state, IDS.hero, "held");
   }
   /** The next turn, its dice from `faces`. */
   const advanceRolling = (state: GameState, faces: number[]) => {
@@ -666,7 +689,7 @@ describe("damage an effect deals at the start of a turn", () => {
     failed(state, "behir", "swallow");
     const hero = actor(state, IDS.hero);
     expect(hero.effects[0]).toMatchObject({
-      name: "Blinded by Foe (Swallow)",
+      name: "Swallowed",
       ongoingDamage: { damage: [{ formula: "6d6", type: "acid" }], at: "source-turn-start" }
     });
     advanceRolling(state, [6, 6, 6, 6, 6, 6]); // the ally's turn
@@ -685,7 +708,7 @@ describe("damage an effect deals at the start of a turn", () => {
     const events = advanceRolling(state, [1, 2, 3, 4, 5, 6]); // the behir's turn: 21 acid, halved
     expect(hero.hp.current).toBe(20);
     expect(events.map((event) => event.text)).toContain(
-      "Hero takes 10 Acid damage from Blinded by Foe (Swallow) (21 acid → 10, resistance: Acid ward)."
+      "Hero takes 10 Acid damage from Swallowed (21 acid → 10, resistance: Acid ward)."
     );
     // Ended, it deals nothing more.
     endEffect(state, IDS.hero, hero.effects[0].id);
@@ -703,9 +726,9 @@ describe("damage an effect deals at the start of a turn", () => {
     expect(hero.hp.current).toBe(30);
     const starting = advanceRolling(state, [7]); // the hero's turn starts
     expect(hero.hp.current).toBe(23);
-    expect(starting.map((event) => event.text)).toContain(
-      "Hero takes 7 Poison damage from Poisoned by Foe (Spores (Recharge 6))."
-    );
+    // The effect takes the action's name without its "(Recharge 6)".
+    expect(hero.effects.map((effect) => effect.name)).toEqual(["Poisoned by Foe (Spores)"]);
+    expect(starting.map((event) => event.text)).toContain("Hero takes 7 Poison damage from Poisoned by Foe (Spores).");
     advanceRolling(state, []); // the hero's turn ends: the repeated save opens
     answer(state, IDS.hero, 20);
     expect(hero.effects).toEqual([]);
@@ -765,7 +788,7 @@ describe("damage an effect deals at the start of a turn", () => {
     failed(state, "behir", "swallow");
     const view = projectPlayerView(state, IDS.session, () => null);
     const effect = view.actors.find((entry) => entry.id === IDS.hero)!.effects[0];
-    expect(effect.name).toBe("Blinded by Foe (Swallow)");
+    expect(effect.name).toBe("Swallowed");
     expect(effect).not.toHaveProperty("ongoingDamage");
   });
 });

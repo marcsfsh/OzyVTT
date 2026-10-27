@@ -1,3 +1,8 @@
+import { bondCasterOf } from "./warding-bond.js";
+import { markTimedRise } from "./timed-revival.js";
+import { damageShares } from "./shared-damage.js";
+import { formsAfterDamage } from "./transform/rules.js";
+import { lycanthropyAtZero } from "./transform/at-zero.js";
 import {
   isDead,
   type Actor,
@@ -7,6 +12,8 @@ import {
   type GameState,
   type HealthBand
 } from "@vtt/domain";
+import { blessOnTheKill } from "./dark-ones-blessing.js";
+import { recordDealing } from "./resolution/dealings.js";
 import {
   adjustDamageParts,
   collectRiders,
@@ -14,41 +21,68 @@ import {
   droppedToZero,
   halveDamageParts,
   normalizeDamageType,
+  parseDiceFormula,
   reduceDamageParts,
   rescaleDamageParts,
+  resolveDice,
+  type AttackKind,
   type DamagePart,
   type DamageReduction,
   type RandomSource,
   type ResolvedRider
 } from "@vtt/rules-5e";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
-import type { ActorDefinition, DamageDrain } from "@vtt/schemas";
+import type { ActorDefinition, DamageDrain, DamageSource } from "@vtt/schemas";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
 import {
   addEffect,
   applyCondition,
+  dropHeldItems,
   DEATH_WARD_TAG,
+  endConcentrationOnTheDead,
   endConcentrationSustainedBy,
   endEffect,
   endEffectsOnDamage,
   endEffectsSustainedBy,
+  endWhatIncapacitationEnds,
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
+  maximumKeeper,
+  STABLE_RECOVERY_TAG,
   NO_HEALING_TAG,
-  reduceExhaustion,
+  NO_HEALING_ON_LAND_TAG,
+  RAGING_TAG,
   removeConditionDirect,
   sourceOf,
   type EffectNarration
 } from "./effects.js";
-import { reconcileEquipment } from "./inventory.js";
+import { returnToLife, stampDeath } from "./death.js";
+import { markRising } from "./risen.js";
+import { dropStable } from "./stable-at-zero.js";
+import { mistyEscape, regainedHitPoints, restorationAtDeath, tallyTurnDamage } from "./death-traits.js";
+import { holdsFeature } from "./class-features.js";
+import { giftOfTheProtectors } from "./book-of-shadows.js";
+import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
-import { releaseSwallowedBy } from "./swallow.js";
-import { leaveShortRest } from "./short-rest-interruptions.js";
+import { offerDamagedReaction } from "./triggered-reactions.js";
+import { releaseSwallowedBy, tallyDamageFromInside } from "./swallow.js";
+import { markBloodiedHit } from "./bloodied-hits.js";
+import { damageTypeTraits } from "./damage-traits.js";
+import { openRepeatSavesOnDamage } from "./save-stages.js";
+import { berserkerCurse } from "./berserker-axe.js";
+import { interruptRests } from "./rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
-import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import {
+  deriveEquipment,
+  ITEM_LAPSED_TAG,
+  type EquipmentCatalog,
+  type EquipmentDerivation
+} from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
+import { noteFire } from "./zone-fire-note.js";
+import { sightRules } from "./vision/rules.js";
 import {
   deathBurst,
   holdOnAtZero,
@@ -56,6 +90,7 @@ import {
   stopRegeneration,
   undeadFortitude
 } from "./statblock-traits.js";
+import { rowRecord } from "./item-records.js";
 
 export function healthBandOf(hp: Actor["hp"]): HealthBand {
   if (hp.current <= 0) return "down";
@@ -87,6 +122,13 @@ export type DamageInput = Readonly<{
   nonlethal?: boolean;
   /** What the damage drains as it lands (a Life Drain's lower Hit Point maximum, Vampiric Touch's healing). */
   drain?: DamageDrain;
+  /** A share of another creature's damage (Warding Bond's caster, a cloaker's target, a shield guardian), which is
+   *  not shared on again. */
+  bondShare?: true;
+  /** Sunlight deals it (a vampire's Sunlight weakness), which a form's Resistance may not meet (`sunlightPierces`). */
+  fromSunlight?: true;
+  /** What dealt it (its spell, the row it was dealt with, the attack's kinds), for a defence that reads it. */
+  damageSource?: DamageSource;
 }>;
 export type DamageDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -147,8 +189,18 @@ export function damageAdjustmentDetail(
 /** Flat `damage-reduction` riders on the receiving side, each with the types it covers: standing ones cover every
  *  type, `on-taking-damage` ones the incoming types their `damage-type-is` matches. Riders sharing a `stackKey` are
  *  one game effect, so only the largest counts. */
-function damageReductionsFor(derivation: EquipmentDerivation, damageTypes: readonly string[]): DamageReduction[] {
-  const isReduction = (rider: ResolvedRider) => rider.modifier.type === "damage-reduction";
+function damageReductionsFor(
+  derivation: EquipmentDerivation,
+  damageTypes: readonly string[],
+  rolling: ReductionRolling | null
+): DamageReduction[] {
+  // A once-a-turn reduction (Resistance) already spent this turn gives nothing more until the next one.
+  const spentThisTurn = (rider: ResolvedRider) =>
+    rider.modifier.oncePerTurn === true &&
+    rider.sourceEffectId !== undefined &&
+    rolling?.turnKey !== undefined &&
+    rolling.spentEffectIds(rider.sourceEffectId);
+  const isReduction = (rider: ResolvedRider) => rider.modifier.type === "damage-reduction" && !spentThisTurn(rider);
   const covered = new Map<ResolvedRider["modifier"], { rider: ResolvedRider; types: string[] | null }>();
   for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: null }).filter(isReduction))
     covered.set(rider.modifier, { rider, types: null });
@@ -167,12 +219,84 @@ function damageReductionsFor(derivation: EquipmentDerivation, damageTypes: reado
   const strongest = new Map<string, { amount: number; types: string[] | null }>();
   const reductions: DamageReduction[] = [];
   for (const { rider, types } of covered.values()) {
-    const amount = rider.modifier.amount ?? 0;
+    // Dice roll only as the damage lands; a preview leaves them out.
+    const dice = rider.modifier.dice !== undefined && rolling ? rolling.roll(rider.modifier.dice) : 0;
+    const amount = (rider.modifier.amount ?? 0) + dice;
     if (amount <= 0) continue;
+    if (rider.modifier.oncePerTurn === true && rider.sourceEffectId !== undefined)
+      rolling?.used.push(rider.sourceEffectId);
     if (rider.stackKey === undefined) reductions.push({ amount, types });
     else if ((strongest.get(rider.stackKey)?.amount ?? 0) < amount) strongest.set(rider.stackKey, { amount, types });
   }
   return [...reductions, ...strongest.values()];
+}
+
+/** How a landing hit rolls a reduction's dice and spends a once-a-turn one: the turn it lands in (`round:actorId`,
+ *  absent outside a fight, where each hit may use it), which effects are already spent this turn, and those it spends. */
+type ReductionRolling = Readonly<{
+  roll: (formula: string) => number;
+  turnKey?: string;
+  spentEffectIds: (effectId: string) => boolean;
+  used: string[];
+}>;
+
+/** The rolling a landing hit on `actor` uses, or null without the server's dice (a preview). */
+function reductionRolling(state: GameState, actor: Actor, rollDie: RandomSource | undefined): ReductionRolling | null {
+  if (!rollDie) return null;
+  const turnKey = state.combat.active ? `${state.combat.round}:${state.combat.turnActorId ?? ""}` : undefined;
+  return {
+    roll: (formula) => resolveDice(parseDiceFormula(formula), rollDie).total,
+    ...(turnKey !== undefined ? { turnKey } : {}),
+    spentEffectIds: (effectId) =>
+      turnKey !== undefined && actor.effects.some((effect) => effect.id === effectId && effect.usedOnTurn === turnKey),
+    used: []
+  };
+}
+
+/** The damage types whose Resistance the dealer's damage ignores (Boon of Irresistible Offense), from its standing
+ *  `ignores-resistance` riders. */
+function resistanceIgnoredBy(
+  state: GameState,
+  sourceActorId: string | null,
+  deps: DamageDeps | undefined,
+  damageSource: DamageSource | undefined
+): string[] {
+  const source = sourceActorId === null ? undefined : state.actors.find((actor) => actor.id === sourceActorId);
+  if (!source || !deps) return [];
+  const definition = source.definitionId ? deps.resolveDefinition(source.definitionId) : undefined;
+  const derivation = deriveEquipment(source, definition, deps.catalog);
+  // A rider scoped to its item ignores Resistance only with the row the damage was dealt with (a Vorpal Sword).
+  const context = { ...derivation.context, moment: null, sourceItemId: damageSource?.rowId ?? null };
+  return collectRiders(derivation.carriers, context).flatMap((rider) =>
+    rider.modifier.type === "ignores-resistance" ? [...(rider.modifier.damageTypes ?? [])] : []
+  );
+}
+
+/** Immunities and Resistances the target holds against this damage alone, by what dealt it: its `on-taking-damage`
+ *  riders narrowed by the spell (a Brooch of Shielding against Magic Missile) or the attack's kind (a Shield of Missile
+ *  Attraction against Ranged weapons), each type with the item or effect that gives it. */
+function sourcedDefences(
+  derivation: EquipmentDerivation,
+  types: readonly string[],
+  damageSource: DamageSource | undefined
+): Readonly<{ immunities: DerivedDefence[]; resistances: DerivedDefence[] }> {
+  const immunities: DerivedDefence[] = [];
+  const resistances: DerivedDefence[] = [];
+  for (const type of new Set(types)) {
+    const riders = collectRiders(derivation.carriers, {
+      ...derivation.context,
+      moment: "on-taking-damage",
+      damageTypes: [type],
+      ...(damageSource?.spellId !== undefined ? { spellId: damageSource.spellId } : {}),
+      ...(damageSource?.attackKinds ? { attackKinds: damageSource.attackKinds as AttackKind[] } : {})
+    });
+    for (const rider of riders) {
+      if (!(rider.modifier.damageTypes ?? []).includes(type)) continue;
+      if (rider.modifier.type === "damage-immunity") immunities.push({ type, source: rider.label });
+      if (rider.modifier.type === "damage-resistance") resistances.push({ type, source: rider.label });
+    }
+  }
+  return { immunities, resistances };
 }
 
 /** The stat block's defences minus any a rest-time re-choice superseded (chosen options are baked in). */
@@ -221,9 +345,31 @@ export function standingDefences(
   };
 }
 
+/** Boon of the Night Spirit's Shadowy Form: "While within Dim Light or Darkness, you have Resistance to all damage
+ *  except Psychic and Radiant". Only where dynamic vision knows the light at the creature's space; else the GM's. */
+function inShadowyForm(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  deps: DamageDeps | undefined
+): boolean {
+  if (!deps || !(definition?.character?.feats ?? []).some((feat) => feat.id === "boon-of-the-night-spirit"))
+    return false;
+  const content = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+  const light = sightRules(state, content).lightAt(actor.id);
+  return light !== null && light.level !== "bright";
+}
+const SHADOWY_FORM_SPARES = ["psychic", "radiant"];
+
 /** What a hit would come to on this actor: each typed part through its defences, then flat reduction off
  *  the total. Pure, so a prompt can show the number Confirm will land. */
-function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: DamageDeps): DamageWeighing {
+function weighDamage(
+  state: GameState,
+  actor: Actor,
+  input: DamageInput,
+  deps?: DamageDeps,
+  rolling: ReductionRolling | null = null
+): DamageWeighing {
   let totalRequested: number;
   let totalAdjusted: number;
   let flatReduction = 0;
@@ -244,40 +390,66 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
       adjustment: NonNullable<DamageApplication["parts"][number]["adjustment"]>,
       type: string
     ) => {
+      const asListed = (rows: readonly DerivedDefence[]) => rows.map((row) => ({ id: row.type, source: row.source }));
       const lists =
         adjustment === "immunity"
-          ? [derivation.damageImmunities]
+          ? [derivation.damageImmunities, asListed(sourced.immunities)]
           : adjustment === "vulnerability"
             ? [derivation.damageVulnerabilities]
             : adjustment === "resistance"
-              ? [derivation.damageResistances]
-              : [derivation.damageResistances, derivation.damageVulnerabilities];
-      const sources = lists.flatMap((list) => list.filter((entry) => entry.id === type).map((entry) => entry.source));
+              ? [derivation.damageResistances, asListed(sourced.resistances)]
+              : [derivation.damageResistances, asListed(sourced.resistances), derivation.damageVulnerabilities];
+      const sources = lists.flatMap((list) =>
+        list.filter((entry) => entry.id === type).flatMap((entry) => (entry.source ? [entry.source] : []))
+      );
       return sources.length > 0 ? [...new Set(sources)].join(", ") : null;
     };
     const resisted = (adjustment: DamageApplication["parts"][number]["adjustment"]) =>
       adjustment === "resistance" || adjustment === "resistance-and-vulnerability";
     // SRD 5.2.1 Petrified: resistance to all damage, poison included (its immunity is to the Poisoned condition).
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
-    // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
-    const underwater = state.combat.active && state.combat.underwater;
-    const standing = standingDefences(definition, fromChoices, derivation);
+    // SRD Underwater Combat: everything fully underwater has resistance to fire damage, except Fire that says it keeps
+    // its force there (Steam Breath).
+    const underwater = state.combat.active && state.combat.underwater && input.damageSource?.fireUnderwater !== true;
+    const shadowy = inShadowyForm(state, actor, definition, deps)
+      ? typed.map((part) => normalizeDamageType(part.type)).filter((type) => !SHADOWY_FORM_SPARES.includes(type))
+      : [];
+    const formed = standingDefences(definition, fromChoices, derivation);
+    // A form whose Resistance sunlight gets through (a vampire's mist: "except the damage it takes from sunlight").
+    const pierced = input.fromSunlight
+      ? new Set(actor.effects.filter((effect) => effect.form?.sunlightPierces).map((effect) => effect.name))
+      : null;
+    const standing = pierced
+      ? { ...formed, resistances: formed.resistances.filter((row) => !pierced.has(row.source ?? "")) }
+      : formed;
     const types = (rows: readonly DerivedDefence[]) => rows.map((row) => row.type);
+    const sourced = sourcedDefences(
+      derivation,
+      typed.map((part) => normalizeDamageType(part.type)),
+      input.damageSource
+    );
     // SRD Order of Application: flat reductions first, then Resistance, then Vulnerability.
     const reduction = reduceDamageParts(
       typed,
       damageReductionsFor(
         derivation,
-        typed.map((part) => normalizeDamageType(part.type))
+        typed.map((part) => normalizeDamageType(part.type)),
+        rolling
       )
     );
     flatReduction = reduction.reduced;
     const adjusted = adjustDamageParts(reduction.parts, {
-      resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : [])],
-      immunities: types(standing.immunities),
+      resistances: [
+        ...types(standing.resistances),
+        ...types(sourced.resistances),
+        ...(underwater ? ["fire"] : []),
+        ...shadowy
+      ],
+      immunities: [...types(standing.immunities), ...types(sourced.immunities)],
       // Effects and items can make a target vulnerable as a stat block can; with a same-type resistance both apply.
       vulnerabilities: types(standing.vulnerabilities),
-      resistAll: petrified
+      resistAll: petrified,
+      ignoresResistance: resistanceIgnoredBy(state, input.sourceActorId ?? null, deps, input.damageSource)
     });
     parts = adjusted.map((part) => {
       const type = part.type.trim().toLowerCase();
@@ -305,7 +477,20 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
         choiceSource === null
           ? "Underwater"
           : null;
-      return { ...part, adjustmentSource: derivedSource ?? choiceSource ?? petrifiedSource ?? underwaterSource };
+      const shadowSource =
+        shadowy.includes(type) &&
+        resisted(part.adjustment) &&
+        !innateHas(innate.resistances) &&
+        derivedSource === null &&
+        petrifiedSource === null &&
+        choiceSource === null &&
+        underwaterSource === null
+          ? "Shadowy Form"
+          : null;
+      return {
+        ...part,
+        adjustmentSource: derivedSource ?? choiceSource ?? petrifiedSource ?? underwaterSource ?? shadowSource
+      };
     });
     totalRequested = typed.reduce((sum, part) => sum + part.amount, 0);
     totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
@@ -353,7 +538,8 @@ export function previewDamage(
 /**
  * What dropping to 0 Hit Points does, by damage or by hit points lost: a character falls Unconscious and is dying (or
  * dies outright when the overflow reaches its maximum), any other creature is defeated (a troll lies down until its
- * turn, a Death Burst goes off), and nobody at 0 sustains effects or Concentration.
+ * turn, a vampire turns to mist, a Death Burst goes off), and nobody at 0 sustains effects or Concentration. `outright`:
+ * it dies whatever it would otherwise do (a kill-outright rule).
  */
 function fallToZero(
   state: GameState,
@@ -361,34 +547,89 @@ function fallToZero(
   definition: ActorDefinition | undefined,
   overflow: number,
   deps: DamageDeps | undefined,
-  events: EffectNarration[]
+  events: EffectNarration[],
+  outright = false,
+  killerId: string | null = null
 ): Readonly<{ instantDeath: boolean; defeated: boolean }> {
   let instantDeath = false;
   let defeated = false;
   if (actor.kind === "player-character") {
-    const outcome = droppedToZero(overflow, actor.hp.maximum);
+    const outcome = droppedToZero(outright ? actor.hp.maximum : overflow, actor.hp.maximum);
     actor.deathSaves = outcome.state;
     instantDeath = outcome.instantDeath;
     applyCondition(actor, "unconscious", { immunities: deps });
     applyCondition(actor, "prone", { immunities: deps });
-    events.push({
-      kind: "condition",
-      text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
-      actorId: actor.id
-    });
+    // A rule that kills outright says what killed it.
+    if (!outright)
+      events.push({
+        kind: "condition",
+        text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
+        actorId: actor.id
+      });
+    events.push(...dropHeldItems(actor, deps));
   } else {
     defeated = true;
     // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
     events.push(...releaseSwallowedBy(state, actor.id, definition));
-    // A troll lies down until its next turn says whether it regenerates; anything else dies, and a Death Burst goes
-    // off as it does.
-    if (!holdOnAtZero(state, actor, definition, events) && deps) deathBurst(state, actor, definition, deps, events);
+    // A troll lies down until its next turn says whether it regenerates and a vampire escapes as mist; anything else
+    // dies, and a Death Burst goes off as it does. Killed outright, it lies dead whatever its traits.
+    if (outright) removeConditionDirect(actor, "unconscious");
+    const holds =
+      !outright &&
+      (holdOnAtZero(state, actor, definition, events) || mistyEscape(state, actor, definition, deps, events));
+    if (!holds && deps) deathBurst(state, actor, definition, deps, events);
+    if (!holds)
+      restorationAtDeath(state, actor, definition, events, {
+        id: killerId,
+        ...(deps?.rollDie ? { rollDie: deps.rollDie } : {})
+      });
   }
   // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
   // concentration (SRD Concentration).
   events.push(...endEffectsSustainedBy(state, actor.id));
   events.push(...endConcentrationSustainedBy(state, actor.id));
+  events.push(...endWhatIncapacitationEnds(state, actor, "unconscious"));
+  // A spell whose last creature just died has nothing left.
+  events.push(...endConcentrationOnTheDead(state, actor));
   return { instantDeath, defeated };
+}
+
+/**
+ * A creature killed outright, whatever its Hit Points (Power Word Kill, a solar's Slaying Bow, a will-o'-wisp's
+ * Consume Life): it drops to 0 and dies
+ * there, a character with three failed death saves and anything else with no trait to hold it up, and what it sustained
+ * ends as any death ends it. `withoutDamage` is an effect that kills with no damage, which Death Ward negates instead
+ * ("If the spell is still in effect when the target is subjected to an effect that would kill it instantly without
+ * dealing damage, that effect is negated against the target, and the spell ends").
+ */
+export function killOutright(
+  state: GameState,
+  actorId: string,
+  cause: string,
+  options: Readonly<{ withoutDamage?: boolean; bodyGone?: boolean; headLost?: boolean; deps?: DamageDeps }> = {}
+): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || isDead(actor)) return [];
+  const events: EffectNarration[] = [];
+  const ward = options.withoutDamage ? actor.effects.find((effect) => effect.tags.includes(DEATH_WARD_TAG)) : undefined;
+  if (ward) {
+    events.push(
+      { kind: "condition", text: `${ward.name} turns ${cause} aside from ${actor.name}.`, actorId },
+      ...endEffect(state, actor.id, ward.id)
+    );
+    return events;
+  }
+  const deps = options.deps;
+  const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
+  actor.hp = { ...actor.hp, current: 0, temporary: 0 };
+  events.push({ kind: "condition", text: `${actor.name} dies (${cause}).`, actorId });
+  fallToZero(state, actor, definition, actor.hp.maximum, deps, events, true);
+  stampDeath(state, actor, {
+    cause,
+    ...(options.bodyGone ? { bodyGone: true } : {}),
+    ...(options.headLost ? { headLost: true } : {})
+  });
+  return events;
 }
 
 /** SRD Death Ward: "The first time the target would drop to 0 Hit Points before the spell ends, the target instead
@@ -428,6 +669,42 @@ function relentlessEndurance(
   return true;
 }
 
+/** The tag on a Hunter's Mark effect. */
+const HUNTERS_MARK_TAG = "hunters-mark";
+
+/** Counts the uses of Relentless Rage since the last rest; each one raises its DC by 5. */
+export const RELENTLESS_RAGE_KEY = "relentless-rage";
+
+/** SRD Relentless Rage (Barbarian 11): "If you drop to 0 Hit Points while your Rage is active and don't die outright,
+ *  you can make a DC 10 Constitution saving throw. If you succeed, your Hit Points instead change to a number equal to
+ *  twice your Barbarian level. Each time you use this feature after the first, the DC increases by 5." The server
+ *  rolls the save. True when it held the creature up. */
+function relentlessRage(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  overflow: number,
+  deps: DamageDeps | undefined,
+  events: EffectNarration[]
+): boolean {
+  if (overflow >= actor.hp.maximum || !deps?.rollDie) return false;
+  if (!actor.effects.some((effect) => effect.tags.includes(RAGING_TAG))) return false;
+  if (!holdsFeature(definition, "relentless-rage", "Relentless Rage")) return false;
+  const used = actor.actionUses[RELENTLESS_RAGE_KEY] ?? 0;
+  const dc = 10 + 5 * used;
+  const save = rollSaveAtOnce(state, actor, "con", { ...deps, rollDie: deps.rollDie });
+  actor.actionUses = { ...actor.actionUses, [RELENTLESS_RAGE_KEY]: used + 1 };
+  const held = save.total >= dc;
+  const level = definition?.character?.classes.find((entry) => entry.id === "barbarian")?.level ?? 0;
+  if (held) actor.hp = { ...actor.hp, current: Math.min(actor.hp.maximum, Math.max(1, level * 2)) };
+  events.push({
+    kind: "condition",
+    text: `${actor.name}'s Relentless Rage: CON save ${save.total} (d20 ${save.natural}) vs DC ${dc}: ${held ? `up at ${actor.hp.current} HP` : "it falls"}.`,
+    actorId: actor.id
+  });
+  return held;
+}
+
 /** Marks the effect that holds what drained damage took off a creature's Hit Point maximum. */
 export const DRAINED_TAG = "drained";
 
@@ -454,9 +731,19 @@ function drainDamage(
       : taken.parts.filter((part) => part.type.toLowerCase() === type).reduce((sum, part) => sum + part.adjusted, 0);
   if (amount <= 0) return { died: false };
   let died = false;
-  const loss = drain.reducesMaximum
-    ? Math.min(amount, Math.max(0, actor.hp.maximum - (drain.keepsOneMaximum ? 1 : 0)))
-    : 0;
+  // SRD Aura of Life: "your Hit Point maximums can't be reduced" while in the aura.
+  const kept = drain.reducesMaximum ? maximumKeeper(actor) : undefined;
+  if (kept)
+    events.push({
+      kind: "damage",
+      text: `${actor.name}'s Hit Point maximum doesn't drop (${kept.name}).`,
+      actorId: actor.id,
+      ...(actor.kind === "player-character" ? {} : { gmOnly: true as const })
+    });
+  const loss =
+    drain.reducesMaximum && !kept
+      ? Math.min(amount, Math.max(0, actor.hp.maximum - (drain.keepsOneMaximum ? 1 : 0)))
+      : 0;
   if (loss > 0) {
     const wasStanding = actor.hp.current > 0;
     actor.hp = {
@@ -548,6 +835,28 @@ export function loseHitPoints(
   return { lost: before - actor.hp.current, events };
 }
 
+/** Marks each worn item whose riders lapse when its bearer takes damage (`lapses.onDamage`) as lapsed until the start
+ *  of the bearer's next turn (`equipment-derivation.ts` reads the mark). */
+function lapseOnDamage(state: GameState, actor: Actor, catalog: EquipmentCatalog): void {
+  for (const row of actor.inventory) {
+    const record = rowRecord(catalog, row);
+    if (!record?.lapses?.onDamage || row.quantity <= 0 || !row.equipped) continue;
+    const id = `${row.id}:lapsed`;
+    actor.effects = [
+      ...actor.effects.filter((effect) => effect.id !== id),
+      makeEffect({
+        id,
+        name: `${record.name} (stopped)`,
+        tags: [ITEM_LAPSED_TAG],
+        itemId: row.id,
+        startedRound: state.combat.round,
+        // Outside a fight there is no next turn to wait for: the next hit is all it stops.
+        duration: state.combat.active ? { type: "until-bearer-next-turn" } : { type: "rounds", remaining: 1 }
+      })
+    ];
+  }
+}
+
 /** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
  *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
  *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
@@ -560,7 +869,20 @@ export function applyDamageDetailed(
 ): DamageOutcome {
   const actor = adjustableActor(state, actorId, scope);
   const events: EffectNarration[] = [];
-  const { totalRequested, totalAdjusted, flatReduction, parts, oilIgnited } = weighDamage(state, actor, input, deps);
+  const rolling = reductionRolling(state, actor, deps?.rollDie);
+  const weighed = weighDamage(state, actor, input, deps, rolling);
+  const { totalRequested, flatReduction, parts, oilIgnited } = weighed;
+  // A holder that halves its damage onto what it holds, or a guardian that takes half its wearer's (`shared-damage.ts`).
+  const sharing =
+    input.bondShare === true
+      ? { kept: weighed.totalAdjusted, shares: [] }
+      : damageShares(state, actor, weighed.totalAdjusted, deps);
+  const totalAdjusted = sharing.kept;
+  // A once-a-turn reduction that helped is spent for this turn (Resistance).
+  if (rolling?.turnKey !== undefined && rolling.used.length > 0)
+    actor.effects = actor.effects.map((effect) =>
+      rolling.used.includes(effect.id) ? { ...effect, usedOnTurn: rolling.turnKey } : effect
+    );
   // Burning oil is spent once it flares.
   if (oilIgnited) {
     events.push({ kind: "damage", text: `The oil on ${actor.name} catches fire (5 Fire damage).`, actorId: actor.id });
@@ -570,6 +892,7 @@ export function applyDamageDetailed(
 
   const hpBefore = actor.hp.current;
   const wasAtZero = hpBefore <= 0;
+  const deadBefore = isDead(actor);
   const absorbed = Math.min(actor.hp.temporary, totalAdjusted);
   actor.hp.temporary -= absorbed;
   const damageToHp = totalAdjusted - absorbed;
@@ -582,6 +905,10 @@ export function applyDamageDetailed(
   // What its stat block does as the damage lands: Acid or Fire stops a troll's Regeneration, and Undead Fortitude may
   // leave a zombie at 1 Hit Point.
   if (totalAdjusted > 0) events.push(...stopRegeneration(state, actor, definition, parts));
+  // What a damage type does to the stat block it lands on (Acid Absorption, Aversion to Fire, Freeze).
+  events.push(...damageTypeTraits(state, actor, definition, parts));
+  // Fire on a creature standing in webs sets them burning (Web), settled with the map after the command.
+  noteFire(state, actor.id, input.parts ?? parts);
   if (!isPlayerCharacter && !knockedOut && !wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
     undeadFortitude(
       state,
@@ -593,7 +920,39 @@ export function applyDamageDetailed(
     );
   // Sleep, Turn Undead and the like end the moment the bearer takes any damage, and so does a Short Rest.
   if (totalAdjusted > 0)
-    events.push(...endEffectsOnDamage(state, actor), ...leaveShortRest(state, new Set([actor.id]), "took damage"));
+    events.push(
+      ...endEffectsOnDamage(
+        state,
+        actor,
+        input.sourceActorId
+          ? { actorId: input.sourceActorId, ...(deps ? { resolveDefinition: deps.resolveDefinition } : {}) }
+          : undefined
+      ),
+      ...interruptRests(state, new Set([actor.id]), "took damage", deps ?? {})
+    );
+
+  // "Whenever the target takes damage, it repeats the save" (Dominate Person, Hideous Laughter).
+  if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId)
+    events.push(
+      ...openRepeatSavesOnDamage(state, actor, input.sourceActorId ?? undefined, {
+        newId: deps.newId,
+        now: deps.now ?? (() => new Date().toISOString()),
+        ...(deps.rollDie ? { rollDie: deps.rollDie } : {}),
+        ...(deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : {})
+      })
+    );
+
+  // A Cloak of Displacement: "If you take damage, the property ceases to function until the start of your next turn."
+  if (totalAdjusted > 0 && deps?.catalog) lapseOnDamage(state, actor, deps.catalog);
+
+  // A Berserker Axe's curse: damage from another creature asks a save against going berserk.
+  if (totalAdjusted > 0 && deps?.newId)
+    events.push(
+      ...berserkerCurse(state, actor, input.sourceActorId ?? undefined, {
+        newId: deps.newId,
+        now: deps.now ?? (() => new Date().toISOString())
+      })
+    );
 
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
@@ -621,7 +980,9 @@ export function applyDamageDetailed(
         sourceActorId: input.sourceActorId ?? null,
         sourceName: input.sourceName ?? null,
         startedRound: state.combat.round,
-        duration: { type: "manual" },
+        // "The creature then has the Unconscious condition and starts a Short Rest": an hour of game time, after which
+        // it wakes, unless hit points or first aid wake it first.
+        duration: { type: "minutes", remaining: 60 },
         linkedConditionIds: ["unconscious"]
       }),
       events,
@@ -629,42 +990,122 @@ export function applyDamageDetailed(
     );
     events.push({
       kind: "condition",
-      text: `${actor.name} was knocked out, Unconscious at 1 HP until it regains hit points.`,
+      text: `${actor.name} was knocked out, Unconscious at 1 HP until it regains hit points or its Short Rest ends.`,
       actorId
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
     // Death Ward held the creature at 1 Hit Point: nothing falls.
+  } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && input.drain?.stableAtZero) {
+    // "The target becomes Stable" (a phase spider's Bite): no dying, no defeat, and the poison's conditions.
+    events.push(
+      ...dropStable(
+        state,
+        actor,
+        input.drain.stableAtZero,
+        {
+          actorId: input.sourceActorId ?? null,
+          name: input.sourceName ?? null,
+          commandId: deps?.commandId ?? deps?.newId?.() ?? `${actor.id}:${hpBefore}`
+        },
+        { ...(deps ?? {}), state }
+      )
+    );
+  } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && input.drain?.killsAtZero) {
+    // "The target dies if it is reduced to 0 Hit Points by this attack": no death saves, no trait to hold it up.
+    const kill = input.drain.killsAtZero;
+    const cause = kill.cause ?? input.sourceName ?? "the blow";
+    events.push({ kind: "condition", text: `${actor.name} dies (${cause}).`, actorId });
+    const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events, true);
+    stampDeath(state, actor, { cause, ...(kill.bodyGone ? { bodyGone: true } : {}) });
+    instantDeath = fell.instantDeath;
+    defeated = fell.defeated;
   } else if (
     isPlayerCharacter &&
     !wasAtZero &&
     actor.hp.current === 0 &&
     damageToHp > 0 &&
-    relentlessEndurance(actor, definition, damageToHp - hpBefore, events)
+    (relentlessRage(state, actor, definition, damageToHp - hpBefore, deps, events) ||
+      relentlessEndurance(actor, definition, damageToHp - hpBefore, events))
   ) {
     // Up at 1 Hit Point: nothing falls.
+  } else if (
+    !wasAtZero &&
+    actor.hp.current === 0 &&
+    damageToHp > 0 &&
+    giftOfTheProtectors(state, actor, damageToHp - hpBefore, events)
+  ) {
+    // A name on a Warlock's page: up at 1 Hit Point.
+  } else if (
+    !wasAtZero &&
+    actor.hp.current === 0 &&
+    damageToHp > 0 &&
+    deps &&
+    lycanthropyAtZero(state, actor, deps, events)
+  ) {
+    // A lycanthrope's curse: it becomes the lycanthrope instead of dropping.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
-    const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
+    const fell = fallToZero(
+      state,
+      actor,
+      definition,
+      damageToHp - hpBefore,
+      deps,
+      events,
+      false,
+      input.sourceActorId ?? null
+    );
     instantDeath = fell.instantDeath;
     defeated = fell.defeated;
   }
+  // A Fiend Warlock near the fall, or the one who dealt it, gains Temporary Hit Points.
+  if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
+    events.push(...blessOnTheKill(state, actor, input.sourceActorId, deps));
+  // A swallower counts the damage the creatures inside it deal this turn.
+  tallyDamageFromInside(state, actor.id, input.sourceActorId, totalAdjusted);
+  // Who damaged whom this turn (Superior Hunter's Prey).
+  if (totalAdjusted > 0 && input.sourceActorId) recordDealing(state, input.sourceActorId, actor.id, "damaged");
+  // Damage on a creature already Bloodied opens its dealer's Rampage.
+  markBloodiedHit(state, input.sourceActorId, hpBefore, actor.hp.maximum, totalAdjusted);
+  // A hydra's heads and a troll's limbs count the damage of each turn.
+  events.push(
+    ...tallyTurnDamage(state, actor, definition, parts, totalAdjusted, (cause) => {
+      const killed = killOutright(state, actor.id, cause, deps ? { deps } : {});
+      defeated ||= killed.length > 0 && !isPlayerCharacter;
+      return killed;
+    })
+  );
   if (input.drain && totalAdjusted > 0) {
     const drained = drainDamage(state, actor, input, { parts, totalAdjusted }, definition, deps, events);
     instantDeath ||= drained.died && isPlayerCharacter;
     defeated ||= drained.died && !isPlayerCharacter;
   }
+  // A form the damage ends: Polymorph with no Temporary Hit Points left, Wild Shape on falling Unconscious, any form
+  // on death.
+  if (totalAdjusted > 0) events.push(...formsAfterDamage(state, actor));
+  // Finger of Death: a Humanoid it kills rises as a Zombie at the start of its caster's next turn.
+  if (input.drain?.slainRise && totalAdjusted > 0 && !deadBefore && isDead(actor))
+    events.push(
+      ...(input.drain.slainRise.afterHours
+        ? markTimedRise(state, actor, definition, input.drain.slainRise, deps?.rollDie)
+        : markRising(state, actor, definition, input.drain.slainRise, input.sourceActorId))
+    );
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
   // at 30, in a fight or out of one (a trap between fights). The prompt carries the effects a committed failure
   // ends. Skipped without an id-minter.
   if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId) {
     const sustained: Array<{ actorId: string; effectId: string }> = [];
+    let markOnly = true;
     for (const bearer of state.actors) {
       for (const effect of bearer.effects) {
-        if (effect.concentration && effect.sourceActorId === actor.id)
-          sustained.push({ actorId: bearer.id, effectId: effect.id });
+        if (!effect.concentration || effect.sourceActorId !== actor.id) continue;
+        sustained.push({ actorId: bearer.id, effectId: effect.id });
+        markOnly &&= effect.tags.includes(HUNTERS_MARK_TAG);
       }
     }
-    if (sustained.length > 0 && state.combat.pendingSaves.length < 100) {
+    // SRD Relentless Hunter (Ranger 13): "Taking damage can't break your Concentration on Hunter's Mark."
+    const unbroken = markOnly && holdsFeature(definition, "relentless-hunter", "Relentless Hunter");
+    if (sustained.length > 0 && !unbroken && state.combat.pendingSaves.length < 100) {
       const dc = Math.min(30, Math.max(10, Math.floor(totalAdjusted / 2)));
       state.combat = {
         ...state.combat,
@@ -695,9 +1136,66 @@ export function applyDamageDetailed(
     }
   }
 
+  // Warding Bond: "Each time the target takes damage, you take the same amount of damage." Its Resistance has already
+  // halved what the target takes; the caster's share is that amount, untyped.
+  const bondCaster = totalAdjusted > 0 && input.bondShare !== true ? bondCasterOf(state, actor.id) : null;
+  if (bondCaster !== null) {
+    const shared = applyDamageDetailed(
+      state,
+      bondCaster,
+      { amount: totalAdjusted, sourceName: "Warding Bond", bondShare: true },
+      { role: "gm" },
+      deps
+    );
+    const casterName = state.actors.find((candidate) => candidate.id === bondCaster)?.name ?? "The caster";
+    events.push(
+      {
+        kind: "damage",
+        text: `${casterName} takes ${shared.application.totalApplied} damage through Warding Bond.`,
+        actorId: bondCaster
+      },
+      ...shared.events
+    );
+  }
+
+  // What the holder or the guardian passes on (`shared-damage.ts`), untyped and not passed on again.
+  for (const share of sharing.shares) {
+    const passed = applyDamageDetailed(
+      state,
+      share.actorId,
+      { amount: share.amount, sourceName: share.via, bondShare: true },
+      { role: "gm" },
+      deps
+    );
+    const name = state.actors.find((candidate) => candidate.id === share.actorId)?.name ?? "Another creature";
+    events.push(
+      {
+        kind: "damage",
+        text: `${name} takes ${passed.application.totalApplied} of ${actor.name}'s damage (${share.via}).`,
+        actorId: share.actorId
+      },
+      ...passed.events
+    );
+  }
+
   // Damage from a creature can open the target's strike-back reaction (Hellish Rebuke). Skipped without an id-minter.
   if (totalAdjusted > 0 && input.sourceActorId && deps) {
     const offered = offerDamageReaction(state, actor, input.sourceActorId, deps);
+    if (offered) events.push(offered);
+  }
+  // Damage can open the creature's own reaction to taking it (a giant octopus's Ink Cloud, a black pudding's Split).
+  if (totalRequested > 0 && deps?.newId) {
+    const offered = offerDamagedReaction(
+      state,
+      actor,
+      {
+        types: parts.filter((part) => part.amount > 0).map((part) => part.type.trim().toLowerCase()),
+        applied: totalAdjusted,
+        hpBefore,
+        sourceActorId: input.sourceActorId ?? null
+      },
+      { ...deps, newId: deps.newId }
+    );
     if (offered) events.push(offered);
   }
 
@@ -732,8 +1230,12 @@ export const deadCantHealLine = (name: string) => `${name} is dead and can't reg
 export function healActor(state: GameState, actorId: string, amount: number, scope: Initiator): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
   if (isDead(actor)) return [{ kind: "condition", text: deadCantHealLine(actor.name), actorId }];
-  // "It can't regain Hit Points until the end of your next turn" (Chill Touch).
-  const barred = actor.effects.find((effect) => effect.tags.includes(NO_HEALING_TAG));
+  // "It can't regain Hit Points until the end of your next turn" (Chill Touch); an aboleth's curse "unless it is
+  // underwater".
+  const underwater = state.combat.active && state.combat.underwater;
+  const barred = actor.effects.find(
+    (effect) => effect.tags.includes(NO_HEALING_TAG) || (effect.tags.includes(NO_HEALING_ON_LAND_TAG) && !underwater)
+  );
   if (barred)
     return [
       {
@@ -759,7 +1261,10 @@ export function healActor(state: GameState, actorId: string, amount: number, sco
 /** SRD: an Unconscious creature at 0 HP, or one knocked out at 1, stays so "until it regains any Hit Points". */
 function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNarration[] {
   if (actor.hp.current <= before) return [];
-  const events = endKnockOut(state, actor);
+  const events = [...endKnockOut(state, actor), ...regainedHitPoints(state, actor)];
+  // A Stable creature healed has no more need of its hours to recover.
+  for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(STABLE_RECOVERY_TAG)))
+    events.push(...endEffect(state, actor.id, effect.id));
   // A troll healed off 0 Hit Points no longer waits on its turn to live or die.
   for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(REGENERATING_AT_ZERO_TAG)))
     events.push(...endEffect(state, actor.id, effect.id));
@@ -777,7 +1282,8 @@ function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNa
   return events;
 }
 
-/** New temporary hit points replace the old ones and don't stack (choosing the higher is left to the table). */
+/** A hand-set value replaces the temporary hit points the creature has, as a correction; a grant from the rules keeps
+ *  the higher of the two instead (`resolution/heal.ts`). */
 export function setTemporaryHp(state: GameState, actorId: string, amount: number, scope: Initiator) {
   const actor = adjustableActor(state, actorId, scope);
   actor.hp.temporary = amount;
@@ -806,15 +1312,15 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
     // The same transition as damage to 0: what it sustains ends, and so does its Concentration.
     events.push(...endEffectsSustainedBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
+    events.push(...endConcentrationOnTheDead(state, actor));
   }
   events.push(...wakeOnHealing(state, actor, before));
   return events;
 }
 
 /**
- * SRD "Dead": the one way back. The GM applies the revival (Revivify, Raise Dead, a story) and names the hit points it
- * gives. The dying state and the Unconscious it brought end, a creature that died with Exhaustion comes back one
- * level lower, and it is no longer attuned to any magic item. Other conditions stay.
+ * SRD "Dead": the GM's way back, for a revival the server doesn't cast (a story, a wish). The GM names the hit points
+ * it gives, and the creature returns as a revival spell returns it (`returnToLife`).
  */
 export function reviveActor(
   state: GameState,
@@ -829,25 +1335,8 @@ export function reviveActor(
   requireGm(scope, "Only the GM can revive a creature.");
   const actor = adjustableActor(state, actorId, scope);
   if (!isDead(actor)) throw new CommandRejectedError(`${actor.name} isn't dead.`);
-  actor.hp.current = Math.max(1, Math.min(actor.hp.maximum, hitPoints));
-  actor.deathSaves = null;
-  if (!actor.effects.some((effect) => effect.linkedConditionIds.includes("unconscious")))
-    removeConditionDirect(actor, "unconscious");
-  reduceExhaustion(actor);
-  if (actor.inventory.some((item) => item.attuned)) {
-    actor.inventory = actor.inventory.map((item) => (item.attuned ? { ...item, attuned: false } : item));
-    // Attunement feeds stored AC and slot maxima, so the loadout is reconciled as an inventory write would be.
-    const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
-    reconcileEquipment(actor, definition, { catalog: deps.catalog, role: "gm" });
-  }
-  const regained = actor.hp.current;
-  return [
-    {
-      kind: "condition",
-      text: `${actor.name} returns to life with ${regained} ${regained === 1 ? "hit point" : "hit points"}.`,
-      actorId
-    }
-  ];
+  const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  return returnToLife(actor, hitPoints, { definition, ...(deps.catalog ? { catalog: deps.catalog } : {}) });
 }
 
 /** The GM sets a creature's hit point maximum. Current HP never exceeds it. A character's sheet sets the

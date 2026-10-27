@@ -20,6 +20,40 @@ export function healingOfText(description: string): SpellEffect["healing"] {
 
 export type SpellRange = SpellReference["range"];
 
+/** How long a spell lasts on the game's clocks: up to ten minutes in rounds (ten to a minute), longer in minutes. */
+export type SpellSpan = Readonly<{ rounds: number }> | Readonly<{ minutes: number }>;
+
+const MINUTES_PER: Readonly<Record<string, number>> = { minute: 1, hour: 60, day: 1440 };
+
+/** A printed duration as a span: "1 round", "10 minutes", "8 hours", "30 days". Null for one that lasts until something
+ *  ends it ("until dispelled", "instantaneous", "special"). */
+export function spellSpanOf(duration: string): SpellSpan | null {
+  const match = /^(?:up to )?(\d+) (round|minute|hour|day)s?$/i.exec(duration.trim());
+  if (!match) return null;
+  const count = Number.parseInt(match[1]!, 10);
+  const unit = match[2]!.toLowerCase();
+  if (unit === "round") return { rounds: count };
+  const minutes = count * MINUTES_PER[unit]!;
+  return minutes <= 10 ? { rounds: minutes * 10 } : { minutes };
+}
+
+/** The duration and the Concentration of one cast at a slot level: the higher-level row that slot reaches, else the
+ *  spell's own (SRD Dominate Beast from a level 6 slot: up to 1 hour). */
+export function spellDurationAt(
+  spell: Pick<SpellReference, "duration" | "concentration" | "upcastDurations">,
+  level: number
+): Readonly<{ duration: string; concentration: boolean }> {
+  const row = (spell.upcastDurations ?? [])
+    .filter((entry) => entry.level <= level)
+    .reduce<NonNullable<SpellReference["upcastDurations"]>[number] | null>(
+      (best, entry) => (best === null || entry.level > best.level ? entry : best),
+      null
+    );
+  return row
+    ? { duration: row.duration, concentration: row.concentration }
+    : { duration: spell.duration, concentration: spell.concentration };
+}
+
 /** "V, S, M (a pinch of soot)" from the structured components, or "None" for a spell with no components: the line a
  *  spell card prints, for the catalog and the homebrew wizard's preview alike. */
 export function spellComponentsText(components: SpellReference["components"]): string {

@@ -1,8 +1,96 @@
-import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import type { RollAnswerOffer, RollAnswered } from "@vtt/domain";
 import { Button, Input, IconX } from "@vtt/ui";
 import { useRollPreference } from "../dice/roll-preference";
 
 export type DieMode = "advantage" | "disadvantage" | "normal";
+
+/** What a tap on an answer sends: the answer's id, whether its die comes off, and a typed reroll's face. */
+export type AnswerChoice = Readonly<{ id: string; subtract?: boolean; face?: number }>;
+
+/**
+ * The answers a shown roll may still take (Bardic Inspiration, Indomitable, a Luck Blade), and the ones it took. Each
+ * offer is one button naming what it does, with what it spends in its title. A die that can be added or taken off
+ * (Improve Fate) gets a button for each way; a reroll of a typed d20 takes the face the physical reroll shows.
+ */
+export function AnswerOffers({
+  offers,
+  answered,
+  typed = false,
+  busy,
+  onAnswer,
+  onInvalid
+}: Readonly<{
+  offers?: readonly RollAnswerOffer[];
+  answered?: readonly RollAnswered[];
+  typed?: boolean;
+  busy: boolean;
+  onAnswer: (choice: AnswerChoice) => void;
+  onInvalid?: (message: string) => void;
+}>) {
+  if ((offers?.length ?? 0) === 0 && (answered?.length ?? 0) === 0) return null;
+  const titleOf = (offer: RollAnswerOffer) => (offer.cost ? `Spends ${offer.cost}` : undefined);
+  return (
+    <span className="roll-answers" role="group" aria-label="Answers to this roll">
+      {answered?.map((line, index) => (
+        <span key={`${line.name}-${index}`} className="roll-answered">
+          {line.name}: {line.change}
+        </span>
+      ))}
+      {offers?.map((offer) => {
+        if (offer.either) {
+          const [plus, minus] = offer.does.split(" or ");
+          return (
+            <Fragment key={offer.id}>
+              <button
+                type="button"
+                className="roll-answer"
+                disabled={busy}
+                title={titleOf(offer)}
+                onClick={() => onAnswer({ id: offer.id })}
+              >
+                {offer.name} · {plus}
+              </button>
+              <button
+                type="button"
+                className="roll-answer"
+                disabled={busy}
+                title={titleOf(offer)}
+                onClick={() => onAnswer({ id: offer.id, subtract: true })}
+              >
+                {offer.name} · {minus}
+              </button>
+            </Fragment>
+          );
+        }
+        if (offer.rerolls && typed)
+          return (
+            <FaceEntry
+              key={offer.id}
+              label={`${offer.name}: the rerolled d20`}
+              placeholder="reroll's d20"
+              action={offer.name}
+              busy={busy}
+              onFace={(face) => onAnswer({ id: offer.id, face })}
+              onInvalid={onInvalid}
+            />
+          );
+        return (
+          <button
+            key={offer.id}
+            type="button"
+            className="roll-answer"
+            disabled={busy}
+            title={titleOf(offer)}
+            onClick={() => onAnswer({ id: offer.id })}
+          >
+            {offer.name} · {offer.does}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
 
 /**
  * The GM's call to roll with Advantage or Disadvantage, whatever the rules count. Players never get it: the rules
@@ -155,7 +243,12 @@ export function RollControls({
   onDismiss,
   onInvalidFace,
   summary,
-  extraActions
+  extraActions,
+  beforeRoll,
+  answers,
+  answered,
+  onAnswer,
+  waiting
 }: Readonly<{
   /** Drives whether the prompt rolls itself as soon as it appears. */
   rollMode: "auto" | "manual";
@@ -192,6 +285,14 @@ export function RollControls({
   summary?: ReactNode;
   /** Extra rolled-phase buttons after Confirm (e.g. Legendary Resistance). */
   extraActions?: ReactNode;
+  /** Extra buttons before anything is rolled (choosing to fail a save). */
+  beforeRoll?: ReactNode;
+  /** The answers the shown roll may still take, and the ones it took. */
+  answers?: readonly RollAnswerOffer[];
+  answered?: readonly RollAnswered[];
+  onAnswer?: (choice: AnswerChoice) => void;
+  /** What the roll waits on before it can be confirmed (another creature's answer); Confirm is held meanwhile. */
+  waiting?: string;
 }>) {
   const { mayType } = useRollPreference();
   const autoRolled = useRef(false);
@@ -205,6 +306,15 @@ export function RollControls({
     }
   }, [shouldAutoRoll, rolled]);
   if (rolled) {
+    if (waiting)
+      return (
+        <span className="save-prompt-confirm">
+          {summary}
+          <span className="roll-waiting" role="status">
+            {waiting}
+          </span>
+        </span>
+      );
     return (
       <span className="save-prompt-confirm">
         {summary}
@@ -216,6 +326,16 @@ export function RollControls({
         {rerollable && (viewer === "gm" || inspired) && (
           <RerollControl viewer={viewer} typed={typed} busy={busy} onReroll={onReroll} onInvalid={onInvalidFace} />
         )}
+        {onAnswer && (
+          <AnswerOffers
+            offers={answers}
+            answered={answered}
+            typed={typed}
+            busy={busy}
+            onAnswer={onAnswer}
+            onInvalid={onInvalidFace}
+          />
+        )}
       </span>
     );
   }
@@ -225,6 +345,7 @@ export function RollControls({
         {rollLabel}
       </button>
       {mayType && <FaceEntry label={faceLabel} busy={busy} onFace={onTyped} onInvalid={onInvalidFace} />}
+      {beforeRoll}
       {onDismiss && (
         <button
           type="button"

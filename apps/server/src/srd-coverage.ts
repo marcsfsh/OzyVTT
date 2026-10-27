@@ -3,14 +3,20 @@ import {
   loadBackgrounds,
   loadClasses,
   loadConditions,
+  loadDamageTypes,
   loadEquipment,
   loadFeats,
   loadGlossary,
+  loadLanguages,
+  loadRules,
+  loadSkills,
+  loadToolbox,
   loadMagicItems,
   loadMonsterDefinitions,
   loadSpecies,
   loadSpells,
   loadSubclasses,
+  loadWeaponProperties,
   loadWeapons,
   featurePicks,
   type EquipmentReference,
@@ -24,8 +30,11 @@ import { modifierDisposition } from "./character-build.js";
 import {
   CONDITION_COVERAGE,
   GLOSSARY_COVERAGE,
+  TOOLBOX_COVERAGE,
   MONSTER_TRAIT_COVERAGE,
   RECORD_OVERRIDES,
+  RULES_COVERAGE,
+  WEAPON_PROPERTY_COVERAGE,
   type CoverageState,
   type CuratedCoverage
 } from "./srd-coverage-curated.js";
@@ -43,26 +52,86 @@ export type CoverageRow = Readonly<{ group: string; id: string; name: string; st
 
 const STATES: readonly CoverageState[] = ["enforced", "guided", "reference"];
 
-const curatedOr = (key: string, computed: CoverageState): Readonly<{ state: CoverageState; note?: string }> =>
-  RECORD_OVERRIDES[key] ?? { state: computed };
+/** The state the data pass computes for each record a curated row may override, by its `RECORD_OVERRIDES` key. */
+type ComputedLedger = Map<string, CoverageState>;
+
+/** The curated row for a record, else its computed state; the computed state goes in the ledger either way. */
+const curatedOr = (
+  ledger: ComputedLedger,
+  key: string,
+  computed: CoverageState
+): Readonly<{ state: CoverageState; note?: string }> => {
+  ledger.set(key, computed);
+  return RECORD_OVERRIDES[key] ?? { state: computed };
+};
 
 const RANK: Readonly<Record<CoverageState, number>> = { reference: 0, guided: 1, enforced: 2 };
 const most = (states: readonly CoverageState[]): CoverageState =>
   states.reduce<CoverageState>((best, state) => (RANK[state] > RANK[best] ? state : best), "reference");
+const least = (states: readonly CoverageState[]): CoverageState =>
+  states.reduce<CoverageState>((worst, state) => (RANK[state] < RANK[worst] ? state : worst), "enforced");
+
+/** Spells whose outcome is what the caster learns, says or makes for the story (what Detect Magic senses, Tongues'
+ *  speech, Control Weather's weather): a stat block's list that casts them is judged by its other spells. */
+const NARRATIVE_SPELLS: ReadonlySet<string> = new Set([
+  "animal-messenger",
+  "augury",
+  "clairvoyance",
+  "commune",
+  "comprehend-languages",
+  "control-weather",
+  "create-food-and-water",
+  "creation",
+  "detect-evil-and-good",
+  "detect-magic",
+  "detect-poison-and-disease",
+  "detect-thoughts",
+  "disguise-self",
+  "divination",
+  "druidcraft",
+  "identify",
+  "legend-lore",
+  "locate-animals-or-plants",
+  "locate-creature",
+  "locate-object",
+  "mage-hand",
+  "message",
+  "prestidigitation",
+  "scrying",
+  "sending",
+  "speak-with-animals",
+  "speak-with-dead",
+  "speak-with-plants",
+  "teleport",
+  "thaumaturgy",
+  "tongues",
+  "word-of-recall"
+]);
 
 type SpellLater = NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number];
 
 /** A later action applies when it deals damage, makes an attack or imposes conditions on a failed save; with a `zone`
- *  the server raises it as creatures enter or start or end a turn in the area (`spell-zones.ts`). */
+ *  the server raises it as creatures enter or start or end a turn in the area (`spell-zones.ts`). An area also applies
+ *  when it charges the ground it makes difficult (`zone-ground.ts`), bars or wards (`zone-barriers.ts`), covers or turns
+ *  shots (`zone-walls.ts`), alerts its caster, or gives the creatures inside what it holds (`zone-auras.ts`). */
 const laterApplies = (later: SpellLater) =>
   later.damage.length > 0 ||
   later.attackRange !== undefined ||
   (later.save?.failureConditions.length ?? 0) > 0 ||
-  later.save?.speedZero === true;
+  later.save?.speedZero === true ||
+  later.zone?.terrain !== undefined ||
+  later.zone?.bars !== undefined ||
+  later.zone?.cover !== undefined ||
+  later.zone?.deflects === true ||
+  later.zone?.wardsSpells !== undefined ||
+  later.zone?.alerts === true ||
+  later.zone?.holds !== undefined;
 
 /** A spell is enforced when a cast applies its numbers or leaves its effect on the targets, or the area it leaves
- *  applies them later; guided when the app spends the slot, holds Concentration, places the area or rolls a save
- *  whose outcome a person applies. */
+ *  applies them later. Every other spell is guided: each is a cast action (`character-build.ts`, `monster-spells.ts`)
+ *  that spends its casting time and slot, checks its components and targets (`resolution/components.ts`,
+ *  `resolution/spell-targets.ts`), holds Concentration, places its area and tells the table, while what it does is a
+ *  person's to apply. */
 export function spellState(spell: SpellReference): CoverageState {
   const effect = spell.effect;
   const applies =
@@ -73,8 +142,16 @@ export function spellState(spell: SpellReference): CoverageState {
       effect.grant !== undefined ||
       effect.failureEffect !== undefined ||
       effect.endsConditions !== undefined ||
+      effect.dispel !== undefined ||
+      effect.endsCurses === true ||
       effect.reaction !== undefined ||
       effect.darts !== undefined ||
+      // The form it gives (Polymorph's Beast) or the effect it picks (Enlarge or Reduce).
+      effect.shapeShift !== undefined ||
+      effect.effectOptions !== undefined ||
+      effect.revives !== undefined ||
+      effect.reposes === true ||
+      effect.killsAtHitPoints !== undefined ||
       (effect.laterActions ?? []).some(laterApplies));
   const saveApplies =
     spell.save !== null &&
@@ -82,57 +159,198 @@ export function spellState(spell: SpellReference): CoverageState {
       (effect?.damage.length ?? 0) > 0 ||
       spell.save.speedZero === true ||
       spell.save.failurePush !== undefined);
-  if (applies || saveApplies) return "enforced";
-  if (spell.level > 0 || spell.concentration || spell.area !== null || spell.save !== null) return "guided";
-  return "reference";
+  // The light it sheds or the fog or Darkness it fills, which dynamic vision reads.
+  const sight = spell.sight;
+  // The walls it raises, cuts or destroys and the doors it opens or locks on the map (`spell-walls.ts`).
+  return applies ||
+    saveApplies ||
+    spell.walls !== undefined ||
+    sight?.light !== undefined ||
+    sight?.area !== undefined ||
+    sight?.dispels !== undefined
+    ? "enforced"
+    : "guided";
 }
 
 type ResolvingFields = Pick<
   ActorAction,
-  "damage" | "healing" | "multiattack" | "onHit" | "darts" | "reaction" | "grants" | "endsConditions"
+  | "damage"
+  | "healing"
+  | "multiattack"
+  | "onHit"
+  | "darts"
+  | "reaction"
+  | "grants"
+  | "endsConditions"
+  | "answer"
+  | "sight"
+  | "shapeShift"
+  | "endsForm"
+  | "effectOptions"
+  | "raisesCorpse"
 > &
-  Readonly<{ attack?: unknown; save?: unknown; damageByLevel?: unknown }>;
+  Partial<Pick<ActorAction, "move" | "teleport" | "leap" | "pull" | "swallow" | "inflicts">> &
+  Readonly<{ attack?: unknown; save?: Readonly<Record<string, unknown>>; damageByLevel?: unknown }>;
+
+/** A save applies when its failure leaves something (conditions or a choice of them, an effect, Speed 0, a push, a
+ *  hazard, damage on later turns, a band by Hit Points, a grapple, Exhaustion, death, what a rest brings, a lost
+ *  Concentration or form) or its success does. The damage it rolls is the action's own. One whose failure leaves
+ *  nothing only opens. */
+const saveApplies = (save: Readonly<Record<string, unknown>> | undefined) =>
+  save !== undefined &&
+  ((Array.isArray(save.failureConditions) && save.failureConditions.length > 0) ||
+    [
+      "conditionChoices",
+      "failureEffect",
+      "successEffect",
+      "failurePush",
+      "failureByHitPoints",
+      "failureBanishes",
+      "failureExhaustion",
+      "failureKills",
+      "atRest",
+      "ongoingDamage",
+      "failureHazard",
+      "escapeDc"
+    ].some((key) => save[key] !== undefined) ||
+    save.speedZero === true ||
+    save.breaksConcentration === true ||
+    save.failureEndsForm === true);
+
+type HitRider = NonNullable<ActorAction["onHit"]>[number];
+
+/** A hit rider applies when it leaves something on the target or its attacker. One that carries only its `reminder`
+ *  (and the name and duration that reminder would give) is said with the hit for the GM to apply. */
+const riderApplies = (rider: HitRider) =>
+  Object.entries(rider).some(
+    ([key, value]) => !["reminder", "name", "duration", "conditions"].includes(key) && value !== undefined
+  ) || rider.conditions.length > 0;
+
+/** What the engine leaves to the GM when the action resolves: the action's own reminder and its hit riders'. */
+const remindersOf = (action: Pick<ActorAction, "reminder" | "onHit">): string[] => [
+  ...(action.reminder ? [action.reminder] : []),
+  ...(action.onHit ?? []).flatMap((rider) => (rider.reminder ? [rider.reminder] : []))
+];
 
 /** An action resolves when it rolls an attack or a save, deals damage, heals, grants an effect, ends conditions,
- *  runs a structured Multiattack or is offered as a reaction prompt. One with none of these only spends its use and
- *  its place in the turn. */
+ *  runs a structured Multiattack, places light or an area of obscurement on the map, is offered as a reaction prompt,
+ *  answers a roll (`roll-answers.ts`), grants a move, a jump or a teleport the movement rules charge
+ *  (`granted-moves.ts`), pulls its targets in, or swallows one (`swallow.ts`). One with none of these only spends its
+ *  use and its place in the turn. */
 const actionResolves = (action: ResolvingFields) =>
+  action.sight?.light !== undefined ||
+  action.sight?.area !== undefined ||
+  action.sight?.dispels !== undefined ||
   action.attack !== undefined ||
-  action.save !== undefined ||
+  saveApplies(action.save) ||
   action.damage.length > 0 ||
   action.damageByLevel !== undefined ||
   action.healing !== undefined ||
   action.multiattack !== undefined ||
-  (action.onHit?.length ?? 0) > 0 ||
+  (action.onHit ?? []).some(riderApplies) ||
   action.darts !== undefined ||
   action.reaction !== undefined ||
   action.grants !== undefined ||
-  action.endsConditions !== undefined;
+  action.endsConditions !== undefined ||
+  action.answer !== undefined ||
+  action.shapeShift !== undefined ||
+  action.endsForm !== undefined ||
+  action.effectOptions !== undefined ||
+  action.move !== undefined ||
+  action.teleport !== undefined ||
+  action.leap !== undefined ||
+  action.pull !== undefined ||
+  action.swallow?.conditions !== undefined ||
+  action.inflicts !== undefined ||
+  action.raisesCorpse !== undefined;
 
 /**
  * A stat block action is enforced when its attack, save, damage, healing, grant or structured Multiattack resolves,
  * or when the server offers it as the generic actions it names (Nimble Escape's Disengage or Hide as a Bonus
- * Action). One that casts spells takes the state of the spells it casts (`spellStates`), each a cast action with the
- * stat block's numbers. Guided when it resolves with a reminder of what is left to the GM, or the app only tracks it
- * (a legendary cost, a recharge, a Multiattack read as prose).
+ * Action). One that casts a spell takes that spell's state (`spellStates`), as a cast action with the stat block's
+ * numbers; a list takes the least of the spells it casts, leaving out those whose outcome is the story's, and names
+ * the ones a person finishes. Guided when it resolves with a reminder of what is left to the GM, or the app only
+ * tracks it (a legendary cost, a recharge, a Multiattack read as prose).
  */
-export function monsterActionState(
+export function monsterActionRow(
+  action: ActorAction,
+  definition: ActorDefinition,
+  spellStates: ReadonlyMap<string, CoverageState>,
+  spellNames: ReadonlyMap<string, string> = new Map()
+): Readonly<{ state: CoverageState; note?: string }> {
+  // An action printed for some forms only is refused in the others, and a save whose failure leaves nothing is still
+  // rolled.
+  const tracked =
+    action.untrackedMultiattack ||
+    remindersOf(action).length > 0 ||
+    action.legendary ||
+    action.uses ||
+    action.formOnly !== undefined ||
+    action.save !== undefined;
+  const floor: CoverageState = tracked ? "guided" : "reference";
+  if (action.castsSpells) {
+    const stateOf = (spellId: string) => spellStates.get(spellId) ?? "reference";
+    const spells = action.castsSpells.spells;
+    if (action.castsSpells.self) {
+      // A single cast names its spell when that spell's row leaves something to a person, a story spell's included.
+      const entry = spells[0]!;
+      const state = most([stateOf(entry.spellId), floor]);
+      const name = spellNames.get(entry.spellId) ?? entry.name;
+      return state === "enforced"
+        ? { state }
+        : {
+            state,
+            note: `Casts ${name} at the stat block's numbers (monster-spells.ts); ${name} applies only as its own row says.`
+          };
+    }
+    // A list's own uses (per day, at will) are counted on every cast, so a list is guided at least.
+    const judged = spells.filter((entry) => !NARRATIVE_SPELLS.has(entry.spellId));
+    const state = most([least(judged.map((entry) => stateOf(entry.spellId))), "guided"]);
+    const unfinished = [
+      ...new Set(
+        judged
+          .filter((entry) => stateOf(entry.spellId) !== "enforced")
+          .map((entry) => spellNames.get(entry.spellId) ?? entry.name)
+      )
+    ];
+    return state === "enforced" || unfinished.length === 0
+      ? { state }
+      : {
+          state,
+          note: `Casts its listed spells at the stat block's numbers (monster-spells.ts); ${unfinished.join(", ")} ${
+            unfinished.length === 1 ? "applies" : "apply"
+          } only as ${unfinished.length === 1 ? "its own row says" : "their own rows say"}.`
+        };
+  }
+  // An entry that prints its choices inside it (a mummy lord's Necrotic Strike: "one Rotting Fist or Channel Negative
+  // Energy attack") is as applied as the least of them.
+  const parts = definition.actions.filter((other) => other.partOf === action.id);
+  if (parts.length > 0)
+    return { state: least(parts.map((part) => monsterActionRow(part, definition, spellStates, spellNames).state)) };
+  const offered = builtinActionsFor(definition).some((builtin) => builtin.name.startsWith(`${action.name}: `));
+  // A reminder is what the engine leaves to the GM when the action resolves, so the action applies only in part, and
+  // the reminder is the note.
+  const reminders = remindersOf(action).join(" ");
+  if (actionResolves(withTakenActions(action)) || offered)
+    return reminders
+      ? { state: "guided", note: `The server resolves it and says the GM's part with it: ${reminders}` }
+      : { state: "enforced" };
+  return reminders
+    ? { state: floor, note: `The app offers it and says the GM's part with it: ${reminders}` }
+    : { state: floor };
+}
+
+/** A feature's or an item's action that only spends its use and its place in the turn, or says a part for the GM
+ *  with it, leaves its record in part the GM's however much its other riders apply. */
+const leavesPart = (action: FeatureRecord["actions"][number]) =>
+  !actionResolves(withTakenActions(action as ActorAction)) || remindersOf(action).length > 0;
+
+/** `monsterActionRow`'s state alone. */
+export const monsterActionState = (
   action: ActorAction,
   definition: ActorDefinition,
   spellStates: ReadonlyMap<string, CoverageState>
-): CoverageState {
-  const tracked = action.untrackedMultiattack || action.reminder || action.legendary || action.uses;
-  const floor: CoverageState = tracked ? "guided" : "reference";
-  if (action.castsSpells) {
-    const casts = action.castsSpells.spells.map((entry) => spellStates.get(entry.spellId) ?? "reference");
-    // A list's own uses (per day, at will) are counted on every cast, so a list is guided at least.
-    return most([...casts, action.castsSpells.self ? floor : "guided"]);
-  }
-  const offered = builtinActionsFor(definition).some((builtin) => builtin.name.startsWith(`${action.name}: `));
-  // A reminder is what the engine leaves to the GM when the action resolves, so the action applies only in part.
-  if (actionResolves(withTakenActions(action)) || offered) return action.reminder ? "guided" : "enforced";
-  return floor;
-}
+): CoverageState => monsterActionRow(action, definition, spellStates).state;
 
 type Riders = Pick<FeatureRecord, "actions" | "effects" | "modifiers" | "grants" | "uses" | "tags">;
 type Modifier = Riders["modifiers"][number];
@@ -145,9 +363,9 @@ const modifierApplies = (riders: Riders) => (modifier: Modifier) => {
   return modifier.type !== "short-rest-regain" || riders.actions.length === 0;
 };
 
-/** A modifier nothing reads yet (a spell attack bonus, a sense): its record applies in part at most. */
+/** A modifier nothing reads yet: its record applies in part at most. Senses are read by dynamic vision. */
 const unreadModifier = (riders: Riders) =>
-  riders.modifiers.some((modifier) => modifierDisposition(modifier.type) === "unread" || modifier.type === "sense");
+  riders.modifiers.some((modifier) => modifierDisposition(modifier.type) === "unread");
 
 const ridersApply = (riders: Riders) =>
   riders.actions.some(actionResolves) ||
@@ -173,27 +391,54 @@ export function featureState(feature: FeatureRecord): CoverageState {
     (feature.extraPicks?.length ?? 0) > 0 ||
     (feature.extraSpellLists?.length ?? 0) > 0 ||
     feature.replacesFeatureId !== undefined;
-  if (ridersApply(feature) || pickApplies || buildApplies) return unreadModifier(feature) ? "guided" : "enforced";
+  if (ridersApply(feature) || pickApplies || buildApplies)
+    return unreadModifier(feature) || feature.actions.some(leavesPart) ? "guided" : "enforced";
   if (feature.uses !== undefined || feature.actions.length > 0 || picks.length > 0) return "guided";
   return "reference";
 }
 
-/** An item is enforced when it is a weapon or armor or carries riders, a scroll's spell or ammunition. An item that
+/** An item is enforced when it is a weapon or armor or carries riders, a scroll's spell, ammunition or a study. An item that
  *  casts spells takes the state of the spells it casts, as a stat block's casting does. Guided when the app only
  *  tracks it (attunement, charges, a curse, an action that only spends a use), uses it as a base weapon or armor
  *  without its magic, or rolls its checks (a tool). */
 export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<string, CoverageState>): CoverageState {
   // A magic weapon or armor with no rider of its own is only its base, so its magic is the GM's.
   const base = (item.weapon ?? null) !== null || (item.armor ?? null) !== null;
+  const kinds = (item.variants ?? []).map((kind) => ({ ...kind, uses: undefined, tags: [] }));
   const applies =
     (base && !item.isMagic) ||
     item.grantsFeatIds.length > 0 ||
     (item.ammunition ?? null) !== null ||
     item.spellScroll !== undefined ||
+    item.study !== undefined ||
     item.removesArmorDrawbacks === true ||
-    ridersApply(item);
-  if (applies) return unreadModifier(item) ? "guided" : "enforced";
-  const casts = item.casts.map((cast) => spellStates.get(cast.spellId) ?? "reference");
+    (item.onHit ?? []).some(riderApplies) ||
+    // Its light, which dynamic vision reads while it is lit.
+    item.light !== undefined ||
+    item.weaponChanges !== undefined ||
+    item.bonusActionAttack === true ||
+    item.magicSaveAura !== undefined ||
+    item.savesNegateSpells !== undefined ||
+    item.servesAsFocus !== undefined ||
+    ridersApply(item) ||
+    // A kind or form that carries riders of its own (an Ioun Stone's, a Rod of Lordly Might's battleaxe).
+    kinds.some((kind) => ridersApply(kind) || kind.weapon !== undefined || (kind.onHit ?? []).some(riderApplies));
+  // An item that casts is no more than the weakest of its casts: a cast the GM runs leaves the item in part theirs.
+  const casts = [...item.casts, ...kinds.flatMap((kind) => kind.casts)].map(
+    (cast) => spellStates.get(cast.spellId) ?? "reference"
+  );
+  if (applies) {
+    // One rider that applies doesn't carry the rest: an action that only spends its use, a hit rider said for the GM
+    // or a modifier nothing reads leaves the item in part the GM's.
+    const actions = [...item.actions, ...kinds.flatMap((kind) => kind.actions)];
+    const partial =
+      unreadModifier(item) ||
+      kinds.some(unreadModifier) ||
+      actions.some(leavesPart) ||
+      [...(item.onHit ?? []), ...kinds.flatMap((kind) => kind.onHit ?? [])].some((rider) => rider.reminder);
+    const own: CoverageState = partial ? "guided" : "enforced";
+    return casts.length === 0 ? own : least([own, most([least(casts), "guided"])]);
+  }
   // A tool's checks roll with the ability its entry names and the sheet's proficiency; the GM sets what they do.
   const tool = item.category === "tool" && toolAbility(item.description) !== null;
   const tracked =
@@ -205,7 +450,7 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     item.cursed ||
     item.uses !== undefined ||
     item.actions.length > 0;
-  return most([...casts, tracked ? "guided" : "reference"]);
+  return most([...(casts.length > 0 ? [least(casts)] : []), tracked ? "guided" : "reference"]);
 }
 
 /** A monster trait's kind: its name without the uses or lair suffix ("Legendary Resistance (3/Day)"). */
@@ -235,23 +480,36 @@ function curatedRow(group: string, id: string, name: string, curated: CuratedCov
   return curated ? { group, id, name, ...curated } : { group, id, name, state: "reference", note: "not classified" };
 }
 
-export function srdCoverageRows(): CoverageRow[] {
+export const srdCoverageRows = (): CoverageRow[] => classify().rows;
+
+/** The state the data pass computes for every record a curated row may override, by its `RECORD_OVERRIDES` key, so a
+ *  test can hold each curated row that differs from it to `CURATED_OVER_COMPUTED`. */
+export const computedRecordStates = (): ReadonlyMap<string, CoverageState> => classify().ledger;
+
+function classify(): Readonly<{ rows: CoverageRow[]; ledger: ComputedLedger }> {
   const rows: CoverageRow[] = [];
+  const ledger: ComputedLedger = new Map();
   const spellStates = new Map<string, CoverageState>();
   for (const spell of loadSpells()) {
-    const row = curatedOr(`spell:${spell.id}`, spellState(spell));
+    const row = curatedOr(ledger, `spell:${spell.id}`, spellState(spell));
     spellStates.set(spell.id, row.state);
     rows.push({ group: "Spells", id: spell.id, name: spell.name, ...row });
   }
 
+  const spellNames = new Map(loadSpells().map((spell) => [spell.id, spell.name]));
+  // A choice printed inside its entry (Necrotic Strike's two attacks) is that entry's row.
   for (const definition of loadMonsterDefinitions())
-    for (const action of definition.actions)
+    for (const action of definition.actions.filter((candidate) => candidate.partOf === undefined)) {
+      const key = `action:${definition.name}/${action.id}`;
+      const computed = monsterActionRow(action, definition, spellStates, spellNames);
+      ledger.set(key, computed.state);
       rows.push({
         group: "Monster actions",
         id: `${definition.name}/${action.id}`,
         name: `${definition.name}: ${action.name}`,
-        ...curatedOr(`action:${definition.name}/${action.id}`, monsterActionState(action, definition, spellStates))
+        ...(RECORD_OVERRIDES[key] ?? computed)
       });
+    }
   for (const [kind, { printings }] of monsterTraitKinds())
     rows.push(curatedRow("Monster traits", kind, `${kind} (${printings})`, MONSTER_TRAIT_COVERAGE[kind]));
 
@@ -264,7 +522,7 @@ export function srdCoverageRows(): CoverageRow[] {
         group: `${record.name} features`,
         id: `${record.id}/${feature.id}`,
         name: repeated ? `${feature.name} (level ${feature.level})` : feature.name,
-        ...curatedOr(`feature:${feature.id}`, featureState(feature))
+        ...curatedOr(ledger, `feature:${feature.id}`, featureState(feature))
       });
     }
   for (const record of loadSubclasses()) {
@@ -274,7 +532,7 @@ export function srdCoverageRows(): CoverageRow[] {
         group: `${className} features`,
         id: `${record.id}/${feature.id}`,
         name: `${feature.name} (${record.name})`,
-        ...curatedOr(`feature:${feature.id}`, featureState(feature))
+        ...curatedOr(ledger, `feature:${feature.id}`, featureState(feature))
       });
   }
   for (const species of loadSpecies()) {
@@ -288,7 +546,7 @@ export function srdCoverageRows(): CoverageRow[] {
         group: "Species traits",
         id: `${species.id}/${feature.id}`,
         name: `${feature.name} (${of})`,
-        ...curatedOr(`feature:${feature.id}`, featureState(feature))
+        ...curatedOr(ledger, `feature:${feature.id}`, featureState(feature))
       });
   }
   // A background is build data: its ability increases, proficiencies, origin feat and equipment are all applied.
@@ -299,7 +557,7 @@ export function srdCoverageRows(): CoverageRow[] {
       group: "Feats",
       id: feat.id,
       name: feat.name,
-      ...curatedOr(`feature:${feat.feature.id}`, featureState(feat.feature))
+      ...curatedOr(ledger, `feature:${feat.feature.id}`, featureState(feat.feature))
     });
 
   for (const item of loadMagicItems())
@@ -307,58 +565,131 @@ export function srdCoverageRows(): CoverageRow[] {
       group: "Magic items",
       id: item.id,
       name: item.name,
-      ...curatedOr(`item:${item.id}`, itemState(item, spellStates))
+      ...curatedOr(ledger, `item:${item.id}`, itemState(item, spellStates))
     });
-  // The equipment catalog folds in weapons, armor and magic items, which have their own groups.
-  const gear = loadEquipment().filter((item) => !item.isMagic && item.weapon === null && item.armor === null);
+  // The equipment catalog folds in weapons, armor and magic items, which have their own groups. Gear that also swings
+  // as a weapon (a Torch, a staff focus) is still gear.
+  const ownGroup = new Set([...loadWeapons(), ...loadArmor()].map((record) => record.id));
+  const gear = loadEquipment().filter((item) => !item.isMagic && !ownGroup.has(item.id));
   for (const item of gear)
     rows.push({
       group: "Gear and tools",
       id: item.id,
       name: item.name,
-      ...curatedOr(`item:${item.id}`, itemState(item, spellStates))
+      ...curatedOr(ledger, `item:${item.id}`, itemState(item, spellStates))
     });
   // Weapons and armor are wholly mechanical: attacks, properties and masteries; Armor Class, Strength and Stealth.
   for (const weapon of loadWeapons())
     rows.push({ group: "Weapons", id: weapon.id, name: weapon.name, state: "enforced" });
   for (const armor of loadArmor()) rows.push({ group: "Armor", id: armor.id, name: armor.name, state: "enforced" });
+  for (const property of loadWeaponProperties())
+    rows.push(
+      curatedRow("Weapon properties and masteries", property.id, property.name, WEAPON_PROPERTY_COVERAGE[property.id])
+    );
 
   for (const condition of loadConditions())
     rows.push(curatedRow("Conditions", condition.id, condition.name, CONDITION_COVERAGE[condition.id]));
   for (const entry of loadGlossary())
     rows.push(curatedRow("Rules glossary", entry.id, entry.name, GLOSSARY_COVERAGE[entry.id]));
-  return rows;
+  // The toolbox's poisons are gear, above; its other records are curated.
+  for (const record of loadToolbox().filter((entry) => entry.kind !== "poison"))
+    rows.push(curatedRow("Gameplay Toolbox", record.id, record.name, TOOLBOX_COVERAGE[record.id]));
+  // A section's name repeats across chapters ("Ability Checks"), so the chapter is named with it. The page keeps to
+  // straight quotes, and the SRD prints one heading with a curly apostrophe.
+  for (const rule of loadRules())
+    rows.push(
+      curatedRow(
+        "Rules chapters",
+        rule.id,
+        `${rule.name.replace(/\u2019/g, "'")} (${rule.ruleset})`,
+        RULES_COVERAGE[rule.id]
+      )
+    );
+  for (const skill of loadSkills())
+    rows.push({
+      group: "Skills",
+      id: skill.id,
+      name: skill.name,
+      state: "enforced",
+      note: `ability-checks.ts rolls it with ${ABILITY_NAMES[skill.ability ?? ""] ?? "its ability"}, adding the Proficiency Bonus, or twice it with Expertise, when the sheet has it. What a success achieves outside the actions that roll it is the GM's call.`
+    });
+  for (const type of loadDamageTypes())
+    rows.push({
+      group: "Damage types",
+      id: type.id,
+      name: type.name,
+      state: "enforced",
+      note: "Every damage roll carries its type, and hit-points.ts applies the creature's Resistance, Vulnerability and Immunity to it."
+    });
+  for (const language of loadLanguages())
+    rows.push({
+      group: "Languages",
+      id: language.id,
+      name: language.name,
+      state: "reference",
+      note: "The builder records it among the languages a character knows (character-build.ts); speaking and understanding it are the table's."
+    });
+  return { rows, ledger };
 }
 
 // Numeric, so Unarmored Movement (level 2) comes before (level 10).
 const byName = (a: CoverageRow, b: CoverageRow) => a.name.localeCompare(b.name, "en", { numeric: true });
 const capitalized = (state: CoverageState) => `${state[0]!.toUpperCase()}${state.slice(1)}`;
 
-/** Groups whose every row is curated: they print as one table with the notes. */
-const TABLE_GROUPS = new Set(["Monster traits", "Conditions", "Rules glossary"]);
+/** Groups whose every row carries a note: they print as one table with the notes. */
+const TABLE_GROUPS = new Set([
+  "Monster traits",
+  "Conditions",
+  "Rules glossary",
+  "Gameplay Toolbox",
+  "Weapon properties and masteries",
+  "Rules chapters",
+  "Skills",
+  "Damage types",
+  "Languages"
+]);
+
+const ABILITY_NAMES: Readonly<Record<string, string>> = {
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
+  cha: "Charisma"
+};
 
 /** How the rows of each kind of group get their state, for the page's opening. */
 const CLASSIFICATION = [
   "- **Spells:** a cast resolves in `action-resolution.ts` and the steps in `resolution/`, at the caster's own",
-  "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, or",
-  "  when the area it leaves applies them as creatures enter it or start or end a turn there (`spell-zones.ts`).",
+  "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, ends",
+  "  spells or curses (`resolution/dispel.ts`), or when the area it leaves applies them as creatures enter it or",
+  "  start or end a turn there (`spell-zones.ts`), or when it raises, cuts or breaks the map's walls or works its",
+  "  doors (`spell-walls.ts`).",
   "  Guided when the app spends the slot and holds the Concentration, the area or a save while a person applies",
   "  what the spell does. A spell whose cast leaves a rider to the table (Storm of Vengeance's later turns) is",
   "  curated as guided, with a note.",
-  "- **Monster actions:** enforced when the attack, save, damage, healing or effect resolves, or when the server",
-  "  offers the action as the generic action it names (Nimble Escape's Disengage or Hide). An action that casts",
-  "  spells takes the state of the spells it casts, each a cast action at the stat block's numbers. Guided when the",
-  "  server resolves it and reminds the GM of the rest, or only counts a use, a legendary cost or a recharge.",
+  "- **Monster actions:** enforced when the attack, damage, healing or effect resolves, a save's failure leaves",
+  "  something, or the server offers the action as the generic action it names (Nimble Escape's Disengage or Hide).",
+  "  An action that casts one spell takes that spell's state; a list takes the least of the spells it casts whose",
+  "  outcome isn't the story's (what Detect Magic senses), each a cast action at the stat block's numbers. Guided when",
+  "  the server resolves it and reminds the GM of the rest (a hit's rider the build doesn't read), whose reminder is",
+  "  the note, rolls a save whose failure is the GM's, or only counts a use, a legendary cost or a recharge. A hit",
+  "  rider that carries only a reminder applies nothing.",
   "- **Class features, species traits and feats:** enforced when their riders (an action that resolves, an",
   "  effect, a modifier the engine reads, a grant) or the builder's picks apply them. Guided when the app counts",
-  "  their uses or offers an action that only spends a use, or when part of what they do is left to a person.",
+  "  their uses or offers an action that only spends a use, even beside riders that apply, or when part of what",
+  "  they do is left to a person.",
   "- **Magic items and gear:** enforced for weapons, armor, ammunition, Spell Scrolls and items whose riders",
-  "  apply. An item that casts spells takes the state of the spells it casts. Guided when the app only tracks",
-  "  Attunement, charges or a curse, or binds the item to a base weapon or armor without its magic. Tools are",
-  "  guided too: the server rolls their checks, and the GM sets what they achieve.",
+  "  apply. An item that casts spells takes the state of the spells it casts, and one with an action that only",
+  "  spends a use is guided however much else it applies. Guided when the app only tracks Attunement, charges or",
+  "  a curse, or binds the item to a base weapon or armor without its magic. Tools are guided too: the server",
+  "  rolls their checks, and the GM sets what they achieve.",
   "- **Backgrounds, weapons and armor:** enforced. The builder applies a background, and every weapon and armor",
   "  statistic reaches the rolls.",
-  "- **Monster traits, conditions and the rules glossary:** curated by hand, each with a note.",
+  "- **Monster traits, conditions, the rules glossary, the Gameplay Toolbox, the rules chapters' sections and the",
+  "  weapon properties and masteries:** curated by hand, each with a note.",
+  "- **Skills and damage types:** enforced, each with the module that reads it. **Languages:** reference; the builder",
+  "  records them and speaking them is the table's.",
   "",
   "Records the data can't classify, because the engine handles them in code or their data applies only part of",
   "what they do, are curated too (`RECORD_OVERRIDES`). Each group lists their notes after its records."
@@ -379,14 +710,17 @@ export function renderSrdCoverage(): string {
     "  creature's line of sight or its degree of cover, and a note names any narrative part left to the table.",
     "- **Guided:** the app tracks it or applies part of it, and a person applies the rest. It may count a use, open a",
     "  prompt, roll a check or post a reminder. The note says which part is the table's.",
-    "- **Reference:** the app shows the text and applies nothing.",
+    "- **Reference:** the app shows the text and applies nothing beyond carrying an item (its weight in its bearer's",
+    "  load). The note says why the rest is the table's.",
     "",
     "A note names the module that applies a record, so it can be checked in the code. Enforcement follows the",
     "table's rules policy: under advise the server warns where it would refuse, and under off it says nothing.",
     "",
     "Regenerate this page with `npm run map`. A test (`apps/server/test/srd-coverage.test.ts`) fails when the page",
-    "is stale, when a curated row is missing or names a record that no longer exists, and when a sampled claim",
-    "stops matching the engine. Known gaps in enforced records are GitHub issues.",
+    "is stale, when a record is missing from the page or listed twice, when a guided or reference row has no note,",
+    "when a curated row is missing, names a record that no longer exists or differs from the computed state without",
+    "saying so (`CURATED_OVER_COMPUTED`), and when a sampled claim stops matching the engine. Known gaps in enforced",
+    "records are GitHub issues.",
     "",
     "## Summary",
     "",

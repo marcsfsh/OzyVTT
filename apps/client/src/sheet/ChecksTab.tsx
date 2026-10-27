@@ -7,7 +7,9 @@ import { signed, titleCase } from "../encounter/format";
 import { modeLabel } from "../encounter/roll-mode-notes";
 import { RollModeNotes, RollModeTag } from "../encounter/RollModeTag";
 import type { SrdExtension } from "../encounter/sheet-extension";
-import { ABILITY_WORDS, exhaustionLevel, type SheetActor } from "./sheet-model";
+import { HelpAnAlly } from "./HelpAnAlly";
+import { ToolUses } from "./ToolUses";
+import { ABILITY_WORDS, exhaustionLevel, type SheetActor, type SheetState } from "./sheet-model";
 import type { Quarry } from "./useSheetController";
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
@@ -83,6 +85,39 @@ export function SkillButton({
       <strong>{signed(skill.bonus)}</strong>
       <RollModeTag mode={skill.mode} />
     </button>
+  );
+}
+
+/** The situations the character's gear and features name (a Book's topic, prying with a Crowbar), each a toggle the
+ *  next check it fits carries to the server. The GM judges whether the check really fits. */
+export function CheckSituations({
+  situations,
+  rolls
+}: Readonly<{ situations: ActorDerivedSheet["situations"]; rolls: SheetRolls }>) {
+  if (situations.length === 0) return null;
+  return (
+    <div className="cs-situations" role="group" aria-label="Situations">
+      <span className="cs-eyebrow">Situations</span>
+      <p className="cs-sub">Turn one on, then roll the check it fits. Your GM decides whether it does.</p>
+      <div className="cs-chiprow">
+        {situations.map((situation) => {
+          const on = rolls.declared.some((entry) => entry.situation === situation.situation);
+          return (
+            <button
+              key={situation.situation}
+              type="button"
+              className={`cs-toggle interactive${on ? " is-on" : ""}`}
+              aria-pressed={on}
+              disabled={rolls.rolling}
+              title={situation.source}
+              onClick={() => rolls.toggleSituation(situation)}
+            >
+              {situation.situation.charAt(0).toUpperCase() + situation.situation.slice(1)} ({situation.effect})
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -282,8 +317,9 @@ function ProficiencyEditor({
 
 /**
  * The checks: each ability's check and saving throw, the skills in two columns with the ability each uses, the tools,
- * the quarry of a Hunter's Mark, and the senses. A tap rolls on the server, which works out the bonus and any
- * Advantage or Disadvantage, so a button can't disagree with the roll. On a laptop this is the sheet's left column.
+ * the quarry of a Hunter's Mark, outside a fight the help it can give an ally's check, and the senses. A tap rolls on
+ * the server, which works out the bonus and any Advantage or Disadvantage, so a button can't disagree with the roll.
+ * On a laptop this is the sheet's left column.
  */
 export function ChecksTab({
   actor,
@@ -294,7 +330,11 @@ export function ChecksTab({
   quarry,
   busy,
   edit,
-  onEdited
+  onEdited,
+  helping,
+  onFeedback,
+  inFight = false,
+  party
 }: Readonly<{
   actor: SheetActor;
   definition: ActorDefinition;
@@ -305,6 +345,13 @@ export function ChecksTab({
   busy: boolean;
   edit: SheetEdit;
   onEdited: (next: ActorDefinition) => void;
+  /** Outside a fight, the table whose party members the character may help with a check. */
+  helping?: SheetState | undefined;
+  onFeedback?: (text: string) => void;
+  /** The character is in the running fight, where a tool's use takes its action. */
+  inFight?: boolean;
+  /** The table, for the creature a use works for (Cobbler's Tools' footwear). */
+  party?: SheetState | undefined;
 }>) {
   const skills = useSkillRows(definition, derived);
   const [editing, setEditing] = useState(false);
@@ -319,6 +366,7 @@ export function ChecksTab({
         </p>
       )}
       <RollModeNotes derived={derived} />
+      <CheckSituations situations={derived?.situations ?? []} rolls={rolls} />
       <div className="cs-section-head">
         <span className="cs-eyebrow">Skills</span>
         {actor.kind === "player-character" && !editing && (
@@ -365,7 +413,7 @@ export function ChecksTab({
               <button
                 key={tool.id}
                 type="button"
-                className="cs-roll has-label is-proficient"
+                className={`cs-roll has-label${tool.proficient !== false ? " is-proficient" : ""}`}
                 disabled={rolls.rolling}
                 aria-label={`Roll ${tool.name}, ${signed(tool.bonus)}${modeLabel(tool.mode)}`}
                 onClick={() =>
@@ -383,6 +431,7 @@ export function ChecksTab({
           </div>
         </>
       )}
+      <ToolUses actor={actor} derived={derived} rolls={rolls} inFight={inFight} state={party} />
       {quarry.map((creature) => (
         <div key={creature.id} className="cs-chiprow" role="group" aria-label={`Find ${creature.name}`}>
           <span className="cs-eyebrow">Find {creature.name}</span>
@@ -403,6 +452,17 @@ export function ChecksTab({
           })}
         </div>
       ))}
+      {helping && onFeedback && (
+        <HelpAnAlly
+          actor={actor}
+          state={helping}
+          choices={[
+            ...skills.filter((skill) => skill.tier !== undefined).map(({ id, name }) => ({ id, name })),
+            ...tools.map(({ id, name }) => ({ id, name }))
+          ]}
+          onFeedback={onFeedback}
+        />
+      )}
       <SensesAndDefences definition={definition} extension={extension} derived={derived} />
     </div>
   );

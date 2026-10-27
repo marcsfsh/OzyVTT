@@ -14,7 +14,7 @@ import {
   type RandomSource,
   type RiderContext
 } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import type { EquipmentCatalog, EquipmentDerivation } from "../equipment-derivation.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "../roll-history.js";
 import type { RuleId, RulesOverride } from "../rules-families.js";
@@ -22,6 +22,7 @@ import type { EffectNarration } from "../effects.js";
 import { withoutSourceName } from "../hidden-source.js";
 import { hiddenFrom } from "../vision/audience.js";
 import type { MasterySwing } from "../weapon-mastery.js";
+import type { SummonChoice, SummonOutcome, SummonRequest } from "../summons.js";
 import type { BuiltinHandler } from "./builtins.js";
 import type { EconomyPlan } from "./economy.js";
 
@@ -55,6 +56,12 @@ export type ResolveInput = Readonly<{
   holdKey?: string;
   /** Throw the held attack d20 again: a player's Heroic Inspiration rerolls one die, the GM throws afresh. */
   reroll?: boolean;
+  /** On a preview, answer the held attack roll with one of the attacker's answers (Peerless Skill, Stroke of Luck). */
+  answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
+  /** On a preview, roll the damage too and hold its dice for the roller to answer (`held-damage.ts`). */
+  damageLook?: boolean;
+  /** On a look, the answer to the held damage: the dice it rerolls, by their place in the held roll. */
+  damageAnswer?: Readonly<{ id: "empowered-spell" | "heroic-inspiration"; dice: readonly number[] }>;
   /** GM only: a hand-entered attack total, used verbatim vs AC. The natural die is unknown, so a crit is declared
    * via `critical` and a natural 1 via `fumble`. */
   attackTotal?: number;
@@ -66,11 +73,37 @@ export type ResolveInput = Readonly<{
   skill?: string | null;
   /** The ability a cast chooses (Hex). */
   ability?: "str" | "dex" | "con" | "int" | "wis" | "cha" | null;
+  /** The conditions an action with `conditionPicks` also ends on its target (Restoring Touch); their points were added
+   *  to the action's chosen cost. */
+  conditionIds?: readonly string[];
+  /** What each target regains from a heal its user divides (Preserve Life), checked against the pool and each cap. */
+  healingShares?: Readonly<Record<string, number>>;
+  /** The option picked for an action that offers several (`grants.options`, `failureEffect.options`); absent, the
+   *  first. */
+  optionId?: string | null;
+  /** An option for each target, for an action that asks for one per target; a target left out takes `optionId`. */
+  targetOptions?: Readonly<Record<string, string>>;
+  /** The carried weapon a grant binds to (`grants.bindsWeapon`). */
+  itemId?: string | null;
+  /** The armor or weapon of the target the action acts on (`action.object`, Mending). */
+  objectItemId?: string | null;
+  /** A reaction to this creature's turn starting: a failure "until the end of its turn" ends with that turn. */
+  currentTurnOf?: string;
+  /** The action's area is centred on its user where it stands (an octopus's ink), with no template placed. */
+  areaAt?: Readonly<{ x: number; y: number }>;
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];
   /** Push mastery's chosen distance (0 declines); absent pushes the most the mastery allows. */
   pushFeet?: number;
+  /** Who an action's `vitality` goes to (Improved Potent Spellcasting); absent, the user. */
+  vitalityTo?: string;
+  /** Who an action's `areaHeal` goes to (Land's Aid); absent, nobody. */
+  aidTo?: string;
+  /** Tactical Master's Push, Sap or Slow in place of the weapon's own mastery for this attack. */
+  mastery?: "push" | "sap" | "slow";
+  /** An Evoker's Overchannel: the spell's damage dice deal their maximum (`resolution/overchannel.ts`). */
+  overchannel?: boolean;
   /** The slot a spell is cast with; absent, its own level, else the lowest above it with a slot left. */
   slotLevel?: number;
   /** The damage type picked for an action whose caster chooses one (`ActorAction.damageTypes`); absent, its first. */
@@ -78,6 +111,13 @@ export type ResolveInput = Readonly<{
   /** A parked attack finishing (see `parkForAcReaction`): its economy was checked and spent when it rolled, so it is
    *  neither checked nor spent again, and its target is not offered the AC reaction a second time. */
   economyPaid?: boolean;
+  /** A parked attack finishing after its target's AC reaction was answered, so it is not offered again. */
+  acSettled?: boolean;
+  /** An attack held before its roll while a creature chose whether to turn it (Redirect Attack): its economy was spent
+   *  when it was held, its roll is made now, and it is not offered for turning again. */
+  redirectSettled?: boolean;
+  /** A parked attack finishing after others answered its roll: who was asked already. */
+  answersAsked?: readonly string[];
   /** A reaction's AC bonus against this attack only (Parry), added to the target's AC. */
   reactionAcBonus?: Readonly<{ amount: number; source: string }>;
   /** A parked attack's effect dice as they rolled (Bless's d4), which the replay reuses with no new roll. */
@@ -87,8 +127,63 @@ export type ResolveInput = Readonly<{
   /** The cast's area was placed on the map as a template, whose annotation takes this command's id; a spell that
    *  leaves its area behind (Moonbeam) keeps acting there. */
   areaPlaced?: boolean;
+  /** The placed area's point of origin on the map, from which its Dexterity saves read cover (SRD Cover: "an attack
+   *  or other effect originates on the opposite side of the cover"). A replay reads it from the template's drawing. */
+  areaOrigin?: Readonly<{ x: number; y: number }>;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
+  /** A long casting's first turn going ahead after no Counterspell stopped it: it begins as that turn's cast would. */
+  longCastBegins?: boolean;
+  /** Take the action's own move now and the rest of it later (`movement-grants.ts`): the cost is spent, no target. */
+  moveFirst?: boolean;
+  /** The rest of an action whose move was taken first: its cost was spent then, so it is neither checked nor spent. */
+  owedPaid?: boolean;
+  /** The space an action's `destination` sets its creature down in (a bulette's Deadly Leap, a kraken's Fling), or a
+   *  failure's move takes its target to (Telekinesis), with the height it lifts it to. */
+  destination?: Readonly<{ x: number; y: number }>;
+  destinationAltitudeFeet?: number;
+  /** The spell area a cast that ends spells is aimed at (Dispel Magic on a Spirit Guardians); the GM's to name. */
+  zoneId?: string;
+  /** The door or wall on the live map a cast is aimed at (Knock, Arcane Lock, Passwall). */
+  wallId?: string;
+  /** A light set on the live map a cast lights or puts out (Fire Play). */
+  lightId?: string;
+  /** The template the cast placed, as the map will draw it, for the walls it raises (Wall of Force). */
+  placedArea?: Readonly<{
+    shape: "circle" | "cone" | "line" | "square";
+    origin: Readonly<{ x: number; y: number }>;
+    target: Readonly<{ x: number; y: number }>;
+  }>;
+  /** The other templates of a use that places several (Meteor Swarm's Spheres), as the map draws them. */
+  morePlacedAreas?: ReadonlyArray<
+    Readonly<{
+      shape: "circle" | "cone" | "line" | "square";
+      origin: Readonly<{ x: number; y: number }>;
+      target: Readonly<{ x: number; y: number }>;
+    }>
+  >;
+  /** The caster stands where no sound can be made (Silence's sphere), measured on the map by the server. */
+  silenced?: boolean;
+  /** A parked attack finishing: the declared rider (Brutal Strike) its roll forwent Advantage for, whose hit it may
+   *  still carry. */
+  forgoneAdvantageBy?: string;
+  /** A melee hit that drops its target to 0 leaves it at 1 Hit Point and Unconscious (SRD Knocking Out a Creature). */
+  knockOut?: boolean;
+  /** How the caster shapes this spell's cast (Metamagic, Sculpt Spells), checked and applied by `metamagic.ts`. */
+  shaping?: readonly CastShaping[];
+  /** What the user picked for an action that brings creatures (`summons.ts`): which stat blocks, a form, a creature
+   *  type, damage types, and where they appear. */
+  summon?: SummonChoice;
+  /** The form a shape-shift takes (a known form, a Beast, a printed form's id, or `true`), and one per target where
+   *  each takes its own (`shape-shift.ts`). */
+  form?: string;
+  targetForms?: ReadonlyArray<Readonly<{ targetId: string; form: string }>>;
+  /** Whether the user's gear melds into its form or is worn by it, where the action lets it choose. */
+  gear?: "merged" | "worn";
+  /** The effect a use picks among its action's options (Enlarge or Reduce). */
+  option?: string;
+  /** The creature types a cast's barrier wards, among those its spell offers (Magic Circle, Hallow). */
+  creatureTypes?: readonly string[];
 }>;
 
 export type ResolveDependencies = Readonly<{
@@ -110,8 +205,39 @@ export type ResolveDependencies = Readonly<{
   /** SRD forced movement (Push): moves a combatant straight away from another and reports the distance, or
    *  null. Built by the operation layer, which has the grid (an opportunity attack's too). */
   pushToken?: (
-    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>
+    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number; toward?: boolean }>
   ) => Readonly<{ value: number; unit: string }> | null;
+  /** Where a creature would stand set down at a point on the live map (`destination`), snapped as a GM drag is: the
+   *  point, how far it is from `fromActorId` (the way it moves for that creature itself, edge to edge for another),
+   *  and the creatures whose spaces it would share there. Null when the map can't place it. */
+  destinationAt?: (
+    actorId: string,
+    at: Readonly<{ x: number; y: number }>,
+    fromActorId: string
+  ) => Readonly<{ at: Readonly<{ x: number; y: number }>; feet: number; sharers: readonly string[] }> | null;
+  /** Sets a creature's token at a snapped point on the live map, on the ground. */
+  placeToken?: (actorId: string, at: Readonly<{ x: number; y: number }>) => void;
+  /** The nearest unoccupied space to a creature within `withinFeet` of another (`forced-movement.ts`): null when none
+   *  is, undefined when the map can't say. */
+  openSpaceBeside?: (
+    actorId: string,
+    besideId: string,
+    withinFeet: number
+  ) => Readonly<{ x: number; y: number }> | null | undefined;
+  /** Brings an action's creatures onto the map (`bringSummons`), built by the operation layer, which has the grid and
+   *  mints ids. Absent, a summon is left for the GM to place. */
+  summon?: (request: SummonRequest) => SummonOutcome;
+  /** The cover the spell walls between two combatants give the second from the first (Blade Barrier), measured on the
+   *  map by the operation layer. */
+  zoneCover?: (fromActorId: string, targetId: string) => "half" | "three-quarters" | "total" | null;
+  /** The wall that deflects an ordinary projectile from the first combatant at the second (Wind Wall), or null. */
+  deflectedBy?: (fromActorId: string, targetId: string) => string | null;
+  /** The live map's scale, for distances to what isn't a creature (a trap's area); absent when the grid is not set. */
+  pixelsPerFoot?: number;
+  /** Feet from a combatant to the point a spell area was placed at (Delayed Blast Fireball's bead), or null. */
+  zoneFeet?: (actorId: string, zoneId: string) => number | null;
+  /** Moves an area straight toward a combatant, up to these feet, and reports what it met (a Sphere of Annihilation). */
+  moveZone?: (zoneId: string, towardActorId: string, feet: number) => EffectNarration[];
 }>;
 
 type RollBase = Pick<
@@ -192,6 +318,9 @@ export type ResolveContext = {
   readonly hiddenFromInitiator: (actorId: string) => boolean;
   readonly attacker: LiveActor;
   readonly targets: readonly LiveActor[];
+  /** Targets the cast's damage passes over: killed outright by it, or saved from that by Death Ward (Power Word
+   *  Kill). */
+  spared?: Set<string>;
   /** The builtin's special cases; only for an action taken from the builtin catalog. */
   readonly builtin: BuiltinHandler | undefined;
   /** The attacker's equipment contribution. */
@@ -210,10 +339,15 @@ export type ResolveContext = {
   /** Narration for the whole table, for riders that changed the board; `warnings` is the GM-only channel.
    *  A sentence goes in exactly one of the two. */
   readonly tableNarration: ActionTableNarration[];
+  /** What the action lets its user sense, told to its own player alone (Find Traps: a trap's nature, not where). */
+  readonly sensed: string[];
   rollMode: ActionRollMode | undefined;
   check: NonNullable<ActionResolution["check"]> | null;
   attack: ActionResolutionAttack | null;
   crit: boolean;
+  /** What answers added to the attack roll, and whether one made it hit, for a replay that holds no die. */
+  attackAnswerBonus?: number;
+  answeredHit?: boolean;
   /** The roll-specific facts riders filter on (attack kind, target size, damage types...). */
   riderFilters: Omit<Partial<RiderContext>, "moment">;
   readonly damage: Array<{ formula: string; type: string; total: number; source?: string }>;
@@ -231,7 +365,7 @@ export type ResolveContext = {
   effectGranted: ActionResolution["effectGranted"];
   /** Effects this resolve ended, each with its source so a hidden one can be masked before the result is told. */
   readonly effectsEnded: EndedEffect[];
-  readonly reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string }>;
+  readonly reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string; holdsDamage?: true }>;
   /** A save a builtin forced (grapple, shove); an action's own `save` is reported from the action. */
   builtinSave: ActionResolution["save"];
   healing: ActionResolution["healing"];
@@ -240,9 +374,19 @@ export type ResolveContext = {
   /** The Concentration this cast started (a Concentration spell): what its failed saves impose is sustained by it. */
   castId: string | null;
   /** The extras this hit carries whose costs are spent after the hit's own (`spendHitOptions`). */
-  readonly hitRiders: Array<{ action: DefinitionAction; slotLevel?: number }>;
+  readonly hitRiders: Array<{ action: DefinitionAction; slotLevel?: number; pactSlot?: number }>;
+  /** The declared rider (Brutal Strike) this attack roll gave up its Advantage for, or null. */
+  forgoneAdvantageBy: string | null;
+  /** A chosen rider keeps the Hide action's Invisible through this attack (Supreme Sneak's Stealth Attack). */
+  keepsHidden: boolean;
   /** The live effects whose damage riders this hit rolled, so a coat of poison is spent (`spendDamageUses`). */
   readonly damageEffectIds: string[];
+  /** The creatures this resolve brought onto the map (`resolution/summon.ts`). */
+  summoned?: ReadonlyArray<Readonly<{ actorId: string; name: string }>>;
+  /** A look at the damage records no roll: the roller alone sees its dice until the confirm deals them. */
+  silentRolls?: boolean;
+  /** This later action comes with its spell's cast at no further cost (`takenWithCast`), and spends that free use. */
+  withCast?: boolean;
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die
@@ -266,7 +410,7 @@ export function recordRoll(
     total: extra.total ?? resolution.total,
     ...(extra.typed ? { typed: true as const } : {})
   };
-  recordRollInHistory(ctx.state, record);
+  if (!ctx.silentRolls) recordRollInHistory(ctx.state, record);
   return record.id;
 }
 

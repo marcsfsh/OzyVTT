@@ -58,10 +58,12 @@
   }
 }
 /* Staging tray chips: neutral plate, team colour on a 1px edge and the round avatar disc, painted on a
-   backing layer behind the drag surface. */
+   backing layer behind the drag surface. The tray keeps its height in the map column (`flex: none`): squeezed by a
+   short phone pane, its chips spilled over the map options row above it. */
 .encounter-token-tray {
   position: relative;
   isolation: isolate;
+  flex: none;
   min-height: 3.6rem;
   display: flex;
   align-items: center;
@@ -274,6 +276,10 @@
 .encounter-token.hidden .encounter-token-body {
   stroke-dasharray: 6 4;
   opacity: 0.72;
+}
+/* On the Border Ethereal: a ghostly, see-through token. */
+.encounter-token.ethereal {
+  opacity: 0.5;
 }
 /* Active turn: magenta ring and glow that pulses once. The ring only renders while active, so the
    one-shot animation runs on each turn change. `transform-box: fill-box` is required, or the SVG
@@ -544,6 +550,125 @@
   fill: var(--surface-3);
   stroke: var(--text-muted);
 }
+/* Water: an indigo wash with ripples (still) or flow arrows (running). Ice: a pale cyan wash, cross-hatched. */
+.terrain-water {
+  fill: var(--indigo);
+  fill-opacity: 0.28;
+  stroke: var(--indigo);
+  stroke-opacity: 0.7;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-running {
+  stroke-dasharray: 8 4;
+}
+.terrain-ripple,
+.terrain-flow {
+  stroke: var(--cyan-hi);
+  stroke-opacity: 0.6;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-ice {
+  fill: var(--cyan-hi);
+  fill-opacity: 0.22;
+  stroke: var(--cyan-hi);
+  stroke-opacity: 0.75;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-frost {
+  stroke: var(--cyan-hi);
+  stroke-opacity: 0.45;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-stroke-water,
+.terrain-stroke-running-water {
+  fill: var(--indigo);
+  stroke: var(--indigo);
+}
+.terrain-stroke-ice {
+  fill: var(--cyan-hi);
+  stroke: var(--cyan-hi);
+}
+.terrain-stroke-trap {
+  fill: var(--danger);
+  stroke: var(--danger);
+}
+/* Traps: a dashed danger outline with a warning mark; one the party hasn't found is fainter on the GM's map, and one
+   made safe is muted. */
+.terrain-trap rect {
+  fill: var(--danger);
+  fill-opacity: 0.16;
+  stroke: var(--danger);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-trap text {
+  fill: var(--danger-hi);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.terrain-trap-hidden rect {
+  fill-opacity: 0.08;
+  stroke-opacity: 0.6;
+}
+.terrain-trap-disarmed rect {
+  fill: var(--text-muted);
+  stroke: var(--text-muted);
+}
+.terrain-trap-disarmed text {
+  fill: var(--text-muted);
+}
+/* The ground buttons show a swatch of what they paint. */
+.map-ground-swatch {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: var(--radius-sm);
+}
+.map-ground-water {
+  background: color-mix(in srgb, var(--indigo) 55%, transparent);
+}
+.map-ground-running-water {
+  background: repeating-linear-gradient(90deg, var(--indigo) 0 4px, var(--cyan-hi) 4px 6px);
+}
+.map-ground-ice {
+  background: color-mix(in srgb, var(--cyan-hi) 45%, transparent);
+}
+/* The GM's trap list: each trap's name over its buttons, which wrap at a phone's width. */
+.map-trap-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.map-trap-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.map-trap-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.map-trap-meta {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.map-trap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.map-trap-actions .nh-btn {
+  flex: 1 1 auto;
+}
 
 .token-condition circle {
   fill: color-mix(in srgb, var(--surface-3) 65%, var(--violet));
@@ -639,10 +764,61 @@
   min-width: 0;
   max-width: 100%;
 }
+/* Riding: a controlled ride and an independent one for each mount within reach, or the way off the one it rides. */
+.encounter-mount {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.encounter-mount-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.encounter-mount .nh-btn {
+  min-height: var(--tap-min);
+  max-width: 100%;
+  white-space: normal;
+}
+.encounter-mount-note {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+/* A move or teleport an action granted this turn, on its own line under the modes. */
+.encounter-move-modes-grant {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 .encounter-move-modes .nh-segmented-option {
   flex: none;
   min-height: var(--tap-min);
   white-space: nowrap;
+}
+/* A creature's height in its token menu: the stepper, then the move or the GM's free placement. */
+.encounter-height {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+/* The height badge on a token: how many feet up it is, drawn as a pill at its top right. */
+.token-altitude rect {
+  fill: var(--surface-1);
+  stroke: var(--cyan);
+  stroke-width: 1.5;
+}
+.token-altitude text {
+  fill: var(--text);
+  font-family: var(--font-label);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.token-altitude path {
+  fill: var(--cyan);
 }
 /* A refused move's follow-up: the GM moves it anyway, a player asks the GM. */
 .encounter-move-blocked {
@@ -718,6 +894,34 @@
 .vision-layer.erasing .vision-hit {
   cursor: crosshair;
 }
+/* While an action is aimed, a wall takes a tap as its target: a band narrower than a handle's ring, so a creature
+   standing beside the wall still takes its own tap. */
+.vision-aim-hit {
+  stroke: transparent;
+  stroke-width: 16px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+  cursor: crosshair;
+}
+/* What only the GM learns of a door and a wall: a square on the handle of a door held shut, a violet ring on a secret
+   door, and the hit points of a wall or door that is an object. */
+.vision-door-lock {
+  fill: var(--violet-hi);
+  pointer-events: none;
+}
+.vision-wall-door.secret .vision-door-ring {
+  stroke: var(--violet-hi);
+  stroke-dasharray: 3 2;
+}
+.vision-object-hp {
+  fill: var(--violet-hi);
+  font-family: var(--font-numeric);
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--void);
+  stroke-width: 3px;
+  pointer-events: none;
+}
 .vision-light-dim,
 .vision-light-bright {
   fill: var(--violet);
@@ -740,6 +944,52 @@
   stroke: var(--void);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+}
+/* A flame set on the map and snuffed out: a hollow glyph until it is lit again. */
+.vision-light.out .vision-light-glyph {
+  fill: var(--void);
+  stroke: var(--violet-hi);
+}
+/* The GM's painted areas of light and obscurement, and the one being dragged: violet, shaded darker the less light
+   or sight they leave. */
+.vision-area,
+.vision-area-preview {
+  fill: var(--violet);
+  fill-opacity: 0.08;
+  stroke: var(--violet-hi);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.vision-area-dim,
+.vision-area-lightly-obscured {
+  fill-opacity: 0.16;
+}
+.vision-area-dark,
+.vision-area-heavily-obscured {
+  fill-opacity: 0.26;
+}
+.vision-area-magical-darkness {
+  fill: var(--void);
+  fill-opacity: 0.45;
+}
+/* A creature a player's character senses without seeing it (Divine Sense): a dashed ring and its creature type, in
+   the information hue, above the dark. */
+.vision-sensed circle {
+  fill: color-mix(in srgb, var(--indigo) 22%, transparent);
+  stroke: var(--indigo);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+.vision-sensed text {
+  fill: var(--indigo-text);
+  font-family: var(--font-label);
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--void);
+  stroke-width: 3px;
 }
 
 /* A monster's number among its kind sits on a square badge at the token's top left. Every list shows the same number. */

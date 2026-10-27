@@ -67,7 +67,19 @@
       "uses": {
         "limit": 1,
         "per": "long-rest"
-      }
+      },
+      "replaces": [
+        {
+          "offer": "feature:magic-initiate-cleric",
+          "when": "level-up",
+          "amount": 1
+        },
+        {
+          "offer": "feature:magic-initiate-cleric/2",
+          "when": "level-up",
+          "amount": 1
+        }
+      ]
     }
   },
   {
@@ -116,7 +128,19 @@
       "uses": {
         "limit": 1,
         "per": "long-rest"
-      }
+      },
+      "replaces": [
+        {
+          "offer": "feature:magic-initiate-druid",
+          "when": "level-up",
+          "amount": 1
+        },
+        {
+          "offer": "feature:magic-initiate-druid/2",
+          "when": "level-up",
+          "amount": 1
+        }
+      ]
     }
   },
   {
@@ -165,7 +189,19 @@
       "uses": {
         "limit": 1,
         "per": "long-rest"
-      }
+      },
+      "replaces": [
+        {
+          "offer": "feature:magic-initiate-wizard",
+          "when": "level-up",
+          "amount": 1
+        },
+        {
+          "offer": "feature:magic-initiate-wizard/2",
+          "when": "level-up",
+          "amount": 1
+        }
+      ]
     }
   },
   {
@@ -269,7 +305,25 @@
           "str",
           "dex"
         ]
-      }
+      },
+      "modifiers": [
+        {
+          "type": "roll-mode",
+          "roll": "attack",
+          "mode": "advantage",
+          "when": [
+            {
+              "type": "on-attack-roll"
+            },
+            {
+              "type": "versus-marked",
+              "tags": [
+                "grapple"
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   {
@@ -303,13 +357,7 @@
             {
               "type": "attack-kind-is",
               "kinds": [
-                "ranged"
-              ]
-            },
-            {
-              "type": "weapon-property-is",
-              "properties": [
-                "ammunition"
+                "ranged-weapon-kind"
               ]
             }
           ]
@@ -365,6 +413,23 @@
       "description": "When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.",
       "tags": [
         "fighting-style"
+      ],
+      "modifiers": [
+        {
+          "type": "damage-die-minimum",
+          "minimum": 3,
+          "when": [
+            {
+              "type": "on-damage-roll"
+            },
+            {
+              "type": "attack-kind-is",
+              "kinds": [
+                "two-handed"
+              ]
+            }
+          ]
+        }
       ]
     }
   },
@@ -424,7 +489,25 @@
       "uses": {
         "limit": 1,
         "per": "own-turn"
-      }
+      },
+      "actions": [
+        {
+          "id": "boon-of-combat-prowess",
+          "name": "Peerless Aim",
+          "activation": "other",
+          "description": "When you miss with an attack roll, you can hit instead. Once you use this benefit, you can't use it again until the start of your next turn.",
+          "damage": [],
+          "answer": {
+            "rolls": [
+              "attack"
+            ],
+            "when": "failure",
+            "effect": {
+              "kind": "hit"
+            }
+          }
+        }
+      ]
     }
   },
   {
@@ -494,7 +577,31 @@
       "uses": {
         "limit": 1,
         "per": "encounter"
-      }
+      },
+      "actions": [
+        {
+          "id": "boon-of-fate",
+          "name": "Improve Fate",
+          "activation": "other",
+          "description": "When you or another creature within 60 feet of you succeeds on or fails a D20 Test, roll 2d4 and apply the total as a bonus or penalty to the d20 roll. Once you use it, you can't use it again until you roll Initiative or finish a Short or Long Rest.",
+          "damage": [],
+          "answer": {
+            "rolls": [
+              "attack",
+              "save",
+              "check",
+              "death-save"
+            ],
+            "whose": "any",
+            "rangeFeet": 60,
+            "when": "any",
+            "effect": {
+              "kind": "add-or-subtract",
+              "amount": "2d4"
+            }
+          }
+        }
+      ]
     }
   },
   {
@@ -523,7 +630,23 @@
           "str",
           "dex"
         ]
-      }
+      },
+      "modifiers": [
+        {
+          "type": "ignores-resistance",
+          "damageTypes": [
+            "bludgeoning",
+            "piercing",
+            "slashing"
+          ]
+        },
+        {
+          "type": "extra-damage",
+          "abilityScore": "increased",
+          "doubleOnCritical": false,
+          "when": [{ "type": "on-natural-20" }]
+        }
+      ]
     }
   },
   {
@@ -577,6 +700,31 @@
       "tags": [
         "epic-boon"
       ],
+      "actions": [
+        {
+          "id": "merge-with-shadows",
+          "name": "Merge with Shadows",
+          "activation": "bonus-action",
+          "description": "While within Dim Light or Darkness, you give yourself the Invisible condition. The condition ends on you immediately after you take an action, a Bonus Action, or a Reaction.",
+          "damage": [],
+          "sight": {
+            "inDimLightOrDarkness": true
+          },
+          "grants": {
+            "name": "Merge with Shadows",
+            "tags": [
+              "until-next-action"
+            ],
+            "target": "self",
+            "duration": {
+              "type": "manual"
+            },
+            "conditions": [
+              "invisible"
+            ]
+          }
+        }
+      ],
       "choice": {
         "kind": "ability-score",
         "choose": 1,
@@ -609,6 +757,13 @@
       "description": "You gain the following benefits. Ability Score Increase: Increase one ability score of your choice by 1, to a maximum of 30. Truesight: You have Truesight with a range of 60 feet.",
       "tags": [
         "epic-boon"
+      ],
+      "modifiers": [
+        {
+          "type": "sense",
+          "sense": "truesight",
+          "feet": 60
+        }
       ],
       "choice": {
         "kind": "ability-score",

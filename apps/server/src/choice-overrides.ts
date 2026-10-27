@@ -1,4 +1,10 @@
-import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
+import {
+  CatalogChoiceError,
+  resolveCatalogChoice,
+  type CatalogChoiceCatalogs,
+  type CatalogChoiceOption
+} from "@vtt/domain";
+import { spellPickFits } from "./character-offers.js";
 import { normalizeDamageType } from "@vtt/rules-5e";
 import type { Actor, ActorDefinition } from "@vtt/schemas";
 import type { ContentView } from "./content-library.js";
@@ -12,13 +18,23 @@ import type { ContentView } from "./content-library.js";
 type ReplaceableOption = Readonly<{
   id: string;
   name?: string;
-  grants?: Readonly<{ spells?: readonly unknown[] }>;
+  grants?: Readonly<{ spells?: readonly unknown[] } & Record<string, unknown>>;
+  modifiers?: readonly unknown[];
+  actions?: readonly unknown[];
+  effects?: readonly unknown[];
   requires?: Readonly<{ offer: string; id: string }>;
 }>;
 type ReplaceableChoice = Readonly<{
+  kind?: string;
+  choose?: number;
   from?: readonly string[];
   fromCatalog?: string;
   options?: ReadonlyArray<ReplaceableOption>;
+  minSpellLevel?: number;
+  maxSpellLevel?: number;
+  castingTime?: string;
+  ritual?: true;
+  fromSpellbook?: true;
 }>;
 
 /** The rider block as this module needs it; the fields read are named explicitly. */
@@ -28,12 +44,13 @@ type ReplaceableRecord = Readonly<{
   replaces?: ReadonlyArray<Readonly<{ offer: string; when: string; amount: number }>>;
   choice?: ReplaceableChoice;
   choices?: ReadonlyArray<ReplaceableChoice>;
+  extraPicks?: ReadonlyArray<Readonly<{ offer: string }>>;
 }>;
 
 /** One offer this character may re-choose on a rest, with the answers that are legal for it. */
 export type ReplaceableOffer = Readonly<{
   offer: string;
-  /** The rest that clears the override. A `short-rest` clause is satisfied by a Long Rest too. */
+  /** The rest after which it may be re-made. A `short-rest` clause is satisfied by a Long Rest too. */
   per: "short-rest" | "long-rest";
   /** The feature's display name, for the refusal message and the GM's log line. */
   label: string;
@@ -43,23 +60,68 @@ export type ReplaceableOffer = Readonly<{
   /** The build reads this answer (its options grant spells, or another pick depends on it), so a re-choice is
    *  written to the ledger and the sheet rebuilt, and is never kept as an override. */
   rebuilds: boolean;
+  /** A pick of several answers (Weapon Mastery's weapon kinds): each re-choice swaps one held answer for another, up
+   *  to `swaps` of them a rest. Always written to the ledger. */
+  multi: boolean;
+  swaps: number;
+  /** The kind of the ledger rows answering it, which tells a feature's picks of different kinds apart (Pact of the
+   *  Tome's cantrips and rituals). */
+  kind: string | null;
 }>;
 
-/** Every option a choice offers, from whichever sources it names. */
-function optionsOf(choice: ReplaceableChoice, catalogs: CatalogChoiceCatalogs): Array<{ id: string; name: string }> {
+/** Every option a choice offers, from whichever sources it names, within its spell level window, casting time and
+ *  Ritual tag, and from the spellbook where it says so. */
+function optionsOf(
+  choice: ReplaceableChoice,
+  catalogs: CatalogChoiceCatalogs,
+  spellbook: ReadonlySet<string> | undefined
+): Array<{ id: string; name: string }> {
   const named = choice.options
     ? choice.options.map((option) => ({ id: option.id, name: option.name ?? option.id }))
     : (choice.from ?? []).map((id) => ({ id, name: id }));
   if (!choice.fromCatalog) return named;
+  let resolved: CatalogChoiceOption[] = [];
   try {
-    const resolved = resolveCatalogChoice(choice.fromCatalog, catalogs);
-    const seen = new Set(named.map((option) => option.id));
-    return [...named, ...resolved.filter((option) => !seen.has(option.id))];
+    resolved = resolveCatalogChoice(choice.fromCatalog, catalogs);
   } catch (error) {
     // A catalog gap leaves the bespoke options standing, as in the builder.
     if (!(error instanceof CatalogChoiceError)) throw error;
-    return named;
   }
+  const fits = spellPickFits(choice, catalogs);
+  const seen = new Set(named.map((option) => option.id));
+  return [
+    ...named,
+    ...resolved.filter(
+      (option) =>
+        !seen.has(option.id) &&
+        (option.level === undefined ||
+          ((choice.minSpellLevel === undefined || option.level >= choice.minSpellLevel) &&
+            (choice.maxSpellLevel === undefined || option.level <= choice.maxSpellLevel))) &&
+        (fits === null || fits(option.id)) &&
+        (choice.fromSpellbook !== true || spellbook === undefined || spellbook.has(option.id))
+    )
+  ];
+}
+
+/** An option a rest-time override can stand in for: one whose only mechanics are the damage defences
+ *  `choiceOverrideDefenses` reads at damage time (Fiendish Resilience). Anything else the build reads off the chosen
+ *  option (a modifier, an action, its being on the sheet), so changing it rebuilds. */
+const DEFENCE_GRANTS = new Set(["damageResistances", "damageImmunities", "when"]);
+function overridable(choice: ReplaceableChoice): boolean {
+  const options = choice.options ?? [];
+  return (
+    options.length > 0 &&
+    options.every(
+      (option) =>
+        (option.modifiers?.length ?? 0) === 0 &&
+        (option.actions?.length ?? 0) === 0 &&
+        (option.effects?.length ?? 0) === 0 &&
+        Object.entries(option.grants ?? {}).every(
+          ([key, value]) => DEFENCE_GRANTS.has(key) || (Array.isArray(value) && value.length === 0)
+        ) &&
+        Object.values(option.grants ?? {}).some((value) => Array.isArray(value) && value.length > 0)
+    )
+  );
 }
 
 /** Whether another pick this character holds is gated on `offer`'s answer (Nature's Ward and the later land spells
@@ -72,35 +134,108 @@ function hasDependents(carriers: readonly ReplaceableRecord[], offer: string): b
   );
 }
 
-/** Every rest-time re-choice this built character has. Empty for monsters, PDF imports, and content without `replaces`. */
-export function replaceableOffers(definition: ActorDefinition | undefined, library: ContentView): ReplaceableOffer[] {
+/** A class's cantrips as a rest-time pick of several, keyed `class-cantrips:<classId>`: any cantrip on its list. */
+function classCantripOffer(
+  ref: Readonly<{ kind: string; sourceId: string }>,
+  clause: Readonly<{ when: string; amount: number }>,
+  library: ContentView
+): ReplaceableOffer | null {
+  if (ref.kind !== "class" || (clause.when !== "short-rest" && clause.when !== "long-rest")) return null;
+  const record = library.classRecord(ref.sourceId);
+  const listId = record?.spellcasting?.spellListId ?? ref.sourceId;
+  let cantrips: Array<{ id: string; name: string }> = [];
+  try {
+    cantrips = resolveCatalogChoice(`${listId}-spells`, library.catalogChoiceCatalogs()).filter(
+      (option) => option.level === 0
+    );
+  } catch (error) {
+    if (!(error instanceof CatalogChoiceError)) throw error;
+  }
+  if (cantrips.length === 0) return null;
+  return {
+    offer: `class-cantrips:${ref.sourceId}`,
+    per: clause.when,
+    label: `${record?.name ?? ref.sourceId} cantrips`,
+    options: cantrips.map((option) => option.id),
+    optionNames: Object.fromEntries(cantrips.map((option) => [option.id, option.name])),
+    rebuilds: true,
+    multi: true,
+    swaps: clause.amount,
+    kind: "cantrip"
+  };
+}
+
+/** Every rest-time re-choice this built character has. Empty for monsters, PDF imports, and content without `replaces`.
+ *  `spellbook` narrows a pick from the spellbook (Spell Mastery) to the spells the character's book holds. */
+export function replaceableOffers(
+  definition: ActorDefinition | undefined,
+  library: ContentView,
+  spellbook?: ReadonlySet<string>
+): ReplaceableOffer[] {
   const carriers = definition?.character?.features ?? [];
-  const records = carriers
-    .map((ref) => library.featureRecord(ref) as ReplaceableRecord | undefined)
-    .filter((record): record is ReplaceableRecord => record !== undefined);
+  const held = carriers
+    .map((ref) => ({ ref, record: library.featureRecord(ref) as ReplaceableRecord | undefined }))
+    .filter(
+      (entry): entry is { ref: (typeof carriers)[number]; record: ReplaceableRecord } => entry.record !== undefined
+    );
+  const records = held.map((entry) => entry.record);
   const offers: ReplaceableOffer[] = [];
-  for (const record of records) {
+  for (const { ref, record } of held) {
     for (const clause of record.replaces ?? []) {
       // Only rest clauses become runtime state; build-time replacement belongs to the ledger.
       if (clause.when !== "short-rest" && clause.when !== "long-rest") continue;
+      // A class's cantrips swapped on a rest (a Wizard's "Whenever you finish a Long Rest, you can replace one of
+      // your cantrips from this feature with another Wizard cantrip").
+      if (clause.offer === "class-cantrips") {
+        const swap = classCantripOffer(ref, clause, library);
+        if (swap && !offers.some((existing) => existing.offer === swap.offer)) offers.push(swap);
+        continue;
+      }
       if (offers.some((existing) => existing.offer === clause.offer)) continue;
       // The options are the offer's own list: a re-choice can't reach past what the original pick could choose.
       const target =
         clause.offer.startsWith("feature:") && clause.offer.slice("feature:".length).replace(/\/\d+$/, "") === record.id
           ? record
           : (records.find((candidate) => `feature:${candidate.id}` === clause.offer) ?? null);
-      const choice = target?.choice ?? target?.choices?.[0];
+      // A clause on a feature of several picks re-makes one answer across those of its first pick's kind (Spell
+      // Mastery's "replace one of those spells"); one naming a later pick (`/2`) re-makes that pick.
+      const nth = /\/(\d+)$/.exec(clause.offer);
+      const blocks = target?.choices?.length
+        ? nth
+          ? [target.choices[Number(nth[1]) - 1]].filter((block) => block !== undefined)
+          : target.choices.filter((block) => block.kind === target.choices![0]!.kind)
+        : target?.choice
+          ? [target.choice]
+          : [];
+      const choice = blocks[0];
       if (!choice) continue; // a clause naming an offer with no option list re-chooses nothing
-      const options = optionsOf(choice, library.catalogChoiceCatalogs());
+      const seen = new Set<string>();
+      const options = blocks
+        .flatMap((block) => optionsOf(block, library.catalogChoiceCatalogs(), spellbook))
+        .filter((option) => !seen.has(option.id) && seen.add(option.id) !== undefined);
+      const multi =
+        blocks.length > 1 ||
+        (choice.choose ?? 1) > 1 ||
+        choice.kind === "weapon-mastery" ||
+        (target!.extraPicks ?? []).some((grant) => grant.offer === clause.offer);
       offers.push({
         offer: clause.offer,
         per: clause.when,
-        label: target!.name,
+        // A feature asking picks of several kinds names which ("Pact of the Tome: cantrips").
+        label:
+          new Set((target!.choices ?? []).map((block) => block.kind)).size > 1 && choice.kind
+            ? `${target!.name}: ${choice.kind.replace(/-/g, " ")}s`
+            : target!.name,
         options: options.map((option) => option.id),
         optionNames: Object.fromEntries(options.map((option) => [option.id, option.name])),
         rebuilds:
+          multi ||
+          !overridable(choice) ||
           (choice.options ?? []).some((option) => (option.grants?.spells?.length ?? 0) > 0) ||
-          hasDependents(records, clause.offer)
+          hasDependents(records, clause.offer),
+        multi,
+        swaps: clause.amount,
+        kind: choice.kind ?? null
       });
     }
   }

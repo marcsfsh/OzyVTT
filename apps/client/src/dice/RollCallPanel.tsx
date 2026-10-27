@@ -4,6 +4,7 @@ import { Button, Input, RevealSwitch, SegmentedControl, Select, useToast } from 
 import { useSkillCatalog } from "../content/catalogs";
 import { command } from "../lib/command";
 import { ABILITY_WORDS, callLabel, resultWords } from "./roll-call-words";
+import { CallSituations, toggled } from "./CallSituations";
 import "./roll-calls.css";
 
 const ABILITY_IDS = Object.keys(ABILITY_WORDS) as AbilityId[];
@@ -22,6 +23,11 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
   const [skill, setSkill] = useState("perception");
   const [dc, setDc] = useState("");
   const [blind, setBlind] = useState(false);
+  // What the check relies on: a Blinded character fails one that needs sight, a Deafened one one that needs hearing.
+  const [sense, setSense] = useState<"" | "sight" | "hearing">("");
+  // The creature a check is about (Insight into a sphinx's intentions), whose traits can weigh on it.
+  const [about, setAbout] = useState("");
+  const others = state.actors.filter((actor) => actor.kind !== "player-character" && !actor.archived);
   // Characters left out of the next call; everyone is in until the GM taps them out.
   const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -64,6 +70,8 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
       kind,
       ability,
       ...(kind === "check" && skill ? { skill } : {}),
+      ...(kind === "check" && sense ? { sense } : {}),
+      ...(kind === "check" && about ? { aboutActorId: about } : {}),
       ...(dcValue !== undefined ? { dc: dcValue } : {}),
       actorIds: chosen.map((actor) => actor.id),
       ...(kind === "check" && blind ? { blind: true } : {})
@@ -72,13 +80,21 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
     if (!result.ok) toast(result.message ?? "The call was refused.", { tone: "error" });
   };
 
-  /** The GM rolls a character's part of a call: the check, or the save the call opened. */
+  // The situations the GM turned on for each character's check, by call and character.
+  const [situations, setSituations] = useState<Readonly<Record<string, readonly string[]>>>({});
+  const pickedFor = (callId: string, actorId: string) => situations[`${callId}:${actorId}`] ?? [];
+  /** The GM rolls a character's part of a call: the check, with the situations turned on, or the save it opened. */
   const rollFor = async (call: RollCall, actorId: string, saveId: string | undefined) => {
     setBusy(true);
+    const picked = pickedFor(call.id, actorId);
     const result =
       call.kind === "save" && saveId
         ? await command("save:answer", { saveId, method: "roll", commit: true })
-        : await command("roll-call:answer", { callId: call.id, actorId });
+        : await command("roll-call:answer", {
+            callId: call.id,
+            actorId,
+            ...(picked.length > 0 ? { situations: [...picked] } : {})
+          });
     setBusy(false);
     if (!result.ok) toast(result.message ?? "That roll was refused.", { tone: "error" });
   };
@@ -128,6 +144,29 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
                   {skills.map((entry) => (
                     <option key={entry.id} value={entry.id}>
                       {entry.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            )}
+            {kind === "check" && (
+              <label>
+                Needs
+                <Select value={sense} onChange={(event) => setSense(event.target.value as "" | "sight" | "hearing")}>
+                  <option value="">Nothing more</option>
+                  <option value="sight">Sight</option>
+                  <option value="hearing">Hearing</option>
+                </Select>
+              </label>
+            )}
+            {kind === "check" && others.length > 0 && (
+              <label>
+                About
+                <Select value={about} onChange={(event) => setAbout(event.target.value)}>
+                  <option value="">None</option>
+                  {others.map((actor) => (
+                    <option key={actor.id} value={actor.id}>
+                      {actor.name}
                     </option>
                   ))}
                 </Select>
@@ -205,6 +244,17 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
                     ) : (
                       <>
                         <span className="roll-call-waiting">Waiting</span>
+                        <CallSituations
+                          situations={entry.situations}
+                          picked={pickedFor(open.id, entry.actorId)}
+                          busy={busy}
+                          onToggle={(situation) =>
+                            setSituations((current) => ({
+                              ...current,
+                              [`${open.id}:${entry.actorId}`]: toggled(pickedFor(open.id, entry.actorId), situation)
+                            }))
+                          }
+                        />
                         <Button
                           size="sm"
                           variant="secondary"

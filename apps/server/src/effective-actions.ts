@@ -1,7 +1,8 @@
+import { picksFor, potentRangeFeet, potentVitality } from "./class-features.js";
 import type { Actor } from "@vtt/domain";
 import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
-import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
-import { withTakenActions } from "./builtin-actions.js";
+import { abilityModifier, collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
+import { withEmpoweredStrikes, withTakenActions } from "./builtin-actions.js";
 import { atSpellUpLevel } from "./lasting-spells.js";
 import {
   deriveEquipment,
@@ -9,6 +10,13 @@ import {
   type EquipmentCatalog,
   type EquipmentDerivation
 } from "./equipment-derivation.js";
+import { spellbookRituals } from "./ritual-adept.js";
+import { spellClassOf } from "./class-features.js";
+import { grantedItemActions, grantedSpellActions } from "./granted-actions.js";
+import { storedCastActions } from "./stored-casts.js";
+import { divineInterventionCasts } from "./divine-intervention.js";
+import { withHeadCount } from "./death-traits.js";
+import { withPactWeaponAttacks } from "./pact-weapon.js";
 
 /** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
@@ -22,14 +30,50 @@ export function effectiveActions(
   const declared = definition?.actions ?? [];
   // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a level 3 spell slot).
   const taken = declared.map((action) =>
-    withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition)
+    withHeadCount(
+      withPotentVitality(
+        withPotentRange(
+          withEmpoweredStrikes(
+            withAgonizingBlast(
+              withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
+              definition
+            ),
+            definition
+          ),
+          definition,
+          catalog
+        ),
+        definition,
+        catalog
+      ),
+      definition,
+      actor
+    )
   );
+  // A Wizard's Ritual Adept casts a ritual from its book that the sheet doesn't list.
+  const rituals = spellbookRituals(definition, actor, catalog);
   // The definition's own list when nothing changed, so a caller holding it sees the same array.
-  const base = taken.every((action, index) => action === declared[index]) ? declared : taken;
+  const unchanged = taken.every((action, index) => action === declared[index]);
+  // What another creature's spell lets this one do while it lasts (Dragon's Breath's exhale).
+  const granted = actor
+    ? [
+        ...grantedSpellActions(actor, catalog),
+        ...storedCastActions(actor, catalog),
+        ...grantedItemActions(actor, definition, catalog)
+      ]
+    : [];
+  // A Cleric's Divine Intervention casts any Cleric spell of level 5 or lower.
+  const divine = divineInterventionCasts(definition, catalog);
+  const base =
+    unchanged && rituals.length === 0 && granted.length === 0 && divine.length === 0
+      ? declared
+      : [...taken, ...rituals, ...granted, ...divine];
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
-  return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor));
+  return [...base, ...derivation.actions].map((action) =>
+    withPactWeaponAttacks(withStandingRiders(action, derivation, actor, definition), actor, definition)
+  );
 }
 
 /** SRD Eldritch Spear: the cantrip picked for it reaches 30 feet farther for each Warlock level. Applied to the spell
@@ -37,13 +81,53 @@ export function effectiveActions(
 function withEldritchSpear(action: ActorAction, definition: ActorDefinition | undefined): ActorAction {
   const rangeFeet = action.attack?.rangeFeet;
   if (rangeFeet === undefined || action.spellId === undefined) return action;
-  const character = definition?.character;
-  const picked = character?.choices?.find(
-    (choice) => choice.kind === "cantrip" && choice.payload?.featureId === "eldritch-spear"
-  )?.id;
-  const level = character?.classes.find((entry) => entry.id === "warlock")?.level ?? 0;
-  if (picked !== action.spellId || level === 0) return action;
+  const level = definition?.character?.classes.find((entry) => entry.id === "warlock")?.level ?? 0;
+  if (!picksFor(definition, "eldritch-spear", "cantrip").includes(action.spellId) || level === 0) return action;
   return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 30 * level } };
+}
+
+/** SRD Agonizing Blast: "Choose one of your known Warlock cantrips that deals damage. You can add your Charisma
+ *  modifier to that spell's damage rolls", in the spell's own damage type, for each cantrip picked for it. Folded into
+ *  the first damage roll, so a Critical Hit doesn't double it. */
+function withAgonizingBlast(action: ActorAction, definition: ActorDefinition | undefined): ActorAction {
+  if (action.spellId === undefined || action.damage.length === 0 || !definition) return action;
+  if (!picksFor(definition, "agonizing-blast", "cantrip").includes(action.spellId)) return action;
+  const charisma = abilityModifier(definition.abilityScores.cha);
+  if (charisma === 0) return action;
+  return {
+    ...action,
+    damage: action.damage.map((part, index) =>
+      index === 0 ? { ...part, formula: withFlatBonus(part.formula, charisma) } : part
+    )
+  };
+}
+
+/** SRD Improved Elemental Fury, Improved Potent Spellcasting (Druid 15): "When you cast a Druid cantrip with a range of
+ *  10 feet or greater, the spell's range increases by 300 feet." Applied to the spell attack's range; a cantrip with
+ *  no attack has it added where its targets are checked (`resolution/spell-targets.ts`). */
+function withPotentRange(
+  action: ActorAction,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): ActorAction {
+  const rangeFeet = action.attack?.rangeFeet;
+  if (rangeFeet === undefined || rangeFeet < 10 || action.spellId === undefined) return action;
+  const spell = catalog?.spellRecord?.(action.spellId);
+  if (potentRangeFeet(definition, spell) === 0) return action;
+  return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 300 } };
+}
+
+/** SRD Improved Blessed Strikes, Potent Spellcasting: "When you cast a Cleric cantrip and deal damage to a creature
+ *  with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of
+ *  Temporary Hit Points equal to twice your Wisdom modifier." */
+function withPotentVitality(
+  action: ActorAction,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): ActorAction {
+  if (action.spellId === undefined || action.damage.length === 0 || action.vitality) return action;
+  const amount = potentVitality(definition, catalog?.spellRecord?.(action.spellId));
+  return amount > 0 ? { ...action, vitality: { rangeFeet: 60, amount } } : action;
 }
 
 /** A later action of a spell its caster has up at a higher level, rolled at that level; anything else unchanged. */
@@ -53,16 +137,31 @@ function atLevelUp(action: ActorAction, actor: Actor | undefined, catalog: Equip
 }
 
 /** Folds the standing riders that apply to one action into the numbers the resolver reads. */
-export function withStandingRiders(action: ActorAction, derivation: EquipmentDerivation, actor: Actor): ActorAction {
+export function withStandingRiders(
+  action: ActorAction,
+  derivation: EquipmentDerivation,
+  actor: Actor,
+  definition?: ActorDefinition
+): ActorAction {
   const sourceItemId = sourceItemOf(action, derivation, actor.inventory);
-  const riders = collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId });
-  if (riders.length === 0) return action;
+  const all = collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId });
+  if (all.length === 0) return action;
+  // A spellcasting rider that names a class reaches only the spells cast as that class (Innate Sorcery's DC).
+  const spellClass = spellClassOf(definition, action.spellId);
+  const riders = all.filter(
+    (rider) =>
+      (rider.modifier.type !== "spell-save-dc" && rider.modifier.type !== "spell-attack-bonus") ||
+      rider.modifier.classId === undefined ||
+      rider.modifier.classId === spellClass
+  );
 
   // A wand of the war mage's bonus to spell attack rolls lands on every spell attack its bearer makes.
   const attackBonus =
     sumRiders(riders, "attack-bonus") +
     (action.spellId !== undefined && action.attack ? sumRiders(riders, "spell-attack-bonus") : 0);
-  const damageBonus = sumRiders(riders, "damage-bonus");
+  // What rides a hit adds dice to the weapon's damage, which carries the weapon's own bonus once (a Staff of
+  // Striking's charge is 1d6 Force, not 1d6 + 3).
+  const damageBonus = action.ridesHit ? 0 : sumRiders(riders, "damage-bonus");
   const critDice = riders.reduce(
     (total, rider) => (rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total),
     0

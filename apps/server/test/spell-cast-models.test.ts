@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { castAction } from "../src/item-actions.js";
+import { answerSave } from "../src/saving-throws.js";
 import { ALLY, build, clericInput, druidInput, fight, FOE, FOE2, view, wizardInput } from "./spell-casters.js";
 
 // What each cast does, per SRD 5.2.1: damage dealt when a spell appears, saves made on later turns,
@@ -50,6 +51,70 @@ describe("damage when the spell appears", () => {
   });
 });
 
+describe("Heat Metal's object", () => {
+  const heated = (rows: ReadonlyArray<Record<string, unknown>>) => {
+    const table = fight(druid);
+    const foe = table.state.actors.find((actor) => actor.id === FOE)!;
+    foe.inventory = rows.map((row) => ({ quantity: 1, attuned: false, ...row })) as typeof foe.inventory;
+    table.resolve("spell-heat-metal", {}, [4, 4]);
+    const save = table.state.combat.pendingSaves[0]!;
+    answerSave(
+      table.state,
+      "cmd-heat",
+      save.id,
+      "manual",
+      1,
+      true,
+      { role: "gm" },
+      {
+        random: () => 3,
+        newRollId: () => crypto.randomUUID(),
+        sessionId: "30000000-0000-4000-8000-00000000000a",
+        role: "gm",
+        now: () => "2026-10-16T00:00:00.000Z",
+        resolveDefinition: () => undefined
+      }
+    );
+    return table.state.actors.find((actor) => actor.id === FOE)!;
+  };
+
+  it("is dropped from the hand on a failed save, still carried", () => {
+    const foe = heated([
+      {
+        id: "scimitar",
+        name: "Scimitar",
+        equipped: true,
+        weapon: { damageDice: "1d6", damageType: "slashing", properties: [] }
+      }
+    ]);
+    expect(foe.inventory).toEqual([expect.objectContaining({ id: "scimitar", equipped: false, quantity: 1 })]);
+  });
+
+  it("stays on when it is worn armor, and the failure brings Disadvantage until the caster's next turn", () => {
+    const foe = heated([
+      {
+        id: "plate-armor",
+        name: "Plate Armor",
+        equipped: true,
+        armor: {
+          acBase: 18,
+          addDexModifier: false,
+          dexModifierCap: null,
+          stealthDisadvantage: true,
+          strengthRequired: 15
+        }
+      }
+    ]);
+    expect(foe.inventory[0]).toMatchObject({ equipped: true });
+    expect(foe.effects).toEqual([
+      expect.objectContaining({
+        name: "Heat Metal: wearing the red-hot object",
+        duration: expect.objectContaining({ type: "until-source-next-turn" })
+      })
+    ]);
+  });
+});
+
 describe("a save made later, not on the cast", () => {
   it("prompts no save when Spirit Guardians is cast, and leaves the area the server runs around the caster", () => {
     const { resolve, state } = fight(cleric);
@@ -62,6 +127,7 @@ describe("a save made later, not on the cast", () => {
 
   it("resolves the later save against a creature: Wisdom, 3d8 Radiant, half on a success", () => {
     const { resolve, state } = fight(cleric);
+    resolve("spell-spirit-guardians", { targetIds: [] });
     resolve("spell-spirit-guardians-then-save", {}, [3, 3, 3]);
     expect(state.combat.pendingSaves).toEqual([
       expect.objectContaining({ ability: "wis", targetActorId: FOE, proposedDamage: 9, halfOnSuccess: true })
@@ -98,7 +164,9 @@ describe("a failed save's conditions", () => {
 
 describe("a damage type the caster picks", () => {
   it("deals Chromatic Orb's damage as the type picked, and refuses one the spell doesn't offer", () => {
-    const { resolve } = fight(wizard);
+    const { resolve, hero } = fight(wizard);
+    // Its material is "a diamond worth 50+ GP", which the caster must carry.
+    hero.inventory.push({ id: "diamond", name: "Diamond", quantity: 1, equipped: false, attuned: false });
     expect(resolve("spell-chromatic-orb", { damageType: "fire" }, [15, 3, 3, 3]).damage[0]).toMatchObject({
       type: "fire",
       total: 9
@@ -106,6 +174,36 @@ describe("a damage type the caster picks", () => {
     const again = fight(wizard);
     expect(() => again.resolve("spell-chromatic-orb", { damageType: "radiant" }, [15])).toThrowError(
       /can't deal radiant damage/
+    );
+  });
+});
+
+describe("Chromatic Orb's leap", () => {
+  const withDiamond = (table: ReturnType<typeof fight>) =>
+    table.hero.inventory.push({ id: "diamond", name: "Diamond", quantity: 1, equipped: false, attuned: false });
+
+  it("leaps on matching d8s to another creature within 30 feet, at no cost, of the same type, each creature once", () => {
+    const table = fight(wizard, { distance: 25 });
+    withDiamond(table);
+    // d20 15, then the d8s 3, 3, 5: two match.
+    table.resolve("spell-chromatic-orb", { damageType: "fire" }, [15, 3, 3, 5]);
+    const slots = table.hero.spellSlots!.find((slot) => slot.level === 1)!.remaining;
+    expect(() => table.resolve("spell-chromatic-orb", { targetIds: [FOE] }, [15, 1, 2, 4])).toThrowError(
+      /already struck/
+    );
+    const leap = table.resolve("spell-chromatic-orb", { targetIds: [FOE2] }, [15, 1, 1, 4]);
+    expect(leap.damage[0]).toMatchObject({ type: "fire" });
+    expect(table.hero.spellSlots!.find((slot) => slot.level === 1)!.remaining).toBe(slots);
+    // A level 1 slot leaps once: matching dice again open no second leap.
+    expect(table.state.combat.turn.actionInstance?.components["spell-chromatic-orb"]).toBe(0);
+  });
+
+  it("leaps only within 30 feet of the last target", () => {
+    const table = fight(wizard, { distance: 40 });
+    withDiamond(table);
+    table.resolve("spell-chromatic-orb", {}, [15, 3, 3, 5]);
+    expect(() => table.resolve("spell-chromatic-orb", { targetIds: [FOE2] }, [15, 1, 2, 4])).toThrowError(
+      /within 30 feet/
     );
   });
 });
@@ -140,12 +238,15 @@ describe("Sacred Flame", () => {
 describe("a spell that takes a minute or more to cast", () => {
   const caster = build(wizardInput(["alarm", "magic-missile"]));
 
-  it("takes the Magic action, with a reminder of the turns and Concentration it needs", () => {
-    const { resolve, action } = fight(caster);
+  it("takes the Magic action, and in a fight the action on each turn of its minute", () => {
+    const { resolve, action, hero } = fight(caster);
     expect(action("spell-alarm").activation).toBe("action");
-    expect(resolve("spell-alarm", { targetIds: [] }).warnings?.join(" ")).toMatch(
-      /Alarm takes 1 minute to cast\. Until then, the caster takes the Magic action on each turn/
-    );
+    expect(
+      resolve("spell-alarm", { targetIds: [] })
+        .tableNarration?.map((line) => line.text)
+        .join(" ")
+    ).toMatch(/begins casting Alarm\. It takes the action on each of .+'s next 9 turns, with Concentration held\./);
+    expect(hero.effects.some((effect) => effect.longCast?.actionId === "spell-alarm")).toBe(true);
   });
 
   it("can't be cast while the caster is Incapacitated", () => {

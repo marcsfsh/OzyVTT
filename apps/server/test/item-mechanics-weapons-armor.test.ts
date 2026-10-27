@@ -106,6 +106,14 @@ function stateWith(inventory: InventoryItem[]): GameState {
 
 const EQUIPMENT = loadEquipment();
 
+/** Chain Mail's armor block, as the bind copies it onto the row. */
+function chainMail() {
+  const { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired } = EQUIPMENT.find(
+    (record) => record.id === "chain-mail"
+  )!.armor!;
+  return { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired };
+}
+
 // The inventory row the weapon bind mints: the magic item's id/name/category and the two booleans,
 // plus the base weapon's block copied from its shipped catalog row (minus `mastery`, which the strict
 // `ItemWeaponSchema` does not carry).
@@ -113,6 +121,7 @@ const boundTo = (magicId: string, baseId: string, over: Record<string, unknown> 
   const base = EQUIPMENT.find((record) => record.id === baseId)?.weapon;
   if (!base) throw new Error(`no shipped equipment row "${baseId}" carries a weapon block to bind`);
   return asPicked(magicId, {
+    baseId,
     weapon: {
       category: base.category,
       damageDice: base.damageDice,
@@ -162,7 +171,8 @@ describe("Armor of Resistance halves a typed damage total", () => {
   const ARMOR = shipped("armor-of-resistance");
   const catalog = catalogOf([ARMOR]);
   const definition = definitionOf();
-  const worn = (equipped = true) => stateWith([asPicked("armor-of-resistance", { equipped })]);
+  const worn = (equipped = true) =>
+    stateWith([asPicked("armor-of-resistance", { equipped, baseId: "chain-mail", armor: chainMail() })]);
 
   it("halves the authored damage type and names the armor on the line", () => {
     const state = worn();
@@ -234,10 +244,8 @@ describe("the armour and shield rows move a real Armor Class", () => {
     // `armor` block. A shield adds the plain shield's +2 from its block on top of its own bonus: Dex 14
     // and no body armor make 10 + 2 + 2 = 14 before the rider. Built, so a Shield alone derives the AC.
     for (const [id, amount] of [
-      ["armor-1", 1],
       ["shield-2", 2 + 2],
-      ["sentinel-shield", 2],
-      ["dwarven-plate", 2]
+      ["sentinel-shield", 2]
     ] as const) {
       const catalog = catalogOf([shipped(id)]);
       const definition = { ...definitionOf(), source: { name: "OzyVTT Character Builder", version: "1" } };
@@ -247,6 +255,19 @@ describe("the armour and shield rows move a real Armor Class", () => {
       setInventoryItem(state, IDS.hero, asPicked(id, { equipped: false }), () => definition, { catalog });
       expect(state.actors[0].armorClass, `${id}: unequipping must be the un-grant`).toBe(12);
     }
+  });
+});
+
+describe("a template armor's magic rides its bound base", () => {
+  it("gives nothing until it is bound, and its bonus on top of the base armor once it is", () => {
+    // SRD Armor, +1: "You have a bonus to Armor Class while wearing this armor." Unbound, it is no armor yet.
+    const catalog = catalogOf([shipped("armor-1"), EQUIPMENT.find((record) => record.id === "chain-mail")!]);
+    const definition = { ...definitionOf(), source: { name: "OzyVTT Character Builder", version: "1" } };
+    const state = stateWith([]);
+    setInventoryItem(state, IDS.hero, asPicked("armor-1"), () => definition, { catalog });
+    expect(state.actors[0].armorClass, "an unbound Armor, +1 must not raise AC").toBe(12);
+    setInventoryItem(state, IDS.hero, asPicked("armor-1", { baseId: "chain-mail" }), () => definition, { catalog });
+    expect(state.actors[0].armorClass, "Chain Mail 16, +1").toBe(17);
   });
 });
 
@@ -322,7 +343,8 @@ describe("the shipped on-hit dice on a bound melee block", () => {
   it("(c) flame-tongue on a longsword: the resolution carries TWO typed entries, slashing + 2d6 fire", () => {
     const definition = definitionOf();
     const catalog = catalogOf([shipped("flame-tongue")]);
-    const state = fight(stateWith([boundTo("flame-tongue", "longsword")]));
+    // Ablaze: its flames are lit on the row (a Bonus Action), which its 2d6 Fire needs.
+    const state = fight(stateWith([boundTo("flame-tongue", "longsword", { lit: true })]));
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-flame-tongue"
     )!;
@@ -440,8 +462,8 @@ describe("the authored riders are present in the shipped bundle", () => {
       mode: "advantage",
       when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
     });
-    expect(shipped("plate-armor-of-etherealness").casts).toContainEqual(
-      expect.objectContaining({ spellId: "etherealness" })
+    expect(shipped("plate-armor-of-etherealness").actions).toContainEqual(
+      expect.objectContaining({ id: "etherealness", grants: expect.objectContaining({ toggles: true }) })
     );
     expect(shipped("armor-of-invulnerability").grants!.damageResistances).toEqual([
       "bludgeoning",
@@ -454,19 +476,27 @@ describe("the authored riders are present in the shipped bundle", () => {
 
   it("pins the re-authored weapon rows BY NAME AND VALUE, and every other weapon row to none", () => {
     // Exactly these weapon rows carry exactly these weapon-scoped riders (by name and value), and any
-    // other weapon row carries none. Magic weapon rows still carry no `weapon` block of their own;
-    // the swing comes from the base weapon at bind time.
+    // other weapon row carries none. Magic weapon rows carry no `weapon` block of their own, the swing coming from
+    // the base weapon at bind time, except the Sun Blade, whose radiant blade is its own Longsword.
     const weapons = MAGIC_ITEMS.filter((row) => row.category === "weapon");
     expect(
-      weapons.filter((row) => row.weapon != null),
+      weapons.filter((row) => row.weapon != null).map((row) => row.id),
       "the premise moved: a weapon row now carries a weapon block"
-    ).toHaveLength(0);
+    ).toEqual(["sun-blade"]);
 
     const AUTHORED: Readonly<Record<string, readonly string[]>> = {
       "weapon-1": ["attack-bonus +1", "damage-bonus +1"],
       "weapon-2": ["attack-bonus +2", "damage-bonus +2"],
       "weapon-3": ["attack-bonus +3", "damage-bonus +3"],
-      "dwarven-thrower": ["attack-bonus +3", "damage-bonus +3"],
+      "dwarven-thrower": [
+        "attack-bonus +3",
+        "damage-bonus +3",
+        "extra-damage 1d8 force",
+        "extra-damage 1d8 force vs giant"
+      ],
+      "energy-bow": ["attack-bonus +1", "damage-bonus +1"],
+      "thunderous-greatclub": ["extra-damage 1d8 thunder"],
+      oathbow: ["extra-damage 3d6 piercing"],
       defender: ["attack-bonus +3", "damage-bonus +3"],
       "vorpal-sword": ["attack-bonus +3", "damage-bonus +3"],
       "holy-avenger": ["attack-bonus +3", "damage-bonus +3", "extra-damage 2d10 radiant vs fiend, undead"],
@@ -481,8 +511,8 @@ describe("the authored riders are present in the shipped bundle", () => {
         "damage-bonus +1",
         "attack-bonus +2 vs construct",
         "damage-bonus +2 vs construct",
-        "damage-bonus +7 on a critical hit",
-        "damage-bonus +7 on a critical hit vs construct"
+        "damage-bonus +7 on a rolled 20",
+        "damage-bonus +7 on a rolled 20 vs construct"
       ],
       "mace-of-disruption": ["extra-damage 2d6 radiant vs fiend, undead"],
       "vicious-weapon": ["extra-damage 2d6 of the weapon's type"],
@@ -491,25 +521,34 @@ describe("the authored riders are present in the shipped bundle", () => {
       "luck-blade": ["attack-bonus +1", "damage-bonus +1"],
       "flame-tongue": ["extra-damage 2d6 fire"],
       "frost-brand": ["extra-damage 1d6 cold"],
-      "sword-of-wounding": ["extra-damage 2d6 necrotic"]
+      "sword-of-wounding": ["extra-damage 2d6 necrotic"],
+      "sword-of-sharpness": ["damage-bonus +7 on a rolled 20", "damage-bonus +7 on a rolled 20"],
+      "sun-blade": ["attack-bonus +2", "damage-bonus +2", "extra-damage 1d8 radiant vs undead"],
+      "sword-of-life-stealing": ["extra-damage 15 necrotic on a rolled 20 vs all but construct, undead"]
     };
     const WEAPON_SCOPED = ["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice", "damage-bonus"];
     type Named = {
       type: string;
       amount?: number;
       formula?: string;
+      flat?: number;
       damageType?: string;
-      when?: ReadonlyArray<{ type: string; creatureTypes?: readonly string[] }>;
+      when?: ReadonlyArray<{ type: string; creatureTypes?: readonly string[]; except?: boolean }>;
     };
     // A gate names when the rider fires: on a critical hit, or against the creature types it names.
     const gateOf = (modifier: Named): string => {
-      const crit = modifier.when?.some((trigger) => trigger.type === "on-critical-hit") ? " on a critical hit" : "";
-      const versus = modifier.when?.find((trigger) => trigger.type === "versus-creature-type")?.creatureTypes;
-      return `${crit}${versus ? ` vs ${versus.join(", ")}` : ""}`;
+      const crit = modifier.when?.some((trigger) => trigger.type === "on-critical-hit")
+        ? " on a critical hit"
+        : modifier.when?.some((trigger) => trigger.type === "on-natural-20")
+          ? " on a rolled 20"
+          : "";
+      const typed = modifier.when?.find((trigger) => trigger.type === "versus-creature-type");
+      const versus = typed?.creatureTypes;
+      return `${crit}${versus ? ` vs ${typed?.except ? "all but " : ""}${versus.join(", ")}` : ""}`;
     };
     const nameOf = (modifier: Named): string =>
       (modifier.type === "extra-damage"
-        ? `extra-damage ${modifier.formula} ${modifier.damageType ?? "of the weapon's type"}`
+        ? `extra-damage ${modifier.formula ?? modifier.flat} ${modifier.damageType ?? "of the weapon's type"}`
         : `${modifier.type} ${(modifier.amount ?? 0) >= 0 ? "+" : ""}${modifier.amount}`) + gateOf(modifier);
     const actual = Object.fromEntries(
       weapons
@@ -533,7 +572,15 @@ describe("the authored riders are present in the shipped bundle", () => {
     // weapon", and `scope: "bearer"` would let two magic weapons in a pack stack. A rider gated on the hit, a
     // critical hit or the target's creature type is the item's own printed condition.
     const printedGate = (trigger: { type: string }) =>
-      ["on-hit", "on-attack-roll", "on-critical-hit", "versus-creature-type"].includes(trigger.type);
+      [
+        "on-hit",
+        "on-attack-roll",
+        "on-critical-hit",
+        "on-natural-20",
+        "versus-creature-type",
+        "attack-kind-is",
+        "versus-marked"
+      ].includes(trigger.type);
     for (const row of weapons) {
       for (const modifier of row.modifiers ?? []) {
         if (!WEAPON_SCOPED.includes(modifier.type)) continue;
@@ -547,23 +594,29 @@ describe("the authored riders are present in the shipped bundle", () => {
     }
   });
 
-  it("leaves every RESERVED item bare, so a later unit finds an unauthored carrier", () => {
-    // Rows whose printed effects need mechanics the engine does not model yet.
-    for (const id of ["sun-blade", "energy-bow", "thunderous-greatclub"]) {
-      const row = shipped(id) as unknown as { modifiers: unknown[]; casts: unknown[]; cursed: boolean };
-      expect(row.modifiers, `${id} is reserved and must carry no modifiers`).toEqual([]);
-      expect(row.casts, `${id} is reserved and must carry no casts`).toEqual([]);
-      expect(row.cursed, `${id} is reserved and must not be cursed`).toBe(false);
-    }
+  it("binds the Energy Bow to its bow with Force arrows and none to spend, and sets the Thunderous Greatclub's Strength", () => {
+    expect(shipped("energy-bow").appliesTo?.baseIds).toEqual(["longbow", "shortbow"]);
+    expect(shipped("energy-bow").weaponChanges).toEqual({ damageType: "force", removeProperties: ["ammunition"] });
+    expect(shipped("thunderous-greatclub").modifiers[0]).toEqual({
+      type: "ability-score-minimum",
+      ability: "str",
+      score: 20
+    });
   });
 
-  it("gives Spellguard Shield its Disadvantage on spell attacks alone", () => {
+  it("gives Spellguard Shield its Disadvantage on spell attacks and Advantage on saves against magic", () => {
     expect(shipped("spellguard-shield").modifiers).toEqual([
       {
         type: "roll-mode",
         roll: "incoming-attack",
         mode: "disadvantage",
         when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
+      },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-magic" }]
       }
     ]);
   });

@@ -1,7 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { abilityModifier } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
-import { spellCastMechanics, upcastAction } from "./item-actions.js";
+import { castAreaOf, laterSpellAction, spellCastMechanics, upcastAction } from "./item-actions.js";
 
 type CastsSpells = NonNullable<ActorAction["castsSpells"]>;
 type Entry = CastsSpells["spells"][number];
@@ -27,14 +27,68 @@ export function withMonsterSpells(
     if (!casts) return [action];
     if (casts.self) {
       const entry = casts.spells[0]!;
-      return [{ ...action, ...castOf(entry, casts, spellRecord(entry.spellId), definition, action) }];
+      return [
+        { ...action, ...castOf(entry, casts, spellRecord(entry.spellId), definition, action) },
+        ...laterCasts(action, casts, spellRecord, definition, taken)
+      ];
     }
     const children = casts.spells
       .filter((entry) => !taken.has(entry.id))
       .map((entry) => childCast(action, entry, casts, spellRecord(entry.spellId), definition));
-    return [action, ...children];
+    return [action, ...children, ...laterCasts(action, casts, spellRecord, definition, taken)];
   });
   return { ...definition, actions };
+}
+
+/** What the list's spells let the caster do once they are up (Dream's terrifying message, Spiritual Weapon's later
+ *  attack), at the stat block's numbers and each spell's printed level, printed inside the list. */
+function laterCasts(
+  parent: ActorAction,
+  casts: CastsSpells,
+  spellRecord: (spellId: string) => SpellReference | undefined,
+  definition: ActorDefinition,
+  taken: Set<string>
+): ActorAction[] {
+  const numbers = {
+    attackBonus: casts.attackBonus,
+    saveDc: casts.saveDc,
+    bearersDc: false,
+    modifier: abilityModifier(definition.abilityScores[casts.ability])
+  };
+  return casts.spells.flatMap((entry) => {
+    const spell = spellRecord(entry.spellId);
+    return (spell?.effect?.laterActions ?? []).flatMap((row) => {
+      const built = laterSpellAction(spell!, row, numbers);
+      if (taken.has(built.id)) return [];
+      taken.add(built.id);
+      const level = entry.atLevel ?? spell!.level;
+      const later = level > spell!.level ? upcastAction(built, spell!, level) : built;
+      return [{ ...withCastRiders(later, parent.castRiders), partOf: parent.id }];
+    });
+  });
+}
+
+/** A later action of a cast with riders (a night hag's Dream): it reaches from the Border Ethereal too, and the damage
+ *  its lasting effect deals as its bearer wakes lowers the maximum and traps the soul it kills. */
+function withCastRiders(later: ActorAction, riders: ActorAction["castRiders"]): ActorAction {
+  if (!riders) return later;
+  const atRest = later.save?.atRest;
+  return {
+    ...later,
+    ...(riders.fromEthereal ? { castRiders: { fromEthereal: true } } : {}),
+    ...(later.save && atRest
+      ? {
+          save: {
+            ...later.save,
+            atRest: {
+              ...atRest,
+              ...(riders.drainsMaximum ? { drainsMaximum: true as const } : {}),
+              ...(riders.trapsSoul ? { trapsSoul: true as const } : {})
+            }
+          }
+        }
+      : {})
+  };
 }
 
 /** The name a cast of an entry goes by: the spell's, and the level when it isn't the spell's own ("Acid Arrow (level
@@ -62,7 +116,9 @@ function childCast(
     activation: parent.activation,
     description: (spell?.description ?? `${parent.name}: ${entry.name}.`).slice(0, 12000),
     damage: [],
-    ...(uses ? { uses } : {})
+    ...(uses ? { uses } : {}),
+    // The stat block prints it inside its list, as SRD 5.2.1 does.
+    partOf: parent.id
   };
   return { ...base, ...castOf(entry, casts, spell, definition, base) };
 }
@@ -83,12 +139,20 @@ function castOf(
     bearersDc: false,
     modifier: abilityModifier(definition.abilityScores[casts.ability])
   });
+  const grants =
+    mechanics.grants && casts.grantTags
+      ? { grants: { ...mechanics.grants, tags: [...new Set([...mechanics.grants.tags, ...casts.grantTags])] } }
+      : {};
   const cast: ActorAction = {
     ...action,
     ...mechanics,
+    ...grants,
     spellId: spell.id,
-    // A healing area heals the creatures the caster picks, so it is picked with no template.
-    ...(spell.area && !mechanics.healing ? { area: spell.area } : {})
+    ...castAreaOf(spell, mechanics),
+    // A reaction spell's trigger rides a reaction's cast (Protective Magic's Counterspell), so the table offers it.
+    ...(spell.effect?.reaction && action.activation === "reaction"
+      ? { reaction: structuredClone(spell.effect.reaction) }
+      : {})
   };
   const level = entry.atLevel ?? spell.level;
   const {

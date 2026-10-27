@@ -27,6 +27,7 @@ import type {
   ActorActionsAvailabilityResult,
   ActorAddResult,
   ActorMovementResult,
+  CraftingOffersResult,
   NextLevelResult,
   AnnotationAddResult,
   CharacterDraftResult,
@@ -37,6 +38,7 @@ import type {
   LooseSaveOutcome,
   MutationResult,
   SpellbookResult,
+  ConversionResult,
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
@@ -44,6 +46,9 @@ import type {
   SceneCreateResult,
   StabilizeResult,
   LightAddResult,
+  DoorUseResult,
+  TrapDisarmResult,
+  ObjectAttackResult,
   VisionPreviewResult,
   ScenePreviewResult,
   WallAddResult
@@ -55,6 +60,10 @@ import type { SoundBoardResult, SoundBoardView, SoundCommandResult } from "./sou
 import type {
   ActionResolveSchema,
   ActionUseSchema,
+  CraftingCancelSchema,
+  CraftingHelpSchema,
+  CraftingStartSchema,
+  CraftingWorkSchema,
   CharacterDraftDiscardSchema,
   CharacterDraftSaveSchema,
   ActorAddFromDefinitionSchema,
@@ -67,10 +76,13 @@ import type {
   ActorSetSpeedSchema,
   ActorSetArmorClassSchema,
   ActorSetHeroicInspirationSchema,
+  ActorGiveHeroicInspirationSchema,
+  ActorAwardExperienceSchema,
   ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
   ActorSpendUsesSchema,
   ActorRestoreUsesSchema,
+  ActorConvertSchema,
   AddCombatantSchema,
   RemoveCombatantSchema,
   SpellZoneEndSchema,
@@ -92,9 +104,11 @@ import type {
   CharacterResolveImportSchema,
   CharacterSetCurrencySchema,
   CharacterSetFavouritesSchema,
+  CharacterSetKnownFormsSchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
+  CharacterStudyItemSchema,
   CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
   CharacterFinishPreparingSchema,
@@ -103,6 +117,7 @@ import type {
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CharacterSubmitImportSchema,
+  CheckAnswerSchema,
   CheckRerollSchema,
   CheckRollSchema,
   CommandIdentitySchema,
@@ -117,6 +132,12 @@ import type {
   FogSetEnabledSchema,
   TerrainPaintSchema,
   TerrainResetSchema,
+  TrapPlaceSchema,
+  TrapEditSchema,
+  TrapRemoveSchema,
+  TrapSpringSchema,
+  TrapDisarmSchema,
+  EnvironmentSetSchema,
   HpAmountSchema,
   InitiativeNextSchema,
   InitiativePreviousSchema,
@@ -124,6 +145,7 @@ import type {
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
   InitiativeSwapSchema,
+  InitiativeOrderTieSchema,
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
@@ -133,7 +155,9 @@ import type {
   RestAnswerSchema,
   RestAskSchema,
   RestFinishSchema,
+  RestInterruptSchema,
   RestMarkDoneSchema,
+  RestResumeSchema,
   RestPartySchema,
   RulesAnswerSchema,
   RulesAskSchema,
@@ -147,8 +171,11 @@ import type {
   SceneReorderSchema,
   SceneSetCombatantsSchema,
   SetActorArchivedSchema,
+  SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
+  SetActorLairSchema,
+  SetActorPickSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
   SetConditionSchema,
@@ -163,11 +190,28 @@ import type {
   TableSetStagingDefaultsSchema,
   TempHpSchema,
   TimePassSchema,
+  SurvivalSetTrackingSchema,
+  ActorNourishSchema,
+  ActorHoldBreathSchema,
+  TimeSetDawnSchema,
   TokenMoveSchema,
+  TokenSetAltitudeSchema,
+  ActorFallSchema,
+  ActorMountSchema,
+  SummonCommandSchema,
+  SummonDismissSchema,
+  SummonLookSchema,
+  SummonRecallSchema,
   TurnLegendarySchema,
+  TurnOrderSchema,
   TurnReactionSchema,
   TurnUseSchema,
   DoorSetOpenSchema,
+  DoorSetStateSchema,
+  DoorUseSchema,
+  ObjectAttackSchema,
+  ObjectDamageSchema,
+  ObjectSetSchema,
   LightAddSchema,
   LightMoveSchema,
   LightRemoveSchema,
@@ -181,6 +225,10 @@ import type {
   ScenePreviewSchema,
   VisionResetExploredSchema,
   VisionSetAmbientSchema,
+  VisionAreaAddSchema,
+  VisionAreaRemoveSchema,
+  ItemSetFormSchema,
+  ItemSetLightSchema,
   VisionSetEnabledSchema,
   WallAddSchema,
   WallClearSchema,
@@ -368,6 +416,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CheckRerollSchema>,
     acknowledgement: (result: CheckRollResult) => void
   ) => void;
+  /** Answer a character's latest check with one of its answers (Tactical Mind, a Bardic Inspiration die). */
+  "check:answer": (
+    payload: CommandPayload<typeof CheckAnswerSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
   /** GM: call for a check or a save from one or several characters. */
   "roll-call:start": (
     payload: CommandPayload<typeof RollCallStartSchema>,
@@ -387,6 +440,22 @@ export interface ClientToServerEvents {
   "actor:set-heroic-inspiration": (
     payload: CommandPayload<typeof ActorSetHeroicInspirationSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A character's player or the GM: give its second Heroic Inspiration to a player character who lacks one, or let it go. */
+  "actor:give-heroic-inspiration": (
+    payload: CommandPayload<typeof ActorGiveHeroicInspirationSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: award XP to player characters, each an amount and a share of the defeated creatures' XP. */
+  "actor:award-experience": (
+    payload: CommandPayload<typeof ActorAwardExperienceSchema>,
+    acknowledgement: (
+      result: MutationResult & {
+        each?: number;
+        creatures?: number;
+        ready?: Array<{ actorId: string; name: string; level: number }>;
+      }
+    ) => void
   ) => void;
   /** The server first re-runs the command as the player; only a still-blocked one is parked for the GM (`askId`). */
   "rules:ask": (
@@ -427,6 +496,16 @@ export interface ClientToServerEvents {
   /** GM shares (or un-shares) an archived character's sheet with players as a read-only keepsake. Default hidden. */
   "actor:set-sheet-preview": (
     payload: CommandPayload<typeof SetActorSheetPreviewSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM marks a legendary creature as fighting in its lair, with the lair's counts, or out of it. */
+  "actor:set-lair": (
+    payload: CommandPayload<typeof SetActorLairSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM picks what a creature's stat block leaves to the GM (a Draconic Origin's damage type, a Training skill). */
+  "actor:set-pick": (
+    payload: CommandPayload<typeof SetActorPickSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-speed": (
@@ -495,7 +574,7 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ContentCompendiumResult) => void
   ) => void;
   "content:monster-actions": (
-    payload: { definitionId: string },
+    payload: { definitionId: string; actorId?: string },
     acknowledgement: (result: ContentActionsResult) => void
   ) => void;
   "content:monster-sheet": (
@@ -543,6 +622,10 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof SetActorHealthDisplaySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "actor:set-attitude": (
+    payload: CommandPayload<typeof SetActorAttitudeSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "encounter:set-environment": (
     payload: CommandPayload<typeof SetEnvironmentSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -575,6 +658,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorRestoreUsesSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** Turn one resource into another, or recover one, by a feature's rule (the character's player or the GM). */
+  "actor:convert": (
+    payload: CommandPayload<typeof ActorConvertSchema>,
+    acknowledgement: (result: ConversionResult) => void
+  ) => void;
   /** A player asks the GM for a Long Rest for their character, or takes the ask back. */
   "rest:ask": (
     payload: CommandPayload<typeof RestAskSchema>,
@@ -595,14 +683,41 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof RestMarkDoneSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  /** GM-only: end the party's Short Rest, with its benefits or without. */
+  /** GM-only: end the party's Short or Long Rest, with its benefits or without. */
   "rest:finish": (
     payload: CommandPayload<typeof RestFinishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A member of the party's Long Rest that was interrupted rests again. */
+  "rest:resume": (
+    payload: CommandPayload<typeof RestResumeSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: interrupt one member's Long Rest. */
+  "rest:interrupt": (
+    payload: CommandPayload<typeof RestInterruptSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM-only: move game time forward. */
   "time:pass": (
     payload: CommandPayload<typeof TimePassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "survival:set-tracking": (
+    payload: CommandPayload<typeof SurvivalSetTrackingSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:nourish": (
+    payload: CommandPayload<typeof ActorNourishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:hold-breath": (
+    payload: CommandPayload<typeof ActorHoldBreathSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: set the hour dawn comes, or let a Long Rest stand in for it. */
+  "time:set-dawn": (
+    payload: CommandPayload<typeof TimeSetDawnSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-slot": (
@@ -634,12 +749,22 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CharacterGiveItemSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** GM: a carried manual or tome is studied; the score rises and the copy's magic is spent. */
+  "character:study-item": (
+    payload: CommandPayload<typeof CharacterStudyItemSchema>,
+    acknowledgement: (result: MutationResult & { ability?: string; before?: number; after?: number }) => void
+  ) => void;
   "character:recover-ammunition": (
     payload: CommandPayload<typeof CharacterRecoverAmmunitionSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-currency": (
     payload: CommandPayload<typeof CharacterSetCurrencySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Set a Druid's known Wild Shape forms. The GM for anyone; a player for their own claimed character. */
+  "character:set-known-forms": (
+    payload: CommandPayload<typeof CharacterSetKnownFormsSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** Pin options to the sheet's turn card. The GM for anyone; a player for their own claimed character. */
@@ -684,6 +809,28 @@ export interface ClientToServerEvents {
   "actor:movement": (payload: { actorId: string }, acknowledgement: (result: ActorMovementResult) => void) => void;
   /** What a character's next level brings; only when the caller may level that character. */
   "character:next-level": (payload: { actorId: string }, acknowledgement: (result: NextLevelResult) => void) => void;
+  /** What a character could start crafting now; its owner or the GM. */
+  "actor:crafting-offers": (
+    payload: { actorId: string },
+    acknowledgement: (result: CraftingOffersResult) => void
+  ) => void;
+  "crafting:start": (
+    payload: CommandPayload<typeof CraftingStartSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "crafting:help": (
+    payload: CommandPayload<typeof CraftingHelpSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: log days of downtime work on a project. */
+  "crafting:work": (
+    payload: CommandPayload<typeof CraftingWorkSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "crafting:cancel": (
+    payload: CommandPayload<typeof CraftingCancelSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "turn:use": (
     payload: CommandPayload<typeof TurnUseSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -698,6 +845,11 @@ export interface ClientToServerEvents {
   ) => void;
   "turn:end": (
     payload: CommandPayload<typeof CommandIdentitySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** The creature's controller orders what happens at once as its turn starts or ends. */
+  "turn:order": (
+    payload: CommandPayload<typeof TurnOrderSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "dice:roll": (
@@ -728,6 +880,10 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof InitiativeSwapSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "initiative:order-tie": (
+    payload: CommandPayload<typeof InitiativeOrderTieSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "initiative:roll-self": (
     payload: CommandPayload<typeof InitiativeRollSelfSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -751,6 +907,41 @@ export interface ClientToServerEvents {
   "token:move": (
     payload: CommandPayload<typeof TokenMoveSchema>,
     acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** GM makes a creature fall: the server rolls the damage once any reaction to it is answered. */
+  "actor:fall": (
+    payload: CommandPayload<typeof ActorFallSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A creature climbs onto a mount or off the one it rides. */
+  "actor:mount": (
+    payload: CommandPayload<typeof ActorMountSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A creature commands the creatures it summoned. */
+  "summon:command": (
+    payload: CommandPayload<typeof SummonCommandSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A summoned creature's commander dismisses it, for good or into its pocket dimension. */
+  "summon:dismiss": (
+    payload: CommandPayload<typeof SummonDismissSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A familiar comes back from its pocket dimension. */
+  "summon:recall": (
+    payload: CommandPayload<typeof SummonRecallSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A commander sees through a summoned creature's eyes. */
+  "summon:look": (
+    payload: CommandPayload<typeof SummonLookSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** GM sets how high a creature is, free of movement. */
+  "token:set-altitude": (
+    payload: CommandPayload<typeof TokenSetAltitudeSchema>,
+    acknowledgement: (result: MutationResult) => void
   ) => void;
   "scene:create": (
     payload: CommandPayload<typeof SceneCreateSchema>,
@@ -810,6 +1001,30 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof TerrainResetSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "trap:place": (
+    payload: CommandPayload<typeof TrapPlaceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:edit": (
+    payload: CommandPayload<typeof TrapEditSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:remove": (
+    payload: CommandPayload<typeof TrapRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:spring": (
+    payload: CommandPayload<typeof TrapSpringSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:disarm": (
+    payload: CommandPayload<typeof TrapDisarmSchema>,
+    acknowledgement: (result: TrapDisarmResult) => void
+  ) => void;
+  "environment:set": (
+    payload: CommandPayload<typeof EnvironmentSetSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "vision:set-enabled": (
     payload: CommandPayload<typeof VisionSetEnabledSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -844,6 +1059,23 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof DoorSetOpenSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "door:set-state": (
+    payload: CommandPayload<typeof DoorSetStateSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "door:use": (payload: CommandPayload<typeof DoorUseSchema>, acknowledgement: (result: DoorUseResult) => void) => void;
+  "object:set": (
+    payload: CommandPayload<typeof ObjectSetSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "object:damage": (
+    payload: CommandPayload<typeof ObjectDamageSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "object:attack": (
+    payload: CommandPayload<typeof ObjectAttackSchema>,
+    acknowledgement: (result: ObjectAttackResult) => void
+  ) => void;
   "light:add": (
     payload: CommandPayload<typeof LightAddSchema>,
     acknowledgement: (result: LightAddResult) => void
@@ -854,6 +1086,22 @@ export interface ClientToServerEvents {
   ) => void;
   "light:remove": (
     payload: CommandPayload<typeof LightRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:add-area": (
+    payload: CommandPayload<typeof VisionAreaAddSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:remove-area": (
+    payload: CommandPayload<typeof VisionAreaRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "item:set-light": (
+    payload: CommandPayload<typeof ItemSetLightSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "item:set-form": (
+    payload: CommandPayload<typeof ItemSetFormSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:add": (

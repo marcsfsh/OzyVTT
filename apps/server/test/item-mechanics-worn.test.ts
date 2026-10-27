@@ -565,7 +565,14 @@ describe("the charges a worn item rations", () => {
     const action = effectiveActions(definition, actor, catalog).find(
       (entry) => entry.id === "item-robe-of-scintillating-colors-dazzle"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureConditions: ["stunned"] });
+    expect(action.save).toEqual({
+      ability: "wis",
+      dc: 15,
+      successDamage: "none",
+      failureConditions: ["stunned"],
+      // "until the effect ends", which is the end of the wearer's next turn.
+      failureDuration: { type: "until-source-turn-end" }
+    });
     expect(action.uses).toEqual({ limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" });
 
     resolveDefinitionAction(
@@ -626,9 +633,16 @@ describe("the casts that survived the spell-record check", () => {
     const detect = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-detect-thoughts")!;
     const suggest = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-suggestion")!;
 
-    // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored.
-    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: [] });
-    expect(suggest.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["charmed"] });
+    // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored. Detect Thoughts' cast
+    // asks no save: its Wisdom save is the probe's, a later action.
+    expect(detect.save).toBeUndefined();
+    expect(suggest.save).toEqual({
+      ability: "wis",
+      dc: 13,
+      successDamage: "none",
+      failureConditions: ["charmed"],
+      endsOnSourceSideDamage: true
+    });
     // Neither cast synthesizes damage or an attack from the spell's text.
     expect(detect.damage).toEqual([]);
     expect(suggest.damage).toEqual([]);
@@ -659,7 +673,14 @@ describe("the casts that survived the spell-record check", () => {
     const cast = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-eyes-of-charming-cast-charm-person"
     )!;
-    expect(cast.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["charmed"] });
+    expect(cast.save).toEqual({
+      ability: "wis",
+      dc: 13,
+      successDamage: "none",
+      failureConditions: ["charmed"],
+      endsOnSourceSideDamage: true,
+      advantageIfFighting: true
+    });
     expect(cast.uses).toEqual({ limit: 3, per: "long-rest", pool: "eyes-of-charming-charges" });
     resolveDefinitionAction(
       state,
@@ -673,7 +694,7 @@ describe("the casts that survived the spell-record check", () => {
     const detect = effectiveActions(definition, medallion.actors[0], catalog).find(
       (entry) => entry.id === "item-medallion-of-thoughts-cast-detect-thoughts"
     )!;
-    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: [] });
+    expect(detect.save).toBeUndefined();
     expect(detect.uses).toEqual({ limit: 5, per: "long-rest", pool: "medallion-of-thoughts-charges" });
   });
 
@@ -732,17 +753,25 @@ describe("the spell save DC a legendary robe does NOT raise", () => {
     expect(dcs([wand, robe])).toEqual(bare);
   });
 
-  it("carries no rider at all on the robe, and no row in the whole bundle carries `spell-save-dc`", () => {
+  it("gives the robe its base AC, Advantage against magic, and +2 to its wearer's own DC and spell attacks", () => {
     const record = view.equipmentRecord("robe-of-the-archmagi")!;
-    expect(record.modifiers ?? []).toEqual([]);
-    expect(record.casts ?? []).toEqual([]);
-    expect(record.actions ?? []).toEqual([]);
-    // The robe was the only carrier, so no shipped item carries `spell-save-dc`; a new one must justify it.
+    expect(record.modifiers).toEqual([
+      { type: "base-armor-class", base: 15 },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-magic" }]
+      },
+      { type: "spell-save-dc", amount: 2 },
+      { type: "spell-attack-bonus", amount: 2 }
+    ]);
+    // `spell-save-dc` raises the wearer's own DC only; the robe is the one shipped carrier.
     expect(
       loadMagicItems()
         .filter((row) => (row.modifiers ?? []).some((modifier) => modifier.type === "spell-save-dc"))
         .map((row) => row.id)
-    ).toEqual([]);
+    ).toEqual(["robe-of-the-archmagi"]);
   });
 
   it("moves the Robe of Stars' +1 into the save the server rolls, and off again", () => {
@@ -775,60 +804,48 @@ describe("the worn items left as prose, by name", () => {
   const rows = loadMagicItems();
   const worn = rows.filter((row) => row.category === "wondrous-item" && row.slot !== "wondrous");
 
-  it("leaves the five casts that produced the wrong thing unauthored, by name", () => {
-    // Each of these produced the wrong effect when driven (e.g. a Helm of Teleportation dealing 1d100
-    // Force damage). Re-authoring one adds a `casts` entry and fails here.
-    for (const [id, why] of [
-      ["helm-of-teleportation", "teleport's damage.roll is the SRD's 1d100 MISHAP table"],
-      ["cape-of-the-mountebank", "dimension-door's 4d6 is arrival damage, not a cast's damage"],
-      ["circlet-of-blasting", "scorching-ray's 2d6 is ONE of three rays, at the wearer's bonus not the circlet's +5"],
-      ["boots-of-levitation", "levitate's Con save is an unwilling target's; the boots cast on yourself"],
-      ["cloak-of-the-bat", "polymorph's Wis save is an unwilling target's; the cloak casts on yourself"]
+  it("casts the Cloak of the Bat's Polymorph on its wearer alone, as a Bat", () => {
+    // Its Wisdom save is an unwilling target's, so the cast is held to its wearer and to the Bat.
+    const cast = view.equipmentRecord("cloak-of-the-bat")!.casts[0]!;
+    expect(cast).toMatchObject({ spellId: "polymorph", targets: { who: "self" }, forms: { only: ["bat"] } });
+  });
+
+  it("sets the scores the amulet, gauntlets and headband print, and a belt's by the giant the GM names", () => {
+    const floors = (id: string) => view.equipmentRecord(id)!.modifiers;
+    expect(floors("amulet-of-health")).toEqual([{ type: "ability-score-minimum", ability: "con", score: 19 }]);
+    expect(floors("gauntlets-of-ogre-power")).toEqual([{ type: "ability-score-minimum", ability: "str", score: 19 }]);
+    expect(floors("headband-of-intellect")).toEqual([{ type: "ability-score-minimum", ability: "int", score: 19 }]);
+    const belt = view.equipmentRecord("belt-of-giant-strength")!;
+    expect(belt.modifiers).toEqual([]);
+    expect(belt.variants!.map((kind) => [kind.id, kind.modifiers[0]])).toEqual([
+      ["hill", { type: "ability-score-minimum", ability: "str", score: 21 }],
+      ["frost", { type: "ability-score-minimum", ability: "str", score: 23 }],
+      ["stone", { type: "ability-score-minimum", ability: "str", score: 23 }],
+      ["fire", { type: "ability-score-minimum", ability: "str", score: 25 }],
+      ["cloud", { type: "ability-score-minimum", ability: "str", score: 27 }],
+      ["storm", { type: "ability-score-minimum", ability: "str", score: 29 }]
+    ]);
+  });
+
+  it("authors the talismans' Holy Symbol, +2 to spell attack rolls, and the charges that destroy them", () => {
+    for (const [id, charges] of [
+      ["talisman-of-pure-good", 7],
+      ["talisman-of-ultimate-evil", 6]
     ] as const) {
       const row = view.equipmentRecord(id)!;
-      expect(row.casts ?? [], `${id} - ${why}`).toEqual([]);
-      expect(row.actions ?? [], `${id} - the charge-alone shape does not rescue a cast`).toEqual([]);
-    }
-    // And the two blocked on healing carry nothing at all.
-    for (const id of ["periapt-of-health", "necklace-of-prayer-beads"]) {
-      const row = view.equipmentRecord(id)!;
-      expect(row.casts ?? []).toEqual([]);
-      expect(row.actions ?? []).toEqual([]);
-      expect(row.modifiers ?? []).toEqual([]);
-    }
-  });
-
-  it("leaves the two RESERVED items and the four ability-score refusals entirely to prose", () => {
-    for (const id of [
-      // The gloves need a rolled reduction ("1d10 plus your Dexterity modifier"), a free-hand gate and a
-      // Reaction cost; `on-taking-damage` + `damage-reduction` alone cannot express it.
-      "gloves-of-missile-snaring",
-      "periapt-of-wound-closure", // rolled amount
-      "amulet-of-health",
-      "belt-of-giant-strength", // ITEM_REFUSED_MODIFIER_TYPES
-      "gauntlets-of-ogre-power",
-      "headband-of-intellect"
-    ]) {
-      const row = view.equipmentRecord(id)!;
-      expect(row.modifiers ?? [], `${id} must stay prose`).toEqual([]);
-      expect(row.casts ?? []).toEqual([]);
-      expect(row.actions ?? []).toEqual([]);
-      expect(Object.values(row.grants ?? {}).flat()).toEqual([]);
-    }
-  });
-
-  it("authors the talismans' +2 to spell attack rolls and nothing else", () => {
-    for (const id of ["talisman-of-pure-good", "talisman-of-ultimate-evil"]) {
-      const row = view.equipmentRecord(id)!;
       expect(row.modifiers, id).toEqual([{ type: "spell-attack-bonus", amount: 2 }]);
+      expect(row.servesAsFocus).toBe("holy-symbol");
+      expect(row.charges?.lastCharge).toBe("destroyed");
       expect(row.casts ?? []).toEqual([]);
-      expect(row.actions ?? []).toEqual([]);
+      expect(row.actions.map((action) => [action.id, action.uses?.limit, action.uses?.per])).toEqual([
+        ["rebuke", charges, "never"]
+      ]);
     }
   });
 
-  it("splits the eight 'Advantage on a check' rows 3 authored / 5 prose, and says why for each", () => {
-    // Of the eight "Advantage on ... checks" rows, only those whose clause the engine can express exactly
-    // are authored; authoring the rest would over-grant.
+  it("splits the eight 'Advantage on a check' rows 6 authored / 2 read by id, and says why for each", () => {
+    // Of the eight "Advantage on ... checks" rows, those whose clause a rider can express exactly are authored; the
+    // other two need a fact no rider names, so the server reads them by the item id.
     const advantageOnChecks = worn
       .filter((row) => /Advantage on [^.]*\bchecks?\b/i.test(row.description ?? ""))
       .map((row) => row.id)
@@ -861,16 +878,29 @@ describe("the worn items left as prose, by name", () => {
       });
     }
 
-    // Still prose (5), each for its own reason, which the failure message names.
+    // The Eyes of the Eagle's and the Robe of Eyes' "checks that rely on sight" and the Eyes of Minute Seeing's search
+    // within a foot are situations the roller names beside the check.
+    expect(view.equipmentRecord("eyes-of-the-eagle")!.modifiers[0]?.when).toContainEqual({
+      type: "situation-is",
+      situation: "relying on sight"
+    });
+    const robe = view.equipmentRecord("robe-of-eyes")!.modifiers.find((modifier) => modifier.type === "roll-mode");
+    expect(robe?.when).toContainEqual({ type: "situation-is", situation: "relying on sight" });
+    expect(view.equipmentRecord("eyes-of-minute-seeing")!.modifiers[0]?.when).toContainEqual({
+      type: "situation-is",
+      situation: "examining something within 1 foot"
+    });
+
+    // Read by the item id (2), each for its own reason, which the failure message names.
     for (const [id, why] of [
-      ["belt-of-dwarvenkind", "Persuasion narrowed to dwarves and duergar - no trigger names who you are influencing"],
-      ["eyes-of-minute-seeing", "Investigation within ONE FOOT - nothing measures a distance"],
-      ["eyes-of-the-eagle", "Perception 'that rely on sight' - Search does not know what it relied on"],
-      ["robe-of-eyes", "Perception 'that rely on sight', on a robe whose own Drawbacks Blind you"],
-      ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation, which the engine does not hold"]
+      ["belt-of-dwarvenkind", "Persuasion with dwarves and duergar reads who is influenced (ability-checks.ts)"],
+      ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation is zone-sphere.ts's"]
     ] as const) {
-      const advantage = view.equipmentRecord(id)!.modifiers.filter((modifier) => modifier.type === "roll-mode");
-      expect(advantage, `${id} must stay prose: ${why}`).toEqual([]);
+      // A check's Advantage only: the belt's Advantage on saves against Poisoned is authored.
+      const advantage = view
+        .equipmentRecord(id)!
+        .modifiers.filter((modifier) => modifier.type === "roll-mode" && modifier.roll === "check");
+      expect(advantage, `${id} carries no check rider: ${why}`).toEqual([]);
     }
   });
 

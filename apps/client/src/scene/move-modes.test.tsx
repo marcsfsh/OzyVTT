@@ -35,6 +35,7 @@ describe("picking how a creature moves", () => {
       "Fly 70",
       "Swim",
       "Climb",
+      "Jump",
       "Teleport",
       "Forced"
     ]);

@@ -4,19 +4,25 @@ import type {
   ActorDerivedSheet,
   ContentSkillSummary,
   DerivedAbilityRow,
+  DerivedGearUses,
   DerivedSkillRow,
   DerivedToolRow
 } from "@vtt/domain";
 import { aggregateRollMode, collectRiders, sumRiders } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
 import { checkPlan, passivePerception, toolAbility, toolProficiencies, type CheckNames } from "./ability-checks.js";
+import { holdsFastHands, utilizeUses, type UtilizeUse } from "./utilize.js";
+import { checkSituations } from "./check-situations.js";
 import {
+  checkRiderBonus,
   EMPTY_DERIVATION,
   skillTierSources,
   type EquipmentCatalog,
   type EquipmentDerivation
 } from "./equipment-derivation.js";
+import type { ClassReference } from "@vtt/content-srd-5.2.1";
 import { choiceOverrideDefenses } from "./choice-overrides.js";
+import { classColumnsOf } from "./class-columns.js";
 import { autoFailsPhysicalSaves } from "./condition-rules.js";
 import { standingDefences } from "./hit-points.js";
 import { auraBonusOf, saveRollSources, saveTotalFor } from "./saving-throws.js";
@@ -45,7 +51,8 @@ export function deriveActorSheet(
   definition: ActorDefinition | undefined,
   derivation: EquipmentDerivation,
   skills: readonly ContentSkillSummary[],
-  catalog?: Partial<Pick<EquipmentCatalog, "featureRecord" | "equipmentRecord">>
+  catalog?: Partial<Pick<EquipmentCatalog, "featureRecord" | "equipmentRecord">>,
+  classRecord: (id: string) => ClassReference | undefined = () => undefined
 ): ActorDerivedSheet {
   const proficiencyBonus = definition?.proficiencyBonus ?? 0;
   const proficientSaves = new Set(definition?.proficiencies?.saves ?? []);
@@ -90,14 +97,51 @@ export function deriveActorSheet(
     };
   });
 
-  // Tools the SRD gives an ability ("Ability: Dexterity"); a proficiency the catalog can't name has no check to roll.
-  const tools = toolProficiencies(definition, derivation).flatMap((id): DerivedToolRow[] => {
+  // Tools the SRD gives an ability ("Ability: Dexterity") that the character is proficient with or carries; a
+  // proficiency the catalog can't name has no check to roll. Every use needs the tool carried.
+  const proficientTools = toolProficiencies(definition, derivation);
+  const carriedIds = actor.inventory.filter((row) => row.quantity > 0).map((row) => catalogIdOf(row));
+  const toolIds = [
+    ...new Set([...proficientTools, ...carriedIds.filter((id) => catalog?.equipmentRecord?.(id)?.category === "tool")])
+  ];
+  const tools = toolIds.flatMap((id): DerivedToolRow[] => {
     const record = catalog?.equipmentRecord?.(id);
     const ability = toolAbility(record?.description);
     if (!record || !ability) return [];
     const plan = checkPlan(actor, definition, derivation, { ability, tool: id }, { names });
     return [
-      { id, name: record.name, ability, bonus: plan.modifier, mode: plan.rollMode, reliableTalent: plan.reliableTalent }
+      {
+        id,
+        name: record.name,
+        ability,
+        bonus: plan.modifier,
+        mode: plan.rollMode,
+        reliableTalent: plan.reliableTalent,
+        proficient: proficientTools.includes(id),
+        carried: carriedIds.includes(id),
+        uses: utilizeUses(record).map(derivedUse)
+      }
+    ];
+  });
+  // Carried gear that prints a Utilize check (a Grappling Hook), each use with the bonus its check would roll.
+  const gearUses = [...new Set(carriedIds)].flatMap((id): DerivedGearUses[] => {
+    const record = catalog?.equipmentRecord?.(id);
+    if (!record || record.category === "tool" || !record.utilize) return [];
+    return [
+      {
+        id,
+        name: record.name,
+        uses: utilizeUses(record).map((use) => {
+          const plan = checkPlan(
+            actor,
+            definition,
+            derivation,
+            { ability: use.ability, ...(use.skill !== undefined ? { skill: use.skill } : {}) },
+            { names }
+          );
+          return { ...derivedUse(use), ability: use.ability, bonus: plan.modifier, mode: plan.rollMode };
+        })
+      }
     ];
   });
 
@@ -109,10 +153,16 @@ export function deriveActorSheet(
     // Initiative is not reconciled onto the actor, so the live value is computed here; `actor.initiative`
     // still holds the instantiation-time number. `initiativeBonus` already includes Dexterity (a built
     // character's Dex modifier plus feats, a stat block's printed bonus).
-    initiative: (definition?.initiativeBonus ?? 0) + derivation.initiative,
+    // Initiative is a Dexterity check, so a bonus to ability checks reaches it too (a Stone of Good Luck).
+    initiative:
+      (definition?.initiativeBonus ?? 0) +
+      derivation.initiative +
+      checkRiderBonus(derivation, { ability: "dex" }, definition?.abilityScores),
     abilities,
     skills: derivedSkills,
     tools,
+    gearUses,
+    fastHands: holdsFastHands(definition),
     passivePerception: passivePerception(
       checkPlan(actor, definition, derivation, { ability: "wis", skill: "perception" }, { names })
     ),
@@ -129,7 +179,11 @@ export function deriveActorSheet(
     ),
     // The SRD's three, plus what an `attunement-slots` rider adds (Use Magic Device).
     attunementSlots: 3 + derivation.attunementSlots,
-    weaponMasteries: weaponMasteriesOf(definition, catalog?.equipmentRecord)
+    // The character's own load: what its own rows weigh, which its sheet already shows.
+    carrying: derivation.carrying ? { ...derivation.carrying } : null,
+    weaponMasteries: weaponMasteriesOf(definition, catalog?.equipmentRecord),
+    classColumns: classColumnsOf(definition, classRecord),
+    situations: checkSituations(derivation)
   };
 }
 
@@ -147,4 +201,14 @@ function skillTier(
   const printed = (definition?.extensions["open5e.srd-2024"] as { skills?: Record<string, unknown> } | undefined)
     ?.skills?.[skillId];
   return definition?.proficiencies === undefined && typeof printed === "number" ? "proficient" : "none";
+}
+
+/** A printed Utilize use as the sheet offers it. */
+function derivedUse(use: UtilizeUse): DerivedToolRow["uses"][number] {
+  return {
+    label: use.label,
+    dc: use.dc,
+    ...(use.skill !== undefined ? { skill: use.skill } : {}),
+    ...(use.onSuccess !== undefined ? { forAnother: true as const } : {})
+  };
 }

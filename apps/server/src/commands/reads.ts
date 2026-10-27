@@ -1,26 +1,30 @@
 import type { z } from "zod";
 import { contentRoutes, gameRoutes, type ApiRoute } from "@vtt/api-contract/routes";
-import { ContentCompendiumRequestSchema, type GmView, type PlayerView } from "@vtt/domain";
+import { ContentCompendiumRequestSchema, type GmView, type PlayerView, type SpellZone } from "@vtt/domain";
 import { actionAvailability } from "../action-resolution.js";
 import { deriveActorSheet } from "../actor-derived.js";
 import { storedDefinition } from "../actor-roster.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builderOffers } from "../builder-offers.js";
+import { conversionOffers } from "../conversions.js";
 import { draftOwnerOf } from "../character-drafts.js";
 import { BUILTIN_TARGETING, builtinActionsFor } from "../builtin-actions.js";
 import { builtinCheckSkills } from "../resolution/builtins.js";
 import { actionSummariesOf, actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
+import { formsOffer } from "../transform/offer.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { rechoicesOf } from "../ledger-rechoice.js";
 import { receivedSpellChoices, spellChoicesOf } from "../spell-choices.js";
 import { withMasteries } from "../weapon-masteries.js";
 import {
   ActorAvailableActionsSchema,
+  ActorCraftingOffersSchema,
   ActorMovementSchema,
   BuilderOffersSchema,
   CharacterNextLevelSchema,
   ContentActionsSchema,
+  ContentMonsterActionsSchema,
   ScenePreviewSchema,
   VisionPreviewSchema
 } from "@vtt/domain/commands";
@@ -30,11 +34,18 @@ import { partyViewerIds } from "../vision/audience.js";
 import { flatPolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { movementStatus } from "../movement-rules.js";
+import { spaceSharingFor } from "../space-sharing.js";
+import { areaGroundFor } from "../zone-preview.js";
+import { visibleToPlayerAnnotation } from "../projections.js";
 import { previewScene } from "../scene-preview.js";
 import { nextLevelOf } from "../next-level.js";
+import { castOptionsOf } from "../spell-zones.js";
+import { craftingOffers } from "../crafting.js";
+import { craftingDeps } from "./crafting.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";
+import { rowAsSeen } from "../disguised-items.js";
 
 // The reads both transports serve. Every catalog is scoped to the caller through `catalogFor`, so a homebrew
 // GM-only record never reaches a player; which reads a player may call at all is the `gmOnly` gate.
@@ -110,15 +121,50 @@ export const gameReads = [
     event: "content:monster-actions",
     route: contentRoutes.getContentMonsterActions,
     gmOnly: "Only the GM can browse stat blocks.",
-    schema: ContentActionsSchema,
+    schema: ContentMonsterActionsSchema,
+    httpInput: ({ params, query }) => ({
+      definitionId: params.definitionId,
+      ...(typeof query.actorId === "string" ? { actorId: query.actorId } : {})
+    }),
     malformed: "The action lookup is malformed.",
     run: (principal, input, kit) => {
-      const { definitionId } = input as z.output<typeof ContentActionsSchema>;
+      const { definitionId, actorId } = input as z.output<typeof ContentMonsterActionsSchema>;
       const catalog = kit.catalogFor(principal);
       const imported = storedDefinition(kit.read(), definitionId);
+      // A combatant built from the stat block acts with what it carries too (a wand, a potion, a magic weapon), as
+      // its own sheet's list has it; it reads the play-time stat block, so one on the table stays runnable.
+      const combatant = actorId
+        ? kit.read().actors.find((candidate) => candidate.id === actorId && candidate.definitionId === definitionId)
+        : undefined;
+      const played = combatant ? kit.resolveDefinition(definitionId) : undefined;
       // Browse uses the catalog's own lookup (honours draft/published/deleted), and leaves the play-time resolver out.
-      const definition = imported ?? catalog.monster(definitionId);
-      const actions = imported ? actionSummariesOf(imported.actions) : catalog.monsterActionSummaries(definitionId);
+      const definition = played ?? imported ?? catalog.monster(definitionId);
+      const playedActions = combatant && played ? effectiveActions(played, combatant, kit.equipmentCatalog()) : [];
+      const actions =
+        combatant && played
+          ? actionSummariesOf([...playedActions]).map((summary, index) => {
+              // A Shape-Shift offers its forms and aims at no one; leaving a form too.
+              const action = playedActions[index]!;
+              // The effects a use picks among, or the form of the area a cast leaves (Wall of Fire's ring).
+              const picks = castOptionsOf(
+                action,
+                action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined
+              );
+              if (!action.shapeShift && !action.endsForm && !picks.options && !picks.wardTypes) return summary;
+              return {
+                ...summary,
+                ...(action.shapeShift
+                  ? { forms: formsOffer(kit.read(), combatant, action, played, kit.equipmentCatalog()) }
+                  : {}),
+                ...picks,
+                ...(action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)
+                  ? { targeting: "none" as const }
+                  : {})
+              };
+            })
+          : imported
+            ? actionSummariesOf(imported.actions)
+            : catalog.monsterActionSummaries(definitionId);
       if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
       // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
       const builtins = builtinActionsFor(definition)
@@ -172,14 +218,19 @@ export const gameReads = [
         "check",
         "You can only check your own character's actions."
       );
-      const actor = state.actors.find((candidate) => candidate.id === actorId);
-      if (!actor) throw new GameNotFoundError("That combatant no longer exists.");
+      const found = state.actors.find((candidate) => candidate.id === actorId);
+      if (!found) throw new GameNotFoundError("That combatant no longer exists.");
+      const catalog = kit.equipmentCatalog();
+      // A player reads a disguised copy's actions as the item it passes for: the same row and action ids, so using one
+      // uses the copy as it is.
+      const actor = isGmGrade(principal)
+        ? found
+        : { ...found, inventory: found.inventory.map((row) => rowAsSeen(row, catalog)) };
       const definition = actor.definitionId ? kit.resolveDefinition(actor.definitionId) : undefined;
       if (actor.definitionId && !definition) throw new GameNotFoundError("That combatant's stat block is unavailable.");
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
-      const catalog = kit.equipmentCatalog();
       const available = effectiveActions(definition, actor, catalog);
-      const builtins = builtinActionsFor(definition).filter(
+      const builtins = builtinActionsFor(definition, actor).filter(
         (candidate) => !available.some((declared) => declared.id === candidate.id)
       );
       const derivation = deriveEquipment(actor, definition, catalog);
@@ -195,7 +246,15 @@ export const gameReads = [
         ),
         // Derived numbers are computed only after the authorization gate above, which is why they ride a
         // request and is never on the broadcast projection (see `actor-derived.ts`).
-        derived: deriveActorSheet(actor, definition, derivation, kit.catalogFor(principal).skillSummaries(), catalog),
+        // The class table's columns read the classes the sheet already has, as play does.
+        derived: deriveActorSheet(
+          actor,
+          definition,
+          derivation,
+          kit.catalogFor(principal).skillSummaries(),
+          catalog,
+          (id) => kit.playCatalog().classRecord(id)
+        ),
         // Read against what the sheet already has, as `actor.rechoose` checks them.
         rechoices: rechoicesOf(actor, definition, kit.playCatalog()),
         // Read against the sheet's content and the table's builder policy, as the swap and the spellbook check them,
@@ -203,7 +262,9 @@ export const gameReads = [
         spellChoices: receivedSpellChoices(
           spellChoicesOf(actor, definition, kit.playCatalog(), state.builderPolicy),
           kit.catalogFor(principal)
-        )
+        ),
+        // Checked as `actor.convert` checks them, so a control the sheet offers is one the server applies.
+        conversions: conversionOffers(state, actor, { resolveDefinition: kit.resolveDefinition, catalog })
       };
     }
   },
@@ -234,10 +295,45 @@ export const gameReads = [
       );
       if (!state.actors.some((candidate) => candidate.id === actorId))
         throw new GameNotFoundError("That combatant no longer exists.");
-      return movementStatus(state, actorId, {
-        resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
-        catalog: kit.equipmentCatalog()
-      });
+      const initiator = initiatorOf(principal);
+      // The preview charges what the server will: a creature that shares spaces passes others, and anyone may cross a
+      // swarm. A player hears only of swarms their characters can see.
+      const hidden = initiator.role === "gm" ? () => false : kit.hiddenFor(initiator, state);
+      // The ground the spell areas change for the mover, of those the asker can see: a placed area by its template's
+      // visibility, one around its caster by the caster's.
+      const mapAssetId = state.combat.mapAssetId;
+      const calibration = mapAssetId
+        ? (kit.context.mapCatalog.get(mapAssetId)?.calibration?.calibration ?? null)
+        : null;
+      const sessionId = initiator.role === "player" ? initiator.sessionId : undefined;
+      const seen = (zone: SpellZone) => {
+        if (initiator.role === "gm") return true;
+        const annotation = zone.annotationId
+          ? state.combat.annotations.find((candidate) => candidate.id === zone.annotationId)
+          : undefined;
+        return annotation ? visibleToPlayerAnnotation(state, annotation, sessionId) : !hidden(zone.casterId);
+      };
+      const areaGround = calibration
+        ? areaGroundFor(
+            state,
+            actorId,
+            {
+              geometry: { width: 0, height: 0, calibration },
+              resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
+              catalog: kit.equipmentCatalog()
+            },
+            seen,
+            (creatureId) => !hidden(creatureId)
+          )
+        : undefined;
+      return {
+        ...movementStatus(state, actorId, {
+          resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
+          catalog: kit.equipmentCatalog()
+        }),
+        ...spaceSharingFor(state, actorId, (definitionId) => kit.resolveDefinition(definitionId), hidden),
+        ...(areaGround ? { areaGround } : {})
+      };
     }
   },
 
@@ -265,6 +361,22 @@ export const gameReads = [
       if (!actor) throw new GameNotFoundError("That character no longer exists.");
       const definition = actor.definitionId ? storedDefinition(state, actor.definitionId) : undefined;
       return nextLevelOf(actor, definition, kit.catalogFor(principal), state.builderPolicy);
+    }
+  },
+
+  {
+    event: "actor:crafting-offers",
+    route: gameRoutes.getActorCraftingOffers,
+    schema: ActorCraftingOffersSchema,
+    malformed: "The crafting lookup is malformed.",
+    // Its owner or the GM, from the reader's own catalog, so a player sees only what they may craft.
+    run: (principal, input, kit) => {
+      const state = kit.read();
+      const actorId = (input as z.output<typeof ActorCraftingOffersSchema>).actorId;
+      requireActorAccess(initiatorOf(principal), state, actorId, "resource", "You can only read your own character.");
+      const actor = state.actors.find((candidate) => candidate.id === actorId);
+      if (!actor) throw new GameNotFoundError("That character no longer exists.");
+      return craftingOffers(actor, craftingDeps(kit, principal, state));
     }
   },
 

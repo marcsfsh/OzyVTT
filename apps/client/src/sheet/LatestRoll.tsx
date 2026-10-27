@@ -1,5 +1,6 @@
 import type { PlayerRollRecord } from "@vtt/domain";
 import { Button, IconStar } from "@vtt/ui";
+import { AnswerOffers } from "../encounter/RollControls";
 import type { SheetRolls } from "./useSheetRolls";
 import type { SheetState } from "./sheet-model";
 import { useSheetRollIds } from "./sheet-roll-ids";
@@ -57,7 +58,12 @@ export function LatestRoll({
         <span className="cs-lastroll-open">{body}</span>
       )}
       {canReroll && (
-        <Button size="sm" variant="secondary" disabled={rolls.rolling} onClick={() => void rolls.rerollCheck()}>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={rolls.rolling}
+          onClick={() => void (rolls.lastSave?.rollId === roll.id ? rolls.rerollSave() : rolls.rerollCheck())}
+        >
           {role === "gm" ? (
             "Reroll"
           ) : (
@@ -67,6 +73,23 @@ export function LatestRoll({
           )}
         </Button>
       )}
+      {rolls.lastCheck?.rollId === roll.id && <CheckAnswers rolls={rolls} />}
     </div>
+  );
+}
+
+/** What the check this sheet rolled last may still take (Bardic Inspiration, Stroke of Luck), as buttons. */
+export function CheckAnswers({ rolls }: Readonly<{ rolls: SheetRolls }>) {
+  const check = rolls.lastCheck;
+  if (!check?.answers?.length) return null;
+  return (
+    <span className="save-prompt-confirm cs-lastroll-answers">
+      <AnswerOffers
+        offers={check.answers}
+        typed={check.typed}
+        busy={rolls.rolling}
+        onAnswer={(answer) => void rolls.answerCheck(answer)}
+      />
+    </span>
   );
 }

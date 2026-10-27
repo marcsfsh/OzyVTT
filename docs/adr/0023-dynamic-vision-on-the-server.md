@@ -6,6 +6,9 @@ Accepted on 2026-10-17. Amends ADR-0022: its consequence that "a _public_ token 
 visually covered but still present in the player payload" no longer holds. A creature wholly under
 manual fog is now left out of what players receive, the same way as one out of sight.
 
+Amended on 2026-10-19 by "Light, obscurement and the rules that read sight" below, and again by
+"Doors, objects and the walls spells make".
+
 ## Context and decision drivers
 
 The owner's decision: **the server hides what a character can't see.** Each player's device gets
@@ -164,19 +167,137 @@ about 40 ms in the dark (7 ms in bright light), and a player's vision block is a
     price of not drawing where the carrier stands.
   - A rule that a hidden creature would trigger for a visible one (Pack Tactics, an aura, an ally for
     Sneak Attack, Disadvantage beside it) doesn't apply. The GM can still set the roll mode.
-- Not modelled yet: the Light and Daylight spells (the GM places a light), the Bullseye Lantern's
-  cone, Darkvision granted by an effect (the effect schema refuses senses), locked doors, opening a
-  door as the turn's object interaction, magical Darkness and heavily obscured areas, and dim
-  light's Disadvantage on Perception.
+- Not modelled yet: opening a door as the turn's object interaction. The light spells, the Bullseye
+  Lantern's Cone, senses from effects, magical Darkness, obscured areas and Dim Light's Disadvantage
+  on Perception came with the first amendment below, and locked doors with the second.
+
+## Amendment (2026-10-19): light, obscurement and the rules that read sight
+
+**Light levels.** A point is in Bright Light, Dim Light or Darkness: the scene's ambient level, then
+the painted areas over it (`bright`, `dim`, `dark`), then the lights that reach it with a clear line,
+each Bright Light out to its bright radius and Dim Light for its dim radius more. Bright ambient
+light may be sunlight (`vision.sunlight`), as may a light or an area (Daylight, Sunbeam, Holy
+Nimbus, a Sun Blade). Dim Light is Lightly Obscured and Darkness Heavily Obscured. Darkvision sees
+Dim Light as Bright and Darkness as Dim within its range; Devil's Sight and Truesight see both
+normally. Painted `lightly-obscured` and `heavily-obscured` areas are fog and foliage whatever the
+light, and `magical-darkness` stops every sight but Blindsight, Truesight and Devil's Sight. A
+heavily obscuring area blocks sight through it, so no one sees into or across it, except the one
+creature an area spares (Insect Cloud's holder).
+
+**Where light and senses come from.** Senses: stat blocks, species, features, invocations, feats,
+active items and live effects (True Seeing, See Invisibility, the Darkvision spell, Stonecunning),
+including `see-invisibility`, `devils-sight` and `x-ray` (walls don't stop sight within range).
+Goggles of Night add to Darkvision. Lights: an item in hand that is lit on its row (`item.set-light`:
+a Tinderbox or another flame, a Bonus Action in a fight, a Hooded Lantern's hood, a Bullseye
+Lantern's Cone aimed by its holder), which burns down on the game clock and is used up or needs Oil;
+an item that always glows while held; an effect (Produce Flame, Faerie Fire's outline, Shining
+Smite, Sacred Weapon); and a stat block's Illumination, put out by an effect tagged `light-out`. A
+spell's or an action's `sight` places its light, fog or magical Darkness on its area, its user or
+its targets, and dispels the spell light, Darkness or fog of a level it names that the new area
+overlaps (Darkness and Daylight, Gust of Wind). What a cast makes ends with the Concentration, the
+effect or the rounds that keep it (`vision/cast-sight.ts`, pruned after every command).
+
+**The rules.** `vision/rules.ts` gives the rules one answer to "can this creature see that one":
+the map while vision is on, and with it off the conditions plus Blindsight, Truesight and See
+Invisibility by the distance between tokens, so an Invisible creature is seen by them even on a
+scene with no vision. Light and line of sight are the GM's while vision is off, and a rule that
+needs them keeps its printed effect there. With vision on:
+
+- Cover comes from the map: of a target's four corners, the walls hide one or two (Half Cover),
+  three (Three-Quarters) or all from every corner of the attacker (Total), and another creature on
+  the line gives Half Cover. The GM's marks still count; the best applies.
+- An area of effect leaves out a creature every straight line to which a wall or closed door blocks
+  from its point of origin.
+- Hide needs a Heavily Obscured space or Three-Quarters or Total Cover from each enemy
+  (`hide.exposed`); Naturally Stealthy counts a creature a size larger as cover. The Hide total is
+  the DC a Search with Perception meets to find the creature, and a Verbal spell ends hiding.
+- Frightened gives its Disadvantage only while its source is within line of sight, and
+  `movement.toward-fear` refuses a willing move closer to it.
+- A Perception check to find a creature fails when the roller is Blinded or the creature is Heavily
+  Obscured to it, and has Disadvantage when it is Lightly Obscured. Passive Perception against a
+  hidden creature stays the GM's.
+- Riders can name sight: `sees-other` (Dodge), `seen-by-other` (Faerie Fire's Advantage) and
+  `other-lacks-sense` (Blur). A save with `sight.seenBy` reaches only creatures that see its user (a
+  ghost's Horrific Visage) or its area (Hypnotic Pattern). A trait or feature can ask for sunlight
+  or Bright Light (Sunlight Sensitivity, a vampire's burn at turn start) or Dim Light and Darkness
+  (`light.too-bright`: Shadow Stealth, Merge with Shadows, One with Shadows; Shadowy Form's
+  Resistance).
+
+**Senses shown to one player.** An effect with `detects` (Divine Sense, Detect Evil and Good) adds
+marks to its bearer's player's vision block for each public creature of a named type within range
+(through walls unless `blockedByWalls`) that the player doesn't already see: its position and
+creature type only. The table screen and other players get none, and a GM-only creature is never
+marked. Nothing else about the creature crosses.
+
+**Commands.** `vision.add-area` and `vision.remove-area` are the GM's (`scene:write`), and
+`vision.set-ambient` takes `sunlight`. `item.set-light` is `combat:write`: a player lights, hoods
+or aims only their own character's light.
+
+**Speed.** Measured on the shared development machine under load (about 11 on 4 cores), 300 walls
+in the dark: with 6 characters, 20 monsters and 10 lights, recording what the party has explored
+takes about 120 ms the first time, six player projections and the table screen about 60 ms, and
+13 ms once cached. With 30 tokens, 20 lights and 10 areas: about 180 ms, 120 ms and 8 ms. Asking
+every creature whether it sees every other takes about 13 ms. A player's vision block is 8 to 30
+KB. The first numbers in this record were taken on an idle machine; the cached paths are what a
+turn mostly runs.
+
+## Amendment (2026-10-19): doors, objects and the walls spells make
+
+**Doors that stay shut.** A door may carry `door`: its `fastenings` (a `lock` with the DC to pick it,
+an optional DC to break it by force and the creatures that hold its key; `stuck`, `barred` or
+`jammed` with the Strength (Athletics) DC that forces it, 15 when none is set; `sealed` by Stone
+Shape, which no check opens), an `arcaneLock` with its caster, the creatures it lets through and how
+long Knock holds it off, and `hidden` for a secret door. `door.set-open` refuses a player a door held
+shut against their character and says what holds it ("The door is locked."), so a player learns of
+a lock by trying the door, as at a table. A secret door, or one out of reach, gets the answer a
+missing door gets.
+
+**Objects.** A wall or a door may carry `object`: an Armor Class, Hit Points, a damage threshold
+and its immunities, resistances and vulnerabilities (SRD Breaking Objects). A door with none is a
+Medium wooden door, AC 15 and 18 Hit Points. What holds a creature (a Net, a web, a rope) is an
+object on the effect that holds it (`heldBy`). An object always shrugs off Poison and Psychic
+damage, a Siege Monster's damage to it doubles, and at 0 Hit Points a wall or door is gone and a
+held creature goes free.
+
+**Walls made by spells.** A spell's `walls` raise walls on the template its cast placed: Wall of
+Force (it stops movement, and sight passes), Wall of Stone and Wall of Ice in 10-foot panels that are objects,
+and Forcecage's bars, which stop movement and no line, so they give no cover and stop no area. A
+creature in the new wall's space is moved out of it. Each wall carries its `source` and goes with
+the Concentration or effect that keeps it (`pruneEndedWalls`), unless the spell made it lasting (Wall
+of Stone held for its full duration). A cast's `wallId` aims Knock, Arcane Lock, Mage Hand,
+Thaumaturgy, Elementalism, Stone Shape, Passwall or Disintegrate at a door or a wall, checked for
+range and, where the spell says so, sight. A gap cut in a wall (`openings`) lets sight and movement
+through and closes with its spell. A creature that passes walls (Incorporeal Movement, Earth Glide,
+Tunneler) is still stopped by one a spell raised.
+
+**What players get.** No part of `door` or `object` reaches a player or the table screen. A secret
+door is sent as a `wall`, a wall with gaps as the parts that stand (each with an id derived from
+the wall's), and what holds a creature only as its name.
+
+**Commands.** `door.set-state` and `object.set` are the GM's (`scene:write`), with an optional
+`sceneId`. `door.use` and `object.attack` are `combat:write`: the GM's for any creature, a player's
+for their own character, which must be beside the door to work on it. The server rolls every check
+and attack. `object.damage` is the GM's alone.
+
+**On the map.** A door's handle opens its menu: open or close the door and, with the player's
+character or the GM's acting creature, pick, force, pry, jam or seal it. The GM's handle shows a
+door held shut and a secret one, the GM sees the hit points of each wall or door that is an object,
+and the menu edits the lock, the bar, the secret and the statistics. While an attack or a spell is
+being aimed, a tap on a wall or a door makes it the target. A token's menu names what holds the
+creature and aims a live attack at it.
 
 ## Mobile, security, and visibility impact
 
 The GM's tools are one more labelled group in the map toolbar, **Vision**: the switch, the light
 level, the Wall, Door, Window, Light and Remove tools, the light to place, "Look through", "Remove
-all walls" and "Forget what the party has seen". It works at 390 px with touch. A door's handle has
-a 44-pixel touch ring, which a player taps to open the door beside their character. The client
+all walls" and "Forget what the party has seen". The Light group also paints areas (Paint area,
+with the kind to paint) and turns bright ambient light into sunlight; Remove takes an area away. A
+player's light sources are lit, hooded and aimed in the item's detail on the sheet's Gear tab. It
+works at 390 px with touch. A door's handle has
+a 44-pixel touch ring, which opens the door's menu (see the second amendment). The client
 paints the server's polygons as a second mask in `FogOverlay`: solid for players and the table
-screen, dimmed for the GM.
+screen, dimmed for the GM. What is in sight but not in Bright Light keeps a light shade, and a
+sensed creature is a dashed ring named with its creature type.
 
 ## Migration / reversibility
 
@@ -208,3 +329,12 @@ light. The rules-5e path test and the client's move-preview mirror test cover wa
 in the path search. A browser look at 390 x 844 (touch) and 1280 x 800 covered a player's view in
 the dark, a door tapped open on a phone, the GM's Vision group, looking through a character, and a
 manual-fog scene with the goblins missing from the players' DOM.
+
+For the amendment: `vision-light.test.ts` (light levels, areas, sunlight, senses from effects and
+items, lit items and their burn time), `vision-cast-sight.test.ts` (what casts and actions place,
+keep and dispel), `vision-sight-rules.test.ts` (Cover, areas at walls, Hide, Search, Frightened,
+Dodge, Blinded and obscured checks, light sensitivity, gazes, senses with vision off) and
+`vision-features.test.ts` (invocations, feats, Divine Sense's marks for one player only, Shadowy
+Form, Merge with Shadows, One with Shadows, seen-only saves). On the client,
+`scene/vision-areas.test.tsx` paints and removes areas, sets sunlight and draws Dim Light and sensed
+marks, and `sheet/item-light.test.tsx` lights, hoods and aims a light source.

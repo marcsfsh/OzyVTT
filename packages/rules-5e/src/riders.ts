@@ -22,32 +22,41 @@ export type AttackKind =
   | "opportunity"
   | "weapon"
   | "melee-weapon"
-  | "ranged-weapon";
+  | "ranged-weapon"
+  | "two-handed"
+  | "ranged-weapon-kind";
 
 /** The named roll or event a rider fires at; at most one per rider. */
 export type RiderMoment =
   | "on-attack-roll"
   | "on-hit"
   | "on-critical-hit"
+  | "on-natural-20"
   | "on-damage-roll"
   | "on-saving-throw"
   | "on-ability-check"
   | "on-initiative-roll"
-  | "on-taking-damage";
+  | "on-taking-damage"
+  | "on-healing";
 
 const MOMENTS: ReadonlySet<string> = new Set<RiderMoment>([
   "on-attack-roll",
   "on-hit",
   "on-critical-hit",
+  "on-natural-20",
   "on-damage-roll",
   "on-saving-throw",
   "on-ability-check",
   "on-initiative-roll",
-  "on-taking-damage"
+  "on-taking-damage",
+  "on-healing"
 ]);
 const FILTERS: ReadonlySet<string> = new Set([
   "attack-kind-is",
   "weapon-property-is",
+  "weapon-is",
+  "versus-magic",
+  "versus-spell",
   "damage-type-is",
   "ability-is",
   "skill-is",
@@ -57,9 +66,26 @@ const FILTERS: ReadonlySet<string> = new Set([
   "versus-creature-type",
   "versus-size",
   "versus-condition",
-  "by-effect-source"
+  "by-effect-source",
+  "source-creature-type-is",
+  "versus-breath-weapon",
+  "versus-effect-source",
+  "versus-marked",
+  "versus-hurt",
+  "versus-within",
+  "spell-class-is",
+  "sees-other",
+  "seen-by-other",
+  "other-lacks-sense",
+  "situation-is",
+  "other-weapon"
 ]);
-const DYNAMIC_GATES: ReadonlySet<string> = new Set(["while-effect-tag", "while-hp-at-or-below", "while-condition"]);
+const DYNAMIC_GATES: ReadonlySet<string> = new Set([
+  "while-effect-tag",
+  "while-hp-at-or-below",
+  "while-condition",
+  "while-marking"
+]);
 
 /** Which of the four kinds a trigger belongs to; decides a rider's layer. */
 export function triggerKind(type: string): "static-gate" | "dynamic-gate" | "moment" | "filter" {
@@ -92,7 +118,16 @@ export type RiderTrigger = Readonly<{
   levels?: readonly number[];
   spellIds?: readonly string[];
   creatureTypes?: readonly string[];
+  /** `versus-creature-type`: the target is of none of the types. */
+  except?: boolean;
+  /** `while-attuned-to`: the catalog ids of the other items. */
+  itemIds?: readonly string[];
   sizes?: readonly string[];
+  /** `versus-within`: the farthest the target may stand from the bearer. */
+  feet?: number;
+  senses?: readonly string[];
+  /** `situation-is`: the plain words the roller names a check by ("consulting an accurate Book about its topic"). */
+  situation?: string;
 }>;
 
 /** A typed numeric rider, structurally open so each consumer reads only its fields and a variant this build
@@ -106,16 +141,22 @@ export type RiderModifier = Readonly<{
   whileArmored?: boolean;
   /** `unarmored-defense`: does the benefit survive a shield? */
   allowShield?: boolean;
+  /** `base-armor-class`: the base AC it gives while no armor is worn (Robe of the Archmagi's 15). */
+  base?: number;
   count?: number;
   feet?: number;
   formula?: string;
   /** `extra-damage` may name an ability, alone or beside dice: the bearer's modifier, resolved at the roll. */
   abilityModifier?: RiderAbility;
+  /** `extra-damage`: a fixed amount with no die (Sword of Life Stealing's 15), and Temporary Hit Points for the bearer
+   *  equal to what of it the target takes. */
+  flat?: number;
+  temporaryHitPoints?: boolean;
   damageType?: string;
   /** `damage-resistance` / `damage-vulnerability`. */
   damageTypes?: readonly string[];
   doubleOnCritical?: boolean;
-  roll?: "attack" | "incoming-attack" | "save" | "check" | "initiative" | "concentration";
+  roll?: "attack" | "incoming-attack" | "save" | "check" | "initiative" | "concentration" | "death-save";
   mode?: "advantage" | "disadvantage";
   classId?: string;
   level?: number;
@@ -126,8 +167,48 @@ export type RiderModifier = Readonly<{
   movement?: "fly" | "swim" | "climb" | "burrow";
   equalToSpeed?: boolean;
   hover?: boolean;
-  /** `attack-bonus` / `save-bonus`: dice rolled on top of `amount` ("1d4"), or taken off ("-1d4"). */
+  /** `special-speed` / `movement`: only on the bearer's own turn. */
+  ownTurn?: boolean;
+  /** `movement`: how the bearer falls and jumps ("safe-fall", "leap"), with a leap's `costFeet` and a multiplier's
+   *  `times`. */
+  rule?: string;
+  costFeet?: number;
+  times?: number;
+  /** `attack-bonus` / `save-bonus` / `check-bonus` / `damage-bonus`: dice rolled on top of `amount` ("1d4"), or taken
+   *  off ("-1d4"); `damage-reduction`: dice rolled as the damage lands. */
   dice?: string;
+  /** `check-bonus`: the least its `abilityModifier` part counts as (Thaumaturge's +1). `d20-minimum`: the face a lower
+   *  d20 counts as. */
+  minimum?: number;
+  /** `d20-minimum`: only on a check that uses a proficiency (Reliable Talent). */
+  proficientOnly?: boolean;
+  /** `total-minimum`: the ability whose score a lower total counts as (Indomitable Might's Strength). `extra-damage`:
+   *  the ability whose score is added, `increased` naming the one the carrying feat increased. */
+  abilityScore?: RiderAbility | "increased";
+  /** `extra-damage`: one damage roll of a spell, its first. */
+  oncePerCast?: boolean;
+  /** `ability-score-minimum`: the least the score counts as ("Your Strength is 19"). */
+  score?: number;
+  /** `ability-score`: the most an increase takes the score to (20 when absent). */
+  maximum?: number;
+  /** `ignores-cover`: the most cover the attack sets aside. */
+  degree?: "half" | "three-quarters";
+  /** `speed-minimum`: armor's Strength requirement takes nothing from it either. */
+  ignoresArmor?: boolean;
+  /** `damage-bonus`: a penalty that leaves the damage at 1 or more (Reduce). */
+  leavesOne?: boolean;
+  /** `damage-reduction`: once a turn, on an effect (Resistance). */
+  oncePerTurn?: boolean;
+  /** `healing-bonus`: the slot's level is added, on a spell cast with a slot. */
+  perSlotLevel?: boolean;
+  /** `healing-bonus`: the bearer regains it, once its healing reaches another creature (Blessed Healer). */
+  self?: boolean;
+  /** `spell-ward`: the schools and spells that can't reach the bearer, whether its own side's spells still do, and
+   *  whether magical senses that tell a creature's type miss it too. */
+  schools?: readonly string[];
+  spellIds?: readonly string[];
+  alliesAllowed?: boolean;
+  typeSenses?: boolean;
   when?: readonly RiderTrigger[];
   scope?: "bearer" | "this-item";
 }>;
@@ -169,8 +250,12 @@ export type RiderContext = Readonly<{
   proficientArmor?: readonly string[];
   proficientTools?: readonly string[];
   proficientSkills?: readonly string[];
+  /** The catalog ids of the items the bearer is attuned to, for `while-attuned-to`. */
+  attunedCatalogIds?: readonly string[];
   // ---- dynamic gates ----
   effectTags?: readonly string[];
+  /** The tags of the effects the bearer has put on creatures that still live, for `while-marking`. */
+  markingTags?: readonly string[];
   /** current / maximum, 0..1; absent = unknown, so `while-hp-at-or-below` fails closed. */
   hitPointFraction?: number;
   bearerConditionIds?: readonly string[];
@@ -189,11 +274,45 @@ export type RiderContext = Readonly<{
   targetSize?: string;
   targetConditionIds?: readonly string[];
   targetCreatureType?: string;
+  /** The tags its stat block prints beside the target's type ("demon"), which `versus-creature-type` also matches. */
+  targetTypeTags?: readonly string[];
   /** Which item this roll is made with; `scope: "this-item"` matches against it. */
   sourceItemId?: string | null;
+  /** The item the roll is made with, kept when an item carrier's own id takes `sourceItemId` (`other-weapon`). */
+  rollItemId?: string | null;
   /** The riders being read sit on an effect the roller put on its bearer (Hunter's Mark on the creature it hits);
    *  `by-effect-source` passes only then. */
   fromEffectSource?: boolean;
+  /** The creature type of the creature on the other side: the attacker, for an attack against the bearer, or the
+   *  creature whose effect forces its save. `source-creature-type-is` reads it. */
+  sourceCreatureType?: string;
+  /** The tags beside that creature's type ("demon"), which `source-creature-type-is` also matches. */
+  sourceTypeTags?: readonly string[];
+  /** The riders being read sit on an effect whose source is the roll's target (Bestow Curse on the cursed creature,
+   *  attacking its caster); `versus-effect-source` passes only then. */
+  targetIsEffectSource?: boolean;
+  /** The tags of the effects the bearer put on the target (its grapple, its Hunter's Mark), for `versus-marked`. */
+  targetMarkTags?: readonly string[];
+  /** The target is missing some of its Hit Points, for `versus-hurt`. */
+  targetHurt?: boolean;
+  /** The map's distance from the bearer to the target, for `versus-within`; absent where it can't measure. */
+  targetDistanceFeet?: number;
+  /** The class the bearer casts the spell as (its sheet entry's class), for `spell-class-is`. */
+  spellClassId?: string;
+  /** Whether the bearer can see the other creature in the roll, and it the bearer (the server's sight). */
+  seesOther?: boolean;
+  seenByOther?: boolean;
+  /** The senses the other creature perceives the bearer with, within their range ("blindsight", "truesight"). */
+  otherSenses?: readonly string[];
+  /** The situations the roller says this check fits, for `situation-is`. */
+  situations?: readonly string[];
+  /** The weapon the attack is made with: its catalog id and the base a magic weapon is bound to, for `weapon-is`. */
+  weaponIds?: readonly string[];
+  /** The save is against a spell or another magical effect (`versus-magic`), and against a spell (`versus-spell`). */
+  magicalSource?: boolean;
+  spellSource?: boolean;
+  /** The save is against a breath weapon (`versus-breath-weapon`). */
+  breathWeaponSource?: boolean;
 }>;
 
 const overlaps = (allowed: readonly string[] | undefined, have: readonly string[] | undefined): boolean =>
@@ -235,8 +354,12 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
       return overlaps(trigger.ids, have);
     }
     // ---- dynamic gates ----
+    case "while-attuned-to":
+      return overlaps(trigger.itemIds, context.attunedCatalogIds);
     case "while-effect-tag":
       return overlaps(trigger.tags, context.effectTags);
+    case "while-marking":
+      return overlaps(trigger.tags, context.markingTags);
     case "while-hp-at-or-below":
       return (
         context.hitPointFraction !== undefined &&
@@ -252,6 +375,12 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
       return overlaps(trigger.kinds as readonly string[] | undefined, context.attackKinds);
     case "weapon-property-is":
       return overlaps(trigger.properties, context.weaponProperties);
+    case "weapon-is":
+      return overlaps(trigger.ids, context.weaponIds);
+    case "versus-magic":
+      return context.magicalSource === true;
+    case "versus-spell":
+      return context.spellSource === true;
     case "damage-type-is":
       return overlaps(trigger.damageTypes, context.damageTypes);
     case "ability-is":
@@ -274,12 +403,13 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
       return (
         trigger.spellIds !== undefined && context.spellId !== undefined && trigger.spellIds.includes(context.spellId)
       );
-    case "versus-creature-type":
-      return (
-        trigger.creatureTypes !== undefined &&
-        context.targetCreatureType !== undefined &&
-        trigger.creatureTypes.includes(context.targetCreatureType)
-      );
+    case "versus-creature-type": {
+      if (trigger.creatureTypes === undefined || context.targetCreatureType === undefined) return false;
+      const matched =
+        trigger.creatureTypes.includes(context.targetCreatureType) ||
+        overlaps(trigger.creatureTypes, context.targetTypeTags);
+      return trigger.except === true ? !matched : matched;
+    }
     case "versus-size":
       return (
         trigger.sizes !== undefined && context.targetSize !== undefined && trigger.sizes.includes(context.targetSize)
@@ -288,6 +418,52 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
       return overlaps(trigger.conditionIds, context.targetConditionIds);
     case "by-effect-source":
       return context.fromEffectSource === true;
+    case "source-creature-type-is":
+      return (
+        trigger.creatureTypes !== undefined &&
+        context.sourceCreatureType !== undefined &&
+        (trigger.creatureTypes.includes(context.sourceCreatureType) ||
+          overlaps(trigger.creatureTypes, context.sourceTypeTags))
+      );
+    case "other-weapon":
+      return (
+        context.sourceItemId != null &&
+        context.rollItemId != null &&
+        context.rollItemId !== context.sourceItemId &&
+        (context.attackKinds ?? []).includes("weapon")
+      );
+    case "versus-breath-weapon":
+      return context.breathWeaponSource === true;
+    case "versus-effect-source":
+      return context.targetIsEffectSource === true;
+    case "versus-marked":
+      return overlaps(trigger.tags, context.targetMarkTags);
+    case "versus-hurt":
+      return context.targetHurt === true;
+    case "versus-within":
+      return (
+        trigger.feet !== undefined &&
+        context.targetDistanceFeet !== undefined &&
+        context.targetDistanceFeet <= trigger.feet + 0.5
+      );
+    case "spell-class-is":
+      return (
+        trigger.classIds !== undefined &&
+        context.spellClassId !== undefined &&
+        trigger.classIds.includes(context.spellClassId)
+      );
+    case "sees-other":
+      return context.seesOther === true;
+    case "seen-by-other":
+      return context.seenByOther === true;
+    case "other-lacks-sense":
+      return (
+        trigger.senses !== undefined &&
+        context.otherSenses !== undefined &&
+        !trigger.senses.some((sense) => context.otherSenses!.includes(sense))
+      );
+    case "situation-is":
+      return trigger.situation !== undefined && (context.situations ?? []).includes(trigger.situation);
     default:
       return false;
   }
@@ -337,7 +513,9 @@ export function collectRiders(carriers: readonly RiderCarrier[], context: RiderC
       )
         continue;
       const itemContext =
-        carrier.sourceItemId === undefined ? context : { ...context, sourceItemId: carrier.sourceItemId };
+        carrier.sourceItemId === undefined
+          ? context
+          : { ...context, sourceItemId: carrier.sourceItemId, rollItemId: context.sourceItemId ?? null };
       if (!gates.every((trigger) => triggerKind(trigger.type) === "moment" || passes(trigger, itemContext))) continue;
       collected.push({
         modifier,

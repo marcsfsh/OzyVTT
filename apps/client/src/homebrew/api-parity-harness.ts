@@ -440,14 +440,51 @@ const SAVE_LIFETIME_KEYS = [
   "repeatSave",
   "escapeDc",
   "endsOnDamage",
+  "endsOnSourceSideDamage",
   "speedZero",
   "rangeFeet",
   "failsAtHitPoints",
   "ongoingDamage.**",
   "failureHazard",
   "failurePush.**",
-  "advantageAtSize"
+  "successPush.**",
+  "successMovesOut.**",
+  "advantageAtSize",
+  "escapeAthletics",
+  "repeatOnce",
+  "repeatAtTurnStart",
+  "repeatOnDamage.**",
+  "repeatByAction",
+  "repeatFailureDamage[].**",
+  "repeatTally",
+  "secondFailure.**",
+  "failureExhaustion",
+  "advantageIfFighting",
+  "immuneOnSuccess",
+  "endsWhenSourceDies",
+  "endsWhenSourceIncapacitated",
+  "onlyCreatureTypes",
+  "sparesAffected",
+  "failureKills.**",
+  "failureMaxSize",
+  "repeatDamageAgain",
+  "repeatUnseenSource",
+  "repeatBeyondFeet",
+  "endsOutOfSight",
+  "autoSuccess.**",
+  "endedBy.**",
+  "atRest.**",
+  "successEndsSpell",
+  "repeatTallySuccessesOnly",
+  "failureHoursRolled",
+  "immuneMinutes",
+  "repeatAfterCompelledMove"
 ] as const;
+
+/** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
+const DEATH_SAVE_KEYS = ["failureByHitPoints[].**", "failureBanishes", "banishedForGood"] as const;
+/** The save-block keys for a failure by a margin and the creatures a failure spares (`SaveOutcomeFields`). */
+const MARGIN_SAVE_KEYS = ["failureByMargin.**", "sparesCreatureTypes", "sparesSpecies"] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
@@ -466,6 +503,41 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].castThrough",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast made through a spell its user concentrates on (a Crystal Ball's Detect Thoughts through Scrying) - synthesised from an item cast's `through`; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castCheck.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a check made before a use (an Amulet of the Planes' DC 15 Intelligence (Arcana)) - synthesised from an item cast's `check`; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].alsoUses.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a second limit each use counts against, restored by a Long Rest (a Luck Blade's Wish once a dawn) - synthesised from an item cast's `alsoUses`; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].timePool",
+    types: ACTION_CARRIERS,
+    reason:
+      "uses that are time, a use spending all that is left (Boots of Speed's rounds, a Goat of Traveling's hours) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].conditionPicks.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "conditions a chosen-cost action also ends for points of its pool (Restoring Touch) - authored in the class overlays with `useCost`; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].endsConditions",
     types: ACTION_CARRIERS,
     reason:
@@ -477,6 +549,48 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "a cure that ends the one condition its user picks (Lesser Restoration) - copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].restores",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast that asks which harm it ends (Greater Restoration) - copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].breaksEnchantment.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a touch that ends what some creature types charmed, frightened or possessed (Dispel Evil and Good) - copied from the spell's later actions; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsOwnSpell",
+    types: ACTION_CARRIERS,
+    reason:
+      "a later action that ends its own spell once used (Dispel Evil and Good) - copied from the spell's later actions; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].setsHeading",
+    types: ACTION_CARRIERS,
+    reason:
+      "a later action that names the direction a compelled creature moves (Compulsion) - copied from the spell's later actions; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].scryingModifiers",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast that asks its caster's knowledge of and connection to the target (Scrying) - copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].failureMove.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "how far a failed save moves the target to the space picked, and whether it lifts it (Telekinesis) - copied from the spell's later actions; no editor control yet",
     status: "gap"
   },
   {
@@ -492,6 +606,167 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     reason:
       "what bursts after an attack (Ice Knife) - copied from the spell's cast model by the character build, zero hand authors",
     status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].move.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the move an action makes its creature take (a dragon's Pounce, a troll's Charge) - read from the action's description as it is saved; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].teleport.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the teleport an action makes its creature take (a blink dog's 40 feet) - read from the action's description as it is saved; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].leap.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the jump an action allows (a bulette's Leap) - read from the action's description as it is saved; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].destination.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the space an action sets its user or its target down in (a bulette's Deadly Leap, a kraken's Fling) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].needsObject",
+    types: ACTION_CARRIERS,
+    reason:
+      "the carried object an action needs whole (a night hag's soul bag, an erinyes's rope) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castRiders.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what a monster's spell holds to beyond the spell (a night hag's Dream from the Border Ethereal, wasted on a warded target) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].zone.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the area an action leaves on the map to act later (spread Caltrops, a set Hunting Trap) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].summons.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the creatures an action brings onto the map and how they are commanded (a Horn of Valhalla's Berserkers, a treant's trees) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].holds.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the creatures an action traps off the map inside its item, and how many at once (an Iron Flask) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].releases.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the trapped creature an action lets out beside its user, and the minutes it obeys (an Iron Flask) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].douses.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the flames an action puts out around its user (Frost Brand) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].adjustsLight.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the steps an action turns its own light up or down by (a Sun Blade) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].doorWork.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action does to the door it is aimed at (an Immovable Rod, Sovereign Glue, Universal Solvent, a Ring of the Ram) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].pointsAtHidden.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "how far an action points its user at a secret door or hidden trap (a Wand of Secrets) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].lightsArea.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spilled oil an action lights round its user (a Tinderbox) - authored in the equipment table; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].raisesTower.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the tower an action raises on its placed square, with its walls' print (an Instant Fortress) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].dismissesTower",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that shrinks its user's tower again (an Instant Fortress) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].objectDamage[].**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the damage the objects under an action's area take (a Thunderous Greatclub's Clap of Thunder and Earthquake) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].concentrationSave.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the save a concentrating creature in an action's area also makes (a Thunderous Greatclub's Earthquake) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].grounded",
+    types: ACTION_CARRIERS,
+    reason:
+      "an area that spares the creatures off the ground (a Thunderous Greatclub's Earthquake) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castsAtOnce",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast a feature makes a Magic action whatever the spell's casting time (Pact of the Chain's Find Familiar) - set by the builder from the feature's grant",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].waives",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spell components a feature's cast goes without (Wild Companion's Find Familiar) - set by the builder from the feature's grant",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "summonScaling.**",
+    types: ["monster"],
+    reason:
+      "how a stat block a spell prints scales with the spell's level and its summoner (a Draconic Spirit) - authored with the spell-printed stat blocks; no editor control yet",
+    status: "gap"
   },
   {
     at: "actions[].drain.**",
@@ -535,10 +810,24 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].attack.countWithItself",
+    types: ACTION_CARRIERS,
+    reason:
+      "a weapon's extra attacks made with itself alone (Thirsting Blade's pact weapon) - set by the server on the bonded weapon's swing",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].attack.criticalBonusDice",
     types: ACTION_CARRIERS,
     reason:
       "attack keys the action rows do not enumerate: surfaced when the bare-group false credit was removed (this batch's adversarial review)",
+    status: "gap"
+  },
+  {
+    at: "actions[].attack.bonus",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a printed to-hit that stands in for the derived one (a Ring of the Ram's +7) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {
@@ -568,6 +857,139 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "how a failed save's conditions end, where it pushes and who has Advantage on it, read from the spell's description as the catalog is built",
     status: "gap"
   })),
+  ...DEATH_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "what a failed save does by the target's Hit Points (a Slaying Bow's death, a Death Glare's drop to 0) and the creature types it sends home - authored in the content scripts; no editor control yet",
+    status: "gap"
+  })),
+  ...DEATH_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason:
+      "what a failed save does by the target's Hit Points and the creature types it sends home (Divine Word) - authored in the content scripts",
+    status: "gap"
+  })),
+  ...MARGIN_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "what a failure by 5 or more does instead (a homunculus's Bite) and the creatures a failure spares by type or species (a ghoul's Claw: an Undead or an elf) - read from the stat block's text; no editor control yet",
+    status: "gap"
+  })),
+  ...MARGIN_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason:
+      "what a failure by a margin does and the creatures a failure spares, read from the spell's description as the catalog is built",
+    status: "gap"
+  })),
+  {
+    at: "actions[].underwaterOnly",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action usable only in an underwater fight (a seahorse's Bubble Dash), read from the action's description as the catalog is built",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].object.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the target's armor or weapon a failed save corrodes (a rust monster's Antennae), authored in the stat-block enrichments; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].checkFirst.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the check its user makes before the action lands (binding with a Chain or Manacles) - authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsItemEffects",
+    types: ACTION_CARRIERS,
+    reason:
+      "a command that releases what the item's other actions hold (Iron Bands, a Rope of Entanglement) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].rebindsRow.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "remaking a carried weapon or stack of ammunition as a magic one (Oil of Sharpness) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].damage[].pick",
+    types: ACTION_CARRIERS,
+    reason:
+      "a damage part whose type is the one picked for the creature (a half-dragon's Claw and its Draconic Origin), read from the stat block's text; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.heldBy.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the object that holds a creature a failure restrains (a Net, a giant spider's web) with its Armor Class and Hit Points - read from the stat block's text or authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.heldBy.**",
+    types: ["spell"],
+    reason:
+      "the object that holds a creature a spell's failure restrains, read from the spell's text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "walls.**",
+    types: ["spell"],
+    reason:
+      "the walls a spell raises, cuts or destroys and what it does to a door (Wall of Force, Knock) - a reviewed table in the content build; the spell form has no control for them",
+    status: "gap"
+  },
+  {
+    at: "actions[].raisesCorpse.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a corpse an action raises as a new creature (a wraith's Create Specter): the stat block, how long dead and how many at once - authored in the content scripts; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.breaksConcentration",
+    types: ACTION_CARRIERS,
+    reason:
+      "a failed save that also breaks the creature's Concentration (Earthquake, Sleet Storm) - authored with the spell's save outcomes; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.breaksConcentration",
+    types: ["spell"],
+    reason:
+      "a failed save that also breaks the creature's Concentration (Earthquake, Sleet Storm), authored with the save outcomes as the catalog is built",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.bySelf",
+    types: ACTION_CARRIERS,
+    reason:
+      "a save the user makes against its own action (Contact Other Plane's DC 15 Intelligence save) - copied from the spell's cast model; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].dispel.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that ends spells on its target (Dispel Magic), copied from the spell's cast model; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsCurses",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that ends curses on its target (Remove Curse), copied from the spell's cast model; no editor control yet",
+    status: "gap"
+  },
   {
     at: "actions[].grants.**",
     types: ACTION_CARRIERS,
@@ -588,6 +1010,65 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].swallow.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a stat block's Swallow (how many it holds, the size it swallows, its acid and its regurgitation), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].pull.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that pulls its targets toward its user (a roper's Reel), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].inflicts.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action does to its targets with no roll (a tarrasque's shock wave: Prone and lost Concentration), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].afterHurtingBloodied",
+    types: "*",
+    reason:
+      "an action offered only right after its user damages a Bloodied creature (a gnoll's Rampage), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].largeFillsHold",
+    types: "*",
+    reason: "one SRD author (a water elemental's Whelm: one Large creature or up to two smaller ones)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].useNumber",
+    types: "*",
+    reason: "one SRD author (a sphinx of valor's three roars in their order)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].magical",
+    types: ACTION_CARRIERS,
+    reason:
+      "that an action's saves are against magic (a sphinx's magical roar), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].holdsAtOnce",
+    types: "*",
+    reason: "one SRD author (a shambling mound's Engulf, one creature at a time)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].multiattackAlternativesAfter",
+    types: "*",
+    reason: "one SRD author (a clay golem's three Slams after Hasten), read from its Multiattack's prose",
+    status: "permanent: lone SRD record"
+  },
+  {
     at: "actions[].multiattackReplacements[].**",
     types: ACTION_CARRIERS,
     reason:
@@ -599,6 +1080,26 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "authored in the class overlays, spell effects and stat-block prose (Uncanny Dodge, Shield, Parry); no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].reactionByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a reaction that changes with level (Deflect Energy) - feature-carrier actions only, beside reaction itself",
+    status: "gap"
+  },
+  {
+    at: "actions[].answer.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action does to a roll after it is seen (Bardic Inspiration, Indomitable, a Luck Blade) - authored in the class overlays, item mechanics and stat-block enrichments; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].answerAmountByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason: "an answer's die that grows with level (the Bardic Inspiration die) - feature-carrier actions only",
     status: "gap"
   },
   {
@@ -644,6 +1145,37 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].explodingDice.**",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Sorcerous Burst), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].teleportOutcome",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Teleport), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].identifiesItem",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Identify), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].wishUses",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Wish), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].castLastsMinutes",
+    types: ACTION_CARRIERS,
+    reason:
+      "how long an item cast lasts in place of the spell's duration (Oil of Slipperiness' Grease) - synthesised from an item cast's `lastsMinutes`",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].darts",
     types: ACTION_CARRIERS,
     reason: "synthesised from a spell's cast model by the character build (Magic Missile), zero hand authors",
@@ -672,6 +1204,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "a stat block's damage under a printed condition (Bloodied swarms, a charge), read from the hit clause as the catalog is built; no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].attack.advantageWhen",
+    types: ["monster"],
+    reason:
+      "the Advantage a stat block's attack prints for itself (against a creature it grapples, one missing Hit Points, or in the first round), read from its text as the catalog is built; no control on the action row yet",
     status: "gap"
   },
   {
@@ -714,10 +1253,31 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "upcastDurations[].**",
+    types: ["spell"],
+    reason:
+      "a spell's duration and Concentration by slot level, authored from its higher-level text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "area.**",
     types: ["spell"],
     reason: "read from the spell's description as the catalog is built; the editor writes the description",
     status: "permanent: system-synthesised"
+  },
+  {
+    at: "sight.**",
+    types: ["spell"],
+    reason:
+      "the light, darkness or fog the spell places on the map (Daylight, Fog Cloud), authored per spell as the catalog is built",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].sight.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the light, darkness or fog an action places (a darkmantle's Darkness Aura) - copied from the spell by the character build or authored in the catalog; no editor control yet",
+    status: "gap"
   },
   {
     at: "actions[].spellSlot.level",
@@ -736,6 +1296,121 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason: "one SRD author (a lone record)",
     status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].ridesHit.**",
+    types: "*",
+    reason:
+      "what an action adds to a hit (Sneak Attack's Cunning Strikes, Brutal Strike, a staff's charges): the hits it rides, its cost, its save and the effects picked with it - authored in the class and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].targets.**",
+    types: "*",
+    reason:
+      "who an action that isn't a spell may target (how many, how far, which creatures) - authored in the overlays or read from a stat block's save text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].shapeShift.**",
+    types: "*",
+    reason:
+      "how an action shape-shifts a creature (Wild Shape's known forms, Polymorph's Beast, a werewolf's printed forms) - authored in the class, spell and stat block content; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsForm",
+    types: "*",
+    reason: "the action that leaves a form early, added by the form itself as it is taken; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].partOf",
+    types: "*",
+    reason:
+      "the printed entry a cast belongs to (a Spellcasting list's spell), set as the catalog makes a stat block's casts; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].endsUntilItActs",
+    types: "*",
+    reason: "one SRD author (a will-o'-wisp's Consume Life, which ends its Vanish)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].formOnly",
+    types: "*",
+    reason:
+      "the printed forms an action works in (a werewolf's Bite), read from the stat block as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].effectOptions[].**",
+    types: "*",
+    reason:
+      "the effects a use picks one of (Enlarge or Reduce), copied from the spell's cast model by the character build; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].save.failureEndsForm",
+    types: "*",
+    reason:
+      "a failed save that returns a shape-shifted creature to its true form (Moonbeam), copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.failureEndsForm",
+    types: ["spell"],
+    reason: "one SRD author (Moonbeam), a reviewed override in the content build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.disadvantageTypes",
+    types: "*",
+    reason:
+      "the creature types that have Disadvantage on a save (Shatter's Constructs), copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.disadvantageTypes",
+    types: ["spell"],
+    reason: "one SRD author (Shatter), a reviewed override in the content build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.unwillingOnly",
+    types: "*",
+    reason:
+      "a save only an unwilling target makes (Enlarge/Reduce, True Polymorph), copied from the spell by the character build; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].spendsNoUses",
+    types: "*",
+    reason:
+      "an action that spends none of its feature's uses (Quivering Palm's ending, paid when the hit set it) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^onHit[].**",
+    types: ["equipment"],
+    reason:
+      "what a magic weapon's hit does beside its damage (Giant Slayer's save, a Sword of Sharpness's rolled 20) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].targets.**",
+    types: ["equipment"],
+    reason:
+      "who an item's cast may affect beside the spell's own targets (a ring's Fear on Beasts only) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].area.**",
+    types: ["equipment"],
+    reason:
+      "the area an item's cast covers in place of the spell's own (Cloak of Arachnida's doubled Web) - authored in the item overlay; no editor control yet",
+    status: "gap"
   },
 
   // ---- effect rider surface ----
@@ -764,6 +1439,89 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "effects[].endsOnIncapacitated",
+    types: FEATURE_CARRIERS,
+    reason:
+      "an effect that ends when its keeper has the Incapacitated condition (Superior Defense, Divine Sense, Draconic Flight) - authored in the class, species and item overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "poison.**",
+    types: ["equipment"],
+    reason:
+      "a poison's kind, save and damage (the Gameplay Toolbox's sample poisons), built from the toolbox chapter with the actions that deliver it; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].sensesTraps.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that senses the traps the map holds within a range (Find Traps) - authored in the spell scripts; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].ownTurn",
+    types: ACTION_CARRIERS,
+    reason:
+      "a speed or way of moving its bearer has only on its own turn (Acrobatic Movement) - authored in the class overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].oncePerCast",
+    types: FEATURE_CARRIERS,
+    reason:
+      "an extra-damage rider added to one damage roll of a cast, the first (Empowered Evocation, Elemental Affinity) - authored in the class overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].timing",
+    types: ACTION_CARRIERS,
+    reason:
+      "when in its user's own turn an action is taken (Superior Defense at the turn's start, Sacred Weapon in the Attack action) - authored in the class overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].vitality.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "Temporary Hit Points a cast gives once its damage lands (Improved Potent Spellcasting) - derived at read time from the Cleric's option, never authored",
+    status: "gap"
+  },
+  {
+    at: "actions[].damageDiceByAbility.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "damage dice counted by an ability modifier from a level (Sear Undead) - feature-carrier actions only, beside damageByLevel",
+    status: "gap"
+  },
+  {
+    at: "actions[].areaHeal.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "one creature picked in the area regains its own roll (Land's Aid) - authored in the class overlays; no control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].areaHealByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason: "the area's healing growing with level (Land's Aid) - feature-carrier actions only, beside damageByLevel",
+    status: "gap"
+  },
+  {
+    at: "effects[].light.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "the light an effect sheds around its bearer (Faerie Fire's outline); authored in the spell overlay, no control yet",
+    status: "gap"
+  },
+  {
+    at: "effects[].detects.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "the creatures an effect lets its bearer sense (Divine Sense); authored in the class and spell overlays, no control yet",
+    status: "gap"
+  },
+  {
     at: "effects[].damageUses",
     types: FEATURE_CARRIERS,
     reason:
@@ -771,10 +1529,100 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
-    at: "modifiers[].**",
+    at: "modifiers[].when[].senses",
     types: FEATURE_CARRIERS,
+    reason: "the senses of `other-lacks-sense` (Blur), a trigger the content authors and the editor doesn't offer",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].when[].itemIds",
+    types: "*",
     reason:
-      "the modifier rows beyond the editor's offered subset: a type the form does not offer has no field for its keys",
+      "the items of `while-attuned-to` (a Hammer of Thunderbolts beside a Belt of Giant Strength), a trigger the content authors and the editor doesn't offer",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].when[].except",
+    types: "*",
+    reason:
+      "a creature-type gate turned to every type but those (a Sword of Life Stealing's 'not a Construct or an Undead') - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].flat",
+    types: "*",
+    reason:
+      "extra damage of a set number (a Sword of Life Stealing's 15 Necrotic) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "modifiers[].temporaryHitPoints",
+    types: "*",
+    reason:
+      "extra damage whose amount its bearer gains as Temporary Hit Points (a Sword of Life Stealing) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].fireUnderwater",
+    types: "*",
+    reason:
+      "fire that being underwater doesn't resist (a steam mephit's Steam Breath), read from the action's text as the content is built",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].forceOf",
+    types: "*",
+    reason:
+      "an attack that strikes through the force another of its item's actions placed (a Dancing Sword, a Feather Token's whip) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].gmTakes",
+    types: "*",
+    reason:
+      "an action only the GM takes (a Manual of Golems' finished golem) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].grantedOnly",
+    types: "*",
+    reason:
+      "an item action offered only through an outcome or a grant (a Wand of Wonder's rolled spell) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].hurlsWeapon.**",
+    types: "*",
+    reason:
+      "the item's own weapon hurled at a range (a Hammer of Thunderbolts) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].keepsItem",
+    types: "*",
+    reason:
+      "an action that leaves its consumable item unspent (a Manual of Golems read by one who can't use it) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].refusedWithSlots.**",
+    types: "*",
+    reason:
+      "the spell slots that keep an action from befalling its user (a Manual of Golems' reader) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].rollsOn.**",
+    types: "*",
+    reason:
+      "the table an action rolls once it is done (a Wand of Wonder's d100) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].swingsWeapon",
+    types: "*",
+    reason:
+      "an attack with the item's own weapon as its bearer swings it (a Dancing Sword) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
 
@@ -848,6 +1696,202 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "casts[].endsWithItem",
+    types: ["equipment"],
+    reason:
+      "an item cast that ends when the item is taken off (a Hat of Disguise) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].forms.**",
+    types: ["equipment"],
+    reason:
+      "the forms an item's shape-shifting cast is held to (a Cloak of the Bat's Polymorph into a Bat) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].inDimLightOrDarkness",
+    types: ["equipment"],
+    reason:
+      "an item cast only in Dim Light or Darkness (a Cloak of the Bat's Polymorph) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].grantedOnly",
+    types: ["equipment"],
+    reason:
+      "an item cast offered only as the outcome of its table (a Wand of Wonder's Fireball) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^attractsMissiles.**",
+    types: ["equipment"],
+    reason:
+      "the ranged attacks a cursed item draws onto its bearer (a Shield of Missile Attraction) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^disguisedAs",
+    types: ["equipment"],
+    reason:
+      "the item a trap passes for until it is identified (a Potion of Poison's Potion of Healing) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^initiativeAura.**",
+    types: ["equipment"],
+    reason:
+      "an aura of Advantage on Initiative that wakes sleepers (a Weapon of Warning) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^lapses.**",
+    types: ["equipment"],
+    reason:
+      "when an item's riders stop (a Cloak of Displacement at Speed 0 or after damage) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^regainsHitPoints.**",
+    types: ["equipment"],
+    reason:
+      "the Hit Points its bearer regains as time passes (a Ring of Regeneration) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^unarmedStrike.**",
+    types: ["equipment"],
+    reason:
+      "what its wearer's Unarmed Strikes deal (Demon Armor's claws) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].teleport.**",
+    types: ["equipment"],
+    reason:
+      "an item cast's own teleport in place of the spell's (a Cape of the Mountebank's Dimension Door) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].requiresEffectTag",
+    types: ["equipment"],
+    reason:
+      "the effect an item's cast needs on its user (a Dragon Orb's control) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].lastsMinutes",
+    types: ["equipment"],
+    reason:
+      "how long an item cast lasts in place of the spell's duration (Oil of Slipperiness' Grease: 8 hours) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].useCost",
+    types: ["equipment"],
+    reason:
+      "an item cast's charge cost above one (Staff of Fire's Fireball: 3) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].chargesRaiseLevel",
+    types: ["equipment"],
+    reason:
+      "the most charges a cast may spend, each a level higher (Wand of Fireballs) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].alsoUses.**",
+    types: ["equipment"],
+    reason:
+      "an item cast's once-a-dawn limit beside its charges (a Luck Blade's Wish) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.startingByPool",
+    types: ["equipment"],
+    reason:
+      "each pool's own count when a copy is added (a Helm of Brilliance's gems) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].through",
+    types: ["equipment"],
+    reason:
+      "the spell an item's cast goes through (a Crystal Ball's Scrying) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].check.**",
+    types: ["equipment"],
+    reason:
+      "the check an item's cast asks first (an Amulet of the Planes) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "servesAsFocus",
+    types: ["equipment"],
+    reason:
+      "the Spellcasting Focus a magic item serves as (a talisman's Holy Symbol) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "savesNegateSpells.**",
+    types: ["equipment"],
+    reason:
+      "a successful save that leaves a spell no effect (a Ring of Spell Turning) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "breaks.**",
+    types: ["equipment"],
+    reason:
+      "the chance a use breaks the item (a Horn of Blasting, a Wind Fan) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].optionIds",
+    types: ["equipment"],
+    reason:
+      "the spell's options an item's cast may pick (Wand of Fear's Command: flee or grovel only) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.lastCharge.**",
+    types: ["equipment"],
+    reason:
+      "what the last charge does to the item (destroyed, nonmagical, or an item it becomes) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^utilize[].**",
+    types: ["equipment"],
+    reason:
+      "a gear item's Utilize checks at their printed DCs (a Grappling Hook's DC 13 Acrobatics) - authored in the equipment source; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.lastChargeTwenty",
+    types: ["equipment"],
+    reason:
+      "the charges a 20 on the last charge's d20 gives back (Staff of Power) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.starting",
+    types: ["equipment"],
+    reason:
+      "the charges a copy holds when it is added (Necklace of Fireballs' beads) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "uses.afterHours",
+    types: "*",
+    reason:
+      "the hours of game time before uses spent for a time come back (Wings of Flying's 1d12) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "extraPicks[].**",
     types: "*",
     reason: "extra-pick rows beyond what the resolver reads: no rows control at feature scope",
@@ -864,6 +1908,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "replacesFeatureId",
     types: ["species"],
     reason: "supersession at species-trait scope: the control exists on class features and is missing here",
+    status: "gap"
+  },
+  {
+    at: "freeCastOf.**",
+    types: "*",
+    reason:
+      "a free casting a feature gives the spells other features grant (Natural Recovery's Circle Spell): no control at feature scope yet",
     status: "gap"
   },
   {
@@ -931,6 +1982,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: zero SRD authors"
   },
   {
+    at: "startingEquipment[].items[].pickFrom",
+    types: ["class", "background"],
+    reason:
+      "the items a kit entry lets its taker pick (the Bard's instrument of choice): the kit editor writes items without a pick list yet",
+    status: "gap"
+  },
+  {
     at: "multiclassProficiencies.**",
     types: ["class"],
     reason:
@@ -959,6 +2017,82 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "^study.**",
+    types: ["equipment"],
+    reason: "a manual's or tome's study, the score it raises for good once the GM marks it done; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^variants[].**",
+    types: ["equipment"],
+    reason:
+      "the kinds one record covers (an Ioun Stone's stones) or the forms its holder picks (a Rod of Lordly Might's buttons), each with riders of its own - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^variantChoice.**",
+    types: ["equipment"],
+    reason:
+      "who picks a copy's kind, and what changing a form costs - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^weaponChanges.**",
+    types: ["equipment"],
+    reason:
+      "what a magic weapon changes about its bound base (a Dwarven Thrower's Thrown 20/60, an Energy Bow's Force) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^container.**",
+    types: ["equipment"],
+    reason:
+      "what the item holds as a container (a Backpack's 30 pounds, a Handy Haversack's pouches) - authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^attunementHeldBy",
+    types: ["equipment"],
+    reason:
+      "the effect that keeps its bearer attuned (a Dragon Orb's charm) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^bonusActionAttack",
+    types: ["equipment"],
+    reason:
+      "an attack with the weapon as a Bonus Action (Scimitar of Speed) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^contents[].**",
+    types: ["equipment"],
+    reason:
+      "what an equipment pack holds, unpacked where a character comes by it (an Explorer's Pack's 10 Torches) - authored in the gear source; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^magicSaveAura.**",
+    types: ["equipment"],
+    reason:
+      "an aura of Advantage on saves against magic for the bearer and its allies (Holy Avenger) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].attackBonus",
+    types: ["equipment"],
+    reason:
+      "a cast's printed bonus to hit (Circlet of Blasting's +5) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].activation",
+    types: ["equipment"],
+    reason:
+      "what casting from the item takes in place of the spell's casting time (a prayer bead's Bonus Action) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "^uses.scaling.id",
     types: ["equipment"],
     reason:
@@ -976,6 +2110,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "castingOptions[].**",
     types: ["spell"],
     reason: "a spell's casting options: the spell form has no rows control for them",
+    status: "gap"
+  },
+  {
+    at: "components.costly[].**",
+    types: ["spell"],
+    reason:
+      "a spell's priced or consumed materials, read from the material text as the catalog is built; the spell form has no rows control for them",
     status: "gap"
   },
   {

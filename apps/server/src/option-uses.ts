@@ -19,7 +19,7 @@ export function turnListOptions(
   catalog: EquipmentCatalog
 ): ReadonlyMap<string, string> {
   const own = effectiveActions(definition, actor, catalog);
-  const builtins = builtinActionsFor(definition).filter(
+  const builtins = builtinActionsFor(definition, actor).filter(
     (candidate) => !own.some((action) => action.id === candidate.id)
   );
   return new Map([

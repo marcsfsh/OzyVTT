@@ -1,7 +1,9 @@
 import type { Actor, GameState } from "@vtt/domain";
 import type { EquipmentReference } from "@vtt/content-srd-5.2.1";
-import { catalogIdOf, type AmmunitionKind, type InventoryItem } from "@vtt/schemas";
+import { catalogIdOf, type AmmunitionKind, type InventoryItem, type OnHitRider } from "@vtt/schemas";
 import { effectiveSlot, type RiderCarrier } from "@vtt/rules-5e";
+import { drawableWhereItLies } from "./containers.js";
+import { rowRecord } from "./item-records.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 
 /**
@@ -46,7 +48,7 @@ export type AmmunitionRow = Readonly<{
 
 const piecesLeft = (row: InventoryItem, count: number) => Math.max(0, row.ammunitionLeft ?? row.quantity * count);
 
-function ammunitionOf(row: InventoryItem, catalog: EquipmentCatalog | undefined): AmmunitionRow | null {
+export function ammunitionOf(row: InventoryItem, catalog: EquipmentCatalog | undefined): AmmunitionRow | null {
   const record = catalog?.equipmentRecord(catalogIdOf(row));
   const bundle = record?.ammunition;
   const slot = effectiveSlot({ slot: record?.slot ?? row.magic?.slot, category: row.category });
@@ -75,7 +77,9 @@ export function ammunitionFor(
     ammo.row.equipped ? (ammo.record?.isMagic ? 0 : 1) : ammo.record?.isMagic ? 3 : 2;
   const fitting = actor.inventory.flatMap((row) => {
     const ammo = ammunitionOf(row, catalog);
+    // Pieces stowed in a pack or a bag aren't drawn as part of an attack; a quiver's are.
     return ammo &&
+      drawableWhereItLies(actor.inventory, row, catalog) &&
       !ammo.unbound &&
       ammo.left > 0 &&
       (ammo.kind === undefined || kind === undefined || ammo.kind === kind)
@@ -120,6 +124,20 @@ export function withShotAmmunitionOnly<T extends Readonly<{ carriers: readonly R
   };
 }
 
+/** SRD Ammunition of Slaying and its kin: a piece's own hit riders ride the shot that draws it (the DC 17 Constitution
+ *  save of an Arrow of Dragon Slaying against a dragon), its kind's included. */
+export function withShotHitRiders<A extends Readonly<{ onHit?: readonly OnHitRider[] }>>(
+  action: A,
+  actor: Pick<Actor, "inventory">,
+  launcherId: string | null,
+  catalog: EquipmentCatalog | undefined
+): A {
+  const drawn = shotFrom(actor, launcherId, catalog)?.ammo?.row;
+  const riders = drawn ? rowRecord(catalog, drawn)?.onHit : undefined;
+  if (!riders || riders.length === 0) return action;
+  return { ...action, onHit: [...(action.onHit ?? []), ...structuredClone(riders)].slice(0, 4) };
+}
+
 /** A row holding `left` pieces: its quantity is the bundles still holding any, and a partly spent bundle keeps the
  *  exact count. */
 export function withPiecesLeft(row: InventoryItem, left: number, count: number): InventoryItem {
@@ -128,22 +146,42 @@ export function withPiecesLeft(row: InventoryItem, left: number, count: number):
   return left === quantity * count ? { ...rest, quantity } : { ...rest, quantity, ammunitionLeft: left };
 }
 
-/** Expends one piece. A piece that can be picked up after the fight is counted toward recovery: magic ammunition
- *  that hit is no longer magical, so it doesn't come back to its row. */
-export function spendPiece(actor: Actor, ammo: AmmunitionRow, recoverable: boolean): void {
+/** Expends one piece. A piece that can be picked up after the fight is counted toward recovery. Magic ammunition that
+ *  hit is no longer magical (`struck`), so it doesn't come back to its row: half of those come back as plain
+ *  ammunition of their kind. */
+export function spendPiece(actor: Actor, ammo: AmmunitionRow, recoverable: boolean, struck = false): void {
+  const spent = !recoverable && struck && ammo.record?.isMagic === true;
   actor.inventory = actor.inventory.map((row) =>
     row.id !== ammo.row.id
       ? row
       : withPiecesLeft(
-          recoverable ? { ...row, ammunitionFired: Math.min(10_000, (row.ammunitionFired ?? 0) + 1) } : row,
+          recoverable
+            ? { ...row, ammunitionFired: Math.min(10_000, (row.ammunitionFired ?? 0) + 1) }
+            : spent
+              ? { ...row, ammunitionSpent: Math.min(10_000, (row.ammunitionSpent ?? 0) + 1) }
+              : row,
           ammo.left - 1,
           ammo.count
         )
   );
 }
 
-/** After a fight, half the pieces fired from each row come back, rounded down; the rest are lost. One line per row
- *  that got any back. */
+/** A thrown weapon leaves its thrower's hand: one fewer is carried, and it is counted to be picked up after the fight. */
+export function leaveHand(actor: Actor, row: InventoryItem): void {
+  actor.inventory = actor.inventory.map((entry) =>
+    entry.id !== row.id
+      ? entry
+      : {
+          ...entry,
+          quantity: Math.max(0, entry.quantity - 1),
+          thrownAway: Math.min(10_000, (entry.thrownAway ?? 0) + 1)
+        }
+  );
+}
+
+/** After a fight, half the pieces fired from each row come back, rounded down, and the rest are lost; half of the
+ *  magic pieces that hit come back as plain ammunition of their kind; every thrown weapon is picked up. One line per
+ *  row that got any back. */
 export function recoverAmmunition(
   state: GameState,
   actorIds: readonly string[],
@@ -151,22 +189,69 @@ export function recoverAmmunition(
 ): Array<Readonly<{ actorId: string; text: string }>> {
   const lines: Array<{ actorId: string; text: string }> = [];
   for (const actor of state.actors) {
-    if (!actorIds.includes(actor.id) || !actor.inventory.some((row) => row.ammunitionFired !== undefined)) continue;
+    if (!actorIds.includes(actor.id) || !actor.inventory.some(owesRecovery)) continue;
+    const plain: Array<Readonly<{ baseId: string; pieces: number }>> = [];
     actor.inventory = actor.inventory.map((row) => {
-      const fired = row.ammunitionFired;
-      if (fired === undefined) return row;
-      const { ammunitionFired: _fired, ...rest } = row;
-      const ammo = ammunitionOf(rest, catalog);
-      const back = Math.floor(fired / 2);
-      if (!ammo || back === 0) return rest;
-      lines.push({
-        actorId: actor.id,
-        text: `${actor.name} recovers ${back} of the ${fired} pieces fired from ${row.name}.`
-      });
-      return withPiecesLeft(rest, ammo.left + back, ammo.count);
+      if (!owesRecovery(row)) return row;
+      const { ammunitionFired: fired, ammunitionSpent: spent, thrownAway: thrown, ...rest } = row;
+      let next: InventoryItem = rest;
+      if (thrown) {
+        next = { ...next, quantity: next.quantity + thrown };
+        lines.push({
+          actorId: actor.id,
+          text: `${actor.name} picks up the ${row.name} thrown in the fight (${thrown}).`
+        });
+      }
+      const ammo = fired ? ammunitionOf(next, catalog) : null;
+      const back = Math.floor((fired ?? 0) / 2);
+      if (ammo && back > 0) {
+        lines.push({
+          actorId: actor.id,
+          text: `${actor.name} recovers ${back} of the ${fired} pieces fired from ${row.name}.`
+        });
+        next = withPiecesLeft(next, ammo.left + back, ammo.count);
+      }
+      const plainBack = Math.floor((spent ?? 0) / 2);
+      if (plainBack > 0 && row.baseId !== undefined) plain.push({ baseId: row.baseId, pieces: plainBack });
+      return next;
     });
+    for (const { baseId, pieces } of plain) {
+      const name = gainPlainPieces(actor, baseId, pieces, catalog);
+      lines.push({ actorId: actor.id, text: `${actor.name} recovers ${pieces} plain ${name}, their magic spent.` });
+    }
   }
   return lines;
+}
+
+const owesRecovery = (row: InventoryItem): boolean =>
+  row.ammunitionFired !== undefined || row.ammunitionSpent !== undefined || row.thrownAway !== undefined;
+
+/** Adds plain pieces of a bundle's kind (arrows, bolts) to the stack carried, or a new one; the stack's name. */
+function gainPlainPieces(actor: Actor, baseId: string, pieces: number, catalog: EquipmentCatalog | undefined): string {
+  const record = catalog?.equipmentRecord(baseId);
+  const count = record?.ammunition?.count ?? 1;
+  const name = record ? ammunitionLabel(record.ammunition?.kind) : baseId;
+  const stack = actor.inventory.find((row) => catalogIdOf(row) === baseId && row.baseId === undefined);
+  if (stack) {
+    const left = ammunitionOf(stack, catalog)?.left ?? stack.quantity * count;
+    actor.inventory = actor.inventory.map((row) => (row === stack ? withPiecesLeft(row, left + pieces, count) : row));
+    return name;
+  }
+  const taken = new Set(actor.inventory.map((row) => row.id));
+  let id = baseId;
+  for (let copy = 2; taken.has(id); copy += 1) id = `${baseId.slice(0, 76)}-${copy}`;
+  const row: InventoryItem = {
+    id,
+    ...(id !== baseId ? { recordId: baseId } : {}),
+    name: record?.name ?? baseId,
+    quantity: 1,
+    equipped: false,
+    attuned: false,
+    ...(record ? { category: record.category } : {}),
+    ...(record?.weightLb != null ? { weightEach: record.weightLb } : {})
+  };
+  actor.inventory = [...actor.inventory, withPiecesLeft(row, pieces, count)];
+  return name;
 }
 
 /** The pieces counts are the server's: a sheet write keeps them, and a quantity change moves the pieces by whole
@@ -176,9 +261,20 @@ export function keepAmmunitionCount(
   incoming: InventoryItem,
   catalog: EquipmentCatalog | undefined
 ): InventoryItem {
-  const { ammunitionLeft: _left, ammunitionFired: _fired, ...rest } = incoming;
-  if (!stored || incoming.quantity <= 0) return rest;
-  const kept = stored.ammunitionFired !== undefined ? { ...rest, ammunitionFired: stored.ammunitionFired } : rest;
+  const {
+    ammunitionLeft: _left,
+    ammunitionFired: _fired,
+    ammunitionSpent: _spent,
+    thrownAway: _thrown,
+    ...rest
+  } = incoming;
+  if (!stored || (incoming.quantity <= 0 && !owesRecovery(stored))) return rest;
+  const kept: InventoryItem = {
+    ...rest,
+    ...(stored.ammunitionFired !== undefined ? { ammunitionFired: stored.ammunitionFired } : {}),
+    ...(stored.ammunitionSpent !== undefined ? { ammunitionSpent: stored.ammunitionSpent } : {}),
+    ...(stored.thrownAway !== undefined ? { thrownAway: stored.thrownAway } : {})
+  };
   if (stored.ammunitionLeft === undefined) return kept;
   const count = catalog?.equipmentRecord(catalogIdOf(stored))?.ammunition?.count ?? 1;
   return withPiecesLeft(

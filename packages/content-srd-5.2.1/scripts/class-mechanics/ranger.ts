@@ -7,6 +7,10 @@ export const ranger: ClassMechanicsModule = {
      * Hunter's Mark always prepared (not counted against the prepared budget), with free casts read off
      * the printed Favored Enemy column (2 rising to 6).
      */
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
+    // rest offers it.
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": both, in the rest's step.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "long-rest", amount: 2 }] },
     "favored-enemy": {
       uses: { scaling: { type: "class-resource", id: "favored-enemy" }, per: "long-rest" },
       grants: { spells: [{ id: "hunters-mark", level: 1, alwaysPrepared: true, withoutSlot: "free" }] }
@@ -21,6 +25,19 @@ export const ranger: ClassMechanicsModule = {
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
+
+    // "You have Advantage on attack rolls against the creature currently marked by your Hunter's Mark."
+    "precise-hunter": {
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "attack",
+          mode: "advantage",
+          when: [{ type: "on-attack-roll" }, { type: "versus-marked", tags: ["hunters-mark"] }]
+        }
+      ]
+    },
+    // Foe Slayer's d10 is the Hunter's Mark the Ranger casts (resolution/grant-extras.ts).
 
     /**
      * "Speed increases by 10 feet while you aren't wearing Heavy armor": the +10 is in the sheet's Speed, and a live
@@ -77,7 +94,7 @@ export const ranger: ClassMechanicsModule = {
       ]
     },
 
-    // Display-only: senses are not modeled on `ActorDefinition` yet.
+    // Dynamic vision reads the Blindsight (`vision/senses.ts`).
     "feral-senses": {
       modifiers: [{ type: "sense", sense: "blindsight", feet: 30 }]
     },
@@ -87,8 +104,8 @@ export const ranger: ClassMechanicsModule = {
     },
 
     /**
-     * The Fighting Style feat catalog plus the inline Druidic Warrior option. Its replace-a-cantrip
-     * clause stays prose.
+     * The Fighting Style feat catalog plus the inline Druidic Warrior option, whose cantrips swap on a Ranger level
+     * up (`replaces`).
      */
     "fighting-style": {
       choice: {
@@ -101,7 +118,8 @@ export const ranger: ClassMechanicsModule = {
             name: "Druidic Warrior",
             description:
               "You learn two Druid cantrips of your choice. Wisdom is your spellcasting ability for them. Whenever you gain a Ranger level, you can replace one of these cantrips with another Druid cantrip.",
-            choice: { kind: "cantrip", choose: 2, fromCatalog: "druid-spells", maxSpellLevel: 0 }
+            choice: { kind: "cantrip", choose: 2, fromCatalog: "druid-spells", maxSpellLevel: 0 },
+            replaces: [{ offer: "feature:druidic-warrior", when: "level-up", amount: 1 }]
           }
         ]
       }
@@ -110,11 +128,12 @@ export const ranger: ClassMechanicsModule = {
   subclasses: {
     hunter: {
       /**
-       * A pick with prose-only options. Colossus Slayer needs a gate on the target's HP and once-per-turn
-       * on a modifier; Horde Breaker's extra attack must target a different creature. Replacing the
-       * choice on a rest stays prose.
+       * Colossus Slayer's 1d8 lands once a turn on a weapon hit against a creature missing hit points. Horde Breaker's
+       * extra attack must target a different creature (`resolution/extra-attacks.ts`). "Whenever you finish a Short or Long Rest,
+       * you can replace the chosen option with the other one."
        */
       "hunters-prey": {
+        replaces: [{ offer: "feature:hunters-prey", when: "short-rest", amount: 1 }],
         choice: {
           kind: "hunters-prey",
           choose: 1,
@@ -123,7 +142,15 @@ export const ranger: ClassMechanicsModule = {
               id: "colossus-slayer",
               name: "Colossus Slayer",
               description:
-                "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn."
+                "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn.",
+              modifiers: [
+                {
+                  type: "extra-damage",
+                  formula: "1d8",
+                  oncePerTurn: true,
+                  when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["weapon"] }, { type: "versus-hurt" }]
+                }
+              ]
             },
             {
               id: "horde-breaker",
@@ -135,9 +162,35 @@ export const ranger: ClassMechanicsModule = {
         }
       },
 
+      /**
+       * Taken once the Ranger's damage has landed on its marked creature this turn: the mark's extra damage (1d6 Force,
+       * 1d10 from Foe Slayer at Ranger 20) to one other creature it can see within 30 feet of the marked one, once per
+       * turn (`resolution/action-targets.ts`).
+       */
+      "superior-hunters-prey": {
+        actions: [
+          {
+            id: "superior-hunters-prey",
+            name: "Superior Hunter's Prey",
+            activation: "other",
+            description:
+              "Once per turn when you deal damage to a creature marked by your Hunter's Mark, deal that spell's extra damage to a different creature you can see within 30 feet of the first creature.",
+            damage: [{ formula: "1d6", type: "force" }],
+            damageByLevel: [
+              { level: 11, formula: "1d6", type: "force" },
+              { level: 20, formula: "1d10", type: "force" }
+            ],
+            uses: { limit: 1, per: "turn", pool: "superior-hunters-prey" },
+            targets: { count: 1, seen: true, who: "others", nearMark: { tag: "hunters-mark", feet: 30 } }
+          }
+        ]
+      },
+
       // Escape the Horde's Disadvantage is read on every Opportunity Attack against the Ranger. Multiattack
       // Defense is marked on the Ranger by the engine after a hit (`resolution/struck.ts`).
+      // "Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one."
       "defensive-tactics": {
+        replaces: [{ offer: "feature:defensive-tactics", when: "short-rest", amount: 1 }],
         choice: {
           kind: "defensive-tactics",
           choose: 1,
@@ -163,6 +216,20 @@ export const ranger: ClassMechanicsModule = {
             }
           ]
         }
+      },
+      // Offered on damage the Ranger is about to take; using it resists the damage's largest type until the turn ends.
+      "superior-hunters-defense": {
+        actions: [
+          {
+            id: "superior-hunters-defense",
+            name: "Superior Hunter's Defense",
+            activation: "reaction",
+            description:
+              "When you take damage, take a Reaction to give yourself Resistance to that damage and any other damage of the same type until the end of the current turn.",
+            damage: [],
+            reaction: { trigger: "takes-damage", response: "resist-type" }
+          }
+        ]
       }
     }
   },

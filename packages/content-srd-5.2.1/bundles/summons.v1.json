@@ -1,0 +1,2106 @@
+[
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "animated-object"
+  },
+  "name": "Animated Object",
+  "summary": "Huge or smaller construct, unaligned - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 16,
+   "dex": 10,
+   "con": 10,
+   "int": 3,
+   "wis": 3,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 15,
+  "hitPoints": {
+   "maximum": 10
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 30,
+  "actions": [
+   {
+    "id": "slam",
+    "name": "Slam",
+    "activation": "action",
+    "description": "Melee Attack Roll: Bonus equals your spell attack modifier, reach 5 ft. Hit: Force damage equal to 1d4 + 3, or 2d6 + 3 + your spellcasting ability modifier if the object is Large, or 2d12 + 3 + your spellcasting ability modifier if the object is Huge.",
+    "attack": {
+     "bonus": 0,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "1d4 + 3",
+      "type": "force"
+     }
+    ]
+   }
+  ],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "poison",
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "poisoned"
+  ],
+  "summonScaling": {
+   "baseLevel": 5,
+   "perLevel": [
+    {
+     "actionId": "slam",
+     "dice": 1
+    }
+   ],
+   "forms": [
+    {
+     "id": "medium",
+     "name": "Medium or smaller",
+     "hitPoints": 10
+    },
+    {
+     "id": "large",
+     "name": "Large",
+     "size": "large",
+     "hitPoints": 20,
+     "damage": [
+      {
+       "actionId": "slam",
+       "formula": "2d6 + 3",
+       "addsModifier": true
+      }
+     ]
+    },
+    {
+     "id": "huge",
+     "name": "Huge",
+     "size": "huge",
+     "hitPoints": 40,
+     "damage": [
+      {
+       "actionId": "slam",
+       "formula": "2d12 + 3",
+       "addsModifier": true
+      }
+     ]
+    }
+   ]
+  },
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "construct",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 30,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [
+     "blindsight 30 ft."
+    ],
+    "passivePerception": 6,
+    "languages": "Understands the languages you know",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "poison, psychic",
+    "conditionImmunities": "charmed, exhaustion, frightened, paralyzed, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": []
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "apparatus-of-the-crab"
+  },
+  "name": "Apparatus of the Crab",
+  "summary": "Large object - CR none",
+  "size": "large",
+  "abilityScores": {
+   "str": 20,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 1,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 20,
+  "hitPoints": {
+   "maximum": 200
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 30,
+  "actions": [
+   {
+    "id": "claws",
+    "name": "Claws (Lever 5 Up)",
+    "activation": "action",
+    "description": "Each extended claw makes a melee attack: +8 to hit, reach 5 ft. Hit: 7 (2d6) Bludgeoning damage.",
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "claw",
+    "name": "Claw",
+    "activation": "action",
+    "description": "Melee Attack Roll: +8, reach 5 ft. Hit: 7 (2d6) Bludgeoning damage.",
+    "attack": {
+     "bonus": 8,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "bludgeoning"
+     }
+    ]
+   },
+   {
+    "id": "grasp",
+    "name": "Grasping Claws (Lever 5 Down)",
+    "activation": "action",
+    "description": "Each extended claw makes a melee attack: +8 to hit, reach 5 ft. Hit: The target has the Grappled condition (escape DC 15).",
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "grasping-claw",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "grasping-claw",
+    "name": "Grasping Claw",
+    "activation": "action",
+    "description": "Melee Attack Roll: +8, reach 5 ft. Hit: The target has the Grappled condition (escape DC 15).",
+    "attack": {
+     "bonus": 8,
+     "reachFeet": 5
+    },
+    "damage": [],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 15
+     }
+    ]
+   }
+  ],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 2,
+    "height": 2
+   }
+  },
+  "damageImmunities": [
+   "poison",
+   "psychic"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 30,
+     "swim": 30,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 5,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "poison, psychic",
+    "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Vehicle",
+      "description": "Its pilot works it from inside with Utilize actions, two levers at a time: Lever 1 extends or retracts its legs (Speed and Swim Speed 0 when retracted), Lever 4 its claws, Lever 5 swings or closes them, Lever 6 walks it, and Lever 7 turns it. Its compartment holds two Medium or smaller creatures."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "arcane-eye"
+  },
+  "name": "Arcane Eye",
+  "summary": "Tiny force - CR none",
+  "size": "tiny",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "invisible",
+    "name": "Invisible"
+   }
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": 30,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [
+     "darkvision 30 ft."
+    ],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Invisible",
+      "description": "An Invisible, invulnerable eye that hovers and sees in every direction, with Darkvision 30 ft. Its caster sees what it sees, and a Bonus Action moves it up to 30 feet."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "arcane-hand"
+  },
+  "name": "Arcane Hand",
+  "summary": "Large object - CR none",
+  "size": "large",
+  "abilityScores": {
+   "str": 26,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 20,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 2,
+    "height": 2
+   }
+  },
+  "damageImmunities": [
+   "poison",
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "summonScaling": {
+   "baseLevel": 5,
+   "hitPointsOfSummoner": true
+  },
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": 60,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "poison, psychic",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Hand of Force",
+      "description": "An object of shimmering magical energy that moves at its caster's command and doesn't occupy its space. Its caster's effects with the spell reach a creature within 5 feet of it, and each moves it up to 60 feet first. If it drops to 0 Hit Points, the spell ends."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "arcane-sword"
+  },
+  "name": "Arcane Sword",
+  "summary": "Medium force - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Spell Force",
+      "description": "A spectral sword that hovers in the air. Its caster's attacks with the spell reach a creature within 5 feet of it, and a Bonus Action moves it up to 30 feet before each later attack."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "clairvoyance-sensor"
+  },
+  "name": "Clairvoyance Sensor",
+  "summary": "Tiny force - CR none",
+  "size": "tiny",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "invisible",
+    "name": "Invisible"
+   }
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Invisible",
+      "description": "An Invisible, intangible and invulnerable sensor that stays where it was made. Its caster sees through it as if in its space. A creature that sees the Invisible sees a luminous orb the size of a fist."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "dancing-sword"
+  },
+  "name": "Dancing Sword",
+  "summary": "Medium force - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": 30,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Item Force",
+      "description": "A hovering sword. Its wielder's attacks with it reach a creature within 5 feet of it, and a Bonus Action moves it up to 30 feet, to a spot within 30 feet of its wielder, before each later attack. It flies back after its fourth attack."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "draconic-spirit"
+  },
+  "name": "Draconic Spirit",
+  "summary": "Large dragon, neutral - CR none",
+  "size": "large",
+  "abilityScores": {
+   "str": 19,
+   "dex": 14,
+   "con": 17,
+   "int": 10,
+   "wis": 14,
+   "cha": 14
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 19,
+  "hitPoints": {
+   "maximum": 50
+  },
+  "initiativeBonus": 2,
+  "speedFeet": 30,
+  "actions": [
+   {
+    "id": "multiattack",
+    "name": "Multiattack",
+    "activation": "action",
+    "description": "The spirit makes a number of Rend attacks equal to half the spell's level (round down), and it uses Breath Weapon.",
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     },
+     {
+      "actionId": "breath-weapon",
+      "count": 1
+     }
+    ]
+   },
+   {
+    "id": "rend",
+    "name": "Rend",
+    "activation": "action",
+    "description": "Melee Attack Roll: Bonus equals your spell attack modifier, reach 10 ft. Hit: 1d6 + 4 + the spell's level Piercing damage.",
+    "attack": {
+     "bonus": 0,
+     "reachFeet": 10
+    },
+    "damage": [
+     {
+      "formula": "1d6 + 9",
+      "type": "piercing"
+     }
+    ]
+   },
+   {
+    "id": "breath-weapon",
+    "name": "Breath Weapon",
+    "activation": "action",
+    "description": "Dexterity Saving Throw: DC equals your spell save DC, each creature in a 30-foot Cone. Failure: 2d6 damage of a type this spirit has Resistance to (your choice when you cast the spell). Success: Half damage.",
+    "save": {
+     "ability": "dex",
+     "dc": 10,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "acid"
+     }
+    ],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    }
+   }
+  ],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 2,
+    "height": 2
+   }
+  },
+  "damageResistances": [
+   "acid",
+   "cold",
+   "fire",
+   "lightning",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "frightened",
+   "poisoned"
+  ],
+  "summonScaling": {
+   "baseLevel": 5,
+   "armorClassPerLevel": 1,
+   "hitPointsPerLevel": 10,
+   "perLevel": [
+    {
+     "actionId": "rend",
+     "plus": 1
+    }
+   ],
+   "halfLevelAttacks": [
+    "rend"
+   ],
+   "chosenDamageType": [
+    "breath-weapon"
+   ]
+  },
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "dragon",
+    "alignment": "neutral",
+    "speeds": {
+     "walk": 30,
+     "swim": 30,
+     "fly": 60,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [
+     "blindsight 30 ft.",
+     "darkvision 60 ft."
+    ],
+    "passivePerception": 12,
+    "languages": "Draconic, understands the languages you know",
+    "damageVulnerabilities": null,
+    "damageResistances": "acid, cold, fire, lightning, poison",
+    "damageImmunities": null,
+    "conditionImmunities": "charmed, frightened, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Shared Resistances",
+      "description": "When you summon the spirit, choose one of its Resistances. You have Resistance to the chosen damage type until the spell ends."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "feather-token-whip"
+  },
+  "name": "Floating Whip",
+  "summary": "Medium force - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": 20,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Item Force",
+      "description": "A floating whip. Its user's Bonus Action moves it up to 20 feet and makes a melee spell attack, +9 to hit, against a creature within 10 feet of it, for 1d6 + 5 Force damage."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "fey-spirit"
+  },
+  "name": "Fey Spirit",
+  "summary": "Medium force - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Spell Force",
+      "description": "A spirit from the Feywild that looks like a Fey creature. Its caster's attacks with the spell reach a creature within 5 feet of it, and a Bonus Action teleports it up to 30 feet before each later attack."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "floating-disk"
+  },
+  "name": "Floating Disk",
+  "summary": "Medium force - CR none",
+  "size": "small",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Spell Force",
+      "description": "A disk of force 3 feet across floating 3 feet off the ground. It holds up to 500 pounds, stays put while its caster is within 20 feet, and follows to stay within 20 feet; more than 100 feet from it, the spell ends."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "giant-fly"
+  },
+  "name": "Giant Fly",
+  "summary": "Large beast, unaligned - CR 0",
+  "size": "large",
+  "abilityScores": {
+   "str": 14,
+   "dex": 13,
+   "con": 13,
+   "int": 2,
+   "wis": 10,
+   "cha": 3
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 11,
+  "hitPoints": {
+   "maximum": 19
+  },
+  "initiativeBonus": 1,
+  "speedFeet": 30,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 2,
+    "height": 2
+   }
+  },
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "beast",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 30,
+     "swim": null,
+     "fly": 60,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [
+     "darkvision 60 ft."
+    ],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": null,
+    "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": []
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "giant-insect"
+  },
+  "name": "Giant Insect",
+  "summary": "Large beast, unaligned - CR none",
+  "size": "large",
+  "abilityScores": {
+   "str": 17,
+   "dex": 13,
+   "con": 15,
+   "int": 4,
+   "wis": 14,
+   "cha": 3
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 15,
+  "hitPoints": {
+   "maximum": 30
+  },
+  "initiativeBonus": 1,
+  "speedFeet": 40,
+  "actions": [
+   {
+    "id": "multiattack",
+    "name": "Multiattack",
+    "activation": "action",
+    "description": "The insect makes a number of attacks equal to half this spell's level (round down).",
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "poison-jab",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "poison-jab",
+    "name": "Poison Jab",
+    "activation": "action",
+    "description": "Melee Attack Roll: Bonus equals your spell attack modifier, reach 10 ft. Hit: 1d6 + 3 + the spell's level Piercing damage plus 1d4 Poison damage.",
+    "attack": {
+     "bonus": 0,
+     "reachFeet": 10
+    },
+    "damage": [
+     {
+      "formula": "1d6 + 7",
+      "type": "piercing"
+     },
+     {
+      "formula": "1d4",
+      "type": "poison"
+     }
+    ]
+   },
+   {
+    "id": "venomous-spew",
+    "name": "Venomous Spew (Centipede Only)",
+    "activation": "bonus-action",
+    "description": "Constitution Saving Throw: DC equals your spell save DC, one creature the insect can see within 10 feet. Failure: The target has the Poisoned condition until the start of the insect's next turn.",
+    "save": {
+     "ability": "con",
+     "dc": 10,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
+    },
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 10,
+     "seen": true
+    }
+   },
+   {
+    "id": "web-bolt",
+    "name": "Web Bolt (Spider Only)",
+    "activation": "bonus-action",
+    "description": "Dexterity Saving Throw: DC equals your spell save DC, one creature the insect can see within 60 feet. Failure: The target's Speed is reduced to 0 until the start of the insect's next turn.",
+    "save": {
+     "ability": "dex",
+     "dc": 10,
+     "successDamage": "none",
+     "failureConditions": [],
+     "speedZero": true,
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     },
+     "failureEffect": {
+      "name": "Web Bolt",
+      "tags": [],
+      "modifiers": [],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
+    },
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    }
+   },
+   {
+    "id": "buzzing-wings",
+    "name": "Buzzing Wings (Wasp Only)",
+    "activation": "bonus-action",
+    "description": "The insect can fly up to half its Fly Speed without provoking Opportunity Attacks.",
+    "damage": [],
+    "move": {
+     "speed": "half",
+     "mode": "fly",
+     "provokes": false
+    }
+   }
+  ],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 2,
+    "height": 2
+   }
+  },
+  "summonScaling": {
+   "baseLevel": 4,
+   "armorClassPerLevel": 1,
+   "hitPointsPerLevel": 10,
+   "perLevel": [
+    {
+     "actionId": "poison-jab",
+     "plus": 1
+    }
+   ],
+   "halfLevelAttacks": [
+    "poison-jab"
+   ],
+   "formActions": [
+    "venomous-spew",
+    "web-bolt",
+    "buzzing-wings"
+   ],
+   "forms": [
+    {
+     "id": "centipede",
+     "name": "Centipede",
+     "actions": [
+      "venomous-spew"
+     ]
+    },
+    {
+     "id": "spider",
+     "name": "Spider",
+     "actions": [
+      "web-bolt"
+     ]
+    },
+    {
+     "id": "wasp",
+     "name": "Wasp",
+     "actions": [
+      "buzzing-wings"
+     ],
+     "speeds": {
+      "fly": 40
+     }
+    }
+   ]
+  },
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "beast",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 40,
+     "swim": null,
+     "fly": null,
+     "climb": 40,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [
+     "darkvision 60 ft."
+    ],
+    "passivePerception": 12,
+    "languages": "Understands the languages you know",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": null,
+    "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Spider Climb",
+      "description": "The insect can climb difficult surfaces, including along ceilings, without needing to make an ability check."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "illusory-copy"
+  },
+  "name": "Illusory Copy",
+  "summary": "Medium illusion - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": null,
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Illusion",
+      "description": "An intangible copy of its caster, who sees and hears through it. A Magic action moves it up to 60 feet. Any damage makes it disappear, and the spell ends."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "illusory-double"
+  },
+  "name": "Illusory Double",
+  "summary": "Medium force - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Spell Force",
+      "description": "An intangible, invulnerable illusion of its caster, who sees and hears through it. A Magic action moves it up to twice its caster's Speed."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "mage-hand"
+  },
+  "name": "Mage Hand",
+  "summary": "Tiny force - CR none",
+  "size": "tiny",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": 30,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Spell Force",
+      "description": "A spectral, floating hand that can't attack, activate magic items or carry more than 10 pounds. A Magic action moves it up to 30 feet; it vanishes more than 30 feet from its caster."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "otherworldly-steed"
+  },
+  "name": "Otherworldly Steed",
+  "summary": "Large celestial, fey, or fiend (your choice), neutral - CR none",
+  "size": "large",
+  "abilityScores": {
+   "str": 18,
+   "dex": 12,
+   "con": 14,
+   "int": 6,
+   "wis": 12,
+   "cha": 8
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 12,
+  "hitPoints": {
+   "maximum": 25
+  },
+  "initiativeBonus": 1,
+  "speedFeet": 60,
+  "actions": [
+   {
+    "id": "otherworldly-slam",
+    "name": "Otherworldly Slam",
+    "activation": "action",
+    "description": "Melee Attack Roll: Bonus equals your spell attack modifier, reach 5 ft. Hit: 1d8 plus the spell's level of Radiant (Celestial), Psychic (Fey), or Necrotic (Fiend) damage.",
+    "attack": {
+     "bonus": 0,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "1d8 + 2",
+      "type": "radiant"
+     }
+    ]
+   },
+   {
+    "id": "fell-glare",
+    "name": "Fell Glare (Fiend Only; Recharges after a Long Rest)",
+    "activation": "bonus-action",
+    "description": "Wisdom Saving Throw: DC equals your spell save DC, one creature within 60 feet the steed can see. Failure: The target has the Frightened condition until the end of your next turn.",
+    "save": {
+     "ability": "wis",
+     "dc": 10,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
+    },
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
+   },
+   {
+    "id": "fey-step",
+    "name": "Fey Step (Fey Only; Recharges after a Long Rest)",
+    "activation": "bonus-action",
+    "description": "The steed teleports, along with its rider, to an unoccupied space of your choice up to 60 feet away from itself.",
+    "damage": [],
+    "teleport": {
+     "feet": 60
+    },
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
+   },
+   {
+    "id": "healing-touch",
+    "name": "Healing Touch (Celestial Only; Recharges after a Long Rest)",
+    "activation": "bonus-action",
+    "description": "One creature within 5 feet of the steed regains a number of Hit Points equal to 2d8 plus the spell's level.",
+    "damage": [],
+    "healing": {
+     "formula": "2d8 + 2"
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
+   }
+  ],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 2,
+    "height": 2
+   }
+  },
+  "summonScaling": {
+   "baseLevel": 2,
+   "armorClassPerLevel": 1,
+   "hitPointsPerLevel": 10,
+   "perLevel": [
+    {
+     "actionId": "otherworldly-slam",
+     "plus": 1
+    },
+    {
+     "actionId": "healing-touch",
+     "plus": 1
+    }
+   ],
+   "speedsFrom": [
+    {
+     "level": 4,
+     "mode": "fly",
+     "feet": 60
+    }
+   ],
+   "formActions": [
+    "fell-glare",
+    "fey-step",
+    "healing-touch"
+   ],
+   "forms": [
+    {
+     "id": "celestial",
+     "name": "Celestial",
+     "creatureType": "celestial",
+     "damageType": "radiant",
+     "actions": [
+      "healing-touch"
+     ]
+    },
+    {
+     "id": "fey",
+     "name": "Fey",
+     "creatureType": "fey",
+     "damageType": "psychic",
+     "actions": [
+      "fey-step"
+     ]
+    },
+    {
+     "id": "fiend",
+     "name": "Fiend",
+     "creatureType": "fiend",
+     "damageType": "necrotic",
+     "actions": [
+      "fell-glare"
+     ]
+    }
+   ]
+  },
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "celestial",
+    "alignment": "neutral",
+    "speeds": {
+     "walk": 60,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 11,
+    "languages": "Telepathy 1 mile (works only with you)",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": null,
+    "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Life Bond",
+      "description": "When you regain Hit Points from a level 1+ spell, the steed regains the same number of Hit Points if you're within 5 feet of it."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "spiritual-weapon"
+  },
+  "name": "Spiritual Weapon",
+  "summary": "Medium force - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Spell Force",
+      "description": "A floating, spectral force that resembles a weapon. Its caster's attacks with the spell reach a creature within 5 feet of it, and a Bonus Action moves it up to 20 feet before each later attack."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "unseen-servant"
+  },
+  "name": "Unseen Servant",
+  "summary": "Medium force - CR none",
+  "size": "medium",
+  "abilityScores": {
+   "str": 2,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 15,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "traitMechanics": [
+   {
+    "kind": "invisible",
+    "name": "Invisible"
+   }
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 15,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": null,
+    "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Invisible",
+      "description": "The servant has the Invisible condition. It can't attack, and it performs simple tasks at your command."
+     }
+    ]
+   }
+  }
+ }
+]

@@ -1,18 +1,25 @@
 import type { CombatState, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
+  climbCells,
+  costWithClimb,
   footprintCenter,
   footprintOrigin,
-  footprintStepBlocked,
+  footprintStepPassage,
   movementPath,
   pointInRects,
   segmentsMeet,
   spacePassage,
+  spaceHeightCells,
+  spansOverlap,
+  slipsThroughStep,
   wallCrossing
 } from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
+import { onOtherPlanes } from "./ethereal.js";
+import { sizeAtMost } from "./resolution/context.js";
 import { areAllies } from "./creature-sides.js";
-import { holdsFeature } from "./class-features.js";
+import { opensItsSpace } from "./space-sharing.js";
 import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid } from "./grid-calibration.js";
 import { layerSlice, normalizedRect, type LayerMapGeometry, type PaintRectInput } from "./map-layers.js";
@@ -20,47 +27,76 @@ import { mapDistance } from "./movement-narration.js";
 import { revealedRegion } from "./fog.js";
 import { intersectRegions, subtractRect, unionRect, type Rect } from "./rect-region.js";
 import type { TokenMapGeometry } from "./token-placement.js";
-import { blocksMovement } from "./vision/sight.js";
+import { blocksMovement, wallPieces } from "./vision/sight.js";
 
-/** Difficult terrain (SRD 5.2.1): the GM paints it per scene; entering a cell whose centre lies in it costs
- *  double. Stored as disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
+/** Painted ground (SRD 5.2.1): the GM paints it per scene. Entering a cell whose centre lies in difficult terrain costs
+ *  double, a creature in water swims, and slippery ice is difficult too (`water.ts`, `ice.ts`). Each kind is stored as
+ *  disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
 
 const MAX_TERRAIN_RECTS = 1000;
 const LIVE_REFUSAL = "That scene is live. Edit its terrain on the table.";
+
+type Terrain = CombatState["terrain"];
+export type TerrainPaintOp = "difficult" | "water" | "running-water" | "ice" | "clear";
+/** The kinds of ground that exclude one another: a square is still water, running water or ice, never two. */
+const SURFACES = ["water", "runningWater", "ice"] as const;
+const SURFACE_OF: Readonly<Partial<Record<TerrainPaintOp, (typeof SURFACES)[number]>>> = {
+  water: "water",
+  "running-water": "runningWater",
+  ice: "ice"
+};
 
 export function paintTerrain(
   state: GameState,
   sceneId: string | undefined,
   geometry: LayerMapGeometry,
-  input: Readonly<{ op: "difficult" | "clear"; rect: PaintRectInput }>
+  input: Readonly<{ op: TerrainPaintOp; rect: PaintRectInput }>
 ) {
   // Terrain lives in cells, so a map without a grid has nowhere to put it.
   if (!geometry.calibration) throw new CommandRejectedError("Calibrate the map's grid before marking terrain.");
   const slice = layerSlice(state, sceneId, "terrain", LIVE_REFUSAL);
   const rect = normalizedRect(geometry, input.rect, "Drag a larger area to mark terrain.");
-  const difficult =
-    input.op === "difficult" ? unionRect(slice.layer.difficult, rect) : subtractRect(slice.layer.difficult, rect);
-  if (difficult.length > MAX_TERRAIN_RECTS)
+  const layer = slice.layer;
+  const surface = SURFACE_OF[input.op];
+  const next: Terrain = {
+    ...layer,
+    difficult:
+      input.op === "difficult"
+        ? unionRect(layer.difficult, rect)
+        : input.op === "clear"
+          ? subtractRect(layer.difficult, rect)
+          : layer.difficult
+  };
+  for (const kind of SURFACES)
+    if (input.op === "clear" || (surface !== undefined && kind !== surface))
+      next[kind] = subtractRect(layer[kind], rect);
+    else if (kind === surface) next[kind] = unionRect(layer[kind], rect);
+  if ([next.difficult, ...SURFACES.map((kind) => next[kind])].some((rects) => rects.length > MAX_TERRAIN_RECTS))
     throw new CommandRejectedError("The terrain is too finely cut up. Clear it and mark it again in larger areas.");
-  slice.write({ difficult });
+  slice.write(next);
 }
 
 export function resetTerrain(state: GameState, sceneId: string | undefined) {
   const slice = layerSlice(state, sceneId, "terrain", LIVE_REFUSAL);
-  slice.write({ difficult: [] });
+  slice.write({ difficult: [], water: [], runningWater: [], ice: [] });
 }
 
 /** Terrain as players and the table screen get it: only what the fog reveals, and with dynamic vision only what the
- *  party has seen (`seen`, disjoint rects), so unrevealed ground keeps its layout. Difficult terrain out of sight is
- *  still charged when someone walks into it. */
-export function visibleTerrain(
-  combat: Pick<CombatState, "fog" | "terrain">,
-  seen?: readonly Rect[]
-): CombatState["terrain"] {
+ *  party has seen (`seen`, disjoint rects), so unrevealed ground keeps its layout. Ground out of sight is still charged
+ *  when someone walks into it. */
+export function visibleTerrain(combat: Pick<CombatState, "fog" | "terrain">, seen?: readonly Rect[]): Terrain {
   const revealed = revealedRegion(combat.fog);
-  const difficult = combat.terrain.difficult.map((rect) => ({ ...rect }));
-  const unfogged = revealed === "everything" ? difficult : intersectRegions(difficult, revealed);
-  return { difficult: seen === undefined ? unfogged : intersectRegions(unfogged, seen) };
+  const visible = (rects: readonly Rect[]) => {
+    const copied = rects.map((rect) => ({ ...rect }));
+    const unfogged = revealed === "everything" ? copied : intersectRegions(copied, revealed);
+    return seen === undefined ? unfogged : intersectRegions(unfogged, seen);
+  };
+  return {
+    difficult: visible(combat.terrain.difficult),
+    water: visible(combat.terrain.water),
+    runningWater: visible(combat.terrain.runningWater),
+    ice: visible(combat.terrain.ice)
+  };
 }
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -87,18 +123,63 @@ export type MovementCostOptions = Readonly<{
   perceives?: (actorId: string) => boolean;
   /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
   passesCreatures?: boolean;
+  /** The mover may pass through the spaces of creatures this size or smaller (a gelatinous cube's Engulf). */
+  passesCreaturesUpTo?: string;
+  /** The mover may pass through the space of any creature larger than itself (Halfling Nimbleness). */
+  nimble?: boolean;
+  /** The path keeps to the straight line drawn, so a move through creatures enters the spaces along it rather than
+   *  going round them. */
+  alongLine?: boolean;
+  /** The mover passes through walls as through Difficult Terrain (a ghost's Incorporeal Movement, a Tunneler). */
+  throughWalls?: boolean;
+  /** The mover passes through walls at no extra cost (Earth Glide, burrowing). A spell's wall stops it all the same. */
+  throughWallsFree?: boolean;
+  /** How narrow an opening the mover passes with no extra movement: any gap (`point`: Amorphous, "as narrow as 1
+   *  inch"), or one a Tiny creature fits (`tiny`: a swarm). */
+  opening?: "point" | "tiny";
+  /** Difficult Terrain costs the mover nothing extra (Freedom of Movement). */
+  ignoresDifficult?: boolean;
   /** Whether the mover's Speed is halved with its centre at this point (Spirit Guardians' Emanation). */
   halvedAt?: (position: Point, sizeCells: number) => boolean;
+  /** Whether a spell's area makes the cell with this centre Difficult Terrain for the mover (Web, Entangle). */
+  difficultAt?: (position: Point) => boolean;
+  /** Whether a spell's area lifts the painted Difficult Terrain of the cell with this centre (Speak with Plants). */
+  clearedAt?: (position: Point) => boolean;
+  /** Whether a spell's ground costs double again on top of its Difficult Terrain with the mover's centre at this point
+   *  (Plant Growth's 4 feet for every foot). A mover off the ground passes over it. */
+  costlyGroundAt?: (position: Point, sizeCells: number) => boolean;
+  /** Whether a spell's barrier bars the mover's step between these two centres (Antilife Shell, Magic Circle). */
+  barredStep?: (from: Point, to: Point, sizeCells: number) => boolean;
+  /** Whether the step between these two centres costs double for the way it goes (Gust of Wind's Line, toward its
+   *  caster). */
+  costlyStep?: (from: Point, to: Point, sizeCells: number) => boolean;
+  /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
+  altitude?: Readonly<{ fromFeet: number; toFeet: number }>;
+  /** It swims with its Swim Speed, so a foot in water costs no more (SRD Swimming); a foot in water costs 1 extra
+   *  otherwise. */
+  swimsFree?: boolean;
+  /** It moves across water as if it were solid ground (Water Walk, a Monk's Acrobatic Movement). */
+  walksOnWater?: boolean;
+  /** It can't pass through liquid (a vampire's mist), so water bars its way. */
+  barredByWater?: boolean;
+  /** Slippery ice costs it nothing extra (Ice Walk). */
+  freeOnIce?: boolean;
 }>;
 
 /** The movement-blocking walls of the live scene (walls, closed doors, windows) in grid units, while its dynamic
- *  vision is on; none otherwise. */
-export function movementWalls(state: GameState, calibration: NonNullable<TokenMapGeometry["calibration"]>) {
+ *  vision is on; none otherwise. With `spellMadeOnly`, the walls a spell or an item raised (Wall of Force), which no
+ *  creature passes however it moves. */
+export function movementWalls(
+  state: GameState,
+  calibration: NonNullable<TokenMapGeometry["calibration"]>,
+  spellMadeOnly = false
+) {
   const vision = state.combat.vision;
   if (!vision.enabled) return [];
   return vision.walls
-    .filter(blocksMovement)
-    .map((wall) => ({ a: imageToGrid(calibration, wall.a), b: imageToGrid(calibration, wall.b) }));
+    .filter((wall) => blocksMovement(wall) && (!spellMadeOnly || wall.source !== undefined))
+    .flatMap(wallPieces)
+    .map((piece) => ({ a: imageToGrid(calibration, piece.a), b: imageToGrid(calibration, piece.b) }));
 }
 
 /**
@@ -118,36 +199,59 @@ export function movementCost(
 ): MovementCost | null {
   const extra = Math.max(0, options.extraPerStep ?? 0);
   const calibration = geometry.calibration;
+  const rise = options.altitude ? options.altitude.toFeet - options.altitude.fromFeet : 0;
   if (!calibration) {
     // No cells to path round a wall on a gridless map: a straight move through one is barred.
-    if (straightThroughWall(state, from, to)) return { feet: 0, difficultFeet: 0, path: [], blocked: true };
+    if (!options.throughWalls && !options.throughWallsFree && straightThroughWall(state, from, to))
+      return { feet: 0, difficultFeet: 0, path: [], blocked: true };
     const straight = mapDistance(geometry, from, to);
     return straight
-      ? { feet: straight.value * (1 + extra), difficultFeet: 0, path: sampled(from, to, straight.value) }
+      ? {
+          feet: Math.hypot(straight.value, rise) * (1 + extra),
+          difficultFeet: 0,
+          path: sampled(from, to, straight.value)
+        }
       : null;
   }
   const mover = state.actors.find((candidate) => candidate.id === actorId);
   const sizeCells = state.combat.tokens.find((token) => token.actorId === actorId)?.sizeCells ?? 1;
+  // Height: the mover's way runs from its lowest point to the top of its space at its highest. A creature whose space
+  // lies wholly above or below it is no obstacle, and a mover off the ground the whole way passes over painted terrain.
+  const feetPerCell = calibration.distancePerCell;
+  const lowFeet = Math.min(options.altitude?.fromFeet ?? 0, options.altitude?.toFeet ?? 0);
+  const highFeet =
+    Math.max(options.altitude?.fromFeet ?? 0, options.altitude?.toFeet ?? 0) +
+    spaceHeightCells(sizeCells) * feetPerCell;
+  const aloft = lowFeet > 0;
   const difficultCells = new Set<string>();
   const closedCells = new Set<string>();
   for (const token of state.combat.tokens) {
     if (token.actorId === actorId || !token.position || options.carried?.includes(token.actorId)) continue;
     const occupant = state.actors.find((candidate) => candidate.id === token.actorId);
     if (!mover || !occupant || occupant.visibility === "gm-only") continue;
+    // The Border Ethereal and the world it overlaps pass through each other.
+    if (onOtherPlanes(mover, occupant)) continue;
     if (options.perceives && !options.perceives(occupant.id)) continue;
+    const occupantLow = token.altitudeFeet ?? 0;
+    if (!spansOverlap(lowFeet, highFeet, occupantLow, occupantLow + spaceHeightCells(token.sizeCells) * feetPerCell))
+      continue;
     const printed = spacePassage({
       ally: areAllies(mover, occupant, options.resolveDefinition),
       incapacitated: isIncapacitated(occupant),
       moverSize: mover.size,
-      occupantSize: occupant.size
+      occupantSize: occupant.size,
+      nimble: options.nimble === true
     });
-    // A mover that can stop in a creature's space, or a swarm's space ("and vice versa"), is never barred; it is still
-    // another creature's space, so it costs as Difficult Terrain.
+    // A mover that can stop in a creature's space, or a swarm's or a gelatinous cube's space, is never barred; it is
+    // still another creature's space, so it costs as Difficult Terrain.
     const swarm =
       occupant.definitionId !== null &&
       occupant.definitionId !== undefined &&
-      holdsFeature(options.resolveDefinition?.(occupant.definitionId), "swarm", "Swarm");
-    const passage = printed === "blocked" && (options.passesCreatures || swarm) ? "difficult" : printed;
+      opensItsSpace(options.resolveDefinition?.(occupant.definitionId));
+    const passes =
+      options.passesCreatures === true ||
+      (options.passesCreaturesUpTo !== undefined && sizeAtMost(occupant.size, options.passesCreaturesUpTo));
+    const passage = printed === "blocked" && (passes || swarm) ? "difficult" : printed;
     if (passage === "open") continue;
     const cells = passage === "blocked" ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGrid(calibration, token.position), token.sizeCells);
@@ -155,43 +259,121 @@ export function movementCost(
       for (let row = 0; row < token.sizeCells; row++) cells.add(`${origin.column + column},${origin.row + row}`);
   }
   const terrain = state.combat.terrain.difficult;
-  const crosses = wallCrossing(movementWalls(state, calibration));
+  const walls = movementWalls(state, calibration);
+  const crosses = wallCrossing(walls);
+  // A spell's wall stops even a mover that passes walls (Wall of Force: "Nothing can physically pass through").
+  const passesWalls = options.throughWalls === true || options.throughWallsFree === true;
+  const fixedWalls = passesWalls ? movementWalls(state, calibration, true) : [];
+  const fixedCrosses = wallCrossing(fixedWalls);
+  // A Tiny creature fits an opening half a square wide; a bigger one squeezes through it.
+  const lane = { tiny: mover?.size === "tiny" };
   const halvedAt = options.halvedAt;
+  const costlyGroundAt = aloft ? undefined : options.costlyGroundAt;
+  const fromCell = footprintOrigin(imageToGrid(calibration, from), sizeCells);
+  const toCell = footprintOrigin(imageToGrid(calibration, to), sizeCells);
+  const lineLength = Math.hypot(toCell.column - fromCell.column, toCell.row - fromCell.row);
+  const nearLine = (cell: { column: number; row: number }) =>
+    lineLength === 0 ||
+    Math.abs(
+      (cell.column - fromCell.column) * (toCell.row - fromCell.row) -
+        (cell.row - fromCell.row) * (toCell.column - fromCell.column)
+    ) /
+      lineLength <=
+      0.75;
+  // Water a mover walks across is ground to it; one that can't pass through liquid finds it closed.
+  const water = options.walksOnWater === true || aloft ? [] : waterRects(state.combat.terrain);
+  const ice = options.freeOnIce === true ? [] : state.combat.terrain.ice;
   const path = movementPath({
-    from: footprintOrigin(imageToGrid(calibration, from), sizeCells),
-    to: footprintOrigin(imageToGrid(calibration, to), sizeCells),
+    from: fromCell,
+    to: toCell,
     sizeCells,
     isDifficult: (column, row) =>
-      difficultCells.has(`${column},${row}`) ||
-      pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain),
+      options.ignoresDifficult !== true &&
+      (difficultCells.has(`${column},${row}`) ||
+        // The ground a spell's area makes difficult lies on the ground, as painted terrain does.
+        (!aloft &&
+          ((pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain) &&
+            options.clearedAt?.(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 })) !== true) ||
+            pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), ice) ||
+            options.difficultAt?.(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 })) === true))),
     // A path can't leave the map to walk round something, nor pass a creature that bars the way.
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
       const center = gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
+      if (options.barredByWater === true && pointInRects(center, water)) return false;
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
-    isStepOpen: (stepFrom, stepTo) => !footprintStepBlocked(stepFrom, stepTo, sizeCells, crosses),
-    extraPerStep: extra,
-    ...(halvedAt
+    ...(water.length > 0
       ? {
-          isHalved: (column: number, row: number) =>
-            halvedAt(gridToImage(calibration, footprintCenter({ column, row }, sizeCells)), sizeCells)
+          isWater: (column: number, row: number) =>
+            pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), water),
+          swimExtra: options.swimsFree === true ? 0 : 1
+        }
+      : {}),
+    isStepOpen: (stepFrom, stepTo) =>
+      (options.alongLine !== true || nearLine(stepTo)) &&
+      (passesWalls
+        ? footprintStepPassage(stepFrom, stepTo, sizeCells, fixedCrosses, fixedWalls, lane) !== "blocked"
+        : footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls, lane) !== "blocked" ||
+          (options.opening !== undefined && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, options.opening))) &&
+      // A spell's barrier holds back even a mover that passes walls.
+      options.barredStep?.(
+        gridToImage(calibration, footprintCenter(stepFrom, sizeCells)),
+        gridToImage(calibration, footprintCenter(stepTo, sizeCells)),
+        sizeCells
+      ) !== true,
+    // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
+    // so does a wall an incorporeal mover passes.
+    isStepSqueezed: (stepFrom, stepTo) => {
+      // Through a gap it slips through, or through earth and stone it glides in, a step costs nothing extra.
+      if (options.ignoresDifficult === true || options.throughWallsFree === true) return false;
+      if (options.opening && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, options.opening)) return false;
+      const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls, lane);
+      return passage === "squeeze" || (options.throughWalls === true && passage === "blocked");
+    },
+    extraPerStep: extra,
+    ...(options.costlyStep
+      ? {
+          isStepCostly: (stepFrom: { column: number; row: number }, stepTo: { column: number; row: number }) =>
+            options.costlyStep!(
+              gridToImage(calibration, footprintCenter(stepFrom, sizeCells)),
+              gridToImage(calibration, footprintCenter(stepTo, sizeCells)),
+              sizeCells
+            )
+        }
+      : {}),
+    ...(halvedAt || costlyGroundAt
+      ? {
+          isHalved: (column: number, row: number) => {
+            const center = gridToImage(calibration, footprintCenter({ column, row }, sizeCells));
+            return halvedAt?.(center, sizeCells) === true || costlyGroundAt?.(center, sizeCells) === true;
+          }
         }
       : {})
   });
+  const climb = climbCells(0, rise, feetPerCell);
   if (!path) {
     // Past the search budget (a very long drag): fall back to the straight count, as before terrain existed.
     const straight = mapDistance(geometry, from, to);
     return straight
-      ? { feet: straight.value * (1 + extra), difficultFeet: 0, path: sampled(from, to, straight.value) }
+      ? {
+          feet: Math.max(straight.value, Math.abs(rise)) * (1 + extra),
+          difficultFeet: 0,
+          path: sampled(from, to, straight.value)
+        }
       : null;
   }
   if (path.blocked) return { feet: 0, difficultFeet: 0, path: [], blocked: true };
   return {
-    feet: path.costCells * calibration.distancePerCell,
+    feet: costWithClimb(path.costCells, path.steps.length - 1, climb, extra) * feetPerCell,
     difficultFeet: path.difficultSteps * calibration.distancePerCell,
     path: path.steps.map((step) => gridToImage(calibration, footprintCenter(step, sizeCells)))
   };
+}
+
+/** Every painted water rect, still and running. */
+export function waterRects(terrain: Pick<CombatState["terrain"], "water" | "runningWater">): Rect[] {
+  return [...terrain.water, ...terrain.runningWater];
 }
 
 function straightThroughWall(state: GameState, from: Point, to: Point): boolean {
@@ -200,7 +382,8 @@ function straightThroughWall(state: GameState, from: Point, to: Point): boolean 
   const grid = (point: Point) => ({ column: point.x, row: point.y });
   return vision.walls
     .filter(blocksMovement)
-    .some((wall) => segmentsMeet(grid(from), grid(to), grid(wall.a), grid(wall.b)));
+    .flatMap(wallPieces)
+    .some((piece) => segmentsMeet(grid(from), grid(to), grid(piece.a), grid(piece.b)));
 }
 
 /** Points along a straight move, every 2.5 feet or so, start and end included. */

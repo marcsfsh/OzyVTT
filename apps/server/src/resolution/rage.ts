@@ -1,11 +1,17 @@
 import { endEffect, RAGE_ROUNDS, RAGING_TAG, turnEndDuration } from "../effects.js";
+import { areAllies } from "../creature-sides.js";
 import type { ResolveContext } from "./context.js";
 
 /** SRD Persistent Rage: "When you roll Initiative, you can regain all expended uses of Rage", its once per Long
- *  Rest spent by the action itself. */
+ *  Rest spent by the action itself. The regain comes only in the window rolling Initiative opens (the sheet offers it
+ *  there, `conversions.ts`), so the action taken any other time gives nothing back. */
 function regainRageUses(ctx: ResolveContext): void {
-  const { attacker, action, siblings, warnings } = ctx;
+  const { state, attacker, action, siblings, warnings } = ctx;
   if (action.id !== "persistent-rage") return;
+  if (!state.combat.active || !state.combat.initiativeWindow.includes(attacker.id)) {
+    warnings.push(`Persistent Rage gives Rage back only when ${attacker.name} rolls Initiative.`);
+    return;
+  }
   const key = siblings.find((sibling) => sibling.id === "rage")?.uses?.pool ?? "rage";
   if (attacker.actionUses[key] === undefined) return;
   const { [key]: _spent, ...rest } = attacker.actionUses;
@@ -14,8 +20,8 @@ function regainRageUses(ctx: ResolveContext): void {
 }
 
 /**
- * SRD Rage: it lasts until the end of the Barbarian's next turn, and each attack roll against another creature or
- * saving throw forced on one extends it to the end of the next turn again (so does taking a Bonus Action to extend
+ * SRD Rage: it lasts until the end of the Barbarian's next turn, and each attack roll against an enemy or saving throw
+ * forced on one extends it to the end of the next turn again (so does taking a Bonus Action to extend
  * it, which is Rage itself re-declared: see `checkLimitedUse`), for up to 10 minutes. It ends early in Heavy armor.
  */
 export function applyRageRules(ctx: ResolveContext): void {
@@ -29,7 +35,10 @@ export function applyRageRules(ctx: ResolveContext): void {
     warnings.push(`${attacker.name} is wearing Heavy armor, so its Rage ends.`);
     return;
   }
-  const others = targets.some((target) => target.id !== attacker.id);
+  // "Against an enemy": a creature on the Barbarian's own side doesn't feed it.
+  const others = targets.some(
+    (target) => target.id !== attacker.id && !areAllies(attacker, target, ctx.deps.resolveDefinition)
+  );
   const attacked = ctx.attack !== null && others;
   const forcedSave = (action.save !== undefined || ctx.builtinSave !== null) && others;
   if (!(attacked || forcedSave) || rage.duration.type !== "until-source-turn-end") return;

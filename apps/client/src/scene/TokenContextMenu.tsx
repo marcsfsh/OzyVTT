@@ -1,13 +1,14 @@
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
-import { IconButton, IconX, Select } from "@vtt/ui";
+import { IconButton, IconX, Select, useToast } from "@vtt/ui";
 import { ConditionEditor } from "../encounter/conditions";
 import { HpAdjust } from "../encounter/HpAdjust";
 import { HealthAudienceOptions, HealthStyleOptions, type HealthStyle } from "../encounter/health-display";
 import { command } from "../lib/command";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { titleCase } from "../encounter/format";
+import { resolveAtHeld, useTargeting } from "../encounter/targeting";
 import { useMenuDismiss, useMenuPlacement } from "./menuPlacement";
 import "./token-menu.css";
 
@@ -27,6 +28,7 @@ export function TokenContextMenu({
   reactionUsed,
   placed,
   moveModes,
+  height,
   onOpenSheet,
   onReturnToTray,
   onClose
@@ -40,6 +42,8 @@ export function TokenContextMenu({
   placed: boolean;
   /** How the creature whose move counts now travels on its next drag. */
   moveModes?: ReactNode;
+  /** How high the creature is, and the way to change it. */
+  height?: ReactNode;
   onOpenSheet: () => void;
   onReturnToTray: () => void;
   onClose: () => void;
@@ -78,6 +82,7 @@ export function TokenContextMenu({
           <IconX />
         </IconButton>
       </div>
+      <HeldBy actor={actor} role={role} />
       <TokenControls
         actor={actor}
         role={role}
@@ -85,6 +90,7 @@ export function TokenContextMenu({
         reactionUsed={reactionUsed}
         placed={placed}
         moveModes={moveModes}
+        height={height}
         onOpenSheet={() => {
           onOpenSheet();
           onClose();
@@ -101,6 +107,72 @@ export function TokenContextMenu({
 }
 
 /**
+ * What holds the creature (a Net, a web, a rope), each an object that frees it when broken, and what it carries with
+ * statistics of its own (a night hag's soul bag): for the GM with its Armor Class and hit points. While an attack is
+ * being aimed, the attack can be aimed at it here.
+ */
+function HeldBy({ actor, role }: Readonly<{ actor: Actor; role: "gm" | "player" }>) {
+  const held = actor.effects.flatMap((effect) =>
+    "heldBy" in effect && effect.heldBy
+      ? [{ effectId: effect.id, holder: effect.heldBy, carried: effect.tags.includes("carried-object") }]
+      : []
+  );
+  return held.length === 0 ? null : <HeldByRows actor={actor} role={role} held={held} />;
+}
+
+function HeldByRows({
+  actor,
+  role,
+  held
+}: Readonly<{
+  actor: Actor;
+  role: "gm" | "player";
+  held: ReadonlyArray<
+    Readonly<{
+      effectId: string;
+      /** Its creature carries it (a soul bag): breaking it frees no one. */
+      carried: boolean;
+      holder:
+        | Readonly<{ name: string }>
+        | Readonly<{ name: string; armorClass: number; hitPoints: Readonly<{ current: number; maximum: number }> }>;
+    }>
+  >;
+}>) {
+  const session = useTargeting();
+  const { toast } = useToast();
+  const attack = session && session.action.attackBonus !== null ? session.action : null;
+  return (
+    <>
+      {held.map(({ effectId, holder, carried }) => (
+        <div key={effectId} className="token-context-held">
+          <p className="token-context-feedback">
+            {role === "gm" && "armorClass" in holder
+              ? `${carried ? "Carries" : "Held by"} ${holder.name} · AC ${holder.armorClass} · ${holder.hitPoints.current}/${holder.hitPoints.maximum} HP`
+              : `${carried ? "Carries" : "Held by"} ${holder.name}`}
+          </p>
+          {attack ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="token-context-item"
+              onClick={() =>
+                resolveAtHeld(actor.id, effectId, undefined, (ok, text) => {
+                  if (text) toast(text, { tone: ok ? "info" : "error" });
+                })
+              }
+            >
+              {`Attack the ${holder.name} with ${attack.name}`}
+            </button>
+          ) : (
+            <p className="token-context-feedback">{`${carried ? "" : `Breaking the ${holder.name} frees ${actor.name}. `}Choose an attack, then open this menu to aim it at the ${holder.name}.`}</p>
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
+/**
  * What can be done to one token: the GM's HP, size, health display, conditions, sheet, image, visibility, reaction
  * and tray; a player's conditions, sheet and reaction on their own. The same controls sit in the token's menu on the
  * map and in the GM's Token tab.
@@ -112,6 +184,7 @@ export function TokenControls({
   reactionUsed,
   placed,
   moveModes,
+  height,
   onOpenSheet,
   onReturnToTray,
   onPickImage
@@ -122,6 +195,7 @@ export function TokenControls({
   reactionUsed: boolean;
   placed: boolean;
   moveModes?: ReactNode;
+  height?: ReactNode;
   onOpenSheet: () => void;
   onReturnToTray: () => void;
   onPickImage: () => void;
@@ -184,6 +258,7 @@ export function TokenControls({
   return (
     <>
       {moveModes}
+      {height}
       {role === "gm" && <HpAdjust actor={actor} controls={["damage", "heal"]} onFeedback={setFeedback} />}
       {role === "gm" && (
         <label className="token-context-size">

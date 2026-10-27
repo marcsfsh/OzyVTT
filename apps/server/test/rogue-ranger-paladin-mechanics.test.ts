@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyRest } from "../src/rests.js";
+import { applyDamageDetailed } from "../src/hit-points.js";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -9,6 +10,7 @@ import { deriveEquipment, equipmentCatalogOf, rollModeClaims } from "../src/equi
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { answerReaction } from "../src/reactions.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
+import { answerAbilityCheck, rollAbilityCheck, type CheckRollDependencies } from "../src/check-rolls.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
@@ -212,7 +214,7 @@ function swing(
   actionId: string,
   faces: number[],
   options: {
-    hitOptions?: Array<{ id: string; damageType?: string; slotLevel?: number }>;
+    hitOptions?: Array<{ id: string; damageType?: string; slotLevel?: number; effects?: string[] }>;
     rollMode?: "advantage" | "disadvantage";
     commit?: boolean;
     distanceFeet?: (a: string, b: string) => number | null;
@@ -261,6 +263,39 @@ describe("Rogue: Sneak Attack rides a qualifying hit", () => {
     expect(
       swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }).hitOffers
     ).toBeUndefined();
+  });
+
+  it("throws its dice on a look at the damage, where Heroic Inspiration rerolls one, and the confirm deals them", () => {
+    // Rogue 5: Sneak Attack 3d6 beside the Shortsword's 1d6.
+    const built = table(rogueInput(5));
+    built.hero.heroicInspiration = true;
+    const attack = (input: Record<string, unknown>, faces: number[]) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "item-shortsword")!,
+        {
+          actorId: IDS.hero,
+          targetIds: [IDS.foe],
+          commandId: nextCommandId(),
+          rollMode: "advantage",
+          holdKey: `attack:${IDS.hero}`,
+          hitOptions: [{ id: "sneak-attack" }],
+          ...input
+        },
+        deps(built, faces)
+      );
+    attack({ commit: false }, [15, 2]);
+    const look = attack({ commit: false, damageLook: true }, [2, 1, 1, 1]);
+    expect((look.heldDamage?.dice ?? []).map((die) => die.face)).toEqual([2, 1, 1, 1]);
+    expect(look.damage.find((part) => part.source === "Sneak Attack")?.total).toBe(3);
+    const answered = attack(
+      { commit: false, damageLook: true, damageAnswer: { id: "heroic-inspiration", dice: [1] } },
+      [6]
+    );
+    expect((answered.heldDamage?.dice ?? []).map((die) => die.face)).toEqual([2, 6, 1, 1]);
+    expect(built.hero.heroicInspiration).toBe(false);
+    const hit = attack({}, [3, 3, 3, 3]);
+    expect(hit.damage.find((part) => part.source === "Sneak Attack")?.total).toBe(8);
   });
 
   it("doubles its dice on a critical hit", () => {
@@ -542,14 +577,39 @@ describe("Rogue: the flat grants and the pick", () => {
     );
   });
 
-  it("spends Stroke of Luck's one use and refuses the second", () => {
-    // A feature that prints a use count and no action gets a synthesized rollable action.
+  it("turns a failed check into a 20 with Stroke of Luck once, and offers it no second time before a rest", () => {
     const built = table(rogueInput(20));
-    resolve(built, "stroke-of-luck", [], []);
-    expect(built.hero.actionUses["stroke-of-luck"]).toBe(1);
-    expect(() => resolve(built, "stroke-of-luck", [], [])).toThrowError(
-      /Stroke of Luck: no uses remaining \(1\/Short Rest\)/
+    const checkDeps = (faces: number[]): CheckRollDependencies => ({
+      random: () => faces.shift()!,
+      newId: nextCommandId,
+      sessionId: IDS.gm,
+      now: () => "2026-07-27T00:00:00.000Z",
+      resolveDefinition: (id) => resolveIn(built.state, id),
+      catalog: built.catalog
+    });
+    const stealth = (face: number) =>
+      rollAbilityCheck(
+        built.state,
+        { role: "gm" },
+        {
+          commandId: nextCommandId(),
+          actorId: IDS.hero,
+          subject: { ability: "int" },
+          dc: 30,
+          visibility: "public"
+        },
+        checkDeps([face])
+      );
+    expect(stealth(4).outcome.answers?.map((offer) => offer.id)).toContain("stroke-of-luck");
+    const turned = answerAbilityCheck(
+      built.state,
+      { role: "gm" },
+      { commandId: nextCommandId(), actorId: IDS.hero, answer: { id: "stroke-of-luck" } },
+      checkDeps([])
     );
+    expect(turned.outcome.natural).toBe(20);
+    expect(built.hero.actionUses["stroke-of-luck"]).toBe(1);
+    expect(stealth(4).outcome.answers?.map((offer) => offer.id) ?? []).not.toContain("stroke-of-luck");
   });
 
   it("gives Steady Aim's Bonus Action a real Advantage effect", () => {
@@ -732,6 +792,129 @@ describe("Ranger: Favored Enemy, audit row 32", () => {
     for (let cast = 0; cast < 6; cast += 1) mark(late);
     expect(late.hero.actionUses["favored-enemy"]).toBe(6);
     expect(() => mark(late)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(6\/Long Rest\)/);
+  });
+});
+
+describe("Hunter: Horde Breaker opens one more attack with the same weapon", () => {
+  const SECOND = "10000000-0000-4000-8000-000000000044";
+  const THIRD = "10000000-0000-4000-8000-000000000045";
+  /** A Hunter 3 with Horde Breaker beside a Foe, a second goblin 5 feet from the Foe and a third 10 feet from it. */
+  function horde() {
+    const input = rangerInput(3);
+    input.choices = input.choices.map((row) => (row.kind === "hunters-prey" ? { ...row, id: "horde-breaker" } : row));
+    const built = table(input);
+    for (const [id, name, score] of [
+      [SECOND, "Second Goblin", 5],
+      [THIRD, "Third Goblin", 4]
+    ] as const) {
+      built.state.actors.push({ ...built.foe, id, name, effects: [] });
+      built.state.combat.initiative.push({ actorId: id, score } as (typeof built.state.combat.initiative)[number]);
+    }
+    const distanceFeet = (a: string, b: string) => {
+      const pair = new Set([a, b]);
+      if (pair.has(IDS.foe) && pair.has(SECOND)) return 5;
+      if (pair.has(IDS.foe) && pair.has(THIRD)) return 10;
+      return 30;
+    };
+    const attack = (actionId: string, targetId: string, faces: number[]) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, actionId)!,
+        { actorId: IDS.hero, targetIds: [targetId], commandId: nextCommandId() },
+        { ...deps(built, faces), distanceFeet }
+      );
+    return { built, attack };
+  }
+
+  it("follows a missed Longbow shot with a shot at a creature within 5 feet of the target, once a turn", () => {
+    const { attack } = horde();
+    const missed = attack("item-longbow", IDS.foe, [2]);
+    expect(missed.attack?.outcome).toBe("miss");
+    expect(missed.opens).toEqual({ actionId: "item-longbow-horde-breaker", actionName: "Longbow (Horde Breaker)" });
+    expect(attack("item-longbow-horde-breaker", SECOND, [17, 5]).attack?.outcome).toBe("hit");
+    expect(() => attack("item-longbow-horde-breaker", THIRD, [17, 5])).toThrowError(/no uses remaining/);
+  });
+
+  it("refuses a creature 10 feet from the first target, and one it already attacked this turn", () => {
+    const { attack } = horde();
+    attack("item-longbow", IDS.foe, [2]);
+    expect(() => attack("item-longbow-horde-breaker", THIRD, [17, 5])).toThrowError(
+      /Third Goblin is 10 ft from the target Horde Breaker follows/
+    );
+    expect(() => attack("item-longbow-horde-breaker", IDS.foe, [17, 5])).toThrowError(
+      /took the attack that set off Horde Breaker/
+    );
+  });
+
+  it("refuses a creature the Ranger already attacked this turn", () => {
+    const { built, attack } = horde();
+    attack("item-longbow", SECOND, [2]);
+    // A second action this turn (the GM's say), aimed at the Foe beside the goblin already shot at.
+    built.state.combat.turn = { ...built.state.combat.turn, actionUsed: false, actionInstance: null };
+    attack("item-longbow", IDS.foe, [2]);
+    expect(() => attack("item-longbow-horde-breaker", SECOND, [17, 5])).toThrowError(
+      /has already attacked Second Goblin this turn/
+    );
+  });
+
+  it("is refused before any weapon attack this turn", () => {
+    const { attack } = horde();
+    expect(() => attack("item-longbow-horde-breaker", SECOND, [17, 5])).toThrowError(
+      /follows an attack with this weapon/
+    );
+  });
+});
+
+describe("Ranger: Superior Hunter's Prey", () => {
+  const OTHER = "10000000-0000-4000-8000-000000000033";
+  /** The Ranger 11 with its Hunter's Mark on the Foe and a Goblin `apart` feet from the Foe. */
+  function marked(apart: number) {
+    const built = table(rangerInput(11));
+    built.state.actors.push({ ...built.foe, id: OTHER, name: "Goblin", effects: [] });
+    built.state.combat.initiative.push({ actorId: OTHER, score: 5 } as (typeof built.state.combat.initiative)[number]);
+    addEffect(
+      built.state,
+      IDS.foe,
+      makeEffect({
+        id: "hunters-mark",
+        name: "Hunter's Mark",
+        tags: ["hunters-mark"],
+        sourceActorId: IDS.hero,
+        duration: { type: "rounds", remaining: 600 }
+      })
+    );
+    const distanceFeet = (a: string, b: string) =>
+      (a === IDS.foe && b === OTHER) || (a === OTHER && b === IDS.foe) ? apart : 30;
+    const prey = (faces: number[]) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "superior-hunters-prey")!,
+        { actorId: IDS.hero, targetIds: [OTHER], commandId: nextCommandId() },
+        { ...deps(built, faces), distanceFeet }
+      );
+    /** A Longbow hit on the Foe, its damage applied as the table applies a hit's (`player-damage.ts`). */
+    const shoot = () => {
+      const hit = resolve(built, "item-longbow", [17, 5]);
+      applyDamageDetailed(built.state, IDS.foe, { amount: hit.damageTotal ?? 0, sourceActorId: IDS.hero }, GM_SCOPE);
+    };
+    return { built, prey, shoot };
+  }
+
+  it("deals the mark's 1d6 Force to a creature within 30 feet of the marked one once the Ranger has damaged it", () => {
+    const { prey, shoot } = marked(20);
+    expect(() => prey([4])).toThrowError(/hasn't dealt damage to a creature it marks this turn/);
+    shoot();
+    expect(prey([4]).damageTargets).toMatchObject([{ total: 4 }]);
+    expect(() => prey([4])).toThrowError(/no uses remaining/);
+  });
+
+  it("refuses a creature 40 feet from the marked one, and the marked one itself", () => {
+    const { built, prey, shoot } = marked(40);
+    shoot();
+    expect(() => prey([4])).toThrowError(/Goblin isn't within 30 feet of the marked creature/);
+    expect(() => resolve(built, "superior-hunters-prey", [4], [IDS.foe])).toThrowError(
+      /reaches a different creature than the marked one/
+    );
   });
 });
 
@@ -1112,10 +1295,51 @@ describe("Paladin: Channel Divinity is ONE counter that three features spend", (
       failureConditions: ["frightened"],
       // "for 1 minute or until it takes any damage".
       failureDuration: { type: "rounds", rounds: 10 },
-      endsOnDamage: true
+      endsOnDamage: true,
+      // "can do only one of the following on its turns: move, take an action, or take a Bonus Action".
+      failureEffect: { name: "Abjured", tags: ["dazed"], modifiers: [] }
     });
     const resolution = resolve(built, "abjure-foes", [], [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "wis", dc: 14 });
+  });
+});
+
+describe("Paladin: Sacred Weapon comes with the Attack action, and Divine Sense ends on Incapacitated", () => {
+  it("takes the Attack action when used first, and its attacks then follow", () => {
+    const built = table(paladinInput(9));
+    resolve(built, "sacred-weapon", [], []);
+    expect(built.state.combat.turn.actionUsed).toBe(true);
+    expect(built.state.combat.turn.actionInstance?.components).toEqual({ attack: 2 });
+    swing(built, "item-longsword", [15, 4]);
+    swing(built, "item-longsword", [15, 4]);
+    expect(built.state.combat.turn.actionInstance?.components).toEqual({ attack: 0 });
+  });
+
+  it("is used between the Attack action's attacks", () => {
+    const built = table(paladinInput(9));
+    swing(built, "item-longsword", [15, 4]);
+    resolve(built, "sacred-weapon", [], []);
+    expect(built.hero.effects.some((effect) => effect.tags.includes("sacred-weapon"))).toBe(true);
+    expect(built.state.combat.turn.actionInstance?.components).toEqual({ attack: 1 });
+  });
+
+  it("is refused off the Paladin's turn and after an action that isn't the Attack action", () => {
+    const offTurn = table(paladinInput(9));
+    nextInitiativeTurn(offTurn.state);
+    expect(() => resolve(offTurn, "sacred-weapon", [], [])).toThrowError(/Sacred Weapon is used on .*'s own turn\./);
+    const built = table(paladinInput(9));
+    resolve(built, "abjure-foes", [1], [IDS.foe]);
+    expect(() => resolve(built, "sacred-weapon", [], [])).toThrowError(
+      /Sacred Weapon is used when .* takes the Attack action, and its action this turn went on something else\./
+    );
+  });
+
+  it("ends Divine Sense when the Paladin is Stunned", () => {
+    const built = table(paladinInput(9));
+    resolve(built, "divine-sense", [], []);
+    expect(built.hero.effects.some((effect) => effect.tags.includes("divine-sense"))).toBe(true);
+    setCondition(built.state, IDS.hero, "stunned", true, undefined, GM_SCOPE);
+    expect(built.hero.effects.some((effect) => effect.tags.includes("divine-sense"))).toBe(false);
   });
 });
 
@@ -1230,6 +1454,9 @@ describe("Paladin: smites that outlast the hit", () => {
     );
     const mark = built.foe.effects.find((effect) => effect.name === "Shining Smite")!;
     expect(mark.castId).toBe(built.hero.effects[0].castId);
+    // "The target sheds Bright Light in a 5-foot radius ... and it can't benefit from the Invisible condition."
+    expect(mark.light).toEqual({ brightFeet: 5, dimFeet: 0 });
+    expect(mark.tags).toContain("outlined");
     // Dropping the Concentration ends the mark.
     endEffect(built.state, IDS.hero, built.hero.effects[0].id);
     expect(built.foe.effects.map((effect) => effect.name)).toEqual(["Sapped by Bree"]);
@@ -1378,5 +1605,263 @@ describe("Paladin: Oath of Devotion, audit row 28", () => {
     expect(() => buildCharacterDefinition(missing, library, policy)).toThrowError(
       /"Epic Boon" needs 1 pick\(s\) of kind "feat"/
     );
+  });
+});
+
+/** The Rogue's Cunning Strike DC, read off the built sheet: 8 + Dexterity modifier + Proficiency Bonus. */
+const cunningDc = (built: Table) =>
+  8 + Math.floor((built.definition.abilityScores.dex - 10) / 2) + built.definition.proficiencyBonus;
+
+const effectIdsOf = (resolution: ReturnType<typeof swing>) =>
+  resolution.hitOffers?.find((offer) => offer.id === "sneak-attack")?.effects?.map((effect) => effect.id) ?? [];
+
+describe("Rogue: Cunning Strike forgoes Sneak Attack dice for an effect", () => {
+  it("rolls a Rogue 5's Sneak Attack with one die less for Trip, and the target saves at 8 + Dexterity + Proficiency Bonus", () => {
+    const built = table(rogueInput(5));
+    const preview = swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false });
+    expect(preview.hitOffers?.find((offer) => offer.id === "sneak-attack")).toMatchObject({
+      dice: "3d6 Piercing",
+      effects: [
+        { id: "trip", name: "Trip", cost: "-1d6" },
+        { id: "withdraw", name: "Withdraw", cost: "-1d6" }
+      ],
+      effectsChoose: 1
+    });
+    const hit = swing(built, "item-shortsword", [15, 2, 3, 4, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["trip"] }]
+    });
+    expect(hit.damage.find((part) => part.source === "Sneak Attack")).toEqual({
+      formula: "2d6",
+      type: "piercing",
+      total: 8,
+      source: "Sneak Attack"
+    });
+    expect(built.state.combat.pendingSaves).toMatchObject([
+      {
+        targetActorId: IDS.foe,
+        ability: "dex",
+        dc: cunningDc(built),
+        actionName: "Sneak Attack: Trip",
+        conditionIds: ["prone"]
+      }
+    ]);
+  });
+
+  it("offers Poison only with a Poisoner's Kit on the Rogue", () => {
+    const built = table(rogueInput(5));
+    expect(
+      effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))
+    ).not.toContain("poison");
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      { id: "poisoners-kit", name: "Poisoner's Kit", quantity: 1, equipped: false, attuned: false, category: "tool" }
+    ];
+    expect(effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))).toContain(
+      "poison"
+    );
+  });
+
+  it("leaves Trip out against a Huge target", () => {
+    const built = table(rogueInput(5));
+    built.foe.size = "huge";
+    expect(effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))).toEqual([
+      "withdraw"
+    ]);
+    expect(() =>
+      swing(built, "item-shortsword", [15, 2, 3, 4, 4], {
+        rollMode: "advantage",
+        hitOptions: [{ id: "sneak-attack", effects: ["trip"] }]
+      })
+    ).toThrowError(/Sneak Attack can't add Trip to this hit/);
+  });
+
+  it("gives Withdraw's half Speed of movement on the Rogue's own turn, provoking no Opportunity Attacks", () => {
+    const built = table(rogueInput(5));
+    swing(built, "item-shortsword", [15, 2, 3, 4, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["withdraw"] }]
+    });
+    const speed = currentSpeedFeet(built.hero, deriveEquipment(built.hero, built.definition, built.catalog)) ?? 0;
+    expect(built.hero.effects.find((effect) => effect.grantedMove !== undefined)).toMatchObject({
+      name: "Sneak Attack: Withdraw",
+      grantedMove: { feet: Math.floor(speed / 10) * 5, provokes: false }
+    });
+  });
+
+  it("carries two effects from Rogue 11, both costs off the dice", () => {
+    const built = table(rogueInput(11));
+    const preview = swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false });
+    expect(preview.hitOffers?.find((offer) => offer.id === "sneak-attack")?.effectsChoose).toBe(2);
+    const hit = swing(built, "item-shortsword", [15, 2, 3, 4, 4, 4, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["trip", "withdraw"] }]
+    });
+    expect(hit.damage.find((part) => part.source === "Sneak Attack")).toMatchObject({ formula: "4d6" });
+    expect(() =>
+      swing(table(rogueInput(5)), "item-shortsword", [15, 2, 3, 4, 4], {
+        rollMode: "advantage",
+        hitOptions: [{ id: "sneak-attack", effects: ["trip", "withdraw"] }]
+      })
+    ).toThrowError(/Sneak Attack adds one effect to a hit/);
+  });
+
+  it("adds Devious Strikes' Knock Out at Rogue 14: 6 of 7 dice for Unconscious that ends on damage", () => {
+    const built = table(rogueInput(14));
+    expect(effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))).toEqual(
+      expect.arrayContaining(["daze", "knock-out", "obscure"])
+    );
+    const hit = swing(built, "item-shortsword", [15, 2, 3, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["knock-out"] }]
+    });
+    expect(hit.damage.find((part) => part.source === "Sneak Attack")).toMatchObject({ formula: "1d6" });
+    expect(built.state.combat.pendingSaves[0]).toMatchObject({
+      ability: "con",
+      conditionIds: ["unconscious"],
+      onFailEffect: { endsOnDamage: true, repeatSave: { ability: "con" }, duration: { type: "rounds", rounds: 10 } }
+    });
+  });
+
+  it("offers a Thief 9 Stealth Attack, which keeps the Hide action's Invisible through the attack", () => {
+    const built = table(rogueInput(9));
+    expect(effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))).toContain(
+      "stealth-attack"
+    );
+    addEffect(
+      built.state,
+      IDS.hero,
+      makeEffect({ id: "hiding", name: "Hidden", tags: ["hidden"], duration: { type: "manual" } })
+    );
+    const hit = swing(built, "item-shortsword", [15, 2, 3, 4, 4, 4, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["stealth-attack"] }]
+    });
+    expect(built.hero.effects.some((effect) => effect.id === "hiding")).toBe(true);
+    expect(hit.warnings?.join(" ")).toMatch(/stays hidden only if it ends this turn behind Three-Quarters Cover/);
+    // The turn's end reads the cover (supreme-sneak.test.ts).
+    expect(built.state.combat.turn.turnUses[`${IDS.hero}:stealth-attack`]).toBe(1);
+  });
+});
+
+describe("Paladin: Lay on Hands is a touch, and Abjure Foes counts the Charisma modifier", () => {
+  const heal = (built: Table, apart: number) =>
+    resolveDefinitionAction(
+      built.state,
+      { ...actionOf(built, "lay-on-hands")!, useCost: 5 },
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextCommandId() },
+      { ...deps(built, []), distanceFeet: () => apart }
+    );
+
+  it("refuses a creature beyond 5 feet and heals one within reach", () => {
+    const built = table(paladinInput(5));
+    expect(actionOf(built, "lay-on-hands")?.targets).toEqual({ count: 1, rangeFeet: 5 });
+    expect(() => heal(built, 30)).toThrowError(/Foe is 30 ft away, beyond Lay on Hands's touch/);
+    expect(heal(built, 5).healing?.targets).toHaveLength(1);
+  });
+
+  it("targets no more creatures than the Charisma modifier allows, and none beyond 60 feet", () => {
+    const built = table(paladinInput(9));
+    const limit = Math.max(1, Math.floor((built.definition.abilityScores.cha - 10) / 2));
+    const others = Array.from({ length: limit + 1 }, (_, index) => ({
+      ...built.foe,
+      id: `10000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`,
+      name: `Foe ${index}`
+    }));
+    built.state.actors.push(...others);
+    built.state.combat.initiative.push(
+      ...others.map((other) => ({ actorId: other.id, score: 5 }) as (typeof built.state.combat.initiative)[number])
+    );
+    const abjure = (targetIds: string[], apart = 30) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "abjure-foes")!,
+        { actorId: IDS.hero, targetIds, commandId: nextCommandId() },
+        { ...deps(built, []), distanceFeet: () => apart }
+      );
+    expect(() => abjure(others.map((other) => other.id))).toThrowError(
+      new RegExp(`targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}; ${limit + 1} were chosen`)
+    );
+    expect(() => abjure([others[0]!.id], 65)).toThrowError(/beyond Channel Divinity: Abjure Foes's 60 ft range/);
+    expect(abjure(others.slice(0, limit).map((other) => other.id)).save?.targets).toHaveLength(limit);
+  });
+});
+
+describe("Thief: Thief's Reflexes takes a second turn in round 1", () => {
+  const OTHER = "10000000-0000-4000-8000-000000000003";
+  /** The Thief at 18, an orc at 12 and the foe at 5. */
+  const fight = (level: number, foeScore = 5) => {
+    const definition = buildCharacterDefinition(rogueInput(level), library, policy);
+    const catalog = equipmentCatalogOf(library);
+    const creature = (id: string, name: string) => ({
+      id,
+      name,
+      kind: "monster",
+      visibility: "public",
+      hp: { current: 20, maximum: 20 },
+      armorClass: 10
+    });
+    const state = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [creature(IDS.foe, "Foe"), creature(OTHER, "Orc")]
+    }) as GameState;
+    importActorDefinition(state, definition, IDS.hero, "public", catalog);
+    startEncounter(
+      state,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.hero, score: 18 },
+          { actorId: OTHER, score: 12 },
+          { actorId: IDS.foe, score: foeScore }
+        ]
+      },
+      () => 1,
+      GEOMETRY
+    );
+    return state;
+  };
+  const turnDeps = (state: GameState) => ({
+    resolveDefinition: (id: string) => state.definitions.find((entry) => entry.id === id)?.definition,
+    rollDie: () => 1
+  });
+  /** Who has each turn, `count` turns on from the current one. */
+  const order = (state: GameState, count: number) => {
+    const turns = [state.combat.turnActorId];
+    for (let index = 1; index < count; index += 1) {
+      nextInitiativeTurn(state, [], turnDeps(state));
+      turns.push(state.combat.turnActorId);
+    }
+    return turns;
+  };
+
+  it("acts at 18 and again at 8 in round 1, and only at 18 from round 2", () => {
+    const state = fight(17);
+    expect(order(state, 4)).toEqual([IDS.hero, OTHER, IDS.hero, IDS.foe]);
+    expect(state.combat.round).toBe(1);
+    nextInitiativeTurn(state, [], turnDeps(state));
+    expect(state.combat.round).toBe(2);
+    expect(order(state, 4)).toEqual([IDS.hero, OTHER, IDS.foe, IDS.hero]);
+  });
+
+  it("takes the second turn last when nobody is below it, and then round 2 begins", () => {
+    const state = fight(17, 9);
+    expect(order(state, 4)).toEqual([IDS.hero, OTHER, IDS.foe, IDS.hero]);
+    expect(state.combat.round).toBe(1);
+    nextInitiativeTurn(state, [], turnDeps(state));
+    expect(state.combat).toMatchObject({ round: 2, turnActorId: IDS.hero, secondTurn: null });
+  });
+
+  it("gives its second turn a fresh economy", () => {
+    const state = fight(17);
+    nextInitiativeTurn(state, [], turnDeps(state));
+    state.combat.turn.actionUsed = true;
+    nextInitiativeTurn(state, [], turnDeps(state));
+    expect(state.combat.turnActorId).toBe(IDS.hero);
+    expect(state.combat.turn.actionUsed).toBe(false);
+  });
+
+  it("gives a Rogue 16 one turn", () => {
+    expect(order(fight(16), 4)).toEqual([IDS.hero, OTHER, IDS.foe, IDS.hero]);
   });
 });

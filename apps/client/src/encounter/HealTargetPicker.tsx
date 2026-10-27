@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { CastShaping } from "@vtt/schemas";
 import { Button, Modal, Stepper } from "@vtt/ui";
 import "./pickers.css";
 
@@ -13,11 +14,32 @@ export type LooseHeal = Readonly<{
   spendUpTo: number | null;
   slotLevel?: number;
   includeDamage?: boolean;
+  /** A spell cast outside a fight at creatures (Aid, Hold Person) picks its targets here as well. */
+  purpose?: "heal" | "cast";
+  /** How the caster shapes the spell (Metamagic), sent with its targets. */
+  shaping?: readonly CastShaping[];
 }>;
 
+/** What the picker asks, by what the pick is for and how many it takes. */
+function askOf(heal: LooseHeal, candidates: number): string {
+  const several = heal.most > 1;
+  if (heal.purpose === "cast")
+    return several && heal.most < candidates
+      ? `Choose up to ${heal.most} creatures for ${heal.name}.`
+      : several
+        ? `Choose the creatures ${heal.name} targets.`
+        : `Choose who ${heal.name} targets.`;
+  return several && heal.most < candidates
+    ? `Choose up to ${heal.most} creatures to regain hit points.`
+    : several
+      ? "Choose the creatures who regain hit points."
+      : "Choose who regains hit points.";
+}
+
 /**
- * Who regains the hit points of a heal outside a fight: the user's own character first, then the party (for the GM,
- * anyone on the roster). The server checks who may be healed and how many.
+ * Who regains the hit points of a heal outside a fight, or whom a spell cast outside a fight targets: the user's own
+ * character first, then the party (for the GM, anyone on the roster). The server checks who may be picked and how
+ * many.
  */
 export function HealTargetPicker({
   heal,
@@ -47,7 +69,7 @@ export function HealTargetPicker({
       size="sm"
       accent="cyan"
       title={heal.name}
-      ariaLabel={`Who ${heal.name} heals`}
+      ariaLabel={heal.purpose === "cast" ? `Who ${heal.name} targets` : `Who ${heal.name} heals`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -57,19 +79,17 @@ export function HealTargetPicker({
             disabled={picked.length === 0}
             onClick={() => onConfirm([...picked], heal.spendUpTo !== null ? spend : null)}
           >
-            Heal
+            {heal.purpose === "cast" ? "Cast" : "Heal"}
           </Button>
         </>
       }
     >
-      <p className="heal-picker-ask">
-        {several && heal.most < candidates.length
-          ? `Choose up to ${heal.most} creatures to regain hit points.`
-          : several
-            ? "Choose the creatures who regain hit points."
-            : "Choose who regains hit points."}
-      </p>
-      <div className="heal-picker-targets" role="group" aria-label="Who regains hit points">
+      <p className="heal-picker-ask">{askOf(heal, candidates.length)}</p>
+      <div
+        className="heal-picker-targets"
+        role="group"
+        aria-label={heal.purpose === "cast" ? "Targets" : "Who regains hit points"}
+      >
         {candidates.map((candidate) => (
           <button
             key={candidate.id}

@@ -50,9 +50,28 @@ export type ItemRiderKey =
   | "vulnerableToOtherChoices"
   | "removesArmorDrawbacks"
   | "consumedOnUse"
-  | "spellScroll";
+  | "spellScroll"
+  | "onHit"
+  | "study"
+  | "light"
+  | "variants"
+  | "variantChoice"
+  | "weaponChanges"
+  | "bonusActionAttack"
+  | "magicSaveAura"
+  | "servesAsFocus"
+  | "savesNegateSpells"
+  | "attractsMissiles"
+  | "disguisedAs"
+  | "unarmedStrike"
+  | "initiativeAura"
+  | "regainsHitPoints"
+  | "lapses"
+  | "breaks"
+  | "container"
+  | "attunementHeldBy";
 
-/** The same fifteen, as a value, so the empty-rider check below iterates the list it is typed against. */
+/** The same keys, as a value, so the empty-rider check below iterates the list it is typed against. */
 const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "tags",
   "actions",
@@ -68,7 +87,26 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "vulnerableToOtherChoices",
   "removesArmorDrawbacks",
   "consumedOnUse",
-  "spellScroll"
+  "spellScroll",
+  "onHit",
+  "study",
+  "light",
+  "variants",
+  "variantChoice",
+  "weaponChanges",
+  "bonusActionAttack",
+  "magicSaveAura",
+  "servesAsFocus",
+  "savesNegateSpells",
+  "attractsMissiles",
+  "disguisedAs",
+  "unarmedStrike",
+  "initiativeAura",
+  "regainsHitPoints",
+  "lapses",
+  "breaks",
+  "container",
+  "attunementHeldBy"
 ] as const);
 
 /** The riders one magic item may carry. Every key optional: an entry authors only what it names. */
@@ -86,7 +124,7 @@ export type ItemMechanicsModule = Readonly<Record<string, ItemMechanics>>;
  * rider yet.
  */
 export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
-  Record<string, "standing" | "at-its-moment" | "unread" | "display-only">
+  Record<string, "standing" | "at-its-moment" | "unread" | "display-only" | "vision">
 > = Object.freeze({
   "attack-bonus": "standing",
   "save-bonus": "standing",
@@ -100,6 +138,7 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "armor-class": "standing",
   "attunement-slots": "standing",
   "special-speed": "standing",
+  movement: "standing",
   "roll-mode": "at-its-moment",
   "extra-damage": "at-its-moment",
   "damage-bonus": "standing",
@@ -108,25 +147,34 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "damage-reduction": "at-its-moment",
   "damage-resistance": "standing",
   "damage-vulnerability": "standing",
-  sense: "display-only"
+  "damage-immunity": "standing",
+  "ignores-resistance": "standing",
+  "d20-minimum": "at-its-moment",
+  "total-minimum": "at-its-moment",
+  "damage-die-minimum": "at-its-moment",
+  "advantage-denied": "at-its-moment",
+  "healing-received-maximized": "at-its-moment",
+  "healing-dice-maximized": "at-its-moment",
+  "healing-bonus": "at-its-moment",
+  "ability-score-minimum": "standing",
+  "speed-minimum": "standing",
+  "carrying-capacity-larger": "standing",
+  "ignores-cover": "at-its-moment",
+  "base-armor-class": "standing",
+  "no-critical-hits": "at-its-moment",
+  "spell-ward": "standing",
+  "proficiency-bonus": "standing",
+  "granted-score-bonus": "standing",
+  "ignores-long-range": "at-its-moment",
+  sense: "vision"
 });
 
-/**
- * Derived from the mirror. `display-only` is not refused here because the set must match the server
- * table, but `sense` riders on items do reach nothing; see `MEASURED_INERT_RIDER_TYPES`.
- */
+/** Derived from the mirror. A `vision` rider (a sense, Darkvision) is read live by dynamic vision. */
 const UNREAD_RIDER_TYPES: ReadonlySet<string> = new Set(
   Object.entries(CARRIER_RIDER_DISPOSITION_MIRROR)
     .filter(([, disposition]) => disposition === "unread")
     .map(([type]) => type)
 );
-
-/**
- * Rider types measured inert on an item carrier, kept apart from the mirror so it stays derivable
- * from the server's table: `darkvision` and `sense` have no field in `EquipmentDerivation` (the
- * sheet's Senses line comes from the species).
- */
-const MEASURED_INERT_RIDER_TYPES: ReadonlySet<string> = new Set(["darkvision", "sense"]);
 
 // ---- Cross-bundle vocabularies (check 3) --------------------------------------------------------
 
@@ -152,6 +200,18 @@ const records = (dir: string, file: string): ReadonlyArray<{ readonly id: string
   JSON.parse(readFileSync(join(dir, file), "utf8")) as Array<{ id: string; category?: string }>;
 const idsIn = (dir: string, file: string): readonly string[] => records(dir, file).map((record) => record.id);
 
+/** The tags the shipped stat blocks print beside their types ("demon", "devil"), lower case. */
+function typeTagsIn(dir: string): string[] {
+  const monsters = JSON.parse(readFileSync(join(dir, "monsters.v1.json"), "utf8")) as Array<{
+    extensions?: Record<string, { typeTags?: unknown } | undefined>;
+  }>;
+  const tags = monsters.flatMap((monster) => {
+    const printed = monster.extensions?.["open5e.srd-2024"]?.typeTags;
+    return Array.isArray(printed) ? printed.filter((tag): tag is string => typeof tag === "string") : [];
+  });
+  return [...new Set(tags.map((tag) => tag.toLowerCase()))];
+}
+
 /** Where each kind's ids come from, read lazily so an entry with no slug reads no bundle. */
 const VOCABULARIES: Readonly<
   Record<RefKind, { readonly source: string; readonly ids: (dir: string) => readonly string[] }>
@@ -165,7 +225,11 @@ const VOCABULARIES: Readonly<
   "damage type": { source: "src/enums.ts DAMAGE_TYPE_IDS", ids: () => DAMAGE_TYPE_IDS },
   condition: { source: "src/enums.ts CONDITION_IDS", ids: () => CONDITION_IDS },
   "school of magic": { source: "src/enums.ts MAGIC_SCHOOL_IDS", ids: () => MAGIC_SCHOOL_IDS },
-  "creature type": { source: "src/enums.ts CREATURE_TYPE_IDS", ids: () => CREATURE_TYPE_IDS },
+  // A type, or a tag a stat block prints beside its type ("Fiend (Demon)"), which the type filters also match.
+  "creature type": {
+    source: "src/enums.ts CREATURE_TYPE_IDS, and the type tags in bundles/monsters.v1.json",
+    ids: (dir) => [...CREATURE_TYPE_IDS, ...typeTagsIn(dir)]
+  },
   "weapon property": { source: "src/enums.ts WEAPON_PROPERTY_IDS", ids: () => WEAPON_PROPERTY_IDS },
   /**
    * `weaponAction` grants proficiency if `grants.weapons` names the weapon's category or its id, so
@@ -222,8 +286,9 @@ const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKin
  *   `uses.pool`, `resource-bonus.poolId`: the live `actionUses` key.
  *   `grants.tools` / `grants.armor` - proficiency groups; no bundle has those ids.
  *   `while-proficient-with.ids` for weapon/armor/tool: groups (the `"skill"` kind is checked).
- *   `sense` - no senses model to check against.
+ *   `sense` - an open name: dynamic vision reads the ones it knows (`vision/senses.ts`), the rest are shown.
  *   `actions[].id`, `multiattack[].actionId` - local to the item's own action list.
+ *   `casts[].optionIds` - local to the cast spell's own options.
  *   `grants.saves` - already a closed zod enum.
  */
 export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
@@ -236,7 +301,11 @@ export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
   "armor",
   "sense",
   "saves",
-  "actionId"
+  "actionId",
+  "optionIds",
+  // Magic item ids another item needs attuned too (Hammer of Thunderbolts): the bundle being built is their vocabulary.
+  "itemIds",
+  "whileAttunedTo"
 ]);
 
 /** Levenshtein, only ever run against one vocabulary to turn a refusal into a fix. */
@@ -381,7 +450,7 @@ export function applyItemMechanics(
     const unknown = Object.keys(entry).filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
     if (unknown.length > 0) {
       refused.push(
-        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The fifteen are: ${ITEM_RIDER_KEYS.join(", ")}`
+        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The keys are: ${ITEM_RIDER_KEYS.join(", ")}`
       );
       continue;
     }
@@ -413,23 +482,17 @@ export function applyItemMechanics(
       continue;
     }
 
-    // The item's own `modifiers`; its `effects[].modifiers` are refused per type by `EffectModifiersSchema`.
-    const unread = parsed.data.modifiers
-      .map((modifier, index) => ({ index, type: modifier.type }))
-      .filter((modifier) => UNREAD_RIDER_TYPES.has(modifier.type));
+    // The item's own `modifiers` and each kind's; `effects[].modifiers` are refused per type by
+    // `EffectModifiersSchema`.
+    const unread = [
+      ...parsed.data.modifiers.map((modifier, index) => ({ path: `modifiers.${index}`, type: modifier.type })),
+      ...(parsed.data.variants ?? []).flatMap((variant, at) =>
+        variant.modifiers.map((modifier, index) => ({ path: `variants.${at}.modifiers.${index}`, type: modifier.type }))
+      )
+    ].filter((modifier) => UNREAD_RIDER_TYPES.has(modifier.type));
     if (unread.length > 0) {
       refused.push(
-        `${itemId} - ${unread.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Leave the item prose until a consumer reads it`
-      );
-      continue;
-    }
-
-    const inert = parsed.data.modifiers
-      .map((modifier, index) => ({ index, type: modifier.type }))
-      .filter((modifier) => MEASURED_INERT_RIDER_TYPES.has(modifier.type));
-    if (inert.length > 0) {
-      refused.push(
-        `${itemId} - ${inert.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which reaches NOTHING from an item: EquipmentDerivation carries no darkvision or senses field at all, so the sheet's Senses line comes from the definition's species extension and never from an item. The rider would parse, ship, and change nothing at the table. Leave the item prose until a consumer reads it`
+        `${itemId} - ${unread.map((modifier) => `${modifier.path} is "${modifier.type}"`).join(" and ")}, which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Leave the item prose until a consumer reads it`
       );
       continue;
     }

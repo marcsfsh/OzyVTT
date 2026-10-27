@@ -467,11 +467,11 @@ describe("the eleventh list: `spells` beside a `when` is refused, never silently
   });
 });
 
-/** The ungated spell-grant path is unaffected, shown on the shipped `high-elf-cantrip` record. */
+/** The ungated spell-grant path is unaffected, shown on the shipped `wood-elf-cantrip` record. */
 function elfViewGating(gate: readonly unknown[] | null): ContentView {
   const base = new ContentLibrary().forAudience("gm");
   const gateTrait = <T extends { id: string; grants?: unknown }>(trait: T): T =>
-    trait.id !== "high-elf-cantrip" || gate === null
+    trait.id !== "wood-elf-cantrip" || gate === null
       ? trait
       : { ...trait, grants: { ...(trait.grants as object), when: gate } };
   return {
@@ -486,7 +486,7 @@ function elfViewGating(gate: readonly unknown[] | null): ContentView {
     },
     featureRecord: (ref) => {
       const record = base.featureRecord(ref);
-      return record && ref.id === "high-elf-cantrip"
+      return record && ref.id === "wood-elf-cantrip"
         ? (gateTrait(record as { id: string; grants?: unknown }) as typeof record)
         : record;
     }
@@ -514,7 +514,7 @@ const highElfInput = (): CharacterCreateRequestInput =>
       { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
       { level: 1, classId: "fighter", kind: "weapon-mastery", id: "flail" },
       { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longbow" },
-      { level: 1, kind: "lineage", id: "high-elf" },
+      { level: 1, kind: "lineage", id: "wood-elf" },
       { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "elf-lineage" } },
       { level: 1, kind: "skill", id: "insight", payload: { featureId: "elf-keen-senses" } },
       { level: 1, kind: "tool", id: "gaming-set-dice" },
@@ -528,10 +528,17 @@ const highElfInput = (): CharacterCreateRequestInput =>
 describe("an ungated granted spell still arrives, on the shipped record that grants one", () => {
   const policy = BuilderPolicySchema.parse({});
 
-  it("puts Prestidigitation on a Fighter's sheet, always prepared, with a caster block to cast it from", () => {
+  it("puts Druidcraft on a Fighter's sheet, always prepared, with a caster block to cast it from", () => {
     const built = buildCharacterDefinition(highElfInput(), elfViewGating(null), policy);
     expect(built.spellcasting!.spells).toEqual([
-      { id: "prestidigitation", name: "Prestidigitation", level: 0, prepared: true, alwaysPrepared: true }
+      {
+        id: "druidcraft",
+        name: "Druidcraft",
+        level: 0,
+        prepared: true,
+        alwaysPrepared: true,
+        actionId: "spell-druidcraft"
+      }
     ]);
     // A Fighter has no spell list, so this block exists only because a trait granted a spell, and
     // `ability: "int"` comes from the grant.
@@ -547,7 +554,7 @@ describe("an ungated granted spell still arrives, on the shipped record that gra
       policy
     );
     expect(built.spellcasting, "a gated spell had nowhere to live: the caster block went with it").toBeUndefined();
-    expect(JSON.stringify(built)).not.toContain("prestidigitation");
+    expect(JSON.stringify(built)).not.toContain("druidcraft");
   });
 });
 

@@ -6,12 +6,37 @@ import type {
   RuleExceptions,
   RuleMode
 } from "@vtt/domain";
+import { refreshReactiveHeads } from "./reactive-heads.js";
+import { dropStaleGrants } from "./granted-moves.js";
+import { proneInSharedSpace } from "./occupied-space.js";
+import { blinkAway } from "./off-plane.js";
+import { timeStopGoesOn } from "./time-stop.js";
+import { secondTurnDue } from "./second-turns.js";
+import { areAllies } from "./creature-sides.js";
+import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
+import { requireActorAccess, type Initiator } from "./authorization.js";
+import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
-import { aggregateRollMode } from "@vtt/rules-5e";
-import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
+import {
+  aggregateRollMode,
+  collectRiders,
+  d20FacesFor,
+  diceRiders,
+  keptD20,
+  parseDiceFormula,
+  resolveDice
+} from "@vtt/rules-5e";
+import { holdRoll } from "./held-rolls.js";
+import {
+  checkRiderBonus,
+  deriveEquipment,
+  itemIsActive,
+  rollModeClaims,
+  type EquipmentCatalog
+} from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
 import {
   endConcentrationSustainedBy,
@@ -20,12 +45,24 @@ import {
   expireEffectsAtTurnStart,
   type EffectNarration
 } from "./effects.js";
-import { leaveShortRest } from "./short-rest-interruptions.js";
-import { releaseSwallowedBy } from "./swallow.js";
-import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
-import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
+import { closeInitiativeWindow, rolledInitiative } from "./initiative-hooks.js";
+import { interruptRests } from "./rest-interruptions.js";
+import { endTravelFor } from "./travel.js";
+import { chargeOwedMovement, releaseSwallowedBy } from "./swallow.js";
+import { endOfTurn, playStartSteps, startOfTurn } from "./turn-boundaries.js";
+import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
+import { runningWaterAtTurnEnd, submergedAtTurnEnd } from "./water.js";
+import { environmentAtTurnEnd } from "./environment.js";
+import { groundAtTurnStart } from "./map-hazards.js";
+import { wavesAtTurnEnd, wavesAtTurnStart } from "./zone-waves.js";
+import { fireAtTurnStart } from "./zone-fire.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
+import { lapseLongCasts } from "./resolution/long-casting.js";
+import { summonTurnEnd, summonTurnStart, takesNoTurns } from "./summon-turns.js";
+import { checkSightFor } from "./vision/rules.js";
+import { rowRecord } from "./item-records.js";
+import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -81,6 +118,10 @@ type RollMode = "advantage" | "disadvantage" | "normal";
 export type InitiativeRollDeps = Readonly<{
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
   catalog?: EquipmentCatalog;
+  /** Rolls the dice a rider adds to or takes off the check (a curse's -1d6); without it they add nothing. */
+  rollDie?: (sides: number) => number;
+  /** Creature-to-creature distance on the map, for an item's aura of Advantage (a Weapon of Warning). */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /**
@@ -95,9 +136,15 @@ export function initiativeRollFor(
   actorId: string,
   surprised: boolean,
   deps: InitiativeRollDeps = {}
-): { mode: RollMode; penalty: number; reasons: string[] } {
+): {
+  mode: RollMode;
+  penalty: number;
+  checkBonus: number;
+  reasons: string[];
+  dice: ReadonlyArray<Readonly<{ label: string; dice: string }>>;
+} {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor) return { mode: "normal", penalty: 0, reasons: [] };
+  if (!actor) return { mode: "normal", penalty: 0, checkBonus: 0, reasons: [], dice: [] };
   const definition = actor.definitionId ? deps.resolveDefinition?.(actor.definitionId) : undefined;
   const derivation = deriveEquipment(actor, definition, deps.catalog);
   const claims = rollModeClaims(derivation, ["initiative"], "on-initiative-roll");
@@ -108,19 +155,113 @@ export function initiativeRollFor(
   const warded = deps.resolveDefinition
     ? wardedConditions(state, actor, { resolveDefinition: deps.resolveDefinition })
     : [];
-  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded);
+  // Frightened only while its source is within line of sight, and the light it stands in (Sunlight Sensitivity).
+  const sight = checkSightFor(state, actor, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded, [], sight);
   for (const side of ["advantage", "disadvantage"] as const)
     for (const claim of asCheck[side])
       if (!claims[side].some((held) => held.label === claim.label)) claims[side].push(claim);
   if (actor.conditions.some((condition) => condition.id === "invisible"))
     claims.advantage.push({ source: "invisible", label: "Invisible" });
+  for (const claim of initiativeAuraClaims(state, actor, deps))
+    if (!claims.advantage.some((held) => held.label === claim.label)) claims.advantage.push(claim);
   if (surprised) claims.disadvantage.push({ source: "surprised", label: "Surprised" });
   const incapacitated = incapacitatingCondition(actor);
   if (incapacitated) claims.disadvantage.push({ source: "incapacitated", label: conditionLabel(incapacitated) });
   const penalty = exhaustionPenalty(actor);
+  // A bonus to ability checks reaches a Dexterity check (a Stone of Good Luck's +1), which Initiative is.
+  const checkBonus = checkRiderBonus(derivation, { ability: "dex" }, definition?.abilityScores);
+  // So do the dice a rider adds to or takes off an ability check.
+  const dice = diceRiders(
+    [
+      ...collectRiders(derivation.carriers, { ...derivation.context, moment: null }),
+      ...collectRiders(derivation.carriers, { ...derivation.context, ability: "dex", moment: "on-ability-check" })
+    ],
+    "check-bonus"
+  );
   const reasons = [...claims.advantage, ...claims.disadvantage].map((claim) => claim.label);
   if (penalty !== 0) reasons.push(`Exhaustion ${penalty}`);
-  return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, reasons };
+  for (const rider of dice) reasons.push(`${rider.label} (${rider.dice})`);
+  return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, checkBonus, reasons, dice };
+}
+
+/** SRD Weapon of Warning: "you and allies within 30 feet of you ... Each subject has Advantage on its Initiative
+ *  rolls": an attuned bearer's item gives its bearer, and each ally the map puts within its reach, Advantage. */
+function initiativeAuraClaims(
+  state: GameState,
+  actor: GameState["actors"][number],
+  deps: InitiativeRollDeps
+): Array<{ source: string; label: string }> {
+  return warningAurasOver(state, actor, deps).map(({ bearer, name }) => ({
+    source: "item-aura",
+    label: bearer.id === actor.id ? name : `${bearer.name}'s ${name}`
+  }));
+}
+
+/** The attuned items whose warning aura reaches this creature: its own, or an ally's within the aura's feet. */
+function warningAurasOver(
+  state: GameState,
+  actor: GameState["actors"][number],
+  deps: InitiativeRollDeps
+): Array<Readonly<{ bearer: GameState["actors"][number]; name: string; wakes: boolean }>> {
+  if (!deps.catalog) return [];
+  const auras: Array<Readonly<{ bearer: GameState["actors"][number]; name: string; wakes: boolean }>> = [];
+  for (const bearer of state.actors) {
+    if (bearer.archived || bearer.hp.current <= 0) continue;
+    for (const row of bearer.inventory) {
+      const record = rowRecord(deps.catalog, row);
+      const aura = record?.initiativeAura;
+      if (!aura || !row.attuned || !itemIsActive(row, record)) continue;
+      if (bearer.id !== actor.id) {
+        if (!areAllies(bearer, actor, deps.resolveDefinition)) continue;
+        const feet = deps.distanceFeet?.(bearer.id, actor.id) ?? null;
+        if (feet === null || feet > aura.feet + DISTANCE_TOLERANCE_FEET) continue;
+      }
+      auras.push({ bearer, name: record!.name, wakes: aura.wakesSleepers === true });
+    }
+  }
+  return auras;
+}
+
+/** SRD Weapon of Warning's Alarm: "The weapon magically awakens each subject who is sleeping naturally when combat
+ *  begins. This benefit doesn't wake a subject from magically induced sleep." A sleeper is Unconscious with Hit Points
+ *  left and no effect holding it there (Sleep's, a knockout's); the GM marks one by hand. */
+function wakeNaturalSleepers(
+  state: GameState,
+  actorIds: ReadonlySet<string>,
+  deps: InitiativeRollDeps
+): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors) {
+    if (!actorIds.has(actor.id) || actor.hp.current <= 0) continue;
+    if (!actor.conditions.some((condition) => condition.id === "unconscious")) continue;
+    if (actor.effects.some((effect) => effect.linkedConditionIds.includes("unconscious"))) continue;
+    const alarm = warningAurasOver(state, actor, deps).find((aura) => aura.wakes);
+    if (!alarm) continue;
+    actor.conditions = actor.conditions.filter((condition) => condition.id !== "unconscious");
+    events.push({
+      kind: "condition",
+      text: `${alarm.bearer.name}'s ${alarm.name} wakes ${actor.name} as the fight begins.`,
+      actorId: actor.id
+    });
+  }
+  return events;
+}
+
+/** The dice riders' total, each signed as its rider says ("-1d6" takes the roll off). */
+function riderDiceTotal(
+  dice: ReadonlyArray<Readonly<{ dice: string }>>,
+  rollDie: ((sides: number) => number) | undefined
+): number {
+  if (!rollDie) return 0;
+  return dice.reduce((sum, rider) => {
+    const negative = rider.dice.startsWith("-");
+    const rolled = resolveDice(parseDiceFormula(negative ? rider.dice.slice(1) : rider.dice), rollDie).total;
+    return sum + (negative ? -rolled : rolled);
+  }, 0);
 }
 
 /** The roll mode alone, from riders and conditions, for a combatant who isn't surprised. */
@@ -152,9 +293,10 @@ function rollUnderMode(rollD20: () => number, mode: RollMode): number {
   return rollD20();
 }
 
-/** One combatant's initiative: the d20 (rolled, or a hand-typed `natural`) plus its modifier and the
- *  Exhaustion penalty. Every path that rolls initiative goes through here, so they all follow the same rules. */
-function rollInitiative(
+/** One combatant's initiative: the d20 (rolled, or a hand-typed `natural`) plus its modifier, the dice its check
+ *  riders add and the Exhaustion penalty. Every path that rolls initiative goes through here, so they all follow the
+ *  same rules. */
+export function rollInitiative(
   state: GameState,
   actorId: string,
   surprised: boolean,
@@ -163,9 +305,9 @@ function rollInitiative(
   natural?: number
 ): { natural: number; modifier: number; total: number; mode: RollMode } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  const { mode, penalty } = initiativeRollFor(state, actorId, surprised, deps);
+  const { mode, penalty, checkBonus, dice } = initiativeRollFor(state, actorId, surprised, deps);
   const die = natural ?? rollUnderMode(rollD20, mode);
-  const modifier = (actor?.initiative ?? 0) + penalty;
+  const modifier = (actor?.initiative ?? 0) + checkBonus + penalty + riderDiceTotal(dice, deps.rollDie);
   const total = die + modifier;
   if (!validScore(total)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
   return { natural: die, modifier, total, mode };
@@ -173,13 +315,35 @@ function rollInitiative(
 
 function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
   const names = new Map(state.actors.map((actor) => [actor.id, actor.name]));
-  return [...entries].sort(
-    (left, right) =>
-      right.score - left.score ||
-      right.tieBreaker - left.tieBreaker ||
-      (names.get(left.actorId) ?? "").localeCompare(names.get(right.actorId) ?? "") ||
-      left.actorId.localeCompare(right.actorId)
+  return followersAfterLeaders(
+    [...entries].sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.tieBreaker - left.tieBreaker ||
+        (names.get(left.actorId) ?? "").localeCompare(names.get(right.actorId) ?? "") ||
+        left.actorId.localeCompare(right.actorId)
+    )
   );
+}
+
+/** An order with each entry that `follows` another moved to right after it and the others that follow it, keeping
+ *  every other entry where it was (a summoned creature "takes its turn immediately after yours"). One whose leader is
+ *  gone keeps its place. */
+function followersAfterLeaders(entries: readonly InitiativeEntry[]): InitiativeEntry[] {
+  const present = new Set(entries.map((entry) => entry.actorId));
+  const follows = (entry: InitiativeEntry) => entry.follows !== undefined && present.has(entry.follows);
+  if (!entries.some(follows)) return [...entries];
+  const placed = new Set<string>();
+  const result: InitiativeEntry[] = [];
+  const place = (entry: InitiativeEntry) => {
+    if (placed.has(entry.actorId)) return;
+    placed.add(entry.actorId);
+    result.push(entry);
+    for (const follower of entries) if (follower.follows === entry.actorId && follows(follower)) place(follower);
+  };
+  for (const entry of entries) if (!follows(entry)) place(entry);
+  for (const entry of entries) place(entry);
+  return result;
 }
 
 /**
@@ -193,7 +357,8 @@ function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) 
   const current = initiative.findIndex((entry) => entry.actorId === turnActorId);
   if (!active || gathering || current < 0) return ordered(state, entries);
   const acted = new Set(initiative.slice(0, current).map((entry) => entry.actorId));
-  return [
+  // One that joins right after a creature whose turn has passed waits for that creature's next turn.
+  return followersAfterLeaders([
     ...ordered(
       state,
       entries.filter((entry) => acted.has(entry.actorId))
@@ -203,7 +368,48 @@ function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) 
       state,
       entries.filter((entry) => !acted.has(entry.actorId) && entry.actorId !== turnActorId)
     )
-  ];
+  ]);
+}
+
+/** A creature takes another's Initiative and its turn right after that creature's (SRD Mounted Combat: "The Initiative
+ *  of a controlled mount changes to match yours when you mount it"), or, with null, keeps its count and stops
+ *  following. Nothing for a creature not in the order. */
+export function followInInitiative(state: GameState, actorId: string, leaderId: string | null): void {
+  const leader = leaderId ? state.combat.initiative.find((entry) => entry.actorId === leaderId) : undefined;
+  if (!state.combat.initiative.some((entry) => entry.actorId === actorId)) return;
+  if (leaderId !== null && !leader) return;
+  const entries = state.combat.initiative.map((entry) => {
+    if (entry.actorId !== actorId) return entry;
+    const { follows: _old, ...rest } = entry;
+    return leader ? { ...rest, score: leader.score, tieBreaker: leader.tieBreaker, follows: leader.actorId } : rest;
+  });
+  state.combat = { ...state.combat, initiative: reorderMidRound(state, entries) };
+}
+
+/** A creature joins the order mid-fight or while it is staged (a summoned creature), in its place by count and after
+ *  the creature it `follows`, as the order would put it now. */
+export function joinInitiative(state: GameState, entry: InitiativeEntry) {
+  if (state.combat.initiative.some((existing) => existing.actorId === entry.actorId))
+    throw new CommandRejectedError("That combatant is already in the encounter.");
+  if (state.combat.initiative.length >= 200)
+    throw new CommandRejectedError("This encounter already has 200 combatants.");
+  state.combat = {
+    ...state.combat,
+    initiative: reorderMidRound(state, [...state.combat.initiative, entry])
+  };
+}
+
+/** A creature's initiative roll by the rules (`initiativeRollFor`), for one that joins rolling its own. */
+export function rollJoiningInitiative(
+  state: GameState,
+  actorId: string,
+  rollD20: () => number,
+  deps: InitiativeRollDeps = {},
+  onRoll?: InitiativeRollSink
+): number {
+  const roll = rollInitiative(state, actorId, false, rollD20, deps);
+  onRoll?.({ actorId, ...roll });
+  return roll.total;
 }
 
 export function startEncounter(
@@ -214,8 +420,10 @@ export function startEncounter(
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined,
   now: number = Date.now(),
   catalog?: EquipmentCatalog,
-  onRoll?: InitiativeRollSink
-) {
+  onRoll?: InitiativeRollSink,
+  rollDie?: (sides: number) => number,
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null
+): EffectNarration[] {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200)
     throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
@@ -256,7 +464,14 @@ export function startEncounter(
         ? `${actor.definitionId}|${surprised}`
         : null;
     const shared = groupKey === null ? undefined : groupDice.get(groupKey);
-    const roll = rollInitiative(state, actor.id, surprised, rollD20, { resolveDefinition, catalog }, shared);
+    const roll = rollInitiative(
+      state,
+      actor.id,
+      surprised,
+      rollD20,
+      { resolveDefinition, catalog, ...(rollDie ? { rollDie } : {}), ...(distanceFeet ? { distanceFeet } : {}) },
+      shared
+    );
     // A group's die reaches the feed once, on its first member.
     if (shared === undefined) onRoll?.({ actorId: actor.id, ...roll });
     if (groupKey !== null && shared === undefined) groupDice.set(groupKey, roll.natural);
@@ -265,6 +480,7 @@ export function startEncounter(
     return { actorId: actor.id, score: roll.total, tieBreaker, ...flags };
   });
   const sorted = ordered(state, initiative);
+  const lasting = lastingOnMap(state, input.mapAssetId);
   // Spread, never a fresh literal, so fields added to CombatState are not dropped. Fog rides the spread:
   // it is prepped before the fight and persists after it.
   state.combat = {
@@ -281,8 +497,8 @@ export function startEncounter(
       }),
       tokenGeometry
     ).map((token) => ({ ...token, position: placedPositions.get(token.actorId) ?? token.position })),
-    annotations: [],
-    spellZones: [],
+    annotations: lasting.annotations,
+    spellZones: lasting.zones,
     turn: { ...EMPTY_TURN },
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
     ruleExceptions: input.ruleExceptions ?? state.combat.ruleExceptions,
@@ -295,13 +511,28 @@ export function startEncounter(
     // Asks parked in the last fight concern a situation that no longer exists.
     pendingRuleAsks: [],
     pendingInitiative,
+    initiativeWindow: [],
+    secondTurn: null,
+    secondTurnsTaken: [],
+    initiativeSwapOffers: [],
     // A fresh fight starts live; the handler captures this start state as the rewind baseline.
     historyCursor: null,
     historyDirty: false
   };
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
-  // Rolling Initiative stops a Short Rest; the GM's rest panel shows who left it.
-  leaveShortRest(state, actorIds, "rolled Initiative");
+  const woken = wakeNaturalSleepers(state, actorIds, {
+    ...(resolveDefinition ? { resolveDefinition } : {}),
+    ...(catalog ? { catalog } : {}),
+    ...(distanceFeet ? { distanceFeet } : {})
+  });
+  // Rolling Initiative stops a rest and the party's travel; the GM's rest panel shows who left the rest.
+  const interrupted = interruptRests(state, actorIds, "rolled Initiative", {
+    ...(resolveDefinition ? { resolveDefinition } : {}),
+    ...(catalog ? { catalog } : {})
+  });
+  endTravelFor(state, actorIds);
+  // What happens "when you roll Initiative": Superior Inspiration's regain, Persistent Rage's window.
+  return [...woken, ...interrupted, ...rolledInitiative(state, actorIds, { resolveDefinition, catalog })];
 }
 
 /**
@@ -368,7 +599,7 @@ export function addCombatant(
   now: number = Date.now(),
   onRoll?: InitiativeRollSink,
   deps: InitiativeRollDeps = {}
-) {
+): EffectNarration[] {
   if (!state.combat.active) throw new CommandRejectedError("Start the encounter before adding a combatant to it.");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -399,7 +630,31 @@ export function addCombatant(
     ]
   };
   if (deps.resolveDefinition) clearPerEncounterUses(state, new Set([actorId]), deps.resolveDefinition, deps.catalog);
-  leaveShortRest(state, new Set([actorId]), "rolled Initiative");
+  const interrupted = interruptRests(state, new Set([actorId]), "rolled Initiative", deps);
+  endTravelFor(state, [actorId]);
+  return [...interrupted, ...rolledInitiative(state, [actorId], deps)];
+}
+
+/**
+ * What a fight starting on this map keeps of the scene: the spell areas still held (a Glyph of Warding, a Fog Cloud cast
+ * before it) and the shapes they and the spells' lights and fog stand on. Every other drawing is cleared, and a fight on
+ * another map keeps nothing.
+ */
+function lastingOnMap(
+  state: GameState,
+  mapAssetId: string
+): Readonly<{ zones: GameState["combat"]["spellZones"]; annotations: GameState["combat"]["annotations"] }> {
+  if (state.combat.mapAssetId !== mapAssetId) return { zones: [], annotations: [] };
+  const zones = state.combat.spellZones
+    .filter((zone) => !zone.bursting && zoneHeld(state, zone))
+    .map((zone) => ({ ...zone, entered: [], affected: [] }));
+  const vision = state.combat.vision;
+  const kept = new Set<string>([
+    ...zones.flatMap((zone) => (zone.annotationId === null ? [] : [zone.annotationId])),
+    ...vision.lights.flatMap((light) => (light.annotationId === undefined ? [] : [light.annotationId])),
+    ...vision.areas.flatMap((area) => (area.shape.type === "template" ? [area.shape.annotationId] : []))
+  ]);
+  return { zones, annotations: state.combat.annotations.filter((annotation) => kept.has(annotation.id)) };
 }
 
 export function endEncounter(state: GameState) {
@@ -417,8 +672,11 @@ export function endEncounter(state: GameState) {
     turnActorId: null,
     turn: { ...EMPTY_TURN },
     underwater: false,
-    // The fight's spell areas end with it; Concentration on them is the caster's to keep or drop.
-    spellZones: [],
+    // A spell area outlasts the fight while what keeps it does (the caster's Concentration, or the effect of a longer
+    // spell, which `endEncounterEffects` has already ended if a minute or less of it was left).
+    spellZones: state.combat.spellZones
+      .filter((zone) => !zone.bursting && zoneHeld(state, zone))
+      .map((zone) => ({ ...zone, entered: [], affected: [] })),
     reactionsUsed: [],
     legendaryUsed: {},
     pendingSaves: [],
@@ -426,6 +684,8 @@ export function endEncounter(state: GameState) {
     pendingDamage: [],
     pendingRuleAsks: [],
     pendingInitiative: [],
+    initiativeWindow: [],
+    turnSteps: null,
     historyCursor: null,
     historyDirty: false
   };
@@ -451,9 +711,102 @@ export function setInitiativeScore(state: GameState, actorId: string, score: num
   settleGatherIfComplete(state);
 }
 
+/**
+ * SRD Initiative: "If a tie occurs, the GM decides the order among tied monsters, and the players decide the order among
+ * tied characters." A character's player (or the GM) puts it directly ahead of another character tied on its score, before
+ * either has taken a turn in this fight.
+ */
+export function orderTiedCharacters(state: GameState, scope: Initiator, actorId: string, beforeActorId: string) {
+  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before ordering Initiative.");
+  requireActorAccess(scope, state, actorId, "edit", "You can only move your own character in the turn order.");
+  if (actorId === beforeActorId) throw new CommandRejectedError("Pick another character tied with yours.");
+  const own = state.combat.initiative.find((entry) => entry.actorId === actorId);
+  const other = state.combat.initiative.find((entry) => entry.actorId === beforeActorId);
+  const kindOf = (id: string) => state.actors.find((actor) => actor.id === id)?.kind;
+  if (!own || !other || kindOf(actorId) !== "player-character" || kindOf(beforeActorId) !== "player-character")
+    throw new CommandRejectedError("Both must be characters in this fight.");
+  if (own.score !== other.score)
+    throw new CommandRejectedError("Only characters tied on the same score are ordered so.");
+  const current = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
+  const acted = (id: string) =>
+    state.combat.round > 1 || state.combat.initiative.findIndex((entry) => entry.actorId === id) < current;
+  if (acted(actorId) || acted(beforeActorId))
+    throw new CommandRejectedError("Ties are settled before either character takes a turn in this fight.");
+  setInitiativeScore(state, actorId, own.score, Math.min(1000, other.tieBreaker + 1));
+}
+
 /** SRD Alert, Initiative Swap: right after initiative is rolled, two combatants trade scores. Not while either
  *  is Incapacitated, and only before the first of them has taken a turn in this fight. */
 export function swapInitiative(state: GameState, actorId: string, withActorId: string) {
+  const [first, second] = swapEntries(state, actorId, withActorId);
+  const swapped = state.combat.initiative.map((entry) =>
+    entry.actorId === actorId
+      ? { ...entry, score: second.score, tieBreaker: second.tieBreaker }
+      : entry.actorId === withActorId
+        ? { ...entry, score: first.score, tieBreaker: first.tieBreaker }
+        : entry
+  );
+  state.combat = {
+    ...state.combat,
+    initiative: reorderMidRound(state, swapped),
+    // A swap made settles every offer either was in.
+    initiativeSwapOffers: state.combat.initiativeSwapOffers.filter(
+      (offer) => ![offer.actorId, offer.withActorId].some((id) => id === actorId || id === withActorId)
+    )
+  };
+}
+
+/**
+ * Alert's Initiative Swap from a player: "you can swap your Initiative with the Initiative of one willing ally". The
+ * character's player offers it, and the swap is made when the ally's player takes the offer (the same command naming
+ * the pair the other way round), or at once when that player controls the ally too. The GM swaps any two at once.
+ * Returns whether the swap was made, or only offered.
+ */
+export function offerInitiativeSwap(
+  state: GameState,
+  scope: Initiator,
+  actorId: string,
+  withActorId: string,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): "swapped" | "offered" {
+  if (scope.role === "gm") {
+    swapInitiative(state, actorId, withActorId);
+    return "swapped";
+  }
+  requireActorAccess(scope, state, actorId, "edit", "You can only swap your own character's Initiative.");
+  const taken = state.combat.initiativeSwapOffers.some(
+    (offer) => offer.actorId === withActorId && offer.withActorId === actorId
+  );
+  if (taken) {
+    swapInitiative(state, withActorId, actorId);
+    return "swapped";
+  }
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const ally = state.actors.find((candidate) => candidate.id === withActorId);
+  const definition = actor?.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  if (!actor || !holdsFeature(definition, "alert", "Alert"))
+    throw new CommandRejectedError(`${actor?.name ?? "That character"} doesn't have the Alert feat's Initiative Swap.`);
+  if (!ally || !areAllies(actor, ally, resolveDefinition))
+    throw new CommandRejectedError(
+      `Initiative Swap is made with a willing ally, and ${ally?.name ?? "that creature"} isn't one.`
+    );
+  swapEntries(state, actorId, withActorId);
+  if (ally.ownerSessionId === actor.ownerSessionId) {
+    swapInitiative(state, actorId, withActorId);
+    return "swapped";
+  }
+  state.combat = {
+    ...state.combat,
+    initiativeSwapOffers: [
+      ...state.combat.initiativeSwapOffers.filter((offer) => offer.actorId !== actorId),
+      { actorId, withActorId }
+    ].slice(-20)
+  };
+  return "offered";
+}
+
+/** The two entries an Initiative Swap trades, refused when it can't be made now. */
+function swapEntries(state: GameState, actorId: string, withActorId: string): [InitiativeEntry, InitiativeEntry] {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before swapping Initiative.");
   if (actorId === withActorId) throw new CommandRejectedError("Pick another combatant to swap with.");
   const entries = [actorId, withActorId].map((id) => state.combat.initiative.find((entry) => entry.actorId === id));
@@ -474,15 +827,7 @@ export function swapInitiative(state: GameState, actorId: string, withActorId: s
     throw new CommandRejectedError(
       "Initiative Swap happens right after initiative is rolled, before either has acted."
     );
-  const [first, second] = entries as InitiativeEntry[];
-  const swapped = state.combat.initiative.map((entry) =>
-    entry.actorId === actorId
-      ? { ...entry, score: second.score, tieBreaker: second.tieBreaker }
-      : entry.actorId === withActorId
-        ? { ...entry, score: first.score, tieBreaker: first.tieBreaker }
-        : entry
-  );
-  state.combat = { ...state.combat, initiative: reorderMidRound(state, swapped) };
+  return entries as [InitiativeEntry, InitiativeEntry];
 }
 
 /** A claimed player rolls their own initiative (or supplies `natural`, a physical die) and clears their
@@ -502,8 +847,18 @@ export function rollSelfInitiative(
   if (!state.combat.pendingInitiative.includes(actorId))
     throw new CommandRejectedError("Your initiative is already set.");
   const override = options.rollMode;
-  const natural = options.natural ?? (override ? rollUnderMode(rollD20, override) : undefined);
+  // The dice are thrown here and held (`initiative:<actorId>`), so Heroic Inspiration can reroll one of them.
+  const mode = override ?? initiativeRollFor(state, actorId, entry.surprised === true, deps).mode;
+  const faces = options.natural === undefined ? d20FacesFor(mode, [], () => rollD20()) : [options.natural];
+  const natural = options.natural ?? keptD20(faces, mode);
   const roll = rollInitiative(state, actorId, entry.surprised === true, rollD20, deps, natural);
+  holdRoll(state, {
+    key: `initiative:${actorId}`,
+    actorId,
+    faces,
+    typed: options.natural !== undefined,
+    ...(options.natural === undefined ? { readAs: mode } : {})
+  });
   // A hand-typed `natural` is a die the server never threw, so only server rolls reach the feed.
   if (options.natural === undefined) onRoll?.({ actorId, ...roll, mode: override ?? roll.mode });
   const initiative = reorderMidRound(
@@ -546,6 +901,13 @@ function settleGatherIfComplete(state: GameState) {
 
 /** Dependencies for start-of-turn recharge rolls and ongoing damage and end-of-turn repeat saves; optional so scene
  *  bookkeeping can advance turns without them. */
+/** Whether a creature takes a Reaction on every turn, not once a round (a marilith's Reactive trait). */
+function reactsEveryTurn(state: GameState, actorId: string, deps: TurnAdvanceDeps | undefined): boolean {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor?.definitionId || !deps) return false;
+  return holdsFeature(deps.resolveDefinition(actor.definitionId), "reactive", "Reactive");
+}
+
 export type TurnAdvanceDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so an item's recharge pool re-arms like a stat block's. */
@@ -558,6 +920,8 @@ export type TurnAdvanceDeps = Readonly<{
   geometry?: TokenMapGeometry | null;
   /** Creature-to-creature distance on the map, for the auras that reach creatures as turns start and end. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** Two or more things happening at once as the new turn starts wait for its creature's controller to order them. */
+  askOrder?: boolean;
 }>;
 
 /** SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the spent
@@ -649,46 +1013,134 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // Wait mode holds turns until every player has rolled their initiative (or the GM rolls the rest).
   if (state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0)
     throw new CommandRejectedError("Players are still rolling initiative. Roll for the rest to begin.");
-  const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
-  if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
+  const ownIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
+  if (ownIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
+  // Thief's Reflexes: a second turn goes on to the turn it came before, or ends the round.
+  const running = state.combat.secondTurn;
+  const fromSecond = running !== null && running.actorId === state.combat.turnActorId;
+  const resumeIndex =
+    fromSecond && running.resume !== null
+      ? state.combat.initiative.findIndex((entry) => entry.actorId === running.resume)
+      : -1;
+  const currentIndex = fromSecond ? (resumeIndex < 0 ? state.combat.initiative.length - 1 : resumeIndex - 1) : ownIndex;
   // A defeated creature takes no more turns: the order passes over it to the next one still in the fight.
   const length = state.combat.initiative.length;
+  // So does a summoned thing with no turns of its own (Spiritual Weapon's force).
+  const passedOver = (actorId: string) => isDefeated(state, actorId) || takesNoTurns(state, actorId);
   let steps = 1;
-  while (steps < length && isDefeated(state, state.combat.initiative[(currentIndex + steps) % length].actorId))
+  while (steps < length && passedOver(state.combat.initiative[(currentIndex + length + steps) % length].actorId))
     steps += 1;
   if (steps === length) steps = 1;
-  const wraps = currentIndex + steps >= length;
+  // Time Stop: the caster takes its turns in a row while no time passes for anyone else.
+  const stopped = timeStopGoesOn(state);
+  const passesRound = !stopped && currentIndex + steps >= length;
+  // A Thief's second turn of round 1 comes before the first turn below its Initiative minus 10.
+  const second = stopped
+    ? null
+    : secondTurnDue(
+        state,
+        fromSecond ? running.score : state.combat.initiative[ownIndex]!.score,
+        passesRound ? null : state.combat.initiative[currentIndex + steps]!.score,
+        deps?.resolveDefinition,
+        passedOver
+      );
+  const wraps = passesRound && second === null;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
+  // What its turn's start did at once, never put in order, happens now as it was listed.
+  if (deps) ending.push(...playStartSteps(state, deps));
+  // Its first turn over, a creature has done what it does when it rolled Initiative.
+  closeInitiativeWindow(state, outgoingId);
+  // "If you somehow end a turn in a space with another creature, you have the Prone condition" (SRD 5.2.1).
+  const calibration = deps?.geometry?.calibration;
+  if (outgoingId && calibration && deps && familyModeFor(state.combat, "movement") !== "freeform")
+    proneInSharedSpace(state, outgoingId, calibration, deps.resolveDefinition, ending);
+  // Blink: "Roll 1d6 at the end of each of your turns".
+  if (outgoingId && deps?.newId) blinkAway(state, outgoingId, deps.rollDie, deps.newId, ending);
   endOfTurn(
     state,
     outgoingId,
     ending,
     deps?.newId ? { ...deps, newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
   );
+  // A spell cast over several turns lapses on a turn that went without its action.
+  lapseLongCasts(state, outgoingId, ending);
+  // A summoned creature that did nothing its summoner asked takes the Dodge action, and its orders are used up.
+  summonTurnEnd(state, outgoingId, ending);
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
+  // A wave that moved this turn sinks and weakens (Tsunami).
+  if (zones && outgoingId) ending.push(...wavesAtTurnEnd(state, outgoingId, zones));
+  // The water it ends its turn in (a vampire's running water, a sahuagin wet again) and the scene's weather (frigid
+  // water's rounds, a strong wind bringing a flier down).
+  if (deps && outgoingId) {
+    const waterDeps = {
+      resolveDefinition: deps.resolveDefinition,
+      rollDie: deps.rollDie,
+      ...(deps.catalog ? { catalog: deps.catalog } : {}),
+      ...(deps.newId ? { newId: deps.newId } : {}),
+      ...(deps.now ? { now: deps.now } : {})
+    };
+    ending.push(...runningWaterAtTurnEnd(state, outgoingId, calibration, waterDeps));
+    ending.push(...submergedAtTurnEnd(state, outgoingId, calibration, waterDeps));
+    if (deps.newId)
+      ending.push(
+        ...environmentAtTurnEnd(state, outgoingId, calibration, {
+          resolveDefinition: deps.resolveDefinition,
+          ...(deps.catalog ? { catalog: deps.catalog } : {}),
+          random: deps.rollDie,
+          newId: deps.newId,
+          now: deps.now ?? (() => new Date().toISOString())
+        })
+      );
+  }
   events?.push(...ending);
   // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
-  const nextActorId = wraps
-    ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
-    : order[currentIndex + steps].actorId;
+  const nextActorId = stopped
+    ? outgoingId!
+    : second
+      ? second.actorId
+      : wraps
+        ? (order.find((entry) => !passedOver(entry.actorId)) ?? order[0]).actorId
+        : order[currentIndex + steps]!.actorId;
+  if (second)
+    events?.push({
+      kind: "effect",
+      text: `${state.actors.find((actor) => actor.id === second.actorId)?.name ?? "A Thief"} takes a second turn at Initiative ${second.score} (Thief's Reflexes).`,
+      actorId: second.actorId
+    });
   state.combat = {
     ...state.combat,
     initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
-    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
-    turn: { ...EMPTY_TURN },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
+    secondTurn: second
+      ? { ...second, resume: passesRound ? null : state.combat.initiative[currentIndex + steps]!.actorId }
+      : null,
+    ...(second ? { secondTurnsTaken: [...state.combat.secondTurnsTaken, second.actorId] } : {}),
+    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD). The turn
+    // that just ended opens the window for legendary actions, until the incoming creature does something.
+    turn: { ...EMPTY_TURN, ...(outgoingId && !stopped ? { afterActorId: outgoingId } : {}) },
+    // A marilith's Reactive: "The marilith can take one Reaction on every turn of combat."
+    reactionsUsed: state.combat.reactionsUsed.filter(
+      (actorId) => actorId !== nextActorId && !reactsEveryTurn(state, actorId, deps)
+    ),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
+  // A hydra's extra Opportunity Attack Reactions come back with its own.
+  refreshReactiveHeads(state.actors.find((actor) => actor.id === nextActorId));
+  // A move or teleport granted for the turn that ended lapses with it.
+  dropStaleGrants(state);
+  // Movement already spent of this turn (climbing out of a corpse off it) is used.
+  chargeOwedMovement(state, nextActorId);
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
+  // A summoned creature its summoner didn't command with a Bonus Action takes the Dodge action (Animate Dead).
+  summonTurnStart(state, nextActorId, events);
   if (!deps) return;
   // Then what lands at the start of its turn: a swallow's acid, Searing Smite's fire.
   const starting: EffectNarration[] = [];
@@ -696,6 +1148,22 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // Then the spell areas: each counts "once per turn" afresh, a spell's duration runs out at its caster's turn, and
   // the incoming creature starting its turn inside one (Web, Stinking Cloud) meets it.
   if (zones) starting.push(...zonesAtTurnStart(state, nextActorId, zones));
+  // A creature in a wave fights it before it can move (Tsunami).
+  if (zones) starting.push(...wavesAtTurnStart(state, nextActorId, zones));
+  // Burning webs burn out, and burn a creature starting its turn in them (Web).
+  if (zones) starting.push(...fireAtTurnStart(state, nextActorId, zones));
+  // A creature starting its turn on slippery ice saves or falls Prone, and one on a statue's plate sets it off.
+  if (deps.newId)
+    starting.push(
+      ...groundAtTurnStart(state, nextActorId, {
+        resolveDefinition: deps.resolveDefinition,
+        ...(deps.catalog ? { catalog: deps.catalog } : {}),
+        rollDie: deps.rollDie,
+        newId: deps.newId,
+        now: deps.now ?? (() => new Date().toISOString()),
+        geometry: deps.geometry ?? null
+      })
+    );
   events?.push(...starting);
   rollRecharges(state, nextActorId, deps, events);
   refreshOwnTurnUses(state, nextActorId, deps);
@@ -713,10 +1181,12 @@ export function previousInitiativeTurn(state: GameState) {
     ...state.combat,
     round: wraps && state.combat.round > 1 ? state.combat.round - 1 : state.combat.round,
     turnActorId: previousActorId,
+    secondTurn: null,
     // Backing up is a GM correction, so the strip starts clean. Effect durations do not rewind here; the
     // timeline restore is the real undo.
     turn: { ...EMPTY_TURN },
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, previousActorId)
   };
+  dropStaleGrants(state);
 }

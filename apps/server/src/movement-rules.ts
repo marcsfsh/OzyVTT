@@ -1,19 +1,54 @@
+import { reactionSpent } from "./commanded-reactions.js";
+import { spareOpportunityReactions } from "./reactive-heads.js";
+import { riddenBearerOf } from "./attachments.js";
+import { formEffectOf } from "./transform/forms.js";
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, TeleportLanding } from "@vtt/schemas";
 import { footprintOrigin } from "@vtt/rules-5e";
 import { RulesBlockedError } from "./game-store.js";
+import { altitudeOf as altitudeOfToken, altitudesAlong, heightRefusal, setAltitude, sharesHeight } from "./altitude.js";
+import {
+  activeMoveGrant,
+  activeTeleportGrant,
+  recordEntered,
+  spendMoveGrant,
+  spendTeleportGrant,
+  type MoveGrant
+} from "./granted-moves.js";
 import { holdsFeature } from "./class-features.js";
+import { creaturesEntered } from "./space-entry.js";
+import { sizeAtMost } from "./resolution/context.js";
+import { isNimble, opensItsSpace } from "./space-sharing.js";
+import { HIDDEN_SOURCE } from "./hidden-source.js";
+import { ridesWith } from "./mounts.js";
+import { isEthereal, onOtherPlanes } from "./ethereal.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
+import { burrowsThroughWalls, passesEarth, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
 import { effectiveActions } from "./effective-actions.js";
-import { NO_OPPORTUNITY_ATTACKS_TAG, NO_REACTIONS_TAG, READIED_TAG, releaseReadied } from "./effects.js";
-import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import {
+  endEffect,
+  NO_OPPORTUNITY_ATTACKS_TAG,
+  NO_REACTIONS_TAG,
+  NO_TELEPORT_TAG,
+  READIED_TAG,
+  releaseReadied,
+  type EffectNarration
+} from "./effects.js";
+import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
-import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
+import { jumpLimits, leapRider } from "./jumping.js";
+import { travelBudgetFeet, travelCostsExtra, walksOnLiquid, type TravelMode } from "./speed.js";
+import { crossesAtNoCost } from "./spell-zones.js";
+import { pitRefusal } from "./traps.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import { DAZED_TAG } from "./resolution/economy.js";
 import type { MovementCost, MovementCostOptions } from "./terrain.js";
 import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
+import { fearSources } from "./vision/rules.js";
+import { compelledMoveRefusal } from "./compelled-moves.js";
+import { UNMOVABLE_TAG } from "./forced-movement.js";
 import {
   effectiveModeFor,
   familyModeFor,
@@ -35,15 +70,25 @@ export type MovementRulesInput = Readonly<{
   to: EncounterTokenPosition | null;
   /** How the move travels; walking when absent. */
   mode?: MoveMode;
+  /** The mover's height before and after the move, in feet; on the ground when absent. */
+  fromAltitudeFeet?: number;
+  toAltitudeFeet?: number;
   /** A player moved the token (not the GM): off its turn, or by teleportation, that needs the GM's go-ahead. */
   byPlayer?: boolean;
+  /** What held the mover up as it set off (the token's own, when absent). */
+  wasAirborne?: "fly" | "levitate";
   /** Map distance in feet between two image points; null when unmeasurable. */
   distance: (a: Point, b: Point) => number | null;
   /** What the move costs the mover, difficult terrain, creatures and extra costs included (`movementCost`);
    *  `distance` when absent. */
   cost?: (from: Point, to: Point, options: MovementCostOptions) => MovementCost | null;
-  /** Footprint-aware feet between an enemy and the mover at `point` (SRD: nearest point of each space); center-to-center when absent. Used for reach. */
-  creatureDistance?: (enemy: Readonly<{ actorId: string; position: Point }>, moverPoint: Point) => number | null;
+  /** Footprint-aware feet between an enemy and the mover at `point` and `altitudeFeet` (SRD: nearest point of each space,
+   *  height included); center-to-center when absent. Used for reach. */
+  creatureDistance?: (
+    enemy: Readonly<{ actorId: string; position: Point }>,
+    moverPoint: Point,
+    altitudeFeet?: number
+  ) => number | null;
   /** The map's grid, so a move can't end in another creature's space; no check without one. */
   calibration?: SquareGridCalibration | null;
   /** Creatures the mover drags along (it grapples them), and whether that costs it an extra foot per foot. */
@@ -55,6 +100,11 @@ export type MovementRulesInput = Readonly<{
   /** With dynamic vision on: whether the mover perceived a creature as it set off. One it didn't is no obstacle and no
    *  refusal, as a hidden one isn't. Every creature counts when absent. */
   perceives?: (actorId: string) => boolean;
+  /** With dynamic vision on: whether the mover saw a point as it set off ("an unoccupied space you can see", for a
+   *  teleport). Every point counts when absent. */
+  seesPoint?: (point: Point) => boolean;
+  /** Whether a point lies in Difficult Terrain, where a jump's landing needs a check. No check when absent. */
+  difficultAt?: (point: Point) => boolean;
   /** With dynamic vision on: whether a creature saw the mover as it set off, which an opportunity attack needs. The
    *  conditions alone decide (Blinded, Invisible) when absent. */
   seenBy?: (actorId: string) => boolean;
@@ -77,6 +127,28 @@ export type MovementRulesOutcome = Readonly<{
   crawled: boolean;
   /** It was a Readied creature's move off its turn, taken with its Reaction. */
   readied?: true;
+  /** The move or teleport an action or feature granted that this one was taken with (`granted-moves.ts`). */
+  granted?: string;
+  /** A jump that landed in Difficult Terrain, which owes a DC 10 Dexterity (Acrobatics) check (`jumping.ts`). */
+  landsOnDifficult?: true;
+  /** The teleport arrived in a filled space and fails with this Force damage (`failedTeleport`). */
+  teleportFails?: string;
+  /** What the granted teleport's arrival does near its destination (a mummy lord's Whirlwind of Sand). */
+  teleportLanding?: TeleportLanding;
+  /** The willing creature the granted teleport takes along (Dimension Door), and whether it leaves smoke behind. */
+  teleportPassengerId?: string;
+  teleportSmoke?: true;
+  /** The granted teleport's damage when it fails, for a passenger that can't arrive. */
+  teleportFailDamage?: string;
+  /** The mover waits here, at the edge of the reach it leaves, while the Opportunity Attacks it provoked are answered
+   *  (`held-moves.ts`); `refundFeet` is what the rest of the way cost, given back if it never goes on. */
+  heldAt?: Readonly<{ position: Point; altitudeFeet: number; promptIds: readonly string[]; refundFeet: number }>;
+  /** The way a walk, a flight, a climb, a swim or a burrow went, step by step, as its cost measured it. */
+  path?: readonly Point[];
+  /** The granted move ends by letting go of what its mover grapples (a roc's Swoop: "drops that creature"). */
+  dropsHeld?: true;
+  /** At the end of the granted move its mover can take the Hide action freely (a weretiger's Prowl). */
+  thenHide?: true;
 }>;
 
 /**
@@ -90,8 +162,15 @@ export type MovementRulesOutcome = Readonly<{
  * distance already moved). Crawling, and climbing or swimming without the speed, cost an extra foot per foot, and so
  * does dragging a grappled creature. Teleportation and forced movement spend none and provoke nothing.
  *
+ * Granted moves (`granted-moves.ts`): a move an action or feature gave the creature for this turn ("moves up to half
+ * its Speed", Tactical Shift) is charged to that grant, on the creature's turn or off it, when it fits; it provokes
+ * unless the grant says otherwise. A granted teleport is checked for its range, an unoccupied space and sight, and
+ * needs no GM go-ahead. A player's move off the turn with no grant, or a teleport with none, is the GM's to allow; the
+ * GM's own off-turn moves with no grant are repositioning and spend nothing.
+ *
  * Opportunity attacks: leaving an enemy's melee reach anywhere along the path opens a leaves-reach prompt answered as
- * a real melee attack; the move completes first (arrival-timing approximation). Disengage suppresses; a hidden mover
+ * a real melee attack, and the mover waits at the last point of its way still in reach while the prompts are open
+ * (`heldAt`, `held-moves.ts`). Disengage suppresses; a hidden mover
  * prompts no one (a player must not learn a hidden token's retreat), and neither does a mover the enemy can't see
  * (Invisible, or the enemy Blinded) unless its Blindsight or Truesight reaches. Sides are `areEnemies`', as attacks'.
  */
@@ -119,6 +198,11 @@ function movementCounts(state: GameState, actorId: string): boolean {
   );
 }
 
+/** In a running fight, a creature moving when it isn't its turn: what a creature can do only "on your turn" waits. */
+export function offItsTurn(state: GameState, actorId: string): boolean {
+  return turnsRunning(state) && state.combat.turnActorId !== actorId;
+}
+
 /** A fight whose turns have begun: not a wait-mode fight still gathering initiative. */
 function turnsRunning(state: GameState): boolean {
   const gathering = state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0;
@@ -144,13 +228,21 @@ export function movementStatus(
   const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
   const counted = actor !== undefined && movementCounts(state, actorId);
   const derivation = actor ? deriveEquipment(actor, definition, input.catalog) : null;
+  // What a creature can do only on its own turn (Acrobatic Movement's climb) isn't offered off it.
+  const offTurn = offItsTurn(state, actorId);
   const modes =
     actor && derivation
       ? TRAVEL_MODES.flatMap((mode) => {
-          const budget = travelBudgetFeet(actor, derivation, definition, mode);
+          const budget = travelBudgetFeet(actor, derivation, definition, mode, offTurn);
           return budget === null
             ? []
-            : [{ mode, budgetFeet: budget, extraCost: travelCostsExtra(actor, definition, mode, derivation) }];
+            : [
+                {
+                  mode,
+                  budgetFeet: budget,
+                  extraCost: travelCostsExtra(actor, definition, mode, derivation, offTurn)
+                }
+              ];
         })
       : [];
   return {
@@ -162,8 +254,63 @@ export function movementStatus(
     ...(actor?.conditions.some((condition) => condition.id === "prone") ? { crawling: true } : {}),
     ...(actor && dragCostsExtra(state, actor.id, grappledBy(state, actor.id), input.resolveDefinition)
       ? { dragging: true }
-      : {})
+      : {}),
+    ...grantsOf(state, actor),
+    ...(incorporeal(definition) || (actor && passesEarth(actor)) ? { throughWalls: true } : {}),
+    ...(openingPassage(definition) ? { opening: openingPassage(definition)! } : {}),
+    ...(burrowsThroughWalls(definition) ? { burrowsThroughWalls: burrowsThroughWalls(definition)! } : {}),
+    ...(actor && isEthereal(actor) ? { ethereal: true } : {}),
+    ...(actor && freeOfDifficultTerrain(actor, derivation ?? undefined) ? { ignoresDifficultTerrain: true } : {}),
+    ...(actor && walksOnLiquid(actor, derivation ?? undefined, offItsTurn(state, actor.id))
+      ? { walksOnWater: true }
+      : {}),
+    ...(actor && formEffectOf(actor)?.form?.noLiquid ? { barredByWater: true } : {})
   };
+}
+
+/** The move and teleport granted to a creature for this turn, as `actor:movement` reports them. */
+function grantsOf(state: GameState, actor: GameState["actors"][number] | undefined) {
+  const move = actor ? activeMoveGrant(state, actor) : null;
+  const teleport = actor ? activeTeleportGrant(state, actor) : null;
+  return {
+    ...(move && move.feet > 0
+      ? {
+          granted: {
+            name: move.name,
+            feet: move.feet,
+            ...(move.mode ? { mode: move.mode } : {}),
+            provokes: move.provokes,
+            ...(move.jump ? { jump: true } : {})
+          }
+        }
+      : {}),
+    ...(teleport ? { teleport: { name: teleport.name, feet: teleport.feet } } : {})
+  };
+}
+
+/** On a willing ally a Monk's Step of the Wind carries (Heightened Focus): "You move the creature with you until the end
+ *  of your turn. The creature's movement doesn't provoke Opportunity Attacks." */
+export const CARRIED_ALONG_TAG = "carried-along";
+
+/** The creatures `moverId` carries along on its own turn (Heightened Focus), which its moves take with it. */
+export function carriedAlongBy(state: GameState, moverId: string): readonly string[] {
+  if (state.combat.turnActorId !== moverId) return [];
+  return state.actors
+    .filter((actor) =>
+      actor.effects.some((effect) => effect.tags.includes(CARRIED_ALONG_TAG) && effect.sourceActorId === moverId)
+    )
+    .map((actor) => actor.id);
+}
+
+/** "Until the end of your turn": what the creature carried ends as its turn does. */
+export function setDownCarried(state: GameState, actorId: string): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors)
+    for (const effect of actor.effects.filter(
+      (candidate) => candidate.tags.includes(CARRIED_ALONG_TAG) && candidate.sourceActorId === actorId
+    ))
+      events.push(...endEffect(state, actor.id, effect.id));
+  return events;
 }
 
 /** The creatures a grappler holds (its `grapple` effects on them). */
@@ -176,10 +323,12 @@ export function grappledBy(state: GameState, grapplerId: string): readonly strin
 }
 
 const SIZE_RANK: Readonly<Record<string, number>> = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gargantuan: 5 };
+/** On a grapple whose creature its grappler carries at no extra cost (a shambling mound's Engulf). */
+export const CARRIED_FREE_TAG = "carried-free";
 
 /** SRD Grappled: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot
  *  unless you are Tiny or two or more sizes smaller than it." A bugbear's Abduct: it "needn't spend extra movement to
- *  move a creature it is grappling". */
+ *  move a creature it is grappling", and Grappler's Fast Wrestler waives it for a creature its size or smaller. */
 export function dragCostsExtra(
   state: GameState,
   grapplerId: string,
@@ -191,26 +340,43 @@ export function dragCostsExtra(
   if (holdsFeature(definition, "abduct", "Abduct")) return false;
   const rank = (actorId: string) =>
     SIZE_RANK[state.actors.find((actor) => actor.id === actorId)?.size ?? "medium"] ?? SIZE_RANK.medium!;
+  // "When the shambling mound moves, the Grappled target moves with it, costing it no extra movement."
+  const carriedFree = (actorId: string) =>
+    state.actors
+      .find((actor) => actor.id === actorId)
+      ?.effects.some((effect) => effect.sourceActorId === grapplerId && effect.tags.includes(CARRIED_FREE_TAG)) ===
+    true;
+  // Grappler's Fast Wrestler: no extra movement "to move a creature Grappled by you if the creature is your size or
+  // smaller".
+  const wrestler = holdsFeature(definition, "grappler", "Grappler");
   return grappledIds.some((actorId) => {
     const size = state.actors.find((actor) => actor.id === actorId)?.size ?? "medium";
-    return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2;
+    if (wrestler && rank(actorId) <= rank(grapplerId)) return false;
+    return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2 && !carriedFree(actorId);
   });
 }
 
-/** The creatures a grappler drags come along, moved the same way it went, and snapped (SRD Grappled: "Movable").
- *  Returns those moved. */
+/** The creatures a grappler drags come along, moved the same way it went, and snapped (SRD Grappled: "Movable"). A
+ *  grappler that rose or came down takes them up or down as far (a roc carrying its prey aloft), where they hang in
+ *  its grip until it lets go (`heldAloft` in `falling.ts`). Returns those moved. */
 export function dragAlong(
   state: GameState,
   heldIds: readonly string[],
   from: Point,
   to: Point,
-  geometry: TokenMapGeometry
+  geometry: TokenMapGeometry,
+  riseFeet = 0
 ): string[] {
   const moved: string[] = [];
   for (const heldId of heldIds) {
-    const held = state.combat.tokens.find((token) => token.actorId === heldId)?.position;
+    const token = state.combat.tokens.find((candidate) => candidate.actorId === heldId);
+    const held = token?.position;
     if (!held) continue;
     moveEncounterToken(state, heldId, { x: held.x + to.x - from.x, y: held.y + to.y - from.y }, geometry);
+    if (riseFeet !== 0) {
+      const height = Math.max(0, altitudeOfToken(token) + riseFeet);
+      setAltitude(state, heldId, height, height > 0 ? "fly" : undefined);
+    }
     moved.push(heldId);
   }
   return moved;
@@ -280,21 +446,50 @@ const SHARES_SPACE = ["Air Form", "Fire Form", "Water Form", "Swarm"] as const;
 const sharesSpace = (state: GameState, actorId: string, input: MovementRulesInput, swarmOnly = false): boolean => {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
-  return (swarmOnly ? ["Swarm"] : SHARES_SPACE).some((name) => holdsFeature(definition, name, name));
+  // A form that can enter a creature's space and stop there (a vampire's mist, Gaseous Form's cloud).
+  if (!swarmOnly && actor && formEffectOf(actor)?.form?.sharesSpaces) return true;
+  if (swarmOnly) return opensItsSpace(definition);
+  return SHARES_SPACE.some((name) => holdsFeature(definition, name, name));
 };
 
+/** A spell's force that neither blocks a space nor is blocked (Spiritual Weapon's force, an Arcane Eye). */
+const intangible = (state: GameState, actorId: string): boolean =>
+  state.actors.find((actor) => actor.id === actorId)?.summon?.intangible === true;
+
 /** SRD: "You can't willingly end a move in a space occupied by another creature." Hidden creatures don't count, so
- *  the refusal can't give one away; neither do the creatures the mover drags. */
-function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Point): boolean {
-  if (!input.calibration || sharesSpace(state, input.actorId, input)) return false;
+ *  the refusal can't give one away; neither do the creatures the mover drags, nor those of a size it may move into
+ *  (`engulfing`: a gelatinous cube's Engulf, whose creatures it then holds inside). */
+function endsInOccupiedSpace(
+  state: GameState,
+  input: MovementRulesInput,
+  to: Point,
+  everyone = false,
+  engulfing?: string
+): boolean {
+  if (!input.calibration || intangible(state, input.actorId)) return false;
+  const moverActor = state.actors.find((actor) => actor.id === input.actorId);
+  // Air Form and Water Form as the stalker and the water elemental print them: "can enter an enemy's space and stop
+  // there", so only an enemy's space is one it may end in.
+  const enemiesOnly = moverActor !== undefined && stopsOnlyInEnemySpace(moverDefinitionOf(moverActor, input));
+  if (sharesSpace(state, input.actorId, input) && !enemiesOnly) return false;
   const moverToken = state.combat.tokens.find((token) => token.actorId === input.actorId);
   const mine = cellsAt(input.calibration, to, moverToken?.sizeCells ?? 1);
+  const feetPerCell = input.calibration.distancePerCell;
   return state.combat.tokens.some((token) => {
     if (token.actorId === input.actorId || !token.position || input.dragging?.actorIds.includes(token.actorId))
       return false;
-    if (sharesSpace(state, token.actorId, input, true)) return false;
-    if (state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
-    if (input.perceives && !input.perceives(token.actorId)) return false;
+    // A rider shares its mount's space.
+    if (ridesWith(state, input.actorId, token.actorId)) return false;
+    // A creature above or below the mover's space at the end isn't in it (a flier over a goblin).
+    if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
+    if (sharesSpace(state, token.actorId, input, true) || intangible(state, token.actorId)) return false;
+    const occupant = state.actors.find((actor) => actor.id === token.actorId);
+    if (occupant && moverActor && onOtherPlanes(occupant, moverActor)) return false;
+    if (engulfing !== undefined && sizeAtMost(occupant?.size, engulfing)) return false;
+    if (enemiesOnly && moverActor && occupant && areEnemies(moverActor, occupant, input.resolveDefinition))
+      return false;
+    if (!everyone && occupant?.visibility === "gm-only") return false;
+    if (!everyone && input.perceives && !input.perceives(token.actorId)) return false;
     for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))
       if (mine.has(cell)) return true;
     return false;
@@ -308,16 +503,83 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   const prompts: Array<{ actorId: string; name: string }> = [];
   const outcome: Policing = { warnings: [], overridden: null };
   let readied = false;
+  let granted: string | undefined;
+  let landsOnDifficult = false;
+  let failDamage: string | undefined;
+  let landing: TeleportLanding | undefined;
+  let passengerId: string | undefined;
+  let failOn: string | undefined;
+  let smoke = false;
+  let heldAt: MovementRulesOutcome["heldAt"];
+  let dropsHeld = false;
+  let thenHide = false;
+  const travelled: { path?: readonly Point[] } = {};
   const done = (crawled = false): MovementRulesOutcome => ({
     warning: outcome.warnings.length > 0 ? outcome.warnings.join(" ") : null,
     overridden: outcome.overridden,
     prompts,
     crawled,
-    ...(readied ? { readied: true as const } : {})
+    ...(readied ? { readied: true as const } : {}),
+    ...(granted ? { granted } : {}),
+    ...(landsOnDifficult ? { landsOnDifficult: true as const } : {}),
+    ...(failDamage ? { teleportFails: failDamage } : {}),
+    ...(landing ? { teleportLanding: landing } : {}),
+    ...(passengerId ? { teleportPassengerId: passengerId, ...(failOn ? { teleportFailDamage: failOn } : {}) } : {}),
+    ...(smoke ? { teleportSmoke: true as const } : {}),
+    ...(heldAt ? { heldAt } : {}),
+    ...(travelled.path ? { path: travelled.path } : {}),
+    ...(dropsHeld ? { dropsHeld: true as const } : {}),
+    ...(thenHide ? { thenHide: true as const } : {})
   });
   // Forced movement is the GM's (the command refuses a player's), and spends nothing.
   if (!mover || from === null || to === null || mode === "forced") return done();
-  readied = readiedMove(state, mover, mode);
+  const fromAltitude = input.fromAltitudeFeet ?? 0;
+  const toAltitude = input.toAltitudeFeet ?? fromAltitude;
+  // A creature held so that it can't teleport (a tarrasque's Bite) is refused one, a granted one too.
+  const holder =
+    mode === "teleport" ? mover.effects.find((effect) => effect.tags.includes(NO_TELEPORT_TAG)) : undefined;
+  if (holder)
+    police(
+      state,
+      input,
+      "movement.teleport",
+      `${mover.name} can't teleport while ${holder.sourceName ?? "something"} holds it.`,
+      outcome
+    );
+  // A granted teleport the move keeps to the terms of is taken now, by anyone, with nothing more to ask.
+  if (mode === "teleport") {
+    const teleport = activeTeleportGrant(state, mover);
+    const refusal = teleport ? teleportRefusal(state, input, mover.name, teleport, toAltitude) : null;
+    if (teleport && refusal === null) {
+      spendTeleportGrant(mover, teleport.effectId);
+      granted = teleport.name;
+      landing = teleport.landing;
+      passengerId = teleport.passengerId;
+      failOn = teleport.failDamage;
+      if (teleport.costFeet !== undefined)
+        chargeTeleport(state, input, mover, teleport.costFeet, teleport.name, outcome);
+      smoke = teleport.smoke === true;
+      // A space filled by a creature the mover didn't know of fails the teleport that says so (Dimension Door).
+      if (teleport.failDamage && endsInOccupiedSpace(state, input, to, true)) failDamage = teleport.failDamage;
+      return done();
+    }
+    if (teleport && refusal && input.byPlayer) police(state, input, "movement.teleport", refusal, outcome);
+  }
+  // "Its Speed becomes 0 ... and it moves with the target" (a darkmantle attached).
+  const ridden =
+    mode !== "teleport" && (movementCounts(state, actorId) || input.byPlayer)
+      ? riddenBearerOf(state, mover.id)
+      : undefined;
+  if (ridden)
+    police(
+      state,
+      input,
+      "movement.no-movement-remaining",
+      `${mover.name} is attached to ${ridden.name}, so its Speed is 0 and it moves only with it.`,
+      outcome
+    );
+  const grant = mode === "teleport" ? null : fittingMoveGrant(state, input, mover, mode, fromAltitude, toAltitude);
+  readied = !grant && readiedMove(state, mover, mode);
   const counted = movementCounts(state, actorId) || readied;
   // A readied move is the creature's Reaction: one it still has.
   if (readied && state.combat.reactionsUsed.includes(mover.id))
@@ -330,7 +592,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     );
   // SRD: you move on your own turn. A player's move off it (a reaction that moves) is the GM's call; a readied move
   // is the creature's own Reaction.
-  if (input.byPlayer && turnsRunning(state) && state.combat.turnActorId !== actorId && !readied)
+  if (input.byPlayer && turnsRunning(state) && state.combat.turnActorId !== actorId && !readied && !grant)
     police(
       state,
       input,
@@ -340,36 +602,149 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     );
   // Teleportation spends no movement and provokes nothing, and a player's needs the GM's go-ahead (the spell or
   // feature that grants it is theirs to rule on).
-  if (mode === "teleport" && input.byPlayer)
+  if (mode === "teleport" && input.byPlayer && !activeTeleportGrant(state, mover))
     police(state, input, "movement.teleport", `${mover.name} can teleport only with the GM's go-ahead.`, outcome);
-  if ((counted || input.byPlayer) && endsInOccupiedSpace(state, input, to))
+  // A cube's Engulf may stop on the creatures it moves through: they are inside it, or leave it as their save says.
+  const engulfing =
+    grant?.throughCreatures && opensItsSpace(moverDefinitionOf(mover, input)) ? grant.throughCreatures : undefined;
+  if ((counted || input.byPlayer || grant) && endsInOccupiedSpace(state, input, to, false, engulfing))
     police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
-  if (mode === "teleport" || !counted) return done();
+  // SRD 5.2.1 Frightened: "You can't willingly move closer to the source of fear."
+  const feared = (counted || input.byPlayer || grant) && approachesFear(state, input, mover, from, to);
+  if (feared)
+    police(
+      state,
+      input,
+      "movement.toward-fear",
+      `${mover.name} is Frightened and can't willingly move closer to ${feared}.`,
+      outcome
+    );
+  // A move an effect compels on the creature's own turn goes its way (Fear's flight, Compulsion's heading).
+  const compelled =
+    counted && mode !== "teleport" && state.combat.turnActorId === mover.id
+      ? compelledMoveRefusal(state, mover, from, to, input)
+      : null;
+  if (compelled) police(state, input, "movement.compelled", compelled, outcome);
+  // Imprisonment's Chaining: "can't be moved by any means", so neither its own move nor a drag takes it.
+  const chained = [actorId, ...(input.dragging?.actorIds ?? [])]
+    .map((id) => state.actors.find((actor) => actor.id === id))
+    .find((actor) => actor?.effects.some((effect) => effect.tags.includes(UNMOVABLE_TAG)));
+  if (chained && mode !== "teleport")
+    police(state, input, "movement.no-movement-remaining", `${chained.name} can't be moved by any means.`, outcome);
+  // SRD Climber's Kit: "you can't move more than 25 feet from there without undoing the anchor".
+  const tether = (counted || input.byPlayer || grant) && strainsAnchor(input, mover, to);
+  if (tether) police(state, input, "movement.tether", tether, outcome);
+  // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
+  const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
+  // SRD Hidden Pit: "A creature needs a Climb Speed, climbing gear, or magic such as Spider Climb to scale the pit's
+  // smooth walls."
+  const pit =
+    (counted || input.byPlayer || grant) && mode !== "teleport"
+      ? pitRefusal(
+          state,
+          mover,
+          from,
+          to,
+          moverToken?.sizeCells ?? 1,
+          {
+            climbs: mode === "climb" && !travelCostsExtra(mover, moverDefinitionOf(mover, input), "climb"),
+            flies: mode === "fly",
+            hasClimbingGear: mover.inventory.some(
+              (row) => (row.recordId ?? row.id) === "climbers-kit" && row.quantity > 0
+            )
+          },
+          input.calibration
+        )
+      : null;
+  if (pit) police(state, input, "movement.pit", pit, outcome);
+  // Etherealness: "you can move in any direction".
+  const heightBar =
+    (counted || input.byPlayer || grant) && !isEthereal(mover)
+      ? heightRefusal(mover.name, mode, fromAltitude, toAltitude, input.wasAirborne ?? moverToken?.airborne)
+      : null;
+  if (heightBar) police(state, input, "movement.altitude", heightBar, outcome);
+  if (mode === "teleport") return done();
+  // A granted move is charged to its grant, and provokes unless it says otherwise.
+  if (grant) {
+    // A flight that ends by dropping its prey is one move: the rest of it goes with the drop.
+    spendMoveGrant(mover, grant.effectId, grant.dropsHeld ? grant.feet : grant.chargeFeet);
+    dropsHeld = grant.dropsHeld === true;
+    thenHide = grant.thenHide === true;
+    // The creatures a move through them entered are what its action then targets (a cube's Engulf).
+    if (grant.throughCreatures)
+      recordEntered(
+        mover,
+        grant.effectId,
+        creaturesEntered(state, actorId, grant.path, input.dragging?.actorIds ?? [])
+      );
+    if (grant.jump && grant.costFeet > 0) {
+      const used = state.combat.turn.movementUsedFeet;
+      const budget = movementCounts(state, actorId)
+        ? travelBudgetFeet(
+            mover,
+            deriveEquipment(mover, moverDefinitionOf(mover, input), input.catalog),
+            moverDefinitionOf(mover, input),
+            "walk"
+          )
+        : null;
+      if (budget !== null && used + grant.costFeet > budget + 1e-6)
+        police(
+          state,
+          input,
+          "movement.exceeds-speed",
+          `${mover.name} has ${Math.max(0, budget - used)} ft of movement left, and ${grant.name} spends ${grant.costFeet} ft.`,
+          outcome,
+          true
+        );
+      if (budget !== null)
+        state.combat = {
+          ...state.combat,
+          turn: { ...state.combat.turn, movementUsedFeet: used + grant.costFeet }
+        };
+    }
+    granted = grant.name;
+    landsOnDifficult = grant.jump === true && input.difficultAt?.(to) === true;
+    const held = grant.provokes ? openOpportunityAttacks(state, input, mover, grant.path, prompts) : null;
+    if (held) heldAt = { position: held.at, altitudeFeet: held.altitudeFeet, promptIds: held.promptIds, refundFeet: 0 };
+    return done(mover.conditions.some((condition) => condition.id === "prone"));
+  }
+  if (!counted) return done();
+  // SRD Abjure Foes, a Rogue's Daze: a creature limited to one of moving, an action or a Bonus Action that took
+  // either can't move (resolution/economy.ts refuses the rest).
+  const limited = mover.effects.find((effect) => effect.tags.includes(DAZED_TAG));
+  if (
+    limited &&
+    !readied &&
+    state.combat.turnActorId === actorId &&
+    (state.combat.turn.actionUsed || state.combat.turn.bonusActionUsed)
+  )
+    police(
+      state,
+      input,
+      "condition.one-thing-a-turn",
+      `${mover.name} has acted this turn, and ${limited.name} allows only one of moving, an action or a Bonus Action.`,
+      outcome
+    );
+  if (mode === "jump") {
+    landsOnDifficult = applyJump(state, input, mover, fromAltitude, toAltitude, outcome, readied);
+    if (readied) spendReadied(state, mover.id);
+    openOpportunityAttacks(state, input, mover, [from, to], prompts);
+    return done();
+  }
 
   // The budget for this way of moving; Prone, the only way is to crawl (SRD Prone: "Your only movement options are
   // to crawl or to spend an amount of movement equal to half your Speed ... to right yourself").
   const crawling = mover.conditions.some((condition) => condition.id === "prone");
   const travel: TravelMode = crawling ? "walk" : mode;
-  const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
+  const moverDefinition = moverDefinitionOf(mover, input);
   const derivation = deriveEquipment(mover, moverDefinition, input.catalog);
   let budget = travelBudgetFeet(mover, derivation, moverDefinition, travel);
   if (budget === null && travel !== "walk") {
     police(state, input, "movement.no-speed", `${mover.name} has no ${MODE_NAMES[travel]} Speed.`, outcome);
     budget = travelBudgetFeet(mover, derivation, moverDefinition, "walk");
   }
-  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel, derivation);
-  const extraPerStep = (slowed ? 1 : 0) + (input.dragging?.costsExtra ? 1 : 0);
-  const options: MovementCostOptions = {
-    extraPerStep,
-    carried: input.dragging?.actorIds ?? [],
-    resolveDefinition: input.resolveDefinition,
-    ...(input.perceives ? { perceives: input.perceives } : {}),
-    ...(sharesSpace(state, actorId, input) ? { passesCreatures: true } : {})
-  };
-  const straight = (): MovementCost | null => {
-    const distance = input.distance(from, to);
-    return distance === null ? null : { feet: distance * (1 + extraPerStep), difficultFeet: 0 };
-  };
+  const { extraPerStep, slowed, options } = costOptions(state, input, mover, travel, fromAltitude, toAltitude);
+  const straight = () => straightCost(input, from, to, fromAltitude, toAltitude, extraPerStep);
   let charge = input.cost ? input.cost(from, to, options) : straight();
   if (charge?.blocked) {
     police(
@@ -383,7 +758,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     );
     charge = straight();
   }
-  const moved = charge?.feet ?? null;
+  // "If you move up or down, every foot of movement costs an extra foot" on the Border Ethereal.
+  const climbFeet = isEthereal(mover) ? Math.abs(toAltitude - fromAltitude) : 0;
+  const moved = charge ? charge.feet + climbFeet : null;
   const difficultFeet = charge?.difficultFeet ?? 0;
   if (moved !== null && budget !== null && moved > 0.05) {
     // A readied move is its own: up to its Speed, whatever the creature whose turn it is has moved.
@@ -412,12 +789,350 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     if (!readied) state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + moved } };
   }
   // The readied move spends the Reaction and uses up the ready, and a spell it held with it.
-  if (readied) {
-    state.combat = { ...state.combat, reactionsUsed: [...new Set([...state.combat.reactionsUsed, mover.id])] };
-    releaseReadied(state, mover.id);
+  if (readied) spendReadied(state, mover.id);
+  const path = charge?.path && charge.path.length > 1 ? charge.path : [from, to];
+  travelled.path = path;
+  const held = openOpportunityAttacks(state, input, mover, path, prompts);
+  if (held) {
+    // What the rest of the way cost, for a mover the attack stops: its own movement, not a readied move's.
+    const rest = readied
+      ? null
+      : (input.cost
+          ? input.cost(held.at, to, costOptions(state, input, mover, travel, held.altitudeFeet, toAltitude).options)
+          : straight()
+        )?.feet;
+    heldAt = {
+      position: held.at,
+      altitudeFeet: held.altitudeFeet,
+      promptIds: held.promptIds,
+      refundFeet: rest !== null && rest !== undefined && moved !== null ? Math.min(rest, moved) : 0
+    };
   }
-  openOpportunityAttacks(state, input, mover, charge?.path ?? [from, to], prompts);
   return done(crawling);
+}
+
+/** A jump on the creature's turn (SRD Long Jump, High Jump): across up to its long jump and up to its high jump, a
+ *  foot of movement for each foot jumped, or a rider's cheap leap (Boots of Striding and Springing). It passes over what
+ *  lies between. Returns whether it lands in Difficult Terrain. */
+function applyJump(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  fromAltitude: number,
+  toAltitude: number,
+  outcome: Policing,
+  readied: boolean
+): boolean {
+  const { from, to } = input;
+  if (!from || !to) return false;
+  if (mover.conditions.some((condition) => condition.id === "prone"))
+    police(state, input, "movement.jump", `${mover.name} is Prone and can only crawl.`, outcome);
+  const definition = moverDefinitionOf(mover, input);
+  const derivation = deriveEquipment(mover, definition, input.catalog);
+  const used = readied ? 0 : state.combat.turn.movementUsedFeet;
+  // "If you move at least 10 feet immediately before the jump": the run-up is the turn's movement so far.
+  const ranUp = used >= 10;
+  const limits = jumpLimits(definition, derivation, ranUp);
+  const across = input.distance(from, to) ?? 0;
+  const rise = Math.max(0, toAltitude - fromAltitude);
+  const leap = leapRider(state, mover, derivation);
+  const leaping = leap !== null && across <= leap.feet + DISTANCE_TOLERANCE_FEET && rise <= limits.highFeet;
+  const start = ranUp ? "" : " from a standing start";
+  if (!leaping && across > limits.longFeet + DISTANCE_TOLERANCE_FEET)
+    police(
+      state,
+      input,
+      "movement.jump",
+      `${mover.name} can jump ${limits.longFeet} ft across${start}, and that space is ${Math.round(across)} ft away.`,
+      outcome
+    );
+  if (rise > limits.highFeet + DISTANCE_TOLERANCE_FEET)
+    police(
+      state,
+      input,
+      "movement.jump",
+      `${mover.name} can jump ${limits.highFeet} ft up${start}, and that is ${rise} ft.`,
+      outcome
+    );
+  const cost = leaping ? leap.costFeet : Math.max(across, rise);
+  const budget = travelBudgetFeet(mover, derivation, definition, "walk");
+  if (budget !== null && used + cost > budget + 1e-6)
+    police(
+      state,
+      input,
+      budget === 0 ? "movement.no-movement-remaining" : "movement.exceeds-speed",
+      budget === 0
+        ? `${mover.name} can't move while its Speed is 0.`
+        : `${mover.name} has ${Math.max(0, Math.round((budget - used) * 10) / 10)} ft of movement left (this jump needs ${Math.round(cost * 10) / 10} ft).`,
+      outcome,
+      true
+    );
+  if (!readied)
+    state.combat = {
+      ...state.combat,
+      turn: {
+        ...state.combat.turn,
+        movementUsedFeet: used + cost,
+        ...(leaping ? { turnUses: { ...state.combat.turn.turnUses, [leap.useKey]: 1 } } : {})
+      }
+    };
+  return input.difficultAt?.(to) === true;
+}
+
+/** The name of a source of fear the move ends closer to: the creature behind an effect that frightens the mover. A
+ *  source hidden from the table is named as such. Null when the move approaches none. */
+function approachesFear(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  from: Point,
+  to: Point
+): string | null {
+  if (!mover.conditions.some((condition) => condition.id === "frightened")) return null;
+  for (const sourceId of fearSources(mover)) {
+    const source = state.actors.find((actor) => actor.id === sourceId);
+    const at = state.combat.tokens.find((token) => token.actorId === sourceId)?.position;
+    if (!source || !at) continue;
+    const measure = (point: Point, altitudeFeet: number) =>
+      input.creatureDistance
+        ? input.creatureDistance({ actorId: source.id, position: at }, point, altitudeFeet)
+        : input.distance(at, point);
+    const before = measure(from, input.fromAltitudeFeet ?? 0);
+    const after = measure(to, input.toAltitudeFeet ?? input.fromAltitudeFeet ?? 0);
+    if (before !== null && after !== null && after < before - DISTANCE_TOLERANCE_FEET)
+      return source.visibility === "gm-only" || input.perceives?.(source.id) === false
+        ? HIDDEN_SOURCE.toLowerCase()
+        : source.name;
+  }
+  return null;
+}
+
+/** A granted teleport that costs movement (Tree Stride: "You must use 5 feet of movement to enter a tree ... using
+ *  another 5 feet of movement"), charged on the creature's own turn like a move. */
+function chargeTeleport(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  costFeet: number,
+  name: string,
+  outcome: Policing
+): void {
+  if (!movementCounts(state, mover.id)) return;
+  const definition = moverDefinitionOf(mover, input);
+  const budget = travelBudgetFeet(mover, deriveEquipment(mover, definition, input.catalog), definition, "walk");
+  const used = state.combat.turn.movementUsedFeet;
+  if (budget !== null && used + costFeet > budget + 1e-6)
+    police(
+      state,
+      input,
+      "movement.exceeds-speed",
+      `${mover.name} has ${Math.max(0, budget - used)} ft of movement left, and ${name} spends ${costFeet} ft.`,
+      outcome,
+      true
+    );
+  state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + costFeet } };
+}
+
+/** Why a move takes an anchored creature too far from its anchor, or null. Height counts as distance does. */
+function strainsAnchor(input: MovementRulesInput, mover: GameState["actors"][number], to: Point): string | null {
+  const anchored = mover.effects.find((effect) => effect.anchor !== undefined);
+  const anchor = anchored?.anchor;
+  if (!anchor) return null;
+  const across = input.distance({ x: anchor.x, y: anchor.y }, to);
+  if (across === null) return null;
+  const up = Math.abs((input.toAltitudeFeet ?? input.fromAltitudeFeet ?? 0) - anchor.altitudeFeet);
+  if (Math.max(across, up) <= anchor.feet + DISTANCE_TOLERANCE_FEET) return null;
+  return `${mover.name} is anchored (${anchored.name}) and can't move more than ${anchor.feet} feet from the anchor. Undo the anchor first.`;
+}
+
+/** A readied move spends the creature's Reaction and uses up the ready, and a spell it held with it. */
+function spendReadied(state: GameState, moverId: string): void {
+  state.combat = { ...state.combat, reactionsUsed: [...new Set([...state.combat.reactionsUsed, moverId])] };
+  releaseReadied(state, moverId);
+}
+
+const moverDefinitionOf = (mover: GameState["actors"][number], input: Pick<MovementRulesInput, "resolveDefinition">) =>
+  mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
+
+/** "The ghost can move through other creatures and objects as if they were Difficult Terrain." */
+const incorporeal = (definition: ActorDefinition | undefined) =>
+  holdsFeature(definition, "incorporeal-movement", "Incorporeal Movement");
+
+/** The tags that free a mover from Difficult Terrain: Freedom of Movement's ("The target's movement is unaffected by
+ *  Difficult Terrain", a Ring of Free Action's too) and a creature that otherwise ignores it (Horseshoes of a Zephyr). */
+const DIFFICULT_TERRAIN_FREE_TAGS: readonly string[] = ["freedom-of-movement", "ignores-difficult-terrain"];
+
+/** Whether a live effect or a worn item's own effect frees the mover from Difficult Terrain. */
+const freeOfDifficultTerrain = (mover: GameState["actors"][number], derivation: EquipmentDerivation | undefined) =>
+  mover.effects.some((effect) => effect.tags.some((tag) => DIFFICULT_TERRAIN_FREE_TAGS.includes(tag))) ||
+  (derivation?.context.effectTags ?? []).some((tag) => DIFFICULT_TERRAIN_FREE_TAGS.includes(tag));
+
+/** What each foot of a move costs beside itself, and the options the path's cost is measured with. */
+function costOptions(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  travel: TravelMode,
+  fromAltitude: number,
+  toAltitude: number
+): { extraPerStep: number; slowed: boolean; options: MovementCostOptions } {
+  const crawling = mover.conditions.some((condition) => condition.id === "prone");
+  const moverDefinition = moverDefinitionOf(mover, input);
+  const derivation = deriveEquipment(mover, moverDefinition, input.catalog);
+  const offTurn = offItsTurn(state, mover.id);
+  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel, derivation, offTurn);
+  const extraPerStep = (slowed ? 1 : 0) + (input.dragging?.costsExtra ? 1 : 0);
+  return {
+    extraPerStep,
+    slowed,
+    options: {
+      extraPerStep,
+      // SRD Swimming: "You ignore this extra cost if you have a Swim Speed and use it to swim." A creature with one
+      // swims across the painted water on its way, however the move was asked.
+      ...(!travelCostsExtra(mover, moverDefinition, "swim", derivation, offTurn) ? { swimsFree: true } : {}),
+      ...(walksOnLiquid(mover, derivation, offTurn) ? { walksOnWater: true } : {}),
+      ...(formEffectOf(mover)?.form?.noLiquid ? { barredByWater: true } : {}),
+      ...(crossesAtNoCost(mover, "ice", input) ? { freeOnIce: true } : {}),
+      carried: input.dragging?.actorIds ?? [],
+      resolveDefinition: input.resolveDefinition,
+      ...(input.perceives ? { perceives: input.perceives } : {}),
+      ...(sharesSpace(state, input.actorId, input) || incorporeal(moverDefinition) ? { passesCreatures: true } : {}),
+      ...(isNimble(moverDefinition) ? { nimble: true } : {}),
+      // A ghost through walls as Difficult Terrain; a burrower through earth and stone: freely (Earth Glide), or at
+      // half its Burrow Speed (Tunneler).
+      ...(incorporeal(moverDefinition) ||
+      passesEarth(mover) ||
+      (travel === "burrow" && burrowsThroughWalls(moverDefinition) === "half")
+        ? { throughWalls: true }
+        : {}),
+      ...((travel === "burrow" && burrowsThroughWalls(moverDefinition) === "free") || isEthereal(mover)
+        ? { throughWallsFree: true }
+        : {}),
+      // Amorphous, Compression and the elementals' forms slip through any gap; a swarm through one a Tiny creature fits.
+      ...(openingPassage(moverDefinition) ? { opening: openingPassage(moverDefinition)! } : {}),
+      ...(freeOfDifficultTerrain(mover, derivation) ? { ignoresDifficult: true } : {}),
+      ...(fromAltitude !== 0 || toAltitude !== 0 ? { altitude: { fromFeet: fromAltitude, toFeet: toAltitude } } : {})
+    }
+  };
+}
+
+/** A move's cost as the crow flies, height included by the grid's rule (the larger of across and up). */
+function straightCost(
+  input: Pick<MovementRulesInput, "distance">,
+  from: Point,
+  to: Point,
+  fromAltitude: number,
+  toAltitude: number,
+  extraPerStep = 0
+): MovementCost | null {
+  const distance = input.distance(from, to);
+  if (distance === null) return null;
+  const rise = Math.abs(toAltitude - fromAltitude);
+  return { feet: Math.max(distance, rise) * (1 + extraPerStep), difficultFeet: 0 };
+}
+
+/** Why a teleport breaks a granted teleport's terms (SRD: "up to N feet to an unoccupied space you can see"), or null
+ *  when it keeps them. */
+function teleportRefusal(
+  state: GameState,
+  input: MovementRulesInput,
+  name: string,
+  teleport: Readonly<{ feet: number; unseen?: true; near?: Readonly<{ actorId: string; feet: number }> }>,
+  toAltitude: number
+): string | null {
+  const { from, to } = input;
+  if (!from || !to) return null;
+  const far = straightCost(input, from, to, input.fromAltitudeFeet ?? 0, toAltitude)?.feet ?? null;
+  if (far !== null && far > teleport.feet + DISTANCE_TOLERANCE_FEET)
+    return `${name} can teleport up to ${teleport.feet} ft, and that space is ${Math.round(far)} ft away.`;
+  // A nalfeshnee's Pursuit: "its destination space must be within 10 feet of the triggering creature".
+  const near = teleport.near;
+  const quarry = near ? state.combat.tokens.find((token) => token.actorId === near.actorId) : undefined;
+  if (near && quarry?.position) {
+    const apart =
+      input.creatureDistance?.({ actorId: near.actorId, position: quarry.position }, to, toAltitude) ??
+      input.distance(quarry.position, to);
+    const quarryName = state.actors.find((actor) => actor.id === near.actorId)?.name ?? "the creature it follows";
+    if (apart !== null && apart > near.feet + DISTANCE_TOLERANCE_FEET)
+      return `${name} must end within ${near.feet} ft of ${quarryName}, and that space is ${Math.round(apart)} ft away.`;
+  }
+  if (endsInOccupiedSpace(state, input, to)) return `${name} can teleport only to an unoccupied space.`;
+  if (!teleport.unseen && input.seesPoint && !input.seesPoint(to))
+    return `${name} can teleport only to a space it can see.`;
+  return null;
+}
+
+/** The granted move this one is taken with: one for this turn, of this way of moving, with the feet for it. A jump's
+ *  grant takes a jump only; a straight charge must end nearer an enemy than it began. Null when none fits, and then
+ *  the move is the turn's own. */
+function fittingMoveGrant(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  mode: MoveMode,
+  fromAltitude: number,
+  toAltitude: number
+):
+  | (MoveGrant & { effectId: string; name: string; chargeFeet: number; costFeet: number; path: readonly Point[] })
+  | null {
+  const grant = activeMoveGrant(state, mover);
+  const { from, to } = input;
+  if (!grant || !from || !to || grant.feet <= 0) return null;
+  const jumping = mode === "jump";
+  if (grant.jump ? !jumping : jumping) return null;
+  if (grant.mode !== undefined && grant.mode !== mode) return null;
+  const travel: TravelMode = mode === "teleport" || mode === "forced" || mode === "jump" ? "walk" : mode;
+  let cost: MovementCost | null;
+  if (grant.jump) cost = straightCost(input, from, to, fromAltitude, toAltitude);
+  else {
+    const costed = costOptions(state, input, mover, travel, fromAltitude, toAltitude);
+    const { extraPerStep } = costed;
+    // "The cube can move through the spaces of Large or smaller creatures."
+    const options = grant.throughCreatures
+      ? { ...costed.options, passesCreaturesUpTo: grant.throughCreatures, alongLine: true }
+      : costed.options;
+    cost = input.cost
+      ? input.cost(from, to, options)
+      : straightCost(input, from, to, fromAltitude, toAltitude, extraPerStep);
+    if (cost?.blocked) return null;
+  }
+  if (cost === null || cost.feet > grant.feet + DISTANCE_TOLERANCE_FEET) return null;
+  if (grant.straight && !endsNearerAnEnemy(state, input, mover, from, to)) return null;
+  if (grant.awayFromActorId && !endsFartherFrom(state, input, grant.awayFromActorId, from, to)) return null;
+  // Toward a creature: where it began is farther from that creature than where it ends.
+  if (grant.towardActorId && !endsFartherFrom(state, input, grant.towardActorId, to, from)) return null;
+  return {
+    ...grant,
+    chargeFeet: grant.jump ? grant.feet : cost.feet,
+    costFeet: grant.costFeet ?? 0,
+    path: cost.path && cost.path.length > 1 ? cost.path : [from, to]
+  };
+}
+
+/** A flight "as far away from you as it can": it ends farther from that creature than it began. */
+function endsFartherFrom(state: GameState, input: MovementRulesInput, actorId: string, from: Point, to: Point) {
+  const at = state.combat.tokens.find((token) => token.actorId === actorId)?.position;
+  if (!at) return true;
+  const before = input.distance(at, from);
+  const after = input.distance(at, to);
+  return before === null || after === null || after > before + DISTANCE_TOLERANCE_FEET;
+}
+
+/** A charge "straight toward an enemy": it ends nearer some enemy than it began. */
+function endsNearerAnEnemy(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  from: Point,
+  to: Point
+): boolean {
+  return state.combat.tokens.some((token) => {
+    const enemy = state.actors.find((actor) => actor.id === token.actorId);
+    if (!enemy || !token.position || !areEnemies(mover, enemy, input.resolveDefinition)) return false;
+    const before = input.distance(token.position, from);
+    const after = input.distance(token.position, to);
+    return before !== null && after !== null && after < before - DISTANCE_TOLERANCE_FEET;
+  });
 }
 
 /** Leaves-reach prompts for every enemy whose reach the mover leaves anywhere along its path (SRD "If you move
@@ -428,20 +1143,23 @@ function openOpportunityAttacks(
   mover: GameState["actors"][number],
   path: readonly Point[],
   prompts: Array<{ actorId: string; name: string }>
-): void {
+): Hold | null {
   const { actorId } = input;
-  if (mover.visibility === "gm-only" || mover.effects.some((effect) => effect.tags.includes("disengaged"))) return;
+  let hold: Hold | null = null;
+  if (mover.visibility === "gm-only" || mover.effects.some((effect) => effect.tags.includes("disengaged"))) return null;
   // "The rat doesn't provoke Opportunity Attacks when it moves out of an enemy's reach"; Flyby, when it flies out.
   const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
-  if (holdsFeature(moverDefinition, "agile", "Agile")) return;
-  if ((input.mode ?? "walk") === "fly" && holdsFeature(moverDefinition, "flyby", "Flyby")) return;
+  if (holdsFeature(moverDefinition, "agile", "Agile")) return null;
+  if ((input.mode ?? "walk") === "fly" && holdsFeature(moverDefinition, "flyby", "Flyby")) return null;
   for (const entry of state.combat.initiative) {
     if (entry.actorId === actorId || state.combat.pendingReactions.length >= 20) continue;
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (
       !enemy ||
+      onOtherPlanes(mover, enemy) ||
       !areEnemies(mover, enemy, input.resolveDefinition) ||
-      state.combat.reactionsUsed.includes(enemy.id) ||
+      // A hydra's heads beyond one each give it another Reaction for Opportunity Attacks.
+      (reactionSpent(state, enemy.id) && spareOpportunityReactions(enemy, input.resolveDefinition) === 0) ||
       isIncapacitated(enemy) ||
       // Shocking Grasp, or anything that takes away Reactions.
       enemy.effects.some(
@@ -463,18 +1181,27 @@ function openOpportunityAttacks(
       input.creatureDistance ??
       ((target: Readonly<{ actorId: string; position: Point }>, point: Point) =>
         input.distance(target.position, point));
+    // The mover rises or falls evenly along the way, so a flier climbing out of reach leaves it too.
+    const heights = altitudesAlong(
+      path.length,
+      input.fromAltitudeFeet ?? 0,
+      input.toAltitudeFeet ?? input.fromAltitudeFeet ?? 0
+    );
     // Tolerance both ways: "was in reach" forgives noise at exactly reach, and "now out" needs a real step past it.
     let left: number | null = null;
+    let leftIndex = 0;
     for (let index = 1; index < path.length && left === null; index++) {
-      const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, path[index - 1]!);
-      const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, path[index]!);
+      const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, path[index - 1]!, heights[index - 1]);
+      const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, path[index]!, heights[index]);
       if (
         wasIn !== null &&
         nowOut !== null &&
         wasIn <= reach + DISTANCE_TOLERANCE_FEET &&
         nowOut > reach + DISTANCE_TOLERANCE_FEET
-      )
+      ) {
         left = wasIn;
+        leftIndex = index - 1;
+      }
     }
     if (left === null) continue;
     if (input.seenBy ? !input.seenBy(enemy.id) : !seesMover(enemy, enemyDefinition, mover, left)) continue;
@@ -485,12 +1212,18 @@ function openOpportunityAttacks(
       )
     )
       continue;
+    const promptId = input.newPromptId();
+    // "The attack occurs right before the creature leaves your reach": the mover waits at the last point of the way
+    // still in reach, the first such point of all the reaches it leaves.
+    if (hold === null || leftIndex < hold.index)
+      hold = { index: leftIndex, at: path[leftIndex]!, altitudeFeet: heights[leftIndex] ?? 0, promptIds: [] };
+    hold.promptIds.push(promptId);
     state.combat = {
       ...state.combat,
       pendingReactions: [
         ...state.combat.pendingReactions,
         {
-          id: input.newPromptId(),
+          id: promptId,
           kind: "leaves-reach" as const,
           actorId: enemy.id,
           actionId: "opportunity-attack",
@@ -512,4 +1245,8 @@ function openOpportunityAttacks(
     };
     prompts.push({ actorId: enemy.id, name: enemy.name });
   }
+  return hold;
 }
+
+/** Where a mover waits while the Opportunity Attacks it provoked are answered, and the prompts it waits on. */
+type Hold = { index: number; at: Point; altitudeFeet: number; promptIds: string[] };

@@ -32,7 +32,7 @@ export const monk: ClassMechanicsModule = {
      * Focus Points read off the printed column; the shared `pool` lets all three 1-point actions (and
      * Stunning Strike) spend one counter. These are the paid forms; the free Disengage/Dash forms are in
      * the text. Flurry's strikes are a compound Bonus Action: resolving it opens a pool of Unarmed Strikes
-     * (two, three from Heightened Focus at 10) that each strike spends. Heightened Focus's other upgrades stay prose.
+     * (two, three from Heightened Focus at 10) that each strike spends.
      */
     "monks-focus": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -51,8 +51,14 @@ export const monk: ClassMechanicsModule = {
           name: "Patient Defense",
           activation: "bonus-action",
           description:
-            "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point.",
-          damage: []
+            "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point. From Monk level 10 (Heightened Focus), you also gain Temporary Hit Points equal to two rolls of your Martial Arts die.",
+          damage: [],
+          // Heightened Focus: two rolls of the Martial Arts die (d8 at 10, d10 at 11, d12 at 17).
+          healingByLevel: [
+            { level: 10, formula: "2d8", self: true, temporary: true },
+            { level: 11, formula: "2d10", self: true, temporary: true },
+            { level: 17, formula: "2d12", self: true, temporary: true }
+          ]
         },
         {
           id: "step-of-the-wind",
@@ -64,7 +70,52 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
-    // The once-per-Long-Rest permission only; the GM gives the Focus Points back from the sheet's Limited uses.
+    // Offered when the Monk falls (`falling.ts`): the answer takes five times its Monk level off the fall's damage.
+    "slow-fall": {
+      actions: [
+        {
+          id: "slow-fall",
+          name: "Slow Fall",
+          activation: "reaction",
+          description:
+            "When you fall, take a Reaction to reduce any damage you take from the fall by an amount equal to five times your Monk level.",
+          damage: [],
+          reaction: { trigger: "falls", response: "reduce-fall-damage", perLevel: 5, classId: "monk" }
+        }
+      ]
+    },
+    /**
+     * Offered when a hit's damage includes Bludgeoning, Piercing or Slashing (any type from Deflect Energy at 13); the
+     * builder adds the Dexterity modifier and Monk level to the 1d10. A reduction to 0 spends a Focus Point on the
+     * redirect picked with the answer (deflect-redirect.ts).
+     */
+    "deflect-attacks": {
+      actions: [
+        {
+          id: "deflect-attacks",
+          name: "Deflect Attacks",
+          activation: "reaction",
+          description:
+            "When an attack roll hits you and its damage includes Bludgeoning, Piercing, or Slashing damage, take a Reaction to reduce the attack's total damage against you by 1d10 plus your Dexterity modifier and Monk level.",
+          damage: [],
+          reaction: {
+            trigger: "hit-by-attack",
+            response: "reduce-damage",
+            formula: "1d10",
+            damageTypes: ["bludgeoning", "piercing", "slashing"],
+            redirectsAtZero: true
+          },
+          reactionByLevel: [
+            {
+              level: 13,
+              reaction: { trigger: "hit-by-attack", response: "reduce-damage", formula: "1d10", redirectsAtZero: true }
+            }
+          ],
+          adds: { classLevel: 1, abilityModifier: "dex" }
+        }
+      ]
+    },
+    // Once per Long Rest; initiative-hooks.ts offers it when the Monk rolls Initiative, and conversions.ts restores the points.
     "uncanny-metabolism": {
       uses: { limit: 1, per: "long-rest" }
     },
@@ -73,15 +124,30 @@ export const monk: ClassMechanicsModule = {
     "unarmored-movement": {
       modifiers: [{ type: "speed", amount: 10, when: [{ type: "while-unarmored" }] }]
     },
+    // "While you aren't wearing armor or wielding a Shield, you gain the ability to move along vertical surfaces and
+    // across liquids on your turn without falling during the movement": a Climb Speed equal to its Speed, and water as
+    // ground, on its own turn.
+    "acrobatic-movement": {
+      modifiers: [
+        {
+          type: "special-speed",
+          movement: "climb",
+          equalToSpeed: true,
+          ownTurn: true,
+          when: [{ type: "while-unarmored" }]
+        },
+        { type: "movement", rule: "walks-on-liquid", ownTurn: true, when: [{ type: "while-unarmored" }] }
+      ]
+    },
     // `effective-actions` folds it onto every weapon swing and the Martial Arts strike.
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
     /**
-     * DC is 8 + Wisdom + Proficiency Bonus; the Focus Point comes off the shared pool. A failed save is
+     * DC is 8 + Wisdom + Proficiency Bonus; the Focus Point comes off the shared pool. It rides a hit with a Monk weapon
+     * or an Unarmed Strike, once per turn on any turn, and opens its save on that hit's target. A failed save is
      * Stunned until the start of the Monk's next turn; a success halves the target's Speed for as long, and the next
-     * attack roll against it spends the Advantage. The engine holds "once per turn" beside the Focus Point, keyed by
-     * the action's id.
+     * attack roll against it spends the Advantage.
      */
     "stunning-strike": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -91,8 +157,9 @@ export const monk: ClassMechanicsModule = {
           name: "Stunning Strike",
           activation: "other",
           description:
-            "Once per turn, when you hit a creature with a Monk weapon or an Unarmed Strike, expend 1 Focus Point: the target makes a Constitution saving throw or has the Stunned condition until the start of your next turn. On a success its Speed is halved until the start of your next turn and the next attack roll against it before then has Advantage.",
+            "Once per turn, when you hit a creature with a Monk weapon or an Unarmed Strike, expend 1 Focus Point: the target makes a Constitution saving throw or has the Stunned condition until the start of your next turn. On a success its Speed is halved until the start of your next turn and the next attack roll against it before then has Advantage. Choose it on the hit's result.",
           damage: [],
+          ridesHit: { rides: "monk-weapon-or-unarmed", oncePerTurn: true },
           save: {
             ability: "con",
             dc: { base: 8, ability: "wis", proficiencyBonus: true },
@@ -111,11 +178,23 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
-    /** "Your physical and mental discipline grant you proficiency in all saving throws." */
+    /** "Your physical and mental discipline grant you proficiency in all saving throws. Additionally, whenever you make a
+     *  saving throw and fail, you can expend 1 Focus Point to reroll it, and you must use the new roll." */
     "disciplined-survivor": {
-      grants: { saves: ["str", "dex", "con", "int", "wis", "cha"] }
+      grants: { saves: ["str", "dex", "con", "int", "wis", "cha"] },
+      uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
+      actions: [
+        {
+          id: "disciplined-survivor",
+          name: "Disciplined Survivor",
+          activation: "other",
+          description: "When you fail a saving throw, expend 1 Focus Point to reroll it. You must use the new roll.",
+          damage: [],
+          answer: { rolls: ["save", "death-save"], when: "failure", effect: { kind: "reroll" } }
+        }
+      ]
     },
-    // "At the start of your turn, you can expend 3 Focus Points"; the Incapacitated end condition stays prose.
+    // "At the start of your turn, you can expend 3 Focus Points"; the grant ends on the Incapacitated condition.
     "superior-defense": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
       actions: [
@@ -123,6 +202,7 @@ export const monk: ClassMechanicsModule = {
           id: "superior-defense",
           name: "Superior Defense",
           activation: "other",
+          timing: "turn-start",
           description:
             "At the start of your turn, expend 3 Focus Points to bolster yourself against harm for 1 minute or until you have the Incapacitated condition. During that time, you have Resistance to every damage type except Force.",
           damage: [],
@@ -131,7 +211,34 @@ export const monk: ClassMechanicsModule = {
             name: "Superior Defense",
             tags: ["superior-defense"],
             duration: { type: "rounds", rounds: 10 },
+            endsOnIncapacitated: true,
             modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_BUT_FORCE] }]
+          }
+        }
+      ]
+    },
+    /**
+     * Patient Defense's Temporary Hit Points ride its action above. Step of the Wind's carried ally is its own action
+     * on the turn the Monk Dashes: the ally moves with the Monk's moves until the turn ends (movement-rules.ts).
+     */
+    "heightened-focus": {
+      actions: [
+        {
+          id: "step-of-the-wind-carry",
+          name: "Step of the Wind: carry an ally",
+          activation: "other",
+          timing: "own-turn",
+          requiresEffectTag: "dashing",
+          description:
+            "When you use Step of the Wind, choose a willing creature within 5 feet of yourself that is Large or smaller. You move the creature with you until the end of your turn. The creature's movement doesn't provoke Opportunity Attacks.",
+          damage: [],
+          targets: { count: 1, rangeFeet: 5, maxSize: "large", who: "allies" },
+          grants: {
+            name: "Carried by Step of the Wind",
+            tags: ["carried-along"],
+            target: "target",
+            notSelf: true,
+            duration: { type: "until-source-turn-end" }
           }
         }
       ]
@@ -146,11 +253,8 @@ export const monk: ClassMechanicsModule = {
         { type: "ability-score", ability: "wis", amount: 4, maximum: 25 }
       ]
     }
-    // Not modeled here: Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`),
-    // but its die and Dexterity do not reach inventory Monk weapons. Martial-Arts-die features (Deflect
-    // Attacks/Energy, temp HP amounts), and Slow Fall, Acrobatic Movement, Empowered Strikes, Self-Restoration
-    // and Perfect Focus stay prose. Evasion is read by the save outcome (`hasEvasion` in the server) from the
-    // held feature.
+    // Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`), and Evasion is read by the save
+    // outcome (`hasEvasion` in the server) from the held feature. Acrobatic Movement is read by its feature id (`speed.ts`, `terrain.ts`).
   },
   // The Unarmored Movement column's steps (+15 at 6, +20 at 10, +25 at 14, +30 at 18), each replacing the last.
   stages: [6, 10, 14, 18].map((level, index, levels) => ({
@@ -185,19 +289,79 @@ export const monk: ClassMechanicsModule = {
           }
         ]
       },
-      // Flat 10d12 against the Monk's derived DC, for the 4 Focus Points the vibrations cost. Their duration and the
-      // one-target rule stay prose.
+      /**
+       * "Whenever you hit a creature with an attack granted by your Flurry of Blows, you can impose one of the
+       * following effects": a strike the Flurry opened offers them, the saves at the Monk's 8 + Wisdom + Proficiency
+       * Bonus.
+       */
+      "open-hand-technique": {
+        actions: [
+          {
+            id: "open-hand-technique",
+            name: "Open Hand Technique",
+            activation: "other",
+            description:
+              "Whenever you hit a creature with an attack granted by your Flurry of Blows, impose one effect on it. Addle: it can't make Opportunity Attacks until the start of its next turn. Push: it makes a Strength saving throw or is pushed up to 15 feet away from you. Topple: it makes a Dexterity saving throw or has the Prone condition. Choose it on the hit's result.",
+            damage: [],
+            ridesHit: {
+              rides: "flurry-of-blows",
+              saveDc: { base: 8, ability: "wis", proficiencyBonus: true },
+              effectRequired: true,
+              effects: [
+                {
+                  id: "addle",
+                  name: "Addle",
+                  applies: {
+                    name: "Addled",
+                    tags: ["no-opportunity-attacks"],
+                    duration: { type: "until-bearer-next-turn" }
+                  }
+                },
+                {
+                  id: "push",
+                  name: "Push",
+                  save: { ability: "str", failurePush: { feet: 15, upTo: true } }
+                },
+                { id: "topple", name: "Topple", save: { ability: "dex", failureConditions: ["prone"] } }
+              ]
+            }
+          }
+        ]
+      },
+      /**
+       * Starting the vibrations rides an Unarmed Strike hit and spends the 4 Focus Points; the mark stays until ended
+       * (it lasts Monk-level days), and a second creature's ends the first's. Ending them is an action, or one attack
+       * of the Attack action, against the marked creature only, and spends nothing: a Constitution save against 10d12
+       * Force, half on a success. The same plane is the GM's.
+       */
       "quivering-palm": {
         uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
         actions: [
+          {
+            id: "quivering-palm-start",
+            name: "Quivering Palm: start",
+            activation: "other",
+            description:
+              "When you hit a creature with an Unarmed Strike, expend 4 Focus Points to start imperceptible vibrations in it, which last a number of days equal to your Monk level. Only one creature at a time can have them. Choose it on the hit's result.",
+            damage: [],
+            useCost: 4,
+            ridesHit: {
+              rides: "unarmed",
+              applies: { name: "Quivering Palm", tags: ["quivering-palm"], onePerSource: true },
+              appliesDaysPerLevel: true,
+              reminder: "Quivering Palm: to end the vibrations harmlessly, end the effect from the creature's row."
+            }
+          },
           {
             id: "quivering-palm",
             name: "Quivering Palm",
             activation: "action",
             description:
-              "End the vibrations you set in a creature. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one.",
+              "End the vibrations you set in a creature, as an action or in place of one attack of the Attack action. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one. You and the target must be on the same plane of existence.",
             damage: [{ formula: "10d12", type: "force" }],
-            useCost: 4,
+            replacesAttack: true,
+            spendsNoUses: true,
+            targets: { count: 1, markedBy: "quivering-palm" },
             save: {
               ability: "con",
               dc: { base: 8, ability: "wis", proficiencyBonus: true },
@@ -207,7 +371,6 @@ export const monk: ClassMechanicsModule = {
           }
         ]
       }
-      // Not modeled: Open Hand Technique (per-hit choice with different saves) and Fleet Step (extra Bonus Action).
     }
   },
   liveResources: ["focus-points"]

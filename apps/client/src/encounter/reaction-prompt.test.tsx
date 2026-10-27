@@ -54,6 +54,24 @@ describe("the reaction prompt's buttons", () => {
 });
 
 describe("the prompt for each trigger", () => {
+  it("offers Feather Fall for a falling creature, with how far it falls", () => {
+    mount({
+      ...DODGE,
+      kind: "falls",
+      actionId: "spell-feather-fall",
+      actionName: "Feather Fall (1st, Reaction)",
+      sourceName: "Kesh",
+      targetActorId: "10000000-0000-4000-8000-000000000003",
+      proposedDamage: 0,
+      proposedDamageParts: [],
+      weighed: null,
+      fallFeet: 40
+    });
+    expect(screen.getByText(/Kesh is falling 40 ft/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cast Feather Fall" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
+  });
+
   it("offers Parry's AC bonus before the attack lands", () => {
     mount({
       ...DODGE,
@@ -65,9 +83,48 @@ describe("the prompt for each trigger", () => {
       weighed: null,
       acBonus: 2
     });
-    expect(screen.getByText(/attack would hit Borin\. \+2 AC turns it into a miss/)).toBeTruthy();
+    expect(screen.getByText(/attack would hit Borin\. \+2 AC may turn it into a miss/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Use Parry" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Take the hit" })).toBeTruthy();
+  });
+
+  it("offers Arrow-Catching Shield before a ranged attack rolls at an ally", () => {
+    mount({
+      ...DODGE,
+      kind: "attack-targeted",
+      actionId: "catch-the-attack",
+      actionName: "Arrow-Catching Shield",
+      targetActorId: "10000000-0000-4000-8000-000000000003",
+      targetName: "Bran",
+      proposedDamage: 0,
+      proposedDamageParts: [],
+      weighed: null
+    });
+    expect(
+      screen.getByText(/Dragon is attacking Bran, and the attack waits on the answer before it rolls/)
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use Arrow-Catching Shield" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Let it roll" })).toBeTruthy();
+  });
+
+  it("names each ally Redirect Attack may hand the attack to", () => {
+    mount({
+      ...DODGE,
+      kind: "attack-targeted",
+      actionId: "redirect-attack",
+      actionName: "Redirect Attack",
+      targetActorId: "10000000-0000-4000-8000-000000000002",
+      targetName: "Borin",
+      redirectChoices: [
+        { actorId: "10000000-0000-4000-8000-000000000004", name: "Snik" },
+        { actorId: "10000000-0000-4000-8000-000000000005", name: "Grub" }
+      ],
+      proposedDamage: 0,
+      proposedDamageParts: [],
+      weighed: null
+    });
+    expect(screen.getByRole("button", { name: "Redirect Attack · Snik" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Redirect Attack · Grub" })).toBeTruthy();
   });
 
   it("strikes back with the spell itself, or with a melee swing to roll first", () => {

@@ -53,6 +53,22 @@ describe("target hints agree with the server", () => {
       }
   });
 
+  it("counts height between creatures, as the server does", () => {
+    const positions = [cell(0, 0), cell(1, 0), cell(1, 1), { x: 300, y: 300 }];
+    const heights = [0, 10, 25, 5];
+    const state = table(positions, [1, 1, 1, 2]);
+    const placed = state.combat.tokens.map((token, index) => ({ ...token, altitudeFeet: heights[index] }));
+    for (const a of placed)
+      for (const b of placed) {
+        const server = creatureDistance(
+          { width: 1000, height: 1000, calibration: GRID },
+          { position: a.position!, sizeCells: a.sizeCells, sizePx: a.sizePx, altitudeFeet: a.altitudeFeet },
+          { position: b.position!, sizeCells: b.sizeCells, sizePx: b.sizePx, altitudeFeet: b.altitudeFeet }
+        );
+        expect(creatureDistanceFeet(CALIBRATION, a, b)).toBe(server?.value);
+      }
+  });
+
   it("catches the same creatures under every shape", () => {
     const positions = [cell(2, 2), cell(3, 2), cell(4, 4), cell(6, 2), cell(2, 6), cell(5, 5), cell(8, 8)];
     const state = table(positions);

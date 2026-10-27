@@ -75,6 +75,7 @@ const monkInput = (level = 1): MutableInput => ({
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
     { level: 1, classId: "monk", kind: "skill", id: "stealth" },
+    { level: 1, classId: "monk", kind: "tool", id: "instrument-flute" },
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },

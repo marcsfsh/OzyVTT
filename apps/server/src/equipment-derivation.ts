@@ -1,4 +1,6 @@
-import type { Actor } from "@vtt/domain";
+import { suppressedByAntimagic, underAntimagic } from "./antimagic.js";
+import { gearMerged } from "./transform/forms.js";
+import type { Actor, ContentMonsterSummary, ContentSpellSummary } from "@vtt/domain";
 import type {
   ClassReference,
   EquipmentReference,
@@ -8,8 +10,16 @@ import type {
   SpellReference,
   SubclassReference
 } from "@vtt/content-srd-5.2.1";
-import { catalogIdOf, type ActorAction, type ActorDefinition, type InventoryItem, type Modifier } from "@vtt/schemas";
 import {
+  catalogIdOf,
+  type ActorAction,
+  type ActorDefinition,
+  type DamageType,
+  type InventoryItem,
+  type Modifier
+} from "@vtt/schemas";
+import {
+  ABILITIES,
   armorWeightOf,
   collectRiders,
   effectiveSlot,
@@ -23,20 +33,27 @@ import {
   type ResolvedRider,
   type RollModeSource
 } from "@vtt/rules-5e";
+import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { scrollCastAction } from "./scrolls.js";
 import { speedZeroed } from "./speed.js";
 import {
-  castAction,
+  itemCastActions,
   extraAttackAction,
   isItemActionId,
   itemAction,
+  itemActionId,
   itemActionRest,
   UNARMED_STRIKE_ACTION_ID,
   weaponAbilityModifier,
-  weaponSwing
+  weaponSwing,
+  improvisedSwing
 } from "./item-actions.js";
 import { freesLightExtraAttack, IMPLEMENTED_MASTERIES, type MasteryInForce } from "./weapon-mastery.js";
+import { copyKeyOf, rowRecord } from "./item-records.js";
+import { containerOf, hostOf } from "./containers.js";
+import { animatedRowIds } from "./animated-items.js";
+import { carryingOf, type Carrying } from "./carrying.js";
 
 /**
  * Every rider contribution is a pure function of (actor, definition, catalog), recomputed whole on every read
@@ -86,6 +103,11 @@ export type EquipmentCatalog = Readonly<{
   /** A class or subclass record, for the spell list a Spell Scroll's reader draws from. */
   classRecord?: (id: string) => ClassReference | undefined;
   subclassRecord?: (id: string) => SubclassReference | undefined;
+  /** The bestiary's rows and stat blocks, for the forms a shape-shift may take (Wild Shape, Polymorph). */
+  monsterSummaries?: () => readonly ContentMonsterSummary[];
+  monster?: (id: string) => ActorDefinition | undefined;
+  /** Every spell's row, for a feature that casts any spell of a list (Divine Intervention). */
+  spellSummaries?: () => readonly ContentSpellSummary[];
 }>;
 
 /** Narrows a content view to the hooks the derivation reads. */
@@ -96,7 +118,10 @@ export function equipmentCatalogOf(view: EquipmentCatalog): EquipmentCatalog {
     ...(view.featureRecord ? { featureRecord: view.featureRecord } : {}),
     ...(view.spellRecord ? { spellRecord: view.spellRecord } : {}),
     ...(view.classRecord ? { classRecord: view.classRecord } : {}),
-    ...(view.subclassRecord ? { subclassRecord: view.subclassRecord } : {})
+    ...(view.subclassRecord ? { subclassRecord: view.subclassRecord } : {}),
+    ...(view.monsterSummaries ? { monsterSummaries: view.monsterSummaries } : {}),
+    ...(view.monster ? { monster: view.monster } : {}),
+    ...(view.spellSummaries ? { spellSummaries: view.spellSummaries } : {})
   };
 }
 
@@ -119,6 +144,9 @@ export type EquipmentDerivation = Readonly<{
   conditionImmunities: readonly Defence[];
   /** The standing sums written onto the actor when its inventory changes. */
   armorClass: number;
+  /** The base ACs items give while no armor is worn (Robe of the Archmagi's 15 + Dexterity), chosen like Unarmored
+   *  Defense. */
+  baseArmorClasses: readonly number[];
   initiative: number;
   spellSlots: readonly Readonly<{ level: number; amount: number }>[];
   /** The standing halves of the save and check bonuses; the momentary halves are collected per roll. */
@@ -143,6 +171,8 @@ export type EquipmentDerivation = Readonly<{
   untrainedArmor: WornItem | null;
   /** An equipped Shield the bearer has no training with: it gives no AC. */
   untrainedShield: WornItem | null;
+  /** What a character carries against its carrying capacity; null for a stat block. */
+  carrying: Carrying | null;
 }>;
 
 /** An equipped item the rules name in a refusal or a roll card. */
@@ -156,6 +186,7 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
   damageImmunities: [],
   conditionImmunities: [],
   armorClass: 0,
+  baseArmorClasses: [],
   initiative: 0,
   spellSlots: [],
   saveBonus: 0,
@@ -168,13 +199,20 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
   sources: [],
   attunementSlots: 0,
   untrainedArmor: null,
-  untrainedShield: null
+  untrainedShield: null,
+  carrying: null
 });
 
 /** Whether an item's riders apply: equipped, present and (if required) attuned. A cursed item contributes
  *  nothing before attunement. No catalog record fails open to mundane. */
 export function itemIsActive(item: InventoryItem, record: EquipmentReference | undefined): boolean {
-  if (item.quantity <= 0 || !item.equipped) return false;
+  // A copy whose magic is spent (a Gem of Brightness with no charges left, a studied manual) is a plain object.
+  if (item.quantity <= 0 || !item.equipped || item.dormant === true) return false;
+  // A template not yet bound to its base ("Armor, +1" with no armor picked) is no armor or weapon yet, so its magic
+  // has nothing to ride. One with a single base is that base.
+  if (record?.appliesTo && record.appliesTo.baseIds.length > 1 && item.baseId === undefined) return false;
+  // A Flame Tongue's fire is there only while it is ablaze.
+  if (record?.light?.ridersWhileLit === true && item.lit !== true) return false;
   const requiresAttunement = record?.attunement?.required === true || item.magic?.attunementRequired === true;
   return requiresAttunement ? item.attuned : true;
 }
@@ -229,7 +267,8 @@ export function armorTrainingGaps(
 function bodyArmorCarriers(
   worn: ActiveItem | undefined,
   definition: ActorDefinition | undefined,
-  untrained: boolean
+  untrained: boolean,
+  speedKept = false
 ): RiderCarrier[] {
   const body = worn?.item;
   const armor = body?.armor;
@@ -238,7 +277,14 @@ function bodyArmorCarriers(
   // Mithral keeps neither drawback, whatever a row bound before the rule copied from its base.
   const drawbacks = worn?.record?.removesArmorDrawbacks !== true;
   const strength = definition?.abilityScores.str;
-  if (drawbacks && armor.strengthRequired !== null && strength !== undefined && strength < armor.strengthRequired)
+  // An item that keeps its wearer's Speed whatever armor it wears (Boots of Striding and Springing) waives the -10.
+  if (
+    drawbacks &&
+    !speedKept &&
+    armor.strengthRequired !== null &&
+    strength !== undefined &&
+    strength < armor.strengthRequired
+  )
     carriers.push({
       label: `${body.name} (needs Strength ${armor.strengthRequired})`,
       sourceItemId: body.id,
@@ -296,6 +342,7 @@ function bearerContext(
   const proficiencies = definition?.proficiencies;
   return {
     attunedItemIds: actor.inventory.filter((item) => item.attuned).map((item) => item.id),
+    attunedCatalogIds: actor.inventory.filter((item) => item.attuned).map((item) => catalogIdOf(item)),
     armorWeight: bodyArmor ? armorWeightOf(bodyArmor.item.armor!) : null,
     shieldEquipped: armored.some((entry) => effectiveSlot(slotView(entry)) === "shield"),
     classIds: (identity?.classes ?? []).map((entry) => entry.id),
@@ -327,7 +374,11 @@ function characterCarriers(definition: ActorDefinition | undefined, catalog: Equ
   const blocks: Array<Readonly<{ name: string; modifiers: readonly Modifier[] }>> = [];
   for (const held of definition?.character?.feats ?? []) {
     const record = catalog.featRecord?.(held.id);
-    if (record) blocks.push({ name: record.name, modifiers: record.feature.modifiers });
+    if (record)
+      blocks.push({
+        name: record.name,
+        modifiers: withIncreasedAbility(record.feature.modifiers, definition, held.id)
+      });
   }
   for (const held of definition?.character?.features ?? []) {
     const record = catalog.featureRecord?.(held);
@@ -337,6 +388,28 @@ function characterCarriers(definition: ActorDefinition | undefined, catalog: Equ
     const modifiers = block.modifiers.filter(ridesOnTheBearer);
     return modifiers.length > 0 ? [{ label: block.name, modifiers }] : [];
   });
+}
+
+/** "The ability score increased by this feat": a rider naming `increased` takes the ability the ledger picked for the
+ *  feat's own increase, and is dropped when there is none. */
+function withIncreasedAbility(
+  modifiers: readonly Modifier[],
+  definition: ActorDefinition | undefined,
+  featId: string
+): readonly Modifier[] {
+  if (!modifiers.some((modifier) => "abilityScore" in modifier && modifier.abilityScore === "increased"))
+    return modifiers;
+  const picked = (definition?.character?.choices ?? []).find(
+    (row) => row.kind === "ability-score" && (row.payload as { featureId?: unknown } | undefined)?.featureId === featId
+  )?.id;
+  const ability = ABILITIES.find((candidate) => candidate === picked);
+  return modifiers.flatMap((modifier) =>
+    "abilityScore" in modifier && modifier.abilityScore === "increased"
+      ? ability
+        ? [{ ...modifier, abilityScore: ability } as Modifier]
+        : []
+      : [modifier]
+  );
 }
 
 /** Own feats/features whose grants block is gated; ungated ones are already baked into the definition. */
@@ -356,19 +429,42 @@ function characterGatedGrants(
   return gated;
 }
 
+/** The tag of the effect that marks an item whose riders lapse until its bearer's next turn (`lapses.onDamage`). */
+export const ITEM_LAPSED_TAG = "item-lapsed";
+
+/** Whether an item's riders are stopped now (`lapses`): its bearer's Speed is 0, or it took damage since the start of
+ *  its last turn. */
+function itemLapsed(actor: Actor, rowId: string, record: EquipmentReference): boolean {
+  const lapses = record.lapses;
+  if (!lapses) return false;
+  if (lapses.atSpeedZero && (speedZeroed(actor) || actor.speedFeet === 0)) return true;
+  return (
+    lapses.onDamage === true &&
+    actor.effects.some((effect) => effect.tags.includes(ITEM_LAPSED_TAG) && effect.itemId === rowId)
+  );
+}
+
 /** The actor's live effects as rider carriers. An effect that lapses while its bearer is incapacitated or its Speed
  *  is 0 (Dodge) carries nothing then. */
-function effectCarriers(actor: Actor): RiderCarrier[] {
+function effectCarriers(actor: Actor, suppressMagic: boolean): RiderCarrier[] {
   const lapsed = isIncapacitated(actor) || speedZeroed(actor) || actor.speedFeet === 0;
   return actor.effects.flatMap((effect) => {
     if (effect.voidWhileIncapacitated && lapsed) return [];
-    const modifiers = effect.modifiers.filter(notItemScoped);
+    // In an Antimagic Field an ongoing spell is suppressed, its time still counting.
+    if (suppressMagic && suppressedByAntimagic(effect)) return [];
+    // One bound to a carried row (Magic Weapon) reaches that row's rolls with its `this-item` riders, and nothing
+    // once the row is gone.
+    const bound =
+      effect.itemId !== undefined && actor.inventory.some((row) => row.id === effect.itemId && row.quantity > 0);
+    if (effect.itemId !== undefined && !bound) return [];
+    const modifiers = bound ? effect.modifiers : effect.modifiers.filter(notItemScoped);
     if (modifiers.length === 0) return [];
     return [
       {
         label: effect.name,
         modifiers,
         sourceEffectId: effect.id,
+        ...(bound ? { sourceItemId: effect.itemId } : {}),
         ...(effect.stackKey !== undefined ? { stackKey: effect.stackKey } : {})
       }
     ];
@@ -381,8 +477,12 @@ function effectCarriers(actor: Actor): RiderCarrier[] {
 export function deriveEquipment(
   actor: Actor,
   definition: ActorDefinition | undefined,
-  catalog: EquipmentCatalog | undefined
+  catalog: EquipmentCatalog | undefined,
+  /** `suppressMagic`: magic items and ongoing spells give nothing, as inside an Antimagic Field or against a target in
+   *  one ("Magical properties of magic items don't work inside the aura or on anything inside it"). */
+  options: Readonly<{ suppressMagic?: boolean }> = {}
 ): EquipmentDerivation {
+  const suppressMagic = options.suppressMagic === true || underAntimagic(actor);
   // `equipped` makes a weapon swingable; `active` (also attuned where required) makes its riders apply.
   // An unattuned cursed blade is indistinguishable from a mundane one.
   const equipped: ActiveItem[] = [];
@@ -391,20 +491,41 @@ export function deriveEquipment(
   const packed: ActiveItem[] = [];
   /** A curse's vulnerabilities, which hold while attuned whether or not the item is worn. */
   const cursedVulnerabilities: Defence[] = [];
-  // Every row read with the catalog's armor block, so what armor does holds for a row that names the item only.
-  const inventory = catalog ? actor.inventory.map((item) => withCatalogArmor(item, catalog)) : [];
+  // Every row read with the catalog's armor and weapon blocks, so what they do holds for a row that names the item only.
+  // Gear melded into a form gives nothing while the form lasts (Polymorph, Wild Shape's merged equipment).
+  const inventory =
+    catalog && !gearMerged(actor)
+      ? actor.inventory.map((item) => withCatalogWeapon(withCatalogArmor(item, catalog), catalog))
+      : [];
+  /** Records a copy is attuned to: "You can't attune to more than one copy of an item", so a second copy a GM's write
+   *  left attuned gives nothing. */
+  const attunedRecords = new Set<string>();
   for (const item of inventory) {
     if (item.quantity <= 0) continue;
-    const record = catalog!.equipmentRecord(catalogIdOf(item));
+    // The copy's kind adds its riders (an Ioun Stone of Protection's +1 AC).
+    const record = rowRecord(catalog, item);
     const entry = { item, record };
+    const copy = copyKeyOf(record, item);
+    const secondCopy = item.attuned && record?.attunement?.required === true && attunedRecords.has(copy);
+    if (item.attuned && record?.attunement?.required === true) attunedRecords.add(copy);
     if (item.equipped) equipped.push(entry);
-    if (item.equipped && itemIsActive(item, record)) active.push(entry);
-    else if (record?.consumedOnUse) packed.push(entry);
+    // An Antimagic Field leaves a magic item a plain one: a +1 sword swings as its base, a potion does nothing.
+    const magicOff = suppressMagic && (record?.isMagic === true || item.magic !== undefined);
+    if (magicOff) continue;
+    if (item.equipped && !secondCopy && itemIsActive(item, record)) active.push(entry);
+    // Caltrops are spread straight from their bag, as a potion is drunk from the pack; one in a Bag of Holding is taken
+    // out first, with the action that costs.
+    else if (
+      item.dormant !== true &&
+      (record?.consumedOnUse || record?.actions.some((action) => action.zone !== undefined)) &&
+      containerOf(hostOf(inventory, item), catalog)?.retrieval === undefined
+    )
+      packed.push(entry);
     if (item.attuned && record) cursedVulnerabilities.push(...curseVulnerabilitiesOf(record, item));
   }
   const carriers: RiderCarrier[] = [
     ...(catalog ? characterCarriers(definition, catalog) : []),
-    ...effectCarriers(actor)
+    ...effectCarriers(actor, suppressMagic)
   ];
   const gatedGrants = catalog ? characterGatedGrants(definition, catalog) : [];
   if (
@@ -467,12 +588,16 @@ export function deriveEquipment(
     if (!record) continue;
     const label = record.name;
     const isWeapon = effectiveSlot(slotView(entry)) === "weapon" || item.weapon !== undefined;
-    carriers.push({ label, modifiers: record.modifiers, sourceItemId: item.id, isWeapon });
+    // A Cloak of Displacement's illusion stops while its wearer's Speed is 0, and after it takes damage.
+    if (!itemLapsed(actor, item.id, record))
+      carriers.push({ label, modifiers: record.modifiers, sourceItemId: item.id, isWeapon });
     takeGrants(withChosenResistance(record, item), item.id, label);
     takeEffects(record, item.id, label);
-    for (const declared of record.actions) actions.push(itemAction(item, declared, definition));
+    for (const declared of record.actions)
+      if (!declared.grantedOnly) actions.push(itemAction(item, declared, definition));
     for (const cast of record.casts)
-      actions.push(castAction(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
+      if (!cast.grantedOnly)
+        actions.push(...itemCastActions(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
     const read = record.spellScroll ? scrollCastAction(item, definition, catalog) : null;
     if (read) actions.push(read);
     // Depth 1: the feat's riders join this block, so unequipping removes them in one recomputation.
@@ -490,7 +615,12 @@ export function deriveEquipment(
       sources.push({ itemId: item.id, itemName: label, summary: summarise(record) });
   }
   for (const { item, record } of packed) {
-    for (const declared of record?.actions ?? []) actions.push(itemAction(item, declared, definition));
+    for (const declared of record?.actions ?? [])
+      if (!declared.grantedOnly) actions.push(itemAction(item, declared, definition));
+    // A consumable that casts a spell is used from the pack too (a Dust of Disappearance's pinch).
+    if (record?.consumedOnUse)
+      for (const cast of record.casts)
+        actions.push(...itemCastActions(item, cast, record.name, definition, catalog!.spellRecord?.(cast.spellId)));
     // A scroll is read from the pack like a potion is drunk from it.
     const read = record?.spellScroll ? scrollCastAction(item, definition, catalog) : null;
     if (read) actions.push(read);
@@ -522,20 +652,42 @@ export function deriveEquipment(
     .filter((entry) => entry.item.weapon?.properties?.includes("light"))
     .reduce((count, entry) => count + Math.max(1, entry.item.quantity), 0);
   const twoWeaponFighting = (definition?.character?.feats ?? []).some((feat) => feat.id === "two-weapon-fighting");
-  // A Shield is strapped to one arm, so a Versatile weapon can't take its two-handed grip beside it.
+  const hordeBreaker = holdsFeature(definition, "horde-breaker", "Horde Breaker");
+  // A Shield is strapped to one arm, so a Versatile weapon can't take its two-handed grip beside it, unless it hovers
+  // beside its user (an animated Shield).
+  const animated = animatedRowIds(actor);
   const shieldInHand = equipped.some(
-    (entry) => entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "shield"
+    (entry) =>
+      entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "shield" && !animated.has(entry.item.id)
   );
   for (const equippedEntry of equipped) {
     const entry = { ...equippedEntry, item: withCatalogWeaponFacts(equippedEntry, catalog!) };
-    const swing = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce);
-    if (!swing) continue;
+    // A light source that is also a weapon (a Torch) attacks with its fire, so only while it burns.
+    if (burnsToStrike(entry) && entry.item.lit !== true) continue;
+    // A weapon used against its make counts as an improvised weapon: a bow swung, a sword thrown.
+    for (const form of ["melee", "thrown"] as const) {
+      const improvised = improvisedSwing(entry.item, definition, form);
+      if (!improvised) continue;
+      actions.push(improvised);
+      weaponActionIds.push(improvised.id);
+    }
+    // An effect bound to this row changes how it swings while it lasts (Shillelagh's ability and die).
+    const bound = actor.effects.find((effect) => effect.itemId === entry.item.id && effect.weapon)?.weapon;
+    const bare = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, {
+      ...(bound ? { bound } : {})
+    });
+    if (!bare) continue;
+    const swing = { ...bare, action: withItemHitRiders(bare.action, entry) };
     const weaponAttack = swing.action;
     actions.push(weaponAttack);
     weaponActionIds.push(weaponAttack.id);
-    const twoHanded = shieldInHand
+    const bareTwoHanded = shieldInHand
       ? null
-      : weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, { twoHanded: true });
+      : weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, {
+          twoHanded: true,
+          ...(bound ? { bound } : {})
+        });
+    const twoHanded = bareTwoHanded && { ...bareTwoHanded, action: withItemHitRiders(bareTwoHanded.action, entry) };
     if (twoHanded) {
       actions.push(twoHanded.action);
       weaponActionIds.push(twoHanded.action.id);
@@ -558,15 +710,36 @@ export function deriveEquipment(
     // The extra attacks the weapon can make beside its own (not Extra Attack's to multiply, so not weapon swings
     // for `weaponActionIds`). The Light one carries the weapon's mastery; Cleave's is the mastery itself.
     if (entry.item.weapon?.properties?.includes("light") && lightWeaponsInHand >= 2) {
-      const extra = extraAttackAction(entry.item, swing, "light", {
-        insideAttackAction: freesLightExtraAttack(inForce?.id),
-        keepModifier: twoWeaponFighting
-      });
+      const extra = withItemHitRiders(
+        extraAttackAction(entry.item, swing, "light", {
+          insideAttackAction: freesLightExtraAttack(inForce?.id),
+          keepModifier: twoWeaponFighting
+        }),
+        entry
+      );
       actions.push(extra);
       if (inForce) masteryByActionId[extra.id] = inForce;
     }
     if (inForce?.id === "cleave" && weaponAttack.attack?.reachFeet !== undefined)
-      actions.push(extraAttackAction(entry.item, swing, "cleave"));
+      actions.push(withItemHitRiders(extraAttackAction(entry.item, swing, "cleave"), entry));
+    // Hunter's Prey's Horde Breaker: one more attack with the same weapon, which carries its mastery.
+    if (hordeBreaker) {
+      const extra = withItemHitRiders(extraAttackAction(entry.item, swing, "horde-breaker"), entry);
+      actions.push(extra);
+      if (inForce) masteryByActionId[extra.id] = inForce;
+    }
+    // "You can make one attack with it as a Bonus Action on each of your turns" (Scimitar of Speed).
+    if (entry.record?.bonusActionAttack && itemIsActive(entry.item, entry.record)) {
+      const bonus: ActorAction = {
+        ...weaponAttack,
+        id: itemActionId(entry.item.id, BONUS_ATTACK_SUFFIX),
+        name: `${entry.item.name} (Bonus Action attack)`,
+        activation: "bonus-action",
+        description: `Attack with ${entry.item.name} as a Bonus Action.`
+      };
+      actions.push(bonus);
+      if (inForce) masteryByActionId[bonus.id] = inForce;
+    }
   }
   // A builder-minted unarmed strike (Monk Martial Arts) is a weapon swing too, so Extra Attack reaches it.
   if (definition?.actions.some((action) => action.id === UNARMED_STRIKE_ACTION_ID && action.attack !== undefined)) {
@@ -576,7 +749,10 @@ export function deriveEquipment(
   // Armor training counts what items grant in this same recomputation (Elven Chain-style training).
   const training = armorTrainingGaps(withResolvedSlots(inventory, catalog), definition, armorProficiencies);
   const body = equipped.find((entry) => entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "armor");
-  carriers.push(...bodyArmorCarriers(body, definition, training.untrainedArmor !== null));
+  const speedKept = active.some((entry) =>
+    (entry.record?.modifiers ?? []).some((modifier) => modifier.type === "speed-minimum" && modifier.ignoresArmor)
+  );
+  carriers.push(...bodyArmorCarriers(body, definition, training.untrainedArmor !== null, speedKept));
 
   // The standing + conditional pass: riders naming no moment whose static and dynamic gates pass.
   const context = bearerContext(actor, definition, equipped, {
@@ -586,15 +762,24 @@ export function deriveEquipment(
     effectTags: itemEffectTags
   });
   const standing = collectRiders(carriers, { ...context, moment: null });
+  // SRD Armor Training: a Shield gives a holder without Shield training none of its AC, its magic bonus included.
+  const untrainedShieldId = training.untrainedShield?.itemId;
+  const armorRiders =
+    untrainedShieldId === undefined
+      ? standing
+      : standing.filter((rider) => rider.modifier.type !== "armor-class" || rider.sourceItemId !== untrainedShieldId);
   return {
     context,
     skills,
     saves,
     damageResistances: [...damageResistances, ...defencesOf(standing, "damage-resistance")],
     damageVulnerabilities: [...defencesOf(standing, "damage-vulnerability"), ...cursedVulnerabilities],
-    damageImmunities,
+    damageImmunities: [...damageImmunities, ...defencesOf(standing, "damage-immunity")],
     conditionImmunities,
-    armorClass: sumRiders(standing, "armor-class"),
+    armorClass: sumRiders(armorRiders, "armor-class"),
+    baseArmorClasses: standing.flatMap((rider) =>
+      rider.modifier.type === "base-armor-class" && rider.modifier.base !== undefined ? [rider.modifier.base] : []
+    ),
     // "Add your Proficiency Bonus" is proficiency, so it counts once however many carriers grant it.
     initiative:
       sumRiders(standing, "initiative") +
@@ -614,7 +799,8 @@ export function deriveEquipment(
     masteryByActionId,
     sources,
     attunementSlots: sumRiders(standing, "attunement-slots"),
-    ...training
+    ...training,
+    carrying: carryingOf(actor, definition, catalog, standing)
   };
 }
 
@@ -626,6 +812,51 @@ function withCatalogArmor(item: InventoryItem, catalog: EquipmentCatalog): Inven
   if (!armor) return item;
   const { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired } = armor;
   return { ...item, armor: { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired } };
+}
+
+/** A row with the catalog's weapon block when the row carries none and the record is no template: a staff stored
+ *  before its record could be wielded as a Quarterstaff swings like one. The row's own block wins. */
+function withCatalogWeapon(item: InventoryItem, catalog: EquipmentCatalog): InventoryItem {
+  if (item.weapon !== undefined) return item;
+  const record = rowRecord(catalog, item);
+  const stats = record?.appliesTo ? undefined : record?.weapon;
+  if (!stats?.damageDice || !stats.damageType) return item;
+  return {
+    ...item,
+    weapon: {
+      category: stats.category,
+      damageDice: stats.damageDice,
+      damageType: stats.damageType,
+      rangeFeet: stats.rangeFeet ?? null,
+      longRangeFeet: stats.longRangeFeet ?? null,
+      ...(stats.melee !== undefined ? { melee: stats.melee } : {}),
+      ...(stats.versatileDice !== undefined ? { versatileDice: stats.versatileDice } : {}),
+      ...(stats.properties !== undefined ? { properties: [...stats.properties] } : {})
+    }
+  };
+}
+
+/** A weapon's attack with what its hit does beside its damage (Giant Slayer, a Sword of Wounding): the record's
+ *  riders, once the item is active, so a cursed or unattuned one adds nothing. */
+/** SRD Torch: "you can attack with the Torch, using it as a Simple Melee weapon. On a hit, the target takes 1 Fire
+ *  damage": a gear light source with a weapon block, which strikes with its flame. */
+const burnsToStrike = (entry: ActiveItem): boolean =>
+  entry.record?.light !== undefined &&
+  entry.record.light.always !== true &&
+  entry.record.category !== "weapon" &&
+  entry.record.weapon != null;
+
+function withItemHitRiders(action: ActorAction, entry: ActiveItem): ActorAction {
+  if (!itemIsActive(entry.item, entry.record)) return action;
+  // Its wielder picks each hit's damage type from the weapon's own and the item's (a Javelin of Lightning).
+  const options = entry.record?.weaponChanges?.damageTypeOptions ?? [];
+  const own = action.damage[0]?.type;
+  const pickable = own ? [...new Set([...(action.damageTypes ?? [own]), ...options])] : [];
+  const typed: ActorAction =
+    options.length > 0 && pickable.length >= 2 ? { ...action, damageTypes: pickable as DamageType[] } : action;
+  const riders = entry.record?.onHit;
+  if (!riders || riders.length === 0) return typed;
+  return { ...typed, onHit: [...(typed.onHit ?? []), ...structuredClone(riders)].slice(0, 4) };
 }
 
 /** A weapon row with the catalog's melee band and Versatile die filled in, for rows stored before the row carried
@@ -675,7 +906,10 @@ function heavyWeaponCarrier(item: InventoryItem, definition: ActorDefinition | u
 }
 
 /** The damage types standing `damage-resistance` or `damage-vulnerability` riders name, each with its carrier. */
-function defencesOf(riders: readonly ResolvedRider[], type: "damage-resistance" | "damage-vulnerability"): Defence[] {
+function defencesOf(
+  riders: readonly ResolvedRider[],
+  type: "damage-resistance" | "damage-vulnerability" | "damage-immunity"
+): Defence[] {
   return riders.flatMap((rider) =>
     rider.modifier.type === type ? (rider.modifier.damageTypes ?? []).map((id) => ({ id, source: rider.label })) : []
   );
@@ -732,18 +966,51 @@ export function skillTierSources(derivation: EquipmentDerivation, skillId: strin
 }
 
 /** The whole rider bonus to one ability check: the standing `derivation.checkBonus` plus the momentary
- *  `on-ability-check` riders that `narrow` lets through. */
+ *  `on-ability-check` riders that `narrow` lets through, and the ability modifiers riders add, each at least its
+ *  minimum (Thaumaturge's Wisdom, minimum +1), read from `scores`. */
 export function checkRiderBonus(
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>
+  narrow: CheckNarrow,
+  scores?: Readonly<Record<RiderAbility, number>>
 ): number {
   const momentary = collectRiders(derivation.carriers, {
     ...derivation.context,
     ...(narrow.ability !== undefined ? { ability: narrow.ability } : {}),
     ...(narrow.skill !== undefined ? { skill: narrow.skill } : {}),
+    ...(narrow.situations !== undefined ? { situations: narrow.situations } : {}),
     moment: "on-ability-check"
   });
-  return derivation.checkBonus + sumRiders(momentary, "check-bonus");
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  return (
+    derivation.checkBonus +
+    sumRiders(momentary, "check-bonus") +
+    abilityModifierBonus([...standing, ...momentary], "check-bonus", scores)
+  );
+}
+
+/** What an ability check's riders are narrowed by: its ability and skill, and the situations the roller says it fits. */
+export type CheckNarrow = Readonly<{ ability?: RiderAbility; skill?: string; situations?: readonly string[] }>;
+
+/** What riders of one type add from an ability modifier (`abilityModifier`), each counted as at least its `minimum`;
+ *  without the scores, the minimum alone. Riders sharing a `stackKey` count once. */
+export function abilityModifierBonus(
+  riders: readonly ResolvedRider[],
+  type: string,
+  scores: Readonly<Record<RiderAbility, number>> | undefined
+): number {
+  const counted = new Set<string>();
+  let total = 0;
+  for (const rider of riders) {
+    const { abilityModifier: ability, minimum } = rider.modifier;
+    if (rider.modifier.type !== type || ability === undefined) continue;
+    if (rider.stackKey !== undefined) {
+      if (counted.has(rider.stackKey)) continue;
+      counted.add(rider.stackKey);
+    }
+    const modifier = scores ? Math.floor((scores[ability] - 10) / 2) : (minimum ?? 0);
+    total += Math.max(minimum ?? modifier, modifier);
+  }
+  return total;
 }
 
 export type RollModeClaims = { advantage: RollModeSource[]; disadvantage: RollModeSource[] };
@@ -801,8 +1068,19 @@ export function sourceItemOf(
   return best ?? derivation.sources.find((source) => rest.startsWith(source.itemId))?.itemId ?? null;
 }
 
+/** The id suffix of the attack an item lets its wielder make as a Bonus Action (`item-<id>-bonus-attack`). */
+export const BONUS_ATTACK_SUFFIX = "bonus-attack";
+
 /** The weapon property list for a derived action's item, so `weapon-property-is` can narrow. */
 export function weaponPropertiesOf(itemId: string | null, inventory: readonly InventoryItem[]): readonly string[] {
   if (itemId === null) return [];
   return inventory.find((item) => item.id === itemId)?.weapon?.properties ?? [];
+}
+
+/** Which weapon a derived action's item is: its catalog id and the base a magic weapon is bound to, so `weapon-is` can
+ *  narrow (Bracers of Archery's Longbow and Shortbow, a +1 Longbow among them). */
+export function weaponIdsOf(itemId: string | null, inventory: readonly InventoryItem[]): readonly string[] {
+  const row = itemId === null ? undefined : inventory.find((item) => item.id === itemId);
+  if (!row?.weapon) return [];
+  return row.baseId !== undefined ? [catalogIdOf(row), row.baseId] : [catalogIdOf(row)];
 }

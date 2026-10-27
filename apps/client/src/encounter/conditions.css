@@ -66,6 +66,14 @@
 .condition-text li + li {
   margin-top: 0.2rem;
 }
+/* The GM names a charmer or a source of fear: a label over a full-width select, thumb-sized on a phone. */
+.condition-detail-source {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 .condition-detail-origin,
 .condition-detail-muted {
   margin: 0.35rem 0 0;

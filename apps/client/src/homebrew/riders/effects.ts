@@ -11,7 +11,7 @@ import { hasType, whenField } from "./triggers";
  * form offers the subset an effect is usually written with:
  * - `roll-mode` for advantage or disadvantage on a named roll (Reckless Attack, Dodge, Rage's Strength checks
  *   with an "Only for…" ability line).
- * - `damage-resistance` and `damage-vulnerability`.
+ * - `damage-resistance`, `damage-vulnerability` and `damage-immunity`.
  * - `speed`, summed live and given back when the effect ends.
  * - `special-speed`, a Fly, Swim, Climb or Burrow Speed while the effect lasts (Fly, Spider Climb).
  */
@@ -19,6 +19,7 @@ export const EFFECT_MODIFIER_LABELS = {
   "roll-mode": ["Rolls", "Advantage or disadvantage"],
   "damage-resistance": ["Damage and defence", "Resistance to damage"],
   "damage-vulnerability": ["Damage and defence", "Vulnerability to damage"],
+  "damage-immunity": ["Damage and defence", "Immunity to damage"],
   speed: ["The character", "Speed"],
   "special-speed": ["The character", "Fly, swim, climb or burrow speed"]
 } as const satisfies Partial<Record<Modifier["type"], readonly [group: string, label: string]>>;
@@ -33,6 +34,7 @@ function blankEffectModifier(type: string): Draft {
       return { type, roll: "attack", mode: "advantage" };
     case "damage-resistance":
     case "damage-vulnerability":
+    case "damage-immunity":
       return { type, damageTypes: [] };
     case "speed":
       return { type, amount: 10 };
@@ -111,7 +113,7 @@ const effectModifiersField = (): FieldDef => ({
       label: "Damage types",
       kind: "multiselect",
       options: DAMAGE_TYPES,
-      visibleWhen: hasType("damage-resistance", "damage-vulnerability")
+      visibleWhen: hasType("damage-resistance", "damage-vulnerability", "damage-immunity")
     },
     whenField()
   ]
@@ -158,8 +160,10 @@ export const effectsField = (scope: RiderScope): FieldDef => ({
       kind: "select",
       options: [
         opt("rounds", "A number of rounds"),
+        opt("minutes", "A number of minutes of game time"),
         opt("until-source-next-turn", "Until your next turn"),
         opt("until-source-turn-end", "Until the end of your next turn"),
+        opt("until-rest", "Until a rest"),
         opt("encounter", "The whole encounter"),
         opt("manual", "Until removed by hand")
       ]
@@ -171,6 +175,22 @@ export const effectsField = (scope: RiderScope): FieldDef => ({
       min: 1,
       max: 100,
       visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "rounds"
+    },
+    {
+      key: "duration.minutes",
+      label: "Minutes",
+      kind: "number",
+      min: 1,
+      max: 527040,
+      help: "Time the GM passes and rests count it down: 60 is an hour, 1440 a day.",
+      visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "minutes"
+    },
+    {
+      key: "duration.rest",
+      label: "Rest",
+      kind: "select",
+      options: [opt("long", "A Long Rest"), opt("short", "A Short or Long Rest")],
+      visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "until-rest"
     },
     { key: "concentration", label: "Needs concentration", kind: "switch" },
     // Nested `rows`, the same depth `whenField` renders at inside `modifiersField`.

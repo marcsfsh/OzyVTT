@@ -390,6 +390,18 @@
   flex-direction: column;
   gap: var(--space-3);
 }
+/* A situation's words can run long, so its toggle wraps instead of widening the column. */
+.cs-situations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cs-situations .cs-toggle {
+  min-height: var(--tap-min);
+  max-width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
 
 /* ---- The phone's header ---- */
 .cs-head {
@@ -720,9 +732,13 @@ button.cs-lastroll-open {
 }
 
 /* ---- Checks ---- */
+/* Three to a row where each box fits its two 44px buttons side by side, else fewer (the laptop's left column). */
 .cs-abilities {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(calc(2 * var(--tap-min) + 3 * var(--space-1) + 2px), calc((100% - 2 * var(--space-1)) / 3)), 1fr)
+  );
   gap: var(--space-1);
 }
 .cs-ability {
@@ -775,7 +791,7 @@ button.cs-lastroll-open {
 .cs-roll.is-stacked {
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
+  min-width: var(--tap-min);
   padding: var(--space-1) 2px;
 }
 .cs-roll.is-proficient {
@@ -852,6 +868,46 @@ button.cs-lastroll-open {
   flex-direction: column;
   gap: var(--space-2);
 }
+/* A tool's Utilize uses: the printed words wrap, and the roll at its DC stays beside them. */
+.cs-tool-uses {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-tool-uses li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
+}
+.cs-tool-uses em {
+  font-style: normal;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+}
+.cs-tool-uses-block {
+  display: grid;
+  gap: var(--space-1);
+}
+.cs-tool-use-name {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.cs-tool-use-why {
+  display: block;
+  font-weight: 600;
+  font-size: var(--fs-2xs);
+  color: var(--caution);
+}
+.cs-tool-use-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
 .cs-skill-edit {
   display: grid;
   gap: 2px;
@@ -900,6 +956,16 @@ button.cs-lastroll-open {
 }
 .cs-ac-edit .nh-input {
   width: 4.5rem;
+}
+/* Today's food and water: a line, then the ways to eat and drink, wrapping on a phone. */
+.cs-food-line {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.cs-food-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 .cs-hd {
   display: flex;
@@ -992,6 +1058,13 @@ button.cs-lastroll-open {
   font: 700 var(--fs-sm) / 1.2 var(--font-body);
 }
 .cs-use-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* A recovery's slot levels, one stepper each, wrapping on a phone. */
+.cs-recover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1290,6 +1363,13 @@ button.cs-lastroll-open {
 .cs-cast-option .cs-cast-reason {
   color: var(--caution-hi);
 }
+/* Transmuted Spell's new damage type, picked under its option. */
+.cs-cast-type {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
 
 /* ---- The level box ---- */
 .cs-level-wrap {
@@ -1510,6 +1590,14 @@ button.cs-lastroll-open {
 .cs-pip.is-on {
   background: var(--grad-sun);
   box-shadow: none;
+}
+/* A player's spent pip shows the slot and takes no tap. */
+.cs-pip.is-spent {
+  display: inline-block;
+  cursor: default;
+}
+.cs-pip.is-spent::after {
+  content: none;
 }
 .cs-slotpips .cs-count {
   margin-left: var(--space-1);
@@ -1927,9 +2015,67 @@ button.cs-circle::after {
   gap: var(--space-2);
   margin: 0;
 }
+/* The forms its holder picks (a Rod of Lordly Might's), as one row of toggles under a label. */
+.cs-item-forms {
+  display: grid;
+  gap: var(--space-1);
+}
+/* Where a row is carried: loose, or in a container, with what taking it out costs. */
+.cs-item-place {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.cs-item-place .nh-select {
+  min-height: var(--tap-min);
+  max-width: 100%;
+}
+/* What a container holds, listed under it, a step in. */
+.cs-contents {
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--line);
+}
 .cs-use-cost {
   color: var(--text-dim);
   font-weight: 600;
+}
+.cs-xp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+}
+.cs-xp-total {
+  color: var(--text);
+  font: 700 var(--fs-h3) / 1.2 var(--font-numeric);
+}
+.cs-xp.is-ready .cs-xp-total {
+  color: var(--cyan-hi);
+}
+.cs-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+}
+.cs-column {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--track-edge);
+  background: var(--track);
+}
+.cs-column dt {
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.2 var(--font-label);
+}
+.cs-column dd {
+  margin: 0;
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.2 var(--font-numeric);
 }
 .cs-masteries {
   display: grid;
@@ -1965,4 +2111,61 @@ button.cs-circle::after {
 .cs-mastery .cs-mastery-name {
   color: var(--cyan-hi);
   font: 600 var(--fs-xs) / 1.2 var(--font-label);
+}
+
+/* A creature in a form (Wild Shape, Polymorph): the sheet reads the form's statistics, and says so. */
+.cs-form-banner {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 12%, var(--surface-2));
+  color: var(--text);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+/* Wild Shape's known forms and the Beasts it may learn, picked on the Features tab. */
+.cs-known-forms-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.cs-known-forms-pick {
+  display: grid;
+  gap: var(--space-1);
+  max-height: 18rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-known-form {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.cs-known-form > input {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+}
+.cs-known-form > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: start;
+}
+.cs-known-form.is-picked {
+  color: var(--cyan-hi);
+}
+.cs-known-forms-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }

@@ -780,7 +780,9 @@
             ],
             "adds": {
               "abilityModifier": "wis"
-            }
+            },
+            "damageTypes": ["necrotic", "radiant"],
+            "targets": { "count": 1, "rangeFeet": 30, "seen": true, "who": "others" }
           },
           {
             "id": "divine-spark-heal",
@@ -811,7 +813,8 @@
             ],
             "adds": {
               "abilityModifier": "wis"
-            }
+            },
+            "targets": { "count": 1, "rangeFeet": 30, "seen": true, "who": "others" }
           },
           {
             "id": "turn-undead",
@@ -824,9 +827,19 @@
               "successDamage": "none",
               "failureConditions": ["frightened", "incapacitated"],
               "failureDuration": { "type": "rounds", "rounds": 10 },
-              "endsOnDamage": true
+              "endsOnDamage": true,
+              "endsWhenSourceIncapacitated": true,
+              "endsWhenSourceDies": true,
+              "failureEffect": {
+                "name": "Turned",
+                "tags": [],
+                "modifiers": [],
+                "compelled": { "way": "away", "allMovement": true }
+              }
             },
-            "damage": []
+            "damage": [],
+            "damageDiceByAbility": { "level": 5, "ability": "wis", "die": "d8", "type": "radiant", "minimum": 1 },
+            "targets": { "rangeFeet": 30, "creatureTypes": ["undead"] }
           }
         ],
         "uses": {
@@ -1966,8 +1979,8 @@
             "quantity": 2
           },
           {
-            "id": "quarterstaff",
-            "name": "Quarterstaff"
+            "id": "arcane-focus-staff",
+            "name": "Arcane Focus (Staff)"
           },
           {
             "id": "robe",
@@ -2658,7 +2671,8 @@
           "choose": 2,
           "fromCatalog": "wizard-spells",
           "minSpellLevel": 3,
-          "maxSpellLevel": 3
+          "maxSpellLevel": 3,
+          "fromSpellbook": true
         }
       }
     ]

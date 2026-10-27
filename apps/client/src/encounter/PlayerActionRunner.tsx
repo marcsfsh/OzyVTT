@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import {
+  actionChoicesOf,
+  choosesAbility,
+  summonChoicesOf,
+  type ActorDefinition,
+  type ContentActionSummary
+} from "@vtt/domain";
+import type { CastShaping } from "@vtt/schemas";
 import { command, read } from "../lib/command";
 import { ActionList } from "../sheet/ActionList";
 import { CastDetail } from "../sheet/CastDetail";
@@ -12,8 +19,10 @@ import { useSpellReference } from "./spells";
 import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
+import { DamageLook } from "./DamageLook";
 import { CommonActionChips } from "./CommonActionChips";
 import { ReadyChooser, readyableSpells } from "./ReadyChooser";
+import { SpellPickChooser } from "./SpellPickChooser";
 import { damageBreakdown } from "./format";
 import { modeWords } from "./roll-mode-notes";
 import { AskTheGmPrompt } from "./RuleAsk";
@@ -28,7 +37,7 @@ import {
   useTargetingBusy,
   useTargetingResult
 } from "./targeting";
-import { foesFirst, type TargetRow } from "../table/targetRows";
+import { foesFirst, pickableTargets, type TargetRow } from "../table/targetRows";
 import { revealInRegion } from "../lib/reveal";
 import "./action-runner.css";
 
@@ -63,15 +72,68 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
     ...(action.save?.conditionChoices ? { conditionChoices: [...action.save.conditionChoices] } : {}),
+    // The space a leap or a throw lands in, or a failed save moves its target to (Telekinesis), and how high.
+    ...(action.destination ? { destination: { who: action.destination.who, feet: action.destination.feet } } : {}),
+    ...(action.failureMove
+      ? {
+          destination: {
+            who: "target" as const,
+            feet: action.failureMove.feet,
+            ...(action.failureMove.lifts ? { lifts: true as const } : {})
+          }
+        }
+      : {}),
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
+    // Conditions a touch may also end, each for points of its pool (Restoring Touch).
+    ...(action.conditionPicks
+      ? {
+          conditionPicks: {
+            conditions: [...action.conditionPicks.conditions],
+            pointsEach: action.conditionPicks.pointsEach
+          }
+        }
+      : {}),
+    // A pool its user divides among the targets (Preserve Life): the flat number the sheet resolved it to.
+    ...(action.healing?.divided && /^\d+(\s*\+\s*\d+)*$/.test(action.healing.formula.trim())
+      ? {
+          dividesHealing: action.healing.formula.split("+").reduce((sum, term) => sum + Number(term.trim()), 0)
+        }
+      : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
+    // A summon whose user picks the creature or its type (Find Familiar) asks before it resolves.
+    ...(summonChoicesOf(action.summons) ? { summonChoices: summonChoicesOf(action.summons)! } : {}),
+    // Bringing a creature aims at no one, unless it rises from a corpse or the cast also strikes (Spiritual Weapon).
+    ...(action.summons && !action.summons.fromCorpse && !action.attack && !action.save && action.damage.length === 0
+      ? { targeting: "none" as const }
+      : {}),
+    // What it asks for as it resolves; a self grant that asks is aimed at no one, so the pick comes before the tap.
+    ...(actionChoicesOf(action) ? { choices: actionChoicesOf(action)! } : {}),
+    ...(actionChoicesOf(action) && action.grants?.target === "self" ? { targeting: "none" as const } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
       : {}),
     // So does a touch that ends a condition (Lay on Hands' cure).
     ...(action.endsConditions && !action.healing ? { targeting: "single" as const } : {})
+  };
+}
+
+/** A sheet's own action with what the server offers for it when it shape-shifts: the forms it may take, the effects
+ *  it picks one of, and whom it aims at (Wild Shape at no one, leaving a form too). */
+export function withShapeOffer(
+  action: ContentActionSummary,
+  row: ContentActionSummary | undefined
+): ContentActionSummary {
+  // The action a form adds to leave it early (its id is the server's).
+  const leaving = action.id === "leave-form";
+  if (!row || (!row.forms && !row.options && !row.wardTypes && !leaving)) return action;
+  return {
+    ...action,
+    ...(row.forms ? { forms: row.forms } : {}),
+    ...(row.options ? { options: row.options } : {}),
+    ...(row.wardTypes ? { wardTypes: row.wardTypes } : {}),
+    ...(row.targeting && action.targeting === undefined ? { targeting: row.targeting } : {})
   };
 }
 
@@ -131,12 +193,15 @@ export function PlayerActionRunner({
   insideNow,
   actor = null,
   myTurn = true,
+  offTurn = false,
   header,
   pickOnly,
   castPlace = { kind: "inline" },
   look = "list",
   round = null,
-  acting = null
+  acting = null,
+  turnTitle,
+  pinnable = true
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -158,6 +223,8 @@ export function PlayerActionRunner({
   actor?: SheetActor | null;
   /** The character acts now; off its turn the list stays in view and only reactions are live. */
   myTurn?: boolean;
+  /** It acts off its own turn (a readied spell or action), so a result it gets stays until its player closes it. */
+  offTurn?: boolean;
   /** What sits above the list (the economy on the sheet's own Play tab). */
   header?: ReactNode;
   /** Only the aim and its result, for a use started from another tab of the sheet; Done closes it. */
@@ -169,6 +236,10 @@ export function PlayerActionRunner({
   /** The fight's round, and who acts off this character's turn, for the turn card's heading. */
   round?: number | null;
   acting?: string | null;
+  /** The turn card's heading when the turn isn't the character's own (a creature its character commands). */
+  turnTitle?: string;
+  /** Whether the player may pin favourites on this card: only on their own character. */
+  pinnable?: boolean;
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
@@ -211,6 +282,8 @@ export function PlayerActionRunner({
   );
   /** A spell waiting for its slot to be chosen. */
   const [casting, setCasting] = useState<TurnOption | null>(null);
+  /** A feature whose spell is being picked (Divine Intervention). */
+  const [choosing, setChoosing] = useState<TurnOption | null>(null);
   const hitExtras = definition.actions.filter(
     (action) => facts.ridesAHit.has(action.id) && action.spellId === undefined
   );
@@ -218,6 +291,10 @@ export function PlayerActionRunner({
   // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first. An item's action carries the
   // server's word on it (a scroll of Detect Magic is a tap, a potion picks its drinker).
   const isTargetlessOwn = (action: ContentActionSummary) => {
+    // A summon with a creature to pick asks for it first.
+    if (action.summonChoices) return false;
+    // A pick comes first (Fire Shield's warm or chill, the weapon Magic Weapon is cast on).
+    if (action.choices) return false;
     if (action.targeting === "none") return true;
     // A touch that ends a condition picks who it touches.
     if (action.targeting === "single" || action.targeting === "multi") return false;
@@ -243,12 +320,20 @@ export function PlayerActionRunner({
     },
     []
   );
-  // The turn moved on: what was being aimed on it goes, as when the runner was mounted only for the turn.
+  // The turn moved on: what was being aimed on it goes, as when the runner was mounted only for the turn. A result got
+  // off the turn (a readied spell released, which ends the Ready) stays until its player closes it.
   const wasMyTurn = useRef(myTurn);
+  const resultOffTurn = useRef(false);
+  const offTurnNow = useRef(offTurn);
+  offTurnNow.current = offTurn;
+  // Whether the result in view arrived off the turn, read when it arrives.
+  useEffect(() => {
+    resultOffTurn.current = result !== null && offTurnNow.current;
+  }, [result]);
   useEffect(() => {
     if (wasMyTurn.current && !myTurn) {
       clearTargeting();
-      setTargetingResult(null);
+      if (!resultOffTurn.current) setTargetingResult(null);
     }
     wasMyTurn.current = myTurn;
   }, [myTurn]);
@@ -270,16 +355,26 @@ export function PlayerActionRunner({
   }, [castingId, castPlace.kind]);
 
   if (actions.length === 0 && facts.common.length === 0) return null;
-  const onOutcome = (ok: boolean, message?: string) => {
+  const onOutcome = (ok: boolean, message?: string, sensed?: readonly string[]) => {
     if (!ok && message) onFeedback(message);
+    // What a sense found (Find Traps) is told to whoever took the action.
+    if (ok && sensed && sensed.length > 0) onFeedback(sensed.join(" "));
   };
   /** A tap on an option: one with nothing to aim resolves at once; the rest go to targeting. */
-  const take = (action: ContentActionSummary, slotLevel?: number, darts?: number) => {
-    if (isTargetlessOwn(action))
+  const take = (
+    action: ContentActionSummary,
+    slotLevel?: number,
+    darts?: number,
+    shaping: readonly CastShaping[] = []
+  ) => {
+    const shaped = withShapeOffer(action, facts.rows.get(action.id));
+    // A shape-shift picks its form first (Wild Shape), and Enlarge/Reduce its effect.
+    if (!shaped.forms && !shaped.options && isTargetlessOwn(shaped))
       resolveActionDirect(actorId, action.id, revision, onOutcome, undefined, undefined, {
-        ...(slotLevel !== undefined ? { slotLevel } : {})
+        ...(slotLevel !== undefined ? { slotLevel } : {}),
+        ...(shaping.length > 0 ? { shaping } : {})
       });
-    else beginTargeting(action, actorId, slotLevel, darts);
+    else beginTargeting(shaped, actorId, slotLevel, darts, shaping);
   };
   /** The ways a spell option can be cast now. The fight's own rules decide; the list only offers what it can. */
   const castChoices = (option: TurnOption): CastOption[] =>
@@ -294,14 +389,14 @@ export function PlayerActionRunner({
         })
       : [];
   /** Casts a spell option the chosen way: at a slot level (Magic Missile's darts grow with it), without a slot, or
-   *  as a Ritual. */
-  const castWith = (option: TurnOption, choice: CastOption) => {
+   *  as a Ritual, shaped as its caster chose (Metamagic). */
+  const castWith = (option: TurnOption, choice: CastOption, shaping: readonly CastShaping[] = []) => {
     const spell = option.spell!;
     const variant =
       choice.kind === "free" ? spell.freeActionId : choice.kind === "ritual" ? spell.ritualActionId : undefined;
     if (variant) {
       const summary = ownSummaries.get(variant);
-      if (summary) take(summary);
+      if (summary) take(summary, undefined, undefined, shaping);
       return;
     }
     const own = definition.actions.find((candidate) => candidate.id === option.id);
@@ -309,7 +404,7 @@ export function PlayerActionRunner({
       own?.darts !== undefined && own.spellSlot && choice.kind === "slot"
         ? own.darts + Math.max(0, choice.level - own.spellSlot.level)
         : undefined;
-    take(option.summary, choice.kind === "slot" ? choice.level : undefined, darts);
+    take(option.summary, choice.kind === "slot" ? choice.level : undefined, darts, shaping);
   };
 
   /** The turn card's pins, stored on the character; the server checks each is one of its options now. */
@@ -320,8 +415,14 @@ export function PlayerActionRunner({
   /** A tap on an option: a spell with a choice of slot opens its cast detail, the rest go at once. */
   const pickOption = (option: TurnOption) => {
     setTargetingResult(null);
+    if (option.picks && option.picks.length > 0) {
+      setChoosing(option);
+      return;
+    }
     const choices = option.spell ? castChoices(option) : [];
-    if (option.spell && (choices.length > 1 || (choices.length === 1 && !choices[0]!.available))) {
+    // A spell its caster may shape (Metamagic) opens its cast, where the options are offered.
+    const shapeable = (option.summary.shaping?.options.length ?? 0) > 0;
+    if (option.spell && (choices.length > 1 || shapeable || (choices.length === 1 && !choices[0]!.available))) {
       setCasting(option);
       return;
     }
@@ -341,9 +442,9 @@ export function PlayerActionRunner({
         aimed
         busy={busy}
         onBack={() => setCasting(null)}
-        onCast={(choice) => {
+        onCast={(choice, shaping) => {
           setCasting(null);
-          castWith(casting, choice);
+          castWith(casting, choice, shaping);
         }}
       />
     ) : null;
@@ -367,12 +468,13 @@ export function PlayerActionRunner({
               myTurn={myTurn}
               round={round}
               acting={acting}
+              {...(turnTitle ? { title: turnTitle } : {})}
               busy={busy}
               {...(unavailable ? { unavailable } : {})}
               header={header}
               pins={pinsOf(actor)}
               counts={optionCountsOf(actor)}
-              {...(actor ? { onSetPins: setPins } : {})}
+              {...(actor && pinnable ? { onSetPins: setPins } : {})}
               onUse={pickOption}
             />
           ) : (
@@ -411,6 +513,17 @@ export function PlayerActionRunner({
           />
         </>
       )}
+      {choosing && (
+        <SpellPickChooser
+          option={choosing}
+          busy={busy}
+          onClose={() => setChoosing(null)}
+          onPick={(pick) => {
+            setChoosing(null);
+            take(pick.summary);
+          }}
+        />
+      )}
       {readying && (
         <ReadyChooser
           spells={readySpells}
@@ -430,32 +543,40 @@ export function PlayerActionRunner({
       {picking && !result?.preview && (
         <ActionTargetPicker
           picking={picking}
-          targets={foesFirst(
-            targets
-              // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
-              // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
-              .filter(
-                (target) =>
-                  target.actorId !== actorId ||
-                  picking.action.healing != null ||
-                  healingOf(picking.action) !== undefined ||
-                  (picking.action.builtin !== true &&
-                    picking.action.attackBonus === null &&
-                    picking.action.saveAbility === null &&
-                    picking.action.damage.length === 0)
-              )
-              .map(
-                (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
-                  targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
-              ),
-            "player-character",
-            picking.action.healing != null || healingOf(picking.action) !== undefined
+          targets={pickableTargets(
+            foesFirst(
+              targets
+                // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
+                // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
+                .filter(
+                  (target) =>
+                    target.actorId !== actorId ||
+                    picking.action.healing != null ||
+                    healingOf(picking.action) !== undefined ||
+                    (picking.action.builtin !== true &&
+                      picking.action.attackBonus === null &&
+                      picking.action.saveAbility === null &&
+                      picking.action.damage.length === 0)
+                )
+                .map(
+                  (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
+                    targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
+                ),
+              "player-character",
+              picking.action.healing != null || healingOf(picking.action) !== undefined
+            ),
+            picking.action,
+            picking.action.spellId !== undefined ? spellIndex.get(picking.action.spellId) : undefined
           )}
           onMap
           {...(insideNow ? { insideNow } : {})}
+          carried={actor?.inventory ?? []}
           busy={busy}
           onInvalidFace={onFeedback}
           onRoll={(face) => resolveTargeting(revision, onOutcome, face !== undefined ? { attackNatural: face } : {})}
+          {...(picking.action.damageLook && picking.action.attackBonus === null
+            ? { onLookAtDamage: () => resolveTargeting(revision, onOutcome, { damageLook: true }) }
+            : {})}
         />
       )}
       {result && (
@@ -482,7 +603,22 @@ export function PlayerActionRunner({
               onFeedback={onFeedback}
               push={result.push}
               {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
+              knockOutOffered={result.knockOut === "offered"}
+              look={result}
               resolve={(options) => resolveTargeting(revision, onOutcome, options)}
+            />
+          )}
+          {/* A spell's damage looked at before the cast lands (Empowered Spell, Heroic Inspiration). */}
+          {result.preview && !result.attack && result.heldDamage && (
+            <DamageLook
+              result={result}
+              look={result.heldDamage}
+              busy={busy}
+              confirmLabel="Confirm"
+              onAnswer={(id, dice) =>
+                resolveTargeting(revision, onOutcome, { damageLook: true, damageAnswer: { id, dice } })
+              }
+              onConfirm={() => resolveTargeting(revision, onOutcome, { commit: true })}
             />
           )}
           {result.save && (
@@ -490,16 +626,22 @@ export function PlayerActionRunner({
               Each target makes a DC {result.save.dc} {result.save.ability.toUpperCase()} save. The GM answers these.
             </p>
           )}
-          {result.waitingOnReaction && result.attack && (
-            <p className="action-save-note">
-              Waiting on {result.attack.targetName}'s{" "}
-              <strong>
-                {result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId)
-                  ?.actionName ?? "reaction"}
-              </strong>
-              . It may turn the hit into a miss, and the attack finishes when it is answered.
-            </p>
-          )}
+          {result.waitingOnReaction &&
+            result.attack &&
+            (() => {
+              const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
+              // Another creature's answer to the roll (Cutting Words) is not named: it may be one the player can't see.
+              return prompt ? (
+                <p className="action-save-note">
+                  Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong>. It may turn the hit into
+                  a miss, and the attack finishes when it is answered.
+                </p>
+              ) : (
+                <p className="action-save-note">
+                  Waiting on an answer to the attack roll. The attack finishes when it is answered.
+                </p>
+              );
+            })()}
           {result.damage.length > 0 &&
             !result.preview &&
             (() => {
@@ -521,13 +663,17 @@ export function PlayerActionRunner({
             result.damageTotal > 0 &&
             (() => {
               const reactionPrompt = result.reactionPrompts?.find(
-                (candidate) => candidate.actorId === result.attack!.targetId
+                (candidate) => candidate.holdsDamage || candidate.actorId === result.attack!.targetId
               );
               if (reactionPrompt)
-                return (
+                return reactionPrompt.actorId === result.attack!.targetId ? (
                   <p className="action-save-note">
                     Waiting on {result.attack!.targetName}'s <strong>{reactionPrompt.actionName}</strong>. The damage
                     lands when it is answered.
+                  </p>
+                ) : (
+                  <p className="action-save-note">
+                    Waiting on an answer to the damage roll. The damage lands when it is answered.
                   </p>
                 );
               return (

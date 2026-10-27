@@ -1,13 +1,15 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState, PassiveOption } from "@vtt/domain";
 import { conditionLabel, incapacitatingCondition } from "./condition-rules.js";
-import { hasEffectTag, NO_ACTIONS_TAG, SLOWED_TAG } from "./effects.js";
+import { concentrationOn, hasEffectTag, NO_ACTIONS_TAG, SLOWED_TAG, spellWords } from "./effects.js";
 import { laterRowOf } from "./item-actions.js";
 import { castSlot, useLimitFor } from "./resolution/economy.js";
 import type { DefinitionAction, LiveActor } from "./resolution/context.js";
 import { hitRiderOf } from "./resolution/hit-riders.js";
 import { markMoveOf } from "./resolution/marks.js";
 import { familyOf, type RuleId } from "./rules-families.js";
+import { END_EFFECT_ACTION_ID, NO_ENDING_OPTION } from "./ending-actions.js";
+import { readyIn } from "./clock-pools.js";
 
 /**
  * What the sheet says about an option it can't use now, and which options stay off the turn list. The availability
@@ -40,6 +42,13 @@ function usesReason({ state, attacker, action, siblings }: ReasonFacts): string 
   const spent =
     uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
   if (spent < useLimitFor(siblings, action)) return "Not enough uses left.";
+  if (uses.per === "never") return "No uses left, and they don't come back.";
+  if (uses.per === "time") {
+    const wait = readyIn(state, attacker, key);
+    return wait
+      ? `No uses left. It can be used again in ${wait} of game time.`
+      : "No uses left until enough game time passes.";
+  }
   return uses.per === "turn" ? "No uses left this turn." : `No uses left ${USES_COME_BACK[uses.per]}.`;
 }
 
@@ -79,8 +88,11 @@ function actionSpentReason({ state, attacker, siblings }: ReasonFacts): string {
 function requiresReason({ attacker, action, spell }: ReasonFacts): string {
   if (action.requiresEffectTag && !hasEffectTag(attacker, action.requiresEffectTag))
     return `Only while ${conditionLabel(action.requiresEffectTag)}.`;
+  if (action.castThrough && !concentrationOn(attacker, action.castThrough))
+    return `Only while you concentrate on ${spellWords(action.castThrough)}.`;
   if (spell && markMoveOf(spell, action.id)) return `You aren't concentrating on ${spell.name}.`;
   if (spell && laterRowOf(spell, action.id)) return `Cast ${spell.name} first.`;
+  if (action.id === END_EFFECT_ACTION_ID) return NO_ENDING_OPTION;
   return "It needs an effect you don't have now.";
 }
 
@@ -90,12 +102,20 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "movement.no-movement-remaining": () => "No movement left.",
   "movement.stand-up-cost": () => "Not enough movement left to stand up.",
   "movement.stand-up-off-turn": () => "Stand up on your own turn.",
+  "movement.drop-prone": () => "Drop Prone on your own turn, with Speed above 0.",
+  "movement.tether": () => "Undo the anchor to move farther from it.",
+  "movement.pit": () => "Climb out of the pit with a Climb Speed, climbing gear or magic.",
   "movement.already-moved": () => "You moved this turn.",
   "movement.off-turn": () => "It isn't your turn.",
   "movement.teleport": () => "The GM moves a token that teleports.",
   "movement.occupied": () => "Another creature is in that space.",
   "movement.no-speed": () => "You don't have that speed.",
   "movement.blocked-path": () => "Enemies block the way.",
+  "movement.altitude": () => "Fly, climb or jump to change height.",
+  "movement.jump": () => "A jump goes as far as the creature's Strength allows.",
+  "movement.toward-fear": () => "You can't move closer to what you fear.",
+  "movement.compelled": () => "An effect decides where you move this turn.",
+  "movement.mount": () => "Mount a creature within 5 feet that is at least one size larger.",
   "economy.action-used": actionSpentReason,
   "economy.bonus-action-used": ({ state, attacker }) =>
     hasEffectTag(attacker, SLOWED_TAG) && state.combat.turn.actionUsed && !state.combat.turn.bonusActionUsed
@@ -103,6 +123,9 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
       : "You used your Bonus Action this turn.",
   "economy.reaction-used": () => "Your Reaction is spent until your next turn.",
   "economy.not-your-turn": () => "It isn't your turn.",
+  "economy.turn-start": () => "Use it at the start of your turn, before you move or act.",
+  "economy.attack-action": () => "Use it as part of the Attack action.",
+  "economy.heavy-armor": () => "You can't enter a Rage in Heavy armor.",
   "economy.spent-slot": () => "Only the GM gives that back.",
   "initiative.gathering": () => "Turns begin once everyone has rolled Initiative.",
   "condition.incapacitated": ({ attacker }) => {
@@ -115,9 +138,25 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "condition.down": () => "You can't act at 0 Hit Points.",
   "condition.imposed": () => "It ends by its own rules or the GM's say.",
   "condition.raging": () => "You can't cast spells while raging.",
+  "summon.cant-attack": () => "This creature can't attack.",
+  "summon.command": () => "Your command doesn't reach that far.",
   "condition.no-reactions": () => "You can't take Reactions now.",
   "condition.no-spells": () => "You can't cast spells now.",
-  "legendary.own-turn": () => "Take it at the end of another creature's turn.",
+  "condition.cant-attack": () => "You can't attack now.",
+  "condition.dash-only": () => "You can take only the Dash action now.",
+  "condition.forced-attack": () => "This turn your action is one melee attack on the creature picked for you.",
+  "condition.one-thing-a-turn": () => "This turn you can only move, take an action or take a Bonus Action.",
+  "mount.controlled": () => "A controlled mount can only Dash, Disengage or Dodge.",
+  "movement.cant-stand": () => "You can't stand up now.",
+  "form.no-spells": ({ spell }) =>
+    spell && (spell.components.materialConsumed || (spell.components.costly ?? []).length > 0)
+      ? "Beast Spells leaves out a spell with a costly or consumed Material component."
+      : "You can't cast spells in this form.",
+  "form.no-actions": () => "You can't take actions in this form.",
+  "form.no-attacks": () => "You can't attack in this form.",
+  "form.wrong-form": ({ action }) => `Only in ${action.formOnly?.length === 1 ? "one" : "some"} of your forms.`,
+  "legendary.own-turn": () => "Take it right after another creature's turn.",
+  "legendary.after-a-turn": () => "Take it right after another creature's turn, before the next one acts.",
   "attack.light-needs-attack": () => "Attack with another Light weapon first.",
   "attack.cleave-needs-hit": () => "Hit with this weapon in melee first.",
   "attack.after-first-roll": () => "Decide it before your first attack roll.",
@@ -128,6 +167,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "spell.scroll-unreadable": () => "That spell isn't on your spell lists.",
   "spell.later-turn": () => "It comes on a later turn.",
   "attack.rides-a-hit": () => "Choose it when an attack hits.",
+  "roll.answers-a-roll": () => "Use it on a roll it answers, once the roll is shown.",
   "legendary.no-actions-remaining": () => "No legendary actions left this round.",
   "legendary.once-per-round": () => "Not again until your next turn.",
   "feature.no-uses-remaining": usesReason,
@@ -136,32 +176,62 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "range.out-of-range": () => "Out of range.",
   "range.out-of-reach": () => "Out of reach.",
   "range.underwater": () => "Out of range underwater.",
+  "action.underwater-only": () => "Only underwater.",
   "target.grappled-by-source": () => "You aren't grappling that creature.",
   "target.too-large-to-grapple": () => "That creature is too large.",
   "target.not-an-enemy": () => "Choose an enemy.",
   "target.mark-still-standing": () => "It moves once its creature drops to 0 Hit Points.",
   "cover.total": () => "The target has Total Cover.",
   "hide.seen": () => "An enemy can see you.",
+  "hide.exposed": () => "Hide in darkness, fog or behind a wall.",
+  "light.too-bright": () => "Only in Dim Light or darkness.",
   "attack.cleave-same-target": () => "Choose a second creature.",
   "attack.cleave-too-far": () => "The second creature must be within 5 feet of the first.",
   "target.too-many": () => "Too many targets.",
+  "target.wrong-type": () => "It can't target that kind of creature.",
+  "target.unseen": () => "You can't see that creature.",
+  "target.outside-area": () => "Those creatures don't fit in one of its areas.",
+  "target.not-allowed": () => "It can't affect that creature.",
+  "target.revival": () => "It can't bring that creature back.",
   "attack.hit-option-unqualified": () => "That hit can't carry it.",
   "condition.charmed-charmer": () => "You can't attack the creature that charmed you.",
   "slots.none-remaining": slotsReason,
   "slots.below-spell-level": ({ action }) => `It needs a level ${action.spellSlot?.level ?? 1} spell slot or higher.`,
   "slots.one-per-turn": () => "You already spent a spell slot this turn.",
-  "slots.not-prepared": () => "Not prepared."
+  "slots.not-prepared": () => "Not prepared.",
+  "metamagic.unknown": () => "You don't have that option.",
+  "metamagic.unfit": () => "This spell can't take that option.",
+  "metamagic.too-many": () => "Too many Metamagic options on one spell.",
+  "metamagic.quickened": () => "You used Quickened Spell this turn, so no other level 1+ spell this turn.",
+  "metamagic.choice": () => "Choose what the option names.",
+  "metamagic.with-a-cast": () => "Choose it when you cast a spell.",
+  "spell.no-verbal": () => "You can't speak now, and it has a Verbal component.",
+  "spell.no-free-hand": () => "Its gestures need a free hand. Unequip a weapon or a Shield on the Gear tab.",
+  "spell.no-material": materialReason
 };
+
+/** A Material component the caster lacks: the priced or consumed material itself, else a pouch or focus in reach. */
+function materialReason({ spell }: ReasonFacts): string {
+  const costly = spell?.components.costly ?? [];
+  if (costly.length > 0)
+    return `It needs ${listed(costly.map((material) => (material.costGp !== null ? `${material.name} worth ${material.costGp}+ GP` : material.name)))}. Add it to your gear.`;
+  return "It needs a Component Pouch, or a Spellcasting Focus you can use, and a hand free to reach it.";
+}
 
 /** Rules about the option itself, which outlast the turn, so they are named before the turn's own. */
 const ABOUT_THE_OPTION: ReadonlySet<RuleId> = new Set([
   "slots.not-prepared",
   "spell.untrained-armor",
+  "spell.no-verbal",
+  "spell.no-free-hand",
+  "spell.no-material",
   "spell.scroll-unreadable",
   "attack.no-ammunition",
   "attack.two-handed",
   "feature.requires-effect",
   "attack.rides-a-hit",
+  "roll.answers-a-roll",
+  "metamagic.with-a-cast",
   "feature.no-uses-remaining",
   "slots.none-remaining",
   "slots.below-spell-level",
@@ -188,7 +258,13 @@ export function unavailableReason(
 }
 
 /** Features a creature takes on its own turn though their activation reads "other". */
-const TAKEN_ON_A_TURN: ReadonlySet<string> = new Set(["action-surge"]);
+const TAKEN_ON_A_TURN: ReadonlySet<string> = new Set([
+  "action-surge",
+  // A spell's harm its caster or the GM deals by hand, with no action (Phantasmal Force's 2d8, Geas's 5d10).
+  "spell-phantasmal-force-then-harm",
+  "spell-geas-then-defiance",
+  "spell-dream-then-terrifying-message"
+]);
 /** Features used outside a fight that their text doesn't tie to a rest's end. */
 const USED_BETWEEN_FIGHTS: ReadonlySet<string> = new Set(["magical-cunning"]);
 
@@ -204,6 +280,10 @@ const structured = (action: DefinitionAction): boolean =>
   action.spellSlot !== undefined ||
   action.legendary !== undefined ||
   action.endsConditions !== undefined ||
+  action.douses !== undefined ||
+  action.lightsArea !== undefined ||
+  action.doorWork !== undefined ||
+  action.pointsAtHidden !== undefined ||
   action.replacesAttack === true;
 
 /**
@@ -212,10 +292,19 @@ const structured = (action: DefinitionAction): boolean =>
  * answers a roll, a hit or a cast (Savage Attacker, Indomitable, Metamagic), or a rest's end (Arcane Recovery). A
  * spell area's later step is run by the server.
  */
-export function passiveOf(action: DefinitionAction, builtin: boolean): PassiveOption | undefined {
+export function passiveOf(
+  action: DefinitionAction,
+  builtin: boolean,
+  spell?: Parameters<typeof laterRowOf>[0]
+): PassiveOption | undefined {
   if (builtin) return undefined;
-  if (hitRiderOf(action)) return "rider";
-  if (action.activation !== "other") return undefined;
+  // A rider tapped before its roll (Brutal Strike) is on the turn list; any other is chosen on a hit.
+  if (hitRiderOf(action)) return hitRiderOf(action)!.declaredBeforeRoll ? undefined : "rider";
+  if (action.activation !== "other" || TAKEN_ON_A_TURN.has(action.id)) return undefined;
+  // Moving a spell's area with the caster's move (Conjure Animals' pack), or a storm's bolts the caster aims, costs
+  // nothing and is the caster's to take.
+  const row = spell ? laterRowOf(spell, action.id) : undefined;
+  if (row?.movesArea || row?.atRow || row?.cutsArea) return undefined;
   if (/^spell-.+-then-/.test(action.id)) return "automatic";
   if (structured(action) || TAKEN_ON_A_TURN.has(action.id)) return undefined;
   if (/\bas (?:a|an|your) (?:magic action|bonus action|action|reaction)\b/i.test(action.description)) return undefined;

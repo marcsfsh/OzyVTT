@@ -3,7 +3,7 @@ import type { ActionReaction } from "@vtt/schemas";
 import type { EffectNarration } from "./effects.js";
 import type { DamageDeps } from "./hit-points.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
-import { offerableReaction } from "./reaction-offers.js";
+import { offerableReaction, slotChoiceOf } from "./reaction-offers.js";
 import type { LiveActor } from "./resolution/context.js";
 import { hiddenFrom } from "./vision/audience.js";
 
@@ -71,6 +71,7 @@ export function offerDamageReaction(
         acBonus: null,
         rollsAttack: offer.reaction.response === "melee-attack" || offer.action.attack !== undefined,
         parkedAttack: null,
+        ...slotChoiceOf(victim, offer.action),
         createdAt: deps.now ? Date.parse(deps.now()) : Date.now()
       }
     ]

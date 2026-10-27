@@ -2,14 +2,19 @@ import { useState } from "react";
 import type {
   AnnotationShapeKind,
   AnnotationVisibility,
+  DoorState,
   EncounterTokenPosition,
   MutationResult,
-  RulesBlocked
+  ObjectStats,
+  RulesBlocked,
+  SceneEnvironment
 } from "@vtt/domain";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
+import { resolveAtLight, resolveAtWall } from "../encounter/targeting";
 import type { MoveMode } from "./movePreview";
 import type { Point } from "./useMapView";
+import type { AreaKindId, GroundOp } from "./mapTools";
 
 /**
  * Everything the map sends: token moves, annotations, fog, terrain and vision. Each family has its own busy flag, and
@@ -21,10 +26,15 @@ export type BlockedMove = Readonly<{
   actorId: string;
   position: EncounterTokenPosition;
   mode: MoveMode | undefined;
+  /** The height the move asked for; absent keeps the token's own. */
+  altitudeFeet?: number;
   blocked: RulesBlocked;
 }>;
 
 const ASKED = "Asked the GM. Waiting for their call.";
+
+/** How a creature works on a door (`door:use`). */
+export type DoorWork = "pick" | "force" | "jam" | "pry" | "seal" | "release";
 
 export function useMapCommands({
   revision,
@@ -34,7 +44,8 @@ export function useMapCommands({
   moveModeFor = () => undefined,
   drawing,
   onShapeAdded,
-  waitingAsks = 0
+  waitingAsks = 0,
+  trapChoice = null
 }: Readonly<{
   revision: number;
   sceneId?: string;
@@ -48,6 +59,8 @@ export function useMapCommands({
   onShapeAdded: (annotationId: string | null) => void;
   /** How many of this viewer's questions wait on the GM; one fewer means the GM answered. */
   waitingAsks?: number;
+  /** The trap a drag sets, and its band of levels. */
+  trapChoice?: Readonly<{ trapId: string; tier: number }> | null;
 }>) {
   const [message, setMessage] = useState("");
   // Once the GM answers (the token moves, or stays), the line no longer says the question is waiting.
@@ -68,7 +81,8 @@ export function useMapCommands({
     actorId: string,
     position: EncounterTokenPosition | null,
     mode: MoveMode | undefined,
-    override?: Readonly<{ reason: string }>
+    override?: Readonly<{ reason: string }>,
+    altitudeFeet?: number
   ) => {
     setBusyActorId(actorId);
     setMessage("");
@@ -77,6 +91,7 @@ export function useMapCommands({
       actorId,
       position,
       ...(mode && mode !== "walk" && position ? { mode } : {}),
+      ...(altitudeFeet !== undefined && position ? { altitudeFeet } : {}),
       ...(override ? { override } : {}),
       ...scene,
       expectedRevision: revision
@@ -89,29 +104,81 @@ export function useMapCommands({
         : (result.message ?? "The token move was rejected.")
     );
     if (!result.ok && result.blocked?.overridable && position)
-      setBlockedMove({ actorId, position, mode, blocked: result.blocked });
+      setBlockedMove({
+        actorId,
+        position,
+        mode,
+        ...(altitudeFeet !== undefined ? { altitudeFeet } : {}),
+        blocked: result.blocked
+      });
     setBusyActorId(null);
   };
-  const submitMove = async (actorId: string, position: EncounterTokenPosition | null) => {
+  /** Moves a token; `altitudeFeet` is the height the move ends at, the token's own when absent. */
+  const submitMove = async (actorId: string, position: EncounterTokenPosition | null, altitudeFeet?: number) => {
     if (busyActorId || !canMove(actorId)) return;
-    await sendMove(actorId, position, moveModeFor(actorId));
+    await sendMove(actorId, position, moveModeFor(actorId), undefined, altitudeFeet);
+  };
+  /** The GM puts a creature at a height, free of movement: on a surface, or in the air. */
+  const setAltitude = async (actorId: string, altitudeFeet: number, airborne: "fly" | "levitate" | null) => {
+    if (busyActorId) return;
+    setBusyActorId(actorId);
+    setMessage("");
+    const result = await command("token:set-altitude", { actorId, altitudeFeet, airborne, expectedRevision: revision });
+    setMessage(result.ok ? "Height set." : (result.message ?? "The height could not be set."));
+    setBusyActorId(null);
+  };
+  /** A creature climbs onto a mount, controlling it or letting it act on its own, or off the one it rides with null. */
+  const mount = async (actorId: string, mountId: string | null, control?: "controlled" | "independent") => {
+    if (busyActorId) return;
+    setBusyActorId(actorId);
+    setMessage("");
+    const result = await command("actor:mount", {
+      actorId,
+      mountId,
+      ...(mountId !== null && control ? { control } : {}),
+      expectedRevision: revision
+    });
+    setMessage(
+      result.ok
+        ? mountId
+          ? "Mounted."
+          : "Dismounted."
+        : (result.message ?? (mountId ? "That creature can't be mounted now." : "It can't dismount now."))
+    );
+    setBusyActorId(null);
+  };
+  /** The GM drops a creature from the height it is at; the server rolls the damage. */
+  const fall = async (actorId: string, intoWater: boolean) => {
+    if (busyActorId) return;
+    setBusyActorId(actorId);
+    setMessage("");
+    const result = await command("actor:fall", { actorId, ...(intoWater ? { intoWater } : {}) });
+    setMessage(result.ok ? "The fall is rolled." : (result.message ?? "The fall could not be rolled."));
+    setBusyActorId(null);
   };
   /** The GM's ruling on a refused move: the same move again, with an audited override. */
   const moveAnyway = async () => {
     if (!blockedMove || busyActorId) return;
-    await sendMove(blockedMove.actorId, blockedMove.position, blockedMove.mode, { reason: "GM ruling on the map" });
+    await sendMove(
+      blockedMove.actorId,
+      blockedMove.position,
+      blockedMove.mode,
+      { reason: "GM ruling on the map" },
+      blockedMove.altitudeFeet
+    );
   };
   /** A player's question about a refused move, parked for the GM to allow or deny. */
   const askAboutMove = async () => {
     if (!blockedMove) return;
-    const { actorId, position, mode } = blockedMove;
+    const { actorId, position, mode, altitudeFeet } = blockedMove;
     const result = await command("rules:ask", {
       type: "token.move",
       payload: {
         commandId: newId(),
         actorId,
         position,
-        ...(mode && mode !== "walk" ? { mode } : {})
+        ...(mode && mode !== "walk" ? { mode } : {}),
+        ...(altitudeFeet !== undefined ? { altitudeFeet } : {})
       }
     });
     setBlockedMove(null);
@@ -252,7 +319,7 @@ export function useMapCommands({
       if (!result.ok) setMessage(result.message ?? failure);
     });
   };
-  const paintTerrain = (op: "difficult" | "clear", a: Point, b: Point) => {
+  const paintTerrain = (op: GroundOp, a: Point, b: Point) => {
     const rect = {
       x: Math.min(a.x, b.x),
       y: Math.min(a.y, b.y),
@@ -260,7 +327,7 @@ export function useMapCommands({
       height: Math.abs(a.y - b.y)
     };
     if (rect.width < 2 || rect.height < 2) {
-      setMessage(op === "difficult" ? "Drag an area to mark it difficult." : "Drag an area to clear it.");
+      setMessage(op === "clear" ? "Drag an area to clear it." : "Drag an area to paint it.");
       return;
     }
     runTerrain(
@@ -273,6 +340,49 @@ export function useMapCommands({
       () => command("terrain:reset", { ...scene, expectedRevision: revision }),
       "The terrain could not be cleared."
     );
+  // Traps and the weather are the live table's, set by the GM.
+  const placeTrap = (a: Point, b: Point) => {
+    const rect = {
+      x: Math.min(a.x, b.x),
+      y: Math.min(a.y, b.y),
+      width: Math.abs(a.x - b.x),
+      height: Math.abs(a.y - b.y)
+    };
+    if (!trapChoice) return;
+    if (rect.width < 2 || rect.height < 2) {
+      setMessage("Drag the trapped area to set the trap.");
+      return;
+    }
+    runTerrain(
+      () =>
+        command("trap:place", { trapId: trapChoice.trapId, tier: trapChoice.tier, rect, expectedRevision: revision }),
+      "The trap could not be set."
+    );
+  };
+  const editTrap = (trapId: string, change: Readonly<{ found?: boolean; state?: "armed" | "disarmed" }>) =>
+    runTerrain(
+      () => command("trap:edit", { trapId, ...change, expectedRevision: revision }),
+      "The trap could not be changed."
+    );
+  const removeTrap = (trapId: string) =>
+    runTerrain(() => command("trap:remove", { trapId, expectedRevision: revision }), "The trap could not be removed.");
+  const springTrap = (trapId: string) =>
+    runTerrain(
+      () => command("trap:spring", { trapId, actorId: null, expectedRevision: revision }),
+      "The trap could not be set off."
+    );
+  const setEnvironment = (environment: Partial<SceneEnvironment>) =>
+    runTerrain(
+      () => command("environment:set", { environment, expectedRevision: revision }),
+      "The weather could not be changed."
+    );
+  /** A creature beside a found trap makes it safe one of its ways; the server rolls any check and says how it went. */
+  const disarmTrap = (trapId: string, actorId: string, disarmId: string) =>
+    runTerrain(async () => {
+      const result = await command("trap:disarm", { trapId, actorId, disarmId, expectedRevision: revision });
+      if (result.ok && result.text) setMessage(result.text);
+      return result.ok ? { ok: true } : result;
+    }, "The trap could not be made safe.");
 
   const runVision = (run: () => Promise<MutationResult>, failure: string, done?: string) => {
     setVisionBusy(true);
@@ -286,10 +396,38 @@ export function useMapCommands({
       () => command("vision:set-enabled", { enabled, ...scene, expectedRevision: revision }),
       "Vision could not be switched."
     );
-  const setAmbient = (ambient: "bright" | "dim" | "dark") =>
+  const setAmbient = (ambient: "bright" | "dim" | "dark", sunlight?: boolean) =>
     runVision(
-      () => command("vision:set-ambient", { ambient, ...scene, expectedRevision: revision }),
+      () =>
+        command("vision:set-ambient", {
+          ambient,
+          ...(sunlight !== undefined ? { sunlight } : {}),
+          ...scene,
+          expectedRevision: revision
+        }),
       "The light could not be changed."
+    );
+  /** An area of light or obscurement over a dragged rectangle. */
+  const addArea = (kind: AreaKindId, a: Point, b: Point) => {
+    if (Math.abs(a.x - b.x) < 4 || Math.abs(a.y - b.y) < 4) {
+      setMessage("Drag over the map to paint an area.");
+      return;
+    }
+    const rect = {
+      x: Math.min(a.x, b.x),
+      y: Math.min(a.y, b.y),
+      width: Math.abs(a.x - b.x),
+      height: Math.abs(a.y - b.y)
+    };
+    runVision(
+      () => command("vision:add-area", { kind, rect, ...scene, expectedRevision: revision }),
+      "The area could not be painted."
+    );
+  };
+  const removeArea = (areaId: string) =>
+    runVision(
+      () => command("vision:remove-area", { areaId, ...scene, expectedRevision: revision }),
+      "That area could not be removed."
     );
   const addWall = (kind: "wall" | "door" | "window", a: Point, b: Point) => {
     if (Math.hypot(a.x - b.x, a.y - b.y) < 4) {
@@ -314,6 +452,36 @@ export function useMapCommands({
       () => command("door:set-open", { wallId, open, ...scene, expectedRevision: revision }),
       open ? "The door could not be opened." : "The door could not be closed.",
       open ? "Door opened." : "Door closed."
+    );
+  /** A creature beside a door picks, forces, pries, jams or seals it; the server rolls the check and says how it went. */
+  const workDoor = (wallId: string, actorId: string, how: DoorWork) => {
+    setVisionBusy(true);
+    void command("door:use", { wallId, actorId, how, expectedRevision: revision }).then((result) => {
+      setVisionBusy(false);
+      setMessage(result.ok ? (result.text ?? "") : (result.message ?? "That could not be done to the door."));
+    });
+  };
+  /** The spell being aimed lights or puts out a flame set on the map (`resolveAtLight`). */
+  const aimAtLight = (lightId: string) =>
+    resolveAtLight(lightId, revision, (ok, text) =>
+      setMessage(text ?? (ok ? "" : "That could not be aimed at the light."))
+    );
+  /** The attack or spell being aimed lands on a door or a wall (`resolveAtWall`); the server says how it went. */
+  const aimAtWall = (wallId: string) =>
+    resolveAtWall(wallId, revision, (ok, text) =>
+      setMessage(text ?? (ok ? "" : "That could not be aimed at the wall."))
+    );
+  /** The GM sets what keeps a door shut and its statistics as an object, in that order: the second write follows the
+   *  first one's revision, so it carries none of its own. */
+  const saveDoor = (wallId: string, door: DoorState | null, object: ObjectStats | null) =>
+    runVision(
+      async () => {
+        const held = await command("door:set-state", { wallId, door, ...scene, expectedRevision: revision });
+        if (!held.ok) return held;
+        return command("object:set", { wallId, object, ...scene });
+      },
+      "The door could not be changed.",
+      "Door saved."
     );
   const addLight = (position: Point, light: Readonly<{ brightFeet: number; dimFeet: number }>) =>
     runVision(
@@ -343,6 +511,9 @@ export function useMapCommands({
     setMessage,
     busyActorId,
     submitMove,
+    setAltitude,
+    mount,
+    fall,
     placeAtCenter,
     blockedMove,
     moveAnyway,
@@ -365,13 +536,25 @@ export function useMapCommands({
     terrainBusy,
     paintTerrain,
     clearAllTerrain,
+    placeTrap,
+    editTrap,
+    removeTrap,
+    springTrap,
+    setEnvironment,
+    disarmTrap,
     visionBusy,
     setVisionEnabled,
     setAmbient,
+    addArea,
+    removeArea,
     addWall,
     removeWall,
     clearWalls,
     setDoorOpen,
+    workDoor,
+    aimAtWall,
+    aimAtLight,
+    saveDoor,
     addLight,
     removeLight,
     forgetExplored

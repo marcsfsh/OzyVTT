@@ -10,7 +10,7 @@ import { hasType, slugValidate, whenField } from "./triggers";
     and vulnerability through `grants`; only an effect carries them as modifiers. */
 const MODIFIER_LABELS: Readonly<
   Record<
-    Exclude<Modifier["type"], "damage-resistance" | "damage-vulnerability">,
+    Exclude<Modifier["type"], "damage-resistance" | "damage-vulnerability" | "damage-immunity">,
     readonly [group: string, label: string]
   >
 > = {
@@ -19,31 +19,54 @@ const MODIFIER_LABELS: Readonly<
   "check-bonus": ["Rolls", "Ability checks"],
   initiative: ["Rolls", "Initiative"],
   "roll-mode": ["Rolls", "Advantage or disadvantage"],
+  "d20-minimum": ["Rolls", "Lowest d20"],
+  "total-minimum": ["Rolls", "Lowest total"],
   "damage-bonus": ["Damage and defence", "Damage rolls"],
   "extra-damage": ["Damage and defence", "Extra damage"],
   "critical-range": ["Damage and defence", "Critical hit range"],
   "critical-bonus-dice": ["Damage and defence", "Extra dice on a critical hit"],
   "damage-reduction": ["Damage and defence", "Damage taken"],
+  "damage-die-minimum": ["Damage and defence", "Lowest damage die"],
+  "ignores-resistance": ["Damage and defence", "Damage that ignores Resistance"],
+  "advantage-denied": ["Damage and defence", "No Advantage on attacks against it"],
+  "ignores-cover": ["Damage and defence", "Attacks that ignore cover"],
+  "no-critical-hits": ["Damage and defence", "Critical hits against it become normal hits"],
+  "spell-ward": ["Damage and defence", "Spells that can't reach it"],
+  "healing-received-maximized": ["Healing", "Healing received at its most"],
+  "healing-dice-maximized": ["Healing", "Healing dice at their most"],
+  "healing-bonus": ["Healing", "More healing"],
   "armor-class": ["Damage and defence", "Armour class"],
+  "base-armor-class": ["Damage and defence", "Base armour class without armour"],
   "unarmored-defense": ["Damage and defence", "Unarmoured defence"],
   "hit-points-per-level": ["Damage and defence", "Hit points per level"],
   "spell-save-dc": ["Spellcasting", "Spell save DC"],
   "spell-attack-bonus": ["Spellcasting", "Spell attack rolls"],
   "spell-slot": ["Spellcasting", "Spell slots"],
   "ability-score": ["The character", "Ability score"],
+  "ability-score-minimum": ["The character", "Ability score of at least"],
   speed: ["The character", "Speed"],
+  "speed-minimum": ["The character", "Speed of at least"],
+  "carrying-capacity-larger": ["The character", "Carries as one size larger"],
   "special-speed": ["The character", "Fly, swim, climb or burrow speed"],
+  movement: ["The character", "Falling and jumping"],
   "extra-attack": ["The character", "Extra attack"],
   darkvision: ["The character", "Darkvision"],
   sense: ["The character", "Another sense"],
   "resource-bonus": ["The character", "A limited-use pool"],
   "short-rest-regain": ["The character", "Uses back on a Short Rest"],
-  "attunement-slots": ["The character", "Attunement slots"]
+  "attunement-slots": ["The character", "Attunement slots"],
+  "proficiency-bonus": ["The character", "Proficiency Bonus"],
+  "granted-score-bonus": ["The character", "Raises another item's score"],
+  "ignores-long-range": ["Damage and defence", "No Disadvantage at long range"]
 };
 
-const MODIFIER_TYPES: readonly SelectOption[] = Object.entries(MODIFIER_LABELS).map(([type, [group, label]]) =>
-  grouped(group)(type, label)
-);
+/** Authored only by the content (a Hammer of Thunderbolts raising a Belt of Giant Strength's score), so the editor
+ *  doesn't offer them. */
+const CONTENT_ONLY_MODIFIERS: ReadonlySet<string> = new Set(["granted-score-bonus"]);
+
+const MODIFIER_TYPES: readonly SelectOption[] = Object.entries(MODIFIER_LABELS)
+  .filter(([type]) => !CONTENT_ONLY_MODIFIERS.has(type))
+  .map(([type, [group, label]]) => grouped(group)(type, label));
 
 /** The GM-facing word for a modifier type, used by publish blockers. */
 export const modifierLabel = (type: unknown): string => {
@@ -56,14 +79,24 @@ function blankModifier(type: string): Draft {
   switch (type) {
     case "ability-score":
       return { type, ability: "str", amount: 1 };
+    case "ability-score-minimum":
+      return { type, ability: "str", score: 19 };
     case "hit-points-per-level":
       return { type, amount: 1 };
     case "speed":
       return { type, amount: 10 };
+    case "speed-minimum":
+      return { type, feet: 30 };
+    case "ignores-cover":
+      return { type, degree: "half" };
     case "special-speed":
       return { type, movement: "fly", feet: 30 };
+    case "movement":
+      return { type, rule: "safe-fall" };
     case "armor-class":
       return { type, amount: 1, whileArmored: false };
+    case "base-armor-class":
+      return { type, base: 13 };
     case "initiative":
       return { type, amount: 1 };
     case "extra-attack":
@@ -96,6 +129,8 @@ function blankModifier(type: string): Draft {
       return { type, poolId: "", amount: 1 };
     case "attunement-slots":
       return { type, amount: 1 };
+    case "proficiency-bonus":
+      return { type, amount: 1 };
     case "critical-range":
       return { type, threshold: 19 };
     case "critical-bonus-dice":
@@ -104,6 +139,20 @@ function blankModifier(type: string): Draft {
       return { type, amount: 1 };
     case "sense":
       return { type, sense: "", feet: 30 };
+    case "d20-minimum":
+      return { type, roll: "check", minimum: 10 };
+    case "total-minimum":
+      return { type, roll: "check", abilityScore: "str" };
+    case "damage-die-minimum":
+      return { type, minimum: 3 };
+    case "ignores-resistance":
+      return { type, damageTypes: [] };
+    case "advantage-denied":
+      return { type, roll: "incoming-attack" };
+    case "spell-ward":
+      return { type, schools: ["divination"] };
+    case "healing-bonus":
+      return { type, amount: 2 };
     default:
       return { type };
   }
@@ -120,8 +169,38 @@ export const ROLL_MODE_ROLLS: readonly SelectOption[] = [
   opt("save", "Saving throws"),
   opt("check", "Ability checks"),
   opt("initiative", "Initiative"),
-  opt("concentration", "Concentration")
+  opt("concentration", "Concentration"),
+  opt("death-save", "Death saving throws")
 ];
+/** The rolls a floor can raise. */
+const FLOORED_ROLLS: readonly SelectOption[] = [opt("check", "Ability checks"), opt("save", "Saving throws")];
+
+/** A switch over a key the schema takes only as `true`: on writes it, off removes it. */
+const trueOnly = (key: string): Pick<FieldDef, "read" | "write"> => ({
+  read: (row) => row[key] === true,
+  write: (next, row) => {
+    const rest = { ...row };
+    delete rest[key];
+    return next === true ? { ...rest, [key]: true } : rest;
+  }
+});
+/** A list the schema takes as absent when empty, never as an empty list. */
+const listOrAbsent = (key: string): Pick<FieldDef, "read" | "write"> => ({
+  read: (row) => (Array.isArray(row[key]) ? row[key] : []),
+  write: (next, row) => {
+    const rest = { ...row };
+    delete rest[key];
+    const list = Array.isArray(next) ? (next as string[]) : [];
+    return list.length > 0 ? { ...rest, [key]: list } : rest;
+  }
+});
+
+/** Signed dice ("1d4", or "-1d4" to take them off), as `SignedDiceSchema` takes them. */
+const signedDiceValidate = (value: unknown): string | null => {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (text === "" || /^-?[1-4]d(?:4|6|8|10|12)$/.test(text)) return null;
+  return `"${text}" isn't dice this takes. Try 1d4, or -1d4 to take them off.`;
+};
 export const ROLL_MODE_WAYS: readonly SelectOption[] = [
   opt("advantage", "Advantage"),
   opt("disadvantage", "Disadvantage")
@@ -176,6 +255,52 @@ export const specialSpeedFields = (): FieldDef[] => [
   }
 ];
 
+const MOVEMENT_RULES: readonly SelectOption[] = [
+  opt("safe-fall", "Takes no damage from falling"),
+  opt("leap", "Leaps for a set cost"),
+  opt("jump-by-dexterity", "Jumps with Dexterity"),
+  opt("jump-multiplier", "Jumps farther")
+];
+
+/** The row's words for a falling or jumping rule: "Leap 30 ft for 10 ft", "Jump distance x2". */
+function movementRuleLabel(modifier: Readonly<Record<string, unknown>>): string {
+  if (modifier.rule === "leap")
+    return `Leap ${Number(modifier.feet ?? 30)} ft for ${Number(modifier.costFeet ?? 10)} ft`;
+  if (modifier.rule === "jump-multiplier") return `Jump distance x${Number(modifier.times ?? 2)}`;
+  return MOVEMENT_RULES.find((entry) => entry.value === modifier.rule)?.label ?? "Falling and jumping";
+}
+
+/** The fields of a falling or jumping rule (Ring of Feather Falling, Boots of Striding and Springing). */
+const movementRuleFields = (): FieldDef[] => [
+  { key: "rule", label: "Rule", kind: "select", options: MOVEMENT_RULES, visibleWhen: hasType("movement") },
+  {
+    key: "feet",
+    label: "Jump up to",
+    kind: "number",
+    min: 5,
+    max: 120,
+    unit: "ft",
+    visibleWhen: (row) => row.type === "movement" && row.rule === "leap"
+  },
+  {
+    key: "costFeet",
+    label: "Movement it spends",
+    kind: "number",
+    min: 0,
+    max: 60,
+    unit: "ft",
+    visibleWhen: (row) => row.type === "movement" && row.rule === "leap"
+  },
+  {
+    key: "times",
+    label: "Times as far",
+    kind: "number",
+    min: 2,
+    max: 4,
+    visibleWhen: (row) => row.type === "movement" && row.rule === "jump-multiplier"
+  }
+];
+
 export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
   key: "modifiers",
   label,
@@ -196,6 +321,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
     if (modifier.type === "spell-slot")
       return `${name} ${signed(Number(modifier.amount ?? 0))} at level ${modifier.level ?? 1}`;
     if (modifier.type === "special-speed") return specialSpeedLabel(modifier);
+    if (modifier.type === "movement") return movementRuleLabel(modifier);
     const amount = modifier.amount ?? modifier.count ?? modifier.feet ?? modifier.threshold;
     return typeof amount === "number" ? `${name} ${signed(amount)}` : name;
   },
@@ -217,7 +343,41 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       label: "Ability",
       kind: "select",
       options: ABILITIES,
-      visibleWhen: hasType("ability-score", "unarmored-defense")
+      visibleWhen: hasType("ability-score", "ability-score-minimum", "unarmored-defense")
+    },
+    {
+      key: "score",
+      label: "Score",
+      kind: "number",
+      min: 1,
+      max: 30,
+      visibleWhen: hasType("ability-score-minimum"),
+      help: "A lower score counts as this while it lasts, as Gauntlets of Ogre Power make Strength 19."
+    },
+    {
+      key: "feet",
+      label: "At least",
+      kind: "number",
+      min: 5,
+      max: 120,
+      unit: "ft",
+      visibleWhen: hasType("speed-minimum")
+    },
+    {
+      key: "ignoresArmor",
+      label: "Heavy armour takes nothing from it",
+      kind: "switch",
+      visibleWhen: hasType("speed-minimum"),
+      ...trueOnly("ignoresArmor"),
+      help: "On when armour whose Strength the bearer lacks still leaves this Speed."
+    },
+    {
+      key: "degree",
+      label: "Cover it ignores",
+      kind: "select",
+      options: [opt("half", "Half cover"), opt("three-quarters", "Half and three-quarters cover")],
+      visibleWhen: hasType("ignores-cover"),
+      help: "Total cover still blocks. Add a condition for the kind of attack, such as a spell attack."
     },
     /* One `amount` field per bound set, because each variant declares its own server-side range;
        `visibleWhen` makes them mutually exclusive. All amounts are signed (negative for curses). */
@@ -234,7 +394,8 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
         "hit-points-per-level",
         "armor-class",
         "spell-save-dc",
-        "spell-attack-bonus"
+        "spell-attack-bonus",
+        "proficiency-bonus"
       )
     },
     /* On a feature the builder bakes this into `speedFeet`; on an item it joins the movement budget
@@ -301,9 +462,132 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       key: "amount",
       label: "Damage reduced by",
       kind: "number",
-      min: 1,
+      min: 0,
       max: 30,
       visibleWhen: hasType("damage-reduction")
+    },
+    {
+      key: "amount",
+      label: "More hit points",
+      kind: "number",
+      min: 0,
+      max: 20,
+      visibleWhen: hasType("healing-bonus")
+    },
+    {
+      key: "dice",
+      label: "Plus dice",
+      placeholder: "1d4",
+      validate: signedDiceValidate,
+      visibleWhen: hasType("attack-bonus", "save-bonus", "check-bonus", "damage-bonus"),
+      emptyValue: "omit",
+      help: "Rolled on top of the amount, as Bless adds 1d4. Write -1d4 to take them off."
+    },
+    {
+      key: "dice",
+      label: "Plus dice",
+      placeholder: "1d4",
+      validate: diceValidate,
+      visibleWhen: hasType("damage-reduction"),
+      emptyValue: "omit",
+      help: "Rolled as the damage lands, as Resistance takes off 1d4."
+    },
+    {
+      key: "oncePerTurn",
+      label: "Once a turn",
+      kind: "switch",
+      visibleWhen: hasType("damage-reduction", "extra-damage"),
+      ...trueOnly("oncePerTurn"),
+      help: "A reduction lands on one hit a turn; extra damage is dealt once a turn, as Colossus Slayer's."
+    },
+    {
+      key: "leavesOne",
+      label: "Leaves at least 1 damage",
+      kind: "switch",
+      visibleWhen: hasType("damage-bonus"),
+      ...trueOnly("leavesOne"),
+      help: "For a penalty that can't take the damage below 1."
+    },
+    {
+      key: "abilityModifier",
+      label: "Plus an ability modifier",
+      kind: "select",
+      options: ABILITIES,
+      emptyValue: "omit",
+      visibleWhen: hasType("check-bonus"),
+      help: "Adds the character's own modifier in that ability to the check."
+    },
+    {
+      key: "minimum",
+      label: "At least",
+      kind: "number",
+      allowNegative: true,
+      min: -5,
+      max: 10,
+      emptyValue: "omit",
+      visibleWhen: (row) => row.type === "check-bonus" && row.abilityModifier !== undefined,
+      help: "The least the ability modifier counts as, such as +1."
+    },
+    {
+      key: "roll",
+      label: "On which roll",
+      kind: "select",
+      options: FLOORED_ROLLS,
+      visibleWhen: hasType("d20-minimum", "total-minimum")
+    },
+    {
+      key: "minimum",
+      label: "A lower d20 counts as",
+      kind: "number",
+      min: 2,
+      max: 20,
+      visibleWhen: hasType("d20-minimum")
+    },
+    {
+      key: "proficientOnly",
+      label: "Only with a proficiency",
+      kind: "switch",
+      ...trueOnly("proficientOnly"),
+      visibleWhen: hasType("d20-minimum"),
+      help: "On for a check that uses one of the character's skill or tool proficiencies."
+    },
+    {
+      key: "abilityScore",
+      label: "A lower total counts as the score in",
+      kind: "select",
+      options: ABILITIES,
+      visibleWhen: hasType("total-minimum")
+    },
+    {
+      key: "minimum",
+      label: "A lower die counts as",
+      kind: "number",
+      min: 2,
+      max: 12,
+      visibleWhen: hasType("damage-die-minimum")
+    },
+    {
+      key: "damageTypes",
+      label: "Damage types",
+      kind: "multiselect",
+      options: DAMAGE_TYPES,
+      visibleWhen: hasType("ignores-resistance")
+    },
+    {
+      key: "perSlotLevel",
+      label: "Plus the spell slot's level",
+      kind: "switch",
+      ...trueOnly("perSlotLevel"),
+      visibleWhen: hasType("healing-bonus"),
+      help: "Only on a spell cast with a spell slot."
+    },
+    {
+      key: "self",
+      label: "The healer regains it",
+      kind: "switch",
+      ...trueOnly("self"),
+      visibleWhen: hasType("healing-bonus"),
+      help: "Once the healing reaches someone else."
     },
     {
       key: "amount",
@@ -341,10 +625,28 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       max: 240,
       unit: "ft",
       visibleWhen: hasType("darkvision"),
-      note: "Display only."
+      note: "Dynamic vision reads it; the best range counts."
+    },
+    {
+      key: "extends",
+      label: "Adds to other Darkvision",
+      kind: "switch",
+      visibleWhen: hasType("darkvision"),
+      ...trueOnly("extends"),
+      help: "The feet are added to the bearer's other Darkvision, as Goggles of Night's 60 feet are."
     },
     ...specialSpeedFields(),
+    ...movementRuleFields(),
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
+    {
+      key: "base",
+      label: "Base AC",
+      kind: "number",
+      min: 11,
+      max: 20,
+      visibleWhen: hasType("base-armor-class"),
+      help: "Plus Dexterity, while no armour is worn. A shield still adds. The best way to work out AC counts."
+    },
     {
       key: "proficiencyBonus",
       label: "Also add the Proficiency Bonus",
@@ -456,6 +758,40 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       note: "Display only."
     },
     { key: "feet", label: "Distance", kind: "number", min: 0, max: 240, unit: "ft", visibleWhen: hasType("sense") },
+    {
+      key: "schools",
+      label: "Schools",
+      kind: "tags",
+      visibleWhen: hasType("spell-ward"),
+      suggestions: (ctx) => ctx.schools,
+      ...listOrAbsent("schools"),
+      help: "A spell of these schools can't target the bearer, and its area leaves the bearer out."
+    },
+    {
+      key: "spellIds",
+      label: "Spells",
+      kind: "tags",
+      visibleWhen: hasType("spell-ward"),
+      suggestions: (ctx) => ctx.spells.map((entry) => entry.id),
+      ...listOrAbsent("spellIds"),
+      help: "These spells can't reach the bearer either, whatever their school, as Zone of Truth can't a Ring of Mind Shielding's."
+    },
+    {
+      key: "typeSenses",
+      label: "Hidden from senses that tell its type",
+      kind: "switch",
+      visibleWhen: hasType("spell-ward"),
+      ...trueOnly("typeSenses"),
+      help: "On when no magic may learn the bearer's type, so Divine Sense doesn't find it either."
+    },
+    {
+      key: "alliesAllowed",
+      label: "Lets its own side's spells through",
+      kind: "switch",
+      visibleWhen: hasType("spell-ward"),
+      ...trueOnly("alliesAllowed"),
+      help: "On when the bearer may allow a spell, as an Amulet of Proof against Detection and Location's wearer does."
+    },
     whenField(),
     {
       key: "scope",

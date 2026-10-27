@@ -19,13 +19,18 @@ import {
   ActorSetSpeedSchema,
   ActorSetArmorClassSchema,
   SetActorArchivedSchema,
+  SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
+  SetActorLairSchema,
+  SetActorPickSchema,
   SetActorSheetPreviewSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
   SetTokenImageSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
+import { legendaryInLair } from "../lair.js";
+import { setStatBlockPick } from "../statblock-picks.js";
 import { setActorSize, setActorVisibility } from "../token-placement.js";
 import { importedDefinition } from "./characters.js";
 import { initiatorOf } from "./kit.js";
@@ -263,6 +268,68 @@ export const actorCommands = [
   }),
 
   defineCommand({
+    type: "actor.set-lair",
+    operationId: "setActorLair",
+    description:
+      'Marks a legendary creature as fighting in its lair, or out of it (GM-grade only; SRD 5.2.1). In its lair it has the legendary action uses and Legendary Resistance its stat block prints for the lair ("3 (4 in Lair)"); uses already spent stay spent. Refused for a creature whose stat block prints no lair.',
+    summary: "Mark a legendary creature as fighting in its lair, with the lair's legendary counts (GM).",
+    schema: SetActorLairSchema,
+    malformed: "The lair command is malformed.",
+    gmOnly: "Only the GM can say where a creature fights.",
+    // Silent to players: legendary counts are GM knowledge.
+    async run({ request, execute }, kit) {
+      const { actorId, inLair } = request;
+      const { duplicate } = await execute((state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That creature no longer exists.");
+        const definition = actor.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
+        const legendary = legendaryInLair(definition, inLair);
+        if (!legendary) throw new CommandRejectedError(`${actor.name}'s stat block prints no lair.`);
+        actor.legendary = legendary;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `${kit.actorName(actorId)} ${inLair ? "fights in its lair" : "no longer fights in its lair"}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.set-pick",
+    operationId: "setActorPick",
+    description:
+      "Records what a creature's stat block leaves to the GM's choice (GM-grade only; SRD 5.2.1): a half-dragon's Draconic Origin damage type, which its Claw and Dragon's Breath deal, or a commoner's Training skill, which it rolls with proficiency and Advantage. `key` names the pick the stat block prints and `value` one of its options; null clears it. Refused for a pick the stat block doesn't print or a value it doesn't allow.",
+    summary: "Choose what a creature's stat block leaves to the GM, such as a damage type or a skill (GM).",
+    schema: SetActorPickSchema,
+    malformed: "The pick command is malformed.",
+    gmOnly: "Only the GM can make a stat block's choices.",
+    // Silent to players: what the GM chose shows when the creature uses it.
+    async run({ request, execute }, kit) {
+      const { actorId, key, value } = request;
+      let name = "";
+      const { duplicate } = await execute((state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That creature no longer exists.");
+        const definition = actor.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
+        name = setStatBlockPick(actor, definition, key, value).name;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text:
+            value === null
+              ? `${kit.actorName(actorId)}'s ${name} is no longer chosen.`
+              : `${kit.actorName(actorId)}'s ${name} is ${value.replace(/-/g, " ")}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
+    }
+  }),
+
+  defineCommand({
     type: "actor.set-speed",
     operationId: "setActorSpeed",
     description:
@@ -310,6 +377,35 @@ export const actorCommands = [
             armorClass === null
               ? `${kit.actorName(actorId)}'s Armor Class follows their gear again.`
               : `The GM set ${kit.actorName(actorId)}'s Armor Class to ${armorClass}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.set-attitude",
+    operationId: "setActorAttitude",
+    description:
+      "Sets a monster's or NPC's attitude toward the party (GM-grade only): Friendly, Indifferent (the default) or Hostile (SRD Influence). An Influence check, or a Charisma check naming the creature, has Advantage against a Friendly one and Disadvantage against a Hostile one. The attitude never reaches a player.",
+    summary: "Set a monster's or NPC's attitude for Influence checks (GM).",
+    schema: SetActorAttitudeSchema,
+    malformed: "The attitude command is malformed.",
+    gmOnly: "Only the GM sets a creature's attitude.",
+    async run({ request, execute }, kit) {
+      const { actorId, attitude } = request;
+      const { duplicate } = await execute((state) => {
+        const actor = state.actors.find((item) => item.id === actorId);
+        if (!actor) throw new CommandRejectedError("That creature no longer exists.");
+        if (actor.kind === "player-character")
+          throw new CommandRejectedError("A player character's attitude is its player's to play.");
+        if (attitude === "indifferent") delete actor.attitude;
+        else actor.attitude = attitude;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `The GM set ${kit.actorName(actorId)}'s attitude to ${attitude[0].toUpperCase()}${attitude.slice(1)}.`,
           actorIds: [actorId],
           gmOnly: true
         });

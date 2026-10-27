@@ -14,6 +14,7 @@ import {
   loadEquipment,
   loadGlossary,
   loadMagicItems,
+  loadPoisons,
   loadMonsterDefinitions,
   loadRules,
   loadSkills,
@@ -257,9 +258,9 @@ describe("SRD 5.2.1 monster bundle", () => {
     const ratBite = byId("rat").actions.find((action) => action.id === "bite");
     expect(ratBite?.attack).toEqual({ bonus: 2, reachFeet: 5 });
     expect(ratBite?.damage).toEqual([{ formula: "1", type: "piercing" }]);
-    // ankheg: dice primary plus acid rider, parenthetical advantage clause skipped.
+    // ankheg: dice primary plus acid rider, and the parenthetical Advantage against a creature it grapples.
     const ankhegBite = byId("ankheg").actions.find((action) => action.id === "bite");
-    expect(ankhegBite?.attack).toEqual({ bonus: 5, reachFeet: 5 });
+    expect(ankhegBite?.attack).toEqual({ bonus: 5, reachFeet: 5, advantageWhen: "target-grappled-by-self" });
     expect(ankhegBite?.damage).toEqual([
       { formula: "2d6 + 3", type: "slashing" },
       { formula: "1d6", type: "acid" }
@@ -534,9 +535,11 @@ describe("SRD 5.2.1 reference bundles", () => {
     // the generated magic items.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
     expect(loadMagicItems().length).toBe(270);
-    // 141 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets, two gaming sets and
-    // the two Spell Scrolls the gear table sells (Cantrip and Level 1).
-    expect(equipment.length).toBe(141 + nonImprovisedWeapons + loadArmor().length + 270);
+    // 144 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets, two gaming sets, the
+    // two Spell Scrolls the gear table sells (Cantrip and Level 1) and the three Saddles (Exotic, Military, Riding).
+    // The Gameplay Toolbox's 14 sample poisons join them.
+    expect(loadPoisons()).toHaveLength(14);
+    expect(equipment.length).toBe(144 + nonImprovisedWeapons + loadArmor().length + 270 + 14);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).

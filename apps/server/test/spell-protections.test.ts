@@ -189,7 +189,7 @@ describe("Befuddlement", () => {
     use(state, castOf("befuddlement"), [FOE]);
     answer(state, FOE, 1);
     const befuddled = actor(state, FOE).effects[0]!;
-    expect(befuddled).toMatchObject({ name: "Befuddlement", tags: ["no-spells"] });
+    expect(befuddled).toMatchObject({ name: "Befuddlement", tags: ["no-spells", "restorable", "cured-by-heal"] });
     const caster = fight(wizard);
     actor(caster.state, HERO).effects = [{ ...befuddled, id: "befuddled" }];
     expect(() => caster.resolve("spell-fire-bolt", {})).toThrowError(
@@ -278,19 +278,17 @@ describe("Greater Invisibility and Invisibility", () => {
 });
 
 describe("Enhance Ability", () => {
-  it("gives Advantage on checks with the ability the caster picks, and asks again for Constitution", () => {
+  it("gives Advantage on checks with the ability the caster picks for each target, and refuses Constitution", () => {
     const { state } = fight(wizard);
-    use(state, castOf("enhance-ability"), [FOE], [], { ability: "str" });
+    use(state, castOf("enhance-ability"), [FOE], [], { targetOptions: { [FOE]: "str" } });
     const goblin = actor(state, FOE);
     expect(goblin.effects[0]).toMatchObject({ name: "Enhance Ability (Strength)" });
     const derivation = deriveEquipment(goblin, undefined, catalog);
     expect(checkRollMode(derivation, { ability: "str" }).mode).toBe("advantage");
     expect(checkRollMode(derivation, { ability: "dex" }).mode).toBe("normal");
     const refused = fight(wizard);
-    const result = use(refused.state, castOf("enhance-ability"), [FOE], [], { ability: "con" });
-    expect((result.warnings ?? []).join(" ")).toMatch(/choose Strength, Dexterity, Intelligence, Wisdom or Charisma/);
-    expect(checkRollMode(deriveEquipment(actor(refused.state, FOE), undefined, catalog), { ability: "con" }).mode).toBe(
-      "normal"
+    expect(() => use(refused.state, castOf("enhance-ability"), [FOE], [], { optionId: "con" })).toThrowError(
+      "Enhance Ability doesn't offer that choice."
     );
   });
 });

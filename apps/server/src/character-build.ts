@@ -29,6 +29,7 @@ import {
   type ClassLevelRow,
   type ClassReference,
   type FeatureRecord,
+  type FeatureSaveDc,
   type Modifier,
   type SpellReference
 } from "@vtt/content-srd-5.2.1";
@@ -39,20 +40,27 @@ import {
   SPELLCASTING_ABILITY_KIND,
   spellSlotsOf,
   surveyForBuild,
+  KIT_ITEM_KIND,
   type BuildClass,
+  type ChoiceOffer,
   type CharacterFeatureOrigin
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
 import {
-  isLongCastingTime,
+  castAreaOf,
+  spellActivationOf,
   laterSpellAction,
   ritualSpellActionId,
   spellCastMechanics,
   UNARMED_STRIKE_ACTION_ID
 } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
+import { bookOfShadowsRow } from "./book-of-shadows.js";
 import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
+import { CONTENT_STAMP } from "./content-stamp.js";
+import { withProficiencyEdit } from "./sheet-proficiency-edits.js";
+import { studyIncreasesOf } from "./study-ledger.js";
 import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -139,7 +147,21 @@ type InterpretedFeatures = {
     withSlot: boolean;
     /** Whose spellcasting ability casts it; see `SpellSource`. */
     source: SpellSource;
+    /** How the granting feature changes the creatures the spell brings (Wild Companion's Fey familiar). */
+    summon?: SummonChange;
+    /** Which of its castings are a Magic action, whatever the spell's casting time (Pact of the Chain, Wild
+     *  Companion). */
+    asMagicAction?: MagicActionCasting;
+    /** How the granting feature changes its castings: components they go without, and a free casting only on its
+     *  caster or with its healing dice at their highest. */
+    casting?: CastingChange;
+    /** The feature that grants it: its own id, or for a chosen option the feature it was chosen under. */
+    grantedBy: string;
   }>;
+  /** Free castings a feature gives the spells other features grant, on its own uses (Natural Recovery). */
+  freeCastsOf: Array<
+    Readonly<{ features: ReadonlySet<string>; minLevel: number; uses: NonNullable<ActorAction["uses"]> }>
+  >;
   /** The free casting a feature with limited uses gives the spell picked for it (Magic Initiate's level 1 spell). */
   pickedSpellUses: Map<string, NonNullable<ActorAction["uses"]>>;
   /** Hit points the features add: each `hit-points-per-level` rider times the level that scales it (a Sorcerer level
@@ -176,7 +198,7 @@ type CarrierRiderType = Exclude<Modifier["type"], (typeof BUILDER_BAKED_MODIFIER
  *  fails. These reach the table as rider carriers via `deriveEquipment`. Values record where each is
  *  consumed ("unread": no consumer yet). */
 const CARRIER_RIDER_DISPOSITION: Readonly<
-  Record<CarrierRiderType, "standing" | "at-its-moment" | "unread" | "display-only">
+  Record<CarrierRiderType, "standing" | "at-its-moment" | "unread" | "display-only" | "vision">
 > = {
   "attack-bonus": "standing", // effective-actions folds it into attack.bonus; action-resolution adds the on-attack-roll half
   "save-bonus": "standing", // saving-throws.ts saveRiderBonus (standing + on-saving-throw)
@@ -190,6 +212,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "armor-class": "standing", // storedArmorClass, via derivation.armorClass, so Defense follows the armor worn now
   "attunement-slots": "standing", // inventory.ts, the attunement limit
   "special-speed": "standing", // speed.ts specialSpeedsOf, the movement modes
+  movement: "standing", // falling.ts and jumping.ts: safe falls, leaps and jump distance
   "roll-mode": "at-its-moment", // rollModeClaims: attacks, saves, checks, initiative
   "extra-damage": "at-its-moment", // resolution/damage.ts rolls it as its own typed damage entry
   "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in resolution/damage.ts
@@ -198,15 +221,34 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionsFor, taken off the hit before resistances
   "damage-resistance": "standing", // derivation.damageResistances, beside the definition's own
   "damage-vulnerability": "standing", // derivation.damageVulnerabilities, beside the definition's own
-  sense: "display-only" // like `darkvision`: the trait prose carries it; no definition field models senses
+  "damage-immunity": "standing", // derivation.damageImmunities, beside the definition's own
+  "ignores-resistance": "standing", // hit-points.ts resistanceIgnoredBy, read on the creature dealing the damage
+  "d20-minimum": "at-its-moment", // ability-checks.ts d20MinimumOf and saving-throws.ts flooredSaveTotal
+  "total-minimum": "at-its-moment", // ability-checks.ts totalMinimumOf and saving-throws.ts flooredSaveTotal
+  "damage-die-minimum": "at-its-moment", // resolution/damage.ts, on the attack's own damage dice
+  "advantage-denied": "at-its-moment", // resolution/attack.ts drops the attack's Advantage against the bearer
+  "healing-received-maximized": "at-its-moment", // resolution/heal.ts, on the creature healed
+  "healing-dice-maximized": "at-its-moment", // resolution/heal.ts, on the healer
+  "healing-bonus": "at-its-moment", // resolution/heal.ts, on the healer
+  "ability-score-minimum": "standing", // live-abilities.ts raises the score every rule reads, from items and effects
+  "speed-minimum": "standing", // speed.ts, a floor under the movement budget
+  "carrying-capacity-larger": "standing", // carrying.ts, read with what the creature carries
+  "ignores-cover": "at-its-moment", // resolution/attack.ts sets the target's cover aside on the attack roll
+  "base-armor-class": "standing", // actor-roster.ts storedArmorClass offers it like Unarmored Defense
+  "no-critical-hits": "at-its-moment", // resolution/attack.ts turns a Critical Hit on the bearer into a hit
+  "spell-ward": "standing", // resolution/spell-wards.ts, read on the bearer as a spell is aimed at it or reaches it
+  "proficiency-bonus": "standing", // live-abilities.ts moves the Proficiency Bonus every rule reads, from items and effects
+  "granted-score-bonus": "standing", // live-abilities.ts raises what another worn item sets a score to
+  "ignores-long-range": "at-its-moment", // resolution/attack.ts sets long range's Disadvantage aside
+  sense: "vision" // vision/senses.ts reads it live for dynamic vision, from every carrier
 };
 
 /** Where a modifier type is consumed, for the coverage manifest (`srd-coverage.ts`): baked by the builder, read at a
- *  roll, or read by nothing yet. `darkvision` is baked, but only to be displayed, like `sense`. */
+ *  roll, read live by dynamic vision (`darkvision` and `sense`, `vision/senses.ts`), or read by nothing yet. */
 export function modifierDisposition(
   type: Modifier["type"]
-): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" {
-  if (type === "darkvision") return "display-only";
+): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" | "vision" {
+  if (type === "darkvision") return "vision";
   return (BUILDER_BAKED_MODIFIER_TYPES as readonly string[]).includes(type)
     ? "baked"
     : CARRIER_RIDER_DISPOSITION[type as CarrierRiderType];
@@ -235,14 +277,89 @@ function resolvedUseLimit(uses: NonNullable<FeatureRecord["uses"]>, context: Bui
   return rows.length > 0 ? rows[rows.length - 1].limit : 0;
 }
 
+type FeatureHitRider = NonNullable<FeatureRecord["actions"][number]["ridesHit"]>;
+
+/** A feature's DC in one of `FeatureSaveDcSchema`'s three forms, as the character's number. */
+function featureDc(feature: FeatureRecord, dc: FeatureSaveDc, context: BuildContext): number {
+  if (dc === "spellcasting") {
+    if (context.spellcastingAbility === null)
+      reject(`"${feature.name}" uses the spell save DC, but this class has no spellcasting.`);
+    return spellSaveDc(context.finalScores[context.spellcastingAbility!], context.proficiencyBonus);
+  }
+  if (typeof dc === "number") return dc;
+  return (
+    dc.base + abilityModifier(context.finalScores[dc.ability]) + (dc.proficiencyBonus ? context.proficiencyBonus : 0)
+  );
+}
+
+/** A feature's hit rider with its DC as the character's number and the effects one hit carries at this level. */
+function builtHitRider(
+  feature: FeatureRecord,
+  rider: FeatureHitRider,
+  context: BuildContext
+): NonNullable<ActorAction["ridesHit"]> {
+  const { saveDc, effectsChooseByLevel, appliesDaysPerLevel, ...rest } = rider;
+  const rows = (effectsChooseByLevel ?? []).filter((row) => row.level <= context.level);
+  const choose = rows.length > 0 ? Math.max(...rows.map((row) => row.choose)) : rest.effectsChoose;
+  // "Which last for a number of days equal to your Monk level", counted on the game clock.
+  const applies =
+    appliesDaysPerLevel && rest.applies
+      ? { applies: { ...rest.applies, duration: { type: "minutes" as const, minutes: context.level * 24 * 60 } } }
+      : {};
+  return {
+    ...rest,
+    ...applies,
+    ...(saveDc !== undefined ? { saveDc: Math.max(1, Math.min(40, featureDc(feature, saveDc, context))) } : {}),
+    ...(choose !== undefined ? { effectsChoose: choose } : {})
+  };
+}
+
 /** A feature action as a definition action. The rider templates' to-hit and DC come from the character's numbers. */
 function interpretAction(
   feature: FeatureRecord,
   action: FeatureRecord["actions"][number],
   context: BuildContext
 ): ActorAction {
-  const { attack, save, damageByLevel, multiattackByLevel, healingByLevel, adds, grantScaling, ...carried } = action;
+  const {
+    attack,
+    save,
+    damageByLevel,
+    damageDiceByAbility,
+    multiattackByLevel,
+    healingByLevel,
+    areaHealByLevel,
+    adds,
+    grantScaling,
+    ridesHit,
+    spendsNoUses,
+    answerAmountByLevel,
+    reactionByLevel,
+    ...carried
+  } = action;
   const assembled: Record<string, unknown> = { ...carried };
+  if (ridesHit) assembled.ridesHit = builtHitRider(feature, ridesHit, context);
+  // A reaction that changes with level (Deflect Energy widens Deflect Attacks to every damage type at Monk 13).
+  const reactionRows = (reactionByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  if (reactionRows.length > 0) assembled.reaction = reactionRows[reactionRows.length - 1]!.reaction;
+  // The die an answer rolls at this level (the Bardic Inspiration die), on the action's answer and its grant's.
+  const answerRows = (answerAmountByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  const answerAmount = answerRows[answerRows.length - 1]?.amount;
+  if (answerAmount !== undefined) {
+    const withAmount = (answer: ActorAction["answer"]): ActorAction["answer"] =>
+      answer && "amount" in answer.effect ? { ...answer, effect: { ...answer.effect, amount: answerAmount } } : answer;
+    if (action.answer) assembled.answer = withAmount(action.answer);
+    if (action.grants?.answer) assembled.grants = { ...action.grants, answer: withAmount(action.grants.answer) };
+  }
+  // "Reroll it with a bonus equal to your Fighter level": the level multiple is the reroll's bonus.
+  if (adds?.classLevel && action.answer?.effect.kind === "reroll")
+    assembled.answer = {
+      ...action.answer,
+      effect: { ...action.answer.effect, bonus: adds.classLevel * context.level }
+    };
   if (attack) {
     const ability = attack.ability === "spellcasting" ? context.spellcastingAbility : attack.ability;
     if (!ability)
@@ -254,18 +371,9 @@ function interpretAction(
     };
   }
   if (save) {
-    if (save.dc === "spellcasting" && context.spellcastingAbility === null)
-      reject(`"${feature.name}" uses the spell save DC, but this class has no spellcasting.`);
     // `FeatureSaveDcSchema` has three forms: "spellcasting", a number, and `{base, ability,
     // proficiencyBonus}` (Dragonborn Breath Weapon, 8 + CON + PB). All must resolve to a number.
-    const dc =
-      save.dc === "spellcasting"
-        ? spellSaveDc(context.finalScores[context.spellcastingAbility!], context.proficiencyBonus)
-        : typeof save.dc === "number"
-          ? save.dc
-          : save.dc.base +
-            abilityModifier(context.finalScores[save.dc.ability]) +
-            (save.dc.proficiencyBonus ? context.proficiencyBonus : 0);
+    const dc = featureDc(feature, save.dc, context);
     assembled.save = { ...save, dc, ...(save.dc === "spellcasting" ? { spellcasting: true } : {}) };
   }
   if (damageByLevel && damageByLevel.length > 0) {
@@ -275,13 +383,32 @@ function interpretAction(
     if (rows.length > 0)
       assembled.damage = [{ formula: rows[rows.length - 1].formula, type: rows[rows.length - 1].type }];
   }
+  // "A number of d8s equal to your Wisdom modifier (minimum of 1d8)" (Sear Undead), from its level.
+  if (damageDiceByAbility && damageDiceByAbility.level <= context.level) {
+    const count = Math.max(
+      damageDiceByAbility.minimum,
+      abilityModifier(context.finalScores[damageDiceByAbility.ability])
+    );
+    assembled.damage = [{ formula: `${count}${damageDiceByAbility.die}`, type: damageDiceByAbility.type }];
+  }
   const plan = (multiattackByLevel ?? []).filter((row) => row.level <= context.level).sort((a, b) => a.level - b.level);
   if (plan.length > 0) assembled.multiattack = plan[plan.length - 1].multiattack;
   const healingRows = (healingByLevel ?? [])
     .filter((row) => row.level <= context.level)
     .sort((left, right) => left.level - right.level);
-  if (healingRows.length > 0)
-    assembled.healing = { ...(action.healing ?? {}), formula: healingRows[healingRows.length - 1].formula };
+  if (healingRows.length > 0) {
+    const { formula, self, temporary } = healingRows[healingRows.length - 1];
+    assembled.healing = {
+      ...(action.healing ?? {}),
+      ...(self ? { self } : {}),
+      ...(temporary ? { temporary } : {}),
+      formula
+    };
+  }
+  const areaHealRows = (areaHealByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  if (areaHealRows.length > 0) assembled.areaHeal = { formula: areaHealRows[areaHealRows.length - 1].formula };
   // "1d10 plus your Fighter level", "add your Wisdom modifier": read off the character as it is built.
   if (adds) {
     const bonus =
@@ -293,6 +420,10 @@ function interpretAction(
       assembled.damage = [{ ...damage[0], formula: formulaPlus(damage[0].formula, bonus) }, ...damage.slice(1)];
     const healing = assembled.healing as ActorAction["healing"];
     if (healing) assembled.healing = { ...healing, formula: formulaPlus(healing.formula, bonus) };
+    // "1d10 plus your Dexterity modifier and Monk level" taken off a hit's damage.
+    const reaction = assembled.reaction as ActorAction["reaction"];
+    if (reaction?.response === "reduce-damage")
+      assembled.reaction = { ...reaction, formula: formulaPlus(reaction.formula, bonus) };
   }
   // The grant's damage bonus is the printed column at this level (Rage Damage), and the sheet says the number.
   if (grantScaling && action.grants) {
@@ -307,14 +438,15 @@ function interpretAction(
       assembled.description = `${action.description} ${amount.name}: +${amount.amount}.`.slice(0, 12000);
     }
   }
-  // The feature's limited uses ride the action when the action declares none of its own.
-  if (feature.uses && assembled.uses === undefined) {
+  // The feature's limited uses ride the action when the action declares none of its own and spends them.
+  if (feature.uses && assembled.uses === undefined && spendsNoUses !== true) {
     const limit = resolvedUseLimit(feature.uses, context);
     if (limit >= 1) {
       assembled.uses = {
         limit: Math.min(MAX_ACTION_USES, limit),
         per: feature.uses.per,
-        ...(feature.uses.pool ? { pool: feature.uses.pool } : {})
+        ...(feature.uses.pool ? { pool: feature.uses.pool } : {}),
+        ...(feature.uses.afterHours ? { afterHours: feature.uses.afterHours } : {})
       };
     }
   }
@@ -329,10 +461,10 @@ const spellActionId = (spellId: string): string => `spell-${spellId}`;
 const DICE_FORMULA = /^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i;
 
 /**
- * The server-resolved action for one known cantrip, or null. Cantrips only, since a leveled spell
- * action would need a slot the sheet can't express. A roll counts as damage only with a damage type,
- * and an action is minted only for typed damage or a save (save outranks attack). Scaled by character
- * level from the printed rows (Fire Bolt's 2d10 at 5, Eldritch Blast's second beam), as the sheet is.
+ * The server-resolved action for one known cantrip, or null for a leveled spell. Every cantrip is cast through the
+ * server, so a cast that rolls nothing (Light, Guidance) still spends its action, holds its Concentration and is told
+ * to the table. Scaled by character level from the printed rows (Fire Bolt's 2d10 at 5, Eldritch Blast's second
+ * beam), as the sheet is.
  */
 function cantripActionFor(
   spell: SpellReference,
@@ -348,30 +480,17 @@ function cantripActionFor(
       ...(tier?.targetCount && spell.effect?.attacks ? { attacks: tier.targetCount } : {})
     }
   );
-  // A cantrip that lasts and acts later (Produce Flame) is cast to start it, with nothing to roll.
-  if (mechanics.damage.length === 0 && !mechanics.save && (spell.effect?.laterActions ?? []).length === 0) return null;
   return {
     id: spellActionId(spell.id),
     name: spell.name,
-    activation: activationOf(spell.castingTime),
+    activation: spellActivationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
-    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
+    ...castAreaOf(spell, mechanics),
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
   } as ActorAction;
-}
-
-/** The action economy a casting time names ("Action", "Bonus Action", "Reaction, which you take when..."). A casting
- *  time of a minute or more takes the Magic action on each turn of it (SRD "Longer Casting Times"), so it is an action
- *  too, refused while Incapacitated. */
-function activationOf(castingTime: string): ActorAction["activation"] {
-  if (/bonus/i.test(castingTime)) return "bonus-action";
-  if (/reaction/i.test(castingTime)) return "reaction";
-  if (/^(?:1 )?action\b/i.test(castingTime.trim()) || isLongCastingTime(castingTime)) return "action";
-  return "other";
 }
 
 type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLevel: number; modifier: number }>;
@@ -379,38 +498,26 @@ type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLe
 /**
  * A leveled spell as an action. Cast with a slot, it carries `spellSlot` at the spell's level, which the economy
  * spends (a higher slot on request upcasts the dice). Cast without one (`free`), it spends the granting
- * feature's uses, or nothing at will. Null for an at-will cast with nothing to resolve.
+ * feature's uses, or nothing at will. A cast that rolls nothing still spends its action and is told to the table.
  */
 function leveledSpellActionFor(
   spell: SpellReference,
   numbers: CasterNumbers,
   free?: ActorAction["uses"] | null
-): ActorAction | null {
+): ActorAction {
   const mechanics = spellCastMechanics(
     spell,
     { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, bearersDc: true, modifier: numbers.modifier },
     {}
   );
-  // A reaction the table can offer (Shield) is something to resolve too.
-  const resolvable =
-    mechanics.damage.length > 0 ||
-    mechanics.save !== undefined ||
-    mechanics.healing !== undefined ||
-    mechanics.attack ||
-    mechanics.grants !== undefined ||
-    spell.effect?.reaction !== undefined ||
-    // A spell that lasts and acts on later turns (Flame Blade) is cast to start it.
-    (spell.effect?.laterActions ?? []).length > 0;
-  if (free === null && !resolvable) return null;
   const freeCast = free !== undefined;
   return {
     id: freeCast ? `${spellActionId(spell.id)}-free` : spellActionId(spell.id),
     name: freeCast ? `${spell.name} (no slot)` : spell.name,
-    activation: activationOf(spell.castingTime),
+    activation: spellActivationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
-    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
+    ...castAreaOf(spell, mechanics),
     // A reaction spell's trigger rides its action, so the table offers it (Shield when an attack would hit).
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     ...(freeCast ? (free ? { uses: free } : {}) : { spellSlot: { level: spell.level } }),
@@ -433,6 +540,16 @@ function ritualActionOf(cast: ActorAction, spell: SpellReference): ActorAction {
  *  (Evocation Savant). */
 const SPELLBOOK_TAG = "spellbook";
 
+/**
+ * Picked spells a feature casts without a slot in a way its uses can't say. SRD Spell Mastery: "You can cast them at
+ * their lowest level without expending a spell slot" (at will, null). SRD Signature Spells: "you can cast each of them
+ * once at level 3 without expending a spell slot ... until you finish a Short or Long Rest" (a counter each).
+ */
+const PICKED_SPELL_CASTS: Readonly<Record<string, (spellId: string) => ActorAction["uses"] | null>> = {
+  "spell-mastery": () => null,
+  "signature-spells": (spellId) => ({ limit: 1, per: "short-rest", pool: `signature-spells-${spellId}` })
+};
+
 /** `ActorDefinitionSchema`'s cap on a sheet's actions; spells past it keep their sheet entry without an action. */
 const MAX_DEFINITION_ACTIONS = 100;
 
@@ -451,7 +568,92 @@ type SpellEntry = {
   ritualActionId?: string;
   source: SpellSource;
   free?: ActorAction["uses"] | null;
+  summon?: SummonChange;
+  asMagicAction?: MagicActionCasting;
+  casting?: CastingChange;
 };
+
+/** What a feature changes about a granted spell's castings (`FeatureGrants.spells[]`): the components every casting
+ *  goes without, and its free casting cast only on its caster or with its healing dice at their highest. */
+type CastingChange = Readonly<{
+  waives?: ReadonlyArray<"verbal" | "somatic" | "material">;
+  freeSelf?: true;
+  freeMaximized?: true;
+}>;
+
+/** The casting change a granted spell carries, or undefined when it changes nothing. */
+function castingChangeOf(spell: NonNullable<FeatureRecord["grants"]>["spells"][number]): CastingChange | undefined {
+  const change: CastingChange = {
+    ...(spell.waives ? { waives: [...spell.waives] } : {}),
+    ...(spell.self ? { freeSelf: true as const } : {}),
+    ...(spell.maximized ? { freeMaximized: true as const } : {})
+  };
+  return Object.keys(change).length > 0 ? change : undefined;
+}
+
+/** Two sources' changes to one spell's castings, together. */
+function mergedCasting(first: CastingChange | undefined, second: CastingChange | undefined): CastingChange | undefined {
+  if (!first || !second) return first ?? second;
+  const waives = [...new Set([...(first.waives ?? []), ...(second.waives ?? [])])];
+  return {
+    ...(waives.length > 0 ? { waives } : {}),
+    ...(first.freeSelf || second.freeSelf ? { freeSelf: true as const } : {}),
+    ...(first.freeMaximized || second.freeMaximized ? { freeMaximized: true as const } : {})
+  };
+}
+
+/** A cast with its feature's change: the components it goes without, and for a free casting, its caster as its only
+ *  target ("on yourself") and its healing dice at their highest (Fiendish Vigor). */
+function withCastingChange(action: ActorAction, change: CastingChange | undefined, free: boolean): ActorAction {
+  if (!change) return action;
+  return {
+    ...action,
+    ...(change.waives ? { waives: [...change.waives] } : {}),
+    ...(free && change.freeSelf ? { targets: { ...(action.targets ?? {}), who: "self" as const } } : {}),
+    ...(free && change.freeMaximized && action.healing
+      ? { healing: { ...action.healing, maximized: true as const } }
+      : {})
+  };
+}
+
+/** Which castings a feature makes a Magic action (`FeatureGrants.spells[].asMagicAction`). */
+type MagicActionCasting = NonNullable<NonNullable<FeatureRecord["grants"]>["spells"][number]["asMagicAction"]>;
+
+/** The cast as a Magic action that takes effect at once, whatever the spell's casting time. */
+const asMagicActionCast = (action: ActorAction): ActorAction => ({
+  ...action,
+  activation: "action",
+  castsAtOnce: true
+});
+
+/** What a feature changes about the creatures a granted spell brings (`FeatureGrants.spells[].summon`). */
+type SummonChange = NonNullable<NonNullable<FeatureRecord["grants"]>["spells"][number]["summon"]>;
+
+/** A cast action with its feature's change to what it summons: the creature type, that it leaves at its caster's Long
+ *  Rest, more forms to pick, and casting without Concentration (Wild Companion, Pact of the Chain, Dragon Companion). */
+function withSummonChange(action: ActorAction, change: SummonChange | undefined): ActorAction {
+  const summons = action.summons;
+  if (!summons || !change) return action;
+  return {
+    ...action,
+    summons: {
+      ...summons,
+      ...(change.creatureTypes ? { creatureTypes: [...change.creatureTypes] } : {}),
+      ...(change.untilLongRest ? { lasts: { type: "until-long-rest" as const } } : {}),
+      ...(change.moreCreatures
+        ? {
+            creatures: [
+              ...summons.creatures,
+              ...change.moreCreatures.filter(
+                (row) => !summons.creatures.some((existing) => existing.monsterId === row.monsterId)
+              )
+            ].slice(0, 24)
+          }
+        : {}),
+      ...(change.concentrationOptional ? { concentrationOptional: true as const } : {})
+    }
+  };
+}
 
 /**
  * Mints and links each spell's actions: a cantrip's (`actionId`), a leveled spell's slot cast (`actionId`, when the
@@ -470,26 +672,46 @@ function linkSpellActions(
     const record = library.spellRecord(entry.id);
     if (!record) continue;
     const numbers = numbersOf(entry.source);
-    const mint = (action: ActorAction | null, key: "actionId" | "freeActionId" | "ritualActionId") => {
+    const mint = (minted: ActorAction | null, key: "actionId" | "freeActionId" | "ritualActionId") => {
+      const action = minted ? withSummonChange(minted, entry.summon) : null;
       if (!action || into.length >= MAX_DEFINITION_ACTIONS || into.some((existing) => existing.id === action.id))
         return;
       into.push(action);
       entry[key] = action.id;
     };
-    if (record.level === 0) mint(cantripActionFor(record, numbers), "actionId");
-    else {
+    if (record.level === 0) {
+      const cantrip = cantripActionFor(record, numbers);
+      mint(cantrip ? withCastingChange(cantrip, entry.casting, false) : null, "actionId");
+    } else {
       if (hasSlots && entry.withSlot !== false) {
-        const cast = leveledSpellActionFor(record, numbers);
-        mint(cast, "actionId");
+        const cast = withCastingChange(leveledSpellActionFor(record, numbers), entry.casting, false);
+        mint(entry.asMagicAction === "every-casting" ? asMagicActionCast(cast) : cast, "actionId");
         // SRD Rituals: a prepared ritual spell can be cast without a slot and takes 10 minutes longer.
-        if (cast && record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
+        if (record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
       }
-      if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
+      if (entry.free !== undefined) {
+        const free = withCastingChange(leveledSpellActionFor(record, numbers, entry.free), entry.casting, true);
+        // "Cast it as a Magic action without expending a spell slot" (Pact of the Chain).
+        mint(entry.asMagicAction ? asMagicActionCast(free) : free, "freeActionId");
+      }
     }
     // What the spell lets its caster do once it is up (Produce Flame's hurl, Spirit Guardians' save), with no slot.
     const tier =
       record.level === 0 ? cantripTierAt(cantripScalingOf(record.castingOptions), numbers.characterLevel) : null;
     for (const later of record.effect?.laterActions ?? []) {
+      // One the spell gives the creature it touches (Dragon's Breath's exhale) is on that creature's sheet, from its
+      // effect, not the caster's.
+      if (record.effect?.grant?.grantsLaterAction === later.name) continue;
+      // An area that only changes the ground (Entangle's plants) is the server's alone, with nothing to take or roll.
+      if (
+        later.activation === "other" &&
+        !later.save &&
+        later.damage.length === 0 &&
+        !later.attackRange &&
+        !later.movesArea &&
+        !later.cutsArea
+      )
+        continue;
       const action = laterSpellAction(
         record,
         later,
@@ -503,7 +725,14 @@ function linkSpellActions(
 }
 
 /** The sheet's spell entry without the build-only fields. */
-const sheetSpell = ({ source: _source, free: _free, ...entry }: SpellEntry) => entry;
+const sheetSpell = ({
+  source: _source,
+  free: _free,
+  summon: _summon,
+  asMagicAction: _asMagicAction,
+  casting: _casting,
+  ...entry
+}: SpellEntry) => entry;
 
 /** The Martial Arts unarmed strike from the printed `classResources` column, or null without one. Uses
  *  the better of DEX or STR (SRD Dexterous Attacks). A non-dice amount keeps the generic builtin. Monk weapons
@@ -550,7 +779,8 @@ function interpretFeature(
   context: BuildContext,
   source: SpellSource,
   classId: string | null = null,
-  className: string | null = null
+  className: string | null = null,
+  grantedBy: string = feature.id
 ): void {
   into.traits.push({ name: feature.name, description: feature.description });
   /** An action or pool id as this class owns it, and the action's name when that id had to change. */
@@ -572,9 +802,22 @@ function interpretFeature(
   const carriesUses = feature.uses !== undefined && synthesizedUses >= 1;
   // The counter of a free-cast grant (Divine Smite once per Long Rest) rides its spell's free-cast action instead.
   const freeUses: ActorAction["uses"] | undefined = carriesUses
-    ? { limit: synthesizedUses, per: feature.uses!.per, pool: owned(feature.uses!.pool ?? feature.id) }
+    ? {
+        limit: synthesizedUses,
+        per: feature.uses!.per,
+        pool: owned(feature.uses!.pool ?? feature.id),
+        ...(feature.uses!.afterHours ? { afterHours: feature.uses!.afterHours } : {})
+      }
     : undefined;
-  const freeCastGrant = feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
+  // A free casting of what other features grant (Natural Recovery) spends this feature's counter on those casts.
+  const freeCastOf = feature.freeCastOf !== undefined && carriesUses;
+  if (freeCastOf)
+    into.freeCastsOf.push({
+      features: new Set(feature.freeCastOf!.features),
+      minLevel: feature.freeCastOf!.minLevel ?? 0,
+      uses: freeUses!
+    });
+  const freeCastGrant = freeCastOf || feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
   // A spell picked for a feature with limited uses is cast with them (Magic Initiate once per Long Rest, Mystic
   // Arcanum), so the counter rides that spell's free-cast action, with no action of its own.
   const freeCastPick = carriesUses && featurePicks(feature).some((pick) => pick.kind === "spell");
@@ -597,7 +840,8 @@ function interpretFeature(
             uses: {
               limit: synthesizedUses,
               per: feature.uses!.per,
-              ...(feature.uses!.pool ? { pool: owned(feature.uses!.pool) } : {})
+              ...(feature.uses!.pool ? { pool: owned(feature.uses!.pool) } : {}),
+              ...(feature.uses!.afterHours ? { afterHours: feature.uses!.afterHours } : {})
             }
           }
         : {})
@@ -624,6 +868,10 @@ function interpretFeature(
         ability: spell.ability,
         withSlot: spell.withSlot,
         source,
+        grantedBy,
+        ...(spell.summon ? { summon: spell.summon } : {}),
+        ...(spell.asMagicAction ? { asMagicAction: spell.asMagicAction } : {}),
+        ...(castingChangeOf(spell) ? { casting: castingChangeOf(spell) } : {}),
         ...(spell.withoutSlot === "at-will" ? { free: null } : {}),
         // A free casting with no counter to spend is refused at build, so nothing casts without limit.
         ...(spell.withoutSlot === "free"
@@ -665,7 +913,7 @@ function interpretFeature(
           into.unarmoredDefenses.push({ ability: modifier.ability, allowShield: modifier.allowShield });
         break;
       case "darkvision":
-        break; // display-only: the trait prose carries the senses; no definition field models them
+        break; // nothing to bake: dynamic vision reads it live (vision/senses.ts)
       // The roll-time variants; see `CARRIER_RIDER_DISPOSITION`.
       default:
         ownedByTheRollTimeCollector(modifier);
@@ -768,12 +1016,36 @@ export function storedHitPointRolls(choices: readonly CharacterChoice[], level: 
   return rolls;
 }
 
+/** The ledger rows a pick with a default answer takes when the ledger holds none (the High Elf's Prestidigitation). */
+function defaultedRows(offers: readonly ChoiceOffer[]): CharacterChoice[] {
+  return offers.flatMap((offer) =>
+    offer.defaultId !== null && offer.taken.length === 0 && offer.options.has(offer.defaultId)
+      ? [
+          {
+            level: offer.levels[0] ?? 1,
+            ...(offer.classId ? { classId: offer.classId } : {}),
+            kind: offer.kind,
+            id: offer.defaultId,
+            ...(offer.featureId ? { payload: { featureId: offer.featureId } } : {})
+          }
+        ]
+      : []
+  );
+}
+
 export function buildCharacterDefinition(
-  input: CharacterCreateRequestInput,
+  requested: CharacterCreateRequestInput,
   library: ContentView,
   policy: BuilderPolicy
 ): ActorDefinition {
-  const survey = surveyForBuild(input, library, policy);
+  let input = requested;
+  let survey = surveyForBuild(input, library, policy);
+  // A pick the ledger doesn't answer takes its default, which the stored ledger then records.
+  const defaults = defaultedRows(survey.offers);
+  if (defaults.length > 0) {
+    input = { ...input, choices: [...input.choices, ...defaults] };
+    survey = surveyForBuild(input, library, policy);
+  }
   const {
     offers,
     classes,
@@ -847,6 +1119,9 @@ export function buildCharacterDefinition(
       });
     });
   }
+  // A studied manual or tome lands after its level's own increases, so an Ability Score Improvement taken later still
+  // stops at 20.
+  const studies = studyIncreasesOf(input.choices, input.level);
   const holdings = featHoldings({ classes, granted });
   const featChecks = [
     ...(originFeat ? [{ feat: originFeat, level: 1 }] : []),
@@ -874,6 +1149,11 @@ export function buildCharacterDefinition(
           `${increase.ability.toUpperCase()} would be ${finalScores[increase.ability]}; ${increase.source} cannot raise a score above ${increase.maximum}. Choose another ability.`
         );
     }
+    for (const study of studies.filter((candidate) => candidate.level === level))
+      finalScores[study.ability] = Math.max(
+        finalScores[study.ability],
+        Math.min(study.maximum, finalScores[study.ability] + study.amount)
+      );
   }
 
   // ---- 5c. Feature `ability-score` riders, before any feature is interpreted: `interpretAction`
@@ -925,6 +1205,7 @@ export function buildCharacterDefinition(
     damageImmunities: [],
     conditionImmunities: [],
     grantedSpells: [],
+    freeCastsOf: [],
     pickedSpellUses: new Map(),
     hitPointBonus: 0,
     speedBonus: 0,
@@ -962,8 +1243,17 @@ export function buildCharacterDefinition(
       contextOf(classId),
       spellSourceOf(record, origin, classId),
       classId,
-      classId === null ? null : (classOf.get(classId)?.record.name ?? null)
+      classId === null ? null : (classOf.get(classId)?.record.name ?? null),
+      origin?.kind === "option" ? origin.sourceId : record.id
     );
+  // A free casting that other features' spells share (Natural Recovery's one Circle Spell a Long Rest): each such
+  // spell of its level or higher is cast free on the one counter, unless another feature already casts it free.
+  for (const spec of interpreted.freeCastsOf)
+    for (const grantedSpell of interpreted.grantedSpells) {
+      const level = grantedSpell.level ?? library.spellRecord(grantedSpell.id)?.level ?? 0;
+      if (spec.features.has(grantedSpell.grantedBy) && level >= spec.minLevel && grantedSpell.free === undefined)
+        grantedSpell.free = spec.uses;
+    }
   // Martial Arts reads its own class's column (a Monk's), and runs after the features so an id a feature already
   // declared keeps it.
   const martialContext = [...classContexts.values()].find((context) => martialArtsDieOf(context) !== null);
@@ -1049,33 +1339,37 @@ export function buildCharacterDefinition(
   for (const skill of expertiseTaken) {
     if (!skillTaken.includes(skill)) reject(`Expertise in "${skill}" requires proficiency in it first.`);
   }
-  const proficiencies = {
-    saves: dedupe([...classRecord.savingThrows, ...interpreted.grantedSaves]),
-    skills: dedupe(skillTaken).map((id) => ({
-      id,
-      proficiency: expertiseTaken.includes(id) ? "expertise" : "proficient"
-    })),
-    armor: dedupe([...classRecord.armorProficiencies, ...multiclassTraining("armor"), ...interpreted.grantedArmor]),
-    weapons: dedupe([
-      ...classRecord.weaponProficiencies,
-      ...multiclassTraining("weapons"),
-      ...interpreted.grantedWeapons
-    ]),
-    tools: dedupe([
-      ...classRecord.toolProficiencies,
-      ...multiclassTraining("tools"),
-      ...takenOf("tool"),
-      ...skillOrTool.filter((id) => !skillIds.has(id)),
-      ...background.toolProficiencies,
-      ...interpreted.grantedTools
-    ]),
-    languages: dedupe([
-      ...species.languages,
-      ...takenOf("language"),
-      ...background.languages,
-      ...interpreted.grantedLanguages
-    ])
-  };
+  // A hand edit made on the sheet comes last, so it outlasts the rebuild (`sheet-proficiency-edits.ts`).
+  const proficiencies = withProficiencyEdit(
+    {
+      saves: dedupe([...classRecord.savingThrows, ...interpreted.grantedSaves]),
+      skills: dedupe(skillTaken).map((id) => ({
+        id,
+        proficiency: expertiseTaken.includes(id) ? "expertise" : "proficient"
+      })),
+      armor: dedupe([...classRecord.armorProficiencies, ...multiclassTraining("armor"), ...interpreted.grantedArmor]),
+      weapons: dedupe([
+        ...classRecord.weaponProficiencies,
+        ...multiclassTraining("weapons"),
+        ...interpreted.grantedWeapons
+      ]),
+      tools: dedupe([
+        ...classRecord.toolProficiencies,
+        ...multiclassTraining("tools"),
+        ...takenOf("tool"),
+        ...skillOrTool.filter((id) => !skillIds.has(id)),
+        ...background.toolProficiencies,
+        ...interpreted.grantedTools
+      ]),
+      languages: dedupe([
+        ...species.languages,
+        ...takenOf("language"),
+        ...background.languages,
+        ...interpreted.grantedLanguages
+      ])
+    },
+    input.choices
+  );
 
   // ---- 9. Spellcasting: each casting class's own row (cantrips, prepared cap, the highest level it prepares, its
   // list and ability) over one shared slot pool, plus chosen and granted spells. ----
@@ -1102,7 +1396,9 @@ export function buildCharacterDefinition(
     const record = library.spellRecord(pick.id);
     const source = sourceOfFeature(pick.featureId, pick.classId);
     const spellbook = spellbookFeatures.has(pick.featureId);
-    const uses = kind === "spell" ? interpreted.pickedSpellUses.get(pick.featureId) : undefined;
+    // How the pick is cast without a slot: by the feature's own rule where its uses can't say it, else on its uses.
+    const rule = kind === "spell" ? PICKED_SPELL_CASTS[pick.featureId] : undefined;
+    const uses = rule ? rule(pick.id) : kind === "spell" ? interpreted.pickedSpellUses.get(pick.featureId) : undefined;
     const castsAs = castingClassOf(source);
     return {
       id: pick.id,
@@ -1112,32 +1408,46 @@ export function buildCharacterDefinition(
       alwaysPrepared: !spellbook,
       ...(castsAs ? { classId: castsAs } : {}),
       source,
-      ...(uses ? { free: uses } : {})
+      ...(uses !== undefined ? { free: uses } : {})
     };
   };
   const featureCantripEntries = featurePicksOf("cantrip").map((pick) => pickedEntry(pick, "cantrip"));
   const featureSpellEntries = featurePicksOf("spell").map((pick) => pickedEntry(pick, "spell"));
   const grantedSpellEntry = (grantedSpell: InterpretedFeatures["grantedSpells"][number]): SpellEntry => {
     const record = library.spellRecord(grantedSpell.id);
+    // A subclass's spells count as its class's spells (Draconic Spells are Sorcerer spells).
+    const castsAs = castingClassOf(grantedSpell.source);
     return {
       id: grantedSpell.id,
       name: record?.name ?? grantedSpell.id,
       level: grantedSpell.level ?? record?.level ?? 0,
       prepared: true,
       alwaysPrepared: grantedSpell.alwaysPrepared,
+      ...(castsAs ? { classId: castsAs } : {}),
       ...(grantedSpell.withSlot ? {} : { withSlot: false as const }),
       source: grantedSpell.source,
-      ...(grantedSpell.free !== undefined ? { free: grantedSpell.free } : {})
+      ...(grantedSpell.free !== undefined ? { free: grantedSpell.free } : {}),
+      ...(grantedSpell.summon ? { summon: grantedSpell.summon } : {}),
+      ...(grantedSpell.asMagicAction ? { asMagicAction: grantedSpell.asMagicAction } : {}),
+      ...(grantedSpell.casting ? { casting: grantedSpell.casting } : {})
     };
   };
-  /** Adds a spell once; a second source of the same spell adds only its free casting. */
+  /** Adds a spell once; a second source of the same spell adds only its free casting and what it changes about the
+   *  creatures the spell brings. */
   const addSpell = (spells: SpellEntry[], entry: SpellEntry) => {
     const existing = spells.find((candidate) => candidate.id === entry.id);
     if (!existing) spells.push(entry);
-    else if (existing.free === undefined && entry.free !== undefined) {
-      existing.free = entry.free;
-      existing.prepared = true;
-      existing.alwaysPrepared = true;
+    else {
+      if (existing.free === undefined && entry.free !== undefined) {
+        existing.free = entry.free;
+        existing.prepared = true;
+        existing.alwaysPrepared = true;
+      }
+      if (entry.summon && !existing.summon) existing.summon = entry.summon;
+      if (entry.asMagicAction && existing.asMagicAction !== "every-casting")
+        existing.asMagicAction = entry.asMagicAction;
+      const casting = mergedCasting(existing.casting, entry.casting);
+      if (casting) existing.casting = casting;
     }
   };
   // The ability each source casts with: a class's own, the species' or a feat's chosen one, else an ability the grant
@@ -1178,6 +1488,22 @@ export function buildCharacterDefinition(
         : `"${row.id}" is chosen for "${row.classId}", a class this character has no levels in.`
     );
   }
+  // Pact of the Tome: "they must be spells you don't already have prepared", so a book pick the sheet already holds
+  // would be merged away and lost.
+  const featurePicked = [...featurePicksOf("cantrip"), ...featurePicksOf("spell")];
+  const bookPick = featurePicked
+    .filter((pick) => pick.featureId === "pact-of-the-tome")
+    .find((pick) =>
+      [
+        ...classSpells.flatMap((budget) => [...budget.cantripRows, ...budget.spellRows]),
+        ...interpreted.grantedSpells,
+        ...featurePicked.filter((other) => other.featureId !== "pact-of-the-tome")
+      ].some((held) => held.id === pick.id)
+    );
+  if (bookPick)
+    reject(
+      `"${bookPick.id}" is already prepared. The Book of Shadows holds spells the character doesn't already have prepared.`
+    );
   let spellcasting: Record<string, unknown> | undefined;
   if (classSpells.length > 0) {
     const { slots, pact } = spellSlotsOf(classes);
@@ -1230,6 +1556,8 @@ export function buildCharacterDefinition(
           level: 0,
           prepared: true,
           alwaysPrepared: true,
+          // The class a cantrip is cast as, which a rider on that class's spells reads (Innate Sorcery).
+          classId: budget.classId,
           source: `class:${budget.classId}`
         });
       }
@@ -1322,12 +1650,34 @@ export function buildCharacterDefinition(
       reject(`Choose exactly one ${source} equipment option (${options.map((option) => option.id).join(", ")}).`);
     const chosen = options.find((option) => option.id === matches[0].id)!;
     goldPieces += chosen.goldPieces;
+    // The item the kit lets its taker pick ("Musical Instrument of your choice"), recorded in its own row.
+    const kitPicks = input.choices
+      .filter(
+        (row) => row.kind === KIT_ITEM_KIND && (row.classId ?? null) === (source === "class" ? classRecord.id : null)
+      )
+      .map((row) => row.id);
     // A kit item that is one of this source's tool choices is the tool chosen there ("Gaming Set (same as above)").
     const chosenTools = [...(offers.find((offer) => offer.key === `${source}-tools`)?.taken ?? [])];
-    const items = chosen.items.map((item) => {
+    const picked = chosen.items.map((item) => {
+      const pick = item.pickFrom ? kitPicks.findIndex((id) => item.pickFrom!.includes(id)) : -1;
+      if (pick >= 0) {
+        const id = kitPicks.splice(pick, 1)[0]!;
+        return { ...item, id, name: library.equipmentRecord(id)?.name ?? item.name };
+      }
       if (!toolChoices.includes(item.id) || chosenTools.length === 0 || chosenTools.includes(item.id)) return item;
       const tool = chosenTools.shift()!;
       return { ...item, id: tool, name: library.equipmentRecord(tool)?.name ?? item.name };
+    });
+    if (kitPicks.length > 0) reject(`"${kitPicks[0]}" isn't one of the items ${chosen.label} offers a choice of.`);
+    // An equipment pack is the things it holds, each its own row ("10 Torches" a stack of ten).
+    const items = picked.flatMap((item) => {
+      const contents = library.equipmentRecord(item.id)?.contents;
+      if (!contents) return [item];
+      return contents.map((content) => ({
+        id: content.id,
+        name: library.equipmentRecord(content.id)?.name ?? content.id,
+        quantity: content.quantity * item.quantity
+      }));
     });
     for (const item of items) {
       const existing = inventory.find((candidate) => candidate.id === item.id);
@@ -1345,8 +1695,12 @@ export function buildCharacterDefinition(
             id: item.id,
             name: record?.name ?? item.name,
             quantity: item.quantity,
+            // A focus that is also a weapon (the Wizard's staff, "also used as a Quarterstaff") is in hand too.
             equipped: record
-              ? record.category === "armor" || record.category === "shield" || record.category === "weapon"
+              ? record.category === "armor" ||
+                record.category === "shield" ||
+                record.category === "weapon" ||
+                record.weapon !== undefined
               : false,
             attuned: false,
             ...(record?.weightLb !== null && record?.weightLb !== undefined ? { weightEach: record.weightLb } : {}),
@@ -1394,6 +1748,8 @@ export function buildCharacterDefinition(
   );
   if (strayEquipment)
     reject(`"${strayEquipment.id}" is not ${withArticle(classRecord.name)} or ${background.name} equipment option.`);
+  // Pact of the Tome's book, conjured before the first adventure as at the end of a rest.
+  if (heldFeatures.some((ref) => ref.id === "pact-of-the-tome")) inventory.push(bookOfShadowsRow());
   // Only one body armor stays equipped (two would fight over derived AC); keep the best base.
   const equippedArmor = inventory.filter((item) => item.category === "armor" && item.equipped);
   for (const extra of equippedArmor
@@ -1444,7 +1800,7 @@ export function buildCharacterDefinition(
   return ActorDefinitionSchema.parse({
     schemaId: "vtt.actor-character",
     schemaVersion: 1,
-    source: { name: BUILDER_SOURCE_NAME, version: "1" },
+    source: { name: BUILDER_SOURCE_NAME, version: CONTENT_STAMP },
     name: input.name,
     summary,
     size,

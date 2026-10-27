@@ -1,6 +1,12 @@
 import type { HomebrewContentType, HomebrewValidationIssue, HomebrewValidity } from "@vtt/api-contract";
 import { CatalogChoiceError, resolveCatalogChoice, withArticle, type CatalogChoiceCatalogs } from "@vtt/domain";
-import { DAMAGE_ROLL_MOMENTS, RIDER_TRIGGER_KINDS, type ActorDefinition, type Modifier } from "@vtt/schemas";
+import {
+  DAMAGE_ROLL_MOMENTS,
+  HEALING_MOMENTS,
+  RIDER_TRIGGER_KINDS,
+  type ActorDefinition,
+  type Modifier
+} from "@vtt/schemas";
 import {
   CONDITION_IDS,
   DAMAGE_TYPE_IDS,
@@ -19,6 +25,7 @@ import {
   type FeatureRecord,
   type SpeciesReference,
   type SpellListReference,
+  type SpellReference,
   type SubclassReference
 } from "@vtt/content-srd-5.2.1";
 import type { ContentLibrary, ContentView } from "./content-library.js";
@@ -135,8 +142,9 @@ export function validateForPublish(
     case "spell-list":
       spellListIssues(record as SpellListReference, checks);
       break;
-    // A spell names no other record: `SpellReference.classes` entries are open membership tags.
+    // `SpellReference.classes` entries are open membership tags; a priced material may name gear.
     case "spell":
+      spellIssues(record as SpellReference, checks);
       break;
     case "equipment":
       equipmentIssues(record as EquipmentReference, checks);
@@ -332,14 +340,10 @@ function speciesIssues(entry: SpeciesReference, checks: Checks) {
         `Two lineages of ${entry.name} share one id, so only the first would ever be granted. Give ${lineage.name} its own.`
       );
     seen.add(lineage.id);
-    // Lineage traits are flattened untagged, so a choice there would be offered for every lineage.
-    lineage.traits.forEach((trait, traitIndex) => {
-      if (featurePicks(trait).length > 0)
-        checks.add(
-          ["lineages", index, "traits", traitIndex, "choice"],
-          `${trait.name} asks the player to choose from inside a lineage. Lineage traits cannot carry choices yet. Move the choice up to a species trait.`
-        );
-    });
+    // A lineage trait's pick is offered only to a character of that lineage (the High Elf's cantrip).
+    lineage.traits.forEach((trait, traitIndex) =>
+      featureIssues(trait, ["lineages", index, "traits", traitIndex], checks, 1)
+    );
   });
 
   const self: SelfCatalog = {
@@ -410,10 +414,45 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
       ["extensions", STATBLOCK_EXTENSION, "type"],
       `${definition.name} has no creature type, so the bestiary would list it with none and a search by type would never find it. Pick its creature type.`
     );
+  // A reaction that uses another action (Reflexive Antennae, Pursuit) and a damage part of a picked type (a
+  // half-dragon's Claw) find what they name on the same stat block, or they do nothing in play.
+  const picks = new Set(
+    (definition.traitMechanics ?? []).flatMap((mechanic) => (mechanic.kind === "pick" ? [mechanic.key] : []))
+  );
+  definition.actions.forEach((action, index) => {
+    const reaction = action.reaction;
+    const uses = reaction && "usesAction" in reaction ? reaction.usesAction : undefined;
+    if (uses !== undefined && !definition.actions.some((sibling) => sibling.id === uses))
+      checks.add(
+        ["actions", index, "reaction", "usesAction"],
+        `${action.name} uses an action ${definition.name} doesn't have. Pick one of its actions.`
+      );
+    action.damage.forEach((part, partIndex) => {
+      if (part.pick !== undefined && !picks.has(part.pick))
+        checks.add(
+          ["actions", index, "damage", partIndex, "pick"],
+          `${action.name} deals the damage type of a choice ${definition.name}'s traits don't offer. Add the trait that offers it, or give the damage a type.`
+        );
+    });
+  });
 }
 
 /** A template's `appliesTo.baseIds` must resolve to items with the stats the bind copies (weapon or armor), or to
  *  the kinds of ammunition a piece of magic ammunition can be. */
+/** A priced or consumed material that names gear must name gear the catalog holds, or no carried item would be it
+ *  (a name it matches still could). */
+function spellIssues(spell: SpellReference, checks: Checks) {
+  (spell.components.costly ?? []).forEach((material, row) =>
+    (material.itemIds ?? []).forEach((itemId, index) => {
+      if (checks.catalog.equipmentRecord(itemId) === undefined)
+        checks.add(
+          ["components", "costly", row, "itemIds", index],
+          `${spell.name}'s material ${material.name} names an item this table doesn't have. Pick one from the equipment list, or leave the items out and let its name match what a character carries.`
+        );
+    })
+  );
+}
+
 function equipmentIssues(item: EquipmentReference, checks: Checks) {
   riderBlockIssues(item, [], item.name, checks);
   // An item's riders reach the sheet through equipment derivation, which has no arm for granted spells.
@@ -571,6 +610,19 @@ function riderBlockIssues(
   block.actions.forEach((action, index) =>
     riderIssues(action.grants?.modifiers, [...path, "actions", index, "grants", "modifiers"], label, checks)
   );
+  // An item's kinds carry riders of their own (an Ioun Stone's stones).
+  if ("variants" in block)
+    (block.variants ?? []).forEach((variant, index) => {
+      const at: Path = [...path, "variants", index];
+      const named = `${variant.name} (${label})`;
+      riderIssues(variant.modifiers, [...at, "modifiers"], named, checks);
+      variant.effects.forEach((effect, effectIndex) =>
+        riderIssues(effect.modifiers, [...at, "effects", effectIndex, "modifiers"], named, checks)
+      );
+      variant.actions.forEach((action, actionIndex) =>
+        riderIssues(action.grants?.modifiers, [...at, "actions", actionIndex, "grants", "modifiers"], named, checks)
+      );
+    });
 }
 
 /** The moments each reader collects, for the modifiers whose reader is narrower than the vocabulary: a damage
@@ -579,8 +631,36 @@ function riderBlockIssues(
 const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
   "damage-bonus": DAMAGE_ROLL_MOMENTS,
   "extra-damage": DAMAGE_ROLL_MOMENTS,
-  "damage-resistance": [],
-  "damage-vulnerability": []
+  "damage-die-minimum": DAMAGE_ROLL_MOMENTS,
+  // Standing, or as the damage lands, narrowed by what dealt it (a Brooch of Shielding against Magic Missile).
+  "damage-resistance": ["on-taking-damage"],
+  "damage-vulnerability": [],
+  "damage-immunity": ["on-taking-damage"],
+  "ignores-resistance": [],
+  "advantage-denied": [],
+  "ability-score-minimum": [],
+  "base-armor-class": [],
+  "speed-minimum": [],
+  "carrying-capacity-larger": [],
+  "ignores-cover": ["on-attack-roll"],
+  // Standing, or against one attack roll as it is rolled (an Arrow-Catching Shield's +2 against ranged attacks).
+  "armor-class": ["on-attack-roll"],
+  "no-critical-hits": ["on-attack-roll"],
+  "spell-ward": [],
+  "healing-received-maximized": [],
+  "healing-dice-maximized": HEALING_MOMENTS,
+  "healing-bonus": HEALING_MOMENTS,
+  "d20-minimum": ["on-ability-check", "on-saving-throw"],
+  "total-minimum": ["on-ability-check", "on-saving-throw"],
+  "damage-reduction": ["on-taking-damage"]
+};
+
+/** A moment in the words the publish gate uses. */
+const MOMENT_WORDS: Readonly<Record<string, string>> = {
+  "on-ability-check": "on an ability check",
+  "on-saving-throw": "on a saving throw",
+  "on-healing": "when the bearer heals",
+  "on-taking-damage": "when the bearer takes damage"
 };
 
 /** Riders that parse but would never take effect. Checked here because Zod cannot refine inside a
@@ -594,15 +674,40 @@ function riderIssues(modifiers: readonly Modifier[] | undefined, path: Path, lab
         [...path, index],
         read.length === 0
           ? `A modifier of ${label} waits for a moment in a roll, but a defence is read before any roll, so it would never apply. Remove the moment, or make it depend on a state, such as an effect or a condition.`
-          : `A damage modifier of ${label} waits for a moment the damage roll never reaches, so it would add nothing. Make it apply on a hit or on the damage roll, or remove the moment for a bonus that always applies.`
+          : modifier.type === "damage-resistance" || modifier.type === "damage-immunity"
+            ? `A modifier of ${label} waits for a moment in a roll, but a defence is read before any roll or as the damage lands, so it would never apply. Make it apply when the bearer takes damage, make it depend on a state, or remove the moment.`
+            : read === DAMAGE_ROLL_MOMENTS
+              ? `A damage modifier of ${label} waits for a moment the damage roll never reaches, so it would add nothing. Make it apply on a hit or on the damage roll, or remove the moment for a bonus that always applies.`
+              : `A modifier of ${label} waits for a moment its rule never reaches, so it would never apply. Make it apply ${read.map((entry) => MOMENT_WORDS[entry] ?? entry).join(" or ")}, or remove the moment.`
       );
     }
-    if (modifier.type === "extra-damage" && modifier.formula === undefined && modifier.abilityModifier === undefined) {
+    if (
+      modifier.type === "extra-damage" &&
+      modifier.formula === undefined &&
+      modifier.abilityModifier === undefined &&
+      modifier.abilityScore === undefined &&
+      modifier.flat === undefined
+    ) {
       checks.add(
         [...path, index],
         `An extra damage modifier of ${label} has no dice and no ability modifier, so it would add nothing. Fill in one of the two.`
       );
     }
+    if (modifier.type === "damage-reduction" && modifier.amount === 0 && modifier.dice === undefined)
+      checks.add(
+        [...path, index],
+        `A damage reduction of ${label} takes off 0 and no dice, so it would reduce nothing. Give it an amount or dice.`
+      );
+    if (modifier.type === "check-bonus" && modifier.minimum !== undefined && modifier.abilityModifier === undefined)
+      checks.add(
+        [...path, index],
+        `An ability check bonus of ${label} has a least amount but no ability modifier for it to apply to. Pick the ability, or remove the least amount.`
+      );
+    if (modifier.type === "healing-bonus" && modifier.amount === 0 && modifier.perSlotLevel !== true)
+      checks.add(
+        [...path, index],
+        `More healing from ${label} adds 0 and not the slot's level, so it would add nothing. Give it an amount or add the slot's level.`
+      );
   });
 }
 

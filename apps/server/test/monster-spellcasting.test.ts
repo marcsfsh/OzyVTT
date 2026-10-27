@@ -218,6 +218,35 @@ describe("a stat block's spells as cast actions", () => {
   });
 });
 
+describe("a pit fiend's Hellfire Spellcasting", () => {
+  it("casts two Fireballs for one recharge, either of which can be a Hold Monster or a Wall of Fire", () => {
+    const hellfire = actionOf("pit-fiend", "hellfire-spellcasting");
+    expect(hellfire.multiattack).toEqual([{ actionId: "hellfire-spellcasting-fireball-level-5", count: 2 }]);
+    expect(actionOf("pit-fiend", "hellfire-spellcasting-fireball-level-5")).toMatchObject({
+      name: "Fireball (level 5)",
+      damage: [{ formula: "10d6", type: "fire" }],
+      save: { ability: "dex", dc: 21 }
+    });
+    const state = fight("pit-fiend");
+    const fiend = state.actors.find((actor) => actor.id === IDS.foe)!;
+    cast(state, "pit-fiend", hellfire, []);
+    expect(fiend.actionUses).toEqual({ "hellfire-spellcasting": 1 });
+    cast(state, "pit-fiend", actionOf("pit-fiend", "hellfire-spellcasting-fireball-level-5"), [IDS.hero]);
+    cast(state, "pit-fiend", actionOf("pit-fiend", "hellfire-spellcasting-hold-monster-level-7"), [IDS.ally]);
+    // Both casts shared the one use, and the plan is spent.
+    expect(fiend.actionUses).toEqual({ "hellfire-spellcasting": 1 });
+    expect(() =>
+      cast(state, "pit-fiend", actionOf("pit-fiend", "hellfire-spellcasting-fireball-level-5"), [IDS.hero])
+    ).toThrow(RulesBlockedError);
+    // Until it recharges, neither the action nor one of its casts on its own is allowed.
+    nextTurn(state);
+    expect(() => cast(state, "pit-fiend", hellfire, [])).toThrow(RulesBlockedError);
+    expect(() =>
+      cast(state, "pit-fiend", actionOf("pit-fiend", "hellfire-spellcasting-wall-of-fire"), [IDS.hero])
+    ).toThrow(RulesBlockedError);
+  });
+});
+
 describe("a stat block's Invisibility", () => {
   it("makes the Imp Invisible until its Sting's attack roll ends the spell", () => {
     const state = fight("imp");
@@ -228,5 +257,27 @@ describe("a stat block's Invisibility", () => {
     cast(state, "imp", actionOf("imp", "sting"), [IDS.hero], [15, 3, 3, 3]);
     expect(imp.conditions).toEqual([]);
     expect(imp.effects).toEqual([]);
+  });
+});
+
+describe("what a stat block's spells let it do later", () => {
+  it("gives a couatl Dream's terrifying message, and a djinni Wind Walk's return to cloud form, at its numbers", () => {
+    const message = actionOf("couatl", "spell-dream-then-terrifying-message");
+    const spellcasting = actionOf("couatl", "spellcasting");
+    expect(message).toMatchObject({
+      partOf: spellcasting.id,
+      save: { ability: "wis", dc: spellcasting.castsSpells!.saveDc }
+    });
+    expect(actionOf("djinni", "spell-wind-walk-then-cloud-form").shapeShift).toMatchObject({ takesRounds: 10 });
+  });
+
+  it("gives an ancient bronze dragon Control Water's whirlpool at its DC 22, pulling what swims near it", () => {
+    expect(actionOf("ancient-bronze-dragon", "spell-control-water-then-whirlpool")).toMatchObject({
+      save: { ability: "str", dc: 22, successDamage: "half" },
+      damage: [{ formula: "2d8", type: "bludgeoning" }]
+    });
+    const state = fight("ancient-bronze-dragon");
+    cast(state, "ancient-bronze-dragon", actionOf("ancient-bronze-dragon", "spellcasting-control-water"), []);
+    expect(state.combat.spellZones).toMatchObject([{ spellId: "control-water", dc: 22 }]);
   });
 });

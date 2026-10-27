@@ -16,6 +16,7 @@ import {
   computeServerOffers,
   levelGatesFit,
   levelOfPick,
+  KIT_ITEM_KIND,
   MAX_CLASSES,
   SPELLCASTING_ABILITY_KIND,
   withinOfferSpellWindow,
@@ -390,6 +391,26 @@ function answerOffer(
     // Cast with the best of the abilities offered.
     const best = Math.max(...legal.map((id) => scores[id as Ability] ?? 0));
     preferred = legal.filter((id) => (scores[id as Ability] ?? 0) === best);
+  } else if (offer.defaultId !== null && legal.includes(offer.defaultId)) {
+    // A pick with a default starts on it ("You know the Prestidigitation cantrip").
+    preferred = [offer.defaultId];
+  } else if (offer.fromSpellbook) {
+    // Spell Mastery and Signature Spells pick "spells in your spellbook": the class's own spell picks, filled first.
+    const book = new Set(
+      choices
+        .filter(
+          (row) =>
+            row.kind === "spell" &&
+            typeof row.payload?.featureId !== "string" &&
+            (row.classId ?? input.classId) === (offer.classId ?? input.classId)
+        )
+        .map((row) => row.id)
+    );
+    const booked = legal.filter((id) => book.has(id));
+    if (booked.length >= outstanding) {
+      candidates = booked;
+      preferred = booked;
+    }
   } else if (offer.kind === "cantrip" || offer.kind === "spell") {
     // A spell sits on the sheet once: a feature's pick (Magic Initiate, an Evoker's Savant) of one the class already
     // has would be spent for nothing, so it comes from the others while any are left.
@@ -541,6 +562,15 @@ function equipmentRows(survey: ServerOfferSurvey, random: DiceRandom): Character
     const gear = options.filter((option) => option.items.length > 0);
     const option = drawOne(gear.length > 0 ? gear : options, random);
     rows.push({ level: 1, ...(classId ? { classId } : {}), kind: "equipment", id: option.id });
+    // The item the kit lets its taker pick (the Bard's instrument).
+    for (const item of option.items)
+      if (item.pickFrom)
+        rows.push({
+          level: 1,
+          ...(classId ? { classId } : {}),
+          kind: KIT_ITEM_KIND,
+          id: drawOne(item.pickFrom, random)
+        });
   };
   choose(survey.classRecord.startingEquipment, survey.classRecord.id);
   choose(survey.background.startingEquipment, null);

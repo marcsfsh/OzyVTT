@@ -28,13 +28,16 @@ function DieBoxes({ entry }: Readonly<{ entry: HitDiceEntry }>) {
 /**
  * Hit Point Dice per die size, and spending some: each heals its roll plus the Constitution modifier (at least 1). The
  * server picks which dice go, largest first. `boxes` draws each die size as a row of boxes; otherwise one line names
- * what is left of each. The sheet and the party's Short Rest share it.
+ * what is left of each. The sheet and the party's Short Rest share it. A player spends them only during a Short Rest
+ * (`canSpend`); the server checks it.
  */
 export function HitPointDice({
   actorId,
   hitDice,
   constitution = null,
   boxes = false,
+  canSpend = true,
+  canReroll = false,
   onFeedback
 }: Readonly<{
   actorId: string;
@@ -42,11 +45,29 @@ export function HitPointDice({
   /** The Constitution modifier each die adds, when the sheet knows it. */
   constitution?: number | null;
   boxes?: boolean;
+  /** Whether Spend is offered now: the GM, or a player whose character is in a Short Rest. */
+  canSpend?: boolean;
+  /** Whether a die of the spend just made may be rerolled: the GM's, or a player's with Heroic Inspiration. */
+  canReroll?: boolean;
   onFeedback: (text: string) => void;
 }>) {
   const [count, setCount] = useState(1);
   const [busy, setBusy] = useState(false);
+  // A spend made here, whose lowest die Heroic Inspiration may reroll while it is the character's latest roll.
+  const [justSpent, setJustSpent] = useState(false);
   const chosen = Math.max(1, Math.min(count, Math.max(1, hitDice.remaining)));
+  const reroll = () => {
+    setBusy(true);
+    void command("actor:spend-hit-dice", { actorId, count: 1, reroll: true }).then((result) => {
+      setBusy(false);
+      setJustSpent(false);
+      onFeedback(
+        result.ok
+          ? "Rerolled a Hit Point Die. The new healing is in the dice log."
+          : (result.message ?? "The Hit Point Die could not be rerolled.")
+      );
+    });
+  };
   const spend = () => {
     setBusy(true);
     void command("actor:spend-hit-dice", { actorId, count: chosen }).then((result) => {
@@ -57,6 +78,7 @@ export function HitPointDice({
           : (result.message ?? "The Hit Point Dice could not be spent.")
       );
       if (result.ok) setCount(1);
+      setJustSpent(result.ok);
     });
   };
   const each =
@@ -84,7 +106,7 @@ export function HitPointDice({
         {each && hitDice.remaining > 0 && <span className="cs-sub">Spend on a Short Rest · {each} each</span>}
         {hitDice.remaining === 0 && <span className="cs-sub">None left. A Long Rest gives them back.</span>}
       </div>
-      {hitDice.remaining > 0 && (
+      {hitDice.remaining > 0 && canSpend && (
         <div className="cs-hd-spend">
           {/* The phone's boxes spend one die a tap, as a Short Rest spends them one at a time. */}
           {hitDice.remaining > 1 && !boxes && (
@@ -101,6 +123,11 @@ export function HitPointDice({
             Spend
           </Button>
         </div>
+      )}
+      {justSpent && canReroll && (
+        <Button size="sm" variant="secondary" disabled={busy} onClick={reroll}>
+          Reroll the lowest die · Heroic Inspiration
+        </Button>
       )}
     </div>
   );

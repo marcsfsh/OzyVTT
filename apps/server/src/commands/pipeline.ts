@@ -4,10 +4,28 @@ import type { ApiRoute } from "@vtt/api-contract/routes";
 import type { ClientToServerEvents, GameState } from "@vtt/domain";
 import { GameAccessDeniedError } from "../authorization.js";
 import { isIncapacitated } from "../condition-rules.js";
+import type { EffectNarration } from "../effects.js";
+import { needsSettling, settleFalls as settleFallsIn } from "../falling.js";
+import { compelledMoves, fleesNow } from "../granted-moves.js";
+import { needsPlaneSettling, settlePlanes } from "../off-plane.js";
+import { heldMoveReady, settleHeldMove } from "../held-moves.js";
+import { offerNearbyReactions } from "../triggered-reactions.js";
+import { movementCost } from "../terrain.js";
+import { burstEndedZones } from "../spell-zones.js";
+import { releaseGlyphSpells } from "../stored-cast-release.js";
+import { planNextTurn } from "../combat-history.js";
+import { nextInitiativeTurn } from "../encounter.js";
+import { holdsSummons, needsSummonSettling, settleSummons, summonHoldingTurnLeaves } from "../summons.js";
+import { holdsBonds, needsBondSettling, settleBonds } from "../warding-bond.js";
+import { auraChangesAny, holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
+import { holdsZoneOutcomes, settleZoneOutcomes, zoneOutcomesPending } from "../zone-outcomes.js";
+import { settleWeather, weatherPending } from "../environment.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
 import { isGmGrade, principalTag, type CommandContext, type GamePrincipal, type Kit } from "./kit.js";
+import { brightLightEndings, settleBrightLight } from "../light-endings.js";
+import { firstSightCharms, settleFirstSight } from "../first-sight.js";
 
 /** A command's reply: the accepted revision and idempotent-duplicate flag, plus whatever the command adds. */
 export type GameReply = Readonly<Record<string, unknown>>;
@@ -169,6 +187,241 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     }
   }
 
+  /**
+   * Where creatures stand once a command has done its work, as its own commit told like any other: a creature made to
+   * flee takes its Reaction's move (`compelledMoves`), one that left the plane leaves the map and one back from it
+   * returns (`settlePlanes`), and whoever is in the air and can no longer stay there comes down (SRD Flying, Falling).
+   * Every way it happens (a condition, an effect ending, a broken Concentration) moves the token the same way.
+   */
+  async function settleFalls() {
+    const state = context.readState();
+    const lookup = { resolveDefinition: (definitionId: string) => kit.resolveDefinitionIn(state, definitionId) };
+    if (
+      !fleesNow(state) &&
+      !needsPlaneSettling(state) &&
+      !heldMoveReady(state) &&
+      !needsSettling(state, { ...lookup, catalog: kit.equipmentCatalog() })
+    )
+      return;
+    const distance = await kit.creatureDistance();
+    const mapAssetId = state.combat.mapAssetId;
+    const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
+    const id = context.newId();
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id, type: "positions.settle", principal: "table" }, (draft) => {
+      const deps = kit.fallDeps(draft, distance, id);
+      const sameMap = geometry !== null && draft.combat.mapAssetId === mapAssetId;
+      const heldId = draft.combat.heldMove?.actorId;
+      const held = sameMap
+        ? settleHeldMove(draft, geometry, {
+            zones: kit.zoneDeps(draft, geometry),
+            costFeet: (from, to) => {
+              const heldId = draft.combat.heldMove?.actorId;
+              return heldId ? (movementCost(draft, geometry, heldId, from, to)?.feet ?? null) : null;
+            }
+          })
+        : [];
+      // A held move that went on to its end can open another creature's reaction to it (a nalfeshnee's Pursuit).
+      const pursued =
+        heldId && held.length > 0 && draft.combat.heldMove?.actorId !== heldId
+          ? offerNearbyReactions(draft, heldId, "ends-move-near", {
+              newId: context.newId,
+              now: () => new Date().toISOString(),
+              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+              catalog: kit.equipmentCatalog(),
+              distanceFeet: (a, b) => distance(draft, a, b),
+              commandId: id
+            })
+          : [];
+      const planes = sameMap ? settlePlanes(draft, geometry, deps) : [];
+      events = [...held, ...pursued, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
+    });
+    if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishRolls(result.state, id);
+    kit.publishNarrations(events);
+  }
+
+  /**
+   * Summoned creatures whose time is up, that dropped to 0 Hit Points, whose summoner died or that strayed too far leave
+   * the map and the roster, and a creature whose command lapsed stops obeying (`summons.ts`), as their own write. One
+   * that holds the turn ends it first, as its End Turn would, so the turn passes on through the turn's own steps.
+   */
+  async function settleSummoned() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null || !holdsSummons(before)) return;
+    const geometry = await kit.liveGeometry();
+    const distance = await kit.creatureDistance();
+    const leash = (state: GameState) => (a: string, b: string) => distance(state, a, b);
+    if (!needsSummonSettling(before, leash(before))) return;
+    if (summonHoldingTurnLeaves(before, leash(before))) {
+      const turnEvents: EffectNarration[] = [];
+      const passed = await context.store.executeTimeline(
+        { id: context.newId(), type: "turn.end", principal: "table" },
+        (draft, timeline) => {
+          planNextTurn(draft, timeline, false, (advancing) =>
+            nextInitiativeTurn(advancing, turnEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
+          );
+        }
+      );
+      if (!passed.duplicate) {
+        await context.publishGameState(passed.state);
+        kit.context.logTurnBegin(passed.state);
+        kit.publishNarrations(turnEvents);
+      }
+    }
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute(
+      { id: context.newId(), type: "summons.settle", principal: "table" },
+      (draft) => {
+        events = settleSummons(draft, {
+          distanceFeet: leash(draft),
+          geometry: draft.combat.mapAssetId === before.combat.mapAssetId ? geometry : null,
+          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+          catalog: kit.equipmentCatalog()
+        });
+      }
+    );
+    if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /** A Warding Bond whose caster dropped to 0 or ended more than 60 feet from its ward ends, as its own write. */
+  async function settleWardingBonds() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null || !holdsBonds(before)) return;
+    const distance = await kit.creatureDistance();
+    if (!needsBondSettling(before, (a, b) => distance(before, a, b))) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute(
+      { id: context.newId(), type: "bonds.settle", principal: "table" },
+      (draft) => {
+        events = settleBonds(draft, (a, b) => distance(draft, a, b));
+      }
+    );
+    if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /**
+   * What the standing spell areas do to fire, fog and clouds once a command has moved a creature or an area (Sleet
+   * Storm douses a torch carried in, Gust of Wind disperses a cloud), with the server's dice, as its own write when
+   * anything changed.
+   */
+  async function settleZoneOutcomesAfter() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null || !holdsZoneOutcomes(before, kit.equipmentCatalog())) return;
+    const geometry = await kit.liveGeometry();
+    if (!zoneOutcomesPending(before, kit.zoneDeps(before, geometry))) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "spell-zone.outcomes" }, (draft) => {
+      events = settleZoneOutcomes(draft, kit.zoneDeps(draft, geometry));
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /**
+   * A spell area that acts as its spell ends (Delayed Blast Fireball's bead) is left bursting by whatever ended the
+   * spell; the table then raises its saves with the server's dice and the live map, as its own write.
+   */
+  async function settleBurstingZones() {
+    const before = context.readState();
+    if (!before.combat.spellZones.some((zone) => zone.bursting) || before.combat.historyCursor !== null) return;
+    const geometry = await kit.liveGeometry();
+    let events: EffectNarration[] = [];
+    const distance = await kit.creatureDistance();
+    const result = await context.store.execute({ id: context.newId(), type: "spell-zone.burst" }, (draft) => {
+      // A spell glyph's stored spell takes effect on the creature that set it off; an explosive rune bursts.
+      events = [
+        ...releaseGlyphSpells(draft, {
+          ...kit.zoneDeps(draft, geometry),
+          distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+        }),
+        ...burstEndedZones(draft, kit.zoneDeps(draft, geometry))
+      ];
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /**
+   * What a spell's area gives the creatures in it (Holy Aura, Pass without Trace) follows them in and out: after a
+   * command moves a token, an area or ends a spell, the table settles who holds it, as its own write when anything
+   * changed.
+   */
+  async function settleZoneAurasAfter() {
+    const before = context.readState();
+    if (!holdsAuras(before) || before.combat.historyCursor !== null) return;
+    const geometry = await kit.liveGeometry();
+    const changes = zoneAuraChanges(before, kit.zoneDeps(before, geometry));
+    if (!auraChangesAny(changes)) return;
+    const result = await context.store.execute({ id: context.newId(), type: "spell-zone.auras" }, (draft) => {
+      settleZoneAuras(draft, kit.zoneDeps(draft, geometry));
+    });
+    await context.publishGameState(result.state);
+  }
+
+  /**
+   * The scene's weather on the creatures placed in it (`environment.ts`): each holds what heavy precipitation or a strong
+   * wind gives its rolls, and the open flames they carry go out, as its own write when anything changed.
+   */
+  async function settleWeatherAfter() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null) return;
+    const deps = { catalog: kit.equipmentCatalog() };
+    if (!weatherPending(before, deps)) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "environment.weather" }, (draft) => {
+      events = settleWeather(draft, deps);
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /** What lasts only in Dim Light or Darkness (Cloak of the Bat's flight) ends as its bearer stands in Bright Light, as
+   *  its own write when anything ends (`light-endings.ts`); a flier it held up then falls. */
+  async function settleBrightLightAfter() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null) return;
+    const content = {
+      definition: (definitionId: string) => kit.resolveDefinitionIn(before, definitionId),
+      catalog: kit.equipmentCatalog()
+    };
+    if (brightLightEndings(before, content).length === 0) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "effects.light" }, (draft) => {
+      events = settleBrightLight(draft, {
+        definition: (definitionId: string) => kit.resolveDefinitionIn(draft, definitionId),
+        catalog: kit.equipmentCatalog()
+      });
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /** A Philter of Love's drinker is Charmed by the first creature it sees (`first-sight.ts`), as its own write. */
+  async function settleFirstSightAfter() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null) return;
+    const content = {
+      definition: (definitionId: string) => kit.resolveDefinitionIn(before, definitionId),
+      catalog: kit.equipmentCatalog()
+    };
+    if (firstSightCharms(before, content).length === 0) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "effects.first-sight" }, (draft) => {
+      events = settleFirstSight(draft, {
+        definition: (definitionId: string) => kit.resolveDefinitionIn(draft, definitionId),
+        catalog: kit.equipmentCatalog()
+      });
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
   async function dispatch(
     type: GameCommandType,
     principal: GamePrincipal,
@@ -212,7 +465,20 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     );
     const accepted = committed ? { revision: committed.state.revision, duplicate: committed.duplicate } : {};
     const reply = projectReply(principal, { ...accepted, ...extras });
-    if (settle && committed && !committed.duplicate) await settleDownedReactions();
+    if (settle && committed && !committed.duplicate) {
+      await settleZoneOutcomesAfter();
+      await settleBurstingZones();
+      await settleZoneAurasAfter();
+      await settleWeatherAfter();
+      await settleDownedReactions();
+      await settleSummoned();
+      await settleWardingBonds();
+      await settleBrightLightAfter();
+      await settleFirstSightAfter();
+      await settleFalls();
+      // A creature that left the plane ends what it commanded across it (an aboleth's Dominate Mind).
+      await settleSummoned();
+    }
     return reply;
   }
 

@@ -3,11 +3,14 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { actionPools, effectiveActions } from "./effective-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { startTimedPool } from "./clock-pools.js";
 import { CommandRejectedError } from "./game-store.js";
 
 type PoolDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   catalog?: EquipmentCatalog;
+  /** The server's dice, for the wait a pool spent for a time rolls on its first use. */
+  random?: (sides: number) => number;
 }>;
 
 /** The actor and one of its limited-use pools, keyed as the counters are (`uses.pool ?? action.id`). A pool that
@@ -32,14 +35,21 @@ export function spendUses(
   amount: number,
   scope: Initiator,
   deps: PoolDeps
-): Readonly<{ name: string; left: number }> {
+): Readonly<{ name: string; left: number; line: string | null }> {
   requireActorAccess(scope, state, actorId, "resource");
   const { actor, pool, spent } = poolOn(state, actorId, poolId, deps);
   const left = Math.max(0, pool.limit - spent);
   if (amount > left)
     throw new CommandRejectedError(left === 0 ? `${pool.name} has none left.` : `${pool.name} has ${left} left.`);
   actor.actionUses = { ...actor.actionUses, [poolId]: spent + amount };
-  return { name: pool.name, left: left - amount };
+  // A pool spent for a time starts its wait now (Wings of Flying's 1d12 hours).
+  const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  const afterHours = effectiveActions(definition, actor, deps.catalog).find(
+    (action) => (action.uses?.pool ?? action.id) === poolId && action.uses?.per === "time"
+  )?.uses?.afterHours;
+  const line =
+    afterHours && deps.random ? startTimedPool(state, actor, poolId, pool.name, afterHours, deps.random) : null;
+  return { name: pool.name, left: left - amount, line };
 }
 
 /** The GM gives back up to `amount` spent uses (a feature that refills a pool, a ruling). A full pool is refused. */
@@ -57,5 +67,10 @@ export function restoreUses(
   const restored = Math.min(amount, spent);
   const { [poolId]: _spent, ...others } = actor.actionUses;
   actor.actionUses = spent - restored > 0 ? { ...others, [poolId]: spent - restored } : others;
+  // A pool given back whole waits on nothing.
+  if (spent - restored === 0 && actor.readyAt[poolId]) {
+    const { [poolId]: _ready, ...waiting } = actor.readyAt;
+    actor.readyAt = waiting;
+  }
   return { name: pool.name, restored, left: pool.limit - (spent - restored) };
 }

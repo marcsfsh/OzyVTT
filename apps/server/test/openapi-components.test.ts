@@ -361,7 +361,8 @@ describe("generated OpenAPI components", () => {
       const compiled = ajv.compile({ $ref: `openapi#/components/schemas/${base}` });
       expect(compiled(schema.parse(fixture)), `${base}: ${JSON.stringify(compiled.errors)}`).toBe(true);
     }
-  });
+    // Compiling the whole document takes several seconds on a CI runner.
+  }, 60_000);
 
   /** At bundle scale: every bundled SRD record must validate as the homebrew body that would carry it
    * (the "duplicate an SRD record into homebrew" flow). */
@@ -416,7 +417,8 @@ describe("generated OpenAPI components", () => {
         `${component} via HomebrewRecord: ${JSON.stringify(union.errors)}`
       ).toBe(true);
     }
-  });
+    // Compiling the whole document and checking every bundled record takes several seconds.
+  }, 60_000);
 
   /** Per rider branch. No SRD row is a magic item, so the bundle sweep never exercises gates, casts or
    * attunement. Payloads are parsed first so every `.default()` materialises, which is what `additionalProperties:
@@ -440,6 +442,7 @@ describe("generated OpenAPI components", () => {
       "on-attack-roll": {},
       "on-hit": {},
       "on-critical-hit": {},
+      "on-natural-20": {},
       "on-damage-roll": {},
       "on-saving-throw": {},
       "on-ability-check": {},
@@ -456,7 +459,25 @@ describe("generated OpenAPI components", () => {
       "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large", "huge"] },
       "versus-condition": { conditionIds: ["prone"] },
-      "by-effect-source": {}
+      "by-effect-source": {},
+      "on-healing": {},
+      "source-creature-type-is": { creatureTypes: ["fiend", "undead"] },
+      "versus-effect-source": {},
+      "versus-marked": { tags: ["hunters-mark"] },
+      "versus-hurt": {},
+      "versus-within": { feet: 5 },
+      "spell-class-is": { classIds: ["sorcerer"] },
+      "sees-other": {},
+      "seen-by-other": {},
+      "other-lacks-sense": { senses: ["blindsight", "truesight"] },
+      "situation-is": { situation: "consulting an accurate Book about its topic" },
+      "weapon-is": { ids: ["longbow", "shortbow"] },
+      "versus-magic": {},
+      "versus-spell": {},
+      "versus-breath-weapon": {},
+      "other-weapon": {},
+      "while-marking": { tags: ["sworn-enemy"] },
+      "while-attuned-to": { itemIds: ["gauntlets-of-ogre-power"] }
     };
 
     /** One payload per modifier. */
@@ -498,7 +519,30 @@ describe("generated OpenAPI components", () => {
       "damage-resistance": { damageTypes: ["fire"], when: [{ type: "while-effect-tag", tags: ["raging"] }] },
       "damage-vulnerability": { damageTypes: ["cold"] },
       sense: { sense: "tremorsense", feet: 30 },
-      "special-speed": { movement: "fly", feet: 60, hover: true }
+      "special-speed": { movement: "fly", feet: 60, hover: true },
+      "d20-minimum": { roll: "check", minimum: 10, proficientOnly: true },
+      "total-minimum": { roll: "check", abilityScore: "str" },
+      "damage-die-minimum": { minimum: 3 },
+      "damage-immunity": { damageTypes: ["psychic"] },
+      "ignores-resistance": { damageTypes: ["bludgeoning", "piercing", "slashing"] },
+      "advantage-denied": { roll: "incoming-attack" },
+      "healing-received-maximized": {},
+      "healing-dice-maximized": {},
+      "healing-bonus": { amount: 2, perSlotLevel: true },
+      movement: { rule: "leap", feet: 30, costFeet: 10 },
+      "ability-score-minimum": { ability: "str", score: 19 },
+      "speed-minimum": { feet: 30, ignoresArmor: true },
+      "carrying-capacity-larger": {},
+      "ignores-cover": {
+        degree: "half",
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
+      },
+      "no-critical-hits": {},
+      "spell-ward": { schools: ["divination"], spellIds: ["zone-of-truth"], alliesAllowed: true, typeSenses: true },
+      "base-armor-class": { base: 15 },
+      "proficiency-bonus": { amount: 1 },
+      "granted-score-bonus": { ability: "str", amount: 4, maximum: 30 },
+      "ignores-long-range": { when: [{ type: "on-attack-roll" }, { type: "versus-marked", tags: ["sworn-enemy"] }] }
     };
 
     it("validates every trigger against the branch its discriminator routes it to", () => {
@@ -588,10 +632,11 @@ describe("generated OpenAPI components", () => {
       expect(() =>
         bundle.EquipmentReferenceSchema.parse({
           ...authored,
-          modifiers: [{ type: "ability-score", ability: "str", amount: 2 }]
+          modifiers: [{ type: "attunement-slots", amount: 1 }]
         })
       ).toThrow();
-    });
+      // Compiling the whole document takes several seconds on a CI runner.
+    }, 60_000);
   });
 
   it("keeps a fixture for every homebrew shape, so a new component cannot land uncompiled", () => {

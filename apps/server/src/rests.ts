@@ -1,3 +1,5 @@
+import { openFormSwap } from "./transform/known-forms.js";
+import { restoreCarriedAtRest } from "./carried-objects.js";
 import { isDead, longRestWait, makeHitDicePool, type GameState, type HitDiceEntry } from "@vtt/domain";
 import type { Actor, ActorAction, ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier, collectRiders } from "@vtt/rules-5e";
@@ -6,23 +8,42 @@ import { holdsFeature } from "./class-features.js";
 import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
-import { endEffectsAtLongRest, reduceExhaustion, removeConditionDirect, type EffectNarration } from "./effects.js";
+import {
+  endEffectsAtLongRest,
+  endEffectsAtRest,
+  LONG_REST_MINUTES,
+  NO_HEALING_TAG,
+  NO_HEALING_ON_LAND_TAG,
+  reduceExhaustion,
+  removeConditionDirect,
+  type EffectNarration
+} from "./effects.js";
+import { passGameTime } from "./game-time.js";
+import { dawnPoolKeys, timedSpent, type ClockDeps } from "./clock-pools.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
-import { healActor } from "./hit-points.js";
-import { chargesAfterDawn } from "./item-charges.js";
+import { HIT_DICE_DOUBLED_TAG, HIT_DICE_MAXIMIZED_TAG } from "./death-saves.js";
+import { easeOrdeals } from "./death.js";
+import { healActor, RELENTLESS_RAGE_KEY } from "./hit-points.js";
+import { gainHeroicInspiration } from "./heroic-inspiration.js";
+import { spendRerollRight } from "./held-rolls.js";
+import { chargesAfterDawn, neverRegained } from "./item-charges.js";
+import { afterLongRest, deniedRestLine, holdsMaximumAtRest, restDeniedBy } from "./rest-triggers.js";
+import { divineInterventionWaiting } from "./divine-intervention.js";
+import { holdsTrance, TRANCE_LONG_REST_MINUTES } from "./trance.js";
+import { conjureBookOfShadows } from "./book-of-shadows.js";
+import { finishLongRest, openLongRest, type RestApplier } from "./long-rest.js";
+import { endTravelFor } from "./travel.js";
+import { restFromTravel } from "./environment.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
-export const LONG_REST_HOURS = 8;
-/** The clock's ceiling, as the state schema bounds it. */
-const CLOCK_LIMIT_HOURS = 10_000_000;
 
 const hoursText = (hours: number) => `${hours} ${hours === 1 ? "hour" : "hours"}`;
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
  *  already checked the pool holds enough. */
-function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDiceEntry[] {
+export function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDiceEntry[] {
   let left = count;
   return [...entries]
     .sort((a, b) => Number(b.die.slice(1)) - Number(a.die.slice(1)))
@@ -42,7 +63,15 @@ export function hitDieSizesToSpend(entries: readonly HitDiceEntry[], count: numb
     .slice(0, count);
 }
 
+/** Whether `actorId` is in the Short Rest under way (the party's, or one its player started), or has a Short Rest's
+ *  benefits from a Long Rest interrupted after an hour, while it waits to resume. */
+export const inShortRest = (state: GameState, actorId: string) =>
+  (state.rest.shortRest?.actorIds.includes(actorId) ?? false) ||
+  (state.rest.longRest?.members.some((member) => member.actorId === actorId && member.shortRestEarned) ?? false);
+
 /** Spends Hit Point Dice to heal (SRD 5.2.1 Short Rest): each die heals `face + Con modifier`, minimum 1.
+ *  "A creature can spend Hit Dice during a Short Rest", so a player spends them only while their character is in the
+ *  Short Rest under way; the GM resting a creature spends them for it outside a fight.
  *  The caller rolls the faces before the store executes (so retries never reroll) and records them; this
  *  owns validation, healing (via healActor) and the pool decrement. */
 export function spendHitDice(
@@ -51,13 +80,18 @@ export function spendHitDice(
   faces: readonly number[],
   scope: Initiator,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  count: number = faces.length
-): { healed: number; events: EffectNarration[]; conModifier: number } {
+  count: number = faces.length,
+  catalog?: EquipmentCatalog
+): { healed: number; events: EffectNarration[]; conModifier: number; doubled: boolean; before: number } {
   requireActorAccess(scope, state, actorId, "resource");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("Hit Dice are spent on a rest. End the fight first.");
+  if (scope.role !== "gm" && !inShortRest(state, actorId))
+    throw new CommandRejectedError(
+      `Hit Point Dice are spent during a Short Rest. Start one for ${actor.name} first, and spend them before it ends.`
+    );
   refuseRestAtZero(actor, "Hit Dice are spent on a Short Rest, which needs");
   if (!actor.hitDice)
     throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
@@ -67,11 +101,62 @@ export function spendHitDice(
     );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   const conModifier = definition ? scoreModifier(definition.abilityScores.con) : 0;
-  const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier), 0);
+  // A Periapt of Wound Closure doubles what each die restores, and a Potion of Vitality makes each die its maximum.
+  const tags = deriveEquipment(actor, definition, catalog).context.effectTags ?? [];
+  const doubled = tags.includes(HIT_DICE_DOUBLED_TAG);
+  const rolled = tags.includes(HIT_DICE_MAXIMIZED_TAG) ? hitDieSizesToSpend(actor.hitDice.entries, count) : faces;
+  const healed = hitDieHealing(rolled.slice(0, count), conModifier, doubled);
+  const before = actor.hp.current;
   const events = healActor(state, actorId, healed, scope);
   // Decrement the pool die by die: a Fighter 3 / Wizard 2 spends its d10s before its d6s.
   actor.hitDice = makeHitDicePool(spendFromPool(actor.hitDice.entries, faces.length));
-  return { healed, events, conModifier };
+  return { healed, events, conModifier, doubled, before };
+}
+
+/** What a Hit Point Die restores: its roll plus the Constitution modifier, at least 1, doubled by a Periapt of Wound
+ *  Closure. */
+const hitDieHealing = (faces: readonly number[], conModifier: number, doubled: boolean) =>
+  faces.reduce((sum, face) => sum + Math.max(1, face + conModifier) * (doubled ? 2 : 1), 0);
+
+/** Holds a spend of Hit Point Dice for Heroic Inspiration's reroll, over the character's earlier one. */
+export function holdHitDice(state: GameState, held: GameState["heldHitDice"][number]): void {
+  state.heldHitDice = [...state.heldHitDice.filter((entry) => entry.actorId !== held.actorId), held].slice(-50);
+}
+
+/**
+ * Rerolls one die of a character's latest spend of Hit Point Dice (SRD Heroic Inspiration: "reroll any die immediately
+ * after rolling it"), while it is still the character's latest roll: a player spends Heroic Inspiration on the lowest
+ * die, the GM throws them all again. The healing is worked out afresh from the Hit Points before the spend.
+ */
+export function rerollHitDice(
+  state: GameState,
+  actorId: string,
+  scope: Initiator,
+  random: (sides: number) => number,
+  rollId: string
+): { healed: number; dice: ReadonlyArray<{ sides: number; face: number }>; conModifier: number } {
+  requireActorAccess(scope, state, actorId, "resource");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  const held = state.heldHitDice.find((entry) => entry.actorId === actorId);
+  const latest = [...state.rolls].reverse().find((roll) => roll.actorId === actorId);
+  if (!held || !latest || latest.id !== held.rollId)
+    throw new CommandRejectedError(
+      `${actor.name} has no Hit Point Die to reroll: a reroll comes right after the roll.`
+    );
+  spendRerollRight(actor, scope);
+  const lowest = held.dice.reduce((low, die, index) => (die.face < held.dice[low]!.face ? index : low), 0);
+  const dice = held.dice.map((die, index) =>
+    scope.role === "gm" || index === lowest ? { ...die, face: random(die.sides) } : die
+  );
+  const healed = hitDieHealing(
+    dice.map((die) => die.face),
+    held.conModifier,
+    held.doubled
+  );
+  actor.hp = { ...actor.hp, current: Math.min(actor.hp.maximum, held.before + healed) };
+  holdHitDice(state, { ...held, rollId, dice });
+  return { healed, dice, conModifier: held.conModifier };
 }
 
 /** SRD Resting: "To start a Short Rest [or a Long Rest], you must have at least 1 Hit Point", and nothing brings
@@ -145,12 +230,6 @@ function usesAfterShortRest(
   return after;
 }
 
-/** Which re-choices a rest ends: a Short Rest clears those naming it; a Long Rest clears everything. */
-function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "short"): Actor["choiceOverrides"] {
-  if (kind === "long") return {};
-  return Object.fromEntries(Object.entries(overrides).filter(([, override]) => override.per !== "short-rest"));
-}
-
 /** SRD Pact Magic: every expended pact slot comes back on a Short or Long Rest. */
 function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined): void {
   const maximum = actor.pactSlots ? pactSlotMaximum(definition) : null;
@@ -162,10 +241,13 @@ function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined)
  * the dying and the dead get nothing from it, and a Long Rest waits 16 hours of game time after the last one.
  * Short: per-short-rest, recharge and per-encounter pools and Pact Magic slots re-arm, and long-rest pools a feature
  * partly refills (Rage's one use) get those uses back; healing is only by spending Hit Point Dice.
- * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, all
- * pools refreshed, all Hit Point Dice restored, Exhaustion drops one level. It counts as ending at the current game
- * hour; a party rest moves the clock past it. With `charges.random`, a charged item regains its printed dice rather
- * than every charge, and `charges.lines` hears what each regained.
+ * Long: Concentration ends first (onEnd grants land), then HP to max, temp HP cleared, all pools refreshed, all Hit
+ * Point Dice restored, Exhaustion drops one level. It counts as ending at the current game hour.
+ * A Long Rest ends the creature's own effects that would run out in its eight hours. When the game clock moved them
+ * for everyone already (`clockMoved`: a party rest) that has happened; otherwise what lasts longer waits for the GM to
+ * pass the hours. A Short Rest leaves effects to the clock: a player takes one on their own, and only the GM moves game
+ * time (the party's Short Rest moves it an hour). With `charges.random`, a
+ * charged item regains its printed dice rather than every charge, and `charges.lines` hears what each regained.
  */
 export function applyRest(
   state: GameState,
@@ -173,13 +255,40 @@ export function applyRest(
   kind: "long" | "short",
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
   catalog?: EquipmentCatalog,
-  charges?: Readonly<{ random: (sides: number) => number; lines: string[] }>
+  charges?: Readonly<{ random: (sides: number) => number; lines: string[] }>,
+  clockMoved = false,
+  /** A Short Rest's benefits from an interrupted Long Rest: the Initiative that interrupted it may have begun a fight. */
+  interrupted = false
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  const refusal = restRefusal(state, actor, kind);
+  const refusal = interrupted ? atZeroRefusal(actor, "A Short Rest needs") : restRefusal(state, actor, kind);
   if (refusal) throw new CommandRejectedError(refusal);
+  // Resting isn't travelling.
+  endTravelFor(state, [actorId]);
   const events: EffectNarration[] = [];
+  // SRD Trance: an elf "can finish a Long Rest in 4 hours", so its own rest runs out 4 hours of its effects.
+  const restMinutes = holdsTrance(actor.definitionId ? resolveDefinition(actor.definitionId) : undefined)
+    ? TRANCE_LONG_REST_MINUTES
+    : LONG_REST_MINUTES;
+  // "The target gains no benefit from finishing a Short or Long Rest" (a rakshasa's curse): the time passes and what
+  // the rest ends still ends, but nothing comes back.
+  const denied = restDeniedBy(actor, kind);
+  if (denied) {
+    events.push(deniedRestLine(actor, denied, kind));
+    if (kind === "short") return [...events, ...endEffectsAtRest(state, actorId, "short")];
+    events.push(
+      ...endEffectsAtLongRest(state, actorId, clockMoved, true, restMinutes),
+      ...endEffectsAtRest(state, actorId, "long")
+    );
+    actor.lastLongRestAt = state.rest.clockHours;
+    state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
+    if (charges)
+      events.push(
+        ...afterLongRest(state, actor, { random: charges.random, resolveDefinition, ...(catalog ? { catalog } : {}) })
+      );
+    return events;
+  }
   if (kind === "short") {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
     actor.actionUses = usesAfterShortRest(
@@ -188,17 +297,44 @@ export function applyRest(
       effectiveActions(definition, actor, catalog),
       shortRestRegains(deriveEquipment(actor, definition, catalog))
     );
-    // A pick re-made "whenever you finish a Short or Long Rest" lapses here; the build's own answer stands
-    // until the character chooses again.
-    actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");
+    // SRD Relentless Rage: "When you finish a Short or Long Rest, the DC resets to 10."
+    const { [RELENTLESS_RAGE_KEY]: _relentless, ...uses } = actor.actionUses;
+    actor.actionUses = uses;
+    // A pick re-made on a rest stands until the character chooses again (Fiendish Resilience: "until you choose a
+    // different one"), so the rest leaves `choiceOverrides` as they are.
     restorePactSlots(actor, definition);
     // SRD Tireless: "Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1."
     if (holdsFeature(definition, "tireless", "Tireless")) reduceExhaustion(actor);
+    events.push(...endEffectsAtRest(state, actorId, "short"));
+    // An erinyes's magic rope, damaged or destroyed, is whole again.
+    events.push(...restoreCarriedAtRest(actor, definition));
+    // SRD Memorize Spell (Wizard 5): "Whenever you finish a Short Rest, you can study your spellbook and replace one of
+    // the level 1+ Wizard spells you have prepared ... with another level 1+ spell from the book": one change.
+    if (actor.preparation === null && holdsFeature(definition, "memorize-spell", "Memorize Spell"))
+      actor.preparation = { changesLeft: 1 };
+    // What a feature does "when you finish a Short Rest" (Arcane Recovery, a re-choice) is made in the step this opens.
+    actor.restStep = { after: "short-rest" };
+    events.push(...conjureBookOfShadows(state, actor, definition));
     return events;
   }
-  // Eight hours of sleep: Concentration ends and turn-measured effects lapse; "until ended" ones (a curse) stay.
-  events.push(...endEffectsAtLongRest(state, actorId));
-  actor.hp.current = actor.hp.maximum;
+  // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
+  events.push(
+    ...endEffectsAtLongRest(state, actorId, clockMoved, holdsMaximumAtRest(actor), restMinutes),
+    ...endEffectsAtRest(state, actorId, "long"),
+    ...easeOrdeals(state, actor),
+    ...restoreCarriedAtRest(actor, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined)
+  );
+  // A curse that bars healing ("The target can't regain Hit Points", a mummy's) outlasts the rest and keeps them.
+  const barred = actor.effects.find(
+    (effect) => effect.tags.includes(NO_HEALING_TAG) || effect.tags.includes(NO_HEALING_ON_LAND_TAG)
+  );
+  if (barred)
+    events.push({
+      kind: "condition",
+      text: `${actor.name} regains no Hit Points from the rest while ${barred.name} lasts.`,
+      actorId
+    });
+  else actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
   // Every die size in the pool comes back (SRD 5.2.1 "Regain All HP").
   if (actor.hitDice)
@@ -206,15 +342,21 @@ export function applyRest(
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
   const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-  if (charges) {
+  // A pool spent for a time waits on the clock, not the rest (a Horn of Valhalla's 7 days); with a dawn hour, what
+  // an item regains at dawn waits for the clock's dawn too.
+  const waiting: Record<string, number> = { ...timedSpent(actor), ...divineInterventionWaiting(actor) };
+  if (state.rest.dawnHour !== null)
+    for (const key of dawnPoolKeys(actor, longRestDefinition, catalog))
+      if ((actor.actionUses[key] ?? 0) > 0) waiting[key] = actor.actionUses[key]!;
+  if (charges && state.rest.dawnHour === null) {
     const dawn = chargesAfterDawn(actor, longRestDefinition, catalog, charges.random);
-    actor.actionUses = dawn.stillSpent;
+    actor.actionUses = { ...dawn.stillSpent, ...waiting };
     charges.lines.push(...dawn.lines);
-  } else actor.actionUses = {};
-  // Both kinds lapse on a Long Rest.
-  actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
+  } else actor.actionUses = { ...neverRegained(actor, longRestDefinition, catalog), ...waiting };
   reduceExhaustion(actor);
   actor.lastLongRestAt = state.rest.clockHours;
+  // A day's travel counts from its rest (Extended Travel).
+  restFromTravel(actor);
   // Rested, by whatever path: nothing left to ask the GM for.
   state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
   // SRD Long Rest: spell slots (and Pact Magic) refill.
@@ -235,12 +377,21 @@ export function applyRest(
   restorePactSlots(actor, longRestDefinition);
   // The prepared list stands; a caster that prepares after a Long Rest gets the step to change it.
   openPreparation(actor, longRestDefinition);
+  // SRD Wild Shape: "Whenever you finish a Long Rest, you can replace one of your known forms."
+  openFormSwap(actor);
+  actor.restStep = { after: "long-rest" };
+  events.push(...conjureBookOfShadows(state, actor, longRestDefinition));
   // SRD Human, Resourceful: "You gain Heroic Inspiration whenever you finish a Long Rest." One at most.
   if (
     holdsFeature(longRestDefinition, "human-resourceful", "Resourceful") ||
     longRestDefinition?.character?.race?.id === "human"
   )
-    actor.heroicInspiration = true;
+    gainHeroicInspiration(actor);
+  // What acts as the creature finishes a Long Rest ("Whenever the Poisoned target finishes a Long Rest").
+  if (charges)
+    events.push(
+      ...afterLongRest(state, actor, { random: charges.random, resolveDefinition, ...(catalog ? { catalog } : {}) })
+    );
   return events;
 }
 
@@ -290,26 +441,29 @@ function longRest(
   actorId: string,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
   catalog: EquipmentCatalog | undefined,
-  random: ((sides: number) => number) | undefined
+  random: ((sides: number) => number) | undefined,
+  clockMoved = false
 ): EffectNarration[] {
   const lines: string[] = [];
-  const events = applyRest(state, actorId, "long", resolveDefinition, catalog, random ? { random, lines } : undefined);
+  const events = applyRest(
+    state,
+    actorId,
+    "long",
+    resolveDefinition,
+    catalog,
+    random ? { random, lines } : undefined,
+    clockMoved
+  );
   return [...events, ...lines.map((text) => ({ kind: "effect" as const, text, actorId }))];
 }
 
 /**
  * The GM rests several characters together. Every one must be able to, or none rests: the refusal names who can't and
- * why. Long: each rests now and 8 hours pass. Short: the rest opens for each player to spend Hit Dice on their own
- * device, and `finishPartyShortRest` ends it.
+ * why. Long: the rest opens and lasts until the GM finishes it (`finishPartyLongRest`), so what happens meanwhile can
+ * interrupt it (`long-rest.ts`). Short: the rest opens for each player to spend Hit Dice on their own device, and
+ * `finishPartyShortRest` ends it.
  */
-export function startPartyRest(
-  state: GameState,
-  actorIds: readonly string[],
-  kind: "long" | "short",
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog,
-  random?: (sides: number) => number
-): EffectNarration[] {
+export function startPartyRest(state: GameState, actorIds: readonly string[], kind: "long" | "short"): void {
   if (kind === "short" && state.rest.shortRest)
     throw new CommandRejectedError("A Short Rest is already under way. Finish it first.");
   const members = actorIds.map((actorId) => {
@@ -321,15 +475,51 @@ export function startPartyRest(
     .map((actor) => restRefusal(state, actor, kind))
     .filter((refusal): refusal is string => refusal !== null);
   if (refusals.length > 0) throw new CommandRejectedError(refusals.join(" "));
-  if (kind === "short") {
-    state.rest = { ...state.rest, shortRest: { actorIds: [...actorIds], done: [] } };
-    return [];
-  }
-  const events = members.flatMap((actor) => longRest(state, actor.id, resolveDefinition, catalog, random));
-  const clockHours = Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + LONG_REST_HOURS);
-  state.rest = { ...state.rest, clockHours };
-  for (const actor of members) actor.lastLongRestAt = clockHours;
-  return events;
+  endTravelFor(state, actorIds);
+  if (kind === "short") state.rest = { ...state.rest, shortRest: { actorIds: [...actorIds], done: [] } };
+  else openLongRest(state, actorIds);
+}
+
+/** The GM ends the party's Long Rest: with `apply`, the clock moves to its end and each member still resting gets it;
+ *  without, it is called off (`long-rest.ts`). */
+export function finishPartyLongRest(
+  state: GameState,
+  apply: boolean,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  catalog?: EquipmentCatalog,
+  random?: (sides: number) => number
+): Readonly<{ events: EffectNarration[]; rested: string[]; hours: number }> {
+  const applier: RestApplier = (draft, actorId, kind, options) =>
+    kind === "long"
+      ? longRest(draft, actorId, resolveDefinition, catalog, random, options.clockMoved)
+      : applyRest(draft, actorId, kind, resolveDefinition, catalog, undefined, options.clockMoved, options.interrupted);
+  return finishLongRest(state, apply, applier, {
+    resolveDefinition,
+    ...(catalog ? { catalog } : {}),
+    ...(random ? { random } : {})
+  });
+}
+
+/** A player starts a Short Rest for their own character. It is under way, as the party's is: its player spends Hit
+ *  Point Dice during it and marks it done, and the GM ends it, when its benefits land and an hour passes. A Short
+ *  Rest already under way takes the character in. Returns whether it joined one. */
+export function startOwnShortRest(state: GameState, actorId: string, scope: Initiator): boolean {
+  requireActorAccess(scope, state, actorId, "resource");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  const refusal = restRefusal(state, actor, "short");
+  if (refusal) throw new CommandRejectedError(refusal);
+  if (state.rest.longRest?.members.some((member) => member.actorId === actorId && !member.interrupted))
+    throw new CommandRejectedError(`${actor.name} is in the Long Rest under way.`);
+  endTravelFor(state, [actorId]);
+  const rest = state.rest.shortRest;
+  if (rest?.actorIds.includes(actorId)) throw new CommandRejectedError(`${actor.name} is already in the Short Rest.`);
+  if (rest && rest.actorIds.length >= 12) throw new CommandRejectedError("The Short Rest under way is full.");
+  state.rest = {
+    ...state.rest,
+    shortRest: rest ? { ...rest, actorIds: [...rest.actorIds, actorId] } : { actorIds: [actorId], done: [] }
+  };
+  return rest !== null;
 }
 
 /** A member of the party's Short Rest is done spending Hit Dice (or not after all). Their player or the GM. */
@@ -344,15 +534,16 @@ export function markShortRestDone(state: GameState, actorId: string, done: boole
 }
 
 /**
- * Ends the party's Short Rest. With `apply`, each member who can still rest gets its benefits and an hour passes;
- * anyone who can't any more (down, or pulled into a fight) gets nothing and a line saying why. Without, it is called
- * off and no time passes.
+ * Ends the party's Short Rest. With `apply`, each member who can still rest gets its benefits and an hour passes on
+ * the game clock for everyone; anyone who can't any more (down, or pulled into a fight) gets nothing and a line saying
+ * why. Without, it is called off and no time passes.
  */
 export function finishPartyShortRest(
   state: GameState,
   apply: boolean,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  random?: (sides: number) => number
 ): Readonly<{ events: EffectNarration[]; rested: string[] }> {
   const rest = state.rest.shortRest;
   if (!rest) throw new CommandRejectedError("No Short Rest is under way.");
@@ -369,14 +560,21 @@ export function finishPartyShortRest(
       events.push({ kind: "effect", text: `${actor.name} ${why}, so the Short Rest gives them nothing.`, actorId });
       continue;
     }
-    events.push(...applyRest(state, actorId, "short", resolveDefinition, catalog));
+    events.push(...applyRest(state, actorId, "short", resolveDefinition, catalog, undefined, true));
     rested.push(actor.name);
   }
-  state.rest = { ...state.rest, clockHours: Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + SHORT_REST_HOURS) };
+  events.push(
+    ...passGameTime(
+      state,
+      SHORT_REST_HOURS * 60,
+      random ? { resolveDefinition, ...(catalog ? { catalog } : {}), random } : undefined
+    )
+  );
   return { events, rested };
 }
 
-/** The GM moves game time forward. */
-export function passTime(state: GameState, hours: number): void {
-  state.rest = { ...state.rest, clockHours: Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + hours) };
+/** The GM moves game time forward by hours and minutes, and what runs out in that time ends (`passGameTime`); with
+ *  `deps`, what comes back on the clock does too, and what acts every 24 hours acts. */
+export function passTime(state: GameState, hours: number, minutes = 0, deps?: ClockDeps): EffectNarration[] {
+  return passGameTime(state, hours * 60 + minutes, deps);
 }

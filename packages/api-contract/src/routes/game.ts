@@ -5,12 +5,14 @@ import {
   BuilderOffersReplySchema,
   CharacterDraftReplySchema,
   NextLevelReplySchema,
+  CraftingOffersReplySchema,
   ScenePreviewReplySchema,
   SoundBoardViewSchema,
   VisionPreviewReplySchema
 } from "@vtt/domain";
 import {
   ActorAvailableActionsSchema,
+  ActorCraftingOffersSchema,
   ActorMovementSchema,
   BuilderOffersSchema,
   CharacterNextLevelSchema,
@@ -182,6 +184,25 @@ export const getCharacterNextLevel = defineRoute({
   }
 });
 
+export const getActorCraftingOffers = defineRoute({
+  method: "get",
+  path: GAME_PATHS.actorCraftingOffers,
+  operationId: "getActorCraftingOffers",
+  tag: "Live game",
+  summary: "Read what a character could start crafting",
+  description:
+    "SRD 5.2.1 Crafting: for each tool the character is proficient with, what its Craft line makes, each with its raw materials (half the price, a Potion of Healing's 25 GP) and its 8-hour days of work (the price in GP divided by 10, rounded up); the prepared spells it can scribe on a Spell Scroll with proficiency in Arcana or with Calligrapher's Supplies, at the Spell Scroll Costs table's days and gold; and the magic items it can craft with Arcana proficiency and a tool it is proficient with, at the Magic Item Crafting table's days and gold by rarity (halved for a consumable). Whether a tool is carried, and the purse. `crafting.start` checks each again. The GM may ask about any character; a player session only about its claimed character.",
+  access: anySession("game:read"),
+  params: ActorCraftingOffersSchema,
+  responses: {
+    200: ok(CraftingOffersReplySchema, "What the character could start crafting now."),
+    400: refused(),
+    401: refused(),
+    403: refused(ONE_ACTOR),
+    404: refused()
+  }
+});
+
 export const getCharacterDraft = defineRoute({
   method: "get",
   path: GAME_PATHS.characterDraft,
@@ -306,6 +327,7 @@ export const GAME_ROUTES = [
   getActorAvailableActions,
   getActorMovement,
   getCharacterNextLevel,
+  getActorCraftingOffers,
   getCharacterDraft,
   getBuilderOffers,
   previewVision,

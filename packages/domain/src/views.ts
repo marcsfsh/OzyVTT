@@ -4,6 +4,7 @@ import type {
   Annotation,
   BuilderPolicy,
   CheckSubject,
+  CraftingProject,
   CombatState,
   EncounterToken,
   GameState,
@@ -30,7 +31,8 @@ export type PlayerHp =
   { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side
  * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's, and so does its magic
- * mark, which only Magic Resistance reads, and the amounts and immunities a spell's level or caster set. `yours` marks one the
+ * mark, which only Magic Resistance reads, the amounts and immunities a spell's level or caster set, a long casting's
+ * targets and slot, and what an effect gives or wards and the row it is bound to. `yours` marks one the
  * viewing player's own character is the source of (their grapple, their Concentration), which they may end. */
 export type PlayerEffect = Omit<
   EffectInstance,
@@ -44,8 +46,39 @@ export type PlayerEffect = Omit<
   | "hitPointMaximumGain"
   | "temporaryHitPointsEachTurn"
   | "conditionImmunities"
+  | "grantedMove"
+  | "grantedTeleport"
+  | "endsWhenUnaffected"
+  | "longCast"
+  | "hitPointsEachTurn"
+  | "conditionWards"
+  | "suppressedConditions"
+  | "itemId"
+  | "weapon"
+  | "optionId"
+  | "bonusActions"
+  | "grantedSpellAction"
+  | "storedCast"
+  | "storeAwaits"
+  | "endAction"
+  | "usedOnTurn"
+  | "refundsUses"
+  | "shrinksEachLongRest"
+  | "unarmedStrike"
+  | "struck"
+  | "light"
+  | "findDc"
+  | "detects"
+  | "heldBy"
+  | "form"
+  | "sizeChange"
+  | "ownSize"
 > & {
   yours?: true;
+  /** What holds the creature (a Net), by name: the object any creature can attack to free it. */
+  heldBy?: Readonly<{ name: string }>;
+  /** The form its bearer has taken, by name alone (the effect's name says it too). */
+  form?: Readonly<{ name: string }>;
 };
 /** A creature as one player sees it. Their own claimed character gets everything; another player's is limited by
  * `GameState.partyVisibility` (see apps/server/src/projections.ts). */
@@ -54,6 +87,19 @@ export type PlayerActorTableField =
   "id" | "name" | "kind" | "visibility" | "size" | "sizeCells" | "tokenAssetId" | "conditions" | "deathSaves";
 /** Actor fields players receive only on player characters; a monster's stats are GM knowledge. */
 export type PlayerActorPartyField = "armorClass" | "armorClassOverride" | "initiative" | "speedFeet" | "definitionId";
+/** What a player may order a creature their character commands to do (`summon:*`), and the action each takes. */
+export type CommandedOrders = Readonly<{
+  /** Commanding it takes the commander's Bonus Action or a Magic action (`summon:command`). */
+  command?: "bonus-action" | "action";
+  /** The commander dismisses it with this (`summon:dismiss`). */
+  dismiss?: "bonus-action" | "action";
+  /** The commander may look through its eyes with a Bonus Action (`summon:look`) and send it to its pocket
+   *  dimension. */
+  look?: true;
+  /** It waits in its pocket dimension until called back with a Magic action (`summon:recall`). */
+  away?: true;
+}>;
+
 export type PlayerActor = Pick<Actor, PlayerActorTableField> &
   Partial<Pick<Actor, PlayerActorPartyField>> & {
     replaySceneId?: string;
@@ -61,6 +107,9 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     effects: PlayerEffect[];
     claimStatus: "available" | "mine" | "claimed";
     presence: PresenceStatus | null;
+    /** A creature your own character commands (a summoned spirit, a dominated ogre): you act for it, and get its stat
+     *  block (`definition`), exact `hp`, `actionUses` and `pools`. Never on another player's. */ commanded?: true;
+    /** On a creature you command: the orders you may give it and what each costs your character. */ orders?: CommandedOrders;
     /** "Fighter 5 / Rogue 2", derived server-side; on another player's claimed character (the party tier decides),
      *  and on an unclaimed character for the claim picker. */ classLine?: string;
     /** "Dwarf", for the claim picker; only on an unclaimed character, which any player could claim and read in full. */ species?: string;
@@ -70,6 +119,10 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
       number
     >;
     /** Whether the character holds Heroic Inspiration. Same gate as `actionUses`. */ heroicInspiration?: boolean;
+    /** When each pool spent for a time comes back (game-clock minute). Same gate as `actionUses`. */ readyAt?: Actor["readyAt"];
+    /** A second Heroic Inspiration your own character gained, to give to a player character who lacks one or let go.
+     *  Your own claimed character only. */ heroicInspirationToGive?: boolean;
+    /** The character's Experience Points, once the GM has awarded any. Same gate as `actionUses`. */ experiencePoints?: number;
     /** Picks re-made on a rest, keyed by offer key (Circle of the Land's land type). Same gate as `actionUses`. */ choiceOverrides?: Record<
       string,
       { id: string; per: "short-rest" | "long-rest" }
@@ -83,11 +136,16 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** Hit Point Dice pool (per-die `entries` plus the derived total summary). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ hitDice?: NonNullable<
       Actor["hitDice"]
     >;
+    /** What the character ate and drank today, while the table tracks food and water. Same gate as `hitDice`. */ nourishment?: NonNullable<
+      Actor["nourishment"]
+    >;
     /** Sheet resources (spell slots, prepared spells, inventory, currency). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ spellSlots?: Actor["spellSlots"];
     pactSlots?: Actor["pactSlots"];
     preparedSpellIds?: Actor["preparedSpellIds"];
     /** A Wizard's spellbook beyond its sheet. Same gate as `preparedSpellIds`. */ spellbook?: Actor["spellbook"];
+    /** A Druid's known Wild Shape forms. Same gate as `preparedSpellIds`. */ knownForms?: Actor["knownForms"];
     preparation?: Actor["preparation"];
+    /** The step a finished rest opened (recoveries and re-choices). Same gate as `preparation`. */ restStep?: Actor["restStep"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];
     /** The options pinned to the sheet's turn card and how often each option resolved. Your own claimed character
@@ -96,7 +154,16 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{
       style: "bar" | "ring" | "aura";
     }>;
+    /** What this player's Hunter knows of the creature its Hunter's Mark marks (Hunter's Lore), while the mark lasts.
+     *  Only in that player's own projection. */ knownDefences?: KnownDefences;
   };
+/** A creature's damage Immunities, Resistances and Vulnerabilities and its condition Immunities, by id. */
+export type KnownDefences = Readonly<{
+  damageImmunities: readonly string[];
+  damageResistances: readonly string[];
+  damageVulnerabilities: readonly string[];
+  conditionImmunities: readonly string[];
+}>;
 export type PlayerInitiativeEntry = Readonly<{
   actorId: string;
   name: string;
@@ -119,22 +186,39 @@ export type PlayerPendingSave = Omit<
   | "onSuccessEffect"
   | "failureNote"
   | "breaksConcentration"
+  | "successEndsSpell"
+  | "dropsRowId"
   | "zoneId"
   | "magical"
   | "immuneOnSuccess"
+  | "immuneMinutes"
   | "drain"
   | "failurePush"
+  | "successPush"
+  | "successMovesOut"
+  | "failureMovesTo"
+  | "unseats"
   | "advantageAtSize"
+  | "disadvantageTypes"
+  | "spell"
+  | "confirmed"
+  | "spendsOnKill"
+  | "damageSource"
 > & {
   onFailEffect?: Omit<
     NonNullable<PendingSave["onFailEffect"]>,
     "castId" | "sourceActionId" | "ongoingDamage" | "magical"
   >;
+  /** Confirmed, and waiting on another creature's answer to the roll; who may answer stays unnamed. */
+  awaitingAnswer?: true;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. `attackRoll` is the held attack's total, present only when that roll
  *  is in the player's own dice log; `lastsUntilNextTurn` says the reactor's reaction lasts (Shield). */
-export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack"> & {
+export type PlayerPendingReaction = Omit<
+  PendingReaction,
+  "sourceActorId" | "parkedAttack" | "parkedCast" | "saveId" | "asked" | "drain" | "hitKinds" | "damageSource"
+> & {
   attackRoll?: number;
   lastsUntilNextTurn?: true;
 };
@@ -153,14 +237,23 @@ export type PlayerVisionWall = Readonly<{
   open?: boolean;
 }>;
 /** Dynamic vision as one player gets it (ADR-0023): where their own characters see now, what the party has seen in
- *  this scene, and the walls in it. Everything else on the map is dark. */
+ *  this scene, and the walls in it. Everything else on the map is dark. `bright`, when present, is the part of what
+ *  they see that lies in Bright Light; the rest of it is dim, or dark seen by Darkvision. Absent, all of it is bright. */
+/** A creature one of the player's characters senses without seeing it (Divine Sense): where it stands and its
+ *  creature type, nothing else. */
+/** A creature a player's character senses: where it stands and its creature type, or what the sense finds there (`sense`:
+ *  "magic: Evocation", "a venomous beast", "a mind"); a direction-only sense names a point one cell toward it. */
+export type PlayerSensedCreature = Readonly<{ x: number; y: number; creatureType: string; sense?: string }>;
 export type PlayerVision =
   | Readonly<{ enabled: false }>
   | Readonly<{
       enabled: true;
       visible: readonly VisionPolygon[];
+      bright?: readonly VisionPolygon[];
       explored: readonly VisionRect[];
       walls: readonly PlayerVisionWall[];
+      /** Only in a player's own projection, never the table's. */
+      sensed?: readonly PlayerSensedCreature[];
     }>;
 export type PlayerCombatView = Readonly<{
   active: boolean;
@@ -193,12 +286,34 @@ export type PlayerCombatView = Readonly<{
   underwater: boolean;
   reactionsUsed: readonly string[];
   /** The fog mask verbatim (geometry only; hidden things are stripped by their own filters). */ fog: CombatState["fog"];
-  /** Difficult terrain, clipped to what the fog reveals so unrevealed ground keeps its layout. */ terrain: CombatState["terrain"];
+  /** Painted ground (difficult terrain, water, ice), clipped to what the fog reveals so unrevealed ground keeps its layout. */ terrain: CombatState["terrain"];
+  /** The traps the party has found: each one's name, area and whether it is still dangerous. Never a DC, a band of
+   *  levels or a trap no one has found. */ traps: readonly PlayerTrap[];
   /** Dynamic vision: with it on, `tokens` holds only the creatures your characters perceive. */ vision: PlayerVision;
   pendingSaves: readonly PlayerPendingSave[];
   pendingReactions: readonly PlayerPendingReaction[];
   /** The player's own parked Ask-the-GM questions only. */ pendingRuleAsks: readonly PlayerPendingRuleAsk[];
+  /** What happens at once as their own character's turn starts or ends, waiting for them to order it. */ turnSteps?: PlayerTurnSteps | null;
+  /** Alert's Initiative Swap offers their own characters are in: made by them, or waiting for them to take. */ initiativeSwapOffers?: ReadonlyArray<
+    Readonly<{ actorId: string; withActorId: string }>
+  >;
   /** True while the GM has the table viewing an earlier turn (no labels, since those can name hidden combatants). */ rewound: boolean;
+}>;
+/** A trap the party has found, as players and the table screen see it. */
+export type PlayerTrap = Readonly<{
+  id: string;
+  name: string;
+  area: Readonly<{ x: number; y: number; width: number; height: number }>;
+  state: "armed" | "sprung" | "disarmed";
+  /** While it is armed, the ways its text gives to make it safe, by name (`trap:disarm`'s `disarmId`). */
+  ways: ReadonlyArray<Readonly<{ id: string; name: string }>>;
+}>;
+/** The steps of a turn's start or end a player orders: each named, with the creature it lands on when they see it. */
+export type PlayerTurnSteps = Readonly<{
+  id: string;
+  actorId: string;
+  boundary: "start" | "end";
+  steps: ReadonlyArray<Readonly<{ key: string; name: string; targetName?: string }>>;
 }>;
 /** An archived, public character the GM shared for preview: id and name only. */
 export type PlayerArchivedCharacter = Readonly<{ id: string; name: string }>;
@@ -214,6 +329,8 @@ export type PlayerRollCall = Readonly<{
     Readonly<{
       actorId: string;
       saveId?: string;
+      /** The situations their own character's gear names that fit the check, to toggle on the card. */
+      situations?: NonNullable<RollCall["entries"][number]["situations"]>;
       answered: boolean;
       result?: NonNullable<RollCall["entries"][number]["result"]>;
     }>
@@ -225,6 +342,30 @@ export type PlayerRollCall = Readonly<{
 export type PlayerRestView = Readonly<{
   requests: readonly string[];
   shortRest: Readonly<{ actorIds: readonly string[]; done: readonly string[] }> | null;
+  /** The party's Long Rest when one of their characters is in it, cut down to them: who was interrupted and waits to
+   *  resume, and who of those has a Short Rest's benefits to spend Hit Point Dice in. */
+  longRest: Readonly<{
+    actorIds: readonly string[];
+    interrupted: readonly string[];
+    shortRestEarned: readonly string[];
+  }> | null;
+}>;
+/** A party crafting project as a player sees it (their own characters' and the visible party's): what it makes, with
+ *  what, and how far it has come. When it started and the scroll's numbers stay with the GM; helpers are named only
+ *  among the party's visible characters. */
+export type PlayerCraftingProject = Readonly<{
+  id: string;
+  crafterId: string;
+  itemId: string;
+  itemName: string;
+  kind: CraftingProject["kind"];
+  toolId: string;
+  spellId?: string;
+  helperIds: readonly string[];
+  workMinutes: number;
+  doneMinutes: number;
+  /** What its raw materials cost, in copper: only on the player's own characters' projects. */
+  paidCp?: number;
 }>;
 export type PlayerView = Pick<GameState, "revision"> & {
   combat: PlayerCombatView;
@@ -235,6 +376,7 @@ export type PlayerView = Pick<GameState, "revision"> & {
   /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;
   /** Long Rest requests and the party's Short Rest, for the player's own characters only. */ rest: PlayerRestView;
+  /** The party's crafting projects: their own characters' and the visible party's. */ crafting: readonly PlayerCraftingProject[];
 };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */

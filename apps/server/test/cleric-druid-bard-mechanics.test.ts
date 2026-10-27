@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type GameState } from "@vtt/domain";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
-import { importActorDefinition } from "../src/actor-roster.js";
+import { importActorDefinition, storedDefinition } from "../src/actor-roster.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
@@ -157,6 +157,9 @@ const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable =>
       { level: 1, classId: "bard", kind: "skill", id: "performance" },
       { level: 1, classId: "bard", kind: "skill", id: "persuasion" },
       { level: 1, classId: "bard", kind: "skill", id: "deception" },
+      { level: 1, classId: "bard", kind: "tool", id: "instrument-lute" },
+      { level: 1, classId: "bard", kind: "tool", id: "instrument-flute" },
+      { level: 1, classId: "bard", kind: "tool", id: "instrument-drum" },
       { level: 1, kind: "cantrip", id: "vicious-mockery" },
       { level: 1, kind: "cantrip", id: "mage-hand" },
       { level: 1, kind: "spell", id: "charm-person" },
@@ -237,6 +240,16 @@ const deps = (definition: ReturnType<typeof build>): ResolveDependencies => ({
 });
 const command = () => `50000000-0000-4000-8000-0000000000${String(((commandSeq += 1) % 90) + 10)}`;
 
+/** What Wild Shape reads to take a form: a Beast the Druid knows (the Wolf), and the bestiary that holds it. */
+function shapeShifting(state: GameState, definition: ReturnType<typeof build>): ResolveDependencies {
+  state.actors[0]!.knownForms = { ids: ["wolf"], swapOpen: false };
+  return {
+    ...deps(definition),
+    resolveDefinition: (id) => storedDefinition(state, id) ?? library.monster(id),
+    catalog: equipmentCatalogOf(library)
+  };
+}
+
 // Druid
 
 describe("Primal Order: the twin of the bug that started this area (audit row 4)", () => {
@@ -316,8 +329,8 @@ describe("Wild Shape: the pool, read off the printed column (audit row 54)", () 
     resolveDefinitionAction(
       state,
       actionOf(definition, "wild-shape")!,
-      { actorId: HERO, targetIds: [], commandId: command() },
-      deps(definition)
+      { actorId: HERO, targetIds: [], commandId: command(), form: "wolf" },
+      shapeShifting(state, definition)
     );
     expect(state.actors[0].hp.temporary).toBe(6);
   });
@@ -327,13 +340,19 @@ describe("Wild Shape: the pool, read off the printed column (audit row 54)", () 
     const definition = build(druid(2, [primalOrder("warden")]));
     const state = encounterWith(definition);
     const shape = actionOf(definition, "wild-shape")!;
-    resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
+    const shifting = shapeShifting(state, definition);
+    const use = () =>
+      resolveDefinitionAction(
+        state,
+        shape,
+        { actorId: HERO, targetIds: [], commandId: command(), form: "wolf" },
+        shifting
+      );
+    use();
     expect(state.actors[0].actionUses["wild-shape"]).toBe(1);
-    resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
+    use();
     expect(state.actors[0].actionUses["wild-shape"]).toBe(2);
-    expect(() =>
-      resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition))
-    ).toThrowError(/no uses remaining \(2\/Long Rest\)/);
+    expect(use).toThrowError(/no uses remaining \(2\/Long Rest\)/);
   });
 });
 
@@ -343,6 +362,16 @@ describe("Wild Companion: the level-2 Find Familiar", () => {
     expect(spellOf(two, "find-familiar")).toMatchObject({ alwaysPrepared: true });
     // The negative control: a level-1 Druid does not have Wild Companion, so it does not have this.
     expect(spellOf(build(druid(1, [primalOrder("warden")])), "find-familiar")).toBeUndefined();
+  });
+
+  it("casts it as a Magic action, with a slot or Wild Shape, for a Fey familiar that leaves at a Long Rest", () => {
+    const two = build(druid(2, [primalOrder("warden")]));
+    const free = two.actions.find((action) => action.spellId === "find-familiar" && action.uses?.pool === "wild-shape");
+    const slot = two.actions.find((action) => action.spellId === "find-familiar" && action.spellSlot);
+    for (const cast of [free, slot]) {
+      expect(cast).toMatchObject({ activation: "action", castsAtOnce: true });
+      expect(cast?.summons).toMatchObject({ creatureTypes: ["fey"], lasts: { type: "until-long-rest" } });
+    }
   });
 });
 
@@ -385,8 +414,8 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
     resolveDefinitionAction(
       state,
       actionOf(definition, "wild-shape")!,
-      { actorId: HERO, targetIds: [], commandId: command() },
-      deps(definition)
+      { actorId: HERO, targetIds: [], commandId: command(), form: "wolf" },
+      shapeShifting(state, definition)
     );
     expect(state.actors[0].actionUses["wild-shape"]).toBe(2);
     expect(() =>
@@ -397,6 +426,41 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
         deps(definition)
       )
     ).toThrowError(/no uses remaining \(2\/Long Rest\)/);
+  });
+
+  it("heals one creature picked in the area with a roll of its own, 3d6 from Druid 10", () => {
+    expect(actionOf(definition, "lands-aid")).toMatchObject({
+      area: { shape: "sphere", sizeFeet: 10, rangeFeet: 60 },
+      areaHeal: { formula: "2d6" }
+    });
+    expect(
+      actionOf(build(druid(10, [primalOrder("warden"), elementalFury("primal-strike")])), "lands-aid")?.areaHeal
+    ).toEqual({ formula: "3d6" });
+    const state = encounterWith(definition);
+    state.actors[0]!.hp.current = 5;
+    const used = resolveDefinitionAction(
+      state,
+      actionOf(definition, "lands-aid")!,
+      { actorId: HERO, targetIds: [FOE], commandId: command(), aidTo: HERO },
+      { ...deps(definition), distanceFeet: () => 10 }
+    );
+    // Every die shows 3: 2d6 is 6, apart from the save's damage.
+    expect(state.actors[0]!.hp.current).toBe(11);
+    expect(used.healing?.targets).toEqual([{ targetId: HERO, targetName: state.actors[0]!.name, regained: 6 }]);
+    expect(state.combat.pendingSaves).toMatchObject([{ targetActorId: FOE, ability: "con", dc: 13 }]);
+  });
+
+  it("refuses a creature the area can't hold, and a Sphere centred beyond 60 feet", () => {
+    const use = (input: Record<string, unknown>, apart: (a: string, b: string) => number) =>
+      resolveDefinitionAction(
+        encounterWith(definition),
+        actionOf(definition, "lands-aid")!,
+        { actorId: HERO, targetIds: [FOE], commandId: command(), ...input },
+        { ...deps(definition), distanceFeet: apart }
+      );
+    expect(() => use({}, () => 75)).toThrowError(/beyond the 10-foot sphere Land's Aid centres within 60 ft/);
+    // The Druid 60 feet from the ghoul, which the Sphere holds; the Druid itself is 60 feet off, too far from it.
+    expect(() => use({ aidTo: HERO }, () => 60)).toThrowError(/too far apart for one area of Land's Aid/);
   });
 });
 
@@ -471,8 +535,13 @@ describe("Nature's Sanctuary - the third feature on the one Wild Shape counter",
       resolveDefinitionAction(
         state,
         actionOf(definition, id)!,
-        { actorId: HERO, targetIds: id === "lands-aid" ? [FOE] : [], commandId: command() },
-        deps(definition)
+        {
+          actorId: HERO,
+          targetIds: id === "lands-aid" ? [FOE] : [],
+          commandId: command(),
+          ...(id === "wild-shape" ? { form: "wolf" } : {})
+        },
+        id === "wild-shape" ? shapeShifting(state, definition) : deps(definition)
       );
     }
     expect(state.actors[0].actionUses["wild-shape"]).toBe(3);
@@ -540,17 +609,72 @@ describe("Bardic Inspiration: the counter the class is built around", () => {
     expect(actionOf(build(bard(1, 15)), "bardic-inspiration")?.activation).toBe("bonus-action");
   });
 
-  it("spends the die three times and then refuses the fourth", () => {
+  it("gives the die three times and then refuses the fourth", () => {
     const definition = build(bard(1, 15));
     const state = encounterWith(definition);
     const inspire = actionOf(definition, "bardic-inspiration")!;
+    const give = () =>
+      resolveDefinitionAction(
+        state,
+        inspire,
+        { actorId: HERO, targetIds: [FOE], commandId: command() },
+        deps(definition)
+      );
     for (let spent = 1; spent <= 3; spent += 1) {
-      resolveDefinitionAction(state, inspire, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
+      give();
       expect(state.actors[0].actionUses["bardic-inspiration"]).toBe(spent);
+      // The die the creature holds is the Bardic Die column's at this level.
+      expect(state.actors[1].effects[0]?.answer?.effect).toEqual({ kind: "add", amount: "1d6" });
+      state.actors[1].effects = [];
     }
-    expect(() =>
-      resolveDefinitionAction(state, inspire, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition))
-    ).toThrowError(/no uses remaining \(3\/Long Rest\)/);
+    expect(give).toThrowError(/no uses remaining \(3\/Long Rest\)/);
+  });
+
+  // SRD 5.2.1: "inspire another creature within 60 feet of yourself ... which it can roll and add to a failed D20 Test
+  // once within the next hour."
+  it("reaches a creature within 60 feet, and the die lasts an hour", () => {
+    const definition = build(bard(1, 15));
+    const state = encounterWith(definition);
+    const inspire = actionOf(definition, "bardic-inspiration")!;
+    const give = (feet: number) =>
+      resolveDefinitionAction(
+        state,
+        inspire,
+        { actorId: HERO, targetIds: [FOE], commandId: command() },
+        { ...deps(definition), distanceFeet: () => feet }
+      );
+    expect(() => give(65)).toThrowError(/65 ft away, beyond Bardic Inspiration/);
+    give(60);
+    expect(state.actors[1].effects[0]?.duration).toEqual({ type: "minutes", remaining: 60 });
+  });
+
+  // "Another creature within 60 feet of yourself who can see or hear you."
+  it("refuses a creature that can neither see nor hear the Bard, and takes one that only hears", () => {
+    const definition = build(bard(1, 15));
+    const state = encounterWith(definition);
+    const inspire = actionOf(definition, "bardic-inspiration")!;
+    const give = () =>
+      resolveDefinitionAction(
+        state,
+        inspire,
+        { actorId: HERO, targetIds: [FOE], commandId: command() },
+        deps(definition)
+      );
+    state.actors[1].conditions = [{ id: "blinded" }, { id: "deafened" }] as (typeof state.actors)[1]["conditions"];
+    expect(give).toThrowError(/needs a creature that can see or hear Ysolde, and .* can do neither/);
+    state.actors[1].conditions = [{ id: "blinded" }] as (typeof state.actors)[1]["conditions"];
+    give();
+    expect(state.actors[1].effects[0]?.name).toBe("Bardic Inspiration");
+  });
+
+  it("gives a d8 from level 5, and a d12 from level 15", () => {
+    const dieAt = (level: number) =>
+      actionOf(
+        build(bard(level, 15, level >= 3 ? loreSkills("history", "arcana", "nature") : [])),
+        "bardic-inspiration"
+      )?.grants?.answer?.effect;
+    expect(dieAt(5)).toEqual({ kind: "add", amount: "1d8" });
+    expect(dieAt(15)).toEqual({ kind: "add", amount: "1d12" });
   });
 
   it("lets Cutting Words and Peerless Skill spend that SAME counter", () => {
@@ -577,7 +701,7 @@ describe("Bardic Inspiration: the counter the class is built around", () => {
     resolveDefinitionAction(
       state,
       actionOf(definition, "bardic-inspiration")!,
-      { actorId: HERO, targetIds: [], commandId: command() },
+      { actorId: HERO, targetIds: [FOE], commandId: command() },
       deps(definition)
     );
     expect(state.actors[0].actionUses["bardic-inspiration"]).toBe(3);

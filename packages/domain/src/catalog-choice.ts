@@ -18,6 +18,7 @@ import type {
  *                               "no category is specified" in the SRD's feat rules; `weapons` is the kinds of
  *                               weapon, without the magic weapons made from them).
  *   - `<table>-languages`    -> languages printed in one SRD table ("standard-languages").
+ *   - `spells`               -> every spell, from any class's list (Pact of the Tome's cantrips and rituals).
  *   - `<listId>-spells`      -> spells whose `classes` includes the class's `spellcasting.spellListId`.
  *   - `<listId>-spells-of-<school>` -> those spells of one school ("wizard-spells-of-evocation").
  *   - `<classId>-subclasses` -> that class's subclasses.
@@ -104,6 +105,31 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       "The equipment catalog has no weapons."
     );
   }
+  // A narrower kind of weapon, each word a filter it must pass: "melee-weapons" (a Barbarian's Weapon Mastery),
+  // "martial-finesse-weapons". A union joins several ("simple-weapons-or-martial-light-weapons").
+  const weaponFilter = /^((?:simple|martial|melee|ranged|light|finesse)-)+weapons$/.exec(slug);
+  if (weaponFilter) {
+    const words = slug.split("-").slice(0, -1);
+    return nonEmpty(
+      slug,
+      catalogs.equipment
+        .filter((item) => {
+          const weapon = item.category === "weapon" ? item.weapon : null;
+          if (!weapon) return false;
+          return words.every((word) =>
+            word === "simple" || word === "martial"
+              ? weapon.category === word
+              : word === "melee"
+                ? weapon.melee === true
+                : word === "ranged"
+                  ? weapon.melee === false
+                  : (weapon.properties ?? []).includes(word)
+          );
+        })
+        .map((item) => ({ id: item.id, name: item.name })),
+      `No weapon in the equipment catalog is ${words.join(" and ")}.`
+    );
+  }
   // Tools are equipment rows with `category: "tool"`.
   if (slug === "tools") {
     return nonEmpty(
@@ -145,6 +171,13 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       slug,
       catalogs.languages.filter((entry) => entry.table === table).map((entry) => ({ id: entry.id, name: entry.name })),
       `No languages are printed in the "${table}" table.`
+    );
+  }
+  if (slug === "spells") {
+    return nonEmpty(
+      slug,
+      catalogs.spells.map((spell) => ({ id: spell.id, name: spell.name, level: spell.level })),
+      "The spells catalog is empty."
     );
   }
   if (slug.endsWith("-spells")) {
@@ -191,7 +224,7 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
   }
   throw new CatalogChoiceError(
     slug,
-    `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, feats, *-languages, *-spells, *-spells-of-<school>, *-subclasses, *-feats, *-lineages).`
+    `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, feats, spells, *-languages, *-spells, *-spells-of-<school>, *-subclasses, *-feats, *-lineages).`
   );
 }
 

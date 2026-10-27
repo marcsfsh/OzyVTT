@@ -54,6 +54,27 @@ export function oilIgnition<T extends Readonly<{ amount: number; type: string }>
   return oiled && fire ? { amount: 5, type: "fire" } : null;
 }
 
+/** Water or sleet puts out the fire on a creature (Sleet Storm's "exposed flames in the area are doused"): what keeps
+ *  it burning ends, with no roll on the ground. Returns the lines for the table. */
+export function douseFire(state: GameState, actor: Actor, by: string): EffectNarration[] {
+  const burning = actor.effects.filter((effect) => effect.tags.includes(BURNING_TAG));
+  if (burning.length === 0) return [];
+  const events: EffectNarration[] = [
+    { kind: "effect", text: `${by} puts out the fire on ${actor.name}.`, actorId: actor.id }
+  ];
+  for (const effect of burning) {
+    if (effect.linkedConditionIds.length === 0) {
+      events.push(...endEffect(state, actor.id, effect.id));
+      continue;
+    }
+    const { ongoingDamage: _fire, ...rest } = effect;
+    actor.effects = actor.effects.map((candidate) =>
+      candidate.id === effect.id ? { ...rest, tags: rest.tags.filter((tag) => tag !== BURNING_TAG) } : candidate
+    );
+  }
+  return events;
+}
+
 /**
  * Rolling on the ground puts out the fire on its bearer: a Burning effect of its own ends, and one riding conditions
  * only stops burning. The bearer drops Prone, which it gave itself. Returns the fires put out, with their sources.

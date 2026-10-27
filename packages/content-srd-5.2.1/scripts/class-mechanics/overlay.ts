@@ -19,10 +19,10 @@ type OptionInput = z.input<typeof FeatureOptionSchema>;
 type RiderKey =
   "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "replaces" | "choice" | "choices";
 /** Feature-only rider keys (an option cannot carry them). */
-type FeatureRiderKey = RiderKey | "extraSpellLists";
+type FeatureRiderKey = RiderKey | "extraSpellLists" | "freeCastOf";
 
 /** The rider fields an overlay may add to one pickable option inside a feature's choice. */
-export type OptionMechanics = Partial<Pick<OptionInput, RiderKey | "requires" | "level">>;
+export type OptionMechanics = Partial<Pick<OptionInput, RiderKey | "requires" | "level" | "repeatable">>;
 
 /**
  * The rider fields an overlay may add to a feature. Typed off the schema's input so `.default()`ed
@@ -79,6 +79,22 @@ export function potentSpellcasting(spellIds: readonly string[]): NonNullable<Opt
     type: "extra-damage",
     abilityModifier: "wis",
     when: [{ type: "on-damage-roll" }, { type: "spell-id-is", spellIds: [...spellIds] }]
+  };
+}
+
+/** "A bonus to your Intelligence (Arcana or Religion) checks. The bonus equals your Wisdom modifier (minimum of +1)"
+ *  (Thaumaturge, Magician). */
+export function wisdomOnChecks(skills: readonly string[]): NonNullable<OptionInput["modifiers"]>[number] {
+  return {
+    type: "check-bonus",
+    amount: 0,
+    abilityModifier: "wis",
+    minimum: 1,
+    when: [
+      { type: "on-ability-check" },
+      { type: "ability-is", abilities: ["int"] },
+      { type: "skill-is", skills: [...skills] }
+    ]
   };
 }
 

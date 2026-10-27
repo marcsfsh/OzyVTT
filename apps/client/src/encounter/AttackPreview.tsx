@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ActionResolution, HitOffer, HitOptionChoice } from "@vtt/domain";
-import { ForceModeButtons, RerollControl, type DieMode } from "./RollControls";
+import { AnswerOffers, ForceModeButtons, RerollControl, type DieMode } from "./RollControls";
+import { DamageLook } from "./DamageLook";
 import { useTargetingTyped, type ResolveOptions } from "./targeting";
 import "./prompts.css";
 
@@ -45,6 +46,7 @@ export function AttackOutcome({ attack, audience }: Readonly<{ attack: Attack; a
                   : attack.outcome.toUpperCase()
           }`}
       {attack.naturalRoll >= 1 ? ` (nat ${attack.naturalRoll})` : ""} vs {attack.targetName}
+      {(attack.answered ?? []).map((line) => `; ${line.name}: ${line.change}`).join("")}
     </p>
   );
 }
@@ -81,11 +83,60 @@ export function PushChoice({
   );
 }
 
+/** Tactical Master: the weapon's own mastery property, or Push, Sap or Slow in its place for this attack. */
+export function MasteryChoice({
+  options,
+  value,
+  busy,
+  onPick
+}: Readonly<{
+  options: NonNullable<ActionResolution["masteryOptions"]>;
+  value: "push" | "sap" | "slow" | undefined;
+  busy: boolean;
+  onPick: (mastery: "push" | "sap" | "slow" | undefined) => void;
+}>) {
+  const choices = [
+    { id: undefined, name: options.own.name },
+    ...options.alternatives.map((choice) => ({ id: choice.id, name: choice.name }))
+  ];
+  return (
+    <div className="push-choice" role="group" aria-label="Mastery property for this attack">
+      <span className="push-choice-label">Mastery</span>
+      {choices.map((choice) => (
+        <button
+          key={choice.id ?? "own"}
+          type="button"
+          className={`save-die-mode${value === choice.id ? " active" : ""}`}
+          aria-pressed={value === choice.id}
+          disabled={busy}
+          onClick={() => onPick(choice.id)}
+        >
+          {choice.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const titled = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
+/** An offer's button label: its name and the dice it adds, if any. */
+const offerLabel = (offer: HitOffer) =>
+  offer.rerolls ? `${offer.name} · ${offer.dice} twice` : offer.dice ? `${offer.name} +${offer.dice}` : offer.name;
+
+/** The effects picked with an offer after one more is toggled: on or off, never past how many one hit carries. A
+ *  single effect swaps for another. */
+function toggledEffects(offer: HitOffer, picked: readonly string[], id: string): string[] {
+  if (picked.includes(id))
+    return offer.effectRequired && picked.length === 1 ? [...picked] : picked.filter((e) => e !== id);
+  const most = offer.effectsChoose ?? 1;
+  return most === 1 ? [id] : picked.length < most ? [...picked, id] : [...picked];
+}
+
 /**
- * The extras a hit can carry (Sneak Attack, a smite, Divine Strike, a charge): each a toggle, with its type or slot
- * picked once it is on. What it costs and what the engine couldn't check are said under it.
+ * The extras a hit can carry (Sneak Attack, a smite, Divine Strike, a charge): each a toggle, with its type, slot or
+ * effects picked once it is on. What it costs, the save it opens and what the engine couldn't check are said under
+ * it.
  */
 export function HitOfferChoices({
   offers,
@@ -125,13 +176,36 @@ export function HitOfferChoices({
                     ? null
                     : {
                         ...(offer.damageTypes ? { damageType: offer.damageTypes[0] } : {}),
-                        ...(offer.slotLevels ? { slotLevel: offer.slotLevels[0] } : {})
+                        ...(offer.slotLevels ? { slotLevel: offer.slotLevels[0] } : {}),
+                        // One that needs an effect starts with its first.
+                        ...(offer.effectRequired && offer.effects?.[0] ? { effects: [offer.effects[0].id] } : {})
                       }
                 )
               }
             >
-              {offer.name} +{offer.dice}
+              {offerLabel(offer)}
             </button>
+            {pick && offer.effects && (
+              <span className="hit-offer-picks" role="group" aria-label={`${offer.name} effects`}>
+                {offer.effects.map((effect) => {
+                  const on = (pick.effects ?? []).includes(effect.id);
+                  return (
+                    <button
+                      key={effect.id}
+                      type="button"
+                      className={`save-die-mode${on ? " active" : ""}`}
+                      aria-pressed={on}
+                      disabled={busy}
+                      onClick={() =>
+                        update(offer.id, { effects: toggledEffects(offer, pick.effects ?? [], effect.id) })
+                      }
+                    >
+                      {effect.cost ? `${effect.name} ${effect.cost}` : effect.name}
+                    </button>
+                  );
+                })}
+              </span>
+            )}
             {pick && offer.damageTypes && (
               <span className="hit-offer-picks" role="group" aria-label={`${offer.name} damage type`}>
                 {offer.damageTypes.map((type) => (
@@ -164,9 +238,16 @@ export function HitOfferChoices({
                 ))}
               </span>
             )}
-            {(offer.cost || offer.unverified) && (
+            {(offer.cost || offer.save || offer.unverified) && (
               <small className="hit-offer-note">
-                {[offer.cost ? `Costs ${offer.cost}.` : null, offer.unverified].filter(Boolean).join(" ")}
+                {[
+                  offer.cost ? `Costs ${offer.cost}.` : null,
+                  offer.save ?? null,
+                  offer.effectsChoose && offer.effectsChoose > 1 ? `Pick up to ${offer.effectsChoose} effects.` : null,
+                  offer.unverified
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               </small>
             )}
           </div>
@@ -180,8 +261,8 @@ export function HitOfferChoices({
  * An attack previewed but not yet applied: Confirm resolves the hit for real (damage, riders, economy) with the die
  * shown, which the server holds (ADR-0012). The GM may force Advantage or Disadvantage and reroll freely; a player
  * rerolls only by spending Heroic Inspiration, and types the reroll's face when the shown die was typed. A hit that offers
- * a Push asks how far first, and a hit that can carry extras (Sneak Attack, a smite) offers them; Confirm sends those
- * choices.
+ * a Push asks how far first, and a hit that can carry extras (Sneak Attack, a smite) offers them, as a melee hit offers
+ * to knock its target out; Confirm sends those choices.
  */
 export function AttackPreview({
   attack,
@@ -191,6 +272,8 @@ export function AttackPreview({
   onFeedback,
   push,
   hitOffers = [],
+  knockOutOffered = false,
+  look,
   resolve: resolveWith
 }: Readonly<{
   attack: Attack;
@@ -204,6 +287,10 @@ export function AttackPreview({
   push?: ActionResolution["push"];
   /** The extras this hit can carry; chosen ones ride the Confirm. */
   hitOffers?: readonly HitOffer[];
+  /** A melee hit may knock its target out instead of dropping it (SRD); the attacker chooses it before Confirm. */
+  knockOutOffered?: boolean;
+  /** The hit's damage may be looked at before it counts (`offered`), or the look itself, with its held dice. */
+  look?: ActionResolution;
   resolve: (options: ResolveOptions) => void;
 }>) {
   // The shown die was typed from a physical die, so a player's reroll is typed too.
@@ -212,60 +299,125 @@ export function AttackPreview({
   const [pushPick, setPushPick] = useState<number | null>(null);
   const pushFeet = push ? Math.min(pushPick ?? push.maxFeet, push.maxFeet) : undefined;
   const [extras, setExtras] = useState<HitOptionChoice[]>([]);
+  const [knockOut, setKnockOut] = useState(false);
   // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
   const [forced, setForced] = useState<DieMode | undefined>(undefined);
+  // Tactical Master's pick, sent with every later look and the confirm.
+  const mastery = look?.masteryOptions?.picked;
   // A reroll can change what is offered (a miss offers nothing), so only choices still offered are sent.
   const hitOptions = extras.filter((choice) => hitOffers.some((offer) => offer.id === choice.id));
   const resolve = (options: ResolveOptions) =>
     resolveWith({
+      ...(mastery ? { mastery } : {}),
       ...options,
       ...(forced ? { rollMode: forced } : {}),
       // Only a confirming call carries the push and extras; previews ignore them.
       ...(options.commit && pushFeet !== undefined ? { pushFeet } : {}),
-      ...(options.commit && hitOptions.length > 0 ? { hitOptions } : {})
+      // A look at the damage throws the chosen extras' dice too, so Heroic Inspiration can reroll one of them.
+      ...((options.commit || options.damageLook) && hitOptions.length > 0 ? { hitOptions } : {}),
+      ...(options.commit && knockOutOffered && knockOut ? { knockOut: true } : {})
     });
   return (
     <div className="action-preview">
+      {look?.masteryOptions && (
+        <MasteryChoice
+          options={look.masteryOptions}
+          value={mastery}
+          busy={busy}
+          onPick={(picked) =>
+            // A new look with the pick, so the card offers what that property does (Push's distance).
+            resolveWith({
+              commit: false,
+              ...(forced ? { rollMode: forced } : {}),
+              ...(picked ? { mastery: picked } : {})
+            })
+          }
+        />
+      )}
       {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
       {hitOffers.length > 0 && (
         <HitOfferChoices offers={hitOffers} chosen={hitOptions} busy={busy} onChange={setExtras} />
       )}
-      <span className="save-prompt-confirm">
-        {viewer === "gm" && (
-          <ForceModeButtons
-            current={forced}
-            disabled={busy}
-            onPick={(mode) => {
-              const next = mode === "normal" ? undefined : mode;
-              setForced(next);
-              // Sent as is: going back to the rules' count sends no mode at all.
-              resolveWith({ commit: false, ...(next ? { rollMode: next } : {}) });
-            }}
-          />
-        )}
-        <button type="button" className="encounter-primary" disabled={busy} onClick={() => resolve({ commit: true })}>
-          {outcomeOpen(attack)
-            ? "Confirm"
-            : `Confirm ${
-                attack.outcome === "crit"
-                  ? "crit"
-                  : attack.outcome === "hit" || attack.outcome === "unknown"
-                    ? "hit"
-                    : "miss"
-              }`}
-        </button>
-        {(viewer === "gm" || inspired) && (
-          <RerollControl
-            viewer={viewer}
+      {knockOutOffered && (
+        <div className="hit-offers" role="group" aria-label="If the hit drops the target to 0">
+          <div className="hit-offer">
+            <button
+              type="button"
+              className={`save-die-mode${knockOut ? " active" : ""}`}
+              aria-pressed={knockOut}
+              disabled={busy}
+              onClick={() => setKnockOut(!knockOut)}
+            >
+              Knock out
+            </button>
+            <small className="hit-offer-note">At 0 Hit Points it is left at 1 Hit Point and Unconscious instead.</small>
+          </div>
+        </div>
+      )}
+      {look?.heldDamage ? (
+        <DamageLook
+          result={look}
+          look={look.heldDamage}
+          busy={busy}
+          confirmLabel={`Confirm ${attack.outcome === "crit" ? "crit" : "hit"}`}
+          onAnswer={(id, dice) => resolve({ commit: false, damageLook: true, damageAnswer: { id, dice } })}
+          onConfirm={() => resolve({ commit: true })}
+        />
+      ) : (
+        <span className="save-prompt-confirm">
+          {viewer === "gm" && (
+            <ForceModeButtons
+              current={forced}
+              disabled={busy}
+              onPick={(mode) => {
+                const next = mode === "normal" ? undefined : mode;
+                setForced(next);
+                // Sent as is: going back to the rules' count sends no mode at all.
+                resolveWith({ commit: false, ...(next ? { rollMode: next } : {}) });
+              }}
+            />
+          )}
+          <button type="button" className="encounter-primary" disabled={busy} onClick={() => resolve({ commit: true })}>
+            {outcomeOpen(attack)
+              ? "Confirm"
+              : `Confirm ${
+                  attack.outcome === "crit"
+                    ? "crit"
+                    : attack.outcome === "hit" || attack.outcome === "unknown"
+                      ? "hit"
+                      : "miss"
+                }`}
+          </button>
+          {(viewer === "gm" || inspired) && (
+            <RerollControl
+              viewer={viewer}
+              typed={typed}
+              busy={busy}
+              onInvalid={onFeedback}
+              onReroll={(face) =>
+                resolve({ commit: false, reroll: true, ...(face !== undefined ? { attackNatural: face } : {}) })
+              }
+            />
+          )}
+          <AnswerOffers
+            offers={attack.answers}
             typed={typed}
             busy={busy}
             onInvalid={onFeedback}
-            onReroll={(face) =>
-              resolve({ commit: false, reroll: true, ...(face !== undefined ? { attackNatural: face } : {}) })
-            }
+            onAnswer={(answer) => resolve({ commit: false, answer })}
           />
-        )}
-      </span>
+          {look?.damageLook === "offered" && (
+            <button
+              type="button"
+              className="save-die-mode"
+              disabled={busy}
+              onClick={() => resolve({ commit: false, damageLook: true })}
+            >
+              Roll damage
+            </button>
+          )}
+        </span>
+      )}
     </div>
   );
 }

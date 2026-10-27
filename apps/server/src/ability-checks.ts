@@ -1,4 +1,5 @@
 import type { AbilityId, Actor } from "@vtt/domain";
+import { traitOf } from "./statblock-traits.js";
 import {
   abilityModifier,
   aggregateRollMode,
@@ -11,20 +12,26 @@ import {
   type AggregatedRollMode,
   type DiceResolution,
   type RandomSource,
-  type RiderAbility,
+  type ResolvedRider,
   type ThrownDie
 } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
 import { conditionLabel, exhaustionPenalty } from "./condition-rules.js";
 import { RAGING_TAG } from "./effects.js";
+import { toolHelp } from "./help-assist.js";
+import { trainedSkillOf } from "./statblock-picks.js";
 import {
   checkRiderBonus,
   effectiveSkillTier,
   rollModeClaims,
+  type CheckNarrow,
   type EquipmentDerivation,
   type RollModeClaims
 } from "./equipment-derivation.js";
+
+/** The cloak that turns others' Wisdom (Perception) checks to perceive its attuned wearer to Disadvantage. */
+const ELVENKIND_CLOAK_ID = "cloak-of-elvenkind";
 
 // Ability checks (SRD 5.2.1 "Ability Checks", "Proficiency"): one plan for every check the sheet, the builtin actions,
 // the GM's calls for a roll and first aid roll, so their numbers and their Advantage never disagree.
@@ -32,45 +39,62 @@ import {
 /** The rider-claimed Advantage and Disadvantage for one ability check: every carrier's `roll-mode {roll: "check"}`
  *  riders, standing and `on-ability-check`, narrowed by `ability-is` and `skill-is` (Rage's Strength checks, Boots of
  *  Elvenkind, armor's Stealth). Conditions and the check's own circumstances are added by `checkPlan`. */
-export function checkRollMode(
-  derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }> = {}
-): AggregatedRollMode {
+export function checkRollMode(derivation: EquipmentDerivation, narrow: CheckNarrow = {}): AggregatedRollMode {
   const claims = checkRiderClaims(derivation, narrow);
   return aggregateRollMode(claims.advantage, claims.disadvantage);
 }
 
 function checkRiderClaims(
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
+  narrow: CheckNarrow,
   stakes: readonly string[] = []
 ): RollModeClaims {
   return rollModeClaims(derivation, ["check"], "on-ability-check", {
     ...(narrow.ability !== undefined ? { ability: narrow.ability } : {}),
     ...(narrow.skill !== undefined ? { skill: narrow.skill } : {}),
+    ...(narrow.situations !== undefined ? { situations: narrow.situations } : {}),
     // The conditions the check would end (escaping a grapple: Grappled), for a `versus-condition` rider.
     ...(stakes.length > 0 ? { targetConditionIds: stakes } : {})
   });
 }
 
-/** Conditions that give Disadvantage on every ability check. Frightened applies only while the source of fear is in
- *  sight; with no vision system it applies whenever active, as it does for attack rolls. */
+/** Conditions that give Disadvantage on every ability check. Frightened applies only while the source of fear is
+ *  within line of sight (`CheckSight.frightened`), and whenever active when the caller can't tell. */
 const CHECK_DISADVANTAGE_CONDITIONS = ["poisoned", "frightened"] as const;
 
+/** What sight decides about a check, worked out by the caller from the map (`checkSightFor` in `vision/rules.ts`). */
+export type CheckSight = Readonly<{
+  /** Frightened's Disadvantage applies now: its source is within line of sight, or no one can tell. */
+  frightened?: boolean;
+  /** Its traits that give its checks Disadvantage where it stands (Sunlight Sensitivity), by name. */
+  lightSensitivities?: readonly string[];
+  /** How obscured the creature a Perception check is made to find is to the roller, after its senses. */
+  findingObscured?: "none" | "light" | "heavy" | null;
+  /** The roller perceives that creature with Blindsight, which needs no sight. */
+  findingByBlindsight?: boolean;
+}>;
+
 /** The Advantage and Disadvantage the rules give `actor`'s ability checks with this ability (and skill): check riders
- *  (`checkRiderClaims`, Hex's ability among them) and Poisoned and Frightened. Initiative, a Dexterity check, reads it
- *  too. */
+ *  (`checkRiderClaims`, Hex's ability among them), Poisoned and Frightened, and a trait that dislikes the light it
+ *  stands in. Initiative, a Dexterity check, reads it too. */
 export function abilityCheckClaims(
   actor: Actor,
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
+  narrow: CheckNarrow,
   warded: readonly string[] = [],
-  stakes: readonly string[] = []
+  stakes: readonly string[] = [],
+  sight: CheckSight = {}
 ): RollModeClaims {
   const claims = checkRiderClaims(derivation, narrow, stakes);
   for (const condition of CHECK_DISADVANTAGE_CONDITIONS)
-    if (actor.conditions.some((held) => held.id === condition) && !warded.includes(condition))
+    if (
+      actor.conditions.some((held) => held.id === condition) &&
+      !warded.includes(condition) &&
+      (condition !== "frightened" || sight.frightened !== false)
+    )
       claims.disadvantage.push({ source: `condition-${condition}`, label: conditionLabel(condition) });
+  for (const name of sight.lightSensitivities ?? [])
+    claims.disadvantage.push({ source: "light-sensitivity", label: `${name} (in the light)` });
   return claims;
 }
 
@@ -83,8 +107,70 @@ export const ABILITY_NAMES: Readonly<Record<AbilityId, string>> = {
   cha: "Charisma"
 };
 
-/** What a check is made with: the ability, and a skill or a tool (or a tool with the skill it uses) when one applies. */
-export type CheckSubject = Readonly<{ ability: AbilityId; skill?: string; tool?: string }>;
+/** What a check is made with: the ability, and a skill or a tool (or a tool with the skill it uses) when one applies.
+ *  `sense` is what the check relies on, when the GM says: a Blinded roller fails one that needs sight, a Deafened one
+ *  one that needs hearing. */
+export type CheckSubject = Readonly<{ ability: AbilityId; skill?: string; tool?: string; sense?: "sight" | "hearing" }>;
+
+/** The creature a social check interacts with (Influence, or a Charisma check the GM calls naming it). */
+export type CheckVersus = Readonly<{
+  actor: Actor;
+  /** Its creature type is Humanoid (Perfume's "an Indifferent Humanoid"). */
+  humanoid: boolean;
+  /** Feet between the two tokens; null when the map can't tell. */
+  feet: number | null;
+  /** It is a dwarf or a duergar (a Belt of Dwarvenkind's "interact with dwarves and duergar"). */
+  dwarf?: boolean;
+}>;
+
+/** Whether a creature is a dwarf or a duergar: a character of the Dwarf species, or a stat block of that name. */
+export const isDwarf = (definition: ActorDefinition | undefined): boolean =>
+  definition?.character
+    ? definition.character.race?.id === "dwarf"
+    : /\b(dwarf|duergar)\b/i.test(definition?.name ?? "");
+
+/** The belt whose attuned wearer has Advantage on Persuasion checks to interact with dwarves and duergar. */
+const DWARVENKIND_BELT_ID = "belt-of-dwarvenkind";
+
+/** The tag on Perfume's hour, which gives Advantage on Persuasion to influence an Indifferent Humanoid within 5 feet. */
+export const PERFUME_TAG = "perfume";
+
+/** The slack on Perfume's 5 feet, as for reach. */
+const PERFUME_SLACK_FEET = 0.1;
+
+/** A check "to interact with [a creature] socially" (SRD Charmed) or to influence it (Influence): a Charisma check, or
+ *  Wisdom (Animal Handling), which the Influence table lists. */
+const isSocial = (subject: CheckSubject) => subject.ability === "cha" || subject.skill === "animal-handling";
+
+/** What the other party of a social check gives it: its charmer has Advantage (SRD Charmed), its attitude gives
+ *  Advantage when Friendly and Disadvantage when Hostile (SRD Influence), and Perfume gives Advantage on Persuasion
+ *  against an Indifferent Humanoid within 5 feet. */
+function socialClaims(actor: Actor, subject: CheckSubject, versus: CheckVersus, claims: RollModeClaims): void {
+  if (!isSocial(subject)) return;
+  const other = versus.actor;
+  const charmedByRoller =
+    other.conditions.some((held) => held.id === "charmed") &&
+    other.effects.some((effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId === actor.id);
+  if (charmedByRoller)
+    claims.advantage.push({ source: "charmed-by-roller", label: `${other.name} is Charmed by ${actor.name}` });
+  const attitude = other.attitude ?? "indifferent";
+  if (attitude === "friendly") claims.advantage.push({ source: "attitude", label: `${other.name} is Friendly` });
+  if (attitude === "hostile") claims.disadvantage.push({ source: "attitude", label: `${other.name} is Hostile` });
+  if (
+    subject.skill === "persuasion" &&
+    attitude === "indifferent" &&
+    versus.humanoid &&
+    versus.feet !== null &&
+    versus.feet <= 5 + PERFUME_SLACK_FEET &&
+    actor.effects.some((effect) => effect.tags.includes(PERFUME_TAG))
+  )
+    claims.advantage.push({ source: "perfume", label: "Perfume" });
+  const belt = actor.inventory.find(
+    (row) => row.equipped && row.attuned && row.quantity > 0 && catalogIdOf(row) === DWARVENKIND_BELT_ID
+  );
+  if (belt && subject.skill === "persuasion" && versus.dwarf === true)
+    claims.advantage.push({ source: "friend-of-dwarvenkind", label: belt.name });
+}
 
 /** The tag on a Hunter's Mark effect, which gives its caster Advantage on checks to find the marked creature. */
 const HUNTERS_MARK_TAG = "hunters-mark";
@@ -105,6 +191,17 @@ export function toolAbility(description: string | null | undefined): AbilityId |
   if (!named) return null;
   const word = named[1].toLowerCase();
   return (Object.keys(ABILITY_NAMES) as AbilityId[]).find((ability) => ABILITY_NAMES[ability].toLowerCase() === word)!;
+}
+
+/** What a tool's Utilize line lets it do, each with its printed DC ("Utilize: Pick a lock (DC 15), or disarm a trap
+ *  (DC 15)"). Empty when the record prints none. */
+export function toolUses(description: string | null | undefined): Readonly<{ label: string; dc: number }>[] {
+  const line = /Utilize:\s*(.*?\(DC \d+\))\./s.exec(description ?? "")?.[1];
+  if (!line) return [];
+  return [...line.matchAll(/\s*(.+?)\s*\(DC (\d+)\)(?:,\s*(?:or\s+)?|$)/g)].map((use) => {
+    const label = use[1]!.trim();
+    return { label: label.charAt(0).toUpperCase() + label.slice(1), dc: Number(use[2]) };
+  });
 }
 
 /** Tool proficiencies the sheet records and its items grant. */
@@ -153,6 +250,15 @@ export type CheckPlan = Readonly<{
   reliableTalent: boolean;
   /** Dice effects add to the check (" + 1d4"), as formula terms. */
   diceTerms: string;
+  /** A d20 that shows less counts as this (Glibness's 15), and what says so; null when nothing raises it. Reliable
+   *  Talent's 10 is `reliableTalent`. */
+  d20Minimum: Readonly<{ face: number; label: string }> | null;
+  /** A total that comes out lower counts as this (Indomitable Might's Strength score), and what says so. */
+  totalMinimum: Readonly<{ total: number; label: string }> | null;
+  /** Why the check fails whatever it rolls: it needs sight the roller hasn't (SRD Blinded: "You automatically fail any
+   *  ability check that requires sight"; Heavily Obscured: "You have the Blinded condition while trying to see
+   *  something in a Heavily Obscured space"). */
+  autoFails?: string;
 }>;
 
 export type CheckContext = Readonly<{
@@ -165,6 +271,14 @@ export type CheckContext = Readonly<{
   /** Conditions the check would end (escaping a grapple: Grappled), which a `versus-condition` rider reads (Powerful
    *  Build). */
   stakes?: readonly string[];
+  /** What sight decides about it (Frightened's line of sight, the light, how obscured `finding` is). */
+  sight?: CheckSight;
+  /** The creature a social check interacts with: its charmer, its attitude and Perfume read it. */
+  versus?: CheckVersus;
+  /** The situations the roller says it fits (a Book's topic, prying with a Crowbar), for `situation-is` riders. */
+  situations?: readonly string[];
+  /** The creature the check is about (Insight into its intentions), whose traits can weigh on it. */
+  about?: Readonly<{ name: string; definition: ActorDefinition | undefined }>;
 }>;
 
 /** The flat part of a skill check (SRD Skills, Expertise, Jack of All Trades): a GM-typed total, else the stat block's
@@ -237,9 +351,13 @@ function plainCheckPlan(
   subject: CheckSubject,
   context: CheckContext
 ): CheckPlan {
-  const narrow = { ability: subject.ability, ...(subject.skill !== undefined ? { skill: subject.skill } : {}) };
+  const narrow = {
+    ability: subject.ability,
+    ...(subject.skill !== undefined ? { skill: subject.skill } : {}),
+    ...(context.situations !== undefined && context.situations.length > 0 ? { situations: context.situations } : {})
+  };
   const toolProficient = subject.tool !== undefined && toolProficiencies(definition, derivation).includes(subject.tool);
-  const { base, proficient } =
+  const skilled =
     subject.skill !== undefined
       ? skillBase(definition, derivation, { ...subject, skill: subject.skill }, toolProficient)
       : {
@@ -248,7 +366,58 @@ function plainCheckPlan(
             (toolProficient ? (definition?.proficiencyBonus ?? 0) : 0),
           proficient: toolProficient
         };
-  const claims = abilityCheckClaims(actor, derivation, narrow, context.warded, context.stakes);
+  // A commoner's Training: "proficiency in one skill of the DM's choice and Advantage whenever it makes an ability
+  // check using that skill".
+  const trained = subject.skill !== undefined && trainedSkillOf(actor, definition) === subject.skill;
+  const { base, proficient } =
+    trained && !skilled.proficient
+      ? { base: skilled.base + (definition?.proficiencyBonus ?? 0), proficient: true }
+      : skilled;
+  const claims = abilityCheckClaims(actor, derivation, narrow, context.warded, context.stakes, context.sight);
+  if (trained) claims.advantage.push({ source: "training", label: "Training" });
+  // A sphinx's Inscrutable: "Wisdom (Insight) checks made to ascertain its intentions or sincerity are made with
+  // Disadvantage." The label reaches the roller, so it names the trait and not the creature, which may be hidden.
+  const inscrutable = context.about ? traitOf(context.about.definition, "inscrutable") : undefined;
+  if (inscrutable && subject.skill === inscrutable.skill)
+    claims.disadvantage.push({ source: "inscrutable", label: inscrutable.name });
+  if (context.versus) socialClaims(actor, subject, context.versus, claims);
+  // A Wisdom (Perception) check to find a creature relies on sight unless the GM says it listens: Disadvantage when
+  // it is Lightly Obscured to the roller, and a failure whatever the roll when the roller is Blinded or it is Heavily
+  // Obscured.
+  const lookingFor =
+    context.finding !== undefined &&
+    subject.ability === "wis" &&
+    subject.skill === "perception" &&
+    subject.sense !== "hearing";
+  const sight = context.sight ?? {};
+  if (lookingFor && sight.findingObscured === "light" && !sight.findingByBlindsight)
+    claims.disadvantage.push({ source: "lightly-obscured", label: `${context.finding!.name} is Lightly Obscured` });
+  // Cloak of Elvenkind: "Wisdom (Perception) checks made to perceive you have Disadvantage", by sight or hearing, while
+  // its attuned wearer has it on.
+  const cloaked = context.finding?.inventory.find(
+    (row) => row.equipped && row.attuned && row.quantity > 0 && catalogIdOf(row) === ELVENKIND_CLOAK_ID
+  );
+  if (cloaked && subject.ability === "wis" && subject.skill === "perception")
+    claims.disadvantage.push({ source: "cloak-of-elvenkind", label: cloaked.name });
+  const blinded = actor.conditions.some((held) => held.id === "blinded");
+  const deafened = actor.conditions.some((held) => held.id === "deafened");
+  const findingFails =
+    !lookingFor || sight.findingByBlindsight
+      ? undefined
+      : blinded
+        ? `${actor.name} is Blinded, and finding ${context.finding!.name} takes sight.`
+        : sight.findingObscured === "heavy"
+          ? `${context.finding!.name} is Heavily Obscured to ${actor.name}.`
+          : undefined;
+  // SRD Blinded: "You automatically fail any ability check that requires sight"; Deafened: "... that requires
+  // hearing". What the check perceives within the roller's Blindsight needs no sight.
+  const autoFails =
+    findingFails ??
+    (subject.sense === "sight" && blinded && !sight.findingByBlindsight
+      ? `${actor.name} is Blinded, and this check needs sight.`
+      : subject.sense === "hearing" && deafened
+        ? `${actor.name} is Deafened, and this check needs hearing.`
+        : undefined);
   // SRD Tools: "If you have proficiency in the skill that's also used with that check, you have Advantage".
   if (
     subject.tool !== undefined &&
@@ -257,6 +426,8 @@ function plainCheckPlan(
     effectiveSkillTier(definition, derivation, subject.skill) !== "none"
   )
     claims.advantage.push({ source: "tool-and-skill", label: "Skill and tool proficiency" });
+  const helped = subject.tool !== undefined ? toolHelp(actor, subject.tool) : undefined;
+  if (helped) claims.advantage.push({ source: "help", label: helped.name });
   const finding = context.finding;
   if (
     finding &&
@@ -268,16 +439,64 @@ function plainCheckPlan(
   const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
   const atCheck = collectRiders(derivation.carriers, { ...derivation.context, ...narrow, moment: "on-ability-check" });
   const exhaustion = exhaustionPenalty(actor);
+  const riders = [...standing, ...atCheck];
   return {
     subject,
-    label: checkLabel(subject, context.names),
-    modifier: base + checkRiderBonus(derivation, narrow) + exhaustion,
+    label: `${checkLabel(subject, context.names)}${namedSituations(atCheck)}`,
+    modifier: base + checkRiderBonus(derivation, narrow, definition?.abilityScores) + exhaustion,
     exhaustion,
     rollMode: aggregateRollMode(claims.advantage, claims.disadvantage),
     proficient,
     reliableTalent: proficient && holdsFeature(definition, "reliable-talent", "Reliable Talent"),
-    diceTerms: diceRiderTerms(diceRiders([...standing, ...atCheck], "check-bonus"))
+    diceTerms: diceRiderTerms(diceRiders(riders, "check-bonus")),
+    d20Minimum: d20MinimumOf(riders, "check", proficient),
+    totalMinimum: totalMinimumOf(riders, "check", definition),
+    ...(autoFails !== undefined ? { autoFails } : {})
   };
+}
+
+/** The situations that gave this check a rider, as words after its name (", consulting an accurate Book about its
+ *  topic"), so the GM sees what the roller claimed. */
+function namedSituations(riders: readonly ResolvedRider[]): string {
+  const named = new Set<string>();
+  for (const rider of riders)
+    for (const trigger of rider.modifier.when ?? [])
+      if (trigger.type === "situation-is" && trigger.situation !== undefined) named.add(trigger.situation);
+  return [...named].map((situation) => `, ${situation}`).join("");
+}
+
+/** The highest face a `d20-minimum` rider on this roll raises a lower d20 to, and the carrier that says so; one marked
+ *  `proficientOnly` counts only on a check that uses a proficiency. */
+export function d20MinimumOf(
+  riders: readonly ResolvedRider[],
+  roll: "check" | "save",
+  proficient: boolean
+): CheckPlan["d20Minimum"] {
+  let best: CheckPlan["d20Minimum"] = null;
+  for (const rider of riders) {
+    const { type, roll: riderRoll, minimum, proficientOnly } = rider.modifier;
+    if (type !== "d20-minimum" || riderRoll !== roll || minimum === undefined) continue;
+    if (proficientOnly && !proficient) continue;
+    if (best === null || minimum > best.face) best = { face: minimum, label: rider.label };
+  }
+  return best;
+}
+
+/** The highest ability score a `total-minimum` rider on this roll raises a lower total to, and the carrier. */
+export function totalMinimumOf(
+  riders: readonly ResolvedRider[],
+  roll: "check" | "save",
+  definition: ActorDefinition | undefined
+): CheckPlan["totalMinimum"] {
+  let best: CheckPlan["totalMinimum"] = null;
+  for (const rider of riders) {
+    const { type, roll: riderRoll, abilityScore } = rider.modifier;
+    if (type !== "total-minimum" || riderRoll !== roll || abilityScore === undefined || !definition) continue;
+    if (abilityScore === "increased") continue;
+    const score = definition.abilityScores[abilityScore];
+    if (best === null || score > best.total) best = { total: score, label: rider.label };
+  }
+  return best;
 }
 
 /** A check rolled: its d20 faces, the one that counts, and the total. */
@@ -287,6 +506,8 @@ export type CheckRoll = Readonly<{
   total: number;
   /** Reliable Talent counted a d20 of 9 or lower as 10. */
   reliableTalent: boolean;
+  /** What else raised the roll (Glibness's 15, Indomitable Might's Strength score); null when nothing did. */
+  raisedBy: string | null;
   resolution: DiceResolution;
 }>;
 
@@ -305,11 +526,17 @@ export function totalCheck(
   const resolution = resolveWithD20s(d20TestFormula(mode, plan.modifier) + plan.diceTerms, faces, random, held);
   const natural = keptD20(faces, mode);
   const reliable = plan.reliableTalent && natural <= 9;
+  // A d20 floor above Reliable Talent's 10 (Glibness's 15) counts instead.
+  const floor = plan.d20Minimum !== null && natural < plan.d20Minimum.face && (!reliable || plan.d20Minimum.face > 10);
+  const raised = floor ? plan.d20Minimum!.face - natural : reliable ? 10 - natural : 0;
+  const rolled = resolution.total + raised;
+  const lifted = plan.totalMinimum !== null && plan.totalMinimum.total > rolled ? plan.totalMinimum : null;
   return {
     faces,
     natural,
-    total: resolution.total + (reliable ? 10 - natural : 0),
-    reliableTalent: reliable,
+    total: lifted ? lifted.total : rolled,
+    reliableTalent: reliable && !floor && lifted === null,
+    raisedBy: lifted?.label ?? (floor ? plan.d20Minimum!.label : null),
     resolution
   };
 }

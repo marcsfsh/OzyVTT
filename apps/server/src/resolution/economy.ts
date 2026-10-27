@@ -1,17 +1,32 @@
+import { WISH_LOST_TAG } from "./wish.js";
+import { spareOpportunityReactions } from "../reactive-heads.js";
+import { carriedObjectViolation } from "../carried-objects.js";
+import { reactionSpent, spendReaction } from "../commanded-reactions.js";
+import { formViolations } from "../transform/rules.js";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { GameState } from "@vtt/domain";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
+import { CONTROLLED_MOUNT_ACTIONS, controllingRiderOf, RIDING_TAG } from "../mounts.js";
+import { builtinBaseId } from "../builtin-actions.js";
+import { animatedRowIds } from "../animated-items.js";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
 import {
+  CANT_ATTACK_TAG,
+  DASH_ONLY_TAG,
+  FLEE_ONLY_TAG,
+  DODGE_ONLY_TAG,
   HASTED_TAG,
+  concentrationOn,
   hasEffectTag,
+  spellWords,
   NO_ACTIONS_TAG,
+  NO_BONUS_ACTIONS_TAG,
   NO_REACTIONS_TAG,
   SLOWED_TAG,
+  ACTION_OR_BONUS_TAG,
   NO_SPELLS_TAG,
   RAGING_TAG,
   READIED_TAG,
@@ -30,17 +45,44 @@ import {
   overrideReason,
   overrideWaives,
   rememberOverride,
+  rulesInForce,
   type RuleId
 } from "../rules-families.js";
-import { laterRowOf, laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
+import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
+import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
+import { bookOfShadowsGap } from "../book-of-shadows.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
-import { notEnoughUses, useCostOf } from "../use-cost.js";
+import { activationCost, alsoSpentMessage, alsoUsesKey, notEnoughUses } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
+import { planThisTurn, usedMarkOf } from "./multiattack-after.js";
+import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
 import { castMarks, markMoveOf } from "./marks.js";
+import { actionTargetViolations } from "./action-targets.js";
+import { swallowViolations } from "../swallow.js";
+import { followUpViolation } from "../follow-ups.js";
+import { THEN_HIDE_TAG } from "../granted-moves.js";
+import { bloodiedHitViolation } from "../bloodied-hits.js";
+import { attachmentViolations } from "../attachments.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { hiddenFrom } from "../vision/audience.js";
 import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
+import { readComponents, spendComponents, type ComponentSpend } from "./components.js";
+import { spellTargetViolations } from "./spell-targets.js";
+import { NO_CASTING_TAG, raiseViolations, revivalViolations } from "./revival.js";
+import {
+  castInstanceOf,
+  commitShaping,
+  isMetamagicOption,
+  levelBonusOf,
+  shapingCheck,
+  shapingOf,
+  type ShapingPlan
+} from "./metamagic.js";
+import { legendaryActionsPerRound } from "../lair.js";
+import { dealt } from "./dealings.js";
+import { attackActionOpening, fleetStep, rageArmorViolation, timingViolations } from "./turn-windows.js";
+import { AXE_BERSERK_TAG } from "../berserker-axe.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
 
@@ -57,11 +99,24 @@ export type EconomyPlan = Readonly<{
     slotLevel?: number;
     parentId?: string;
     replacements?: Record<string, number>;
+    shaping?: readonly CastShaping[];
+    leap?: Readonly<{ fromId: string; struck: readonly string[]; left: number; damageType?: string }>;
   }> | null;
-  /** The same for a compound Bonus Action (Flurry of Blows). */
-  bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
+  /** The same for a compound Bonus Action (Flurry of Blows), or a spell's rays cast as one (Quickened Spell). */
+  bonusInstance: Readonly<{
+    actorId: string;
+    components: Record<string, number>;
+    slotLevel?: number;
+    shaping?: readonly CastShaping[];
+  }> | null;
   /** Limited-use spend to record, keyed per scope: `amount` uses of it (one, or the action's cost). */
-  spendUse: Readonly<{ key: string; per: NonNullable<DefinitionAction["uses"]>["per"]; amount: number }> | null;
+  spendUse: Readonly<{
+    key: string;
+    per: NonNullable<DefinitionAction["uses"]>["per"];
+    amount: number;
+    /** The second limit the use counts against too (`alsoUses`), one more of it spent. */
+    also?: string;
+  }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions), and the mark of one it
    *  can't take again until its next turn. */
   spendLegendary: Readonly<{ cost: number; onceKey?: string }> | null;
@@ -78,6 +133,16 @@ export type EconomyPlan = Readonly<{
   surge: boolean;
   /** The turn's uses key of a feature used once per turn beside a pool of its own (Stunning Strike), or null. */
   oncePerTurn?: string | null;
+  /** The turn's mark that this action was used, which a sibling Multiattack waits on (`multiattack-after.ts`). */
+  usedMark?: string | null;
+  /** The consumed materials and coins the cast uses up (SRD Components). */
+  componentSpends?: readonly ComponentSpend[];
+  /** The Sorcery Points the cast's Metamagic spends and what it marks on the turn (`metamagic.ts`). */
+  shaping?: ShapingPlan | null;
+  /** It casts a level 1+ spell anew, which Quickened Spell reads on its caster's turn. */
+  leveledCast?: boolean;
+  /** Marks the turn keeps of what this resolve did, for a timing rule that reads them (Fleet Step). */
+  turnMarks?: readonly string[];
 }>;
 
 type EconomyEvaluation = Readonly<{
@@ -102,6 +167,10 @@ type Evaluation = Readonly<{
   onOwnTurn: boolean;
   /** A prose-only Multiattack hides extra attacks from the engine, so action-slot violations degrade to warnings. */
   proseMultiattack: boolean;
+  /** Step of the Wind right after another Bonus Action takes no Bonus Action of its own (Fleet Step). */
+  freeBonusAction?: boolean;
+  /** An Opportunity Attack, which a hydra's extra Reactions can take (Reactive Heads). */
+  opportunity?: boolean;
   violations: RuleViolation[];
   softViolations: RuleViolation[];
   notes: string[];
@@ -137,8 +206,21 @@ export function evaluateActionEconomy(
   /** The spell the action casts, for the slot, preparation and targeting checks. */
   spell?: SpellReference,
   /** Any combatant's stat block, for the side a creature fights on (Help distracts an enemy). */
-  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined,
+  /** What the map says of the cast: the caster stands where no sound can be made (Silence), and the targets are a
+   *  placed template's catch. And how its caster shapes it (Metamagic). */
+  cast: Readonly<{
+    silenced?: boolean;
+    areaPlaced?: boolean;
+    shaping?: readonly CastShaping[];
+    opportunity?: boolean;
+  }> = {}
 ): EconomyEvaluation {
+  // A Multiattack whose other plan waits on an action used this turn (a clay golem's Hasten) plans as it stands now.
+  const usedMark = usedMarkOf(state, attacker.id, action, siblings);
+  action = planThisTurn(state, attacker.id, action);
+  siblings = siblings.map((sibling) => planThisTurn(state, attacker.id, sibling));
+  const fleet = fleetStep(state, attacker, action, definition);
   const evaluation: Evaluation = {
     state,
     attacker,
@@ -149,13 +231,35 @@ export function evaluateActionEconomy(
     resolveDefinition,
     onOwnTurn: state.combat.turnActorId === attacker.id,
     proseMultiattack: siblings.some((candidate) => candidate.untrackedMultiattack === true),
+    // A weretiger's Prowl ends with a Hide that takes no action of its own.
+    freeBonusAction: fleet.free || hidesFreely(attacker, action),
+    ...(cast.opportunity ? { opportunity: true } : {}),
     violations: [],
     softViolations: [],
     notes: []
   };
   checkAbleToAct(evaluation);
+  checkCommandedLimits(evaluation);
+  // What the creature's form keeps it from doing (no spells in Wild Shape, a werewolf's Bite only in wolf form).
+  evaluation.violations.push(
+    ...formViolations(
+      attacker,
+      action,
+      definition,
+      spell ?? (action.spellId !== undefined ? catalog?.spellRecord?.(action.spellId) : undefined)
+    )
+  );
   checkTurnsBegun(evaluation);
   checkOwnTurn(evaluation);
+  evaluation.violations.push(...timingViolations(state, attacker, action));
+  const armored = rageArmorViolation(attacker, action, definition, catalog);
+  if (armored) evaluation.violations.push(armored);
+  // "While underwater, the seahorse moves": only in a fight the GM marked as underwater.
+  if (action.underwaterOnly && !(state.combat.active && state.combat.underwater))
+    evaluation.violations.push({
+      rule: "action.underwater-only",
+      message: `${action.name} can be used only underwater, and this fight isn't.`
+    });
   checkExtraAttackOpened(evaluation);
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition, catalog);
@@ -169,7 +273,11 @@ export function evaluateActionEconomy(
   checkSteadyAim(evaluation);
   // A later ray of a spell already cast this action spends no further slot; it rolls at the first ray's.
   const continued = continuedSpellSlot(evaluation);
-  const slots = checkActionSlots(evaluation);
+  // Used before the Attack action's first attack, it takes the action as the Attack action (Sacred Weapon).
+  const opening = attackActionOpening(state, attacker, action, siblings);
+  const slots = opening
+    ? { ...checkActionSlots(evaluation), markAction: true, instance: opening }
+    : checkActionSlots(evaluation);
   // A Loading weapon fires once per action; an additional action (Action Surge) is another.
   if (slots.extraAction === null) checkLoading(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
@@ -179,24 +287,123 @@ export function evaluateActionEconomy(
     if (unprepared) evaluation.violations.push({ rule: "slots.not-prepared", message: unprepared });
   }
   checkTargeting(evaluation, distanceFeet);
+  // Who a non-spell action may target: its count, range and creatures (`ActionSchema.targets`).
+  evaluation.violations.push(
+    ...actionTargetViolations({
+      state,
+      attacker,
+      action,
+      targetIds,
+      definition,
+      resolveDefinition,
+      distanceFeet,
+      catalog
+    }),
+    // How many it can hold swallowed, and what it can't do while it holds one (a giant toad's Bite).
+    ...swallowViolations(state, attacker, action, siblings, targetIds),
+    // What a creature attached to another can't do while it holds on (a stirge's Proboscis).
+    ...attachmentViolations(state, attacker, action, targetIds),
+    // A Rampage waits on damage to a creature already Bloodied.
+    ...[bloodiedHitViolation(state, attacker, action)].filter((violation) => violation !== null),
+    // An action that needs what its user carries (a night hag's soul bag) waits on it whole.
+    ...[carriedObjectViolation(attacker, action)]
+      .filter((message) => message !== null)
+      .map((message) => ({ rule: "feature.requires-effect" as const, message: message! })),
+    // A follow-up attack a hit opened goes only at that hit's target (an allosaurus's Bite).
+    ...[followUpViolation(state, attacker, action, targetIds)].filter((violation) => violation !== null),
+    ...raiseViolations({ state, attacker, action, targetIds })
+  );
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);
   if (spell) checkLaterTurn(evaluation, spell);
-  if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
-  const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
+  // Its caster shapes a spell cast anew (Metamagic); a later ray keeps its cast's shaping, and a later action has none.
+  const newCast =
+    spell !== undefined &&
+    continued === null &&
+    castInstanceOf(state, attacker, action) === null &&
+    laterRowOf(spell, action.id) === undefined;
+  const shaping = newCast ? (cast.shaping ?? []) : [];
+  const levelBonus = levelBonusOf(shaping);
+  if (spell)
+    evaluation.violations.push(
+      ...spellTargetViolations({
+        state,
+        attacker,
+        action,
+        spell,
+        targetIds,
+        castLevel: (spendSpellSlot?.level ?? continued ?? spell.level) + levelBonus,
+        areaPlaced: cast.areaPlaced === true,
+        characterLevel: (definition?.character?.classes ?? []).reduce((sum, entry) => sum + entry.level, 0),
+        distanceFeet,
+        resolveDefinition,
+        catalog
+      })
+    );
+  // A revival's dead creature: dead, not too long ago, and with a body it can bring back.
+  if (spell && newCast)
+    evaluation.violations.push(...revivalViolations({ state, spell, targetIds, resolveDefinition }));
+  const shaped = newCast
+    ? shapingCheck({
+        state,
+        attacker,
+        action,
+        spell,
+        castLevel: spendSpellSlot?.level ?? spell.level,
+        definition,
+        shaping,
+        targetIds,
+        siblings,
+        resolveDefinition,
+        catalog
+      })
+    : null;
+  if (shaped) evaluation.violations.push(...shaped.violations);
+  // A later ray of a spell already cast this action is no new cast, so it needs no components again.
+  const components =
+    continued === null
+      ? readComponents({
+          attacker,
+          action,
+          spell: spell ?? (action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined),
+          definition,
+          catalog,
+          ...(cast.silenced ? { silenced: true } : {}),
+          ...(shapingOf(shaping, "subtle-spell") ? { subtle: true } : {}),
+          targetCount: new Set(targetIds).size
+        })
+      : { gaps: [], spends: [] };
+  evaluation.violations.push(...components.gaps);
+  // A spell's rays keep the slot and the shaping of the cast that opened them.
+  const castRecord = {
+    ...(spendSpellSlot !== null ? { slotLevel: spendSpellSlot.level } : {}),
+    ...(shaping.length > 0 ? { shaping: [...shaping] } : {})
+  };
+  const opensRays =
+    action.spellId !== undefined && slots.markAction && slots.instance?.components[action.id] !== undefined;
+  const opensBonusRays =
+    action.spellId !== undefined && slots.markBonus && slots.bonusInstance?.components[action.id] !== undefined;
+  const slotCast = spendSpellSlot?.level ?? continued;
   return {
     violations: evaluation.violations,
     softViolations: evaluation.softViolations,
     plan: {
       ...slots,
-      ...(opensSpell ? { instance: { ...slots.instance!, slotLevel: spendSpellSlot.level } } : {}),
+      ...(opensRays ? { instance: { ...slots.instance!, ...castRecord } } : {}),
+      ...(opensBonusRays ? { bonusInstance: { ...slots.bonusInstance!, ...castRecord } } : {}),
       spendUse,
       spendLegendary,
       spendSpellSlot,
-      castLevel: spendSpellSlot?.level ?? continued,
+      // Twinned Spell raises the level the cast counts as, never the slot it spends.
+      castLevel: levelBonus > 0 && spell ? (slotCast ?? spell.level) + levelBonus : slotCast,
       magicAction: evaluation.onOwnTurn && isMagicAction(action),
       surge,
-      oncePerTurn
+      oncePerTurn,
+      usedMark,
+      ...(components.spends.length > 0 ? { componentSpends: components.spends } : {}),
+      ...(shaped?.plan ? { shaping: shaped.plan } : {}),
+      ...(newCast && spell.level >= 1 ? { leveledCast: true } : {}),
+      ...(fleet.marks.length > 0 ? { turnMarks: fleet.marks } : {})
     },
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
@@ -234,6 +441,8 @@ function checkMarkMove(
 function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, spell: SpellReference): void {
   const row = laterRowOf(spell, action.id);
   if (!row || !takenWhileUp(row) || spellUpLevel(attacker, spell) !== null) return;
+  // Another creature's spell gave it this action (Dragon's Breath), so it is there while that effect is.
+  if (attacker.effects.some((effect) => effect.grantedSpellAction?.spellId === spell.id)) return;
   // A sheet built before the cast itself was an action (Produce Flame's) has no way to start it, so it isn't asked to.
   if (!siblings.some((sibling) => sibling.spellId === spell.id && !laterRowOf(spell, sibling.id))) return;
   violations.push({
@@ -246,6 +455,14 @@ function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, sp
  *  turn after the one its caster cast it on. */
 function checkLaterTurn({ state, attacker, action, violations }: Evaluation, spell: SpellReference): void {
   const row = laterRowOf(spell, action.id);
+  // "On each of your turns" (Phantasmal Force): only on its caster's own turn in a fight.
+  if (row?.ownTurnOnly && state.combat.active && state.combat.turnActorId !== attacker.id) {
+    violations.push({
+      rule: "spell.later-turn",
+      message: `${action.name} comes only on ${attacker.name}'s own turn.`
+    });
+    return;
+  }
   if (!row?.laterTurnsOnly || state.combat.turnActorId !== attacker.id) return;
   if ((state.combat.turn.turnUses[castThisTurnKey(attacker.id, spell.id)] ?? 0) === 0) return;
   violations.push({
@@ -351,11 +568,9 @@ function checkSteadyAim({ state, attacker, action, onOwnTurn, violations }: Eval
 }
 
 /** "Once per turn" beside a pool of its own (Stunning Strike spends a Focus Point), counted in the turn's uses, which
- *  start afresh with each turn. Keyed by id, so sheets built earlier get it. */
-const ONCE_PER_TURN: ReadonlySet<string> = new Set(["stunning-strike"]);
-
+ *  start afresh with each turn. Read from the hit rider, whose table covers sheets built earlier. */
 function checkOncePerTurn({ state, attacker, action, violations }: Evaluation): string | null {
-  if (!state.combat.active || !ONCE_PER_TURN.has(action.id)) return null;
+  if (!state.combat.active || hitRiderOf(action)?.oncePerTurn !== true) return null;
   const key = `${attacker.id}:${action.id}`;
   if ((state.combat.turn.turnUses[key] ?? 0) > 0)
     violations.push({
@@ -378,7 +593,21 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
   "orc-relentless-endurance",
   "relentless-endurance",
   "dark-ones-own-luck",
-  "boon-of-fate"
+  "boon-of-fate",
+  // Dream's messenger delivers its terrifying message from the trance that leaves it Incapacitated.
+  "spell-dream-then-terrifying-message"
+]);
+
+/** What a creature limited to Dash may still do (Wind Walk): the Dash action, as an action or a Bonus Action, and the
+ *  action that ends its cloud form. */
+const DASH_ONLY_ALLOWED: ReadonlySet<string> = new Set(["dash", "dash-bonus", "end-effect"]);
+/** What a fleeing creature may still do (a Mace of Terror: "it can use only the Dash action or try to escape from an
+ *  effect that prevents it from moving. If it has nowhere it can move, the creature can take the Dodge action"). */
+const FLEE_ONLY_ALLOWED: ReadonlySet<string> = new Set([
+  ...DASH_ONLY_ALLOWED,
+  "escape-grapple",
+  "end-an-effect",
+  "dodge"
 ]);
 
 /** An effect's name in a refusal, as the creature's own sheet shows it: a caster hidden from the table is "A hidden
@@ -397,8 +626,8 @@ function shownEffectName(
 /** Incapacitation and 0 HP forbid every action, Bonus Action and Reaction (SRD 2024 "Incapacitated"), legendary
  *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
  *  Barbarian can't cast spells. */
-function checkAbleToAct({ state, attacker, action, resolveDefinition, violations }: Evaluation): void {
-  if (action.activation !== "other" || !ANSWERS_A_ROLL.has(action.id)) {
+function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition, violations }: Evaluation): void {
+  if (action.activation !== "other" || !(ANSWERS_A_ROLL.has(action.id) || action.answer !== undefined)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
       violations.push({
@@ -419,6 +648,12 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
       rule: "condition.no-reactions",
       message: `${attacker.name} can't take Reactions while ${shownEffectName(state, unreacting, resolveDefinition)} lasts.`
     });
+  const slowed = attacker.effects.find((effect) => effect.tags.includes(NO_BONUS_ACTIONS_TAG));
+  if (slowed && action.activation === "bonus-action")
+    violations.push({
+      rule: "economy.bonus-action-used",
+      message: `${attacker.name} can't take a Bonus Action while ${shownEffectName(state, slowed, resolveDefinition)} lasts.`
+    });
   // SRD Stinking Cloud: while poisoned by it, "the creature can't take an action or a Bonus Action".
   const reeling = attacker.effects.find((effect) => effect.tags.includes(NO_ACTIONS_TAG));
   if (reeling && (action.activation === "action" || action.activation === "bonus-action"))
@@ -426,12 +661,101 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
       rule: "condition.incapacitated",
       message: `${attacker.name} is reeling from ${shownEffectName(state, reeling, resolveDefinition)} and can't take an action or a Bonus Action this turn.`
     });
+  // SRD Gaseous Form: the cloud "can't attack".
+  const unarmed = action.id.startsWith("unarmed-");
+  const cantAttack = attacker.effects.find((effect) => effect.tags.includes(CANT_ATTACK_TAG));
+  if (cantAttack && (action.attack !== undefined || action.multiattack !== undefined || unarmed))
+    violations.push({
+      rule: "condition.cant-attack",
+      message: `${attacker.name} can't attack while ${shownEffectName(state, cantAttack, resolveDefinition)} lasts.`
+    });
+  // SRD Wind Walk: "The only actions it can take in this form are the Dash action or a Magic action to begin reverting".
+  const dashOnly = attacker.effects.find((effect) => effect.tags.includes(DASH_ONLY_TAG));
+  if (
+    dashOnly &&
+    !DASH_ONLY_ALLOWED.has(action.id) &&
+    action.activation !== "reaction" &&
+    action.activation !== "other"
+  )
+    violations.push({
+      rule: "condition.dash-only",
+      message: `${attacker.name} can take only the Dash action or end ${shownEffectName(state, dashOnly, resolveDefinition)} while it lasts.`
+    });
+  const fleeing = attacker.effects.find((effect) => effect.tags.includes(FLEE_ONLY_TAG));
+  if (
+    fleeing &&
+    !FLEE_ONLY_ALLOWED.has(builtinBaseId(action.id)) &&
+    action.activation !== "reaction" &&
+    action.activation !== "other"
+  )
+    violations.push({
+      rule: "condition.dash-only",
+      message: `${attacker.name} can take only the Dash action, try to escape what holds it, or Dodge with nowhere to move while ${shownEffectName(state, fleeing, resolveDefinition)} lasts.`
+    });
+  // SRD Confusion's 7-8: "it takes the Attack action to make one melee attack against a random creature within reach"
+  // (Gibbering's too): one melee weapon or Unarmed Strike attack on the creature the roll picked, and nothing else.
+  const forced = attacker.effects.find((effect) => effect.forcedAttack !== undefined)?.forcedAttack;
+  if (forced && (action.activation === "action" || action.activation === "bonus-action")) {
+    const melee =
+      action.spellId === undefined &&
+      action.multiattack === undefined &&
+      (unarmed || (action.attack !== undefined && action.attack.reachFeet !== undefined));
+    const picked = state.actors.find((actor) => actor.id === forced.targetId);
+    const pickedName = !picked || picked.visibility === "gm-only" ? "the creature picked" : picked.name;
+    if (!melee || state.combat.turn.actionUsed || targetIds.length !== 1 || targetIds[0] !== forced.targetId)
+      violations.push({
+        rule: "condition.forced-attack",
+        message: `${attacker.name}'s action this turn is one melee attack against ${pickedName}.`
+      });
+  }
+  // A Berserker Axe's berserk bearer "must ... take the Attack action" on each of its turns: its action attacks.
+  const berserk = attacker.effects.find((effect) => effect.tags.includes(AXE_BERSERK_TAG));
+  const attacks =
+    unarmed || action.multiattack !== undefined || (action.attack !== undefined && action.spellId === undefined);
+  if (berserk && action.activation === "action" && !attacks)
+    violations.push({
+      rule: "condition.forced-attack",
+      message: `${attacker.name} is berserk and must take the Attack action against the creature nearest to it.`
+    });
+  // SRD Bestow Curse: a failed Wisdom save at the start of its turn means it is "forced to take the Dodge action on
+  // that turn".
+  const dodgeOnly = attacker.effects.find((effect) => effect.tags.includes(DODGE_ONLY_TAG));
+  if (dodgeOnly && action.activation === "action" && builtinBaseId(action.id) !== "dodge")
+    violations.push({
+      rule: "condition.dash-only",
+      message: `${attacker.name} must take the Dodge action this turn while ${shownEffectName(state, dodgeOnly, resolveDefinition)} lasts.`
+    });
+  // SRD Mounted Combat: a controlled mount "has only three action options during that turn: Dash, Disengage, and Dodge".
+  const rider = controllingRiderOf(state, attacker.id);
+  if (
+    rider &&
+    (action.activation === "action" || action.activation === "bonus-action") &&
+    !CONTROLLED_MOUNT_ACTIONS.has(builtinBaseId(action.id))
+  )
+    violations.push({
+      rule: "mount.controlled",
+      message: `${attacker.name} is a mount ${rider.name} controls, so it can take only the Dash, Disengage or Dodge action.`
+    });
   // SRD Befuddlement: the target "can't cast spells or take the Magic action".
   const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));
   if (befuddled && (action.spellId !== undefined || action.spellSlot !== undefined || isMagicAction(action)))
     violations.push({
       rule: "condition.no-spells",
       message: `${attacker.name} can't cast spells or take the Magic action while ${shownEffectName(state, befuddled, resolveDefinition)} lasts.`
+    });
+  // Resurrection's toll on its caster: "Until you finish a Long Rest, you can't cast spells again".
+  const taxed = attacker.effects.find((effect) => effect.tags.includes(NO_CASTING_TAG));
+  if (taxed && (action.spellId !== undefined || action.spellSlot !== undefined))
+    violations.push({
+      rule: "condition.no-spells",
+      message: `${attacker.name} can't cast spells until ${shownEffectName(state, taxed, resolveDefinition)} ends with a Long Rest.`
+    });
+  // Wish's stress: "there is a 33 percent chance that you are unable to cast Wish ever again".
+  const wishLost = attacker.effects.find((effect) => effect.tags.includes(WISH_LOST_TAG));
+  if (wishLost && action.spellId === "wish")
+    violations.push({
+      rule: "condition.no-spells",
+      message: `${attacker.name} can never cast Wish again.`
     });
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
@@ -445,6 +769,22 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
       message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.`
     });
   }
+  // A cast through another spell (a Crystal Ball's Detect Thoughts through Scrying) needs that spell held.
+  if (action.castThrough && !concentrationOn(attacker, action.castThrough))
+    violations.push({
+      rule: "feature.requires-effect",
+      message: `${action.name} is cast through ${spellWords(action.castThrough)}, which ${attacker.name} isn't concentrating on.`
+    });
+  // End an Effect needs an effect an action ends, on the creature named or anywhere before one is.
+  if (action.id === END_EFFECT_ACTION_ID && !hasEndingOption(state, attacker, targetIds))
+    violations.push({ rule: "feature.requires-effect", message: NO_ENDING_OPTION });
+}
+
+/** What a commanded creature can't do (SRD 5.2.1 Find Familiar: "A familiar can't attack, but it can take other
+ *  actions as normal"). */
+function checkCommandedLimits({ attacker, action, violations }: Evaluation): void {
+  if (attacker.control?.noAttacks && (action.attack !== undefined || action.multiattack !== undefined))
+    violations.push({ rule: "summon.cant-attack", message: `${attacker.name} can't attack.` });
 }
 
 /** An extra attack (SRD Light, Cleave) is owed only once the swing that opens it has happened this turn: an attack
@@ -461,6 +801,21 @@ function checkExtraAttackOpened({ state, attacker, action, violations }: Evaluat
       violations.push({
         rule: "attack.light-needs-attack",
         message: `${action.name} follows an attack with a different Light weapon in the Attack action this turn.`
+      });
+    return;
+  }
+  if (extra.kind === "horde-breaker") {
+    const horde = opened?.horde;
+    // "Once on each of your turns when you make an attack with a weapon": the same weapon, on the Ranger's own turn.
+    if (
+      !horde ||
+      horde.actorId !== attacker.id ||
+      horde.itemId !== extra.itemId ||
+      state.combat.turnActorId !== attacker.id
+    )
+      violations.push({
+        rule: "attack.cleave-needs-hit",
+        message: `${action.name} follows an attack with this weapon on ${attacker.name}'s own turn.`
       });
     return;
   }
@@ -491,31 +846,47 @@ function checkArmorTraining(
   definition: ActorDefinition | undefined,
   catalog: EquipmentCatalog | undefined
 ) {
-  if (action.spellId === undefined && action.spellSlot === undefined) return;
+  const message = untrainedArmorCast(attacker, action, definition, catalog);
+  if (message !== null) violations.push({ rule: "spell.untrained-armor", message });
+}
+
+/** Why this action can't be cast in the armor its caster wears, or null; read by the loose route too, so an item's
+ *  cast outside a fight meets the same rule. */
+export function untrainedArmorCast(
+  attacker: LiveActor,
+  action: Pick<DefinitionAction, "spellId" | "spellSlot">,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): string | null {
+  if (action.spellId === undefined && action.spellSlot === undefined) return null;
   const { untrainedArmor } = catalog
     ? deriveEquipment(attacker, definition, catalog)
     : armorTrainingGaps(attacker.inventory, definition);
-  if (untrainedArmor)
-    violations.push({
-      rule: "spell.untrained-armor",
-      message: `${attacker.name} can't cast spells while wearing ${untrainedArmor.name} without training in it.`
-    });
+  return untrainedArmor
+    ? `${attacker.name} can't cast spells while wearing ${untrainedArmor.name} without training in it.`
+    : null;
 }
 
 /** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read
- *  from the row, since a magic shield's slot travels on its marker. The Lance's "unless mounted" is the GM's call. */
+ *  from the row, since a magic shield's slot travels on its marker. A Lance is "Two-Handed (unless mounted)": one hand
+ *  holds it while its wielder rides (`mounts.ts`). */
 function checkHands({ attacker, action, violations }: Evaluation): void {
   const item = swingItemOf(attacker, action);
   if (!item) return;
+  const mounted = attacker.effects.some((effect) => effect.tags.includes(RIDING_TAG));
+  if (mounted && (item.recordId ?? item.id) === "lance") return;
   const twoHands =
     item.weapon?.properties?.includes("two-handed") === true ||
     itemActionRest(action.id) === `${item.id}-${TWO_HANDED_SUFFIX}`;
   if (!twoHands) return;
+  // An animated Shield hovers beside its user and fills no hand.
+  const animated = animatedRowIds(attacker);
   const shield = attacker.inventory.find(
     (entry) =>
       entry.equipped &&
       entry.quantity > 0 &&
       entry.armor !== undefined &&
+      !animated.has(entry.id) &&
       effectiveSlot({ slot: entry.magic?.slot, category: entry.category }) === "shield"
   );
   if (shield)
@@ -568,12 +939,34 @@ function checkLoading({ state, attacker, action, onOwnTurn, violations }: Evalua
 
 /** Sneak Attack, a smite and the like add their dice to a hit, so they're chosen on the attack's result before it
  *  is confirmed; taken alone they would deal damage with no hit to ride. */
-function checkTakenAlone({ action, violations }: Evaluation): void {
-  if (hitRiderOf(action))
+function checkTakenAlone({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+  // Its cost is spent by the answer itself (`roll-answers.ts`), offered on the roll's own result.
+  if (action.answer)
     violations.push({
-      rule: "attack.rides-a-hit",
-      message: `${action.name} adds to a hit: choose it on the attack's result before you confirm the hit.`
+      rule: "roll.answers-a-roll",
+      message: `${action.name} answers a roll: use it on the roll's result, once the roll is shown.`
     });
+  // A Metamagic option's own row spends its points with the spell it shapes (`metamagic.ts`).
+  else if (isMetamagicOption(action.id) && action.spellId === undefined)
+    violations.push({
+      rule: "metamagic.with-a-cast",
+      message: `${action.name} shapes a spell: choose it on the spell's cast.`
+    });
+  const rider = hitRiderOf(action);
+  if (!rider) return;
+  // Brutal Strike is decided before the roll, so its tap stands alone, on the Barbarian's own turn.
+  if (rider.declaredBeforeRoll) {
+    if (rider.ownTurn && state.combat.active && !onOwnTurn)
+      violations.push({
+        rule: "economy.not-your-turn",
+        message: `${action.name} is used on ${attacker.name}'s own turn.`
+      });
+    return;
+  }
+  violations.push({
+    rule: "attack.rides-a-hit",
+    message: `${action.name} adds to a hit: choose it on the attack's result before you confirm the hit.`
+  });
 }
 
 const USE_SCOPE_LABELS: Readonly<Record<"turn" | "encounter" | "short-rest" | "long-rest", string>> = {
@@ -587,20 +980,49 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
   if (!action.uses) return null;
   // SRD Rage: a raging Barbarian extends it with a Bonus Action, which spends no new use.
   if (action.grants?.tags.includes(RAGING_TAG) && hasEffectTag(attacker, RAGING_TAG)) return null;
+  // Taken again to end what it gave (Plate Armor of Etherealness: "repeat the command word"), it spends no new use.
+  if (
+    action.grants?.toggles &&
+    attacker.effects.some((effect) => effect.sourceActionId === action.id && effect.sourceActorId === attacker.id)
+  )
+    return null;
   const uses = action.uses;
   const key = uses.pool ?? action.id;
+  // A cast in the plan its pool's own action opened (the second Fireball of a pit fiend's Hellfire Spellcasting) shares
+  // the use that opened it.
+  if (paidByOpenPlan(state, attacker, action, key)) return null;
   // The counter is keyed on the pool, so the gate is the pool's size (see `useLimitFor`).
   const limit = useLimitFor(siblings, action);
   const spent =
     uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
+  // "Whenever it roars, the roar has a different effect": a use that comes in its order since the last rest.
+  if (action.useNumber !== undefined && spent + 1 !== action.useNumber && spent < limit)
+    violations.push({
+      rule: "feature.no-uses-remaining",
+      message: `${action.name} comes as use ${action.useNumber} of ${limit}, and ${attacker.name} has spent ${spent}.`
+    });
   // Some activations spend several (Lay on Hands' 5-point cure, or the points its user chose).
-  const cost = useCostOf(action);
+  const cost = activationCost(action, spent, limit);
   if (spent + cost > limit)
     violations.push({
       rule: "feature.no-uses-remaining",
       message: spent >= limit ? noUsesRemaining(action, limit) : notEnoughUses(action.name, limit - spent, cost)
     });
-  return { key, per: uses.per, amount: cost };
+  // A second limit it counts against too (a Luck Blade's Wish, once a dawn).
+  const also = alsoUsesKey(action);
+  if (also && (attacker.actionUses[also] ?? 0) >= action.alsoUses!.limit)
+    violations.push({ rule: "feature.no-uses-remaining", message: alsoSpentMessage(action) });
+  return { key, per: uses.per, amount: cost, ...(also ? { also } : {}) };
+}
+
+/** Whether this turn's open action is the plan of the pool's own action (a Hellfire Spellcasting's two casts), with a
+ *  place or a replacement left for this one. */
+function paidByOpenPlan(state: GameState, attacker: LiveActor, action: DefinitionAction, pool: string): boolean {
+  const open = state.combat.turn.actionInstance;
+  if (!open || open.actorId !== attacker.id || open.parentId !== pool || state.combat.turnActorId !== attacker.id)
+    return false;
+  if (placeFor(open.components, action.id) !== null) return true;
+  return Object.entries(open.replacements ?? {}).some(([key, left]) => left > 0 && key.split("|").includes(action.id));
 }
 
 /** Why a limited-use action is refused, in and out of a fight. */
@@ -611,7 +1033,11 @@ export function noUsesRemaining(action: DefinitionAction, limit: number): string
       ? `spent · recharges on ${uses.recharge}+ at the start of its turn`
       : uses.per === "own-turn"
         ? `spent · back at the start of its next turn`
-        : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
+        : uses.per === "never"
+          ? `all ${limit} spent · they don't come back`
+          : uses.per === "time"
+            ? `spent · back after ${uses.afterHours} hours of game time`
+            : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
   }).`;
 }
 
@@ -720,6 +1146,11 @@ function openedBy(
  *  mix weapons legally; a spell's rays or beams are that spell's alone, never a swing of the Attack action. */
 function attackPool(action: DefinitionAction): Record<string, number> {
   const left = (action.attack?.count ?? 1) - 1;
+  // Attacks a weapon gives only itself (Thirsting Blade's pact weapon) are that weapon's, held in either grip.
+  if (action.attack?.countWithItself && action.spellId === undefined) {
+    const base = action.id.replace(new RegExp(`-${TWO_HANDED_SUFFIX}$`), "");
+    return { [`${base}|${base}-${TWO_HANDED_SUFFIX}`]: left };
+  }
   return action.spellId === undefined ? { attack: left } : { [action.id]: left };
 }
 
@@ -735,6 +1166,10 @@ function continuedSpellSlot({
   // A readied spell is released at the level its slot was spent at when it was readied (SRD Ready).
   const held = onOwnTurn ? undefined : heldReadiedSpell(attacker, action.id);
   if (action.spellSlot && held) return held.level;
+  // A spell's rays cast as a Bonus Action (Quickened Spell) continue the Bonus Action's own instance.
+  const bonusOpen = state.combat.turn.bonusActionInstance;
+  if (action.spellSlot && onOwnTurn && state.combat.turn.bonusActionUsed && bonusOpen?.actorId === attacker.id)
+    if ((bonusOpen.components[action.id] ?? 0) > 0) return bonusOpen.slotLevel ?? action.spellSlot.level;
   if (!action.spellSlot || !onOwnTurn || !state.combat.turn.actionUsed || open?.actorId !== attacker.id) return null;
   return (open.components[action.id] ?? 0) > 0 ? (open.slotLevel ?? action.spellSlot.level) : null;
 }
@@ -761,6 +1196,31 @@ function componentMap(plan: readonly PlanComponent[] | undefined): Record<string
   return components;
 }
 
+/** On its turn the bearer can do only one of these: move, take an action, or take a Bonus Action (a Rogue's Daze,
+ *  Abjure Foes' Frightened). */
+export const DAZED_TAG = "dazed";
+
+/** Refuses a second of the three things a dazed creature may do on its turn; a move it made counts as its one. */
+function checkDazed({ state, attacker, action, onOwnTurn, resolveDefinition, violations }: Evaluation): void {
+  if (!onOwnTurn || (action.activation !== "action" && action.activation !== "bonus-action")) return;
+  const dazed = attacker.effects.find((effect) => effect.tags.includes(DAZED_TAG));
+  if (!dazed) return;
+  const turn = state.combat.turn;
+  const done =
+    turn.movementUsedFeet > 0
+      ? "moved"
+      : action.activation === "action" && turn.bonusActionUsed
+        ? "taken a Bonus Action"
+        : action.activation === "bonus-action" && turn.actionUsed
+          ? "taken an action"
+          : null;
+  if (done)
+    violations.push({
+      rule: action.activation === "action" ? "economy.action-used" : "economy.bonus-action-used",
+      message: `${attacker.name} has ${done} this turn, and ${shownEffectName(state, dazed, resolveDefinition)} leaves only one of moving, an action or a Bonus Action.`
+    });
+}
+
 type SlotPlan = Pick<
   EconomyPlan,
   "markAction" | "markBonus" | "markReaction" | "instance" | "bonusInstance" | "extraAction"
@@ -778,6 +1238,8 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     bonusInstance: state.combat.turn.bonusActionInstance,
     extraAction: null
   };
+  // Outside a fight there is no turn: a cast spends no action, Bonus Action or Reaction.
+  if (!state.combat.active) return unchanged;
   // An open compound Bonus Action (Flurry of Blows) spends its own strikes first and costs no further slot.
   const bonusOpen = state.combat.turn.bonusActionInstance;
   if (onOwnTurn && bonusOpen && bonusOpen.actorId === attacker.id && !action.multiattack) {
@@ -786,11 +1248,15 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
       (components[action.id] ?? 0) > 0 ? action.id : action.attack && (components.attack ?? 0) > 0 ? "attack" : null;
     if (key) {
       components[key] -= 1;
-      return { ...unchanged, bonusInstance: { actorId: attacker.id, components } };
+      return { ...unchanged, bonusInstance: { ...bonusOpen, components } };
     }
   }
-  // SRD Slow: "On its turns, it can take either an action or a Bonus Action, not both."
-  const slowed = onOwnTurn ? attacker.effects.find((effect) => effect.tags.includes(SLOWED_TAG)) : undefined;
+  checkDazed(evaluation);
+  // SRD Slow: "On its turns, it can take either an action or a Bonus Action, not both." A copper dragon's Slowing
+  // Breath says the same.
+  const slowed = onOwnTurn
+    ? attacker.effects.find((effect) => effect.tags.includes(SLOWED_TAG) || effect.tags.includes(ACTION_OR_BONUS_TAG))
+    : undefined;
   if (slowed && action.activation === "bonus-action" && state.combat.turn.actionUsed)
     violations.push({
       rule: "economy.bonus-action-used",
@@ -802,18 +1268,21 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
       message: `${attacker.name} took a Bonus Action this turn, and ${shownEffectName(state, slowed, evaluation.resolveDefinition)} leaves no action as well.`
     });
   if (onOwnTurn && action.activation === "bonus-action") {
-    if (state.combat.turn.bonusActionUsed)
+    if (state.combat.turn.bonusActionUsed && evaluation.freeBonusAction !== true)
       violations.push({
         rule: "economy.bonus-action-used",
         message: `${attacker.name} has already used a Bonus Action this turn.`
       });
-    // A compound Bonus Action opens its plan, which later swings spend (no rolls are consumed opening it).
+    // A compound Bonus Action opens its plan, which later swings spend (no rolls are consumed opening it); a spell's
+    // rays cast as one (Quickened Scorching Ray) open the rest of its rays.
     return {
       ...unchanged,
       markBonus: true,
       ...(action.multiattack
         ? { bonusInstance: { actorId: attacker.id, components: componentMap(action.multiattack) } }
-        : {})
+        : action.spellId !== undefined && (action.attack?.count ?? 1) > 1
+          ? { bonusInstance: { actorId: attacker.id, components: attackPool(action) } }
+          : {})
     };
   }
   if (onOwnTurn && action.activation === "action") return checkActionSlot(evaluation);
@@ -821,12 +1290,24 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
   // A released spell's later rays come with the Reaction its first ray took.
   if (readied && heldReadiedSpell(attacker, action.id)?.raysLeft !== undefined) return unchanged;
   if (action.activation === "reaction" || readied) {
+    // A hydra's heads beyond one each give it another Reaction for Opportunity Attacks (Reactive Heads).
+    const spareHead =
+      evaluation.opportunity === true &&
+      evaluation.resolveDefinition !== undefined &&
+      spareOpportunityReactions(attacker, evaluation.resolveDefinition) > 0;
+    if (spareHead) return { ...unchanged, markReaction: true };
     if (state.combat.reactionsUsed.includes(attacker.id))
       violations.push({
         rule: "economy.reaction-used",
         message: readied
           ? `${attacker.name} has no reaction left to take the readied action with.`
           : `${attacker.name} has already used a reaction this round.`
+      });
+    // Dominate Person: "You can command the target to take a Reaction but must take your own Reaction to do so."
+    else if (reactionSpent(state, attacker.id))
+      violations.push({
+        rule: "economy.reaction-used",
+        message: `${attacker.name}'s Reaction takes its commander's, which is spent this round.`
       });
     return { ...unchanged, markReaction: true };
   }
@@ -955,6 +1436,9 @@ function checkActionSlot(evaluation: Evaluation): SlotPlan {
       actorId: attacker.id,
       components: open.components,
       ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {}),
+      ...(active.shaping !== undefined ? { shaping: active.shaping } : {}),
+      // A leaping Chromatic Orb keeps who it struck (`orb-leap.ts`).
+      ...(active.leap !== undefined ? { leap: active.leap } : {}),
       ...(active.parentId !== undefined ? planRecord(active.parentId, open.replacements) : {})
     }
   });
@@ -1030,12 +1514,18 @@ function checkLegendary(
 ): EconomyPlan["spendLegendary"] {
   if (!action.legendary) return null;
   const cost = action.legendary.cost;
-  const perRound = definition?.legendary?.actionsPerRound ?? 3;
+  const perRound = legendaryActionsPerRound(attacker, definition);
   const spent = state.combat.legendaryUsed[attacker.id] ?? 0;
   if (onOwnTurn)
     violations.push({
       rule: "legendary.own-turn",
-      message: `Legendary actions are taken on other creatures' turns, and this is ${attacker.name}'s own.`
+      message: `Legendary actions are taken right after other creatures' turns, and this is ${attacker.name}'s own.`
+    });
+  // "Immediately after another creature's turn": the window a turn's end opens, one action a window.
+  if (!onOwnTurn && state.combat.active && !legendaryWindowOpen(state, attacker.id))
+    violations.push({
+      rule: "legendary.after-a-turn",
+      message: `${attacker.name} takes a legendary action right after another creature's turn ends, one each time, before the next creature acts.`
     });
   if (spent + cost > perRound)
     violations.push({
@@ -1050,6 +1540,23 @@ function checkLegendary(
       message: `${attacker.name} can't take ${action.name} again until the start of its next turn.`
     });
   return { cost, ...(onceKey !== null ? { onceKey } : {}) };
+}
+
+/** Whether a creature may take a legendary action now: a turn other than its own has just ended, it hasn't taken one
+ *  since, and the creature whose turn it is now hasn't done anything yet. */
+export function legendaryWindowOpen(state: GameState, actorId: string): boolean {
+  const turn = state.combat.turn;
+  if (turn.afterActorId === undefined || turn.afterActorId === actorId) return false;
+  if (turn.legendaryTakenBy?.includes(actorId)) return false;
+  const current = state.combat.turnActorId;
+  return !(
+    turn.actionUsed ||
+    turn.bonusActionUsed ||
+    turn.movementUsedFeet > 0 ||
+    turn.attackRolled === true ||
+    turn.actionInstance !== null ||
+    Object.keys(turn.turnUses).some((key) => key.startsWith(`${current}:`))
+  );
 }
 
 /** Where `combat.legendaryUsed` marks a legendary action taken once until the creature's next turn, beside the
@@ -1073,7 +1580,7 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
     });
   }
   // SRD: "On a turn, you can expend only one spell slot to cast a spell", whoever's turn it is.
-  if (state.combat.turn.spellSlotCasters?.includes(attacker.id))
+  if (state.combat.active && state.combat.turn.spellSlotCasters?.includes(attacker.id))
     violations.push({
       rule: "slots.one-per-turn",
       message: `${attacker.name} has already cast a spell with a spell slot this turn, and only one is allowed per turn.`
@@ -1083,20 +1590,32 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
 
 /** Why a spell cast with a slot is refused for not being prepared (SRD: you cast the spells you have prepared), or
  *  null. Cantrips, always-prepared spells, anything not on the sheet's list (an item's cast) and a sheet that keeps
- *  no prepared list (an import with no prepared cap) need nothing. */
+ *  no prepared list (an import with no prepared cap) need nothing, except a Book of Shadows' spells, which are
+ *  prepared only while the book is carried. */
 export function unpreparedSpell(
-  actor: Pick<LiveActor, "name" | "preparedSpellIds">,
+  actor: Pick<LiveActor, "name" | "preparedSpellIds"> & Partial<Pick<LiveActor, "inventory">>,
   action: Pick<DefinitionAction, "id" | "spellSlot" | "spellId">,
   definition: ActorDefinition | undefined
 ): string | null {
   if (action.spellId === undefined) return null;
+  const entry = definition?.spellcasting?.spells.find((candidate) => candidate.id === action.spellId);
+  const book = entry && !isItemActionId(action.id) ? bookOfShadowsGap(actor, entry, definition) : null;
+  if (book) return book;
   // A slot cast, or a Ritual ("To cast a spell as a Ritual, a spellcaster must have it prepared").
-  if (!action.spellSlot && action.id !== ritualSpellActionId(action.spellId)) return null;
+  const ritual = action.id === ritualSpellActionId(action.spellId);
+  if (!action.spellSlot && !ritual) return null;
   const spell = definition?.spellcasting?.spells.find((entry) => entry.id === action.spellId);
   if (!spell || spell.level === 0 || spell.alwaysPrepared || actor.preparedSpellIds.includes(spell.id)) return null;
   const classes = definition!.spellcasting!.classes ?? [];
   const casting = classes.length === 1 ? classes[0] : classes.find((entry) => entry.classId === spell.classId);
   if (casting?.prepared === undefined) return null;
+  // The Wizard's Ritual Adept: "You can cast any spell as a Ritual if that spell has the Ritual tag and the spell is
+  // in your spellbook. You needn't have the spell prepared, but you must read from the book to cast a spell in this
+  // way." A Wizard's spells on the sheet are its spellbook.
+  if (ritual && casting.classId === "wizard" && hasClassFeature(definition, "ritual-adept", "wizard"))
+    return carriesSpellbook({ inventory: actor.inventory ?? [] })
+      ? null
+      : `${actor.name} hasn't prepared ${spell.name}, and casting it as a Ritual unprepared needs the spellbook to read from.`;
   return `${actor.name} hasn't prepared ${spell.name}.`;
 }
 
@@ -1178,22 +1697,35 @@ function checkTargeting(
 
   if (action.attack !== undefined && distanceFeet !== undefined) checkRange(evaluation, distanceFeet);
 
-  // Cleave (SRD): a second creature, within 5 feet of the first (when the map can tell).
-  const first = action.extraAttack?.kind === "cleave" ? state.combat.turn.extraAttacks?.cleave : null;
+  // Cleave (SRD): a second creature, within 5 feet of the first (when the map can tell). Horde Breaker: "a different
+  // creature that is within 5 feet of the original target ... and that you haven't attacked this turn".
+  const kind = action.extraAttack?.kind;
+  const first =
+    kind === "cleave"
+      ? state.combat.turn.extraAttacks?.cleave
+      : kind === "horde-breaker"
+        ? state.combat.turn.extraAttacks?.horde
+        : null;
+  const feature = kind === "horde-breaker" ? "Horde Breaker" : "Cleave";
   if (first && first.actorId === attacker.id) {
     for (const target of targets) {
       if (target.id === first.targetId) {
         violations.push({
           rule: "attack.cleave-same-target",
-          message: `${target.name} took the hit that set off Cleave. Choose a second creature for the extra attack.`
+          message: `${target.name} took the attack that set off ${feature}. Choose a second creature for the extra attack.`
         });
         continue;
       }
+      if (kind === "horde-breaker" && dealt(state, attacker.id, "attacked", target.id))
+        violations.push({
+          rule: "attack.cleave-same-target",
+          message: `${attacker.name} has already attacked ${target.name} this turn, and Horde Breaker needs a creature it hasn't.`
+        });
       const apart = distanceFeet?.(first.targetId, target.id) ?? null;
       if (apart !== null && apart > 5 + DISTANCE_TOLERANCE_FEET)
         violations.push({
           rule: "attack.cleave-too-far",
-          message: `${target.name} is ${Math.round(apart * 10) / 10} ft from the target Cleave follows; it must be within 5 feet of it.`
+          message: `${target.name} is ${Math.round(apart * 10) / 10} ft from the target ${feature} follows; it must be within 5 feet of it.`
         });
     }
   }
@@ -1238,9 +1770,18 @@ function checkTargeting(
       resolveDefinition: evaluation.resolveDefinition,
       ...(distanceFeet ? { distanceFeet } : {})
     }) !== null;
-  if (!charmWarded && (action.attack !== undefined || action.save !== undefined || action.damage.length > 0)) {
+  // "You can't attack the charmer or target the charmer with damaging abilities or magical effects": a spell, from a
+  // sheet or an item, is magical whether it harms or helps.
+  const magical = action.spellId !== undefined;
+  if (
+    !charmWarded &&
+    (action.attack !== undefined || action.save !== undefined || action.damage.length > 0 || magical)
+  ) {
+    // Only while the creature is Charmed: a hand cleared it, or an effect holds it off (Calm Emotions), and the bar
+    // lifts.
+    const charmed = attacker.conditions.some((condition) => condition.id === "charmed");
     const charmers = attacker.effects.filter(
-      (effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
+      (effect) => charmed && effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
     );
     for (const targetId of targetIds) {
       const charmer = charmers.find((effect) => effect.sourceActorId === targetId);
@@ -1248,52 +1789,10 @@ function checkTargeting(
         const target = state.actors.find((candidate) => candidate.id === targetId);
         violations.push({
           rule: "condition.charmed-charmer",
-          message: `${attacker.name} is Charmed by ${target?.name ?? charmer.sourceName ?? "its charmer"} and can't target them with harmful effects.`
+          message: `${attacker.name} is Charmed by ${target?.name ?? charmer.sourceName ?? "its charmer"} and can't target them with harmful or magical effects.`
         });
       }
     }
-  }
-}
-
-/**
- * A spell's own targeting (SRD Spells, "Range" and "Targets"): a save or healing spell reaches the creatures it names
- * only within its range (a Touch spell within 5 feet), and no more of them than it targets at this slot. An attack's
- * range is the attack's; an area's targets are whoever the template covers; a later action's trigger is wherever the
- * creature is.
- */
-function checkSpellTargets(
-  { state, attacker, action, targetIds, violations }: Evaluation,
-  spell: SpellReference,
-  castLevel: number,
-  distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined
-): void {
-  if (
-    action.area ||
-    (spell.effect?.laterActions ?? []).some((row) => laterSpellActionId(spell.id, row.name) === action.id)
-  )
-    return;
-  const targets = spell.effect?.targets;
-  const unique = [...new Set(targetIds)];
-  if (targets && action.darts === undefined) {
-    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level);
-    if (unique.length > limit)
-      violations.push({
-        rule: "target.too-many",
-        message: `${spell.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}${castLevel > spell.level ? ` with a level ${castLevel} slot` : ""}; ${unique.length} were chosen.`
-      });
-  }
-  if (action.attack !== undefined || !distanceFeet) return;
-  const range = spellRangeFeet(spell.range) ?? (/^touch\b/i.test(spell.range.text ?? "") ? 5 : null);
-  if (range === null) return;
-  for (const targetId of unique) {
-    if (targetId === attacker.id) continue;
-    const distance = distanceFeet(attacker.id, targetId);
-    if (distance === null || distance <= range + DISTANCE_TOLERANCE_FEET) continue;
-    const targetName = state.actors.find((candidate) => candidate.id === targetId)?.name ?? "The target";
-    violations.push({
-      rule: "range.out-of-range",
-      message: `${targetName} is ${Math.round(distance * 10) / 10} ft away, beyond ${spell.name}'s ${range === 5 ? "touch" : `${range} ft range`}.`
-    });
   }
 }
 
@@ -1366,13 +1865,20 @@ export function planEconomy(
     asHitRider,
     catalog,
     spell,
-    resolveDefinition
+    resolveDefinition,
+    {
+      ...(input.silenced === true ? { silenced: true } : {}),
+      ...(input.areaPlaced === true ? { areaPlaced: true } : {}),
+      ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping } : {}),
+      ...(input.attackKinds?.includes("opportunity") ? { opportunity: true } : {})
+    }
   );
   warnings.push(...notes);
 
   // The mode is per rule family: a violation whose family is Off is not a violation for this table.
+  const rules = rulesInForce(state);
   const policed = [...violations, ...softViolations].filter(
-    (violation) => effectiveModeFor(state.combat, violation.rule) !== "freeform"
+    (violation) => effectiveModeFor(rules, violation.rule) !== "freeform"
   );
   if (policed.length === 0) return { plan, overridden: null };
   // This command's override, or a GM override earlier this turn, covers its families; other families still
@@ -1380,7 +1886,7 @@ export function planEconomy(
   const waived = policed.find((violation) => overrideWaives(input.override, violation.rule));
   const covered = (rule: RuleId) => overrideWaives(input.override, rule) || overrideCovers(state.combat.turn, rule);
   const blocking = violations.filter(
-    (violation) => !covered(violation.rule) && effectiveModeFor(state.combat, violation.rule) === "strict"
+    (violation) => !covered(violation.rule) && effectiveModeFor(rules, violation.rule) === "strict"
   );
   if (blocking.length > 0) throw new RulesBlockedError(blocking[0].rule, blocking[0].message);
   warnings.push(...policed.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
@@ -1405,6 +1911,12 @@ export function commitEconomy({
         actorId: plan.instance.actorId,
         components: { ...plan.instance.components },
         ...(plan.instance.slotLevel !== undefined ? { slotLevel: plan.instance.slotLevel } : {}),
+        ...(plan.instance.shaping !== undefined
+          ? { shaping: plan.instance.shaping.map((entry) => ({ ...entry })) }
+          : {}),
+        ...(plan.instance.leap !== undefined
+          ? { leap: { ...plan.instance.leap, struck: [...plan.instance.leap.struck] } }
+          : {}),
         ...(plan.instance.parentId !== undefined
           ? planRecord(plan.instance.parentId, plan.instance.replacements ?? {})
           : {})
@@ -1425,16 +1937,19 @@ export function commitEconomy({
   }
   if (plan.bonusInstance !== state.combat.turn.bonusActionInstance) {
     const bonusInstance = plan.bonusInstance
-      ? { actorId: plan.bonusInstance.actorId, components: { ...plan.bonusInstance.components } }
+      ? {
+          actorId: plan.bonusInstance.actorId,
+          components: { ...plan.bonusInstance.components },
+          ...(plan.bonusInstance.slotLevel !== undefined ? { slotLevel: plan.bonusInstance.slotLevel } : {}),
+          ...(plan.bonusInstance.shaping !== undefined
+            ? { shaping: plan.bonusInstance.shaping.map((entry) => ({ ...entry })) }
+            : {})
+        }
       : null;
     state.combat = { ...state.combat, turn: { ...state.combat.turn, bonusActionInstance: bonusInstance } };
   }
-  if (plan.markReaction) {
-    state.combat = {
-      ...state.combat,
-      reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id]
-    };
-  }
+  // A dominated creature's Reaction takes its commander's too.
+  if (plan.markReaction) spendReaction(state, attacker.id);
   // Actions beyond the one (Action Surge, Haste) and the Magic actions taken, for the turn's own creature.
   if ((plan.extraAction !== null || plan.magicAction || plan.surge) && state.combat.turnActorId === attacker.id) {
     const before = state.combat.turn.extraActions;
@@ -1460,8 +1975,8 @@ export function commitEconomy({
       }
     };
   }
-  // Cleared on turn advance.
-  if (overridden) rememberOverride(state, overridden.rule, input.override);
+  // Cleared on turn advance; outside a fight the override covers this command alone.
+  if (overridden && state.combat.active) rememberOverride(state, overridden.rule, input.override);
   if (plan.spendLegendary) {
     state.combat = {
       ...state.combat,
@@ -1469,43 +1984,55 @@ export function commitEconomy({
         ...state.combat.legendaryUsed,
         [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost,
         ...(plan.spendLegendary.onceKey !== undefined ? { [plan.spendLegendary.onceKey]: 1 } : {})
+      },
+      turn: {
+        ...state.combat.turn,
+        legendaryTakenBy: [...new Set([...(state.combat.turn.legendaryTakenBy ?? []), attacker.id])]
       }
     };
   }
   if (plan.spendSpellSlot) {
     spendSlot(attacker, plan.spendSpellSlot);
     const casters = state.combat.turn.spellSlotCasters ?? [];
-    if (!casters.includes(attacker.id))
+    if (state.combat.active && !casters.includes(attacker.id))
       state.combat = {
         ...state.combat,
         turn: { ...state.combat.turn, spellSlotCasters: [...casters, attacker.id] }
       };
   }
-  if (plan.oncePerTurn) {
-    const key = plan.oncePerTurn;
-    state.combat = {
-      ...state.combat,
-      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
-    };
-  }
-  if (plan.spendUse) {
-    if (plan.spendUse.per === "turn") {
-      const key = `${attacker.id}:${plan.spendUse.key}`;
+  // A consumed material is used up as the cast happens ("which the spell consumes").
+  if (plan.componentSpends) spendComponents(attacker, plan.componentSpends);
+  commitShaping(state, attacker, plan.shaping, plan.leveledCast === true);
+  for (const key of [plan.oncePerTurn, plan.usedMark, ...(plan.turnMarks ?? [])])
+    if (key)
       state.combat = {
         ...state.combat,
-        turn: {
-          ...state.combat.turn,
-          turnUses: {
-            ...state.combat.turn.turnUses,
-            [key]: (state.combat.turn.turnUses[key] ?? 0) + plan.spendUse.amount
-          }
-        }
+        turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
       };
-    } else {
-      attacker.actionUses = {
-        ...attacker.actionUses,
-        [plan.spendUse.key]: (attacker.actionUses[plan.spendUse.key] ?? 0) + plan.spendUse.amount
-      };
-    }
+  if (plan.spendUse) commitUse(state, attacker, plan.spendUse);
+}
+
+/** Records `amount` uses of a limited use: this turn's for a per-turn use, else the creature's own count. */
+export function commitUse(state: GameState, attacker: LiveActor, spendUse: NonNullable<EconomyPlan["spendUse"]>): void {
+  if (spendUse.per === "turn") {
+    const key = `${attacker.id}:${spendUse.key}`;
+    state.combat = {
+      ...state.combat,
+      turn: {
+        ...state.combat.turn,
+        turnUses: { ...state.combat.turn.turnUses, [key]: (state.combat.turn.turnUses[key] ?? 0) + spendUse.amount }
+      }
+    };
+    return;
   }
+  attacker.actionUses = {
+    ...attacker.actionUses,
+    [spendUse.key]: (attacker.actionUses[spendUse.key] ?? 0) + spendUse.amount,
+    ...(spendUse.also ? { [spendUse.also]: (attacker.actionUses[spendUse.also] ?? 0) + 1 } : {})
+  };
+}
+
+/** The Hide a move's end offers (a weretiger's Prowl): its Bonus Action form, while the effect that offers it lasts. */
+function hidesFreely(attacker: LiveActor, action: DefinitionAction): boolean {
+  return action.id === "hide-bonus" && attacker.effects.some((effect) => effect.tags.includes(THEN_HIDE_TAG));
 }

@@ -48,10 +48,27 @@ describe("rule families", () => {
       ["movement.occupied", "movement"],
       ["movement.no-speed", "movement"],
       ["movement.blocked-path", "movement"],
+      // Hideous Laughter: standing up is movement the effect holds back.
+      ["movement.cant-stand", "movement"],
+      ["movement.altitude", "movement"],
+      ["movement.jump", "movement"],
+      ["movement.toward-fear", "movement"],
+      ["movement.compelled", "movement"],
+      ["movement.mount", "movement"],
+      // Dropping Prone on another's turn, and moving past a climbing anchor's tether.
+      ["movement.drop-prone", "movement"],
+      ["movement.tether", "movement"],
+      ["movement.pit", "movement"],
+      // A controlled mount's action: what it may take is the economy of its turn.
+      ["mount.controlled", "economy"],
       ["economy.action-used", "economy"],
+      ["action.underwater-only", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
       ["economy.not-your-turn", "economy"],
+      ["economy.turn-start", "economy"],
+      ["economy.attack-action", "economy"],
+      ["economy.heavy-armor", "economy"],
       // Giving back a spent action, Bonus Action or Reaction lets a creature act twice.
       ["economy.spent-slot", "economy"],
       // No one acts while a wait-mode fight gathers initiative: the turn economy hasn't begun.
@@ -65,7 +82,14 @@ describe("rule families", () => {
       // An effect that takes away Reactions (Slow) is "you have no reaction", like Incapacitated.
       ["condition.no-reactions", "economy"],
       ["condition.no-spells", "economy"],
+      // What an effect leaves its bearer able to do on a turn (Gaseous Form's no attacks, Abjure Foes' one thing,
+      // Command's Flee): like Slow's no Reactions.
+      ["condition.cant-attack", "economy"],
+      ["condition.dash-only", "economy"],
+      ["condition.forced-attack", "economy"],
+      ["condition.one-thing-a-turn", "economy"],
       ["legendary.own-turn", "economy"],
+      ["legendary.after-a-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],
@@ -79,14 +103,23 @@ describe("rule families", () => {
       ["attack.two-handed", "economy"],
       // Casting in untrained armor: what the character can do at all, like the hands rule.
       ["spell.untrained-armor", "economy"],
+      // A familiar that can't attack, and a command beyond its reach, are what summoning costs a creature.
+      ["summon.cant-attack", "economy"],
+      ["summon.command", "economy"],
       // A scroll whose spell the reader's lists lack: what the character can do at all.
       ["spell.scroll-unreadable", "economy"],
       // A later-turn spell action on the turn of its cast: what this turn has done.
       ["spell.later-turn", "economy"],
       // Sneak Attack or a smite taken alone, with no hit to add to.
       ["attack.rides-a-hit", "economy"],
+      ["roll.answers-a-roll", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
+      // A form keeps its creature from casting, acting or attacking, or from an action printed for another form.
+      ["form.no-spells", "economy"],
+      ["form.no-actions", "economy"],
+      ["form.no-attacks", "economy"],
+      ["form.wrong-form", "economy"],
       // Action Surge with two uses, Stunning Strike: once on a turn, a spent per-turn limit.
       ["feature.once-per-turn", "resources"],
       ["legendary.no-actions-remaining", "resources"],
@@ -104,8 +137,18 @@ describe("rule families", () => {
       ["cover.total", "targeting"],
       // Hiding in an enemy's sight: where the creature stands relative to the others, like cover.
       ["hide.seen", "targeting"],
+      ["hide.exposed", "targeting"],
+      ["light.too-bright", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],
+      // Whom a spell may pick: a creature of a type it targets, one the caster sees, all in one of its areas.
+      ["target.wrong-type", "targeting"],
+      ["target.unseen", "targeting"],
+      ["target.outside-area", "targeting"],
+      // A creature the action can't affect (Turn Undead on a goblin, a flask's Holy Water on a bandit).
+      ["target.not-allowed", "targeting"],
+      // A revival spell aimed at a creature it can't bring back (Revivify on one dead an hour).
+      ["target.revival", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
       // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.
@@ -114,7 +157,18 @@ describe("rule families", () => {
       ["slots.none-remaining", "slots"],
       ["slots.below-spell-level", "slots"],
       ["slots.one-per-turn", "slots"],
-      ["slots.not-prepared", "slots"]
+      ["slots.not-prepared", "slots"],
+      // Metamagic shapes a cast: spellcasting rules, its picks' creatures a cast's targeting, its own row a rider.
+      ["metamagic.unknown", "slots"],
+      ["metamagic.unfit", "slots"],
+      ["metamagic.too-many", "slots"],
+      ["metamagic.quickened", "slots"],
+      ["metamagic.choice", "targeting"],
+      ["metamagic.with-a-cast", "economy"],
+      // "Check spell components" relaxes speech, hands and materials alone.
+      ["spell.no-verbal", "components"],
+      ["spell.no-free-hand", "components"],
+      ["spell.no-material", "components"]
     ];
     for (const [rule, family] of expected) expect(familyOf(rule), rule).toBe(family);
     expect(expected.map(([rule]) => rule).sort()).toEqual([...RULE_IDS].sort());

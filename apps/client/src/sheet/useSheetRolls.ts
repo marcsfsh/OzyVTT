@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { AbilityId, CheckRollOutcome, CheckSubject, RollVisibility } from "@vtt/domain";
+import type { AbilityId, ActorDerivedSheet, CheckRollOutcome, CheckSubject, RollVisibility } from "@vtt/domain";
 import { parseDiceFormula } from "@vtt/rules-5e";
 import { usePrompt } from "../components/feedback";
 import { useRollPreference } from "../dice/roll-preference";
-import { command } from "../lib/command";
+import { command, type Reply } from "../lib/command";
 import { modeWords } from "../encounter/roll-mode-notes";
 import { withArticle } from "@vtt/domain";
 import { noteSheetRolls } from "./sheet-roll-ids";
@@ -21,7 +21,10 @@ const ABILITY_WORDS: Readonly<Record<AbilityId, string>> = {
 export function checkLine(outcome: CheckRollOutcome): string {
   const verdict = outcome.success === null ? "" : ` vs DC ${outcome.dc} · ${outcome.success ? "success" : "failure"}`;
   const talent = outcome.reliableTalent ? " · Reliable Talent" : "";
-  return `${outcome.label}: ${outcome.total} (d20 ${outcome.natural}${outcome.typed ? ", typed" : ""})${verdict}${modeWords(outcome.rollMode)}${talent}.`;
+  const answered = (outcome.answered ?? []).map((line) => ` · ${line.name}: ${line.change}`).join("");
+  // A check that needed a sense the roller lacks fails whatever the die shows; the reason says so.
+  const why = outcome.autoFailed ? ` · ${outcome.autoFailed.replace(/\.$/, "")}` : "";
+  return `${outcome.label}: ${outcome.total} (d20 ${outcome.natural}${outcome.typed ? ", typed" : ""})${verdict}${modeWords(outcome.rollMode)}${talent}${answered}${why}.`;
 }
 
 /** The constant a formula adds after its dice ("2d6 + 3" gives 3), so a typed sum of the dice can take it. */
@@ -38,6 +41,15 @@ function flatPart(formula: string): number {
 
 const withBonus = (value: number, bonus: number) =>
   bonus === 0 ? String(value) : `${value} ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
+
+/** A situation the roller can say a check fits (a Book's topic, prying with a Crowbar), as the server lists it. */
+export type CheckSituation = ActorDerivedSheet["situations"][number];
+
+/** Whether a situation can fit this check: its abilities and skills, where it names any. */
+export function situationFits(situation: CheckSituation, subject: CheckSubject): boolean {
+  if (situation.abilities.length > 0 && !situation.abilities.includes(subject.ability)) return false;
+  return situation.skills.length === 0 || (subject.skill !== undefined && situation.skills.includes(subject.skill));
+}
 
 /**
  * Rolls from the sheet. A check or a save is named, never composed: the server works out its bonus and its Advantage or
@@ -59,6 +71,18 @@ export function useSheetRolls(
   const [visibility, setVisibility] = useState<RollVisibility>("public");
   // The check this sheet rolled last, which a reroll throws again while it is still the character's latest roll.
   const [lastCheck, setLastCheck] = useState<CheckRollOutcome | null>(null);
+  // The loose save this sheet rolled last (nothing owed), which Heroic Inspiration may reroll the same way.
+  const [lastSave, setLastSave] = useState<Readonly<{ rollId: string; ability: AbilityId; typed: boolean }> | null>(
+    null
+  );
+  // The situations the roller says the next check fits. Each is spent by the first check it can fit.
+  const [declared, setDeclared] = useState<readonly CheckSituation[]>([]);
+  const toggleSituation = (situation: CheckSituation) =>
+    setDeclared((held) =>
+      held.some((entry) => entry.situation === situation.situation)
+        ? held.filter((entry) => entry.situation !== situation.situation)
+        : [...held, situation]
+    );
   const { prompt, dialog } = usePrompt();
 
   /** Asks for the face a physical d20 shows; null when cancelled or not a face. */
@@ -79,9 +103,17 @@ export function useSheetRolls(
     return face;
   };
 
-  const rollCheck = async (subject: CheckSubject, label: string, findActorId?: string) => {
+  const rollCheck = async (
+    subject: CheckSubject,
+    label: string,
+    findActorId?: string,
+    dc?: number,
+    /** A Thief's Fast Hands makes a Sleight of Hand check as a Bonus Action. */
+    options: Readonly<{ bonusAction?: boolean }> = {}
+  ) => {
     const face = rollMode === "manual" ? await typedFace(`Roll ${label}`) : undefined;
     if (face === null) return;
+    const fitting = declared.filter((situation) => situationFits(situation, subject)).map((entry) => entry.situation);
     setRolling(true);
     const result = await command("check:roll", {
       actorId,
@@ -90,14 +122,53 @@ export function useSheetRolls(
       ...(subject.tool ? { tool: subject.tool } : {}),
       visibility,
       ...(face !== undefined ? { face } : {}),
-      ...(findActorId ? { findActorId } : {})
+      ...(findActorId ? { findActorId } : {}),
+      ...(dc !== undefined ? { dc } : {}),
+      ...(fitting.length > 0 ? { situations: fitting } : {}),
+      ...(options.bonusAction ? { bonusAction: true } : {})
     });
+    settleCheck(result, label, fitting);
+  };
+
+  /** What a check's reply leaves on the sheet: the situations it used, the line, or the refusal. */
+  const settleCheck = (result: Reply<"check:roll">, label: string, fitting: readonly string[]) => {
     setRolling(false);
+    if (result.ok && fitting.length > 0)
+      setDeclared((held) => held.filter((entry) => !fitting.includes(entry.situation)));
     setLastCheck(result.ok && result.check ? result.check : null);
     noteSheetRolls(result.check?.rollId);
     if (!result.ok) onFeedback(result.message ?? "The check was refused.");
     else if (result.hiddenFromRoller) onFeedback(`${label}: rolled for the GM's eyes only.`);
     else if (result.check) (result.check.success !== null ? onFeedback : said)(checkLine(result.check));
+  };
+
+  /** A tool's or gear's printed Utilize use: the server takes its check, its DC and what it costs in a fight. */
+  const rollUse = async (
+    use: Readonly<{
+      tool?: string;
+      item?: string;
+      index: number;
+      ability: AbilityId;
+      label: string;
+      bonusAction?: boolean;
+      forActorId?: string;
+    }>
+  ) => {
+    const face = rollMode === "manual" ? await typedFace(`Roll ${use.label}`) : undefined;
+    if (face === null) return;
+    setRolling(true);
+    const result = await command("check:roll", {
+      actorId,
+      ability: use.ability,
+      ...(use.tool !== undefined ? { tool: use.tool } : {}),
+      ...(use.item !== undefined ? { item: use.item } : {}),
+      use: use.index,
+      visibility,
+      ...(face !== undefined ? { face } : {}),
+      ...(use.bonusAction ? { bonusAction: true } : {}),
+      ...(use.forActorId !== undefined ? { forActorId: use.forActorId } : {})
+    });
+    settleCheck(result, use.label, []);
   };
 
   /** Rerolls the check this sheet rolled last: Heroic Inspiration for a player, free for the GM. A typed check is
@@ -118,6 +189,20 @@ export function useSheetRolls(
     else if (result.check) said(checkLine(result.check));
   };
 
+  /** Answers the check this sheet rolled last (Bardic Inspiration, Tactical Mind, Stroke of Luck). */
+  const answerCheck = async (answer: Readonly<{ id: string; subtract?: boolean; face?: number }>) => {
+    setRolling(true);
+    const result = await command("check:answer", { actorId, answer: { ...answer } });
+    setRolling(false);
+    if (!result.ok) {
+      onFeedback(result.message ?? "The answer was refused.");
+      return;
+    }
+    setLastCheck(result.check ?? null);
+    noteSheetRolls(result.check?.rollId);
+    if (result.check) (result.check.success !== null ? onFeedback : said)(checkLine(result.check));
+  };
+
   /** A saving throw from the sheet: it answers the matching save the character owes, or rolls a loose one. */
   const rollSave = async (ability: AbilityId) => {
     const name = `${ABILITY_WORDS[ability]} save`;
@@ -131,6 +216,50 @@ export function useSheetRolls(
       return;
     }
     noteSheetRolls(result.rollId);
+    setLastSave(
+      result.route === "loose" && result.rollId && !result.outcome?.autoFailed
+        ? { rollId: result.rollId, ability, typed: face !== undefined }
+        : null
+    );
+    sayLooseSave(name, result);
+  };
+
+  /** Rerolls the loose save this sheet rolled last: Heroic Inspiration for a player, free for the GM. */
+  const rerollSave = async () => {
+    if (!lastSave) return;
+    const name = `${ABILITY_WORDS[lastSave.ability]} save`;
+    const face = lastSave.typed ? await typedFace(`Reroll ${withArticle(name)}`) : undefined;
+    if (face === null) return;
+    setRolling(true);
+    const result = await command("save:roll", {
+      actorId,
+      ability: lastSave.ability,
+      reroll: true,
+      ...(face !== undefined ? { face } : {})
+    });
+    setRolling(false);
+    if (!result.ok) {
+      onFeedback(result.message ?? "The reroll was refused.");
+      return;
+    }
+    noteSheetRolls(result.rollId);
+    setLastSave(result.rollId ? { ...lastSave, rollId: result.rollId } : null);
+    sayLooseSave(name, result);
+  };
+
+  /** Says a save's result: the verdict of one the character owed, or a loose one's total when the line can't. */
+  const sayLooseSave = (
+    name: string,
+    result: Readonly<{
+      outcome?: Readonly<{
+        autoFailed?: string | null;
+        total: number;
+        natural?: number;
+        rollMode?: Parameters<typeof modeWords>[0];
+      }> &
+        Readonly<{ dc?: number; success?: boolean }>;
+    }>
+  ) => {
     const outcome = result.outcome;
     if (!outcome) return;
     if (outcome.autoFailed) {
@@ -193,9 +322,15 @@ export function useSheetRolls(
     visibility,
     setVisibility,
     lastCheck,
+    declared,
+    toggleSituation,
     rollCheck,
+    rollUse,
     rerollCheck,
+    answerCheck,
     rollSave,
+    lastSave,
+    rerollSave,
     rollD20,
     rollFlat,
     dialog

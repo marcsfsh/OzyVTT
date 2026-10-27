@@ -159,11 +159,15 @@ describe("reading a scroll in a fight", () => {
     write(table, IDS.wizard, scrollOf("detect-magic"));
     fight(table, IDS.wizard);
     resolveAt(table, IDS.wizard, READ, [], { targetIds: [] });
-    expect(table.actor(IDS.wizard).effects.map((effect) => effect.name)).toEqual(["Concentrating on Detect Magic"]);
+    // The sense itself is the second effect (vision/detect.ts).
+    expect(table.actor(IDS.wizard).effects.map((effect) => effect.name)).toEqual([
+      "Concentrating on Detect Magic",
+      "Detect Magic"
+    ]);
     expect(rowOf(table, IDS.wizard)).toBeUndefined();
   });
 
-  it("attacks with the scroll's +5, and grows a cantrip with its reader's level", () => {
+  it("attacks with the scroll's +5, and casts a cantrip at the lowest caster level", () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
     write(table, IDS.wizard, scrollOf("fire-bolt"));
     // Wizard 3: Fire Bolt's base 1d10, at the scroll's own attack bonus.
@@ -171,7 +175,8 @@ describe("reading a scroll in a fight", () => {
       attack: { bonus: 5 },
       damage: [{ formula: "1d10", type: "fire" }]
     });
-    // At level 5 the reader's Fire Bolt is 2d10, read from a scroll as from their own list.
+    // A spell from an item is cast at the lowest possible spell and caster level (SRD Spells Cast from Items), so a
+    // level 5 reader's scroll Fire Bolt is still 1d10.
     const definition = table.definition(IDS.wizard);
     const fifth = {
       ...definition,
@@ -181,7 +186,7 @@ describe("reading a scroll in a fight", () => {
       }
     };
     expect(scrollCastAction(rowOf(table, IDS.wizard)!, fifth, catalog)?.damage).toEqual([
-      { formula: "2d10", type: "fire" }
+      { formula: "1d10", type: "fire" }
     ]);
   });
 
@@ -224,14 +229,14 @@ describe("a scroll's spell, cast as the spell's own cast is", () => {
     ]);
   });
 
-  it("reminds the GM that an interrupted long casting keeps the scroll", () => {
+  it("casts a long spell from a scroll over its turns, and keeps the scroll until the last one", () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() });
     write(table, IDS.wizard, scrollOf("identify"));
     fight(table, IDS.wizard);
-    const read = resolveAt(table, IDS.wizard, READ, [], { targetIds: [] });
-    expect(read.warnings?.find((line) => line.startsWith("Identify takes 1 minute to cast"))).toContain(
-      "the scroll isn't lost, so give it back on the sheet"
-    );
+    resolveAt(table, IDS.wizard, READ, [], { targetIds: [] });
+    // SRD Longer Casting Times: the casting holds Concentration over its turns, and an interrupted one loses no scroll.
+    expect(table.actor(IDS.wizard).effects.find((effect) => effect.longCast)?.name).toBe("Casting Identify");
+    expect(rowOf(table, IDS.wizard)?.quantity).toBe(1);
   });
 });
 

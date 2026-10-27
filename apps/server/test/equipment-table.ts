@@ -6,6 +6,7 @@ import { BuilderPolicySchema, GameStateSchema, type GameState } from "@vtt/domai
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies, type ResolveInput } from "../src/action-resolution.js";
 import { importActorDefinition, storedDefinition } from "../src/actor-roster.js";
+import { builtinActionFor } from "../src/builtin-actions.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
@@ -175,9 +176,18 @@ export function catalogRow(id: string, over: Partial<InventoryItem> = {}): Inven
   });
 }
 
-/** Writes one row as the given role would. */
+/** Writes one row as the given role would. A player attunes or ends attunement during a Short Rest, as the rules
+ *  ask, so a write that changes it is made in one. */
 export function write(table: Table, actorId: string, item: InventoryItem, role: "gm" | "player" = "player"): void {
-  setInventoryItem(table.state, actorId, item, table.resolve, { catalog, role });
+  const stored = table.state.actors.find((actor) => actor.id === actorId)?.inventory.find((row) => row.id === item.id);
+  const rest = table.state.rest;
+  if (role === "player" && item.attuned !== (stored?.attuned ?? false))
+    table.state.rest = { ...rest, shortRest: { actorIds: [actorId], done: [] } };
+  try {
+    setInventoryItem(table.state, actorId, item, table.resolve, { catalog, role });
+  } finally {
+    table.state.rest = rest;
+  }
 }
 
 /** The stored row, changed by `over` (Equip, Attune, quantity). */
@@ -206,14 +216,18 @@ export function fight(table: Table, actorId: string): void {
   );
 }
 
-/** The effective action with this id, as the resolver would read it. */
+/** The effective action with this id, as the resolver would read it, else the generic action of that id. */
 export function actionOf(table: Table, actorId: string, actionId: string) {
-  const action = effectiveActions(table.definition(actorId), table.actor(actorId), catalog).find(
-    (entry) => entry.id === actionId
-  );
+  const action =
+    effectiveActions(table.definition(actorId), table.actor(actorId), catalog).find((entry) => entry.id === actionId) ??
+    builtinActionFor(table.definition(actorId), actionId, table.actor(actorId));
   if (!action) throw new Error(`no ${actionId} action`);
   return action;
 }
+
+/** Whether the action with this id is a generic one, which the resolver takes with its special cases. */
+const isBuiltin = (table: Table, actorId: string, actionId: string) =>
+  !effectiveActions(table.definition(actorId), table.actor(actorId), catalog).some((entry) => entry.id === actionId);
 
 let command = 0;
 /** Resolves one action at the foe with queued dice faces; `distanceFeet` puts every pair of combatants that far apart. */
@@ -248,6 +262,7 @@ export function resolveAt(
       actorId,
       targetIds: [IDS.foe],
       commandId: `50000000-0000-4000-8000-${String(command).padStart(12, "0")}`,
+      ...(isBuiltin(table, actorId, actionId) ? { builtin: true } : {}),
       ...input
     },
     deps

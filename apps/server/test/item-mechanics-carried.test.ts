@@ -10,7 +10,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
-import { startEncounter } from "../src/encounter.js";
+import { initiativeRollFor, startEncounter } from "../src/encounter.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { looseRollPlan, spendLooseUses } from "../src/tap-routing.js";
 
@@ -126,7 +126,7 @@ const CARRIED_ROWS = loadMagicItems().filter(
     ((row.category === "wondrous-item" && row.slot === "wondrous") || row.category === "consumable") &&
     row.id !== "spell-scroll"
 );
-/** "Carries a rider" over all nine keys `overlay.ts`'s `ITEM_RIDER_KEYS` admits, `tags` included. */
+/** "Carries a rider" over the keys `overlay.ts`'s `ITEM_RIDER_KEYS` admits that act, `tags` and kinds included. */
 const carries = (row: {
   tags?: unknown[];
   modifiers: unknown[];
@@ -137,6 +137,7 @@ const carries = (row: {
   grantsFeatIds: unknown[];
   uses?: unknown;
   cursed: boolean;
+  variants?: unknown[];
 }) =>
   (row.tags ?? []).length > 0 ||
   row.modifiers.length > 0 ||
@@ -146,7 +147,8 @@ const carries = (row: {
   row.grants !== undefined ||
   row.grantsFeatIds.length > 0 ||
   row.uses !== undefined ||
-  row.cursed;
+  row.cursed ||
+  (row.variants ?? []).length > 0;
 
 describe("the Pipes of Haunting spend a charge, refuse the fourth press, and force a real save", () => {
   it("carries the authored action out of the COMMITTED bundle, through the real content library", () => {
@@ -377,37 +379,87 @@ describe("the Stone of Good Luck: both halves reach the roll", () => {
     );
     expect(hide.check!.total).toBe(13); // d20 10 + Dex 2 + the stone's 1
   });
+
+  it("reaches Initiative, a Dexterity check, on the roll and on the sheet", () => {
+    const definition = definitionOf();
+    const content = { resolveDefinition: () => definition, catalog };
+    const bare = stateWith([]);
+    const lucky = stateWith([carried("stone-of-good-luck-luckstone", "Stone of Good Luck")]);
+    expect(initiativeRollFor(bare, IDS.hero, false, content).checkBonus).toBe(0);
+    expect(initiativeRollFor(lucky, IDS.hero, false, content).checkBonus).toBe(1);
+    const sheetOf = (state: GameState) =>
+      deriveActorSheet(
+        state.actors[0],
+        definition,
+        deriveEquipment(state.actors[0], definition, catalog),
+        skillCatalog
+      );
+    expect(sheetOf(lucky).initiative).toBe(sheetOf(bare).initiative + 1);
+    // The roll adds it: d20 10, the stored Dexterity +2, the stone's +1.
+    startEncounter(
+      lucky,
+      { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero }, { actorId: IDS.foe, score: 1 }] },
+      () => 10,
+      GEOMETRY,
+      () => definition,
+      0,
+      catalog
+    );
+    expect(lucky.combat.initiative.find((entry) => entry.actorId === IDS.hero)?.score).toBe(
+      10 + (lucky.actors[0].initiative ?? 0) + 1
+    );
+  });
 });
 
 describe("what the carried items' buttons do outside an encounter", () => {
-  it("leaves them to the loose route, which uses each and spends its charges", () => {
-    // Their printed uses (scrying, messaging, Truesight) are not combat activities: the structured resolver
-    // refuses them, and the loose `action.use` route uses them with nothing to roll, charge by charge.
+  it("casts an item's spell or puts its effect on its user, and leaves a save with no fight to the loose route", () => {
     const definition = definitionOf();
+    // A cast resolves outside a fight as a creature's own does, and spends its charge.
     for (const [id, name, actionId] of [
-      ["crystal-ball", "Crystal Ball", "item-crystal-ball-cast-scrying"],
       ["sending-stones", "Sending Stones", "item-sending-stones-cast-sending"],
-      ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer"],
-      ["pipes-of-haunting", "Pipes of Haunting", "item-pipes-of-haunting-play"]
+      ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer"]
     ] as const) {
       const state = stateWith([carried(id, name)]); // no `fight()`
       const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === actionId)!;
       expect(action, `${id} - the button is on the sheet`).toBeDefined();
-      expect(() =>
-        resolveDefinitionAction(
-          state,
-          action,
-          { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(17) },
-          deps([], definition)
-        )
-      ).toThrow("Start an encounter before resolving actions.");
-      expect({ id, plan: looseRollPlan(action, { includeDamage: true }) }).toEqual({ id, plan: [] });
-      if (!action.uses) continue;
-      // Every printed charge, then a refusal.
-      const available = effectiveActions(definition, state.actors[0], catalog);
-      for (let charge = 0; charge < action.uses.limit; charge++) spendLooseUses(state.actors[0], action, available);
-      expect(() => spendLooseUses(state.actors[0], action, available), id).toThrow("no uses remaining");
+      resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [], commandId: cmd(17) },
+        deps([], definition)
+      );
+      expect(state.actors[0].actionUses[action.uses!.pool ?? action.id], `${id} - its charge is spent`).toBe(1);
     }
+    // The Gem of Seeing's Truesight lands on its user.
+    const peered = stateWith([carried("gem-of-seeing", "Gem of Seeing")]);
+    const peer = effectiveActions(definition, peered.actors[0], catalog).find(
+      (entry) => entry.id === "item-gem-of-seeing-peer"
+    )!;
+    resolveDefinitionAction(
+      peered,
+      peer,
+      { actorId: IDS.hero, targetIds: [], commandId: cmd(18) },
+      deps([], definition)
+    );
+    expect(peered.actors[0].effects.map((effect) => effect.name)).toContain("Peering Through the Gem of Seeing");
+
+    // A save its user forces on others has no one to resolve against outside a fight: the loose route spends it.
+    const state = stateWith([carried("pipes-of-haunting", "Pipes of Haunting")]);
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-pipes-of-haunting-play"
+    )!;
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(19) },
+        deps([], definition)
+      )
+    ).toThrow("Start an encounter before resolving actions.");
+    expect(looseRollPlan(action, { includeDamage: true })).toEqual([]);
+    const available = effectiveActions(definition, state.actors[0], catalog);
+    for (let charge = 0; charge < action.uses!.limit; charge++) spendLooseUses(state.actors[0], action, available);
+    expect(() => spendLooseUses(state.actors[0], action, available)).toThrow("no uses remaining");
   });
 
   it("rolls the Iron Bands' attack loose, and spends their one charge a dawn", () => {
@@ -458,7 +510,7 @@ describe("the one printed to-hit among carried items that the vocabulary can say
   });
 });
 
-describe("the charge-alone items, whose counter is the whole of what they enforce", () => {
+describe("the charged items with no roll of their own, whose counter they enforce", () => {
   it("rations the four elemental summons at one a day and the three-charge items at three", () => {
     const definition = definitionOf();
     for (const [id, name, actionId, limit, label] of [
@@ -490,15 +542,16 @@ describe("the charge-alone items, whose counter is the whole of what they enforc
         1,
         "Summon Earth Elemental"
       ],
-      ["bag-of-tricks", "Bag of Tricks", "item-bag-of-tricks-pull", 3, "Pull a Fuzzy Object"],
+      ["bag-of-tricks", "Bag of Tricks", "item-bag-of-tricks-pull-gray", 3, "Pull a Fuzzy Object (Gray bag)"],
       ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer", 3, "Peer Through the Gem"],
-      ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call", 3, "Call a Swarm of Rats"]
+      ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call-1", 3, "Call a Swarm of Rats"]
     ] as const) {
-      const state = fight(stateWith([carried(id, name)]));
+      // A Bag of Tricks is one of three bags: this one the gray.
+      const state = fight(stateWith([carried(id, name, id === "bag-of-tricks" ? { variantId: "gray" } : {})]));
       const actor = state.actors[0];
       const action = effectiveActions(definition, actor, catalog).find((entry) => entry.id === actionId)!;
       expect(action.uses).toEqual({ limit, per: "long-rest", pool: `${id}-charges` });
-      // The charge is all these enforce.
+      // No roll of their own: the charge, and the creature the summoning ones bring (`summon-items.test.ts`).
       expect(action.damage).toEqual([]);
       expect(action.attack).toBeUndefined();
       expect(action.save).toBeUndefined();
@@ -529,28 +582,34 @@ describe("the casts that survived the spell-record check", () => {
       const cast = effectiveActions(definition, state.actors[0], catalog).find(
         (entry) => entry.id === `item-${id}-cast-scrying`
       )!;
-      // The save Scrying's own target makes, at the item's own printed DC.
-      expect(cast.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureConditions: [] });
+      // The save Scrying's own target makes, at the item's own printed DC, with the spell's 24 hours of immunity.
+      expect(cast.save).toEqual({
+        ability: "wis",
+        dc: 17,
+        successDamage: "none",
+        failureConditions: [],
+        immuneOnSuccess: true,
+        immuneMinutes: 1440
+      });
       expect(cast.damage).toEqual([]);
       expect(cast.attack).toBeUndefined();
       expect(cast.uses).toBeUndefined(); // no charge limit is printed on any of the four
     }
   });
 
-  it("the two SENSOR-GATED casts are absent, and a re-author would land a real Charm on any target", () => {
+  it("casts the two SENSOR-GATED spells only through the orb's Scrying", () => {
     // The SRD casts these through an active Scrying sensor ("targeting creatures you can see within 30 feet
-    // of the spell's sensor"), which no trigger can express, so the derived buttons would have no
-    // prerequisite. Suggestion resolved at a foe in melee would write a charmed pending save.
+    // of the spell's sensor"): each is offered only while its user concentrates on Scrying (`castThrough`).
     const definition = definitionOf();
     for (const [id, name, spell] of [
       ["crystal-ball-of-telepathy", "Crystal Ball of Telepathy", "suggestion"],
       ["crystal-ball-of-mind-reading", "Crystal Ball of Mind Reading", "detect-thoughts"]
     ] as const) {
       const row = view.equipmentRecord(id)!;
-      expect(row.casts.map((cast) => cast.spellId)).toEqual(["scrying"]);
+      expect(row.casts.map((cast) => cast.spellId)).toEqual(["scrying", spell]);
       const state = fight(stateWith([carried(id, name)]));
       const actions = effectiveActions(definition, state.actors[0], catalog);
-      expect(actions.find((entry) => entry.id === `item-${id}-cast-${spell}`)).toBeUndefined();
+      expect(actions.find((entry) => entry.id === `item-${id}-cast-${spell}`)?.castThrough).toBe("scrying");
       // The orb's own printed, ungated Scrying is still unlimited.
       expect(actions.find((entry) => entry.id === `item-${id}-cast-scrying`)!.uses).toBeUndefined();
     }
@@ -601,7 +660,16 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-rope-of-entanglement-entangle"
     )!;
-    expect(action.save).toEqual({ ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"] });
+    expect(action.save).toEqual({
+      ability: "dex",
+      dc: 15,
+      successDamage: "none",
+      failureConditions: ["restrained"],
+      // "a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check" escapes it.
+      escapeDc: 15,
+      // "The rope has AC 20, HP 20, and Immunity to Poison and Psychic damage. It regains 1 Hit Point every 5 minutes".
+      heldBy: { name: "Rope", armorClass: 20, hitPoints: 20, immunities: ["poison", "psychic"], regainsEvery: 5 }
+    });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
     expect(action.damage).toEqual([]);
 
@@ -614,13 +682,19 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "dex", dc: 15, conditionIds: ["restrained"] });
   });
 
-  it("gives the Iron Flask a DC 17 Wis save and applies NO condition: nothing spurious off the prose", () => {
+  it("gives the Iron Flask a DC 17 Wis save whose failure traps and applies no condition", () => {
     const definition = definitionOf();
     const state = fight(stateWith([carried("iron-flask", "Iron Flask", { attuned: false })]));
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-iron-flask-trap"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureConditions: [] });
+    expect(action.save).toEqual({
+      ability: "wis",
+      dc: 17,
+      successDamage: "none",
+      failureConditions: [],
+      failureEffect: { name: "Trapped in the Iron Flask", tags: ["off-plane", "iron-flask"], modifiers: [] }
+    });
     expect(action.damage).toEqual([]);
 
     resolveDefinitionAction(
@@ -664,66 +738,91 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
 // The absences, pinned so none is authored by accident.
 
 describe("what no carried item can carry", () => {
-  it("of the potions and oils, only the Potions of Healing and of Flying act: the rest last an hour or more", () => {
-    // A consumed item is sayable (`consumedOnUse`), but no effect counts an hour: Flying's lasts until its drinker
-    // ends it.
+  it("names the potions and oils that act, and leaves the rest prose", () => {
+    // A consumed item is sayable (`consumedOnUse`), and an hour is game time an effect counts.
     const consumables = CARRIED_ROWS.filter((row) => row.category === "consumable");
     expect(consumables.length).toBeGreaterThan(0);
     expect(consumables.filter(carries).map((row) => row.id)).toEqual([
+      "elixir-of-health",
+      "oil-of-etherealness",
+      "oil-of-sharpness",
+      "oil-of-slipperiness",
+      "philter-of-love",
+      "potion-of-animal-friendship",
+      "potion-of-climbing",
+      "potion-of-diminution",
       "potion-of-flying",
+      "potion-of-gaseous-form",
+      "potion-of-giant-strength",
+      "potion-of-growth",
       "potion-of-healing-greater",
       "potion-of-healing-superior",
-      "potion-of-healing-supreme"
+      "potion-of-healing-supreme",
+      "potion-of-heroism",
+      "potion-of-invisibility",
+      "potion-of-invulnerability",
+      "potion-of-mind-reading",
+      "potion-of-poison",
+      "potion-of-resistance",
+      "potion-of-speed",
+      "potion-of-vitality",
+      "potion-of-water-breathing"
     ]);
   });
 
   it("authors no curse, and could not have, since no carried row requires attunement AND prints a curse", () => {
     expect(CARRIED_ROWS.filter((row) => row.cursed).map((row) => row.id)).toEqual([]);
-    // `mysterious-deck` is the only carried row whose prose says "cursed", and `schemas.ts` would refuse a
-    // curse on it anyway because it requires no attunement.
+    // `mysterious-deck` is the only carried row whose prose says "cursed": Euryale's curse is an effect its draw leaves,
+    // and `schemas.ts` would refuse a curse on the row anyway because it requires no attunement.
     const deck = CARRIED_ROWS.find((row) => row.id === "mysterious-deck")!;
     expect(deck.attunement?.required).toBe(false);
-    expect(carries(deck)).toBe(false);
+    expect(deck.cursed).toBeFalsy();
   });
 });
 
 describe("the absences that were measured and must stay absent", () => {
-  it("the briefed far end, Potion of Resistance, carries no rider, because 'for 1 hour' cannot be said", () => {
+  it("gives a Potion of Resistance's hour to its drinker, by the kind the GM says it is, never to its carrier", () => {
     const potion = view.equipmentRecord("potion-of-resistance")!;
     expect(potion.description).toContain("Resistance to one type of damage for 1 hour");
     // An item's `effects` rider would stand while the bottle is merely carried.
     expect(potion.effects).toEqual([]);
-    // ...and nothing else was reached for either.
     expect(potion.grants).toBeUndefined();
-    expect(potion.actions).toEqual([]);
-    expect(potion.casts).toEqual([]);
-    expect(potion.modifiers).toEqual([]);
-    // Its expensive sibling fails the same way and must not be authored either.
+    expect(potion.variants!.map((kind) => kind.id)).toHaveLength(10);
+    const fire = potion.variants!.find((kind) => kind.id === "fire")!;
+    expect(fire.actions[0]!.grants).toMatchObject({
+      duration: { type: "minutes", minutes: 60 },
+      modifiers: [{ type: "damage-resistance", damageTypes: ["fire"] }]
+    });
     const invulnerability = view.equipmentRecord("potion-of-invulnerability")!;
     expect(invulnerability.effects).toEqual([]);
-    expect(invulnerability.grants).toBeUndefined();
+    expect(invulnerability.actions[0]!.grants?.duration).toEqual({ type: "rounds", rounds: 10 });
   });
 
-  it("every row whose printed effect restores or grants hit points is prose, but the Potions of Healing", () => {
-    for (const id of ["potion-of-vitality", "ioun-stone", "dragon-orb", "potion-of-heroism", "bag-of-beans"]) {
-      const row = view.equipmentRecord(id)!;
-      expect({ id, carries: carries(row) }).toEqual({ id, carries: false });
-    }
+  it("leaves the hit points that come back on the clock or a table to the GM", () => {
+    // A Bag of Beans' planted bean names no outcome: its d100 table is the GM's. An Ioun Stone of Regeneration's hourly
+    // 15 is the GM's too.
+    const plant = view.equipmentRecord("bag-of-beans")!.actions.find((action) => action.id === "plant")!;
+    expect(plant.healing).toBeUndefined();
+    expect(plant.grants).toBeUndefined();
+    const regeneration = view.equipmentRecord("ioun-stone")!.variants!.find((kind) => kind.id === "regeneration")!;
+    expect(regeneration.modifiers).toEqual([]);
   });
 
-  it("the Bead of Force and the Horn of Blasting carry no action", () => {
-    // The bead is destroyed on use, which no `per` value can say.
-    expect(view.equipmentRecord("bead-of-force")!.actions).toEqual([]);
-    // The horn is absent for its 20% explosion chance.
+  it("the Bead of Force is used up as it is thrown, and the Horn of Blasting may explode as it is blown", () => {
+    // Each bead is one of a stack, taken off as it is thrown.
+    const bead = view.equipmentRecord("bead-of-force")!;
+    expect(bead.consumedOnUse).toBe(true);
+    expect(bead.actions.map((action) => action.id)).toEqual(["throw"]);
+    // The horn's blast carries its 20 percent chance to explode.
     const horn = view.equipmentRecord("horn-of-blasting")!;
     expect(horn.description).toContain("20 percent chance of causing the horn to explode");
-    expect(carries(horn)).toBe(false);
+    expect(horn.breaks).toEqual({ percent: 20, damage: { formula: "10d6", type: "force" } });
+    expect(horn.actions.map((action) => action.id)).toEqual(["blast"]);
   });
 
-  it("the seven ability-score refusals stay prose, and so do the reserved and multi-cost rows", () => {
-    // `ability-score` is refused on an item carrier: one potion, three manuals, three tomes.
+  it("the six study books stay prose, and so do the reserved rows", () => {
+    // A manual or tome changes the sheet for good through its study, not a rider.
     for (const id of [
-      "potion-of-giant-strength",
       "manual-of-bodily-health",
       "manual-of-gainful-exercise",
       "manual-of-quickness-of-action",
@@ -733,8 +832,8 @@ describe("the absences that were measured and must stay absent", () => {
     ]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
-    // Rows needing mechanics not modeled yet, and two whose charge table costs more than one charge per use.
-    for (const id of ["mysterious-deck", "cube-of-force", "dragon-orb", "gem-of-brightness", "pearl-of-power"]) {
+    // A Pearl of Power is a slot recovery (conversions.ts), not an item row.
+    for (const id of ["pearl-of-power"]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
   });

@@ -1,10 +1,12 @@
 import type { AnnotationPoint, AnnotationShapeKind, GameState } from "@vtt/domain";
+import { clearLine } from "./vision/geometry.js";
+import { segmentsOf } from "./vision/sight.js";
 import { gridToImage, imageToGrid, type GridPoint, type SquareGridCalibration } from "./grid-calibration.js";
 
 const EPSILON = 1e-6;
 
 /** The grid-space centers of every cell a token's footprint covers (odd footprints center on a cell, even on an intersection: mirrors token-placement). */
-function footprintCellCenters(
+export function footprintCellCenters(
   calibration: SquareGridCalibration,
   position: AnnotationPoint,
   sizeCells: number
@@ -77,13 +79,57 @@ export function tokensInTemplate(
     targetG,
     (widthFeet ?? calibration.distancePerCell) / calibration.distancePerCell
   );
+  // SRD Area of Effect: "If all straight lines from the point of origin to a location are blocked, that location isn't
+  // included." With dynamic vision on, walls, closed doors and windows block them.
+  const reaches = blockedFromOrigin(state, calibration, geometry, shape);
   const caught: string[] = [];
   for (const token of state.combat.tokens) {
     if (token.position === null) continue;
-    if (footprintCellCenters(calibration, token.position, token.sizeCells).some((center) => inside(center)))
+    if (
+      footprintCellCenters(calibration, token.position, token.sizeCells).some(
+        (center) => inside(center) && reaches(center)
+      )
+    )
       caught.push(token.actorId);
   }
   return caught;
+}
+
+/** An area's point of origin on the map, from which its lines and its cover are read: a Sphere, Cylinder or
+ *  Emanation's centre, a Cone or Line's start, and a Cube's middle. */
+export function areaOriginPoint(
+  geometry: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>,
+  shape: AnnotationShapeKind
+): AnnotationPoint {
+  return shape === "square"
+    ? { x: (geometry.origin.x + geometry.target.x) / 2, y: (geometry.origin.y + geometry.target.y) / 2 }
+    : geometry.origin;
+}
+
+/** Whether a straight line from an area's point of origin reaches a cell (its centre or a point near a corner):
+ *  always, with vision off. A Sphere, Cylinder or Emanation spreads from its centre, a Cone or Line from its start, and
+ *  a Cube here from its middle. */
+function blockedFromOrigin(
+  state: GameState,
+  calibration: SquareGridCalibration,
+  geometry: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>,
+  shape: AnnotationShapeKind
+): (cell: GridPoint) => boolean {
+  const vision = state.combat.vision;
+  if (!vision?.enabled || vision.walls.length === 0) return () => true;
+  // Bars (Forcecage's cage) stop no line: attacks, spells and areas go between them.
+  const obstacles = vision.walls
+    .filter((wall) => (wall.kind !== "door" || wall.open !== true) && wall.bars !== true)
+    .flatMap(segmentsOf);
+  const origin = areaOriginPoint(geometry, shape);
+  return (cell) =>
+    [0, 0.35, -0.35].some((dx) =>
+      [0, 0.35, -0.35].some(
+        (dy) =>
+          (dx === 0) === (dy === 0) &&
+          clearLine(origin, gridToImage(calibration, { column: cell.column + dx, row: cell.row + dy }), obstacles)
+      )
+    );
 }
 
 /** Whether a footprint at `position` would be caught by the template, by the same rule as `tokensInTemplate`: any of

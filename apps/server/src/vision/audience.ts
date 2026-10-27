@@ -1,4 +1,5 @@
 import type { CombatState, GameState, PlayerVision, PlayerVisionWall, VisionPolygon, VisionRect } from "@vtt/domain";
+import { commandedBySession } from "../authorization.js";
 import { revealedRegion } from "../fog.js";
 import { intersect, type Rect } from "../rect-region.js";
 import { flatPolygon, type Point, type Polygon } from "./geometry.js";
@@ -12,8 +13,12 @@ import {
   markPolygons,
   type ExploredGrid
 } from "./explored.js";
-import type { SightContent } from "./senses.js";
-import { sceneSight, sightIsCached } from "./sight.js";
+import { sensesOf, type SightContent } from "./senses.js";
+import { isEthereal, needsEtherealSight, seesIntoEthereal } from "../ethereal.js";
+import { distance } from "./geometry.js";
+import { spellWardOf } from "../resolution/spell-wards.js";
+import { derivedUuid } from "./cast-sight.js";
+import { sceneSight, sightIsCached, wallPieces } from "./sight.js";
 
 /**
  * What each audience may know of the creatures on the map (ADR-0023): a player sees through their own characters, the
@@ -102,14 +107,99 @@ function stagedUnseen(state: GameState): Set<string> {
   return staged;
 }
 
+/** With dynamic vision off, the creatures on the Border Ethereal that none of `viewerIds` sees into that plane to
+ *  perceive: Truesight or See Invisibility by the distance between the tokens, or a viewer there itself. Dynamic vision
+ *  answers the same question from the map. */
+function etherealUnseen(state: GameState, viewerIds: readonly string[], content: SightContent): string[] {
+  const ethereal = state.actors.filter((actor) => isEthereal(actor));
+  if (ethereal.length === 0) return [];
+  const pixelsPerFoot = state.combat.vision?.measure?.pixelsPerFoot;
+  const at = (actorId: string) => state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+  const viewers = viewerIds.flatMap((viewerId) => {
+    const viewer = state.actors.find((actor) => actor.id === viewerId);
+    return viewer ? [viewer] : [];
+  });
+  return ethereal
+    .filter((target) => {
+      const where = at(target.id);
+      return !viewers.some((viewer) => {
+        if (viewer.id === target.id || !needsEtherealSight(viewer, target)) return true;
+        const from = at(viewer.id);
+        const feet = pixelsPerFoot && from && where ? distance(from, where) / pixelsPerFoot : null;
+        return seesIntoEthereal(sensesOf(state, viewer, content), feet);
+      });
+    })
+    .map((actor) => actor.id);
+}
+
+/** The creatures seen only through a divination's sensor (Arcane Eye, Clairvoyance) that a ward keeps from it
+ *  (Nondetection: "can't be perceived through magical scrying sensors"). */
+function wardedFromSensors(
+  state: GameState,
+  viewerIds: readonly string[],
+  perceivedBy: (viewerIds: readonly string[]) => ReadonlySet<string>,
+  content: SightContent
+): string[] {
+  const sensors = viewerIds.flatMap((viewerId) => {
+    const sensor = state.actors.find((actor) => actor.id === viewerId);
+    const spell = sensor?.summon?.spell ? content.catalog?.spellRecord?.(sensor.summon.spell.id) : undefined;
+    return sensor && spell?.school === "divination" ? [{ sensor, spell }] : [];
+  });
+  if (sensors.length === 0) return [];
+  const eyes = new Set(viewerIds.filter((viewerId) => !sensors.some(({ sensor }) => sensor.id === viewerId)));
+  const byEyes = perceivedBy([...eyes]);
+  const wardContent = { resolveDefinition: content.definition, catalog: content.catalog };
+  return state.actors
+    .filter(
+      (actor) =>
+        !byEyes.has(actor.id) &&
+        sensors.every(
+          ({ sensor, spell }) =>
+            !perceivedBy([sensor.id]).has(actor.id) ||
+            spellWardOf(state, actor, spell, sensor.summon!.by, wardContent) !== null
+        )
+    )
+    .map((actor) => actor.id);
+}
+
 const placed = (state: GameState, actorId: string) =>
   state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
 const inPlay = (actor: Actor) => actor.visibility === "public" && !actor.archived;
 
-/** A player's own characters on the live map. */
+/** On a commander, while it sees through a creature it commands (a familiar's eyes, after a Bonus Action): the effect's
+ *  source is that creature. */
+export const SHARED_SIGHT_TAG = "shared-sight";
+
+/** Whether a commanded creature's commander sees what it sees now: always (an Arcane Eye), or while the commander holds
+ *  a shared sight of it (a familiar). */
+function sharesSight(state: GameState, actor: Actor): boolean {
+  if (actor.summon?.sight === "always") return true;
+  if (actor.summon?.sight !== "bonus-action") return false;
+  const commander = state.actors.find((candidate) => candidate.id === actor.control?.by);
+  return (
+    commander?.effects.some((effect) => effect.tags.includes(SHARED_SIGHT_TAG) && effect.sourceActorId === actor.id) ??
+    false
+  );
+}
+
+/** A player's own characters on the live map, and the creatures they command whose sight they share (an Arcane Eye,
+ *  or a familiar while its commander looks through its eyes). */
 export function playerViewerIds(state: GameState, sessionId: string): string[] {
   return state.actors
-    .filter((actor) => actor.ownerSessionId === sessionId && inPlay(actor) && placed(state, actor.id))
+    .filter(
+      (actor) =>
+        inPlay(actor) &&
+        placed(state, actor.id) &&
+        (actor.ownerSessionId === sessionId ||
+          (commandedBySession(state, actor, sessionId) && sharesSight(state, actor)))
+    )
+    .map((actor) => actor.id);
+}
+
+/** The creatures a player's characters command (`Actor.control`): theirs to act for, so never hidden from them. */
+export function playerCommandedIds(state: GameState, sessionId: string): string[] {
+  return state.actors
+    .filter((actor) => inPlay(actor) && commandedBySession(state, actor, sessionId))
     .map((actor) => actor.id);
 }
 
@@ -133,20 +223,31 @@ function cached<T>(cache: WeakMap<GameState, Map<string, T>>, state: GameState, 
   return value;
 }
 
-/** What an audience seeing through `viewerIds` may know of the creatures on the live and prepared scenes. */
-export function audienceSight(state: GameState, viewerIds: readonly string[], content: SightContent): AudienceSight {
+/** What an audience seeing through `viewerIds` may know of the creatures on the live and prepared scenes. `knownIds`
+ *  are creatures it always knows of beside its viewers, as it does its own characters (those it commands). */
+export function audienceSight(
+  state: GameState,
+  viewerIds: readonly string[],
+  content: SightContent,
+  knownIds: readonly string[] = []
+): AudienceSight {
   const sight = sceneSight(state, content);
   const compute = () => {
     const hidden = stagedUnseen(state);
+    const known = new Set(knownIds);
     // Its own characters are never lost to it under the fog.
     const fogged = fogCovered(state.combat);
-    for (const viewerId of viewerIds) fogged.delete(viewerId);
+    for (const viewerId of [...viewerIds, ...known]) fogged.delete(viewerId);
     const kinds = new Map(state.actors.map((actor) => [actor.id, actor.kind]));
-    const unknown = (actorId: string) => kinds.get(actorId) !== "player-character";
+    const unknown = (actorId: string) => kinds.get(actorId) !== "player-character" && !known.has(actorId);
     for (const actorId of fogged) if (unknown(actorId)) hidden.add(actorId);
     for (const actorId of unplacedUnderFog(state.combat)) if (unknown(actorId)) hidden.add(actorId);
+    if (!sight.enabled)
+      for (const actorId of etherealUnseen(state, viewerIds, content)) if (unknown(actorId)) hidden.add(actorId);
+    for (const actorId of known) hidden.delete(actorId);
     if (!sight.enabled) return hidden.size === 0 && fogged.size === 0 ? OFF : { ...OFF, hidden, fogged, viewerIds };
-    const perceived = sight.perceivedBy(viewerIds);
+    const perceived = new Set([...sight.perceivedBy(viewerIds), ...known]);
+    for (const actorId of wardedFromSensors(state, viewerIds, sight.perceivedBy, content)) perceived.delete(actorId);
     const combatants = new Set([
       ...state.combat.initiative.map((entry) => entry.actorId),
       ...state.combat.tokens.map((token) => token.actorId)
@@ -156,17 +257,15 @@ export function audienceSight(state: GameState, viewerIds: readonly string[], co
   };
   // Cached only beside the sight it came from, so an answer built from partial content never outlives its caller.
   return sightIsCached(state, sight)
-    ? cached(audienceCache, state, `${sight.enabled}|${viewerIds.join(",")}`, compute)
+    ? cached(audienceCache, state, `${sight.enabled}|${viewerIds.join(",")}|${knownIds.join(",")}`, compute)
     : compute();
 }
 
-/** A player's audience: their own characters' eyes. Without a session (a spectator), the party's. */
+/** A player's audience: their own characters' eyes, and the creatures they command, which they always know of.
+ *  Without a session (a spectator), the party's. */
 export function playerSight(state: GameState, sessionId: string | undefined, content: SightContent): AudienceSight {
-  return audienceSight(
-    state,
-    sessionId === undefined ? partyViewerIds(state) : playerViewerIds(state, sessionId),
-    content
-  );
+  if (sessionId === undefined) return audienceSight(state, partyViewerIds(state), content);
+  return audienceSight(state, playerViewerIds(state, sessionId), content, playerCommandedIds(state, sessionId));
 }
 
 export function partySight(state: GameState, content: SightContent): AudienceSight {
@@ -285,20 +384,29 @@ export function visionOf(state: GameState, viewerIds: readonly string[], content
       isMarked(grid, now, point) || (memory ? isMarked(grid, memory.bytes, point) : false);
     const walls: PlayerVisionWall[] = [];
     for (const wall of state.combat.vision.walls) {
-      const samples = wallSamples(wall.a, wall.b, grid.cellPx);
-      if (!samples.some(known)) continue;
-      const inSight = wall.kind === "door" && samples.some((point) => isMarked(grid, now, point));
-      walls.push({
-        id: wall.id,
-        kind: wall.kind,
-        a: { ...wall.a },
-        b: { ...wall.b },
-        ...(inSight ? { open: wall.open === true } : {})
+      // A secret door is wall to players until the GM reveals it; a gap cut in a wall shows as the parts that stand.
+      const secret = wall.kind === "door" && wall.door?.hidden === true;
+      const pieces = wallPieces(wall);
+      pieces.forEach((piece, index) => {
+        const samples = wallSamples(piece.a, piece.b, grid.cellPx);
+        if (!samples.some(known)) return;
+        const door = wall.kind === "door" && !secret;
+        const inSight = door && samples.some((point) => isMarked(grid, now, point));
+        walls.push({
+          id: index === 0 ? wall.id : derivedUuid(wall.id, `piece-${index}`),
+          kind: secret ? "wall" : wall.kind,
+          a: { ...piece.a },
+          b: { ...piece.b },
+          ...(inSight ? { open: wall.open === true } : {})
+        });
       });
     }
+    // Where in sight the light is bright, so the rest can be painted dim; none when the whole scene is bright.
+    const bright = sight.brightOf(viewerIds, (carrierId) => perceived.has(carrierId));
     return {
       enabled: true as const,
       visible: area.map((polygon): VisionPolygon => flatPolygon(polygon)),
+      ...(bright ? { bright: bright.map((polygon): VisionPolygon => flatPolygon(polygon)) } : {}),
       explored: exploredRectsOf(state),
       walls
     };

@@ -365,7 +365,8 @@ describe("buildCharacterDefinition: Fighter 5 (human soldier, Champion)", () => 
       "greatsword",
       "flail",
       "javelin",
-      "dungeoneers-pack",
+      "crowbar",
+      "torch",
       "spear",
       "shortbow",
       "arrows-20",
@@ -377,6 +378,9 @@ describe("buildCharacterDefinition: Fighter 5 (human soldier, Champion)", () => 
       expect(ids, id).toContain(id);
     }
     expect((definition.startingInventory ?? []).find((item) => item.id === "javelin")?.quantity).toBe(8);
+    // The Dungeoneer's Pack is unpacked into what it holds.
+    expect(ids).not.toContain("dungeoneers-pack");
+    expect((definition.startingInventory ?? []).find((item) => item.id === "torch")?.quantity).toBe(10);
     expect((definition.startingInventory ?? []).find((item) => item.id === "greatsword")?.weapon?.damageDice).toBe(
       "2d6"
     );
@@ -498,9 +502,21 @@ describe("buildCharacterDefinition: Wizard 3 (high-elf sage, Evoker)", () => {
   });
 
   it("merges overlapping starting-equipment items instead of duplicating rows", () => {
-    const quarterstaff = (definition.startingInventory ?? []).find((item) => item.id === "quarterstaff");
-    expect(quarterstaff?.quantity).toBe(2); // one from wizard-a, one from sage-a
+    const robe = (definition.startingInventory ?? []).find((item) => item.id === "robe");
+    expect(robe?.quantity).toBe(2); // one from wizard-a, one from sage-a
     expect(definition.startingCurrency?.gp).toBe(13);
+  });
+
+  // SRD Wizard starting equipment A: "2 Daggers, Arcane Focus (Quarterstaff), Robe, Spellbook, Scholar's Pack".
+  it("carries the Arcane Focus staff the Wizard's kit prints, a focus that swings as a Quarterstaff", () => {
+    const staff = (definition.startingInventory ?? []).find((item) => item.id === "arcane-focus-staff");
+    expect(staff).toMatchObject({
+      quantity: 1,
+      category: "focus",
+      weapon: { damageDice: "1d6", versatileDice: "1d8" }
+    });
+    // The only plain Quarterstaff is the Sage's.
+    expect((definition.startingInventory ?? []).find((item) => item.id === "quarterstaff")?.quantity).toBe(1);
   });
 
   // `weaponAbilityModifier` reads `finesse` from the inventory row's `properties`, so the builder must
@@ -755,7 +771,8 @@ describe("always-prepared grants are not charged to the prepared count", () => {
   it("keeps a Life Domain spell the player ALSO prepared as the grant's always-prepared form", () => {
     // A domain spell the player also listed must become `alwaysPrepared: true` and not spend a prepared slot.
     expect(spells.get("cure-wounds")).toMatchObject({ level: 1, prepared: true, alwaysPrepared: true });
-    expect(spells.get("cure-wounds")).not.toHaveProperty("classId"); // the grant's entry, with no class pick behind it
+    // The grant's entry, always prepared, and cast as a Cleric spell, so a rider on Cleric spells reaches it.
+    expect(spells.get("cure-wounds")).toMatchObject({ alwaysPrepared: true, classId: "cleric" });
     for (const domainSpell of ["aid", "bless", "cure-wounds", "lesser-restoration"]) {
       expect(spells.get(domainSpell)?.alwaysPrepared, domainSpell).toBe(true);
     }

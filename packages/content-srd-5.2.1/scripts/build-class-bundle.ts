@@ -164,7 +164,8 @@ function featureProse(body: string): Map<string, string> {
     const heading = strip(parts[i]);
     const text = withTables(parts[i + 1].split(/\n#{3,6} /)[0])
       .split("\n")
-      .map((line) => line.trim())
+      // A sidebar is a blockquote; its text reads as the rest of the section does.
+      .map((line) => line.trim().replace(/^>\s?/, "").trim())
       .filter(Boolean)
       .join(" ")
       .replace(/[*_]/g, "")
@@ -195,7 +196,12 @@ function proseByPrefix(prose: Map<string, string>, featureId: string): string | 
     if (!featureId.startsWith(`${key}-`)) continue;
     if (best === undefined || key.length > best.length) best = key;
   }
-  return best === undefined ? undefined : prose.get(best);
+  const text = best === undefined ? undefined : prose.get(best);
+  // Each later arcanum row names its own spell level, not the first one's.
+  const arcanum = /^mystic-arcanum-level-(\d)-spell$/.exec(featureId);
+  return text && arcanum
+    ? text.replace("Choose one level 6 Warlock spell", `Choose one level ${arcanum[1]} Warlock spell`)
+    : text;
 }
 
 // ---- Per-class configuration the printed text cannot supply deterministically -------------------
@@ -241,7 +247,7 @@ const ALL_SKILLS = [
 // with prerequisites checked by the build. `repeatable`: an ASI may be taken at several levels, and the server
 // rejects a repeated option id unless the choice allows it (a feat that is not repeatable is still refused).
 const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "feats", repeatable: true };
-const weaponMastery = (n: number) => ({ kind: "weapon-mastery", choose: n, fromCatalog: "weapons" });
+const weaponMastery = (n: number, fromCatalog = "weapons") => ({ kind: "weapon-mastery", choose: n, fromCatalog });
 
 /**
  * Short class copy written for this product (no SRD text): the vendored transcription omits the
@@ -304,7 +310,8 @@ const CONFIG: Record<string, ClassConfig> = {
       "Weapon Mastery": { id: "weapon-mastery", name: "Weapon Mastery", display: true }
     },
     choices: {
-      "weapon-mastery": weaponMastery(2),
+      // "Simple or Martial Melee weapons of your choice".
+      "weapon-mastery": weaponMastery(2, "melee-weapons"),
       "ability-score-improvement": asiChoice,
       "barbarian-subclass": { kind: "subclass", choose: 1, fromCatalog: "barbarian-subclasses" }
     }
@@ -315,7 +322,8 @@ const CONFIG: Record<string, ClassConfig> = {
       ability: "cha",
       prepares: "prepared",
       ritual: true,
-      focus: "arcane-focus",
+      // "You can use a Musical Instrument as a Spellcasting Focus for your Bard spells."
+      focus: "musical-instrument",
       multiclassProgression: "full",
       spellListId: "bard"
     },
@@ -411,7 +419,8 @@ const CONFIG: Record<string, ClassConfig> = {
     columns: { "Sneak Attack": { id: "sneak-attack", name: "Sneak Attack", dice: true, display: true } },
     choices: {
       expertise: { kind: "expertise", choose: 2, fromCatalog: "skills" },
-      "weapon-mastery": weaponMastery(2),
+      // "Weapons of your choice with which you have proficiency": Simple ones, and Martial ones with Finesse or Light.
+      "weapon-mastery": weaponMastery(2, "simple-weapons-or-martial-finesse-weapons-or-martial-light-weapons"),
       "ability-score-improvement": asiChoice,
       "rogue-subclass": { kind: "subclass", choose: 1, fromCatalog: "rogue-subclasses" }
     }
@@ -565,8 +574,10 @@ const ITEM_ALIASES: Record<string, string> = {
   "arcane-focus-orb": "arcane-focus-orb",
   "druidic-focus-quarterstaff": "druidic-focus-wooden-staff",
   "druidic-focus-sprig-of-mistletoe": "druidic-focus-sprig-of-mistletoe",
+  // A kit's instrument or tool of the player's choice: the build swaps it for the class's tool pick.
   "musical-instrument": "instrument-lute",
   "musical-instrument-of-your-choice": "instrument-lute",
+  "artisans-tools-or-musical-instrument-chosen-for-the-tool-proficiency-above": "instrument-lute",
   arrows: "arrows-20",
   "20-arrows": "arrows-20",
   javelins: "javelin",
@@ -576,11 +587,8 @@ const ITEM_ALIASES: Record<string, string> = {
   "book-occult-lore": "book"
 };
 
-/**
- * Starting-equipment entries that point at another choice ("the Artisan's Tools ... chosen for the
- * tool proficiency above"). Kept in the label only; emitting an item id would invent a tool.
- */
-const ITEM_POINTERS = [/chosen for the tool proficiency/i, /of your choice$/i];
+/** Starting-equipment entries that point at another choice and have no item of their own, kept in the label only. */
+const ITEM_POINTERS = [/of your choice$/i];
 
 type CatalogIndex = Map<string, string>;
 function catalogIndex(): CatalogIndex {
@@ -602,14 +610,14 @@ function equipmentOf(text: string, classId: string, catalog: CatalogIndex, unres
   const options: {
     id: string;
     label: string;
-    items: { id: string; name: string; quantity: number }[];
+    items: { id: string; name: string; quantity: number; pickFrom?: string[] }[];
     goldPieces: number;
   }[] = [];
   const parts = [...text.matchAll(/\(([A-C])\)\s*([^;]+?)(?=;\s*or\s*\(|;\s*\(|$)/g)];
   for (const [, letter, chunk] of parts) {
     const label = chunk.replace(/^\s*|\s*$/g, "").replace(/\.$/, "");
     const gold = Number(label.match(/(\d+)\s*GP\s*$/i)?.[1] ?? 0);
-    const items: { id: string; name: string; quantity: number }[] = [];
+    const items: { id: string; name: string; quantity: number; pickFrom?: string[] }[] = [];
     const body = label.replace(/,?\s*(and\s+)?\d+\s*GP\s*$/i, "");
     for (let piece of body.split(/,\s*|\s+and\s+/)) {
       piece = piece.trim().replace(/^and\s+/i, "");
@@ -624,7 +632,15 @@ function equipmentOf(text: string, classId: string, catalog: CatalogIndex, unres
         unresolved.push(`${classId}: "${name}" (${key})`);
         continue;
       }
-      items.push({ id: resolved, name: catalog.get(resolved) ?? name, quantity: qty });
+      // "20 Arrows" is one "Arrows (20)": a bundle row counts its pieces itself.
+      const bundle = Number(/-(\d+)$/.exec(resolved)?.[1] ?? 0);
+      items.push({
+        id: resolved,
+        name: catalog.get(resolved) ?? name,
+        quantity: bundle === qty ? 1 : qty,
+        // "Musical Instrument of your choice" (the Bard's kit): any instrument, picked with the kit.
+        ...(key === "musical-instrument-of-your-choice" ? { pickFrom: [...INSTRUMENTS] } : {})
+      });
     }
     options.push({ id: `${classId}-${letter.toLowerCase()}`, label, items, goldPieces: gold });
   }
@@ -636,6 +652,40 @@ function equipmentOf(text: string, classId: string, catalog: CatalogIndex, unres
 const catalog = catalogIndex();
 /** Every Musical Instrument the equipment catalog prints, by id (its name slugs start "musical-instrument-"). */
 const INSTRUMENTS = [...catalog.keys()].filter((id) => id.startsWith("instrument-")).sort();
+/** The SRD's Artisan's Tools table. */
+const ARTISANS_TOOLS = [
+  "alchemists-supplies",
+  "brewers-supplies",
+  "calligraphers-supplies",
+  "carpenters-tools",
+  "cartographers-tools",
+  "cobblers-tools",
+  "cooks-utensils",
+  "glassblowers-tools",
+  "jewelers-tools",
+  "leatherworkers-tools",
+  "masons-tools",
+  "painters-supplies",
+  "potters-tools",
+  "smiths-tools",
+  "tinkers-tools",
+  "weavers-tools",
+  "woodcarvers-tools"
+];
+for (const id of ARTISANS_TOOLS) if (!catalog.has(id)) throw new Error(`Artisan's Tools "${id}" is not in the catalog`);
+const COUNTS: Record<string, number> = { one: 1, two: 2, three: 3 };
+
+/** "Choose 3 Musical Instruments" and "Choose one type of Artisan's Tools or Musical Instrument": the pick, or null
+ *  when the class names its tools. */
+function toolChoicesOf(text: string): { choose: number; from: string[] } | null {
+  const match = /^Choose (\d+|one|two|three) (?:type of )?(Artisan's Tools or )?Musical Instruments?\b/i.exec(text);
+  if (!match) {
+    if (/choose/i.test(text)) throw new Error(`Unparsed tool choice "${text}"`);
+    return null;
+  }
+  const choose = COUNTS[match[1].toLowerCase()] ?? Number(match[1]);
+  return { choose, from: [...(match[2] ? ARTISANS_TOOLS : []), ...INSTRUMENTS] };
+}
 const unresolvedItems: string[] = [];
 const parsed = new Map<string, ReturnType<typeof parseClass>>();
 
@@ -805,6 +855,7 @@ for (const [id, entry] of parsed) {
     armorProficiencies: armorOf(traits["Armor Training"] ?? ""),
     weaponProficiencies: weaponsOf(traits["Weapon Proficiencies"] ?? ""),
     toolProficiencies: /choose/i.test(toolText) ? [] : toolText ? [slug(toolText)] : [],
+    ...(toolChoicesOf(toolText) ? { toolChoices: toolChoicesOf(toolText)! } : {}),
     startingEquipment: equipment,
     multiclassProficiencies: multiclassTraitsOf(entry.body, entry.name, skills.from, INSTRUMENTS),
     multiclassPrerequisites: {
@@ -877,7 +928,7 @@ function parseSubclass(entry: ReturnType<typeof parseClass>): ParsedSubclass {
     if (!match) continue;
     const description = withTables(parts[i + 1])
       .split("\n")
-      .map((line) => line.trim())
+      .map((line) => line.trim().replace(/^>\s?/, "").trim())
       .filter(Boolean)
       .join(" ")
       .replace(/[*_]/g, "")
@@ -918,6 +969,40 @@ for (const [id, entry] of parsed) {
 }
 
 // ---- The hand-authored three: overlay, then cross-check against this source ----------------------
+
+/**
+ * The hand-authored records keep their mechanics and take the SRD's own words: each feature the source prints under a
+ * heading of its name reads as printed there. A staged feature the source has no heading for keeps its authored text.
+ */
+const proseReplaced: string[] = [];
+function takeSourceProse(
+  features: Array<{ id: string; description: string }>,
+  prose: (id: string) => string | undefined
+) {
+  for (const feature of features) {
+    const text = prose(feature.id);
+    if (text === undefined || text === feature.description) continue;
+    feature.description = text;
+    proseReplaced.push(feature.id);
+  }
+}
+for (const record of authoredClasses) {
+  const entry = parsed.get(record.id);
+  if (!entry) continue;
+  takeSourceProse(
+    record.features,
+    (featureId) =>
+      entry.prose.get(featureId) ??
+      entry.prose.get(featureId.replace(new RegExp(`^${record.id}-`), "")) ??
+      proseByPrefix(entry.prose, featureId)
+  );
+  const subclass = authoredSubclasses.find((candidate) => candidate.classId === record.id);
+  if (subclass) {
+    const source = new Map(parseSubclass(entry).features.map((feature) => [feature.id, feature.description]));
+    takeSourceProse(subclass.features, (featureId) => source.get(featureId));
+  }
+}
+console.log(`hand-authored features given the SRD's text: ${proseReplaced.length}`);
 
 /**
  * The overlay applies to the hand-authored records too. `applyMechanics` refuses a rider the record

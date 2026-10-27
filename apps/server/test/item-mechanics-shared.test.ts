@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
-import { loadMagicItems } from "@vtt/content-srd-5.2.1";
+import { ItemSpellCastSchema, loadMagicItems } from "@vtt/content-srd-5.2.1";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 // The authored map is authoring-side and outside the package's `exports` map, so it is imported by path.
 import { ITEM_MECHANICS } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/items.js";
@@ -9,6 +9,7 @@ import { builtinAction } from "../src/builtin-actions.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { castAction } from "../src/item-actions.js";
 import { setInventoryItem } from "../src/inventory.js";
 import { initiativeRollMode, startEncounter } from "../src/encounter.js";
 
@@ -137,66 +138,71 @@ const fromCatalog = (id: string): InventoryItem => {
 
 /** Every cast the map authors, with the item that casts it. */
 const AUTHORED_CASTS = Object.entries(ITEM_MECHANICS).flatMap(([itemId, mechanics]) =>
-  (mechanics.casts ?? []).map((cast) => ({ itemId, spellId: cast.spellId }))
+  (mechanics.casts ?? []).map((cast) => ({ itemId, spellId: cast.spellId, cast: ItemSpellCastSchema.parse(cast) }))
 );
 
-// Spells no item may cast, each with what the cast would have done. `castAction` reads
-// `spell.damage.roll` as the cast's damage, `spell.damage.types[0] ?? "force"` as its type, and emits
-// an `attack` block from `spell.attackRoll`; for these records those columns describe the spell's text
-// and say nothing of what one cast rolls at a target.
-const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
-  [
-    "cure-wounds",
-    "{roll: '2d8', types: []} -> a 2d8 FORCE damage action; a Staff of Healing would hit the ally it heals"
-  ],
-  [
-    "heal",
-    "{roll: null, types: []} -> no damage, no save, no attack: a Rod of Resurrection that restores nothing and debits a charge"
-  ],
-  ["magic-missile", "{roll: '1d4 + 1'} is ONE of the THREE darts the SRD prints - ~3.5 where the spell averages ~10.5"],
-  ["web", "{roll: '2d4', types: ['fire']} is the damage of BURNING webs, and the cast rolls it on every press"],
-  [
-    "ray-of-enfeeblement",
-    "{roll: '1d8', types: []} -> a 1d8 Force damage action; the 1d8 is what the TARGET subtracts from its own damage rolls"
-  ],
-  ["protection-from-evil-and-good", "a ward that rolls nothing at anybody"],
-  ["faerie-fire", "a spell whose only roll is the target's Dexterity save"]
-];
-
+// What a cast does comes from the spell's cast model (`spell.effect`), the same one a slot cast reads: a healing spell
+// heals and deals nothing, every damage part carries its own type, and Magic Missile makes its darts.
 describe("the cast rules apply to every authored cast", () => {
   it("walks a real population: the sweeps below are vacuous if it is ever empty", () => {
     expect(AUTHORED_CASTS.length).toBeGreaterThan(0);
   });
 
-  it("names none of the seven spells whose record does not describe what a cast rolls", () => {
-    for (const [spellId, why] of REFUSED_CASTS) {
-      const found = AUTHORED_CASTS.filter((cast) => cast.spellId === spellId).map((cast) => cast.itemId);
-      expect(found, `${spellId} is cast by ${found.join(", ")} and it must not be: ${why}`).toEqual([]);
-    }
+  it("casts Web from the Cloak of Arachnida with nothing rolled at the cast", () => {
+    // The record's 2d4 Fire is the webs burning. The cast rolls what the spell's cast model holds, which for Web is
+    // nothing: its save is the webs' own, made as a creature enters them or starts its turn there.
+    const web = view.spellRecord!("web")!;
+    const cast = castAction(
+      { id: "cloak" },
+      { spellId: "web", saveDc: 13, consumesSpellSlot: false },
+      "Cloak",
+      undefined,
+      web
+    );
+    expect(cast.damage).toEqual([]);
+    expect(cast.save).toBeUndefined();
+    expect(cast.attack).toBeUndefined();
   });
 
-  it("names no spell whose damage roll carries no damage type", () => {
-    // `castAction` types damage as `spell.damage.types[0] ?? "force"`, so a spell with dice and no type would
-    // become Force damage; those spells (healing, buffs, choose-your-type) must not be authored as casts.
+  it("builds each cast from the spell's cast model", () => {
     for (const cast of AUTHORED_CASTS) {
       const spell = view.spellRecord!(cast.spellId);
       expect(spell, `${cast.itemId} casts "${cast.spellId}", which resolves to no spell record`).toBeDefined();
-      const offends = spell!.damage?.roll != null && (spell!.damage?.types?.length ?? 0) === 0;
-      expect(
-        offends,
-        `${cast.itemId} casts ${cast.spellId}, whose damage is ${JSON.stringify(spell!.damage)} - castAction types an untyped roll as "force", so this cast would deal Force damage to the ally it is pointed at. Record it as a named absence`
-      ).toBe(false);
+      const action = castAction({ id: cast.itemId }, cast.cast, cast.itemId, definitionOf(), spell);
+      if (spell!.effect?.healing)
+        expect(action.damage, `${cast.itemId}'s ${cast.spellId} heals, so it deals no damage`).toEqual([]);
+      for (const part of action.damage)
+        expect(part.type, `${cast.itemId}'s ${cast.spellId} names its damage type`).not.toBe("");
     }
   });
 
-  it("names no spell the record marks as an attack roll", () => {
-    // An item's cast takes its attack from the spell's cast model, so none of them relies on this column.
+  it("makes Magic Missile's three darts from a wand, and a Staff of Healing heal the ally it is pointed at", () => {
+    const wand = AUTHORED_CASTS.find((cast) => cast.itemId === "wand-of-magic-missiles")!;
+    expect(
+      castAction({ id: wand.itemId }, wand.cast, "Wand", definitionOf(), view.spellRecord!("magic-missile"))
+    ).toMatchObject({
+      darts: 3
+    });
+    const staff = AUTHORED_CASTS.find((cast) => cast.itemId === "staff-of-healing" && cast.spellId === "cure-wounds")!;
+    const cure = castAction(
+      { id: staff.itemId },
+      staff.cast,
+      "Staff",
+      definitionOf(),
+      view.spellRecord!("cure-wounds")
+    );
+    expect(cure.damage).toEqual([]);
+    expect(cure.healing?.formula).toMatch(/^2d8/);
+  });
+
+  it("takes an attack spell's attacks from its cast model, at the bonus the item prints", () => {
+    // An item's cast takes its attack from the spell's cast model, so an attack spell must have one; the wearer's own
+    // bonus is not the item's, so the item prints its own (Circlet of Blasting's +5).
     for (const cast of AUTHORED_CASTS) {
       const spell = view.spellRecord!(cast.spellId)!;
-      expect(
-        spell.attackRoll,
-        `${cast.itemId} casts ${cast.spellId}, which the record marks attackRoll - castAction would hang an attack block on it`
-      ).toBe(false);
+      if (!spell.attackRoll) continue;
+      expect(spell.effect?.attacks ?? 0, `${cast.spellId} has no attacks in its cast model`).toBeGreaterThan(0);
+      expect(cast.cast.attackBonus, `${cast.itemId} prints no bonus to hit for ${cast.spellId}`).toBeDefined();
     }
   });
 });
@@ -244,12 +250,14 @@ describe("the rider families held only by a bundle assertion, driven", () => {
   it("a roll-mode rider really reaches the initiative die, on all three of its carriers", () => {
     const definition = definitionOf();
     for (const id of ["sentinel-shield", "weapon-of-warning", "rod-of-alertness"]) {
+      // Weapon of Warning is any weapon, bound to the one it is.
+      const bound = id === "weapon-of-warning" ? { baseId: "longsword" } : {};
       expect(
-        initiativeRollMode(stateWith([picked(id)]), IDS.hero, () => definition, catalog),
+        initiativeRollMode(stateWith([picked(id, bound)]), IDS.hero, () => definition, catalog),
         `${id}: the authored advantage did not reach initiativeRollMode`
       ).toBe("advantage");
       expect(
-        initiativeRollMode(stateWith([picked(id, { equipped: false })]), IDS.hero, () => definition, catalog),
+        initiativeRollMode(stateWith([picked(id, { ...bound, equipped: false })]), IDS.hero, () => definition, catalog),
         `${id}: unequipping must be the un-grant`
       ).toBe("normal");
     }

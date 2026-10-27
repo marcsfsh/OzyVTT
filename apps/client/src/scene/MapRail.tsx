@@ -9,11 +9,23 @@ import {
   IconSelect,
   IconSparkle,
   IconTerrain,
+  IconBolt,
   IconWall,
+  IconWarning,
   IconX
 } from "@vtt/ui";
 import { isVisionTool, NEEDS_GRID, type MapRailProps, type MapTool } from "./mapTools";
-import { DrawGroup, FogGroup, LightGroup, TerrainGroup, ViewGroup, WallsGroup } from "./MapToolGroups";
+import {
+  DrawGroup,
+  FogGroup,
+  FoundTrapsGroup,
+  LightGroup,
+  TerrainGroup,
+  TrapsGroup,
+  ViewGroup,
+  WallsGroup,
+  WeatherGroup
+} from "./MapToolGroups";
 import { useMapToolGroupRequests } from "./tableGeometry";
 import "./map-rail.css";
 
@@ -24,12 +36,14 @@ import "./map-rail.css";
  * and changes are callbacks, so every change still goes through the map's commands.
  */
 
-type GroupId = "draw" | "fog" | "terrain" | "walls" | "light" | "view";
+type GroupId = "draw" | "fog" | "terrain" | "traps" | "weather" | "walls" | "light" | "view";
 
 const GROUP_LABEL: Record<GroupId, string> = {
   draw: "Draw",
   fog: "Fog",
   terrain: "Terrain",
+  traps: "Traps",
+  weather: "Weather",
   walls: "Walls",
   light: "Light",
   view: "View"
@@ -39,6 +53,8 @@ const GROUP_ICON: Record<GroupId, ReactNode> = {
   draw: <IconDraw />,
   fog: <IconFog />,
   terrain: <IconTerrain />,
+  traps: <IconWarning />,
+  weather: <IconBolt />,
   walls: <IconWall />,
   light: <IconSparkle />,
   view: <IconSearch />
@@ -54,7 +70,8 @@ const DIRECT_TOOLS: ReadonlyArray<{ id: MapTool; label: string; title: string; i
 function groupOf(tool: MapTool): GroupId | null {
   if (tool.startsWith("fog-")) return "fog";
   if (tool.startsWith("terrain-")) return "terrain";
-  if (tool === "vision-light") return "light";
+  if (tool === "trap-place") return "traps";
+  if (tool === "vision-light" || tool === "vision-area") return "light";
   if (isVisionTool(tool)) return "walls";
   if (tool === "circle" || tool === "cone" || tool === "line" || tool === "square") return "draw";
   return null;
@@ -75,8 +92,17 @@ export function MapRail(
   const groups: GroupId[] = readOnly
     ? ["view"]
     : role === "gm"
-      ? ["draw", "fog", "terrain", "walls", "light", "view"]
-      : ["draw", "view"];
+      ? ([
+          "draw",
+          "fog",
+          "terrain",
+          ...(props.traps ? (["traps"] as const) : []),
+          ...(props.environment ? (["weather"] as const) : []),
+          "walls",
+          "light",
+          "view"
+        ] as GroupId[])
+      : (["draw", ...(props.foundTraps?.length ? (["traps"] as const) : []), "view"] as GroupId[]);
   const activeGroup = groupOf(tool);
   // The header's fog and vision chips open their tool here.
   useMapToolGroupRequests((group) => {
@@ -97,6 +123,9 @@ export function MapRail(
     if (group === "draw") return <DrawGroup {...props} id={`${baseId}-draw`} onPickTool={onToolChange} />;
     if (group === "fog") return <FogGroup {...props} onPickTool={onToolChange} />;
     if (group === "terrain") return <TerrainGroup {...props} onPickTool={onToolChange} />;
+    if (group === "traps" && role === "player") return <FoundTrapsGroup {...props} />;
+    if (group === "traps") return <TrapsGroup {...props} id={`${baseId}-traps`} onPickTool={onToolChange} />;
+    if (group === "weather") return <WeatherGroup {...props} id={`${baseId}-weather`} />;
     if (group === "walls") return <WallsGroup {...props} onPickTool={onToolChange} />;
     if (group === "light") return <LightGroup {...props} id={`${baseId}-light`} onPickTool={onToolChange} />;
     return <ViewGroup {...props} />;

@@ -2,7 +2,15 @@
  * What an action's prose says that play needs as data. Read where an action enters the system (the content
  * build, a homebrew save, an import), so the engine never reads prose while a fight runs.
  */
-import type { ActionArea, ActionReaction, ActorAction, DamageDrain, ForcedPush } from "@vtt/schemas";
+import type {
+  ActionArea,
+  ActionMove,
+  ActionReaction,
+  ActionTeleport,
+  ActorAction,
+  DamageDrain,
+  ForcedPush
+} from "@vtt/schemas";
 
 /**
  * The area of effect a description names. SRD 2024 phrasing is consistent enough to pattern-match ("60-foot
@@ -26,10 +34,17 @@ export function areaOfProse(description: string): ActionArea | null {
       sizeFeet: Number(radial[1]),
       widthFeet: null
     };
-  const cylinder =
-    /(\d+)-foot-radius,?\s+(?:\d+[- ]foot[- ](?:high|tall)\s+)?Cylinder/i.exec(description) ??
-    /\d+[- ]foot[- ](?:high|tall),\s+(\d+)-foot-radius\s+Cylinder/i.exec(description);
-  if (cylinder) return { shape: "cylinder", sizeFeet: Number(cylinder[1]), widthFeet: null };
+  const tallFirst = /(\d+)[- ]foot[- ](?:high|tall),\s+(\d+)-foot-radius\s+Cylinder/i.exec(description);
+  if (tallFirst)
+    return { shape: "cylinder", sizeFeet: Number(tallFirst[2]), widthFeet: null, heightFeet: Number(tallFirst[1]) };
+  const cylinder = /(\d+)-foot-radius,?\s+(?:(\d+)[- ]foot[- ](?:high|tall)\s+)?Cylinder/i.exec(description);
+  if (cylinder)
+    return {
+      shape: "cylinder",
+      sizeFeet: Number(cylinder[1]),
+      widthFeet: null,
+      ...(cylinder[2] ? { heightFeet: Number(cylinder[2]) } : {})
+    };
   const cube = /(\d+)-foot\s+Cube/i.exec(description) ?? /(\d+)-foot[- ]square\b/i.exec(description);
   if (cube) return { shape: "cube", sizeFeet: Number(cube[1]), widthFeet: null };
   return null;
@@ -62,6 +77,8 @@ export type MultiattackReplacement = { actionIds: string[]; attacks: number; any
 export type MultiattackOfProse = {
   plan: MultiattackComponent[];
   alternatives: MultiattackComponent[][];
+  /** The action used this turn the alternatives wait on ("if it used Hasten this turn"). */
+  alternativesAfter?: string;
   replacements: MultiattackReplacement[];
 };
 
@@ -93,6 +110,8 @@ const CLAUSES: ReadonlyArray<Readonly<{ pattern: RegExp; kind: "pool" | "either"
   }
 ];
 const SEPARATOR = /\s*(?:,\s*)?(?:and\s+)?(?:it\s+)?/y;
+/** "If it used Hasten this turn": the action an alternative plan waits on. */
+const USED_THIS_TURN = new RegExp(`\\s+if it used (${NAME}) this turn$`);
 
 const countOf = (word: string) => COUNT_WORDS[word.toLowerCase()] ?? Number.parseInt(word, 10);
 const namesOf = (list: string) => list.split(/\s*,\s*(?:or\s+|and\s+)?|\s+or\s+|\s+and\s+/).filter(Boolean);
@@ -176,12 +195,15 @@ export function multiattackOfProse(
   const sentences = description.trim().split(/(?<=\.)\s+/);
   const main = /^The [^.]*? (makes .+?)\.$/.exec(sentences[0] ?? "")?.[1];
   if (!main) return null;
-  // An alternative plan starts at "or (it) makes" / "or uses"; a condition on it ("if it used Hasten this turn") is the
-  // GM's to judge.
+  // An alternative plan starts at "or (it) makes" / "or uses"; one that waits on an action used this turn ("if it used
+  // Hasten this turn") names it, and any other condition on it is the GM's to judge.
   const [first, ...others] = main.split(/,?\s+or\s+(?:it\s+)?(?=makes\s|uses\s)/);
   const plan = planOf(first, idOf);
   if (!plan) return null;
+  let alternativesAfter: string | undefined;
   const alternatives = others.flatMap((text) => {
+    const after = USED_THIS_TURN.exec(text);
+    if (after) alternativesAfter = idOf(after[1]!) ?? alternativesAfter;
     const alternative = planOf(text.replace(/\s+if it\b.*$/i, ""), idOf);
     return alternative ? [alternative] : [];
   });
@@ -189,7 +211,7 @@ export function multiattackOfProse(
     const replacement = replacementOf(sentence, idOf);
     return replacement ? [replacement] : [];
   });
-  return { plan, alternatives, replacements };
+  return { plan, alternatives, ...(alternativesAfter ? { alternativesAfter } : {}), replacements };
 }
 
 /**
@@ -198,18 +220,50 @@ export function multiattackOfProse(
  * regains Hit Points equal to that amount". Null when the text says neither, or names a fixed amount ("decreases by 5
  * (1d10)"), which stays the GM's.
  */
-export function drainOfProse(description: string): DamageDrain | null {
+export function drainOfProse(description: string, name?: string): DamageDrain | null {
   const lowered =
     /\bHit Point maximum decreases by an amount equal to the (?:([A-Z][a-z]+) )?damage (?:taken|dealt)\b/.exec(
       description
     );
   const heals = /\bregains Hit Points equal to (half )?(?:that amount|the damage (?:taken|dealt))\b/.exec(description);
-  if (!lowered && !heals) return null;
+  // "The target dies if it is reduced to 0 Hit Points by this attack. Its body is then absorbed into the mouther", "A
+  // creature dies and turns to dust if reduced to 0 Hit Points by this attack" (a mummy's Rotting Fist).
+  const kills =
+    /\b(?:The target|A creature) dies( and turns to dust)? if (?:it is )?reduced to 0 Hit Points by this attack\b/.exec(
+      description
+    );
+  // "If this damage reduces the target to 0 Hit Points, the target becomes Stable, and it has the Poisoned condition for 1
+  // hour. While Poisoned, the target also has the Paralyzed condition" (a phase spider's Bite, a vampire familiar's
+  // Umbral Dagger).
+  const stable =
+    /\b(?:If this damage reduces the target to 0 Hit Points|If the target is reduced to 0 Hit Points by this attack), the target becomes Stable(?:, and it| but) has the ([A-Z][a-z]+) condition for (\d+) (hour|minute)s?\. While (?:it has the )?([A-Z][a-z]+)(?: condition)?, the target (?:also )?has the ([A-Z][a-z]+) condition\b/.exec(
+      description
+    );
+  const stableAtZero =
+    stable && stable[4] === stable[1]
+      ? {
+          conditions: [stable[1]!, stable[5]!].map(
+            (word) => word.toLowerCase() as NonNullable<DamageDrain["stableAtZero"]>["conditions"][number]
+          ),
+          minutes: Number.parseInt(stable[2]!, 10) * (stable[3] === "hour" ? 60 : 1)
+        }
+      : null;
+  if (!lowered && !heals && !kills && !stableAtZero) return null;
   const type = lowered?.[1]?.toLowerCase();
+  const bodyGone = kills !== null && (kills[1] !== undefined || /\bIts body is then absorbed\b/.test(description));
   return {
     ...(type ? { damageType: type } : {}),
     ...(lowered ? { reducesMaximum: true as const } : {}),
-    ...(heals ? { heals: heals[1] ? ("half" as const) : ("all" as const) } : {})
+    ...(heals ? { heals: heals[1] ? ("half" as const) : ("all" as const) } : {}),
+    ...(stableAtZero ? { stableAtZero } : {}),
+    ...(kills
+      ? {
+          killsAtZero: {
+            ...(name ? { cause: name.trim().slice(0, 80) } : {}),
+            ...(bodyGone ? { bodyGone: true as const } : {})
+          }
+        }
+      : {})
   };
 }
 
@@ -217,25 +271,118 @@ export function drainOfProse(description: string): DamageDrain | null {
  *  giant". Null when the text prints none. */
 export function hitPushOfProse(description: string): ForcedPush | null {
   const push = /\bthe target is pushed (up to )?(\d+) feet (?:straight )?away from\b/.exec(description);
-  return push ? { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) } : null;
+  if (push) return { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) };
+  // "If the target is a Medium or smaller creature, the satyr pushes the target up to 10 feet straight away from itself."
+  const pushes =
+    /\b(?:If the target is an? (Tiny|Small|Medium|Large|Huge) or smaller creature, )?the [a-z -]+? pushes the target (up to )?(\d+) feet straight away from itself\b/.exec(
+      description
+    );
+  if (!pushes) return null;
+  return {
+    feet: Number.parseInt(pushes[3]!, 10),
+    ...(pushes[2] ? { upTo: true as const } : {}),
+    ...(pushes[1] ? { maxTargetSize: pushes[1].toLowerCase() as NonNullable<ForcedPush["maxTargetSize"]> } : {})
+  };
+}
+
+const SPEED_MODES = { fly: "fly", swim: "swim", climb: "climb", burrow: "burrow" } as const;
+
+/** Where an action's text makes an attack or calls for a saving throw. */
+const ATTACK_OR_SAVE = /\bmakes? (?:one|two|an?) [^.]*?attack|Saving Throw:/i;
+
+/**
+ * The move an action makes its own creature take, from its SRD 2024 text: "The dragon moves up to half its Speed, and
+ * it makes one Rend attack", "the roc flies up to half its Fly Speed without provoking Opportunity Attacks", "The
+ * sahuagin swims up to its Swim Speed straight toward an enemy it can see". `first` when the move comes before the
+ * attack or the save the action makes. A move of "its Speed or Burrow Speed" may be either. Null when it prints none.
+ */
+export function moveOfProse(description: string): ActionMove | null {
+  const found =
+    /\b(?:the (?!target\b)[a-z -]+?|it) (?:can |then )?(move|moves|fly|flies|swim|swims|climb|climbs|burrow|burrows) up to (half )?its (?:(Fly|Swim|Climb|Burrow) )?Speed( or [A-Z][a-z]+ Speed)?([^.]*)/i.exec(
+      description
+    );
+  if (!found) return null;
+  const verb = found[1]!.toLowerCase().replace(/ies$/, "y").replace(/s$/, "");
+  const named = found[3]?.toLowerCase() ?? verb;
+  const mode = found[4] ? undefined : SPEED_MODES[named as keyof typeof SPEED_MODES];
+  const rest = found[5] ?? "";
+  const first =
+    ATTACK_OR_SAVE.test(description.slice(found.index)) && !ATTACK_OR_SAVE.test(description.slice(0, found.index));
+  // "The cube can move through the spaces of Large or smaller creatures".
+  const through = /\bcan move through the spaces of (Tiny|Small|Medium|Large|Huge) or smaller creatures/i
+    .exec(description)?.[1]
+    ?.toLowerCase() as "tiny" | "small" | "medium" | "large" | "huge" | undefined;
+  return {
+    speed: found[2] ? "half" : "full",
+    ...(mode ? { mode } : {}),
+    provokes: !/without provoking Opportunity Attacks/i.test(rest),
+    ...(/straight toward/i.test(rest) ? { straight: true as const } : {}),
+    ...(first ? { first: true as const } : {}),
+    ...(through ? { throughCreatures: through } : {}),
+    // "If the roc has a creature Grappled, the roc flies ... and drops that creature."
+    ...(/^If the [a-z ]+ has a creature Grappled\b/.test(description) && /\bdrops that creature\b/.test(rest)
+      ? { dropsHeld: true as const }
+      : {}),
+    // "At the end of this movement, the weretiger can take the Hide action."
+    ...(/\bAt the end of this movement, the [a-z ]+ can take the Hide action\b/.test(description)
+      ? { thenHide: true as const }
+      : {})
+  };
+}
+
+/**
+ * The teleport an action makes its creature take: "The dog teleports up to 40 feet to an unoccupied space it can see";
+ * the balor's "teleports itself or a willing demon within 10 feet of itself up to 60 feet"; a dryad's Tree Stride, 5
+ * feet from a tree up to 60 feet from the last, at most 65 feet. Null when it prints none.
+ */
+export function teleportOfProse(description: string): ActionTeleport | null {
+  const plain =
+    /\bteleports(?: itself(?: or a willing [a-z ]+ within \d+ feet of itself)?)? up to (\d+) feet to an unoccupied space\b/i.exec(
+      description
+    );
+  if (plain) return { feet: Number.parseInt(plain[1]!, 10) };
+  const stride =
+    /\bteleports to an unoccupied space within (\d+) feet of a second [^.]*? within (\d+) feet of the previous\b/i.exec(
+      description
+    );
+  return stride ? { feet: Number.parseInt(stride[1]!, 10) + Number.parseInt(stride[2]!, 10) } : null;
+}
+
+/** A jump an action allows: "The bulette jumps up to 30 feet by spending 10 feet of movement." Null when none. */
+export function leapOfProse(description: string): { feet: number; costFeet: number } | null {
+  const leap = /\bjumps up to (\d+) feet by spending (\d+) feet of movement\b/i.exec(description);
+  return leap ? { feet: Number.parseInt(leap[1]!, 10), costFeet: Number.parseInt(leap[2]!, 10) } : null;
 }
 
 /** The action with its prose facts filled: the area (an authored one wins), whether it is a Multiattack whose
- *  attacks nothing structured names, a Parry's AC reaction (an authored reaction wins), what its damage drains and
- *  how far its hit pushes (an authored one wins). The same object when nothing changes. */
+ *  attacks nothing structured names, a Parry's AC reaction (an authored reaction wins), what its damage drains, how
+ *  far its hit pushes, and the move, teleport or jump it makes its creature take (an authored one wins). The same
+ *  object when nothing changes. */
 export function withProseFacts<Action extends ActorAction>(action: Action): Action {
   const area = action.area ?? areaOfProse(action.description);
   const untracked = /multiattack/i.test(action.name) && !action.multiattack;
   const reaction = action.reaction ?? (action.activation === "reaction" ? acReactionOfProse(action.description) : null);
-  const drain = action.drain ?? (action.damage.length > 0 ? drainOfProse(action.description) : null);
+  const drain = action.drain ?? (action.damage.length > 0 ? drainOfProse(action.description, action.name) : null);
   // A save's push is the save's (`failurePush`); an attack's lands with the hit.
   const push = action.onHitPush ?? (action.attack && !action.save ? hitPushOfProse(action.description) : null);
+  const move = action.move ?? moveOfProse(action.description);
+  const teleport = action.teleport ?? teleportOfProse(action.description);
+  const leap = action.leap ?? leapOfProse(action.description);
+  // "While underwater, the seahorse moves", "each creature in a 15-foot Emanation ... while it is underwater"; a
+  // reaction's "takes damage while underwater" is its trigger.
+  const underwaterOnly =
+    action.underwaterOnly === true ||
+    (action.activation !== "reaction" && /^While underwater,|\bwhile it is underwater\b/.test(action.description));
   if (
     area === (action.area ?? null) &&
     untracked === (action.untrackedMultiattack === true) &&
     reaction === (action.reaction ?? null) &&
     drain === (action.drain ?? null) &&
-    push === (action.onHitPush ?? null)
+    push === (action.onHitPush ?? null) &&
+    move === (action.move ?? null) &&
+    teleport === (action.teleport ?? null) &&
+    leap === (action.leap ?? null) &&
+    underwaterOnly === (action.underwaterOnly === true)
   )
     return action;
   const { untrackedMultiattack: _previous, ...rest } = action;
@@ -245,6 +392,10 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
     ...(untracked ? { untrackedMultiattack: true as const } : {}),
     ...(reaction ? { reaction } : {}),
     ...(drain ? { drain } : {}),
-    ...(push ? { onHitPush: push } : {})
+    ...(push ? { onHitPush: push } : {}),
+    ...(move ? { move } : {}),
+    ...(teleport ? { teleport } : {}),
+    ...(leap ? { leap } : {}),
+    ...(underwaterOnly ? { underwaterOnly: true as const } : {})
   } as Action;
 }

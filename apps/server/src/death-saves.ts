@@ -11,6 +11,17 @@ import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.j
 
 export type DeathSaveMode = "advantage" | "disadvantage" | "normal";
 
+/** Survivor's Defy Death: a death save's d20 of 18 or higher counts as a 20. */
+export const SURVIVOR_CRITICAL = 18;
+
+/** The tag on an item's effect that makes a death save's d20 of 9 or lower count as 10 (Periapt of Wound Closure). */
+export const DEATH_SAVE_FLOOR_TAG = "death-save-floor";
+/** The tag on an item's effect that doubles what each Hit Point Die rolled to heal restores (Periapt of Wound
+ *  Closure). */
+export const HIT_DICE_DOUBLED_TAG = "hit-dice-doubled";
+/** On an effect, each Hit Point Die its bearer spends restores its maximum (a Potion of Vitality, for 24 hours). */
+export const HIT_DICE_MAXIMIZED_TAG = "hit-dice-maximized";
+
 export type DeathSaveRollDependencies = Readonly<{
   random: RandomSource;
   rollId: string;
@@ -59,6 +70,12 @@ export function rollDeathSave(
     naturalRoll?: number;
     modifier?: number;
     test?: SettledDeathSave;
+    /** The total once answers to the roll count (a Bardic Inspiration die); the test's own total otherwise. */
+    total?: number;
+    /** A d20 under this counts as it (a Periapt of Wound Closure's 10). */
+    floor?: number;
+    /** A d20 of this or higher counts as a 20 (Survivor's Defy Death: "18-20"). */
+    criticalFrom?: number;
   }>,
   deps: DeathSaveRollDependencies
 ): DeathSaveRollResult {
@@ -88,7 +105,7 @@ export function rollDeathSave(
   if (options.test) {
     const test = options.test;
     face = test.natural;
-    total = test.resolution.total;
+    total = options.total ?? test.resolution.total;
     if (test.mode !== "normal") mode = test.mode;
     if (test.fresh) record(test.resolution, test.typed);
   } else if (options.naturalRoll !== undefined) {
@@ -102,7 +119,14 @@ export function rollDeathSave(
     if (chosen !== "normal") mode = chosen;
     record(resolution, false);
   }
-  const outcome = resolveDeathSave(actor.deathSaves, face, total);
+  // "Whenever you make a Death Saving Throw, you can change a roll of 9 or lower to a 10" (Periapt of Wound Closure).
+  if (options.floor !== undefined && face < options.floor) {
+    total += options.floor - face;
+    face = options.floor;
+  }
+  // "When you roll 18-20 on a Death Saving Throw, you gain the benefit of rolling a 20 on it" (Survivor).
+  const counted = options.criticalFrom !== undefined && face >= options.criticalFrom ? 20 : face;
+  const outcome = resolveDeathSave(actor.deathSaves, counted, total);
   if (options.commit) actor.deathSaves = outcome.state;
   return { face, total, outcome, mode, committed: options.commit };
 }

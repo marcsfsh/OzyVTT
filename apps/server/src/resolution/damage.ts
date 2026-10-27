@@ -7,8 +7,12 @@ import {
   type RiderCarrier,
   type RiderMoment
 } from "@vtt/rules-5e";
+import { holdsFeature } from "../class-features.js";
 import { endEffect } from "../effects.js";
 import { abilityModifier, endedEffect, recordRoll, type ResolveContext } from "./context.js";
+import { castInstanceOf } from "./metamagic.js";
+import { declaredBeforeRoll } from "./hit-riders.js";
+import { previewDamage } from "../hit-points.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
 export function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
@@ -82,8 +86,10 @@ function damageInForce(ctx: ResolveContext): ResolveContext["action"]["damage"] 
  *  its own and assigns it: dart i strikes the i-th target listed, the list wrapping round when darts remain. */
 export function rollWeaponDamage(ctx: ResolveContext): void {
   const { action, deps, damage, input } = ctx;
+  // A strike declared before its roll (Brutal Strike) rolls its dice with the hit it rides, never with its tap.
+  if (declaredBeforeRoll(action)) return;
   const parts = damageInForce(ctx);
-  if (parts.length > 0 && action.missDamage === "half" && missed(ctx.attack)) {
+  if (parts.length > 0 && (action.missDamage === "half" || potentCantrip(ctx)) && missed(ctx.attack)) {
     halfOnAMiss(ctx, parts);
     return;
   }
@@ -92,21 +98,114 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     for (let dart = 0; dart < action.darts; dart += 1) {
       const targetId = input.targetIds[dart % input.targetIds.length]!;
       for (const part of parts) {
-        const rolled = resolveDice(parseDiceFormula(part.formula), deps.random);
-        recordRoll(ctx, rolled, "damage");
-        damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
+        const thrown = resolveDice(
+          parseDiceFormula(part.formula),
+          input.overchannel === true ? (sides: number) => sides : deps.random
+        );
+        recordRoll(ctx, thrown, "damage");
+        damage.push({ formula: thrown.expression.source, type: part.type, total: thrown.total });
         ctx.dartTargetIds.push(targetId);
       }
     }
     return;
   }
+  // Great Weapon Fighting: a die of the attack's own damage under the floor counts as the floor.
+  const floor = damageDieFloor(ctx);
+  const random = floor > 1 ? (sides: number) => Math.max(Math.min(floor, sides), deps.random(sides)) : deps.random;
+  const savage = savageAttack(ctx);
+  // Overchannel: each of the spell's damage dice deals its maximum.
+  const dice = input.overchannel === true ? (sides: number) => sides : random;
+  // The dice that show their highest face, for a spell whose dice explode (Sorcerous Burst).
+  const maxed: number[] = [];
   parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
-    const rolled = resolveDice(ctx.crit ? criticalExpression(expression, extraCritDice) : expression, deps.random);
+    const rolledExpression = ctx.crit ? criticalExpression(expression, extraCritDice) : expression;
+    let rolled = resolveDice(rolledExpression, dice);
     recordRoll(ctx, rolled, "damage");
+    // The weapon's own dice are rolled again and the higher roll is used: no attacker would choose the lower.
+    if (savage && index === 0) {
+      const again = resolveDice(rolledExpression, deps.random);
+      recordRoll(ctx, again, "damage", "Savage Attacker");
+      if (again.total > rolled.total) rolled = again;
+    }
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
+    for (const term of rolled.terms)
+      if (term.kind === "dice")
+        for (const die of term.dice) if (die.kept && die.face === term.sides) maxed.push(term.sides);
   });
+  explodeDice(ctx, dice, maxed);
+}
+
+/** SRD 5.2.1 Sorcerous Burst: "If you roll an 8 on a d8 for this spell, you can roll another d8, and add it to the
+ *  damage ... the maximum number of these d8s you can add to the spell's damage equals your spellcasting ability
+ *  modifier." Each die of the cast's damage that shows its highest face adds another, and so does each added die, up
+ *  to that many; more damage is never worse, so the server rolls them all. */
+function explodeDice(ctx: ResolveContext, random: (sides: number) => number, maxed: readonly number[]): void {
+  const most = ctx.action.explodingDice?.most ?? 0;
+  const first = ctx.damage[0];
+  if (most <= 0 || !first || maxed.length === 0) return;
+  let pending = maxed.length;
+  const sides = maxed[0]!;
+  let added = 0;
+  while (pending > 0 && added < most) {
+    pending -= 1;
+    added += 1;
+    const extra = resolveDice(parseDiceFormula(`1d${sides}`), random);
+    recordRoll(ctx, extra, "damage", `${ctx.action.name}: another d${sides}`);
+    if (extra.total === sides) pending += 1;
+    ctx.damage.push({ formula: extra.expression.source, type: first.type, total: extra.total });
+  }
+}
+
+/** The face a `damage-die-minimum` rider raises the attack's own damage dice to (Great Weapon Fighting's 3), read at
+ *  the damage roll with the attack's filters (`two-handed`, `melee-weapon`); 1 when none does. */
+function damageDieFloor(ctx: ResolveContext): number {
+  const { derivation, riderFilters, attack } = ctx;
+  const moments: Array<RiderMoment | null> = [null, "on-damage-roll"];
+  if (attack === null || attack.outcome === "hit" || attack.outcome === "crit") moments.push("on-hit");
+  let floor = 1;
+  for (const moment of moments)
+    for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment }))
+      if (rider.modifier.type === "damage-die-minimum") floor = Math.max(floor, rider.modifier.minimum ?? 1);
+  return floor;
+}
+
+/** The hit option that rolls a weapon's damage dice twice (SRD Savage Attacker). */
+export const SAVAGE_ATTACKER = "savage-attacker";
+
+/**
+ * SRD Savage Attacker: "Once per turn when you hit a target with a weapon, you can roll the weapon's damage dice twice
+ * and use either roll against the target." Whether this weapon hit may use it: its attacker holds the feat and has not
+ * used it this turn.
+ */
+export function savageAttackerReady(ctx: ResolveContext): boolean {
+  const { state, attacker, attack, deps } = ctx;
+  if (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit")) return false;
+  if (!(ctx.riderFilters.attackKinds ?? []).includes("weapon") || ctx.action.damage.length === 0) return false;
+  const definition =
+    deps.definition ?? (attacker.definitionId ? deps.resolveDefinition?.(attacker.definitionId) : undefined);
+  if (!holdsFeature(definition, SAVAGE_ATTACKER, "Savage Attacker")) return false;
+  return !state.combat.active || (state.combat.turn.turnUses[`${attacker.id}:${SAVAGE_ATTACKER}`] ?? 0) === 0;
+}
+
+/** Whether the attacker chose Savage Attacker for this hit and may use it; spends the turn's use when it does. */
+function savageAttack(ctx: ResolveContext): boolean {
+  if (!(ctx.input.hitOptions ?? []).some((choice) => choice.id === SAVAGE_ATTACKER)) return false;
+  if (!savageAttackerReady(ctx)) {
+    ctx.warnings.push(`${ctx.attacker.name} can't use Savage Attacker on this hit.`);
+    return false;
+  }
+  const { state, attacker } = ctx;
+  // A look at the damage spends nothing; the confirm that deals it spends the turn's use.
+  if (state.combat.active && ctx.input.commit !== false) {
+    const key = `${attacker.id}:${SAVAGE_ATTACKER}`;
+    state.combat = {
+      ...state.combat,
+      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+    };
+  }
+  return true;
 }
 
 const missed = (attack: ActionResolutionAttack | null) =>
@@ -114,6 +213,18 @@ const missed = (attack: ActionResolutionAttack | null) =>
 
 /** SRD Acid Arrow: "On a miss, the arrow splashes the target with acid for half as much of the initial damage only." The
  *  dice roll as for a hit, and half of each part (rounded down) is owed like Graze's damage. */
+/** SRD Potent Cantrip (Evoker 3): "When you cast a cantrip at a creature and you miss with the attack roll or the target
+ *  succeeds on a saving throw against the cantrip, the target takes half the cantrip's damage (if any) but suffers no
+ *  additional effect from the cantrip." */
+export function potentCantrip(ctx: Pick<ResolveContext, "action" | "deps">): boolean {
+  const { action, deps } = ctx;
+  if (action.spellId === undefined) return false;
+  return (
+    deps.catalog?.spellRecord?.(action.spellId)?.level === 0 &&
+    holdsFeature(deps.definition, "potent-cantrip", "Potent Cantrip")
+  );
+}
+
 function halfOnAMiss(ctx: ResolveContext, parts: ResolveContext["action"]["damage"]): void {
   for (const part of parts) {
     const rolled = resolveDice(parseDiceFormula(part.formula), ctx.deps.random);
@@ -128,7 +239,10 @@ function halfOnAMiss(ctx: ResolveContext, parts: ResolveContext["action"]["damag
 export function dartDamageTargetsOf(ctx: ResolveContext): DamageTarget[] | null {
   if (ctx.dartTargetIds.length === 0) return null;
   const first = ctx.dartTargetIds[0]!;
-  const struck = [...new Set(ctx.dartTargetIds)];
+  // A dart at a creature the spell no longer affects (a tarrasque's Reflective Carapace) strikes no one.
+  const struck = [...new Set(ctx.dartTargetIds)].filter((targetId) =>
+    ctx.targets.some((target) => target.id === targetId)
+  );
   return struck.map((targetId) => {
     const parts = owedDamageParts({
       damage: ctx.damage.filter((_, index) => (ctx.dartTargetIds[index] ?? first) === targetId),
@@ -158,13 +272,16 @@ function markCarriers(ctx: ResolveContext): RiderCarrier[] {
  *  put on the creature it hit): typed `extra-damage` as its own `damage[]` entry (crit-doubled unless
  *  `doubleOnCritical` is false: a Critical Hit rolls the attack's other damage dice twice too) and moment-gated flat
  *  `damage-bonus` as a bonus line. A rider with no `when` fires on every damage roll of its action;
- *  `on-hit`/`on-critical-hit` narrow it. The moments collected here are `DAMAGE_ROLL_MOMENTS`. */
+ *  `on-hit`/`on-critical-hit`/`on-natural-20` narrow it. The moments collected here are `DAMAGE_ROLL_MOMENTS`. */
 export function rollRiderDamage(ctx: ResolveContext): void {
   const { attack, crit, derivation, riderFilters, deps, damage, bonusDamage, warnings } = ctx;
-  if (!rollsDamage(attack)) return;
+  if (!rollsDamage(attack) || declaredBeforeRoll(ctx.action)) return;
   const passes: Array<RiderMoment | null> = [null, "on-damage-roll"];
   if (attack === null || attack.outcome === "hit" || attack.outcome === "crit") passes.push("on-hit");
   if (crit) passes.push("on-critical-hit");
+  // "When you roll a 20": the die itself, so a wider crit range or an auto-crit on a Paralyzed target isn't one.
+  if (attack !== null && attack.naturalRoll === 20 && (attack.outcome === "hit" || attack.outcome === "crit"))
+    passes.push("on-natural-20");
   const marks = markCarriers(ctx);
   const already = new Set<unknown>();
   for (const moment of passes) {
@@ -175,27 +292,58 @@ export function rollRiderDamage(ctx: ResolveContext): void {
     ];
     for (const rider of riders) {
       const modifier = rider.modifier;
-      // Standing flat bonuses (moment null) were already folded into the formula by `withStandingRiders`.
+      // Standing flat bonuses (moment null) were already folded into the formula by `withStandingRiders`; their dice
+      // are rolled here at every moment (Ray of Enfeeblement's -1d8).
       if (modifier.type === "damage-bonus") {
-        if (moment === null || already.has(modifier)) continue;
-        const amount = modifier.amount ?? 0;
-        if (amount === 0 || damage.length === 0) continue;
+        if (already.has(modifier) || damage.length === 0) continue;
+        const amount = moment === null ? 0 : (modifier.amount ?? 0);
+        const dice = modifier.dice === undefined ? 0 : rollSignedDice(ctx, modifier.dice, rider.label);
+        if (amount + dice === 0) continue;
         already.add(modifier);
-        bonusDamage.push({ amount, type: damage[0].type, source: rider.label });
+        bonusDamage.push({
+          amount: modifier.leavesOne ? leavingOne(ctx, amount + dice) : amount + dice,
+          type: damage[0].type,
+          source: rider.label
+        });
         continue;
       }
       if (modifier.type !== "extra-damage" || already.has(modifier)) continue;
-      if (modifier.formula === undefined && modifier.abilityModifier === undefined) continue;
+      const score = modifier.abilityScore === "increased" ? undefined : modifier.abilityScore;
+      if (
+        modifier.formula === undefined &&
+        modifier.abilityModifier === undefined &&
+        score === undefined &&
+        modifier.flat === undefined
+      )
+        continue;
+      if (modifier.oncePerTurn && !firstThisTurn(ctx, rider.label)) continue;
+      // "One damage roll of that spell": a later ray of the cast (its open instance) takes none.
+      if (modifier.oncePerCast && castInstanceOf(ctx.state, ctx.attacker, ctx.action) !== null) continue;
       already.add(modifier);
       // An ability-modifier amount (Agonizing Blast's "add your Charisma modifier") resolves against the
-      // bearer's sheet; it rolls no die and is never crit-doubled.
+      // bearer's sheet; it rolls no die and is never crit-doubled. A score is added whole (Overwhelming Strike).
       const abilityAmount =
-        modifier.abilityModifier === undefined ? 0 : abilityModifier(deps.definition, modifier.abilityModifier);
-      const type = modifier.damageType ?? damage[0]?.type ?? "untyped";
+        (modifier.abilityModifier === undefined ? 0 : abilityModifier(deps.definition, modifier.abilityModifier)) +
+        (score === undefined ? 0 : (deps.definition?.abilityScores[score] ?? 0));
+      // A type the attacker picked for this hit (Conjure Minor Elementals), else the effect's own.
+      const type =
+        pickedRiderType(ctx, rider.sourceEffectId, modifier.damageTypes) ??
+        modifier.damageType ??
+        damage[0]?.type ??
+        "untyped";
+      // A fixed amount with no die (Sword of Life Stealing's 15 Necrotic), never doubled by a Critical Hit.
+      if (modifier.flat !== undefined) {
+        damage.push({ formula: String(modifier.flat), type, total: modifier.flat });
+        warnings.push(`${rider.label}: +${modifier.flat} ${type}.`);
+        if (modifier.temporaryHitPoints) drainToTemporary(ctx, modifier.flat, type, rider.label);
+        continue;
+      }
       if (modifier.formula === undefined) {
         if (abilityAmount === 0) continue; // a +0 modifier adds no entry and no noise to the card
         damage.push({ formula: String(abilityAmount), type, total: abilityAmount });
-        warnings.push(`${rider.label}: +${abilityAmount} ${type} (${modifier.abilityModifier!.toUpperCase()}).`);
+        warnings.push(
+          `${rider.label}: +${abilityAmount} ${type} (${(modifier.abilityModifier ?? score)!.toUpperCase()}).`
+        );
         continue;
       }
       const expression = parseDiceFormula(modifier.formula);
@@ -207,9 +355,62 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       const total = rolled.total + abilityAmount;
       damage.push({ formula: rolled.expression.source, type, total });
       warnings.push(`${rider.label}: +${total} ${type}.`);
+      if (modifier.temporaryHitPoints) drainToTemporary(ctx, total, type, rider.label);
       if (rider.sourceEffectId !== undefined) ctx.damageEffectIds.push(rider.sourceEffectId);
     }
   }
+}
+
+/** Sword of Life Stealing: "you gain Temporary Hit Points equal to the amount of Necrotic damage taken". What the target
+ *  takes of the rider's damage, after its defences, becomes the attacker's Temporary Hit Points if that is more than it
+ *  has (they don't add up). Given as the hit is confirmed. */
+function drainToTemporary(ctx: ResolveContext, amount: number, type: string, label: string): void {
+  const { state, attacker, attack, input, deps } = ctx;
+  if (input.commit === false || attack === null) return;
+  const taken = deps.resolveDefinition
+    ? previewDamage(
+        state,
+        attack.targetId,
+        { amount, parts: [{ amount, type }] },
+        { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
+      ).totalApplied
+    : amount;
+  if (taken <= attacker.hp.temporary) return;
+  attacker.hp = { ...attacker.hp, temporary: taken };
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${attacker.name} gains ${taken} Temporary Hit Points from ${label}.`,
+    actorIds: [attacker.id]
+  });
+}
+
+/** Colossus Slayer's "only once per turn": the first time this turn, which it now spends. Outside a fight, always. */
+function firstThisTurn(ctx: ResolveContext, label: string): boolean {
+  const { state, attacker, input } = ctx;
+  if (!state.combat.active || input.commit === false) return true;
+  const key = `${attacker.id}:once:${label}`.slice(0, 200);
+  if ((state.combat.turn.turnUses[key] ?? 0) > 0) return false;
+  state.combat.turn = { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } };
+  return true;
+}
+
+/** Signed dice a rider adds to the damage ("1d4") or takes off it ("-1d8"), rolled and recorded. */
+function rollSignedDice(ctx: ResolveContext, dice: string, label: string): number {
+  const negative = dice.startsWith("-");
+  const rolled = resolveDice(parseDiceFormula(negative ? dice.slice(1) : dice), ctx.deps.random);
+  recordRoll(ctx, rolled, "damage", `${ctx.action.name}: ${label}`);
+  return negative ? -rolled.total : rolled.total;
+}
+
+/** A penalty that "can't reduce the damage below 1" (Reduce): no more than leaves the hit's first type at 1. */
+function leavingOne(ctx: ResolveContext, amount: number): number {
+  if (amount >= 0) return amount;
+  const type = ctx.damage[0]?.type;
+  const so = [
+    ...ctx.damage.filter((part) => part.type === type).map((part) => part.total),
+    ...ctx.bonusDamage.filter((part) => part.type === type).map((part) => part.amount)
+  ].reduce((sum, value) => sum + value, 0);
+  return Math.max(amount, Math.min(0, 1 - so));
 }
 
 /** A coat of Basic Poison is spent "once its damage is dealt": an effect with damage uses loses one each hit its
@@ -228,4 +429,18 @@ export function spendDamageUses(ctx: ResolveContext): void {
     endEffect(state, attacker.id, effectId);
     effectsEnded.push(endedEffect(attacker, effect));
   }
+}
+
+/** The id prefix of a pick of another damage type for an effect's extra damage on this hit. */
+export const RIDER_TYPE_PREFIX = "rider-type:";
+
+/** The type picked on this hit for an effect's extra damage, when the effect lets it be picked. */
+export function pickedRiderType(
+  ctx: ResolveContext,
+  effectId: string | undefined,
+  types: readonly string[] | undefined
+) {
+  if (effectId === undefined || !types) return undefined;
+  const choice = (ctx.input.hitOptions ?? []).find((entry) => entry.id === `${RIDER_TYPE_PREFIX}${effectId}`);
+  return choice?.damageType && types.includes(choice.damageType) ? choice.damageType : undefined;
 }

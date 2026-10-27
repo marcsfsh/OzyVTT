@@ -42,6 +42,10 @@ export type TurnOption = Readonly<{
   mastery: string | null;
   /** What a lasting spell lets its caster do while it is up (a sphere's ram), shown inside the spell's row. */
   children: readonly TurnOption[];
+  /** The spells a feature casts at its user's pick (Divine Intervention), offered when its row is tapped. */
+  picks?: readonly TurnOption[];
+  /** A pick's spell level, for grouping the picks. */
+  level?: number;
 }>;
 
 /** What the server says about the character's actions beyond its own rows. */
@@ -70,6 +74,8 @@ export const NO_FACTS: TurnFacts = {
 };
 
 const LATER = /^spell-(.+?)-then-/;
+/** A spell Divine Intervention casts, listed under the feature's own row rather than on its own. */
+const DIVINE_PICK = /^divine-intervention-(.+)$/;
 
 /** "reach 5 ft", "80/320 ft", "reach 5 ft, 20/60 ft". */
 function reachWords(summary: ContentActionSummary): string | null {
@@ -98,6 +104,8 @@ function offered(action: ActorDefinition["actions"][number], facts: TurnFacts): 
     action.damage.length > 0 ||
     action.uses !== undefined ||
     (action.healing !== undefined && action.spellId === undefined) ||
+    // A feature that grants its user an effect (Reckless Attack, Steady Aim), taken with a tap.
+    (action.grants !== undefined && action.spellId === undefined) ||
     // A spell the server can resolve (Misty Step, Fly), though it rolls nothing.
     ((action.spellId !== undefined || action.spellSlot !== undefined) && row?.targeting)
   );
@@ -135,10 +143,19 @@ export function turnOptions({
   const pools = actor ? slotPools(definition, actor) : { slots: [], pact: null };
   const uses = actor?.actionUses ?? {};
 
-  const build = (summary: ContentActionSummary, own: ActorDefinition["actions"][number] | null): TurnOption => {
+  const build = (
+    summary: ContentActionSummary,
+    own: ActorDefinition["actions"][number] | null,
+    pickedSpellId?: string
+  ): TurnOption => {
     const spell = spellOf.get(summary.id) ?? null;
-    const content = spell ? spellReference.get(spell.id) : own?.spellId ? spellReference.get(own.spellId) : undefined;
-    const isSpell = spell !== null || castsSpell(summary.id, summary.name) || own?.spellId !== undefined;
+    const spellId = spell?.id ?? own?.spellId ?? pickedSpellId;
+    const content = spellId !== undefined ? spellReference.get(spellId) : undefined;
+    const isSpell =
+      spell !== null ||
+      castsSpell(summary.id, summary.name) ||
+      own?.spellId !== undefined ||
+      pickedSpellId !== undefined;
     const isItem = summary.id.startsWith("item-");
     const kind: TurnOption["kind"] = isSpell
       ? "spell"
@@ -218,8 +235,20 @@ export function turnOptions({
     const own = ownSummaries.get(action.id);
     if (!own) continue;
     const row = facts.rows.get(action.id);
-    // The damage the server rolls, where it differs (a lasting spell's later row at its cast level).
-    const summary = row && row.damage.length === own.damage.length ? { ...own, damage: row.damage } : own;
+    // The damage the server rolls, where it differs (a lasting spell's later row at its cast level), and the ways the
+    // caster may shape a spell's cast.
+    const rolled = {
+      ...own,
+      ...(row && row.damage.length === own.damage.length ? { damage: row.damage } : {}),
+      ...(row?.shaping ? { shaping: row.shaping } : {}),
+      ...(row?.damageLook ? { damageLook: true as const } : {}),
+      ...(row?.areaPerSlot ? { areaPerSlot: row.areaPerSlot } : {})
+    };
+    // Who a feature's grant reaches, as the server takes it: a self grant is a tap with no target.
+    const summary =
+      action.grants !== undefined && action.spellId === undefined && row?.targeting
+        ? { ...rolled, targeting: row.targeting }
+        : rolled;
     const option = build(summary, action);
     const later = action.id.match(LATER);
     const parent = later ? `spell-${later[1]}` : null;
@@ -231,8 +260,16 @@ export function turnOptions({
   }
   // Item-derived rows come after: their `item-` ids never collide with the stat block's. The server says which
   // resolve (a potion, a scroll, a coat of poison).
+  const picks: TurnOption[] = [];
   for (const row of extraActions) {
     if (facts.passive.has(row.id)) continue;
+    const picked = DIVINE_PICK.exec(row.id)?.[1];
+    if (picked !== undefined) {
+      const option = build(row, null, picked);
+      const content = spellReference.get(picked);
+      picks.push({ ...option, name: content?.name ?? option.name, level: content?.level ?? 0 });
+      continue;
+    }
     if (
       (row.targeting === undefined || row.targeting === null) &&
       row.attackBonus === null &&
@@ -243,9 +280,11 @@ export function turnOptions({
       continue;
     options.push(build(row, null));
   }
-  return options.map((option) =>
-    children.has(option.id) ? { ...option, children: children.get(option.id)! } : option
-  );
+  picks.sort((left, right) => (left.level ?? 0) - (right.level ?? 0) || left.name.localeCompare(right.name));
+  return options.map((option) => {
+    const withChildren = children.has(option.id) ? { ...option, children: children.get(option.id)! } : option;
+    return option.id === "divine-intervention" && picks.length > 0 ? { ...withChildren, picks } : withChildren;
+  });
 }
 
 const titleAbility = (ability: string) => `${ability[0]?.toUpperCase() ?? ""}${ability.slice(1)}`;

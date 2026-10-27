@@ -7,10 +7,23 @@ import type {
   PlayerActor,
   PlayerAnnotation
 } from "@vtt/domain";
-import { setTemplatePlacement, toggleTarget, type TargetingSession } from "../encounter/targeting";
+import {
+  picksDestination,
+  setDestination,
+  setTemplatePlacement,
+  toggleTarget,
+  type TargetingSession
+} from "../encounter/targeting";
 import type { GridCalibration } from "./gridPreview";
 import { imagePointFromClient } from "./mapImage";
-import { isVisionTool, type MapTool } from "./mapTools";
+import { GROUND_TOOLS, isVisionTool, type AreaKindId, type GroundOp, type MapTool } from "./mapTools";
+
+/** What a drag paints with this tool: a kind of ground, a clearing, or a trap's area; null for any other tool. */
+function groundOpOf(tool: MapTool): GroundOp | "trap" | null {
+  if (tool === "terrain-clear") return "clear";
+  if (tool === "trap-place") return "trap";
+  return GROUND_TOOLS.find((entry) => entry.tool === tool)?.op ?? null;
+}
 import type { MapCommands } from "./useMapCommands";
 import {
   anchoredCamera,
@@ -39,8 +52,9 @@ export type Gesture =
   | Readonly<{ kind: "pan"; startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
-  | Readonly<{ kind: "terrain"; op: "difficult" | "clear"; origin: Point; current: Point }>
+  | Readonly<{ kind: "terrain"; op: GroundOp | "trap"; origin: Point; current: Point }>
   | Readonly<{ kind: "wall"; wallKind: "wall" | "door" | "window"; origin: Point; current: Point }>
+  | Readonly<{ kind: "vision-area"; origin: Point; current: Point }>
   | Readonly<{ kind: "annotation-move"; id: string; grab: Point; geometry: Readonly<{ origin: Point; target: Point }> }>
   | Readonly<{ kind: "annotation-resize"; id: string; anchor: Point; current: Point }>
   /** Two fingers. Every field is read when the pinch begins and never updated, so zoom is absolute
@@ -85,11 +99,15 @@ export function useMapGestures({
   onSelect,
   onContextMenu: openMenu,
   onPlaceLight,
+  areaKind = "heavily-obscured",
   onTokenPress,
   readOnly = false,
   armedActorId = null,
   onPlaceArmed,
-  onMapMenu
+  onMapMenu,
+  onDoorMenu,
+  onWallAim,
+  onLightAim
 }: Readonly<{
   role: "gm" | "player";
   tool: MapTool;
@@ -113,6 +131,8 @@ export function useMapGestures({
   onContextMenu: (menu: Readonly<{ actorId: string; x: number; y: number }>) => void;
   /** The GM's Light tool: a tap places the chosen light there. */
   onPlaceLight?: (point: Point) => void;
+  /** What the GM's Paint area tool paints. */
+  areaKind?: AreaKindId;
   /** A token pressed with the Select tool, or opened for its menu. */
   onTokenPress?: (actorId: string) => void;
   /** The map only shows: a drag pans and two fingers zoom, and nothing is sent. */
@@ -122,6 +142,12 @@ export function useMapGestures({
   onPlaceArmed?: (point: Point) => void;
   /** A right-click or a long press on an empty spot: the menu of what can go there. */
   onMapMenu?: (menu: Readonly<{ point: Point; x: number; y: number }>) => void;
+  /** A tap on a door's handle: its menu, at the pointer. */
+  onDoorMenu?: (menu: Readonly<{ wallId: string; x: number; y: number }>) => void;
+  /** A tap on a door or a wall while an action is aimed: that wall is its target. */
+  onWallAim?: (wallId: string) => void;
+  /** While an action is aimed, a flame set on the map was tapped (Druidcraft's Fire Play). */
+  onLightAim?: (lightId: string) => void;
 }>) {
   const { camera, setCamera, boxFraction } = view;
   const { busyActorId, setMessage } = commands;
@@ -318,12 +344,36 @@ export function useMapGestures({
       setGesture({ kind: activeTargeting.template.shape, origin: point, current: point });
       return;
     }
-    // A door's handle opens or closes it (the GM's any, a player's beside their character, which the server checks).
+    // A leap or a throw takes the tap as the space it lands in, creatures there included (a bulette lands on them).
+    if (tool === "select" && picksDestination(activeTargeting)) {
+      const point = pointFromScreen(event.clientX, event.clientY);
+      if (!point) return;
+      event.preventDefault();
+      setDestination(point);
+      return;
+    }
+    // While an action is aimed, a flame set on the map takes the tap as its target (Fire Play).
+    const aimedLight = activeTargeting && onLightAim ? target.closest("[data-light-target]") : null;
+    if (tool === "select" && aimedLight) {
+      event.preventDefault();
+      onLightAim!(aimedLight.getAttribute("data-light-target")!);
+      return;
+    }
+    // While an action is aimed, a door or a wall takes the tap as its target: an attack on it, or a spell such as Knock.
+    const aimedWall = activeTargeting && onWallAim ? target.closest("[data-wall-target], [data-door-id]") : null;
+    if (tool === "select" && aimedWall) {
+      event.preventDefault();
+      onWallAim!(aimedWall.getAttribute("data-wall-target") ?? aimedWall.getAttribute("data-door-id")!);
+      return;
+    }
+    // A door's handle opens its menu (open or close it, work on it); without one it opens or closes it. The server
+    // checks who may.
     const door = target.closest("[data-door-id]");
     if (tool === "select" && door) {
       event.preventDefault();
       const doorId = door.getAttribute("data-door-id")!;
-      void commands.setDoorOpen(doorId, door.getAttribute("data-door-open") !== "true");
+      if (onDoorMenu) onDoorMenu({ wallId: doorId, x: event.clientX, y: event.clientY });
+      else void commands.setDoorOpen(doorId, door.getAttribute("data-door-open") !== "true");
       return;
     }
     if (role === "gm" && isVisionTool(tool)) {
@@ -333,13 +383,21 @@ export function useMapGestures({
       if (tool === "vision-erase") {
         const wallId = target.closest("[data-wall-id]")?.getAttribute("data-wall-id");
         const lightId = target.closest("[data-light-id]")?.getAttribute("data-light-id");
+        const areaId = target.closest("[data-area-id]")?.getAttribute("data-area-id");
         if (wallId) void commands.removeWall(wallId);
         else if (lightId) void commands.removeLight(lightId);
-        else setMessage("Tap a wall, door, window or light to remove it.");
+        else if (areaId) void commands.removeArea(areaId);
+        else setMessage("Tap a wall, door, window, light or area to remove it.");
         return;
       }
       if (tool === "vision-light") {
         onPlaceLight?.(point);
+        return;
+      }
+      if (tool === "vision-area") {
+        capturePointer(event);
+        setMessage("");
+        setGesture({ kind: "vision-area", origin: point, current: point });
         return;
       }
       capturePointer(event);
@@ -441,7 +499,8 @@ export function useMapGestures({
       return;
     }
     // Terrain lives in grid cells, so it needs a calibrated map.
-    if ((tool === "terrain-difficult" || tool === "terrain-clear") && role === "gm" && calibration) {
+    const groundOp = groundOpOf(tool);
+    if (groundOp && role === "gm" && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY);
       if (!point) return;
       event.preventDefault();
@@ -449,19 +508,13 @@ export function useMapGestures({
       setMessage("");
       setGesture({
         kind: "terrain",
-        op: tool === "terrain-difficult" ? "difficult" : "clear",
+        op: groundOp,
         origin: point,
         current: point
       });
       return;
     }
-    if (
-      tool !== "select" &&
-      tool !== "terrain-difficult" &&
-      tool !== "terrain-clear" &&
-      !isVisionTool(tool) &&
-      calibration
-    ) {
+    if (tool !== "select" && groundOpOf(tool) === null && !isVisionTool(tool) && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY);
       if (!point) return;
       event.preventDefault();
@@ -617,13 +670,20 @@ export function useMapGestures({
     if (gesture.kind === "terrain") {
       const { op, origin, current } = gesture;
       setGesture(null);
-      commands.paintTerrain(op, origin, current);
+      if (op === "trap") commands.placeTrap(origin, current);
+      else commands.paintTerrain(op, origin, current);
       return;
     }
     if (gesture.kind === "wall") {
       const { wallKind, origin, current } = gesture;
       setGesture(null);
       commands.addWall(wallKind, origin, current);
+      return;
+    }
+    if (gesture.kind === "vision-area") {
+      const { origin, current } = gesture;
+      setGesture(null);
+      commands.addArea(areaKind, origin, current);
       return;
     }
     if (gesture.kind === "measure") {

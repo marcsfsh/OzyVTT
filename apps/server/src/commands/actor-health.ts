@@ -4,7 +4,9 @@ import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { replaceableOffers } from "../choice-overrides.js";
 import type { EffectNarration } from "../effects.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
+import { convertResource } from "../conversions.js";
 import {
+  ActorConvertSchema,
   ActorRechooseSchema,
   ActorRestoreUsesSchema,
   ActorRestSchema,
@@ -32,15 +34,63 @@ import {
   UNTYPED_DAMAGE
 } from "../hit-points.js";
 import { rechooseInLedger } from "../ledger-rechoice.js";
-import { applyRest, hitDieSizesToSpend, spendHitDice } from "../rests.js";
+import { spellbookOf } from "../spellbook.js";
+import {
+  applyRest,
+  hitDieSizesToSpend,
+  holdHitDice,
+  rerollHitDice,
+  spendHitDice,
+  startOwnShortRest
+} from "../rests.js";
 import { restoreUses, spendUses } from "../use-pools.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { recordRoll } from "../roll-history.js";
-import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
+import { initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal } from "./kit.js";
+import type { Initiator } from "../authorization.js";
 import { defineCommand } from "./pipeline.js";
+import { attackKindsOf } from "../resolution/attack.js";
+import { damageSourceOf } from "../resolution/damage-source.js";
+import { itemRowOfAction } from "../item-charges.js";
+
+/** A spend of Hit Point Dice, or a reroll of one, as the shared roll history records it: "2d10 + 1d6 + 4". */
+function hitDiceRecord(
+  rollId: string,
+  commandId: string,
+  principal: GamePrincipal,
+  initiator: Initiator,
+  actor: Readonly<{ id: string; name: string; visibility: string }>,
+  outcome: Readonly<{ healed: number; conModifier: number; dice: ReadonlyArray<{ sides: number; face: number }> }>,
+  kind: "spend" | "reroll"
+): RollRecord {
+  const sizes = outcome.dice.map((die) => die.sides);
+  const bonus = Math.abs(outcome.conModifier * outcome.dice.length);
+  // One term per die size, biggest first.
+  const dicePart = [...new Set(sizes)]
+    .map((sides) => `${sizes.filter((size) => size === sides).length}d${sides}`)
+    .join(" + ");
+  return {
+    id: rollId,
+    commandId,
+    initiatorSessionId: sessionIdOf(principal),
+    initiatorRole: initiator.role,
+    initiatorLabel: actor.name,
+    actorId: actor.id,
+    purpose: "manual",
+    ...(kind === "reroll" ? { label: "Hit Point Dice reroll" } : {}),
+    // Hidden actors stay GM-only.
+    visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
+    formula: `${dicePart}${outcome.conModifier !== 0 ? ` ${outcome.conModifier < 0 ? "-" : "+"} ${bonus}` : ""}`,
+    normalizedFormula: dicePart,
+    dice: outcome.dice.map((die) => ({ group: 0, sides: die.sides, face: die.face, kept: true, sign: 1 as const })),
+    modifiers: outcome.conModifier !== 0 ? [{ value: bonus, sign: outcome.conModifier < 0 ? -1 : 1 }] : [],
+    total: outcome.healed,
+    createdAt: new Date().toISOString()
+  };
+}
 
 // Hit points, conditions and rests.
 
@@ -61,8 +111,28 @@ function sourceActionOf(
   const definition = source.definitionId ? kit.resolveDefinition(source.definitionId) : undefined;
   return (
     effectiveActions(definition, source, kit.equipmentCatalog()).find((candidate) => candidate.id === sourceActionId) ??
-    builtinActionFor(definition, sourceActionId)
+    builtinActionFor(definition, sourceActionId, source)
   );
+}
+
+/** What the named source action deals its damage with (its spell, the carried row, how the attack was made), so a
+ *  defence that reads it applies on the GM's apply as on a player's (`resolution/damage-source.ts`). */
+function sourceOfDamage(
+  state: Parameters<typeof applyDamageDetailed>[0],
+  sourceActorId: string,
+  sourceActionId: string,
+  targetId: string,
+  kit: SourceKit,
+  distance: (a: string, b: string) => number | null
+) {
+  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
+  const action = sourceActionOf(state, sourceActorId, sourceActionId, kit);
+  if (!source || !action) return undefined;
+  const riderItemId = itemRowOfAction(action.id, source.inventory)?.id ?? null;
+  const attackKinds = action.attack
+    ? attackKindsOf({ action, attacker: source, riderItemId, input: {} }, distance(sourceActorId, targetId))
+    : [];
+  return damageSourceOf({ action, attacker: source, riderItemId, riderFilters: { attackKinds } });
 }
 
 /** SRD Knocking Out a Creature: only "a melee attack" can, so a named source action that isn't one is refused. */
@@ -115,6 +185,12 @@ export const actorHealthCommands = [
           isGmGrade(principal) && sourceActorId && request.sourceActionId
             ? sourceActionOf(state, sourceActorId, request.sourceActionId, kit)?.drain
             : undefined;
+        const damageSource =
+          sourceActorId && request.sourceActionId
+            ? sourceOfDamage(state, sourceActorId, request.sourceActionId, actorId, kit, (a, b) =>
+                distance(state, a, b)
+              )
+            : undefined;
         outcome = applyDamageDetailed(
           state,
           actorId,
@@ -127,7 +203,8 @@ export const actorHealthCommands = [
             sourceName: sourceName ?? null,
             sourceActorId: sourceActorId ?? null,
             nonlethal,
-            ...(drain ? { drain } : {})
+            ...(drain ? { drain } : {}),
+            ...(damageSource ? { damageSource } : {})
           },
           initiatorOf(principal),
           {
@@ -258,7 +335,7 @@ export const actorHealthCommands = [
     type: "actor.set-condition",
     operationId: "setCondition",
     description:
-      "Applies or clears a bundled SRD condition. Exhaustion is cumulative: without `level` it gains one level, with one it is set to that level. Player sessions may target only their claimed character: they may add any condition and clear one they added, while clearing one imposed by a save, an effect or the GM is a rules block (`condition.imposed`) they can ask the GM about; standing from Prone is allowed only on their own turn in a fight (`movement.stand-up-off-turn`) and costs half their Speed.",
+      "Applies or clears a bundled SRD condition. Exhaustion is cumulative: without `level` it gains one level, with one it is set to that level. The GM may name the charmer or the source of fear (`sourceActorId`) for Charmed or Frightened: the condition then rides an effect from that creature, so it can't be harmed by its charmed bearer or approached by its frightened one, and clearing the condition ends it. Player sessions may target only their claimed character: they may add any condition and clear one they added, while clearing one imposed by a save, an effect or the GM is a rules block (`condition.imposed`) they can ask the GM about; standing from Prone is allowed only on their own turn in a fight (`movement.stand-up-off-turn`) and costs half their Speed.",
     summary: "Apply or clear an SRD condition, with exhaustion levels.",
     schema: SetConditionSchema,
     malformed: "The condition command is malformed.",
@@ -267,11 +344,12 @@ export const actorHealthCommands = [
         throw new CommandRejectedError("That condition is not in the bundled rules.");
       if (request.override && !isGmGrade(principal))
         throw new GameAccessDeniedError("Only the GM can override movement rules.");
-      const { actorId, conditionId, active, level } = request;
+      const { actorId, conditionId, active, level, sourceActorId } = request;
       let events: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
         events = setCondition(state, actorId, conditionId, active, level, initiatorOf(principal), {
           override: request.override ?? null,
+          ...(sourceActorId !== undefined ? { sourceActorId } : {}),
           resolveDefinition: kit.resolveDefinition,
           catalog: kit.equipmentCatalog()
         });
@@ -299,14 +377,14 @@ export const actorHealthCommands = [
     type: "actor.rechoose",
     operationId: "rechooseActorPick",
     description:
-      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). A pick the build itself reads (its options grant spells, or another pick depends on it, as the land's spells and Nature's Ward do) is written to the character's choices ledger and the sheet is rebuilt from it, keeping what has been spent; a player makes it in the prepare step a Long Rest opens, the GM any time outside a fight. Any other pick is runtime state on the actor, cleared by the matching rest, so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
+      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). A pick the build itself reads (its options grant spells, or another pick depends on it, as the land's spells and Nature's Ward do) is written to the character's choices ledger and the sheet is rebuilt from it, keeping what has been spent, outside a fight. Any other pick is runtime state on the actor, kept until the character chooses again, so a re-choice needs no rebuild. A player session re-chooses only on their claimed character, outside a fight, in the step a finished rest opened (a Long Rest for a Long Rest pick, either rest for the others); the GM on anyone, any time. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
     summary:
       "Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type on a Long Rest, Fiendish Resilience's damage type on either). Your own character; the GM anyone.",
     schema: ActorRechooseSchema,
     malformed: "The re-choose command is malformed.",
     // What may be re-chosen comes from content, never the request.
     async run({ principal, request, execute }, kit) {
-      const { actorId, offer, id } = request;
+      const { actorId, offer, id, replacing } = request;
       const initiator = initiatorOf(principal);
       let line = "";
       const { duplicate } = await execute((state) => {
@@ -317,7 +395,11 @@ export const actorHealthCommands = [
         const definition = actor.definitionId ? kit.resolveDefinition(actor.definitionId) : undefined;
         // Play content: legality is a question about what the sheet already has, whatever a pack's switch says.
         // Nothing GM-only is projected.
-        const choices = replaceableOffers(definition, kit.playCatalog());
+        const choices = replaceableOffers(
+          definition,
+          kit.playCatalog(),
+          definition ? spellbookOf(actor, definition, kit.playCatalog()) : undefined
+        );
         const match = choices.find((candidate) => candidate.offer === offer);
         if (!match) {
           throw new CommandRejectedError(
@@ -332,6 +414,29 @@ export const actorHealthCommands = [
           );
         }
         const chosen = match.optionNames[id] ?? id;
+        // SRD: "whenever you finish a Short or Long Rest" (or a Long Rest): a player re-chooses in the step that rest
+        // opened, outside a fight; the GM any time.
+        if (initiator.role !== "gm") {
+          if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
+            throw new CommandRejectedError(`${match.label} is chosen after a rest. End the fight first.`);
+          const afterLong = actor.restStep?.after === "long-rest" || actor.preparation !== null;
+          const open = match.per === "long-rest" ? afterLong : afterLong || actor.restStep !== null;
+          if (!open)
+            throw new CommandRejectedError(
+              `${actor.name} chooses ${match.label} again after finishing a ${match.per === "long-rest" ? "Long Rest" : "Short or Long Rest"}.`
+            );
+        }
+        // A pick of several changes one held answer at a time, as many a rest as the feature says ("change one of
+        // those weapon choices"); the GM changes any number.
+        if (match.multi && replacing === undefined)
+          throw new CommandRejectedError(`Say which of ${actor.name}'s ${match.label} picks to change.`);
+        if (!match.multi && replacing !== undefined)
+          throw new CommandRejectedError(`${match.label} is one pick. Send no answer to replace.`);
+        const swapped = actor.restStep?.swaps?.[offer] ?? 0;
+        if (match.multi && initiator.role !== "gm" && swapped >= match.swaps)
+          throw new CommandRejectedError(
+            `${actor.name} has changed ${match.swaps === 1 ? "one" : match.swaps} of ${match.label} this rest already.`
+          );
         if (!match.rebuilds) {
           // Stored as `choiceOverrides` on the actor (not the choices ledger) and cleared by the matching rest.
           actor.choiceOverrides = { ...actor.choiceOverrides, [offer]: { id, per: match.per } };
@@ -341,18 +446,25 @@ export const actorHealthCommands = [
         // The build reads this answer (the land's spells and Nature's Ward), so it goes into the ledger.
         if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
           throw new CommandRejectedError(`${match.label} is chosen after a rest. End the fight first.`);
-        // SRD: "Whenever you finish a Long Rest, choose", a player makes it in the step that rest opens.
-        if (initiator.role !== "gm" && match.per === "long-rest" && actor.preparation === null)
-          throw new CommandRejectedError(`${actor.name} chooses ${match.label} again after finishing a Long Rest.`);
-        rechooseInLedger(state, actorId, offer, id, {
-          library: kit.playCatalog(),
-          policy: state.builderPolicy,
-          catalog: kit.equipmentCatalog()
-        });
+        rechooseInLedger(
+          state,
+          actorId,
+          offer,
+          id,
+          { library: kit.playCatalog(), policy: state.builderPolicy, catalog: kit.equipmentCatalog() },
+          replacing,
+          match.kind
+        );
+        const rested = state.actors.find((candidate) => candidate.id === actorId);
+        if (match.multi && rested?.restStep)
+          rested.restStep = { ...rested.restStep, swaps: { ...rested.restStep.swaps, [offer]: swapped + 1 } };
         // An override from before the answer moved into the ledger would only shadow it.
         const { [offer]: _stale, ...others } = actor.choiceOverrides;
         actor.choiceOverrides = others;
-        line = `${kit.actorName(actorId)} chose ${chosen} for ${match.label}.`;
+        line =
+          replacing !== undefined
+            ? `${kit.actorName(actorId)} changed ${match.optionNames[replacing] ?? replacing} for ${chosen} (${match.label}).`
+            : `${kit.actorName(actorId)} chose ${chosen} for ${match.label}.`;
       });
       if (!duplicate)
         kit.context.appendLog({
@@ -368,9 +480,9 @@ export const actorHealthCommands = [
     type: "actor.rest",
     operationId: "restActor",
     description:
-      "Applies a rest to a rostered actor outside combat; a player session may take a Short Rest on their claimed character and asks the GM for a Long Rest (rest.ask), the GM rests anyone. Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead, and a Long Rest is refused within 16 hours of game time after the actor's last one (the refusal says how long is left; time.pass moves the clock). Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, limited-use pools refresh (a charged item regains its printed dice), all spent Hit Point Dice restore, spell slots and Pact Magic refill, a caster that prepares its spells after a Long Rest gets the step to change them, and Exhaustion drops one level. Short: per-short-rest, recharge and per-encounter pools and Pact Magic slots re-arm, and features that say so give back uses of a long-rest pool (Rage, Second Wind, Channel Divinity, Wild Shape: one; Bardic Inspiration from Bard 5: all); healing is the separate spend-hit-dice call.",
+      "Applies a rest to a rostered actor outside combat; the GM rests anyone at once. A player session starts a Short Rest for their claimed character, which is then under way like the party's (rest.party): the player spends Hit Point Dice during it (actor.spend-hit-dice) and marks it done (rest.mark-done), and the GM ends it (rest.finish), when its benefits land and an hour passes; a Short Rest already under way takes the character in. A player asks the GM for a Long Rest (rest.ask). Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead, and a Long Rest is refused within 16 hours of game time after the actor's last one (the refusal says how long is left; time.pass moves the clock). Long: the actor's Concentration ends, and its other effects that would run out in the rest's 8 hours end, their on-end grants firing first. The clock itself moves only with time.pass or a party rest, so what lasts longer waits for the GM to pass those hours and they count once; effects that last until ended stay. Hit points restore to maximum, temporary HP clears, limited-use pools refresh (a charged item regains its printed dice), all spent Hit Point Dice restore, spell slots and Pact Magic refill, a caster that prepares its spells after a Long Rest gets the step to change them, and Exhaustion drops one level. Short: per-short-rest, recharge and per-encounter pools and Pact Magic slots re-arm, and features that say so give back uses of a long-rest pool (Rage, Second Wind, Channel Divinity, Wild Shape: one; Bardic Inspiration from Bard 5: all); healing is the separate spend-hit-dice call. A Short Rest leaves effects to the game clock, which the GM moves (the party Short Rest moves it an hour).",
     summary:
-      "Take a Short Rest on your own character (GM: either rest on anyone, at 1 HP or more): short re-arms short-rest uses and Pact Magic and gives back what features say; long restores HP, hit dice, spell slots and limited uses, opens the prepare step, and drops one Exhaustion level.",
+      "Start a Short Rest for your own character, which the GM ends; the GM rests anyone at once. Short re-arms short-rest uses and Pact Magic; long restores HP, Hit Dice, slots and uses, and drops one Exhaustion level.",
     schema: ActorRestSchema,
     malformed: "The rest command is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -379,6 +491,28 @@ export const actorHealthCommands = [
       // A Long Rest is the GM's to give: a player asks for one (rest.ask) instead.
       if (kind === "long" && initiator.role !== "gm")
         throw new GameAccessDeniedError("Ask the GM for a Long Rest. The GM approves it.");
+      // A player's Short Rest is under way until the GM ends it, so its hour passes and Hit Dice are spent during it.
+      if (initiator.role !== "gm") {
+        let joined = false;
+        const { duplicate: again } = await execute((state) => {
+          joined = startOwnShortRest(state, actorId, initiator);
+        });
+        if (again) return;
+        kit.context.appendLog({
+          kind: "heal",
+          text: `${kit.actorName(actorId)} ${joined ? "joins the Short Rest" : "starts a Short Rest"}.`,
+          actorIds: [actorId],
+          gmOnly: kit.actorHidden(actorId)
+        });
+        kit.context.broadcastTableEvent({
+          kind: "heal",
+          text: `${kit.actorName(actorId)} ${joined ? "joins the Short Rest" : "starts a Short Rest"}. End it from Rest on the Table.`,
+          actorIds: [actorId],
+          gmOnly: true,
+          logged: false
+        });
+        return;
+      }
       let events: EffectNarration[] = [];
       const chargeLines: string[] = [];
       // Authorized inside the mutation against live state (applyRest still refuses a combatant in a running
@@ -414,17 +548,18 @@ export const actorHealthCommands = [
     malformed: "The spend is malformed.",
     async run({ principal, request, execute }, kit) {
       const { actorId, poolId, amount } = request;
-      let spent = { name: "", left: 0 };
+      let spent: { name: string; left: number; line: string | null } = { name: "", left: 0, line: null };
       const { duplicate } = await execute((state) => {
         spent = spendUses(state, actorId, poolId, amount, initiatorOf(principal), {
           resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
-          catalog: kit.equipmentCatalog()
+          catalog: kit.equipmentCatalog(),
+          random: (sides) => kit.context.random(sides)
         });
       });
       if (duplicate) return;
       kit.context.appendLog({
         kind: "action",
-        text: `${kit.actorName(actorId)} spends ${amount} of ${spent.name} (${spent.left} left).`,
+        text: `${kit.actorName(actorId)} spends ${amount} of ${spent.name} (${spent.left} left).${spent.line ? ` ${spent.line}` : ""}`,
         actorIds: [actorId],
         gmOnly: kit.actorHidden(actorId)
       });
@@ -435,7 +570,7 @@ export const actorHealthCommands = [
     type: "actor.restore-uses",
     operationId: "restoreUses",
     description:
-      "GM-only: gives back up to `amount` spent uses of one of the actor's limited-use pools (a feature that refills it, such as Uncanny Metabolism or Persistent Rage, or a ruling). Refused when the pool is already full and for a pool that comes back every turn.",
+      "GM-only: gives back up to `amount` spent uses of one of the actor's limited-use pools (a ruling; a feature that refills a pool by its own rule is `actor.convert`). Refused when the pool is already full and for a pool that comes back every turn.",
     summary: "Give back spent uses of a limited-use pool (GM).",
     schema: ActorRestoreUsesSchema,
     malformed: "The restore is malformed.",
@@ -460,16 +595,70 @@ export const actorHealthCommands = [
   }),
 
   defineCommand({
+    type: "actor.convert",
+    operationId: "convertResource",
+    description:
+      "Turns one of a character's resources into another, or recovers one, by a feature's rule; `actor:available-actions` lists the ones the character has (`conversions`), with why each can't be used now. Font of Magic: a spell slot for Sorcery Points equal to its level, up to the maximum, or as a Bonus Action Sorcery Points for a slot of level 5 or lower at the printed cost and Sorcerer level (a made slot can sit above the maximum and vanishes on a Long Rest). Font of Inspiration: a slot for a Bardic Inspiration. Wild Resurgence: a slot for a Wild Shape when none is left, once on each turn, and a Wild Shape for a level 1 slot once per Long Rest. Nature Magician: Wild Shape uses for one slot, 2 levels each, once per Long Rest. Arcane Recovery and Natural Recovery: spent slots adding up to half the class level (round up), none of level 6 or higher, in the step a finished Short Rest opens, once per Long Rest. Magical Cunning: Pact Magic slots up to half the maximum (all with Eldritch Master), outside a fight. Sorcerous Restoration: Sorcery Points up to half the Sorcerer level, after a Short Rest. Restoring a spent use: Intimidating Presence with a Rage, Holy Nimbus with a level 5 slot, Dragon Wings with 3 Sorcery Points, Hurl Through Hell with a Pact Magic slot, Innate Sorcery with 2 Sorcery Points (Sorcery Incarnate). Pearl of Power: a Magic action for a spent slot of level 3 or lower, once per dawn. Persistent Rage and Uncanny Metabolism (with its Martial Arts die and Monk level in Hit Points): from rolling Initiative to the end of the character's first turn, once per Long Rest. Succubus Form and Incubus Form: the other stat block, with its Hit Points, Armor Class and Speed, in the step a finished Long Rest opens and outside a fight. A player session only on their claimed character; the GM on anyone.",
+    summary: "Turn one resource into another, or recover one, by a feature's rule.",
+    schema: ActorConvertSchema,
+    malformed: "The conversion is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId, conversionId, level, pact, levels, count } = request;
+      let line = "";
+      const { duplicate } = await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, actorId, "resource");
+        line = convertResource(
+          state,
+          actorId,
+          {
+            conversionId,
+            ...(level !== undefined ? { level } : {}),
+            ...(pact !== undefined ? { pact } : {}),
+            ...(levels !== undefined ? { levels } : {}),
+            ...(count !== undefined ? { count } : {})
+          },
+          {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+            catalog: kit.equipmentCatalog(),
+            random: (sides) => kit.context.random(sides)
+          }
+        );
+      });
+      if (duplicate) return;
+      kit.context.appendLog({ kind: "action", text: line, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
+      return { line };
+    }
+  }),
+
+  defineCommand({
     type: "actor.spend-hit-dice",
     operationId: "spendHitDice",
     description:
-      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). Player sessions may target only their claimed character; the dice land in the shared roll history.",
+      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). A player session may target only their claimed character, and only while it is in the Short Rest under way (the party's, or one the player started with actor.rest), since a creature spends Hit Dice during a Short Rest; the GM any time outside a fight. The dice land in the shared roll history. `reroll` rerolls a die of the character's latest spend instead, while it is still the character's latest roll: a player spends Heroic Inspiration on the lowest die, the GM throws them all again, and the Hit Points are worked out afresh.",
     summary: "Spend Hit Point Dice to heal on a Short Rest (roll + Con modifier each, minimum 1).",
     schema: ActorSpendHitDiceSchema,
     malformed: "The hit-dice command is malformed.",
     async run({ principal, request, execute }, kit) {
       const initiator = initiatorOf(principal);
-      const { commandId, actorId, count } = request;
+      const { commandId, actorId, count, reroll } = request;
+      if (reroll === true) {
+        const rerollId = kit.context.newId();
+        let rerolled: ReturnType<typeof rerollHitDice> | null = null;
+        const { state, duplicate } = await execute((draft) => {
+          rerolled = rerollHitDice(draft, actorId, initiator, (sides) => kit.context.random(sides), rerollId);
+          const actor = draft.actors.find((candidate) => candidate.id === actorId)!;
+          recordRoll(draft, hitDiceRecord(rerollId, commandId, principal, initiator, actor, rerolled, "reroll"));
+        });
+        if (duplicate || !rerolled) return;
+        kit.publishRolls(state, commandId);
+        kit.context.appendLog({
+          kind: "heal",
+          text: `${kit.actorName(actorId)} rerolls a Hit Point Die and regains ${(rerolled as { healed: number }).healed} HP in all.`,
+          actorIds: [actorId],
+          gmOnly: kit.actorHidden(actorId)
+        });
+        return;
+      }
       // Roll before executing: a duplicate retry replays the stored outcome and must not consume fresh
       // randomness. The execute callback re-validates against live state.
       const snapshotActor = kit.read().actors.find((candidate) => candidate.id === actorId);
@@ -486,34 +675,23 @@ export const actorHealthCommands = [
           faces,
           initiator,
           (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
-          count
+          count,
+          kit.equipmentCatalog()
         );
         healed = outcome.healed;
         events = outcome.events;
         const actor = draft.actors.find((candidate) => candidate.id === actorId)!;
-        const bonus = Math.abs(outcome.conModifier * count);
-        // "2d10 + 1d6": one term per die size, biggest first.
-        const dicePart = [...new Set(sizes)]
-          .map((sides) => `${sizes.filter((size) => size === sides).length}d${sides}`)
-          .join(" + ");
-        // The dice land in shared roll history; hidden actors stay GM-only.
-        const record: RollRecord = {
-          id: rollId,
-          commandId,
-          initiatorSessionId: sessionIdOf(principal),
-          initiatorRole: initiator.role,
-          initiatorLabel: actor.name,
+        const dice = faces.map((face, index) => ({ sides: sizes[index]!, face }));
+        recordRoll(draft, hitDiceRecord(rollId, commandId, principal, initiator, actor, { ...outcome, dice }, "spend"));
+        // Held for Heroic Inspiration's reroll while it is the character's latest roll.
+        holdHitDice(draft, {
           actorId,
-          purpose: "manual",
-          visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
-          formula: `${dicePart}${outcome.conModifier !== 0 ? ` ${outcome.conModifier < 0 ? "-" : "+"} ${bonus}` : ""}`,
-          normalizedFormula: dicePart,
-          dice: faces.map((face, index) => ({ group: 0, sides: sizes[index], face, kept: true, sign: 1 as const })),
-          modifiers: outcome.conModifier !== 0 ? [{ value: bonus, sign: outcome.conModifier < 0 ? -1 : 1 }] : [],
-          total: outcome.healed,
-          createdAt: new Date().toISOString()
-        };
-        recordRoll(draft, record);
+          rollId,
+          dice,
+          conModifier: outcome.conModifier,
+          doubled: outcome.doubled,
+          before: outcome.before
+        });
       });
       if (duplicate) return;
       kit.publishRolls(state, commandId);

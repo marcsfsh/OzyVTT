@@ -1,6 +1,8 @@
 import type { GameState } from "@vtt/domain";
 import {
   ActorSetHeroicInspirationSchema,
+  CheckAnswerSchema,
+  ActorGiveHeroicInspirationSchema,
   CheckRerollSchema,
   CheckRollSchema,
   RollCallAnswerSchema,
@@ -9,6 +11,7 @@ import {
 } from "@vtt/domain/commands";
 import { ABILITY_NAMES, checkLabel } from "../ability-checks.js";
 import {
+  answerAbilityCheck,
   answerRollCall,
   closeRollCall,
   rerollAbilityCheck,
@@ -18,7 +21,11 @@ import {
   type CheckRollDependencies
 } from "../check-rolls.js";
 import { CommandRejectedError } from "../game-store.js";
+import { checkSituations } from "../check-situations.js";
+import { deriveEquipment } from "../equipment-derivation.js";
+import { gainHeroicInspiration, giveHeroicInspiration } from "../heroic-inspiration.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
+import { rollItemUse, rollUtilizeCheck, spendFastHandsCheck } from "../tool-uses.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 import { initiatorOf, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -80,35 +87,89 @@ export const rollCommands = [
     type: "check.roll",
     operationId: "rollCheck",
     description:
-      "Rolls an ability check on the server: an ability, a skill, or a tool (with the skill it uses, when one does). The server works out the bonus (proficiency or Expertise, Jack of All Trades, a stat block's printed skill, check riders, Exhaustion) and the Advantage or Disadvantage the rules give (items, armor's Stealth Disadvantage, armor worn without training, Poisoned, Frightened, Hex, Hunter's Mark on the creature named by `findActorId`, a tool used with a proficient skill), applies Reliable Talent, records the roll and, with a `dc`, says whether it succeeded. `face` is a typed d20 (a player only while the table's typedRolls is open); `rollMode` is the GM's alone. A player can't roll GM-only, a hidden creature's roll is always the GM's, and a blind roll's numbers stay with the GM. GM-grade for anyone; a player session only for their own claimed character. The response carries `check`.",
+      "Rolls an ability check on the server: an ability, a skill, or a tool (with the skill it uses, when one does). The server works out the bonus (proficiency or Expertise, Jack of All Trades, a stat block's printed skill, check riders, Exhaustion) and the Advantage or Disadvantage the rules give (items, armor's Stealth Disadvantage, armor worn without training, Poisoned, Frightened, Hex, Hunter's Mark on the creature named by `findActorId`, a tool used with a proficient skill, and the riders of the `situations` the roller says it fits, from the sheet's list, such as a Book's topic), applies Reliable Talent, records the roll and, with a `dc`, says whether it succeeded. A tool's or gear's printed Utilize use (`use`, with `tool` or `item`) rolls the record's own check at its DC, and a check with a `tool` and a `dc` is a use too: the item must be carried, and in a fight it takes the Utilize action on the roller's turn, or with `bonusAction` a Thief's Bonus Action (Fast Hands, which also makes a Dexterity (Sleight of Hand) check as a Bonus Action). Cobbler's Tools' success gives the wearer (`forActorId`, within 5 feet) Advantage on its next Dexterity (Acrobatics) check. `face` is a typed d20 (a player only while the table's typedRolls is open); `rollMode` is the GM's alone. A player can't roll GM-only, a hidden creature's roll is always the GM's, and a blind roll's numbers stay with the GM. GM-grade for anyone; a player session only for their own claimed character. The response carries `check`.",
     summary: "Roll an ability, skill or tool check on the server, with the rules' bonus and Advantage or Disadvantage.",
     schema: CheckRollSchema,
     malformed: "The check is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { commandId, actorId, ability, skill, tool, dc, visibility, face, rollMode, findActorId } = request;
+      const {
+        commandId,
+        actorId,
+        ability,
+        skill,
+        tool,
+        dc,
+        visibility,
+        face,
+        rollMode,
+        findActorId,
+        sense,
+        situations,
+        item,
+        use,
+        bonusAction,
+        forActorId
+      } = request;
       const initiator = initiatorOf(principal);
       let result: CheckResult | undefined;
       const geometry = await kit.liveGeometry();
       const { state, duplicate } = await execute((draft) => {
-        result = rollAbilityCheck(
-          draft,
-          initiator,
-          {
-            commandId,
-            actorId,
-            subject: { ability, ...(skill !== undefined ? { skill } : {}), ...(tool !== undefined ? { tool } : {}) },
-            dc: dc ?? null,
-            visibility,
-            ...(face !== undefined ? { face } : {}),
-            ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
-            ...(findActorId !== undefined ? { findActorId } : {})
-          },
-          checkDeps(kit, principal, draft, geometry)
-        );
+        const deps = checkDeps(kit, principal, draft, geometry);
+        const subject = {
+          ability,
+          ...(skill !== undefined ? { skill } : {}),
+          ...(tool !== undefined ? { tool } : {}),
+          ...(sense !== undefined ? { sense } : {})
+        };
+        const shared = {
+          commandId,
+          actorId,
+          visibility,
+          ...(face !== undefined ? { face } : {}),
+          ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
+          ...(situations !== undefined ? { situations } : {}),
+          ...(bonusAction !== undefined ? { bonusAction } : {})
+        };
+        // A tool's or gear's printed use is the Utilize action: the record's check at its DC, the item in the pack.
+        if (use !== undefined)
+          result = rollItemUse(
+            draft,
+            initiator,
+            { ...shared, itemId: (tool ?? item)!, use, ...(forActorId !== undefined ? { forActorId } : {}) },
+            deps
+          );
+        // A check with a tool against a DC is one of its uses too.
+        else if (tool !== undefined && dc !== undefined)
+          result = rollUtilizeCheck(
+            draft,
+            initiator,
+            { ...shared, itemId: tool, subject, dc, label: checkLabel(subject, deps.names) },
+            deps
+          );
+        else {
+          if (bonusAction) spendFastHandsCheck(draft, initiator, actorId, subject, deps);
+          result = rollAbilityCheck(
+            draft,
+            initiator,
+            {
+              commandId,
+              actorId,
+              subject,
+              dc: dc ?? null,
+              visibility,
+              ...(face !== undefined ? { face } : {}),
+              ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
+              ...(findActorId !== undefined ? { findActorId } : {}),
+              ...(situations !== undefined ? { situations } : {})
+            },
+            deps
+          );
+        }
       });
       if (duplicate || !result) return;
       kit.publishRolls(state, commandId);
       narrateVerdict(kit, actorId, result, visibility);
+      kit.publishNarrations(result.events ?? []);
       return checkReply(result);
     }
   }),
@@ -143,6 +204,38 @@ export const rollCommands = [
       if (duplicate || !result) return;
       kit.publishRolls(state, request.commandId);
       narrateVerdict(kit, request.actorId, result, visibility);
+      kit.publishNarrations(result.events ?? []);
+      return checkReply(result);
+    }
+  }),
+
+  defineCommand({
+    type: "check.answer",
+    operationId: "answerCheck",
+    description:
+      "Answers a character's latest check with one of the `answers` its result offered, while it is still that character's latest roll (SRD: a roll changed after it is seen, such as a Bardic Inspiration die added to a failed check, Tactical Mind's 1d10, Peerless Skill, Stroke of Luck or the halfling's Luck). The server checks the answer may meet this roll (whose roll, a failure or a success, uses and Reaction left), rolls its die or rerolls the d20 (`answer.face` is the face a physical reroll shows, for a typed check), spends what it costs, and updates the GM's call the check answers. The response carries `check`.",
+    summary: "Answer a character's latest check with a feature that changes a roll after it is seen.",
+    schema: CheckAnswerSchema,
+    malformed: "The answer is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const initiator = initiatorOf(principal);
+      let result: ReturnType<typeof answerAbilityCheck> | undefined;
+      let visibility = "public";
+      const geometry = await kit.liveGeometry();
+      const { state, duplicate } = await execute((draft) => {
+        visibility =
+          draft.heldRolls.find((held) => held.key === `check:${request.actorId}`)?.check?.visibility ?? "public";
+        result = answerAbilityCheck(
+          draft,
+          initiator,
+          { commandId: request.commandId, actorId: request.actorId, answer: request.answer },
+          { ...checkDeps(kit, principal, draft, geometry), commandId: request.commandId }
+        );
+      });
+      if (duplicate || !result) return;
+      kit.publishRolls(state, request.commandId);
+      narrateVerdict(kit, request.actorId, result, visibility);
+      kit.publishNarrations(result.events);
       return checkReply(result);
     }
   }),
@@ -151,20 +244,43 @@ export const rollCommands = [
     type: "roll-call.start",
     operationId: "startRollCall",
     description:
-      "The GM calls for a roll from one or several characters (GM-grade only): an ability, skill or tool check, or a saving throw with a DC. A save call opens a pending save for each character, answered like any save (the outcome is written back to the call); a check call is answered with `roll-call.answer`. A `blind` call keeps its DC and results from the players: they roll blind. Players see their own part of an open call in `rollCalls`; the GM sees every result and closes the call. The response carries `callId`.",
+      "The GM calls for a roll from one or several characters (GM-grade only): an ability, skill or tool check, or a saving throw with a DC. A save call opens a pending save for each character, answered like any save (the outcome is written back to the call); a check call is answered with `roll-call.answer`. A `blind` call keeps its DC and results from the players: they roll blind. `aboutActorId` names the creature a check is about, whose traits can weigh on it (a sphinx's Inscrutable gives Insight into it Disadvantage); players never see it. Players see their own part of an open call in `rollCalls`; the GM sees every result and closes the call. The response carries `callId`.",
     summary: "Call for a check or a saving throw from one or several characters (GM).",
     schema: RollCallStartSchema,
     malformed: "The call for a roll is malformed.",
     issueMessage: true,
     gmOnly: "Only the GM can call for a roll.",
     async run({ request, execute }, kit) {
-      const { commandId, kind, ability, skill, tool, dc, actorIds, blind } = request;
-      const subject = { ability, ...(skill !== undefined ? { skill } : {}), ...(tool !== undefined ? { tool } : {}) };
+      const { commandId, kind, ability, skill, tool, dc, actorIds, blind, sense, aboutActorId } = request;
+      const subject = {
+        ability,
+        ...(skill !== undefined ? { skill } : {}),
+        ...(tool !== undefined ? { tool } : {}),
+        ...(sense !== undefined ? { sense } : {})
+      };
       const committed = await execute((draft) => {
         startRollCall(
           draft,
-          { id: commandId, kind, subject, dc: dc ?? null, actorIds, blind: blind === true },
-          { newId: kit.context.newId, now: () => Date.now() }
+          {
+            id: commandId,
+            kind,
+            subject,
+            dc: dc ?? null,
+            actorIds,
+            blind: blind === true,
+            ...(aboutActorId !== undefined ? { aboutActorId } : {})
+          },
+          {
+            newId: kit.context.newId,
+            now: () => Date.now(),
+            // What each character's gear lets the check fit (a Book's topic), offered on its card.
+            situationsOf: (actorId) => {
+              const actor = draft.actors.find((candidate) => candidate.id === actorId);
+              if (!actor) return [];
+              const definition = actor.definitionId ? kit.resolveDefinitionIn(draft, actor.definitionId) : undefined;
+              return checkSituations(deriveEquipment(actor, definition, kit.equipmentCatalog()));
+            }
+          }
         );
       });
       if (!committed.duplicate) {
@@ -211,7 +327,8 @@ export const rollCommands = [
             commandId: request.commandId,
             callId: request.callId,
             actorId: request.actorId,
-            ...(request.face !== undefined ? { face: request.face } : {})
+            ...(request.face !== undefined ? { face: request.face } : {}),
+            ...(request.situations !== undefined ? { situations: request.situations } : {})
           },
           checkDeps(kit, principal, draft, geometry)
         );
@@ -219,6 +336,7 @@ export const rollCommands = [
       if (duplicate || !result) return;
       kit.publishRolls(state, request.commandId);
       narrateVerdict(kit, request.actorId, result, blind ? "gm-only" : "public");
+      kit.publishNarrations(result.events ?? []);
       return checkReply(result);
     }
   }),
@@ -241,7 +359,7 @@ export const rollCommands = [
     type: "actor.set-heroic-inspiration",
     operationId: "setHeroicInspiration",
     description:
-      "Gives or takes a character's Heroic Inspiration (GM-grade only). A character holds at most one; spending it rerolls one die of a check, a save, a death save or an attack (`reroll` on those commands). A Human regains it on finishing a Long Rest (Resourceful).",
+      "Gives or takes a character's Heroic Inspiration (GM-grade only). A character holds at most one; spending it rerolls one die of a check, a save, a death save or an attack (`reroll` on those commands). A Human regains it on finishing a Long Rest (Resourceful). A player character given one while holding one holds the second as a gift (`heroicInspirationToGive`), which its player gives to a player character who lacks one or lets go (`actor.give-heroic-inspiration`). Taking it away takes the gift too.",
     summary: "Give or take a character's Heroic Inspiration (GM).",
     schema: ActorSetHeroicInspirationSchema,
     malformed: "The Heroic Inspiration change is malformed.",
@@ -250,7 +368,11 @@ export const rollCommands = [
       const committed = await execute((draft) => {
         const actor = draft.actors.find((candidate) => candidate.id === request.actorId);
         if (!actor) throw new CommandRejectedError("That character no longer exists.");
-        actor.heroicInspiration = request.has;
+        if (request.has) gainHeroicInspiration(actor);
+        else {
+          actor.heroicInspiration = false;
+          actor.heroicInspirationToGive = false;
+        }
       });
       if (!committed.duplicate)
         kit.context.appendLog({
@@ -258,6 +380,33 @@ export const rollCommands = [
           text: `${kit.actorName(request.actorId)} ${request.has ? "gains" : "no longer has"} Heroic Inspiration.`,
           actorId: request.actorId,
           actorIds: [request.actorId],
+          gmOnly: kit.actorHidden(request.actorId)
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.give-heroic-inspiration",
+    operationId: "giveHeroicInspiration",
+    description:
+      "Gives the second Heroic Inspiration a character gained while holding one to a player character in the party who lacks one, or lets it go (`recipientId` null). SRD Heroic Inspiration: the excess is lost unless you give it to a player character who lacks it. The character's player or the GM decides; refused when the character holds no second one or the recipient already has Heroic Inspiration.",
+    summary: "Give a character's second Heroic Inspiration to a party member who lacks one, or let it go.",
+    schema: ActorGiveHeroicInspirationSchema,
+    malformed: "The Heroic Inspiration gift is malformed.",
+    async run({ principal, request, execute }, kit) {
+      let recipient: string | null = null;
+      const committed = await execute((draft) => {
+        recipient = giveHeroicInspiration(draft, initiatorOf(principal), request.actorId, request.recipientId);
+      });
+      if (!committed.duplicate)
+        kit.context.appendLog({
+          kind: "action",
+          text:
+            recipient === null
+              ? `${kit.actorName(request.actorId)} lets a second Heroic Inspiration go.`
+              : `${kit.actorName(request.actorId)} gives Heroic Inspiration to ${recipient}.`,
+          actorId: request.actorId,
+          actorIds: [request.actorId, ...(request.recipientId ? [request.recipientId] : [])],
           gmOnly: kit.actorHidden(request.actorId)
         });
     }

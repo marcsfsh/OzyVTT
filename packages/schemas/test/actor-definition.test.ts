@@ -487,7 +487,7 @@ describe("actor definition v1", () => {
     expect(RiderWhenSchema.safeParse([{ type: "while-condition", conditionIds: ["poisonned"] }]).success).toBe(false);
   });
 
-  it("declares twenty-nine named triggers, every one classified and accepted by the JSON twin", () => {
+  it("declares forty-eight named triggers, every one classified and accepted by the JSON twin", () => {
     // One sample per trigger: the JSON twin folds parameterless moments into one enum branch, so a branch count would
     // not prove agreement.
     const samples: Record<string, Record<string, unknown>> = {
@@ -500,14 +500,18 @@ describe("actor definition v1", () => {
       "while-effect-tag": { tags: ["raging"] },
       "while-hp-at-or-below": { percent: 50 },
       "while-condition": { conditionIds: ["frightened"], present: false },
+      "while-marking": { tags: ["sworn-enemy"] },
+      "while-attuned-to": { itemIds: ["gauntlets-of-ogre-power"] },
       "on-attack-roll": {},
       "on-hit": {},
       "on-critical-hit": {},
+      "on-natural-20": {},
       "on-damage-roll": {},
       "on-saving-throw": {},
       "on-ability-check": {},
       "on-initiative-roll": {},
       "on-taking-damage": {},
+      "on-healing": {},
       "attack-kind-is": { kinds: ["opportunity"] },
       "weapon-property-is": { properties: ["finesse"] },
       "damage-type-is": { damageTypes: ["fire"] },
@@ -516,28 +520,43 @@ describe("actor definition v1", () => {
       "spell-school-is": { schools: ["evocation"] },
       "spell-level-is": { levels: [0, 3] },
       "spell-id-is": { spellIds: ["eldritch-blast"] },
-      "versus-creature-type": { creatureTypes: ["undead"] },
+      "versus-creature-type": { creatureTypes: ["undead"], except: true },
+      "other-weapon": {},
       "versus-size": { sizes: ["large"] },
       "versus-condition": { conditionIds: ["prone"] },
-      "by-effect-source": {}
+      "by-effect-source": {},
+      "sees-other": {},
+      "seen-by-other": {},
+      "other-lacks-sense": { senses: ["blindsight"] },
+      "source-creature-type-is": { creatureTypes: ["fiend"] },
+      "versus-effect-source": {},
+      "versus-marked": { tags: ["grapple"] },
+      "versus-hurt": {},
+      "versus-within": { feet: 15 },
+      "spell-class-is": { classIds: ["sorcerer"] },
+      "situation-is": { situation: "where the Crowbar's leverage applies" },
+      "weapon-is": { ids: ["longbow", "shortbow"] },
+      "versus-magic": {},
+      "versus-spell": {},
+      "versus-breath-weapon": {}
     };
     const declared = RiderTriggerSchema.options.map((option) => option.shape.type.value as string);
-    expect(declared).toHaveLength(29);
+    expect(declared).toHaveLength(48);
     expect(Object.keys(samples).sort()).toEqual([...declared].sort());
     // Every trigger must be classified, or it would evaluate in the wrong layer.
     const kinds = declared.map((type) => RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS]);
     expect(kinds.filter((kind) => kind === undefined)).toEqual([]);
-    expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(6);
-    expect(kinds.filter((kind) => kind === "dynamic-gate")).toHaveLength(3);
-    expect(kinds.filter((kind) => kind === "moment")).toHaveLength(8);
-    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(12);
+    expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(7);
+    expect(kinds.filter((kind) => kind === "dynamic-gate")).toHaveLength(4);
+    expect(kinds.filter((kind) => kind === "moment")).toHaveLength(10);
+    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(27);
 
     for (const type of declared) {
       const trigger = { type, ...samples[type] };
-      // A filter needs a moment beside it.
+      // A filter needs a moment beside it; a situation fits only an ability check.
       const when =
         RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS] === "filter"
-          ? [{ type: "on-hit" }, trigger]
+          ? [{ type: type === "situation-is" ? "on-ability-check" : "on-hit" }, trigger]
           : [trigger];
       expect(RiderWhenSchema.safeParse(when).success, type).toBe(true);
       const definition = structuredClone(legacyDefinition) as Record<string, any>;

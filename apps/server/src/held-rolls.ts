@@ -24,6 +24,9 @@ const HELD_LIMIT = 100;
  *  other key names one pending roll (a save, a death save, a reaction, a check), which keeps its die until answered. */
 const turnScoped = (key: string) => key.startsWith("attack:");
 
+/** A character's latest loose save (one rolled with nothing owed), held for Heroic Inspiration's reroll. */
+export const looseSaveKey = (actorId: string) => `loose-save:${actorId}`;
+
 /** The held dice for a roll, when they still belong to it. */
 export function heldRollFor(state: GameState, key: string): HeldRoll | undefined {
   const held = state.heldRolls.find((entry) => entry.key === key);
@@ -33,16 +36,21 @@ export function heldRollFor(state: GameState, key: string): HeldRoll | undefined
   return held;
 }
 
-/** Holds a roll's dice under its key, over any earlier hold of that key. The oldest go once the list is full. */
+/** Holds a roll's dice under its key, over any earlier hold of that key. The oldest go once the list is full. What
+ *  answered the earlier hold (`roll-answers.ts`) stays with the roll unless `answers` starts it afresh. */
 export function holdRoll(
   state: GameState,
-  held: Omit<HeldRoll, "round" | "turnActorId" | "createdAt" | "rollId" | "typed" | "others"> &
-    Partial<Pick<HeldRoll, "rollId" | "typed" | "others">>
+  held: Omit<HeldRoll, "round" | "turnActorId" | "createdAt" | "rollId" | "typed" | "others" | "answers"> &
+    Partial<Pick<HeldRoll, "rollId" | "typed" | "others" | "answers">>
 ): void {
+  const earlier = state.heldRolls.find((candidate) => candidate.key === held.key);
   const entry: HeldRoll = {
     rollId: null,
     typed: false,
     others: [],
+    answers: earlier?.answers ?? [],
+    ...(earlier?.readAs !== undefined && held.answers === undefined ? { readAs: earlier.readAs } : {}),
+    ...(earlier?.asked !== undefined && held.answers === undefined ? { asked: earlier.asked } : {}),
     ...held,
     round: state.combat.round,
     turnActorId: state.combat.turnActorId,
@@ -127,13 +135,15 @@ export function rollHeldTest(
   key: string,
   actor: Actor,
   scope: Initiator,
-  mode: RollMode,
+  rulesMode: RollMode,
   modifier: number,
   diceTerms: string,
   options: Readonly<{ face?: number; reroll?: boolean }>,
   random: RandomSource
 ): HeldTest {
   const held = heldRollFor(state, key);
+  // A reroll with Advantage (Countercharm) reads its dice that way.
+  const mode = held?.readAs ?? rulesMode;
   const resolveFor = (faces: readonly number[], readAs: RollMode, others: HeldRoll["others"]) =>
     resolveWithD20s(d20TestFormula(readAs, modifier) + diceTerms, faces, random, others);
   if (options.face !== undefined) {

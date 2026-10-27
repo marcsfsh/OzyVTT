@@ -46,7 +46,8 @@ export function CodexShell({
   activeSceneId = null,
   onActivateScene = () => {},
   onOpenReplay,
-  gameHours = null
+  gameHours = null,
+  gameMinutes = 0
 }: Readonly<{
   gmToken: string;
   scenes?: readonly WorkspaceScene[];
@@ -56,6 +57,8 @@ export function CodexShell({
   onOpenReplay?: (archiveId: number) => void;
   /** The game clock (`rest.clockHours`), whose hour goes with the calendar's date. */
   gameHours?: number | null;
+  /** The minutes past that hour (`rest.clockMinutes`). */
+  gameMinutes?: number;
 }>) {
   const route = useRoute();
   const address = codexSectionOf(route.segments);
@@ -160,13 +163,14 @@ export function CodexShell({
       onActivateScene,
       onOpenReplay,
       gameHours,
+      gameMinutes,
       autosave: feeds.autosave,
       feeds,
       quickCreate: setQuickCreate,
       reportError: setActionError,
       openPreview: (characterId) => void openPreview(characterId)
     }),
-    [scenes, actors, party, activeSceneId, onActivateScene, onOpenReplay, gameHours, feeds, openPreview]
+    [scenes, actors, party, activeSceneId, onActivateScene, onOpenReplay, gameHours, gameMinutes, feeds, openPreview]
   );
 
   const View = section ? CODEX_SECTIONS[section].gm : null;

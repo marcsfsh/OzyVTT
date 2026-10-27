@@ -368,6 +368,7 @@
   --fs-sm: 13px;
   --fs-xs: 11px;
   --fs-2xs: 10px; /* uppercase tracked labels only, never body */
+  --fs-field-touch: 16px; /* the least a field takes on a touch screen; iOS zooms into a focused field below it */
 
   --lh-tight: 1.15;
   --lh-snug: 1.3;
@@ -774,6 +775,26 @@ a,
 summary {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* While the zoom guard holds the page (`apps/client/src/lib/zoom-guard.ts`), a finger scrolls and a pinch or a double
+   tap leaves the page alone. Every element carries it because WebKit starts each scroller's touch-action afresh.
+   `:where()` adds no specificity, so a component's own value wins and a drag surface keeps `none`. An engine that
+   can't read the pair keeps `manipulation`, which still stops a double tap. */
+:where([data-zoom-guard], [data-zoom-guard] *) {
+  touch-action: manipulation;
+  touch-action: pan-x pan-y;
+}
+
+/* iOS zooms the page into a focused field whose text is under 16px, so on a touch screen every field you type in or
+   pick from is at least that. The title variant is larger already. Every field rule sets its own size, hence
+   `!important`. */
+@media (any-pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], .nh-input--title),
+  select,
+  textarea {
+    font-size: var(--fs-field-touch) !important;
+  }
 }
 
 /* 44px hit-area floor for controls painted smaller (icon buttons, chip removes): the pseudo-element grows

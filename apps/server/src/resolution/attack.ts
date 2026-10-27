@@ -1,9 +1,10 @@
-import { armorClassInPlay } from "@vtt/domain";
+import { armorClassInPlay, isDead } from "@vtt/domain";
 import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
+  isMeleeWeapon,
   diceRiders,
   keptD20,
   parseDiceFormula,
@@ -11,7 +12,8 @@ import {
   resolveWithD20s,
   sumRiders,
   weaponAbilityFrom,
-  type AttackKind
+  type AttackKind,
+  type ResolvedRider
 } from "@vtt/rules-5e";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
 import { CommandRejectedError } from "../game-store.js";
@@ -25,32 +27,61 @@ import {
 } from "../held-rolls.js";
 import { GM_CHOICE, magicResistanceOf } from "../saving-throws.js";
 import { criticalThreshold } from "../effective-actions.js";
-import { CONCENTRATING_TAG, endEffect, STEADY_AIM_TAG, UNTIL_IT_ACTS_TAG } from "../effects.js";
+import {
+  CONCENTRATING_TAG,
+  endEffect,
+  INVISIBLE_UNTIL_IT_ACTS_TAG,
+  OUTLINED_TO_SOURCE_TAG,
+  STEADY_AIM_TAG,
+  UNTIL_IT_ACTS_TAG
+} from "../effects.js";
 import {
   deriveEquipment,
   rollModeClaims,
+  weaponIdsOf,
   weaponPropertiesOf,
   type EquipmentDerivation,
   type RollModeClaims
 } from "../equipment-derivation.js";
 import { builtinBaseId } from "../builtin-actions.js";
-import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
+import { itemActionRest, TWO_HANDED_SUFFIX, UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
 import { VEXED_TAG } from "../weapon-mastery.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
-import { holdsFeature } from "../class-features.js";
+import { holdsFeature, spellClassOf } from "../class-features.js";
+import { launchesProjectile } from "../zone-walls.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
-import { auraOfAuthority } from "../statblock-traits.js";
+import { creatureTypeOf, swimSpeedFeet, typeTagsOf } from "../statblock-facts.js";
+import { auraOfAuthority, traitOf } from "../statblock-traits.js";
+import { attachedAdvantage } from "../attachments.js";
+import { hitRiderOf } from "./hit-riders.js";
 import { wardedConditions } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
+import { frightenedApplies, lightSensitivities, sightRules, type SightRules } from "../vision/rules.js";
+import {
+  answeredLines,
+  answersOffered,
+  applyRollAnswer,
+  withAnswers,
+  type AnswerDeps,
+  type AnswerTarget
+} from "../roll-answers.js";
 import {
   endedEffect,
   naturalFace,
   recordRoll,
+  tableLineOf,
   type DefinitionAction,
   type LiveActor,
   type ResolveContext
 } from "./context.js";
+
+/** The tags of the effects a creature has put on creatures that still live, for a rider gated on its mark (the
+ *  Oathbow: "While your sworn enemy lives"). */
+export function markingTagsOf(state: ResolveContext["state"], actorId: string): string[] {
+  return state.actors
+    .filter((other) => other.id !== actorId && !isDead(other))
+    .flatMap((other) => other.effects.filter((effect) => effect.sourceActorId === actorId).flatMap((e) => e.tags));
+}
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
  *  ranged, so a mapless table never hands a thrown weapon melee-gated riders or bonuses. */
@@ -66,7 +97,15 @@ export function attackUsedAsRanged(
 /** melee/ranged/thrown derive from reach and range, spell from the spell the action casts, weapon from a carried
  *  weapon or a character's own non-spell attack, and melee-weapon/ranged-weapon from a weapon attack made in melee or
  *  at range; reaction/opportunity come from `input.attackKinds`. */
-function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind[] {
+export function attackKindsOf(
+  ctx: Readonly<{
+    action: DefinitionAction;
+    attacker: LiveActor;
+    riderItemId: string | null;
+    input: Readonly<{ attackKinds?: readonly AttackKind[] }>;
+  }>,
+  distance: number | null
+): AttackKind[] {
   const { action, input, attacker } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
   const attack = action.attack;
@@ -85,6 +124,22 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
     // non-spell attack (an imported sheet lists its Longsword as an action). A monster's Bite is neither.
     const carried =
       ctx.riderItemId !== null && attacker.inventory.some((item) => item.id === ctx.riderItemId && item.weapon);
+    // A melee swing held in two hands: a Two-Handed weapon, or a Versatile one swung with both (Great Weapon Fighting).
+    const wielded = attacker.inventory.find((item) => item.id === ctx.riderItemId);
+    if (
+      used === "melee" &&
+      wielded?.weapon &&
+      (wielded.weapon.properties?.includes("two-handed") ||
+        itemActionRest(action.id) === `${wielded.id}-${TWO_HANDED_SUFFIX}`)
+    )
+      kinds.add("two-handed");
+    // A weapon of the Ranged kind (Archery: "attack rolls you make with Ranged weapons"), a Dart too; a thrown Dagger
+    // is still a Melee weapon.
+    if (
+      wielded?.weapon &&
+      !isMeleeWeapon(wielded.weapon.properties ?? [], wielded.weapon.rangeFeet, wielded.weapon.melee)
+    )
+      kinds.add("ranged-weapon-kind");
     if (
       !unarmed &&
       action.spellId === undefined &&
@@ -115,9 +170,10 @@ function attackAbilityOf(ctx: ResolveContext): "str" | "dex" | undefined {
 }
 
 /** Conditions that by themselves give an attack advantage or disadvantage (SRD conditions appendix), in
- *  the order the roll card lists them. Frightened applies only while its source is in sight; it applies whenever
- *  active, and the GM's explicit roll mode covers the rest. Invisible (Hide grants it as a linked effect) cuts both
- *  ways; with dynamic vision on, who sees through it is decided by `sightClaims`, else by the GM. */
+ *  the order the roll card lists them. Frightened applies while its source is within line of sight (`frightenedApplies`,
+ *  always with vision off). Invisible (Hide grants it as a linked effect) cuts both ways, except against a creature
+ *  that sees it: with dynamic vision on `sightClaims` decides, else Blindsight, Truesight and See Invisibility by
+ *  distance. */
 const CONDITION_ROLL_MODES: ReadonlyArray<
   Readonly<{ side: "attacker" | "target"; condition: string; mode: "advantage" | "disadvantage" }>
 > = [
@@ -158,6 +214,9 @@ function distractionOf(ctx: ResolveContext, target: LiveActor) {
   });
 }
 const outlined = (actor: LiveActor) => actor.effects.some((effect) => effect.tags.includes(OUTLINED_TAG));
+/** Mind Spike: "if it has the Invisible condition, it gains no benefit from that condition against you". */
+const outlinedTo = (actor: LiveActor, viewerId: string) =>
+  actor.effects.some((effect) => effect.tags.includes(OUTLINED_TO_SOURCE_TAG) && effect.sourceActorId === viewerId);
 
 /** Riders on both sides at `on-attack-roll`, read whoever's turn it is (opportunity attacks are off-turn): the
  *  attacker's claims on its attack (Reckless Attack, a cursed blade) and the target's on attacks against it
@@ -169,9 +228,53 @@ function riderClaims(
   targetDerivation: EquipmentDerivation,
   sources: RollModeClaims
 ): void {
-  rollModeClaims(ctx.derivation, ["attack"], "on-attack-roll", ctx.riderFilters, sources);
+  // Who sees whom, for a rider that asks (Dodge against an attacker its bearer can see, Faerie Fire's Advantage for an
+  // attacker that can see the outlined creature, Blur against one without Blindsight or Truesight).
+  const rules = sightRulesOf(ctx);
+  const sensing = (viewerId: string, bearerId: string) => sensesReaching(ctx, rules, viewerId, bearerId);
+  rollModeClaims(
+    ctx.derivation,
+    ["attack"],
+    "on-attack-roll",
+    {
+      ...ctx.riderFilters,
+      seesOther: rules.canSee(ctx.attacker.id, target.id),
+      seenByOther: rules.canSee(target.id, ctx.attacker.id),
+      otherSenses: sensing(target.id, ctx.attacker.id)
+    },
+    sources
+  );
+  // What the target put on the attacker against attacks on itself (Bestow Curse), read only for
+  // `versus-effect-source` riders so nothing counts twice.
+  const curses = ctx.attacker.effects
+    .filter((effect) => effect.sourceActorId === target.id)
+    .map((effect) => ({
+      label: effect.name,
+      sourceEffectId: effect.id,
+      modifiers: effect.modifiers.filter((modifier) =>
+        modifier.when?.some((gate) => gate.type === "versus-effect-source")
+      )
+    }))
+    .filter((curse) => curse.modifiers.length > 0);
+  if (curses.length > 0)
+    rollModeClaims(
+      { ...ctx.derivation, carriers: curses },
+      ["attack"],
+      "on-attack-roll",
+      { ...ctx.riderFilters, targetIsEffectSource: true },
+      sources
+    );
   const kinds = ctx.riderFilters.attackKinds;
-  const filters = kinds ? { attackKinds: kinds } : {};
+  // The attacker's kind, for the target's riders against it (Protection from Evil and Good).
+  const attackerType = creatureTypeOf(ctx.attacker, ctx.deps.definition);
+  const filters = {
+    ...(kinds ? { attackKinds: kinds } : {}),
+    ...(attackerType !== null ? { sourceCreatureType: attackerType } : {}),
+    sourceTypeTags: typeTagsOf(ctx.deps.definition),
+    seesOther: rules.canSee(target.id, ctx.attacker.id),
+    seenByOther: rules.canSee(ctx.attacker.id, target.id),
+    otherSenses: sensing(ctx.attacker.id, target.id)
+  };
   rollModeClaims(targetDerivation, ["incoming-attack"], "on-attack-roll", filters, sources, "Target: ");
   // What this attacker left on the target against itself alone (Multiattack Defense after its hit), read only for
   // `by-effect-source` riders so nothing counts twice.
@@ -194,6 +297,37 @@ function riderClaims(
     );
 }
 
+const sightRulesMemo = new WeakMap<ResolveContext, SightRules>();
+
+const sightContentOf = ({ deps }: ResolveContext) => ({
+  ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+  ...(deps.catalog ? { catalog: deps.catalog } : {})
+});
+
+/** The rules' sight for this resolve: the map's with dynamic vision on, else the conditions and senses by distance. */
+function sightRulesOf(ctx: ResolveContext): SightRules {
+  let rules = sightRulesMemo.get(ctx);
+  if (!rules) {
+    rules = sightRules(ctx.state, sightContentOf(ctx), ctx.deps.distanceFeet);
+    sightRulesMemo.set(ctx, rules);
+  }
+  return rules;
+}
+
+/** The senses `viewerId` perceives `bearerId` with, within their range (Blur reads Blindsight and Truesight). */
+function sensesReaching(ctx: ResolveContext, rules: SightRules, viewerId: string, bearerId: string): string[] {
+  const senses = rules.sensesOf(viewerId);
+  const feet = ctx.deps.distanceFeet?.(viewerId, bearerId) ?? null;
+  if (!senses || feet === null) return [];
+  const reaches = (range: number) => range > 0 && feet <= range + DISTANCE_TOLERANCE_FEET;
+  return [
+    ...(reaches(senses.blindsight) ? ["blindsight"] : []),
+    ...(reaches(senses.truesight) ? ["truesight"] : []),
+    ...(reaches(senses.tremorsense) ? ["tremorsense"] : []),
+    ...(reaches(senses.seeInvisibility) ? ["see-invisibility"] : [])
+  ];
+}
+
 /** With dynamic vision on, who sees whom (SRD "Unseen Attackers and Targets"): an attack against a target you can't
  *  see has Disadvantage, and one against a creature that can't see you has Advantage. This decides Invisible too,
  *  since the condition gives nothing against a creature that can see you (Blindsight, Truesight). A Blinded side is
@@ -209,13 +343,22 @@ function sightClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeCl
   });
   if (!sight.enabled) return false;
   const invisible = (actor: LiveActor) => has(actor, "invisible") && !outlined(actor);
-  if (!has(target, "blinded") && !sight.sees(target.id, attacker.id))
+  // Unseen only for being Invisible to a creature it is outlined to (Mind Spike's caster) counts as seen.
+  if (
+    !has(target, "blinded") &&
+    !sight.sees(target.id, attacker.id) &&
+    !(invisible(attacker) && outlinedTo(attacker, target.id))
+  )
     sources.advantage.push(
       invisible(attacker)
         ? { source: "attacker-invisible", label: "Attacker is Invisible" }
         : { source: "attacker-unseen", label: "Target can't see the attacker" }
     );
-  if (!has(attacker, "blinded") && !sight.sees(attacker.id, target.id))
+  if (
+    !has(attacker, "blinded") &&
+    !sight.sees(attacker.id, target.id) &&
+    !(invisible(target) && outlinedTo(target, attacker.id))
+  )
     sources.disadvantage.push(
       invisible(target)
         ? { source: "target-invisible", label: "Target is Invisible" }
@@ -237,16 +380,29 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
         ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
       })
     : [];
+  const rules = sightRulesOf(ctx);
   for (const entry of CONDITION_ROLL_MODES) {
     const side = entry.side === "attacker" ? attacker : target;
     if (!has(side, entry.condition)) continue;
     if (entry.side === "attacker" && warded.includes(entry.condition)) continue;
     if (entry.condition === "invisible" && (outlined(side) || sighted)) continue;
+    // Invisible gives nothing against the creature it is outlined to (Mind Spike).
+    const other = entry.side === "attacker" ? target : attacker;
+    if (entry.condition === "invisible" && outlinedTo(side, other.id)) continue;
+    // "If a creature can somehow see you, you don't gain this benefit against that creature": with vision off, its
+    // Blindsight, Truesight or See Invisibility reaching you.
+    if (entry.condition === "invisible" && entry.side === "attacker" && rules.canSee(target.id, attacker.id)) continue;
+    if (entry.condition === "invisible" && entry.side === "target" && rules.canSee(attacker.id, target.id)) continue;
+    // Frightened: only "while the source of fear is within line of sight".
+    if (entry.condition === "frightened" && !frightenedApplies(attacker, rules)) continue;
     sources[entry.mode].push({
       source: `${entry.side}-${entry.condition}`,
       label: `${entry.side === "attacker" ? "Attacker" : "Target"} is ${conditionLabel(entry.condition)}`
     });
   }
+  // Sunlight Sensitivity and Light Sensitivity: Disadvantage on its attack rolls where it stands in the light.
+  for (const name of lightSensitivities(ctx.state, attacker, "attack", rules, sightContentOf(ctx)))
+    sources.disadvantage.push({ source: "light-sensitivity", label: `${name} (attacker in the light)` });
   // Grappled: disadvantage against anyone but the grappler, known only via a source-linked effect; a
   // hand-set Grappled applies against everyone (the GM's rollMode overrides).
   if (has(attacker, "grappled")) {
@@ -302,15 +458,23 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
   if (attack.rangeFeet === undefined || !deps.distanceFeet || !ranged) return;
   const normal = attack.rangeNormalFeet;
   if (normal !== undefined && distance !== null && distance > normal + 1e-6) {
-    sources.disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
+    // A rider may set long range's Disadvantage aside (the Oathbow against its sworn enemy).
+    const waived = collectRiders(ctx.derivation.carriers, {
+      ...ctx.derivation.context,
+      ...ctx.riderFilters,
+      moment: "on-attack-roll"
+    }).find((rider) => rider.modifier.type === "ignores-long-range");
+    if (!waived) sources.disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
   }
-  // An able enemy within 5 feet spoils the shot; "who can see you" stays GM adjudication. A creature at 0 HP is
-  // dead or dying, and an ally is no enemy whatever its kind.
+  // An able enemy within 5 feet "who can see you" spoils the shot. A creature at 0 HP is dead or dying, and an ally is
+  // no enemy whatever its kind.
+  const rules = sightRulesOf(ctx);
   for (const entry of state.combat.initiative) {
     if (entry.actorId === attacker.id) continue;
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!enemy || enemy.hp.current <= 0 || isIncapacitated(enemy)) continue;
     if (!areEnemies(attacker, enemy, deps.resolveDefinition)) continue;
+    if (!rules.canSee(enemy.id, attacker.id)) continue;
     // A creature hidden from the table (GM-only, out of every character's sight, or under the fog) never spoils a
     // visible attacker's shot on its own: the Disadvantage would show in the public dice. The GM can still impose it.
     if (ctx.hiddenFromTable(enemy.id) && !ctx.hiddenFromTable(attacker.id)) continue;
@@ -337,8 +501,28 @@ function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeCl
   // Points."
   if (target.hp.current < target.hp.maximum && holdsFeature(deps.definition, "blood-frenzy", "Blood Frenzy"))
     sources.advantage.push({ source: "blood-frenzy", label: "Blood Frenzy (target is hurt)" });
+  // What the attack's own printing gives it (SRD 5.2.1: "with Advantage if the target is Grappled by the ankheg").
+  const printed = ctx.action.attack?.advantageWhen;
+  if (
+    printed === "target-grappled-by-self" &&
+    target.effects.some(
+      (effect) => effect.sourceActorId === attacker.id && effect.linkedConditionIds.includes("grappled")
+    )
+  )
+    sources.advantage.push({ source: "printed", label: `${ctx.action.name} (target Grappled by ${attacker.name})` });
+  if (printed === "target-hurt" && target.hp.current < target.hp.maximum)
+    sources.advantage.push({ source: "printed", label: `${ctx.action.name} (target is hurt)` });
+  if (printed === "first-round" && state.combat.active && state.combat.round === 1)
+    sources.advantage.push({ source: "printed", label: `${ctx.action.name} (first round)` });
   const authority = auraOfAuthority(state, attacker, deps);
   if (authority) sources.advantage.push(authority);
+  // "While attached to a target, the darkmantle can attack only the target but has Advantage on its attack rolls."
+  if (attachedAdvantage(state, attacker.id, target.id))
+    sources.advantage.push({ source: "attached", label: `${attacker.name} attached to ${target.name}` });
+  // SRD Blurred Form (a steam mephit): "Attack rolls against the mephit are made with Disadvantage unless the mephit
+  // has the Incapacitated condition."
+  const blurred = traitOf(target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, "blurred");
+  if (blurred && !isIncapacitated(target)) sources.disadvantage.push({ source: "blurred", label: blurred.name });
   if (!deps.distanceFeet || !holdsFeature(deps.definition, "pack-tactics", "Pack Tactics")) return;
   for (const entry of state.combat.initiative) {
     const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
@@ -366,6 +550,14 @@ function attackRollSources(
   conditionClaims(ctx, target, distance, sources);
   positionClaims(ctx, distance, sources);
   traitClaims(ctx, target, sources);
+  // SRD Elusive: "No attack roll can have Advantage against you" while its gates hold.
+  const denied = collectRiders(targetDerivation.carriers, { ...targetDerivation.context, moment: null }).find(
+    (rider) => rider.modifier.type === "advantage-denied" && rider.modifier.roll === "incoming-attack"
+  );
+  if (denied && sources.advantage.length > 0) {
+    sources.advantage = [];
+    ctx.warnings.push(`${denied.label}: no attack roll has Advantage against ${target.name}.`);
+  }
   return sources;
 }
 
@@ -473,16 +665,34 @@ function rollBonusDice(
   });
 }
 
+/** The most cover each degree an attacker ignores sets aside: Half Cover's +2, or Three-Quarters Cover's +5 too. */
+const COVER_IGNORED: Readonly<Record<"half" | "three-quarters", number>> = { half: 2, "three-quarters": 5 };
+
+/** The widest cover the attacker's riders ignore on this attack roll, with the carrier that does. */
+function coverIgnoredBy(
+  riders: readonly ResolvedRider[]
+): Readonly<{ degree: "half" | "three-quarters"; label: string }> | null {
+  let found: { degree: "half" | "three-quarters"; label: string } | null = null;
+  for (const rider of riders) {
+    const degree = rider.modifier.type === "ignores-cover" ? rider.modifier.degree : undefined;
+    if (degree === undefined) continue;
+    if (found === null || COVER_IGNORED[degree] > COVER_IGNORED[found.degree]) found = { degree, label: rider.label };
+  }
+  return found;
+}
+
 /** The attack roll against the one target: rider filters, roll mode, bonus, the d20 and the outcome
  *  (2024: a hit on an Unconscious or Paralyzed creature from within 5 feet is a critical hit). */
 export function rollAttack(ctx: ResolveContext): void {
-  const { attacker, targets, input, deps, derivation, warnings } = ctx;
+  const { state, attacker, targets, input, deps, derivation, warnings } = ctx;
   const action: DefinitionAction = ctx.action;
   // The spell this action is, on both branches: the spell filters must gate a save spell's riders too.
   const spell = action.spellId === undefined ? undefined : deps.catalog?.spellRecord?.(action.spellId);
+  const spellClassId = spellClassOf(deps.definition, action.spellId);
   const spellFilter = {
     ...(action.spellId !== undefined ? { spellId: action.spellId } : {}),
-    ...(spell ? { spellSchool: spell.school, spellLevel: spell.level } : {})
+    ...(spell ? { spellSchool: spell.school, spellLevel: spell.level } : {}),
+    ...(spellClassId !== null ? { spellClassId } : {})
   };
   // `damage-type-is` depends only on the action, so a save spell (Burning Hands) must match like an
   // attack spell (Fire Bolt) does.
@@ -494,27 +704,46 @@ export function rollAttack(ctx: ResolveContext): void {
   const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
   const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
   const targetDerivation = deriveEquipment(target, targetDefinition, deps.catalog);
-  const creatureType = targetDefinition ? statblockFacts(targetDefinition).creatureType : null;
+  // A character with no printed type is a Humanoid (a lycanthrope's Bite curses one).
+  const creatureType = creatureTypeOf(target, targetDefinition);
   const ability = attackAbilityOf(ctx);
   ctx.riderFilters = {
     attackKinds: attackKindsOf(ctx, distance),
     ...(ability ? { ability } : {}),
     weaponProperties: weaponPropertiesOf(ctx.riderItemId, attacker.inventory),
+    // Which weapon it is, by its id and the base a magic weapon is bound to (Bracers of Archery's bows).
+    weaponIds: weaponIdsOf(ctx.riderItemId, attacker.inventory),
     damageTypes,
     targetSize: target.size ?? "medium",
     targetConditionIds: target.conditions.map((condition) => condition.id),
     ...(creatureType !== null ? { targetCreatureType: creatureType } : {}),
+    targetTypeTags: typeTagsOf(targetDefinition),
     sourceItemId: ctx.riderItemId,
+    // The marks the attacker keeps on creatures that still live (the Oathbow's sworn enemy).
+    markingTags: markingTagsOf(ctx.state, attacker.id),
+    // What the attacker left on the target (its grapple, its Hunter's Mark), whether it is hurt, and how far it is.
+    targetMarkTags: target.effects
+      .filter((effect) => effect.sourceActorId === attacker.id)
+      .flatMap((effect) => effect.tags),
+    targetHurt: target.hp.current < target.hp.maximum,
+    ...(distance !== null ? { targetDistanceFeet: distance } : {}),
     ...spellFilter
   };
   const sources = attackRollSources(ctx, target, targetDerivation, distance);
   const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
   // Only the GM's choice reaches here (a player's is stripped by the command); it wins and is named as the GM's.
   const forced = input.rollMode ?? undefined;
-  const mode = forced ?? aggregated.mode;
+  ctx.forgoneAdvantageBy = forced === undefined ? forgoneFor(ctx, sources) : null;
+  const mode = forced ?? (ctx.forgoneAdvantageBy !== null ? "normal" : aggregated.mode);
+  if (ctx.forgoneAdvantageBy !== null)
+    warnings.push(
+      `${ctx.attacker.name} gives up this roll's Advantage for ${ctx.siblings.find((sibling) => sibling.id === ctx.forgoneAdvantageBy)?.name ?? "a declared strike"}.`
+    );
   ctx.rollMode =
     forced === undefined
-      ? aggregated
+      ? ctx.forgoneAdvantageBy !== null
+        ? { mode: "normal", advantage: [], disadvantage: [] }
+        : aggregated
       : {
           mode: forced,
           advantage: forced === "advantage" ? [GM_CHOICE] : [],
@@ -529,58 +758,173 @@ export function rollAttack(ctx: ResolveContext): void {
   });
   const momentaryAttackBonus = sumRiders(atRoll, "attack-bonus");
   // Exhaustion applies -2 x level to every D20 Test (SRD 5.2.1); explained as a warning line.
-  const bonus = action.attack.bonus + exhaustionPenalty(attacker) + momentaryAttackBonus;
+  // Sundering Blow: the next attack roll another creature makes against the target gains +5.
+  const sundering = sunderingOf(ctx, target);
+  if (sundering) warnings.push(`${sundering.name}: +5 to this attack roll against ${target.name}.`);
+  const bonus = action.attack.bonus + exhaustionPenalty(attacker) + momentaryAttackBonus + (sundering ? 5 : 0);
   if (exhaustionLevel(attacker) > 0)
     warnings.push(`Exhaustion ${exhaustionLevel(attacker)}: −${2 * exhaustionLevel(attacker)} to the attack roll.`);
-  const { naturalRoll, total: rolled, declaredCrit } = rollD20(ctx, mode, bonus);
+  // What answered this roll on an earlier look (`roll-answers.ts`) counts in this one; a confirm releases the die, so
+  // the answers are read first.
+  const answeredBefore = input.holdKey ? heldRollFor(state, input.holdKey) : undefined;
+  if (input.answer && (input.commit !== false || input.holdKey === undefined || input.reroll === true))
+    throw new CommandRejectedError("Answer the attack roll on a look of its own, before you confirm it.");
+  if (input.answer && !answeredBefore)
+    throw new CommandRejectedError("Roll first: an answer meets a roll that was made.");
+  let thrown = rollD20(ctx, mode, bonus);
   // Dice riders are never folded into the bonus, standing or not.
   const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
   const bonusDice = rollBonusDice(ctx, diceRiders([...standing, ...atRoll], "attack-bonus"));
-  const total = rolled + bonusDice.reduce((sum, entry) => sum + (entry.total ?? 0), 0);
+  const diceTotal = bonusDice.reduce((sum, entry) => sum + (entry.total ?? 0), 0);
   const manualTotal = input.attackTotal !== undefined;
 
   // Cover raises the effective AC (SRD Cover: +2 half, +5 three-quarters), and so does a reaction against this
   // attack (Parry); both are shown in the result. A lasting reaction bonus (Shield) is already in `armorClassInPlay`.
+  // An attacker that ignores cover of a degree sets it aside (Wand of the War Mage: Half Cover on a spell attack).
+  const ignoresCover = coverIgnoredBy([...standing, ...atRoll]);
+  const coverSetAside =
+    ignoresCover !== null && ctx.coverBonus > 0 && ctx.coverBonus <= COVER_IGNORED[ignoresCover.degree];
+  if (coverSetAside)
+    warnings.push(`${ignoresCover.label}: ${attacker.name} ignores ${target.name}'s cover on this attack roll.`);
+  const coverBonus = coverSetAside ? 0 : ctx.coverBonus;
   const reactionBonus = input.reactionAcBonus?.amount ?? 0;
   const inPlay = armorClassInPlay(target);
-  const targetAc = inPlay !== undefined ? inPlay + ctx.coverBonus + reactionBonus : null;
-  // A declared crit (total mode) or a natural roll at or above the threshold crits (a `critical-range`
-  // rider can widen it); a nat 1 fumbles when the die is known or, with a typed total, declared.
-  ctx.crit =
-    declaredCrit || (!manualTotal && naturalRoll >= criticalThreshold(derivation, attacker, action, ctx.riderFilters));
-  let outcome = ctx.crit
-    ? ("crit" as const)
-    : naturalRoll === 1
-      ? ("fumble" as const)
-      : targetAc === null
-        ? ("unknown" as const)
-        : total >= targetAc
-          ? ("hit" as const)
-          : ("miss" as const);
-  // SRD Greater Magic Resistance: "the attack rolls of spells automatically miss it". Said to the GM only, since the
-  // reason names a trait of the stat block.
-  if (action.spellId !== undefined && magicResistanceOf(targetDefinition) === "succeeds") {
-    outcome = "miss";
-    ctx.crit = false;
-    if (deps.initiatorRole !== "player")
-      warnings.push(`${target.name}'s Greater Magic Resistance: spell attack rolls automatically miss it.`);
-  }
-  if (outcome === "hit" && (has(target, "unconscious") || has(target, "paralyzed"))) {
-    if ((distance !== null && distance <= 5) || (distance === null && action.attack.reachFeet !== undefined)) {
-      outcome = "crit";
-      ctx.crit = true;
+  // An AC bonus against this kind of attack alone (an Arrow-Catching Shield's +2 against ranged attack rolls).
+  const againstThis = collectRiders(targetDerivation.carriers, {
+    ...targetDerivation.context,
+    ...(ctx.riderFilters.attackKinds ? { attackKinds: ctx.riderFilters.attackKinds } : {}),
+    moment: "on-attack-roll"
+  }).filter((rider) => rider.modifier.type === "armor-class");
+  const momentaryAc = sumRiders(againstThis, "armor-class");
+  for (const rider of againstThis)
+    warnings.push(`${rider.label}: +${rider.modifier.amount ?? 0} to ${target.name}'s AC against this attack.`);
+  const targetAc = inPlay !== undefined ? inPlay + coverBonus + reactionBonus + momentaryAc : null;
+  // "Any Critical Hit against you becomes a normal hit" (Adamantine Armor), read on the target as the attack lands.
+  const critImmune = [
+    ...collectRiders(targetDerivation.carriers, { ...targetDerivation.context, moment: null }),
+    ...collectRiders(targetDerivation.carriers, {
+      ...targetDerivation.context,
+      ...(ctx.riderFilters.attackKinds ? { attackKinds: ctx.riderFilters.attackKinds } : {}),
+      moment: "on-attack-roll"
+    })
+  ].find((rider) => rider.modifier.type === "no-critical-hits");
+  const answersHeld = () =>
+    input.commit === false && input.holdKey !== undefined ? heldRollFor(state, input.holdKey) : answeredBefore;
+  // SRD Wind Wall: ordinary projectiles launched at a target behind the wall "miss automatically".
+  const deflectedBy = launchesProjectile(action, attacker, ctx.riderItemId)
+    ? (deps.deflectedBy?.(attacker.id, target.id) ?? null)
+    : null;
+  /** The roll as its die, its bonus and its answers make it, against the target's AC. */
+  const judge = () => {
+    const read = withAnswers(answersHeld(), thrown.naturalRoll, thrown.total + diceTotal);
+    const naturalRoll = read.natural;
+    // A declared crit (total mode) or a natural roll at or above the threshold crits (a `critical-range`
+    // rider can widen it); a nat 1 fumbles when the die is known or, with a typed total, declared.
+    let crit =
+      thrown.declaredCrit ||
+      (!manualTotal && naturalRoll >= criticalThreshold(derivation, attacker, action, ctx.riderFilters));
+    let outcome: "crit" | "fumble" | "unknown" | "hit" | "miss" = crit
+      ? "crit"
+      : naturalRoll === 1
+        ? "fumble"
+        : targetAc === null
+          ? "unknown"
+          : read.total >= targetAc
+            ? "hit"
+            : "miss";
+    // SRD Greater Magic Resistance: "the attack rolls of spells automatically miss it".
+    const resisted =
+      (action.spellId !== undefined && magicResistanceOf(targetDefinition) === "succeeds") || deflectedBy !== null;
+    if (resisted) {
+      outcome = "miss";
+      crit = false;
     }
+    // Boon of Combat Prowess: "When you miss with an attack roll, you can hit instead."
+    if (read.hit && !resisted && (outcome === "miss" || outcome === "fumble")) outcome = "hit";
+    if (outcome === "hit" && (has(target, "unconscious") || has(target, "paralyzed"))) {
+      if ((distance !== null && distance <= 5) || (distance === null && reachFeet !== undefined)) {
+        outcome = "crit";
+        crit = true;
+      }
+    }
+    if (crit && critImmune) {
+      outcome = "hit";
+      crit = false;
+    }
+    return { naturalRoll, total: read.total, outcome, crit, resisted, read };
+  };
+  const reachFeet = action.attack.reachFeet;
+  let judged = judge();
+  const answerTarget = (): AnswerTarget => ({
+    kind: "attack",
+    roller: attacker,
+    key: input.holdKey ?? "",
+    natural: judged.naturalRoll,
+    total: judged.total,
+    // A miss fails and a hit succeeds; an attack with no AC on record is the GM's to judge.
+    threshold: judged.outcome === "unknown" ? null : targetAc,
+    ...(judged.outcome === "fumble" || judged.resisted
+      ? { automatic: "fail" as const }
+      : judged.outcome === "crit" || judged.read.hit
+        ? { automatic: "succeed" as const }
+        : {}),
+    mode: ctx.rollMode?.mode ?? mode,
+    ...(action.spellId !== undefined ? { spellAttack: true } : {}),
+    purpose: "attack",
+    label: `${action.name} attack roll`,
+    visibility: ctx.rollBase.visibility
+  });
+  if (input.answer) {
+    const events = applyRollAnswer(state, answerTarget(), attacker, input.answer, attackAnswerDeps(ctx));
+    for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+    // A reroll answer changed the held die; this look reads it.
+    thrown = rollD20(ctx, mode, bonus);
+    judged = judge();
   }
+  ctx.crit = judged.crit;
+  if (critImmune && judged.outcome === "hit" && thrown.naturalRoll >= 20)
+    warnings.push(`${critImmune.label}: the Critical Hit against ${target.name} is a normal hit.`);
+  if (deflectedBy !== null) warnings.push(`${deflectedBy} deflects the shot, and it misses ${target.name}.`);
+  else if (judged.resisted && deps.initiatorRole !== "player")
+    warnings.push(`${target.name}'s Greater Magic Resistance: spell attack rolls automatically miss it.`);
+  const held = answersHeld();
+  ctx.attackAnswerBonus = judged.read.bonus;
+  ctx.answeredHit = judged.read.hit;
+  const answered = answeredLines(held);
+  const offered =
+    input.commit === false && input.holdKey !== undefined && held !== undefined
+      ? answersOffered(state, answerTarget(), attackAnswerDeps(ctx))
+      : [];
   ctx.attack = {
     targetId: target.id,
     targetName: target.name,
-    total,
-    naturalRoll,
+    total: judged.total,
+    naturalRoll: judged.naturalRoll,
     targetAc,
-    outcome,
-    ...(ctx.coverBonus > 0 ? { coverBonus: ctx.coverBonus } : {}),
+    outcome: judged.outcome,
+    ...(coverBonus > 0 ? { coverBonus } : {}),
     ...(input.reactionAcBonus ? { reactionAcBonus: { ...input.reactionAcBonus } } : {}),
-    ...(bonusDice.length > 0 ? { bonusDice } : {})
+    ...(bonusDice.length > 0 ? { bonusDice } : {}),
+    ...(answered.length > 0 ? { answered } : {}),
+    ...(offered.length > 0 ? { answers: offered } : {})
+  };
+}
+
+/** What an answer to an attack roll needs from the resolve. */
+function attackAnswerDeps(ctx: ResolveContext): AnswerDeps {
+  const { deps } = ctx;
+  return {
+    // The attacker's own sheet is the one the resolve holds, read when no other lookup is given.
+    resolveDefinition: (id) =>
+      deps.resolveDefinition?.(id) ?? (id === ctx.attacker.definitionId ? deps.definition : undefined),
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    random: deps.random,
+    newRollId: deps.newRollId,
+    sessionId: ctx.rollBase.initiatorSessionId,
+    role: ctx.rollBase.initiatorRole,
+    now: deps.now,
+    commandId: ctx.input.commandId,
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
   };
 }
 
@@ -593,6 +937,63 @@ export function spendDistraction(ctx: ResolveContext): void {
   if (!distraction) return;
   endEffect(state, target.id, distraction.id);
   effectsEnded.push(endedEffect(target, distraction));
+}
+
+/** Sundering Blow on its bearer: the next attack roll made against it by a creature other than its source gains +5. */
+export const SUNDERED_TAG = "sundered";
+
+/** The Sundering Blow this attack roll gains, if any: one per roll, and never the source's own. */
+function sunderingOf(ctx: ResolveContext, target: LiveActor) {
+  return target.effects.find(
+    (effect) => effect.tags.includes(SUNDERED_TAG) && effect.sourceActorId !== ctx.attacker.id
+  );
+}
+
+/** The attack roll that gained a Sundering Blow's +5 spends it, hit or miss. Spent once the attack lands for good, so a
+ *  parked attack's replay still counts it. */
+export function spendSundering(ctx: ResolveContext): void {
+  const { state, attack, targets, effectsEnded, input } = ctx;
+  if (attack === null || input.commit === false) return;
+  const target = targets[0];
+  const sundering = target ? sunderingOf(ctx, target) : undefined;
+  if (!target || !sundering) return;
+  endEffect(state, target.id, sundering.id);
+  effectsEnded.push(endedEffect(target, sundering));
+}
+
+/** A declared strike's mark on its bearer (Brutal Strike): the next qualifying attack roll gives up its Advantage. */
+export const FORGOES_ADVANTAGE_TAG = "forgoes-advantage";
+
+/** SRD Brutal Strike: "you can forgo any Advantage on one Strength-based attack roll of your choice on your turn. The
+ *  chosen attack roll mustn't have Disadvantage." The rider declared before the roll whose hit this roll may carry, or
+ *  null. A parked attack's replay says which it was. */
+function forgoneFor(ctx: ResolveContext, sources: RollModeClaims): string | null {
+  const { attacker, state, input, siblings } = ctx;
+  if (input.forgoneAdvantageBy !== undefined) return input.forgoneAdvantageBy;
+  if (state.combat.turnActorId !== attacker.id) return null;
+  if (sources.advantage.length === 0 || sources.disadvantage.length > 0) return null;
+  const kinds = ctx.riderFilters.attackKinds ?? [];
+  for (const effect of attacker.effects.filter((candidate) => candidate.tags.includes(FORGOES_ADVANTAGE_TAG))) {
+    const declared = siblings.find((sibling) => sibling.id === effect.sourceActionId);
+    const rider = declared ? hitRiderOf(declared) : undefined;
+    if (!declared || !rider?.declaredBeforeRoll) continue;
+    const strength = ctx.riderFilters.ability === "str" && (kinds.includes("weapon") || kinds.includes("unarmed"));
+    if (rider.rides === "strength-attack" && !strength) continue;
+    return declared.id;
+  }
+  return null;
+}
+
+/** The roll that gave up its Advantage spends the declaration, hit or miss. */
+export function spendForgoneDeclaration(ctx: ResolveContext): void {
+  const { state, attacker, effectsEnded, input } = ctx;
+  if (ctx.forgoneAdvantageBy === null || input.forgoneAdvantageBy !== undefined) return;
+  const declaration = attacker.effects.find(
+    (effect) => effect.tags.includes(FORGOES_ADVANTAGE_TAG) && effect.sourceActionId === ctx.forgoneAdvantageBy
+  );
+  if (!declaration) return;
+  endEffect(state, attacker.id, declaration.id);
+  effectsEnded.push(endedEffect(attacker, declaration));
 }
 
 /** Steady Aim gives Advantage on the next attack roll this turn: the roll spends it, hit or miss, while the Speed 0 it
@@ -641,8 +1042,14 @@ export function spendUntilAttacked(ctx: ResolveContext): void {
 export function spendUntilItActs(ctx: ResolveContext): void {
   const { state, action, attacker, attack, input, damage, effectsEnded } = ctx;
   if (input.commit === false) return;
-  const acted = attack !== null || action.spellId !== undefined || action.spellSlot !== undefined || damage.length > 0;
+  const acted =
+    attack !== null ||
+    action.spellId !== undefined ||
+    action.spellSlot !== undefined ||
+    damage.length > 0 ||
+    action.endsUntilItActs === true;
   if (!acted) return;
+  dropInvisibilityOnActing(ctx);
   for (const effect of attacker.effects.filter(
     (candidate) => candidate.tags.includes(UNTIL_IT_ACTS_TAG) && !candidate.id.startsWith(input.commandId)
   )) {
@@ -660,6 +1067,33 @@ export function spendUntilItActs(ctx: ResolveContext): void {
       endEffect(state, caster.id, holding.id);
       effectsEnded.push(endedEffect(caster, holding));
     }
+  }
+}
+
+/** SRD Mislead: "the invisibility ends immediately after you make an attack roll, deal damage, or cast a spell", while
+ *  the spell and its double go on. The effect lets go of Invisible, which ends unless something else holds it. */
+function dropInvisibilityOnActing(ctx: ResolveContext): void {
+  const { attacker, input, tableNarration } = ctx;
+  for (const effect of attacker.effects.filter(
+    (candidate) =>
+      candidate.tags.includes(INVISIBLE_UNTIL_IT_ACTS_TAG) &&
+      candidate.linkedConditionIds.includes("invisible") &&
+      !candidate.id.startsWith(input.commandId)
+  )) {
+    attacker.effects = attacker.effects.map((candidate) =>
+      candidate.id === effect.id
+        ? { ...candidate, linkedConditionIds: candidate.linkedConditionIds.filter((id) => id !== "invisible") }
+        : candidate
+    );
+    const held = attacker.effects.some((candidate) => candidate.linkedConditionIds.includes("invisible"));
+    const entry = attacker.conditions.find((condition) => condition.id === "invisible");
+    if (held || !entry || entry.standalone) continue;
+    attacker.conditions = attacker.conditions.filter((condition) => condition.id !== "invisible");
+    tableNarration.push({
+      kind: "effect",
+      text: `${attacker.name} is no longer Invisible (${effect.name} goes on).`,
+      actorIds: [attacker.id]
+    });
   }
 }
 

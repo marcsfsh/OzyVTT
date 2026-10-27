@@ -832,6 +832,7 @@ const MAGIC_KEYS = [
   "damageTypeChoice",
   "vulnerableToOtherChoices",
   "removesArmorDrawbacks",
+  "study",
   "casts",
   "grantsFeatIds",
   "modifiers",
@@ -840,7 +841,8 @@ const MAGIC_KEYS = [
   "actions",
   "effects",
   "tags",
-  "appliesTo"
+  "appliesTo",
+  "onHit"
 ];
 
 const EQUIPMENT_SCHEMA: HomebrewSchema = {
@@ -986,7 +988,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "Only by",
           kind: "tags",
           placeholder: "cleric",
-          help: "A class or species. It's shown on the sheet and never enforced, because handing a player a restricted item on purpose is a normal table event.",
+          help: "A class, a species, spellcaster, or creature-attuned-to-a- followed by an item's id. Any one is enough. It's shown on the sheet, and a player can't attune a character that meets none. You can still attune anyone.",
           visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
         },
         {
@@ -994,7 +996,13 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "Cursed",
           kind: "switch",
           help: "Players can't unattune, unequip or drop it. Only you can. Its magic stays hidden from them until they attune.",
-          visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
+          visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true,
+          // The curse's vulnerability switch hides with it, so it goes with it, or publishing refuses a switch no one
+          // can see.
+          write: (next, draft) => {
+            const { vulnerableToOtherChoices: _curse, ...rest } = draft;
+            return next === true ? { ...draft, cursed: true } : { ...rest, cursed: false };
+          }
         },
         // The charges themselves are the `uses` on its spells and actions; these say how they come back.
         {
@@ -1033,7 +1041,10 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             ((getAt(draft, "grants.damageResistances") as unknown[] | undefined)?.length ?? 0) > 0,
           write: (next, draft) => {
             const { damageTypeChoice: _old, ...rest } = draft;
-            return Array.isArray(next) && next.length > 0 ? { ...rest, damageTypeChoice: next } : rest;
+            if (Array.isArray(next) && next.length > 0) return { ...rest, damageTypeChoice: next };
+            // With no choice the curse's vulnerability switch hides, so it goes too.
+            const { vulnerableToOtherChoices: _curse, ...bare } = rest;
+            return bare;
           }
         },
         // Like Armor of Vulnerability: the curse makes the bearer vulnerable to every choice it doesn't resist.
@@ -1427,7 +1438,21 @@ const MONSTER_SCHEMA: HomebrewSchema = {
         { key: "token.footprint.width", label: "Token width", kind: "stepper", min: 1, max: 4, unit: "squares" },
         { key: "token.footprint.height", label: "Token height", kind: "stepper", min: 1, max: 4, unit: "squares" },
         { key: "legendary.actionsPerRound", label: "Legendary actions per round", kind: "number", min: 1, max: 5 },
-        { key: "legendary.resistancesPerDay", label: "Legendary resistances per day", kind: "number", min: 1, max: 6 }
+        { key: "legendary.resistancesPerDay", label: "Legendary resistances per day", kind: "number", min: 1, max: 6 },
+        {
+          key: "legendary.actionsInLair",
+          label: "Legendary actions per round in its lair",
+          kind: "number",
+          min: 1,
+          max: 5
+        },
+        {
+          key: "legendary.resistancesInLair",
+          label: "Legendary resistances per day in its lair",
+          kind: "number",
+          min: 1,
+          max: 6
+        }
       ]
     }
   ]

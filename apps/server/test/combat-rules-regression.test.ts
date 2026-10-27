@@ -37,6 +37,15 @@ import { RulesBlockedError } from "../src/game-store.js";
 // without Rage, a single-roll Extra Attack, unresisted damage against a raging barbarian, grapples with
 // no state, and 1-HP heals standing in for dying must be blocked, guided, or engine-owned (ADR-0020).
 
+/** A turn has just ended and the next creature hasn't acted yet: the window a legendary action is taken in (SRD 5.2.1
+ *  "Immediately after another creature's turn"), one action a creature. */
+function legendaryWindow(game: GameState): void {
+  game.combat = {
+    ...game.combat,
+    turn: { ...game.combat.turn, afterActorId: "10000000-0000-4000-8000-0000000000ff", legendaryTakenBy: [] }
+  };
+}
+
 const IDS = {
   torva: "10000000-0000-4000-8000-000000000001",
   pip: "10000000-0000-4000-8000-000000000002",
@@ -1050,6 +1059,23 @@ describe("reaction prompts: Uncanny Dodge (ADR-0020 amendment)", () => {
       { ...deps(faces, definition), resolveDefinition: gameResolver(game) }
     );
 
+  // SRD Uncanny Dodge: "When an attacker that you can see hits you".
+  it("opens no prompt for an attacker Pip can't see, with the map's vision off", () => {
+    const game = crocTurn();
+    const croc = game.actors.find((actor) => actor.id === IDS.croc1)!;
+    croc.conditions = [{ id: "invisible" }] as typeof croc.conditions;
+    const bite = resolveLive(
+      game,
+      crocodileDefinition,
+      "bite",
+      { actorId: IDS.croc1, targetIds: [IDS.pip] },
+      [15, 15, 6, 6, 6]
+    );
+    expect(bite.attack?.outcome).toBe("hit");
+    expect(bite.reactionPrompts ?? []).toEqual([]);
+    expect(game.combat.pendingReactions).toEqual([]);
+  });
+
   it("parks a hit's damage on a pending prompt instead of the apply button", () => {
     const game = crocTurn();
     // Croc 1 bites Pip: 15 + 8 = 23 vs AC 16 hits; 6+6+6+5 = 23 piercing.
@@ -1061,7 +1087,7 @@ describe("reaction prompts: Uncanny Dodge (ADR-0020 amendment)", () => {
       [15, 6, 6, 6]
     );
     expect(bite.reactionPrompts).toEqual([
-      { actorId: IDS.pip, actorName: "Pip Underbough", actionName: "Uncanny Dodge" }
+      { actorId: IDS.pip, actorName: "Pip Underbough", actionName: "Uncanny Dodge", holdsDamage: true }
     ]);
     expect(game.combat.pendingReactions).toHaveLength(1);
     const prompt = game.combat.pendingReactions[0];
@@ -3751,11 +3777,14 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
   it("spends the per-round pool off-turn, blocks past it and on its own turn, and refills at its turn start", () => {
     const game = buildBossGame();
     // Torva's turn: the boss swipes (cost 1; d20 15 + 9 = 24 hits AC 15, 1d8 → 4).
+    legendaryWindow(game);
     resolve(game, bossDefinition, "tail-swipe", { actorId: BOSS, targetIds: [IDS.torva] }, [15, 4]);
     expect(game.combat.legendaryUsed[BOSS]).toBe(1);
+    legendaryWindow(game);
     // Wing Storm costs 2 → the pool is empty (3/3 spent).
     resolve(game, bossDefinition, "wing-storm", { actorId: BOSS, targetIds: [IDS.torva] }, []);
     expect(game.combat.legendaryUsed[BOSS]).toBe(3);
+    legendaryWindow(game);
     expect(() =>
       resolve(game, bossDefinition, "tail-swipe", { actorId: BOSS, targetIds: [IDS.torva] }, [15, 4])
     ).toThrowError(/0 of 3 legendary actions left/);
@@ -3947,17 +3976,24 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
   it("the SRD bundle carries legendary resources (adult red dragon golden check + coverage floors)", () => {
     const monsters = loadMonsterDefinitions();
     const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
-    expect(dragon.legendary).toEqual({ actionsPerRound: 3, resistancesPerDay: 3 });
+    // "Legendary Action Uses: 3 (4 in Lair)" and "Legendary Resistance (3/Day, or 4/Day in Lair)".
+    expect(dragon.legendary).toEqual({
+      actionsPerRound: 3,
+      resistancesPerDay: 3,
+      actionsInLair: 4,
+      resistancesInLair: 4
+    });
     // "The dragon can't take this action again until the start of its next turn."
     expect(dragon.actions.find((action) => action.id === "commanding-presence")!.legendary).toEqual({
       cost: 1,
       oncePerRound: true
     });
-    // SRD 5.2.1: all 30 legendary creatures print "Legendary Action Uses: 3" (the lair bump stays
-    // prose); 32 creatures carry Legendary Resistance; every legendary action row costs 1.
+    // SRD 5.2.1: all 30 legendary creatures print "Legendary Action Uses: 3" (4 in a lair); 32 creatures carry
+    // Legendary Resistance; every printed legendary action costs 1, and the choices printed inside one cost the same.
     expect(monsters.filter((monster) => monster.legendary?.actionsPerRound === 3).length).toBe(30);
     expect(monsters.filter((monster) => monster.legendary?.resistancesPerDay !== undefined).length).toBe(32);
-    expect(monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary).length).toBe(82);
+    const legendary = monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary);
+    expect(legendary.filter((action) => action.partOf === undefined).length).toBe(82);
   });
 });
 
@@ -4128,7 +4164,8 @@ describe("Bonus Action forms of the generic actions (SRD Cunning Action, Nimble 
   it("lists a Rogue's Cunning Action forms and none for a creature without the feature", () => {
     const ids = (definition: ActorDefinition) =>
       builtinActionsFor(definition)
-        .filter((action) => action.activation === "bonus-action")
+        // The forms a feature gives, beside the catalog's own Bonus Actions (Move the Sphere).
+        .filter((action) => action.activation === "bonus-action" && action.id.endsWith("-bonus"))
         .map((action) => `${action.id}:${action.name}`);
     expect(ids(pipDefinition)).toEqual([
       "dash-bonus:Cunning Action: Dash",
@@ -4506,17 +4543,21 @@ describe("Monster actions as the stat block prints them (Multiattack, legendary 
 
   it("spends a prose legendary action's cost, refuses one taken again before the creature's turn, and swings Pounce", () => {
     const { game, act } = fight("adult-red-dragon", true); // Torva's turn
+    legendaryWindow(game);
     act("commanding-presence", []);
     expect(game.combat.legendaryUsed[MONSTER]).toBe(1);
+    legendaryWindow(game);
     expect(() => act("commanding-presence", [])).toThrow(
       /can't take Commanding Presence again until the start of its next turn/
     );
+    legendaryWindow(game);
     const pounce = act("pounce");
     expect(pounce.attack).toMatchObject({ outcome: "hit" });
     expect(game.combat.legendaryUsed[MONSTER]).toBe(2);
     nextInitiativeTurn(game); // the dragon's own turn: the pool and the once-a-round marks refill
     expect(game.combat.legendaryUsed).toEqual({});
     nextInitiativeTurn(game);
+    legendaryWindow(game);
     act("commanding-presence", []);
     expect(game.combat.legendaryUsed[MONSTER]).toBe(1);
   });

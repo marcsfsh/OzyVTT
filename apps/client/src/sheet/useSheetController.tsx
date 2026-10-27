@@ -9,10 +9,12 @@ import {
   type PlayerPendingSave,
   type PlayerView
 } from "@vtt/domain";
+import type { CastShaping } from "@vtt/schemas";
 import { useToast } from "@vtt/ui";
 import { regainedText } from "../encounter/ActionResultHead";
 import { HealTargetPicker, type LooseHeal } from "../encounter/HealTargetPicker";
-import { summaryOfOwnAction } from "../encounter/PlayerActionRunner";
+import { ShapeShiftDialog, type LooseShift } from "../encounter/ShapeShiftDialog";
+import { summaryOfOwnAction, withShapeOffer } from "../encounter/PlayerActionRunner";
 import { sameName } from "../encounter/sheet-names";
 import { beginTargeting, setTargetingResult } from "../encounter/targeting";
 import { command } from "../lib/command";
@@ -108,7 +110,46 @@ export function useSheetController({
       .sort((left, right) => Number(right.kind === "player-character") - Number(left.kind === "player-character"))
       .map((other) => ({ id: other.id, name: other.name }))
   ];
+  // Whom a spell cast outside a fight may target, as the server allows: this character, the party and the creatures
+  // the player can see (for the GM, anyone on the roster).
+  const castCandidates = [
+    { id: actor.id, name: actor.name },
+    ...rosterActors<GmActor | PlayerActor>(state?.actors ?? [])
+      .filter((other) => other.id !== actor.id && !("archived" in other && other.archived))
+      .sort((left, right) => Number(right.kind === "player-character") - Number(left.kind === "player-character"))
+      .map((other) => ({ id: other.id, name: other.name }))
+  ];
   const [looseHeal, setLooseHeal] = useState<LooseHeal | null>(null);
+  const [looseShift, setLooseShift] = useState<LooseShift | null>(null);
+  /** A shape-shift outside a fight (Wild Shape, Polymorph, Enlarge/Reduce) asks for its form, and its targets when it
+   *  has any, before the server resolves it. */
+  const looseShiftOf = (actionId: string, slotLevel?: number, shaping?: readonly CastShaping[]): LooseShift | null => {
+    const row = serverActions.find((candidate) => candidate.id === actionId);
+    if (!row || (!row.forms && !row.options)) return null;
+    return {
+      action: row,
+      aims: row.targeting === "single" || row.targeting === "multi" ? row.targeting : "none",
+      ...(slotLevel !== undefined ? { slotLevel } : {}),
+      ...(shaping && shaping.length > 0 ? { shaping } : {})
+    };
+  };
+  /** A spell cast outside a fight at creatures it helps or makes save (Aid, Hold Person) asks whom it targets, so the
+   *  server resolves it as it would in a fight. An attack or a save-less blast rolls loose as before. */
+  const looseCastOf = (actionId: string, slotLevel?: number, shaping?: readonly CastShaping[]): LooseHeal | null => {
+    const row = serverActions.find((candidate) => candidate.id === actionId);
+    if (!row || row.healing || (row.targeting !== "single" && row.targeting !== "multi")) return null;
+    if (row.attackBonus !== null || (row.saveAbility === null && row.damage.length > 0)) return null;
+    return {
+      actionId,
+      name: row.name,
+      most: row.targeting === "single" ? 1 : castCandidates.length,
+      spendUpTo: null,
+      purpose: "cast",
+      ...(slotLevel !== undefined ? { slotLevel } : {}),
+      ...(shaping && shaping.length > 0 ? { shaping } : {}),
+      includeDamage: true
+    };
+  };
   // A heal outside a fight asks who regains the hit points, unless it only heals its user (Second Wind).
   const looseHealOf = (actionId: string, slotLevel?: number, includeDamage?: boolean): LooseHeal | null => {
     const own = definition?.actions.find((candidate) => candidate.id === actionId);
@@ -128,16 +169,43 @@ export function useSheetController({
   /** An action used through the server's loose route, which rolls it and spends what it costs (a heal asks who it
    *  lands on first). In a fight the server refuses it off the creature's turn and says why. */
   const sendThroughServer = (actionId: string, extra: Readonly<{ includeDamage?: boolean }> = {}) => {
+    const shift = inFight ? null : looseShiftOf(actionId);
+    if (shift) {
+      setLooseShift(shift);
+      return;
+    }
     const heal = inFight ? null : looseHealOf(actionId, undefined, extra.includeDamage);
     if (heal) setLooseHeal(heal);
     else sendLoose(actionId, extra, "That could not be used.");
   };
   /** Outside the fight, an action is used through the server. */
   const looseAction = inFight ? null : sendThroughServer;
+  const shiftDialog = looseShift ? (
+    <ShapeShiftDialog
+      shift={looseShift}
+      candidates={castCandidates}
+      defaultId={actor.id}
+      onClose={() => setLooseShift(null)}
+      onConfirm={({ targetIds, ...choice }) => {
+        setLooseShift(null);
+        sendLoose(
+          looseShift.action.id,
+          {
+            ...(targetIds.length > 0 ? { targetIds } : {}),
+            ...choice,
+            ...(looseShift.slotLevel !== undefined ? { slotLevel: looseShift.slotLevel } : {}),
+            ...(looseShift.shaping ? { shaping: looseShift.shaping.map((entry) => ({ ...entry })) } : {}),
+            includeDamage: true
+          },
+          "That could not be used."
+        );
+      }}
+    />
+  ) : null;
   const healDialog = looseHeal ? (
     <HealTargetPicker
       heal={looseHeal}
-      candidates={healCandidates}
+      candidates={looseHeal.purpose === "cast" ? castCandidates : healCandidates}
       defaultId={actor.id}
       onClose={() => setLooseHeal(null)}
       onConfirm={(targetIds, spend) => {
@@ -148,38 +216,46 @@ export function useSheetController({
             targetIds,
             ...(spend !== null ? { spend } : {}),
             ...(looseHeal.slotLevel !== undefined ? { slotLevel: looseHeal.slotLevel } : {}),
+            ...(looseHeal.shaping ? { shaping: looseHeal.shaping.map((entry) => ({ ...entry })) } : {}),
             ...(looseHeal.includeDamage ? { includeDamage: true } : {})
           },
-          "That could not be used."
+          looseHeal.purpose === "cast" ? "The spell could not be cast." : "That could not be used."
         );
       }}
     />
   ) : null;
 
-  /** Hands a stat-block action to targeting (pick target, roll, resolve), with the slot a spell is cast at. */
-  const routeAttack = (action: DefinitionAction, slotLevel?: number) => {
+  /** Hands a stat-block action to targeting (pick target, roll, resolve), with the slot a spell is cast at and how its
+   *  caster shapes it. */
+  const routeAttack = (action: DefinitionAction, slotLevel?: number, shaping?: readonly CastShaping[]) => {
     setTargetingResult(null);
     // Magic Missile makes one more dart for each slot level above its own; the server counts them again.
     const darts =
       action.darts !== undefined && slotLevel !== undefined && action.spellSlot
         ? action.darts + Math.max(0, slotLevel - action.spellSlot.level)
         : undefined;
-    // A cast with nothing to aim at (Spirit Guardians' Emanation) picks no targets, as the server says.
-    const own = summaryOfOwnAction(action);
+    // A cast with nothing to aim at (Spirit Guardians' Emanation) picks no targets, as the server says, and its
+    // Metamagic's picks are named among its targets with the server's counts.
+    const row = serverActions.find((candidate) => candidate.id === action.id);
+    const offers = row?.shaping;
+    // A shape-shift picks its form as it is aimed (Polymorph), and Enlarge/Reduce its effect.
+    const own = withShapeOffer({ ...summaryOfOwnAction(action), ...(offers ? { shaping: offers } : {}) }, row);
     const aimless =
       own.targeting === undefined && serverActions.some((row) => row.id === action.id && row.targeting === "none");
-    beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts);
+    beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts, shaping);
     if (attackMode === "jump") onJumpToInitiative?.();
   };
-  /** A server-derived action (an item's) handed to targeting by its id; the numbers are for display only. */
-  const routeSummary = (row: ContentActionSummary) => {
+  /** A server-derived action (an item's) handed to targeting by its id; the numbers are for display only. With
+   *  `fastHands`, a Thief takes it as a Bonus Action. */
+  const routeSummary = (row: ContentActionSummary, fastHands = false) => {
     setTargetingResult(null);
-    beginTargeting(row, actor.id);
+    beginTargeting(row, actor.id, undefined, undefined, undefined, fastHands ? { fastHands: true } : {});
     if (attackMode === "jump") onJumpToInitiative?.();
   };
-  /** An item's own action from its detail: aimed on the character's turn, rolled by the server outside a fight. */
-  const itemAction = (row: ContentActionSummary) => {
-    if (structuredAttacks && role === "player") routeSummary(row);
+  /** An item's own action from its detail: aimed on the character's turn, rolled by the server outside a fight. Fast
+   *  Hands' Bonus Action form is aimed the same way. */
+  const itemAction = (row: ContentActionSummary, options: Readonly<{ fastHands?: boolean }> = {}) => {
+    if ((structuredAttacks && role === "player") || options.fastHands) routeSummary(row, options.fastHands === true);
     else sendThroughServer(row.id, row.damage.length > 0 ? { includeDamage: true } : {});
   };
   /** Why an item's action waits: off the character's turn in a fight, only a reaction can be used. */
@@ -204,7 +280,7 @@ export function useSheetController({
    * A spell's cast through its action: on the player's turn it goes through targeting with its slot; otherwise the
    * server routes it, spending the slot and rolling its dice outside a fight, or refusing off turn.
    */
-  const castSpellAction = (actionId: string, slotLevel?: number) => {
+  const castSpellAction = (actionId: string, slotLevel?: number, shaping?: readonly CastShaping[]) => {
     const note = hitExtraNote(actionId);
     if (note) {
       toast(note);
@@ -212,17 +288,30 @@ export function useSheetController({
     }
     const structured = structuredAttacks ? definition?.actions.find((action) => action.id === actionId) : undefined;
     if (structured) {
-      routeAttack(structured, slotLevel);
+      routeAttack(structured, slotLevel, shaping);
       return;
     }
-    const heal = inFight ? null : looseHealOf(actionId, slotLevel, true);
+    const shaped = shaping && shaping.length > 0 ? shaping : undefined;
+    const shift = inFight ? null : looseShiftOf(actionId, slotLevel, shaped);
+    if (shift) {
+      setLooseShift(shift);
+      return;
+    }
+    const healing = inFight ? null : looseHealOf(actionId, slotLevel, true);
+    const heal = inFight
+      ? null
+      : ((healing && shaped ? { ...healing, shaping: shaped } : healing) ?? looseCastOf(actionId, slotLevel, shaped));
     if (heal) {
       setLooseHeal(heal);
       return;
     }
     sendLoose(
       actionId,
-      { includeDamage: true, ...(slotLevel !== undefined ? { slotLevel } : {}) },
+      {
+        includeDamage: true,
+        ...(slotLevel !== undefined ? { slotLevel } : {}),
+        ...(shaped ? { shaping: shaped.map((entry) => ({ ...entry })) } : {})
+      },
       "The spell could not be cast."
     );
   };
@@ -260,7 +349,8 @@ export function useSheetController({
     sendThroughServer,
     itemAction,
     itemBlocked,
-    healDialog,
+    // A heal's or a shape-shift's picks outside a fight; one at a time.
+    healDialog: healDialog ?? shiftDialog,
     routeAttack,
     routeSummary,
     hitExtraNote,

@@ -56,11 +56,14 @@ export const barbarian: ClassMechanicsModule = {
     "unarmored-defense": {
       modifiers: [{ type: "unarmored-defense", ability: "con", allowShield: true }]
     },
-    // Weapon Mastery grows with the printed column: 2 -> 3 at level 4 -> 4 at level 10.
+    // Weapon Mastery grows with the printed column: 2 -> 3 at level 4 -> 4 at level 10, of "Simple or Martial Melee
+    // weapons". "Whenever you finish a Long Rest, you can practice weapon drills and change one of those weapon
+    // choices": one swap in the step a Long Rest opens.
     "weapon-mastery": {
       extraPicks: [
         { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
-      ]
+      ],
+      replaces: [{ offer: "feature:weapon-mastery", when: "long-rest", amount: 1 }]
     },
     // Advantage on Dexterity saves "unless you have the Incapacitated condition" (or one that includes it).
     "danger-sense": {
@@ -123,10 +126,96 @@ export const barbarian: ClassMechanicsModule = {
     "feral-instinct": {
       modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }]
     },
+    /**
+     * Tapped before the roll, on a turn with Reckless Attack: the next Strength attack roll gives up its Advantage
+     * (refused with Disadvantage), and its hit offers the 1d10 of the weapon's type (2d10 from level 17) and one effect
+     * (two different ones from level 17). Improved Brutal Strike's two effects need its feature.
+     */
+    "brutal-strike": {
+      actions: [
+        {
+          id: "brutal-strike",
+          name: "Brutal Strike",
+          activation: "other",
+          description:
+            "With Reckless Attack, forgo the Advantage on your next Strength-based attack roll this turn (it mustn't have Disadvantage). If it hits, the target takes an extra 1d10 damage of the weapon's type, and you can cause one Brutal Strike effect. Forceful Blow: the target is pushed 15 feet straight away from you, and you can then move up to half your Speed straight toward it without provoking Opportunity Attacks. Hamstring Blow: the target's Speed is reduced by 15 feet until the start of your next turn.",
+          damage: [],
+          damageByLevel: [
+            { level: 9, formula: "1d10", type: "weapon" },
+            { level: 17, formula: "2d10", type: "weapon" }
+          ],
+          requiresEffectTag: "reckless-attack",
+          uses: { limit: 1, per: "turn", pool: "brutal-strike" },
+          grants: {
+            name: "Brutal Strike",
+            tags: ["forgoes-advantage"],
+            duration: { type: "until-source-next-turn" }
+          },
+          ridesHit: {
+            rides: "strength-attack",
+            declaredBeforeRoll: true,
+            ownTurn: true,
+            weaponType: true,
+            effectsChooseByLevel: [
+              { level: 9, choose: 1 },
+              { level: 17, choose: 2 }
+            ],
+            effects: [
+              { id: "forceful-blow", name: "Forceful Blow", push: { feet: 15 }, grantsHalfSpeedMove: true },
+              {
+                id: "hamstring-blow",
+                name: "Hamstring Blow",
+                applies: {
+                  name: "Hamstring Blow",
+                  modifiers: [{ type: "speed", amount: -15 }],
+                  duration: { type: "until-source-next-turn" },
+                  onePerTarget: true
+                }
+              },
+              {
+                id: "staggering-blow",
+                name: "Staggering Blow",
+                requiresFeature: "improved-brutal-strike",
+                applies: {
+                  name: "Staggering Blow",
+                  tags: ["no-opportunity-attacks", "until-own-save"],
+                  modifiers: [{ type: "roll-mode", roll: "save", mode: "disadvantage" }],
+                  duration: { type: "until-source-next-turn" }
+                }
+              },
+              {
+                id: "sundering-blow",
+                name: "Sundering Blow",
+                requiresFeature: "improved-brutal-strike",
+                applies: { name: "Sundering Blow", tags: ["sundered"], duration: { type: "until-source-next-turn" } }
+              }
+            ]
+          }
+        }
+      ]
+    },
     // Once per Long Rest; using it regains every expended Rage. The engine reads the feature by its id for the Rage
     // that lasts 10 minutes outright and ends early only on Unconscious.
     "persistent-rage": {
       uses: { limit: 1, per: "long-rest" }
+    },
+    // "If your total for a Strength check or Strength saving throw is less than your Strength score, you can use that
+    // score in place of the total."
+    "indomitable-might": {
+      modifiers: [
+        {
+          type: "total-minimum",
+          roll: "check",
+          abilityScore: "str",
+          when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str"] }]
+        },
+        {
+          type: "total-minimum",
+          roll: "save",
+          abilityScore: "str",
+          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }]
+        }
+      ]
     },
     "epic-boon": {
       choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
@@ -143,7 +232,7 @@ export const barbarian: ClassMechanicsModule = {
     "path-of-the-berserker": {
       /**
        * DC 8 + Strength + Proficiency Bonus; a failed save is Frightened for 1 minute and repeats the save at the
-       * end of each of its turns. Restoring the use by spending a Rage stays prose.
+       * end of each of its turns. Spending a Rage restores the use (`conversions.ts`).
        */
       "intimidating-presence": {
         uses: { limit: 1, per: "long-rest" },
@@ -191,8 +280,34 @@ export const barbarian: ClassMechanicsModule = {
             reaction: { trigger: "damaged-by-creature", response: "melee-attack", rangeFeet: 5 }
           }
         ]
+      },
+      /** Rides the first Strength-based hit on the Berserker's turn while its Rage and Reckless Attack both hold: d6s
+       *  as many as the Rage Damage column (2 to 8, 3 to 15, then 4), of the weapon's or Unarmed Strike's type. */
+      frenzy: {
+        actions: [
+          {
+            id: "frenzy",
+            name: "Frenzy",
+            activation: "other",
+            description:
+              "If you use Reckless Attack while your Rage is active, you deal extra damage to the first target you hit on your turn with a Strength-based attack. To determine the extra damage, roll a number of d6s equal to your Rage Damage bonus and add them together. The damage has the same type as the weapon or Unarmed Strike used for the attack.",
+            damage: [{ formula: "2d6", type: "bludgeoning" }],
+            damageByLevel: [
+              { level: 3, formula: "2d6", type: "bludgeoning" },
+              { level: 9, formula: "3d6", type: "bludgeoning" },
+              { level: 16, formula: "4d6", type: "bludgeoning" }
+            ],
+            ridesHit: {
+              rides: "strength-attack",
+              ownTurn: true,
+              oncePerTurn: true,
+              firstHitOnTurn: true,
+              weaponType: true,
+              whileEffectTags: ["raging", "reckless-attack"]
+            }
+          }
+        ]
       }
-      // Not modeled: Frenzy (dice count read from the Rage Damage column).
     }
   },
   liveResources: ["rage"]

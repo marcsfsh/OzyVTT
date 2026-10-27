@@ -99,11 +99,7 @@
         "id": "overchannel",
         "name": "Overchannel",
         "level": 14,
-        "description": "You can increase the power of your spells. When you cast a Wizard spell of levels 1-5 that deals damage, you can deal maximum damage with it. The first time you do so, you suffer no adverse effect; using it again before you finish a Long Rest deals necrotic damage to you.",
-        "uses": {
-          "limit": 1,
-          "per": "long-rest"
-        }
+        "description": "You can increase the power of your spells. When you cast a Wizard spell of levels 1-5 that deals damage, you can deal maximum damage with it. The first time you do so, you suffer no adverse effect; using it again before you finish a Long Rest deals necrotic damage to you."
       }
     ]
   },
@@ -237,7 +233,7 @@
             "id": "preserve-life",
             "name": "Channel Divinity: Preserve Life",
             "activation": "action",
-            "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet (up to half each target's Hit Point maximum). The engine splits it evenly among the creatures you pick.",
+            "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet, which can include you, as you choose. None regains past half its Hit Point maximum.",
             "damage": [],
             "healing": {
               "formula": "0",
@@ -246,7 +242,8 @@
             },
             "adds": {
               "classLevel": 5
-            }
+            },
+            "targets": { "rangeFeet": 30, "bloodied": true }
           }
         ],
         "uses": {

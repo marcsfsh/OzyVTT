@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { featurePicks } from "@vtt/content-srd-5.2.1";
+import { featurePicks, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -9,7 +9,9 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { specialSpeedsOf } from "../src/speed.js";
 import { effectiveActions } from "../src/effective-actions.js";
+import { shapingOffers } from "../src/resolution/metamagic.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
+import { applyFailureEffect } from "../src/saving-throws.js";
 import { endEncounter, startEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
 import { builderOffers } from "../src/builder-offers.js";
@@ -223,10 +225,18 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
       per: "long-rest",
       pool: "mystic-arcanum-level-6-spell"
     });
+    // True Seeing consumes "mushroom powder worth 25+ GP", and touches one willing creature, here the Warlock itself.
+    built.hero.inventory.push({
+      id: "mushroom-powder",
+      name: "Mushroom powder",
+      quantity: 2,
+      equipped: false,
+      attuned: false
+    });
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-true-seeing-free"),
-      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000001" },
+      { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000001" },
       deps(built, [])
     );
     expect(built.hero.actionUses["mystic-arcanum-level-6-spell"]).toBe(1);
@@ -234,7 +244,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
       resolveDefinitionAction(
         built.state,
         actionOf(built, "spell-true-seeing-free"),
-        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000002" },
+        { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000002" },
         deps(built, [])
       )
     ).toThrow();
@@ -340,13 +350,17 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
   it("gives it a once-per-Long-Rest counter the engine really spends", () => {
     const built = table(level9());
     expect(actionOf(built, "spell-contact-other-plane-free").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    // Its minute of casting completes at once outside a fight, and the use goes with it.
+    endEncounter(built.state);
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-contact-other-plane-free"),
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000010" },
-      deps(built, [])
+      deps(built, [3, 3, 3, 3, 3, 3])
     );
     expect(built.hero.actionUses["contact-patron"]).toBe(1);
+    // "you automatically succeed on the spell's saving throw": the free cast to the patron opens no save.
+    expect(built.state.combat.pendingSaves).toEqual([]);
     expect(() =>
       resolveDefinitionAction(
         built.state,
@@ -550,8 +564,57 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
       )
     );
 
-  it("proposes 8d10 Psychic against a Charisma save at the Warlock's own spell save DC", () => {
-    const built = level14();
+  /** A Dagger in hand, thrown or stabbed: any attack roll's hit carries Hurl Through Hell. */
+  const armed = (built: Built): Built => {
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      {
+        id: "dagger-x",
+        name: "Dagger",
+        quantity: 1,
+        equipped: true,
+        attuned: false,
+        category: "weapon",
+        weapon: {
+          category: "simple",
+          damageDice: "1d4",
+          damageType: "piercing",
+          rangeFeet: 20,
+          longRangeFeet: 60,
+          melee: true,
+          properties: ["finesse", "light", "thrown"]
+        }
+      }
+    ];
+    return built;
+  };
+  let hurlCommand = 30;
+  /** The action back, as on a later turn, while the long-rest use stays spent. */
+  const freshAction = (built: Built) => {
+    built.state.combat = {
+      ...built.state.combat,
+      turn: { ...built.state.combat.turn, actionUsed: false, actionInstance: null, turnUses: {} }
+    };
+  };
+  const stab = (built: Built, faces: number[], hitOptions?: Array<{ id: string }>, commit = true) =>
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "item-dagger-x"),
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++hurlCommand).padStart(12, "0")}`,
+        ...(hitOptions ? { hitOptions } : {}),
+        ...(commit ? {} : { commit: false })
+      },
+      {
+        ...deps(built, faces),
+        resolveDefinition: (id) => built.state.definitions.find((entry) => entry.id === id)?.definition
+      }
+    );
+
+  it("rides an attack roll's hit and proposes 8d10 Psychic against a Charisma save at the Warlock's own DC", () => {
+    const built = armed(level14());
     // CHA 20 (+5) and proficiency +5 at level 14: DC 8 + 5 + 5 = 18, derived.
     const action = actionOf(built, "hurl-through-hell");
     expect(action.save).toEqual({
@@ -561,44 +624,64 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
       successDamage: "none",
       failureConditions: ["incapacitated"],
       // "until the end of your next turn": the Warlock's.
-      failureDuration: { type: "until-source-turn-end" }
+      failureDuration: { type: "until-source-turn-end" },
+      failureEffect: { name: "Hurled Through Hell", tags: ["off-plane"], modifiers: [] }
     });
     expect(built.definition.spellcasting!.saveDc).toBe(18);
-
-    const hurled = resolveDefinitionAction(
-      built.state,
-      action,
-      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000030" },
-      deps(built, [10, 10, 10, 10, 10, 10, 10, 10])
-    );
-    expect(hurled.damage).toEqual([{ formula: "8d10", type: "psychic", total: 80 }]);
+    expect(stab(built, [15], undefined, false).hitOffers?.map((offer) => offer.id)).toContain("hurl-through-hell");
+    stab(built, [15, 2, 10, 10, 10, 10, 10, 10, 10, 10], [{ id: "hurl-through-hell" }]);
     expect(
       built.state.combat.pendingSaves.map((save) => ({
         ability: save.ability,
         dc: save.dc,
-        damage: save.proposedDamage
+        damage: save.proposedDamage,
+        half: save.halfOnSuccess
       }))
-    ).toEqual([{ ability: "cha", dc: 18, damage: 80 }]);
+    ).toEqual([{ ability: "cha", dc: 18, damage: 80, half: false }]);
   });
 
-  it("is once per Long Rest and refuses the second hurl", () => {
+  it("is refused tapped alone, with no hit to ride", () => {
     const built = level14();
-    expect(actionOf(built, "hurl-through-hell").uses).toMatchObject({ limit: 1, per: "long-rest" });
-    resolveDefinitionAction(
-      built.state,
-      actionOf(built, "hurl-through-hell"),
-      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000031" },
-      deps(built, [1, 1, 1, 1, 1, 1, 1, 1])
-    );
-    expect(built.hero.actionUses["hurl-through-hell"]).toBe(1);
     expect(() =>
       resolveDefinitionAction(
         built.state,
         actionOf(built, "hurl-through-hell"),
-        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000032" },
-        deps(built, [])
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000029" },
+        deps(built, [10, 10, 10, 10, 10, 10, 10, 10])
       )
-    ).toThrow();
+    ).toThrow(/Hurl Through Hell adds to a hit/);
+  });
+
+  it("deals a Fiend no damage", () => {
+    const built = armed(level14());
+    const imp = loadMonsterDefinitions().find((monster) => monster.source.externalId === "imp")!;
+    built.state.definitions.push({ id: "imp", definition: imp });
+    built.state.actors.find((actor) => actor.id === IDS.foe)!.definitionId = "imp";
+    built.state.actors.find((actor) => actor.id === IDS.foe)!.armorClass = 12;
+    const hurled = stab(built, [15, 2], [{ id: "hurl-through-hell" }]);
+    expect(built.state.combat.pendingSaves.map((save) => save.proposedDamage)).toEqual([0]);
+    expect(hurled.warnings).toContain("Hurl Through Hell: Foe is a Fiend and takes no damage.");
+  });
+
+  it("is once per Long Rest and refuses the second hurl", () => {
+    const built = armed(level14());
+    expect(actionOf(built, "hurl-through-hell").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    stab(built, [15, 2, 1, 1, 1, 1, 1, 1, 1, 1], [{ id: "hurl-through-hell" }]);
+    expect(built.hero.actionUses["hurl-through-hell"]).toBe(1);
+    freshAction(built);
+    expect(stab(built, [15], undefined, false).hitOffers?.map((offer) => offer.id) ?? []).not.toContain(
+      "hurl-through-hell"
+    );
+  });
+
+  it("takes a target that fails out of reach: nothing can target it until it returns", () => {
+    const built = armed(level14());
+    stab(built, [15, 2, 1, 1, 1, 1, 1, 1, 1, 1], [{ id: "hurl-through-hell" }]);
+    const save = built.state.combat.pendingSaves[0]!;
+    expect(save.onFailEffect).toMatchObject({ name: "Hurled Through Hell", tags: ["off-plane"] });
+    applyFailureEffect(built.state, IDS.foe, save.onFailEffect!, "hurled", {});
+    freshAction(built);
+    expect(() => stab(built, [15, 2])).toThrow(/Foe is gone from this plane for now and can't be targeted/);
   });
 });
 
@@ -661,7 +744,8 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-water-breathing-free"),
-      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000040" },
+      // Water Breathing is for the willing creatures it names; the Warlock names itself.
+      { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000040" },
       deps(built, [])
     );
     expect(built.hero.actionUses["gift-of-the-depths"]).toBe(1);
@@ -669,7 +753,7 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
       resolveDefinitionAction(
         built.state,
         actionOf(built, "spell-water-breathing-free"),
-        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000041" },
+        { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000041" },
         deps(built, [])
       )
     ).toThrow();
@@ -731,22 +815,58 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
   });
 
   it("rolls 1d10 force PLUS the Warlock's +3, and 1d10 alone without the invocation", () => {
-    // CHA 17 (+3) at level 5. Same two dice both times; the difference is the authored rider.
+    // CHA 17 (+3) at level 5. Same two dice both times; the difference is the invocation's pick.
     const bare = blast("one-with-shadows", [15, 7]);
     expect(bare.damage).toEqual([{ formula: "1d10", type: "force", total: 7 }]);
     expect(bare.damageTotal).toBe(7);
 
     const agonized = blast("agonizing-blast", [15, 7]);
-    expect(agonized.damage).toEqual([
-      { formula: "1d10", type: "force", total: 7 },
-      { formula: "3", type: "force", total: 3 }
-    ]);
+    expect(agonized.damage).toEqual([{ formula: "1d10 + 3", type: "force", total: 10 }]);
     expect(agonized.damageTotal).toBe(10);
-    expect((agonized.warnings ?? []).some((warning) => warning.includes("+3 force (CHA)"))).toBe(true);
+  });
+
+  // "Choose one of your known Warlock cantrips that deals damage. You can add your Charisma modifier to that spell's
+  // damage rolls."
+  it("adds Charisma to the cantrip picked for it, in that cantrip's damage type, and to no other", () => {
+    const KNOWS_CHILL_TOUCH: Row[] = [{ level: 1, classId: "warlock", kind: "cantrip", id: "chill-touch" } as Row];
+    const built = withInvocation("agonizing-blast", [
+      ...KNOWS_ELDRITCH_BLAST,
+      ...KNOWS_CHILL_TOUCH,
+      { level: 5, kind: "cantrip", id: "chill-touch", payload: { featureId: "agonizing-blast" } } as Row
+    ]);
+    const live = table(built);
+    expect(actionOf(live, "spell-chill-touch").damage[0]).toMatchObject({ type: "necrotic" });
+    expect(actionOf(live, "spell-chill-touch").damage[0]!.formula).toMatch(/ \+ 3$/);
+    expect(actionOf(live, "spell-eldritch-blast").damage).toEqual([{ formula: "1d10", type: "force" }]);
+  });
+
+  it("is repeatable, each time for a different cantrip", () => {
+    const KNOWS_CHILL_TOUCH: Row[] = [{ level: 1, classId: "warlock", kind: "cantrip", id: "chill-touch" } as Row];
+    const twice = (second: string) =>
+      buildCharacterDefinition(
+        warlockInput(5, [
+          invocation(1, "armor-of-shadows"),
+          invocation(2, "mask-of-many-faces"),
+          invocation(2, "misty-visions"),
+          invocation(5, "agonizing-blast"),
+          invocation(5, "agonizing-blast"),
+          ...asisFor(5, "dex"),
+          ...KNOWS_ELDRITCH_BLAST,
+          ...KNOWS_CHILL_TOUCH,
+          { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } } as Row,
+          { level: 5, kind: "cantrip", id: second, payload: { featureId: "agonizing-blast" } } as Row
+        ]),
+        library,
+        POLICY
+      );
+    const live = table(twice("chill-touch"));
+    expect(actionOf(live, "spell-eldritch-blast").damage[0]!.formula).toBe("1d10 + 3");
+    expect(actionOf(live, "spell-chill-touch").damage[0]!.formula).toMatch(/ \+ 3$/);
+    expect(() => twice("eldritch-blast")).toThrow();
   });
 
   it("leaves a swing that is not that spell alone", () => {
-    // `spell-id-is` filters: the Warlock's starting sickle is not Eldritch Blast and gains nothing.
+    // The Warlock's starting sickle is not the cantrip picked and gains nothing.
     const built = table(withInvocation("agonizing-blast", [...KNOWS_ELDRITCH_BLAST, ...pointedAtTheBlast]));
     const swung = resolveDefinitionAction(
       built.state,
@@ -760,26 +880,28 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
 });
 
 describe("Warlock invocations: the ones that ask a question of their own (audit rows 24, 25, 50)", () => {
-  // Lessons of the First Ones is not authored. Its nested `{kind: "feat"}` pick cannot be answered:
-  // feat rows are settled before chosen options create their offers, so the row finds no offer, and
-  // omitting it fails the completeness check. If that ordering changes, this fails and the row should be authored.
-  it("still takes Lessons of the First Ones as a bare option, because a nested FEAT pick cannot be answered yet", () => {
-    // Takeable, and it grants only its prose.
-    expect(() => withInvocation("lessons-of-the-first-ones")).not.toThrow();
-    // ...and a feat row aimed at it finds no offer.
-    expect(
-      thrown(() =>
-        withInvocation("lessons-of-the-first-ones", [
-          {
-            level: 5,
-            classId: "warlock",
-            kind: "feat",
-            id: "tough",
-            payload: { featureId: "lessons-of-the-first-ones" }
-          } as Row
-        ])
-      )
-    ).toMatch(/No feature "lessons-of-the-first-ones" offers a "feat" choice/);
+  // Lessons of the First Ones: "allowing you to gain one Origin feat of your choice". The feat row answers a pick
+  // only the chosen invocation makes, so the build places it once the invocation's own offers exist.
+  it("takes Lessons of the First Ones with the Origin feat picked for it", () => {
+    const lessons = (feat: string) =>
+      withInvocation("lessons-of-the-first-ones", [
+        {
+          level: 5,
+          classId: "warlock",
+          kind: "feat",
+          id: feat,
+          payload: { featureId: "lessons-of-the-first-ones" }
+        } as Row
+      ]);
+    const built = lessons("savage-attacker");
+    expect((built.character?.feats ?? []).map((feat) => feat.id)).toContain("savage-attacker");
+    expect(built.actions.some((action) => action.id === "savage-attacker")).toBe(true);
+    // An Origin feat only, and not one already held (the Human's Alert).
+    expect(thrown(() => lessons("grappler"))).toMatch(/grappler/);
+    expect(thrown(() => lessons("alert"))).toMatch(/already on this character/);
+    expect(thrown(() => withInvocation("lessons-of-the-first-ones"))).toMatch(
+      /"Lessons of the First Ones" needs 1 pick\(s\) of kind "feat"/
+    );
   });
 
   it("Pact of the Blade asks which weapon, and records the answer", () => {
@@ -798,26 +920,6 @@ describe("Warlock invocations: the ones that ask a question of their own (audit 
     );
   });
 
-  it("Pact of the Tome asks for THREE cantrips and puts all three on the sheet", () => {
-    const tome = (ids: readonly string[]) =>
-      withInvocation(
-        "pact-of-the-tome",
-        ids.map((id) => ({ level: 5, kind: "cantrip", id, payload: { featureId: "pact-of-the-tome" } }) as Row)
-      );
-    const built = tome(["chill-touch", "minor-illusion", "true-strike"]);
-    for (const id of ["chill-touch", "minor-illusion", "true-strike"]) {
-      expect(spellOf(built, id)).toMatchObject({ id, level: 0, prepared: true });
-    }
-    // A level-5 Warlock's own cantrip budget is 3 and untouched: the book's three are extra.
-    expect((built.spellcasting!.spells ?? []).filter((spell) => spell.level === 0)).toHaveLength(5); // 3 book + 2 Magic Initiate
-    expect(thrown(() => tome(["chill-touch", "minor-illusion"]))).toMatch(
-      /"Pact of the Tome" needs 3 pick\(s\) of kind "cantrip"/
-    );
-    expect(thrown(() => tome(["chill-touch", "minor-illusion", "true-strike", "mage-hand"]))).toMatch(
-      /exceeds what this build may choose/
-    );
-  });
-
   it("Pact of the Chain hands over Find Familiar, free (audit row 36)", () => {
     expect(spellOf(withInvocation("pact-of-the-chain"), "find-familiar")).toMatchObject({
       id: "find-familiar",
@@ -826,6 +928,19 @@ describe("Warlock invocations: the ones that ask a question of their own (audit 
       prepared: true
     });
     expect(spellOf(withoutInvocation(), "find-familiar")).toBeUndefined();
+  });
+
+  it("Pact of the Chain casts Find Familiar as a Magic action and offers the special forms", () => {
+    const built = withInvocation("pact-of-the-chain");
+    const free = built.actions.find((action) => action.id === "spell-find-familiar-free")!;
+    expect(free).toMatchObject({ activation: "action", castsAtOnce: true });
+    // With a slot it is the spell as printed: an hour's casting.
+    expect(built.actions.find((action) => action.id === "spell-find-familiar")?.castsAtOnce).toBeUndefined();
+    const forms = free.summons!.creatures.map((row) => row.monsterId);
+    for (const id of ["imp", "pseudodragon", "quasit", "skeleton", "sphinx-of-wonder", "sprite", "venomous-snake"])
+      expect(forms).toContain(id);
+    // The spell's own forms stay on offer.
+    expect(forms).toContain("owl");
   });
 });
 
@@ -1033,17 +1148,18 @@ describe("Sorcerer: Sorcerous Restoration and Epic Boon (audit row 6, the Sorcer
 
 describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Magic opens", () => {
   it("debits the shared counter, so a Metamagic option and Font of Magic spend one supply", () => {
-    // Careful Spell prints "Cost: 1 Sorcery Point", so the chosen option carries a use of the same
-    // `sorcery-points` pool, and Metamagic is a button that spends.
+    // Distant Spell prints "Cost: 1 Sorcery Point": the cast it shapes pays it from the same `sorcery-points` pool,
+    // which the chosen option's own row names. The row alone spends nothing (metamagic.test.ts).
     const built = table(sorcerer(5));
-    expect(actionOf(built, "careful-spell").uses).toMatchObject({ limit: 5, per: "long-rest", pool: "sorcery-points" });
-
-    resolveDefinitionAction(
-      built.state,
-      actionOf(built, "careful-spell"),
-      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000100" },
-      deps(built, [])
-    );
+    expect(actionOf(built, "distant-spell").uses).toMatchObject({ limit: 5, per: "long-rest", pool: "sorcery-points" });
+    const distantFlame = (commandId: string) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "spell-sacred-flame"),
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId, shaping: [{ id: "distant-spell" }] },
+        deps(built, [4, 4])
+      );
+    distantFlame("50000000-0000-4000-8000-000000000100");
     expect(built.hero.actionUses["sorcery-points"]).toBe(1);
 
     // ...and the four points left are Font of Magic's four: one pool, two ways to spend it.
@@ -1056,19 +1172,15 @@ describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Ma
       );
     }
     expect(built.hero.actionUses["sorcery-points"]).toBe(5);
-    expect(() =>
-      resolveDefinitionAction(
-        built.state,
-        actionOf(built, "distant-spell"),
-        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000119" },
-        deps(built, [])
-      )
-    ).toThrow();
+    built.state.combat = { ...built.state.combat, turn: { ...built.state.combat.turn, actionUsed: false } };
+    expect(thrown(() => distantFlame("50000000-0000-4000-8000-000000000119"))).toMatch(
+      /Ilde has 0 Sorcery Points left, and this cast's Metamagic costs 1/
+    );
   });
 
-  it("gives the two-point options NO counter, because a use is not a cost", () => {
-    // `ActionUsesSchema` counts uses and cannot charge two, so Quickened Spell ("Cost: 2 Sorcery Points")
-    // stays prose. Subtle Spell, at one point, does land.
+  it("gives the two-point options no row of their own: the cast that uses one pays its two points", () => {
+    // Quickened Spell's "Cost: 2 Sorcery Points" is paid by the cast it shapes (metamagic.test.ts); a 1-point option
+    // such as Subtle Spell keeps a row that shows the pool.
     const built = table(sorcerer(10));
     const ids = effectiveActions(built.definition, built.hero, built.catalog).map((entry) => entry.id);
     expect(ids).toContain("subtle-spell");
@@ -1252,6 +1364,8 @@ describe("Draconic Sorcery: Dragon Wings and Dragon Companion carry their daily 
       alwaysPrepared: true
     });
     expect(actionOf(built, "spell-summon-dragon-free").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    // "You can modify it so that it doesn't require Concentration", on every casting of the spell.
+    expect(actionOf(built, "spell-summon-dragon-free").summons?.concentrationOptional).toBe(true);
     // A level-17 Sorcerer has the spell from the level-9 Draconic Spells row, but not the free casting.
     const seventeen = sorcerer(17);
     expect(spellOf(seventeen, "summon-dragon")).toMatchObject({ alwaysPrepared: true });
@@ -1311,28 +1425,26 @@ const wizardInput = (): CharacterCreateRequestInput => ({
   ] as CharacterCreateRequestInput["choices"]
 });
 
-describe("Wizard: Signature Spells becomes two free castings that a Short Rest gives back", () => {
-  it("spends both, refuses the third, and re-arms on a Short Rest", () => {
+describe("Wizard: Signature Spells casts each spell once free, and a Short Rest gives them back", () => {
+  it("casts Fireball free once, refuses a second while Counterspell's stays open, and re-arms on a Short Rest", () => {
     const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
-    // "you can cast each of them once at level 3 without expending a spell slot ... until you finish a
-    // Short or Long Rest": two uses, recovered on a Short Rest.
-    // One pool for both spells' free castings; the per-spell split stays in the text.
-    for (const id of ["spell-fireball-free", "spell-counterspell-free"])
-      expect(actionOf(built, id).uses).toMatchObject({ limit: 2, per: "short-rest", pool: "signature-spells" });
+    // "you can cast each of them once at level 3 without expending a spell slot. Once you do so, you can't cast that
+    // spell in this way again until you finish a Short or Long Rest": a counter for each spell.
+    for (const spell of ["fireball", "counterspell"])
+      expect(actionOf(built, `spell-${spell}-free`).uses).toMatchObject({
+        limit: 1,
+        per: "short-rest",
+        pool: `signature-spells-${spell}`
+      });
 
-    for (const [commandId, id] of [
-      ["50000000-0000-4000-8000-000000000130", "spell-fireball-free"],
-      ["50000000-0000-4000-8000-000000000131", "spell-counterspell-free"]
-    ] as const) {
-      resolveDefinitionAction(
-        built.state,
-        actionOf(built, id),
-        { actorId: IDS.hero, targetIds: [], commandId },
-        // Fireball rolls its 8d6 even with no one in the area.
-        deps(built, Array<number>(8).fill(3))
-      );
-    }
-    expect(built.hero.actionUses["signature-spells"]).toBe(2);
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "spell-fireball-free"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000130" },
+      // Fireball rolls its 8d6 even with no one in the area.
+      deps(built, Array<number>(8).fill(3))
+    );
+    expect(built.hero.actionUses["signature-spells-fireball"]).toBe(1);
     expect(() =>
       resolveDefinitionAction(
         built.state,
@@ -1341,22 +1453,43 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
         deps(built, [])
       )
     ).toThrow();
-    expect(built.hero.actionUses["signature-spells"]).toBe(2); // the refusal spent nothing
+    expect(built.hero.actionUses["signature-spells-fireball"]).toBe(1); // the refusal spent nothing
+    expect(built.hero.actionUses["signature-spells-counterspell"]).toBeUndefined();
 
-    // A Short Rest gives them back. Overchannel, once per Long Rest, is the control and must not come back.
+    // A Short Rest gives it back. Overchannel, once per Long Rest, is the control and must not come back.
     built.hero.actionUses = { ...built.hero.actionUses, overchannel: 1 };
     endEncounter(built.state);
     applyRest(built.state, IDS.hero, "short", () => built.definition, built.catalog);
-    expect(built.hero.actionUses["signature-spells"]).toBeUndefined();
+    expect(built.hero.actionUses["signature-spells-fireball"]).toBeUndefined();
     expect(built.hero.actionUses["overchannel"]).toBe(1);
   });
 
+  // SRD Spell Mastery: "You can cast them at their lowest level without expending a spell slot".
+  it("casts Spell Mastery's picks at will at their own level, with no slot and no counter", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    for (const spell of ["magic-missile", "acid-arrow"]) {
+      const free = actionOf(built, `spell-${spell}-free`);
+      expect(free.uses).toBeUndefined();
+      expect(free.spellSlot).toBeUndefined();
+    }
+    const slots = JSON.stringify(built.hero.spellSlots);
+    const uses = JSON.stringify(built.hero.actionUses);
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "spell-magic-missile-free"),
+      { actorId: IDS.hero, targetIds: [IDS.foe, IDS.foe, IDS.foe], commandId: "50000000-0000-4000-8000-000000000140" },
+      deps(built, Array<number>(3).fill(2))
+    );
+    // Nothing is spent, so the next turn can cast it again.
+    expect(JSON.stringify(built.hero.spellSlots)).toBe(slots);
+    expect(JSON.stringify(built.hero.actionUses)).toBe(uses);
+  });
+
   it("holds the counters and picks the hand-authored record already carried", () => {
-    // Arcane Recovery and Overchannel are the Wizard's pools, and Spell Mastery's two spells and the Epic
-    // Boon are picks the level-20 build owes.
+    // Arcane Recovery is the Wizard's pool (Overchannel counts its uses on the cast), and Spell Mastery's two spells
+    // and the Epic Boon are picks the level-20 build owes.
     const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
     expect(actionOf(built, "arcane-recovery").uses).toMatchObject({ limit: 1, per: "long-rest" });
-    expect(actionOf(built, "overchannel").uses).toMatchObject({ limit: 1, per: "long-rest" });
     expect((built.definition.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-dimensional-travel");
     for (const id of ["magic-missile", "acid-arrow", "fireball", "counterspell", "burning-hands", "shatter"]) {
       expect(spellOf(built.definition, id)).toMatchObject({ id });
@@ -1544,5 +1677,125 @@ describe("Spell picks keep to the level and school the SRD prints", () => {
     // The printed pick lands in the spellbook: known, prepared like any other Wizard spell.
     const built = buildCharacterDefinition(wizardInput(), library, POLICY);
     expect(spellOf(built, "burning-hands")).toMatchObject({ prepared: false, alwaysPrepared: false });
+  });
+});
+
+// SRD 5.2.1 Boon of Spell Recall, Free Casting: "Whenever you cast a spell with a level 1-4 spell slot, roll 1d4. If the
+// number you roll is the same as the slot's level, the slot isn't expended."
+describe("Boon of Spell Recall", () => {
+  const recaller = () =>
+    table(
+      buildCharacterDefinition(
+        {
+          ...wizardInput(),
+          choices: wizardInput().choices.map((row) =>
+            row.id === "boon-of-dimensional-travel"
+              ? { ...row, id: "boon-of-spell-recall" }
+              : row.payload?.featureId === "boon-of-dimensional-travel"
+                ? { ...row, payload: { featureId: "boon-of-spell-recall" } }
+                : row
+          ) as CharacterCreateRequestInput["choices"]
+        },
+        library,
+        POLICY
+      )
+    );
+  const thirdLeft = (built: Built) => built.hero.spellSlots?.find((slot) => slot.level === 3)?.remaining;
+
+  it("keeps a level 3 slot when the d4 shows 3, and spends it on a 2", () => {
+    for (const [d4, kept] of [
+      [3, true],
+      [2, false]
+    ] as const) {
+      const built = recaller();
+      const before = thirdLeft(built)!;
+      const result = resolveDefinitionAction(
+        built.state,
+        actionOf(built, "spell-fireball"),
+        { actorId: IDS.hero, targetIds: [], commandId: `50000000-0000-4000-8000-00000000015${d4}` },
+        // Fireball's 8d6, then the boon's d4.
+        deps(built, [...Array<number>(8).fill(3), d4])
+      );
+      expect(thirdLeft(built)).toBe(kept ? before : before - 1);
+      if (kept) expect(result.warnings?.join(" ")).toMatch(/Boon of Spell Recall: the d4 shows 3/);
+    }
+  });
+});
+
+// SRD 5.2.1 Overchannel: "you can deal maximum damage with that spell on the turn you cast it. The first time you do
+// so, you suffer no adverse effect. If you use this feature again before you finish a Long Rest, you take 2d12 Necrotic
+// damage for each level of the spell slot ... Each time you use this feature again ... increases by 1d12."
+describe("Overchannel", () => {
+  const overchannel = (built: Built, commandId: string, faces: number[]) =>
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "spell-fireball"),
+      { actorId: IDS.hero, targetIds: [], commandId, overchannel: true },
+      deps(built, faces)
+    );
+
+  it("maximises Fireball, then burns the Evoker for 6d12 and 9d12 Necrotic on later uses", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    endEncounter(built.state);
+    built.hero.hp = { ...built.hero.hp, current: 200, maximum: 200 };
+    const first = overchannel(built, "50000000-0000-4000-8000-000000000160", []);
+    // Eight d6 at 6 each; Empowered Evocation's Intelligence rides as its own part.
+    expect(first.damage[0]).toMatchObject({ type: "fire", total: 48 });
+    expect(built.hero.hp.current).toBe(200);
+    overchannel(built, "50000000-0000-4000-8000-000000000161", Array<number>(6).fill(2));
+    expect(built.hero.hp.current).toBe(200 - 12);
+    overchannel(built, "50000000-0000-4000-8000-000000000162", Array<number>(9).fill(2));
+    expect(built.hero.hp.current).toBe(200 - 12 - 18);
+    applyRest(built.state, IDS.hero, "long", () => built.definition, built.catalog);
+    expect(built.hero.actionUses["overchannel"]).toBeUndefined();
+  });
+
+  it("is offered on the cast beside Metamagic, and sent with the cast's shaping", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    endEncounter(built.state);
+    const fireball = actionOf(built, "spell-fireball");
+    const offers = shapingOffers(
+      built.state,
+      built.hero,
+      fireball,
+      built.catalog.spellRecord!("fireball"),
+      built.definition,
+      effectiveActions(built.definition, built.hero, built.catalog)
+    );
+    expect(offers?.options).toContainEqual(
+      expect.objectContaining({ id: "overchannel", name: "Overchannel", cost: 0, available: true })
+    );
+    const cast = resolveDefinitionAction(
+      built.state,
+      fireball,
+      {
+        actorId: IDS.hero,
+        targetIds: [],
+        commandId: "50000000-0000-4000-8000-000000000164",
+        shaping: [{ id: "overchannel" }]
+      },
+      deps(built, [])
+    );
+    expect(cast.damage[0]).toMatchObject({ type: "fire", total: 48 });
+    expect(built.hero.actionUses["overchannel"]).toBe(1);
+  });
+
+  it("refuses a cantrip or a slot above level 5", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    endEncounter(built.state);
+    expect(() =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "spell-fireball"),
+        {
+          actorId: IDS.hero,
+          targetIds: [],
+          commandId: "50000000-0000-4000-8000-000000000163",
+          overchannel: true,
+          slotLevel: 6
+        },
+        deps(built, [])
+      )
+    ).toThrow(/level 1 to 5 spell slot/);
   });
 });

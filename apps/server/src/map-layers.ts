@@ -8,7 +8,7 @@ export type LayerMapGeometry = Readonly<{ width: number; height: number; calibra
 export type PaintRectInput = Readonly<{ x: number; y: number; width: number; height: number }>;
 
 /** A layer of the combat a stroke targets: the live table, or a parked scene's stored combat. */
-export function layerSlice<Key extends "fog" | "terrain" | "vision">(
+export function layerSlice<Key extends "fog" | "terrain" | "vision" | "traps">(
   state: GameState,
   sceneId: string | undefined,
   key: Key,

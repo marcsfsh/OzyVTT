@@ -8,6 +8,8 @@
     ".": "./src/index.ts",
     "./schemas": "./src/schemas.ts",
     "./action-prose": "./src/action-prose.ts",
+    "./action-clauses": "./src/action-clauses.ts",
+    "./monster-spellcasting": "./src/monster-spellcasting.ts",
     "./spell-effect": "./src/spell-effect.ts",
     "./homebrew-issues": "./src/homebrew-issues.ts"
   },

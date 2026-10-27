@@ -17,7 +17,9 @@ describe("trait mechanics in the monster bundle", () => {
     const ran = new Map<string, number>();
     const printed = new Map<string, number>();
     for (const monster of monsters.values()) {
-      for (const mechanic of monster.traitMechanics ?? []) ran.set(mechanic.name, (ran.get(mechanic.name) ?? 0) + 1);
+      // A trait read as two mechanics (Corrosive Form's acid and its corroding) counts once for its stat block.
+      for (const name of new Set((monster.traitMechanics ?? []).map((mechanic) => mechanic.name)))
+        ran.set(name, (ran.get(name) ?? 0) + 1);
       for (const name of printedTraits(monster)) printed.set(name, (printed.get(name) ?? 0) + 1);
     }
     for (const name of [
@@ -33,9 +35,15 @@ describe("trait mechanics in the monster bundle", () => {
       "Gibbering",
       "Vile Appearance",
       "Berserk",
-      "Corrosive Form"
+      "Corrosive Form",
+      "Illumination",
+      "Light Sensitivity",
+      "Sunlight Sensitivity",
+      "Sunlight Weakness",
+      "Vampire Weakness",
+      "Invisibility"
     ])
-      expect(ran.get(name) ?? 0, name).toBe(name === "Corrosive Form" ? 1 : printed.get(name));
+      expect(ran.get(name) ?? 0, name).toBe(printed.get(name));
   });
 
   it("gives the troll its stopping types and its death that waits for its turn, and the oni its 1 HP", () => {
@@ -46,7 +54,8 @@ describe("trait mechanics in the monster bundle", () => {
         hitPoints: 15,
         stoppedBy: ["acid", "fire"],
         deathWaitsForTurn: true
-      }
+      },
+      { kind: "severed-limbs", name: "Loathsome Limbs", uses: 4, slashing: 15, limbMonsterId: "troll-limb" }
     ]);
     expect(mechanicsOf("oni")).toEqual([
       { kind: "regeneration", name: "Regeneration", hitPoints: 10, needsHitPoints: true }
@@ -76,7 +85,8 @@ describe("trait mechanics in the monster bundle", () => {
         affects: "chosen",
         notWhileIncapacitated: true,
         damage: [{ formula: "1d10", type: "fire" }]
-      }
+      },
+      { kind: "light", name: "Illumination", brightFeet: 10, dimFeet: 10 }
     ]);
     expect(mechanicsOf("fire-elemental")).toContainEqual(expect.objectContaining({ rangeFeet: 10, hazard: "burning" }));
     expect(mechanicsOf("pit-fiend")).toEqual([
@@ -93,22 +103,30 @@ describe("trait mechanics in the monster bundle", () => {
           successDamage: "none",
           failureConditions: ["frightened"],
           failureDuration: { type: "until-bearer-next-turn" },
-          immuneOnSuccess: true
+          immuneOnSuccess: true,
+          immuneMinutes: 1440
         }
-      }
+      },
+      { kind: "restoration", name: "Diabolical Restoration", bodyGoes: true }
     ]);
     // The hezrou's Stench grants no immunity on a success, the ghast's does.
     expect(mechanicsOf("hezrou")[0]).toMatchObject({ rangeFeet: 10, save: { dc: 16 } });
     expect(mechanicsOf("hezrou")[0]).not.toHaveProperty("save.immuneOnSuccess");
-    expect(mechanicsOf("ghast")[0]).toMatchObject({ save: { immuneOnSuccess: true } });
-    // The mouther's failure is a d8 table the GM reads.
-    expect(mechanicsOf("gibbering-mouther")[0]).toMatchObject({
+    expect(mechanicsOf("ghast")[0]).toMatchObject({ save: { immuneOnSuccess: true, immuneMinutes: 24 * 60 } });
+    // The mouther's ground is Difficult Terrain round it, and its failure is a d8 table the server rolls.
+    expect(mechanicsOf("gibbering-mouther")[0]).toEqual({
+      kind: "difficult-ground",
+      name: "Aberrant Ground",
+      rangeFeet: 10
+    });
+    expect(mechanicsOf("gibbering-mouther")[1]).toMatchObject({
       rangeFeet: 20,
       save: { ability: "wis", dc: 10, failureConditions: [] },
-      reminder: expect.stringContaining("1-4: The target does nothing.")
+      failureTable: "gibbering"
     });
+    expect(mechanicsOf("gibbering-mouther")[1]).not.toHaveProperty("reminder");
     // "Any Beast or Humanoid that starts its turn within 30 feet of the hag and can see the hag's true form": the types
-    // are read, and the sight is the GM's.
+    // are read, and only a creature that sees the hag makes the save.
     expect(mechanicsOf("sea-hag")).toEqual([
       {
         kind: "aura",
@@ -117,13 +135,15 @@ describe("trait mechanics in the monster bundle", () => {
         rangeFeet: 30,
         affects: "all",
         creatureTypes: ["beast", "humanoid"],
+        seenOnly: true,
         save: {
           ability: "wis",
           dc: 11,
           successDamage: "none",
           failureConditions: ["frightened"],
           failureDuration: { type: "until-bearer-next-turn" },
-          immuneOnSuccess: true
+          immuneOnSuccess: true,
+          immuneMinutes: 1440
         }
       }
     ]);
@@ -135,8 +155,65 @@ describe("trait mechanics in the monster bundle", () => {
         rangeFeet: 5,
         affects: "grapple-partners",
         damage: [{ formula: "1d10", type: "piercing" }]
+      },
+      { kind: "restoration", name: "Diabolical Restoration", bodyGoes: true }
+    ]);
+  });
+
+  it("reads the traits that cheat death: mist, a new body, heads and limbs", () => {
+    expect(mechanicsOf("vampire")).toContainEqual({ kind: "misty-escape", name: "Misty Escape" });
+    expect(mechanicsOf("lich")).toContainEqual({
+      kind: "restoration",
+      name: "Spirit Jar",
+      returns: { after: "1d10", unit: "days", needs: "spirit-jar" }
+    });
+    expect(mechanicsOf("lich")).toContainEqual({ kind: "carried-object", name: "Spirit Jar", tag: "spirit-jar" });
+    expect(mechanicsOf("hydra")).toEqual([
+      {
+        kind: "multiple-heads",
+        name: "Multiple Heads",
+        heads: 5,
+        damagePerHead: 25,
+        regrowHitPoints: 20,
+        stoppedBy: ["fire"],
+        attackId: "bite",
+        reactiveHeads: true
       }
     ]);
+  });
+
+  it("reads the light a creature sheds, the light that hinders it, and a creature that is always Invisible", () => {
+    expect(mechanicsOf("fire-elemental")).toContainEqual({
+      kind: "light",
+      name: "Illumination",
+      brightFeet: 30,
+      dimFeet: 30
+    });
+    expect(mechanicsOf("cloaker")).toContainEqual({
+      kind: "light-sensitivity",
+      name: "Light Sensitivity",
+      light: "bright",
+      rolls: ["attack"]
+    });
+    expect(mechanicsOf("drider")).toContainEqual({
+      kind: "light-sensitivity",
+      name: "Sunlight Sensitivity",
+      light: "sunlight",
+      rolls: ["check", "attack"]
+    });
+    // A shadow's Sunlight Weakness reaches every D20 Test, saves included.
+    expect(mechanicsOf("shadow")).toContainEqual(
+      expect.objectContaining({ name: "Sunlight Weakness", rolls: ["attack", "check", "save"] })
+    );
+    // "The vampire takes 20 Radiant damage if it starts its turn in sunlight."
+    expect(mechanicsOf("vampire")).toContainEqual(
+      expect.objectContaining({
+        kind: "light-sensitivity",
+        name: "Vampire Weakness",
+        damageAtTurnStart: { amount: 20, type: "radiant" }
+      })
+    );
+    expect(mechanicsOf("invisible-stalker")).toContainEqual({ kind: "invisible", name: "Invisibility" });
   });
 
   it("reads Death Burst and the balor's Death Throes", () => {
@@ -166,5 +243,47 @@ describe("trait mechanics in the monster bundle", () => {
       []
     );
     expect(mechanicsOf("goblin-warrior")).toEqual([]);
+  });
+
+  it("reads the traits that change who a creature is, what it sticks to and whom it commands", () => {
+    expect(mechanicsOf("incubus")).toContainEqual({
+      kind: "form-at-rest",
+      name: "Succubus Form",
+      monsterId: "succubus"
+    });
+    expect(mechanicsOf("mimic")).toContainEqual({
+      kind: "adhesive",
+      name: "Adhesive (Object Form Only)",
+      maxSize: "huge",
+      escapeDc: 13,
+      forms: ["object"]
+    });
+    expect(mechanicsOf("nightmare")).toContainEqual({
+      kind: "confers-resistance",
+      name: "Confer Fire Resistance",
+      damageType: "fire"
+    });
+    expect(mechanicsOf("sahuagin-warrior")).toContainEqual({
+      kind: "controls-kind",
+      name: "Shark Telepathy",
+      nameHas: "shark",
+      withinFeet: 120
+    });
+    expect(mechanicsOf("sphinx-of-lore")).toContainEqual({
+      kind: "inscrutable",
+      name: "Inscrutable",
+      skill: "insight"
+    });
+    expect(mechanicsOf("clay-golem")).toContainEqual({ kind: "immutable-form", name: "Immutable Form" });
+    expect(mechanicsOf("gelatinous-cube")).toContainEqual({ kind: "transparent", name: "Transparent", dc: 15 });
+    expect(mechanicsOf("tarrasque")).toContainEqual({ kind: "reflective-carapace", name: "Reflective Carapace" });
+    expect(mechanicsOf("troll-limb")).toContainEqual({
+      kind: "spawns",
+      name: "Troll Spawn",
+      afterHours: 24,
+      die: 12,
+      on: 12,
+      monsterId: "troll"
+    });
   });
 });

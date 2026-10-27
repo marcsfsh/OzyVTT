@@ -25,27 +25,32 @@ import { useAuthorizedMapImage } from "./mapImage";
 import { MapToken } from "./MapToken";
 import { MapTokenTray } from "./MapTokenTray";
 import { MapRail } from "./MapRail";
-import { isVisionTool, LIGHT_PRESETS, type LightPresetId, type MapTool } from "./mapTools";
+import { isVisionTool, LIGHT_PRESETS, type AreaKindId, type LightPresetId, type MapTool } from "./mapTools";
 import { alliesByKind, extraPerStepFor, moveLabel, movementWallsOf, previewMove, type MoveMode } from "./movePreview";
 import { MOVE_MODE_KEYS, MOVE_MODE_NAMES, MoveModeChoice } from "./MoveModeChoice";
 import { useMovementBudget } from "./useMovementBudget";
 import { ShapeEditor } from "./ShapeEditor";
 import { TerrainOverlay } from "./TerrainOverlay";
 import { TokenContextMenu } from "./TokenContextMenu";
+import { HeightControl } from "./HeightControl";
+import { MountControl } from "./MountControl";
 import { useMapCommands } from "./useMapCommands";
 import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
 import { cameraFocus, useCameraFollow } from "./cameraFollow";
-import { VisionLayer } from "./VisionLayer";
+import { VisionLayer, type MapWall } from "./VisionLayer";
+import { DoorMenu } from "./DoorMenu";
 import { publishTableGeometry, usePlacementRequests, useTokenFocusRequests } from "./tableGeometry";
 import { MapSpotMenu, type SpotChoice } from "./MapSpotMenu";
 import { GridLines } from "./GridLines";
 import { selectToken } from "./selectedToken";
 import { creatureNumbers, tokenLabel } from "../table/numbering";
-import { caughtByArea } from "../table/targetHints";
+import { caughtByArea, creatureDistanceFeet } from "../table/targetHints";
 import "./encounter-map.css";
 
 type Actor = GmActor | PlayerActor;
+
+const SIZE_ORDER = ["tiny", "small", "medium", "large", "huge", "gargantuan"];
 type AnyAnnotation = Annotation | PlayerAnnotation;
 
 type FogState = Readonly<{
@@ -61,8 +66,12 @@ type FogState = Readonly<{
   }>[];
 }>;
 
+type TerrainRect = Readonly<{ x: number; y: number; width: number; height: number }>;
 type TerrainState = Readonly<{
-  difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
+  difficult: readonly TerrainRect[];
+  water?: readonly TerrainRect[];
+  runningWater?: readonly TerrainRect[];
+  ice?: readonly TerrainRect[];
 }>;
 
 // On-brand annotation swatches. Concrete hexes, since theme vars can't travel: the colour goes over the wire and
@@ -164,6 +173,8 @@ export function EncounterMap({
   const [contextMenu, setContextMenu] = useState<{ actorId: string; x: number; y: number } | null>(null);
   /** What a right-click or long press on an empty spot offers to put there. */
   const [spotMenu, setSpotMenu] = useState<{ point: { x: number; y: number }; x: number; y: number } | null>(null);
+  /** The door whose handle was tapped, and where its menu opens. */
+  const [doorMenu, setDoorMenu] = useState<{ wallId: string; x: number; y: number } | null>(null);
   /** A creature armed from outside the map (a scene's list): the next press on the map places it. */
   const [armedActorId, setArmedActorId] = useState<string | null>(null);
   usePlacementRequests((actorId) => {
@@ -181,6 +192,10 @@ export function EncounterMap({
   const gmVision = vision && "measure" in vision ? vision : null;
   const playerVision = vision && "visible" in vision ? vision : null;
   const [lightPreset, setLightPreset] = useState<LightPresetId>("torch");
+  const [areaKind, setAreaKind] = useState<AreaKindId>("heavily-obscured");
+  /** The trap the GM's next drag sets, and its band of levels. */
+  const [trapKind, setTrapKind] = useState<string>("hidden-pit");
+  const [trapTier, setTrapTier] = useState(1);
   /** Whose eyes the GM looks through: "party", an actor id, or nobody. The live table only. */
   const [lookThrough, setLookThrough] = useState<string | null>(null);
   const [lookedThrough, setLookedThrough] = useState<VisionPreviewReply | null>(null);
@@ -229,7 +244,11 @@ export function EncounterMap({
     if (readOnly) return false;
     if (role === "gm") return true;
     const actor = actorsById.get(actorId);
-    return actor !== undefined && "claimStatus" in actor && actor.claimStatus === "mine";
+    // A player moves their own character and the creatures it commands; the server checks each move.
+    return (
+      actor !== undefined &&
+      (("claimStatus" in actor && actor.claimStatus === "mine") || ("commanded" in actor && actor.commanded === true))
+    );
   };
   const canMoveShape = (annotation: AnyAnnotation) =>
     role === "gm" || isMine(annotation, role) || annotation.movableByOthers;
@@ -253,8 +272,14 @@ export function EncounterMap({
   useTokenFocusRequests((actorId) => {
     if (!moveSceneId) focusOn(actorId);
   });
+  const commandsAttacker = (attackerId: string) => {
+    const attacker = actorsById.get(attackerId);
+    return attacker !== undefined && "commanded" in attacker && attacker.commanded === true;
+  };
   const activeTargeting =
-    targetingSession && !moveSceneId && (role === "gm" || targetingSession.attackerId === ownActorId)
+    targetingSession &&
+    !moveSceneId &&
+    (role === "gm" || targetingSession.attackerId === ownActorId || commandsAttacker(targetingSession.attackerId))
       ? targetingSession
       : null;
   // The camera follows the play: who is choosing targets and whom, a reaction and what it answers, whose turn it
@@ -316,7 +341,8 @@ export function EncounterMap({
           placedArea.placed,
           placedArea.widthFeet,
           tokens.filter((placed) => placed.actorId !== activeTargeting?.attackerId),
-          placedArea.sizeFeet
+          placedArea.sizeFeet,
+          placedArea.toTarget === true
         )
       : []
   );
@@ -329,7 +355,16 @@ export function EncounterMap({
   useEffect(() => {
     setModeChoice(null);
   }, [activeActorId]);
-  const moveMode: MoveMode = modeChoice && modeChoice.actorId === moverId ? modeChoice.mode : "walk";
+  // A creature in the air moves by flying until another way is picked; a levitating one pulls itself along, climbing.
+  const moverAirborne = moverId !== null ? tokensById.get(moverId)?.airborne : undefined;
+  const moveMode: MoveMode =
+    modeChoice && modeChoice.actorId === moverId
+      ? modeChoice.mode
+      : moverAirborne === "fly"
+        ? "fly"
+        : moverAirborne === "levitate"
+          ? "climb"
+          : "walk";
   const moverBudget = useMovementBudget(moverPlaced ? moverId : null, revision);
   const commands = useMapCommands({
     revision,
@@ -342,7 +377,8 @@ export function EncounterMap({
       setTool("select");
       setSelectedId(annotationId);
     },
-    waitingAsks: state?.combat.pendingRuleAsks?.length ?? 0
+    waitingAsks: state?.combat.pendingRuleAsks?.length ?? 0,
+    trapChoice: role === "gm" && !moveSceneId ? { trapId: trapKind, tier: trapTier } : null
   });
   const { message, busyActorId } = commands;
   const looking = role === "gm" && !moveSceneId && gmVision?.enabled === true ? lookThrough : null;
@@ -389,6 +425,7 @@ export function EncounterMap({
       const preset = LIGHT_PRESETS.find((entry) => entry.id === lightPreset) ?? LIGHT_PRESETS[0];
       commands.addLight(point, preset);
     },
+    areaKind,
     readOnly,
     armedActorId,
     onPlaceArmed: (point) => {
@@ -399,7 +436,15 @@ export function EncounterMap({
     // A player's spot menu only places their own waiting token, so it opens only while one waits.
     ...(readOnly || (role === "player" && !tokens.some((placed) => placed.position === null && canMove(placed.actorId)))
       ? {}
-      : { onMapMenu: setSpotMenu })
+      : { onMapMenu: setSpotMenu }),
+    ...(readOnly ? {} : { onDoorMenu: setDoorMenu }),
+    // An attack or a spell aimed at a door or a wall of the live table.
+    ...(readOnly || moveSceneId
+      ? {}
+      : {
+          onWallAim: commands.aimAtWall,
+          onLightAim: commands.aimAtLight
+        })
   });
 
   useEffect(() => {
@@ -495,6 +540,12 @@ export function EncounterMap({
   // The drag's path and cost, as the server will charge it, and what that leaves of the mover's turn. Only the
   // combatant whose turn it is spends movement, so only that drag asks for the budget.
   const difficult = terrain?.difficult ?? [];
+  const water = terrain?.water ?? [];
+  const runningWater = terrain?.runningWater ?? [];
+  const ice = terrain?.ice ?? [];
+  // The traps on the live map: every one for the GM, the found ones for a player. A prepared scene shows none.
+  const gmTraps = !moveSceneId && state && "definitions" in state ? state.combat.traps : undefined;
+  const foundTraps = !moveSceneId && state && !("definitions" in state) ? state.combat.traps : undefined;
   // The walls a move can't pass, as far as this view knows them (a player's: the ones the party has seen).
   const moveWalls = gmVision?.enabled
     ? movementWallsOf(gmVision.walls)
@@ -518,7 +569,30 @@ export function EncounterMap({
           extraPerStep: extraPerStepFor(draggedBudget, draggedMode),
           carried: grappledBy(actors, dragging.actorId, role),
           free: draggedMode === "teleport" || draggedMode === "forced",
-          walls: moveWalls
+          straight: draggedMode === "jump",
+          throughWalls:
+            draggedBudget?.throughWalls === true ||
+            (draggedMode === "burrow" && draggedBudget?.burrowsThroughWalls === "half"),
+          throughWallsFree:
+            (draggedMode === "burrow" && draggedBudget?.burrowsThroughWalls === "free") ||
+            draggedBudget?.ethereal === true,
+          ...(draggedBudget?.opening ? { opening: draggedBudget.opening } : {}),
+          ignoresDifficult: draggedBudget?.ignoresDifficultTerrain === true,
+          walls: moveWalls,
+          ...(draggedBudget?.passesCreatures ? { passesCreatures: true } : {}),
+          ...(draggedBudget?.nimble ? { nimble: true } : {}),
+          ...(draggedBudget?.swarmIds ? { swarmIds: draggedBudget.swarmIds } : {}),
+          ...(draggedBudget?.areaGround ? { areaGround: draggedBudget.areaGround } : {}),
+          water: [...water, ...runningWater],
+          ice,
+          swimsFree: draggedBudget?.modes?.some((entry) => entry.mode === "swim" && entry.extraCost !== true) === true,
+          walksOnWater: draggedBudget?.walksOnWater === true,
+          barredByWater: draggedBudget?.barredByWater === true,
+          // A drag keeps the creature at its height; the token menu changes it.
+          altitude: {
+            fromFeet: tokensById.get(dragging.actorId)?.altitudeFeet ?? 0,
+            toFeet: tokensById.get(dragging.actorId)?.altitudeFeet ?? 0
+          }
         })
       : null;
   // The drag's label says how the creature travels when it isn't walking: the way to move lives in the drag itself.
@@ -549,7 +623,13 @@ export function EncounterMap({
   })();
   // Placing an area template, the drag places and points the area; its size is the action's own.
   const templateFeet = activeTargeting?.mode === "template" ? activeTargeting.template?.sizeFeet : undefined;
-  const preview = gesturePreview(calibration, gesture, annotationAt, templateFeet);
+  const preview = gesturePreview(
+    calibration,
+    gesture,
+    annotationAt,
+    templateFeet,
+    activeTargeting?.mode === "template" && activeTargeting.template?.toTarget === true
+  );
   const selected = selectedId ? annotationAt(selectedId) : null;
 
   const inspector =
@@ -586,13 +666,33 @@ export function EncounterMap({
       onRevealAll={commands.revealAllFog}
       onHideAll={commands.hideAllFog}
       terrainBusy={commands.terrainBusy}
-      hasTerrain={difficult.length > 0}
+      hasTerrain={difficult.length + water.length + runningWater.length + ice.length > 0}
+      {...(gmTraps ? { traps: gmTraps } : {})}
+      trapKind={trapKind}
+      onTrapKindChange={setTrapKind}
+      trapTier={trapTier}
+      onTrapTierChange={setTrapTier}
+      onEditTrap={commands.editTrap}
+      onSpringTrap={commands.springTrap}
+      onRemoveTrap={commands.removeTrap}
+      {...(role === "gm" && !moveSceneId && state && "definitions" in state
+        ? { environment: state.combat.environment }
+        : {})}
+      onEnvironmentChange={commands.setEnvironment}
+      {...(foundTraps && ownActorId ? { foundTraps, disarmerName: actorsById.get(ownActorId)?.name ?? null } : {})}
+      onDisarmTrap={(trapId, wayId) => {
+        if (ownActorId) commands.disarmTrap(trapId, ownActorId, wayId);
+      }}
       onClearTerrain={commands.clearAllTerrain}
       visionEnabled={gmVision?.enabled ?? false}
       visionBusy={commands.visionBusy}
       onVisionEnabledChange={commands.setVisionEnabled}
       ambient={gmVision?.ambient ?? "bright"}
-      onAmbientChange={commands.setAmbient}
+      onAmbientChange={(ambient) => commands.setAmbient(ambient)}
+      sunlight={gmVision?.sunlight ?? false}
+      onSunlightChange={(sunlight) => commands.setAmbient(gmVision?.ambient ?? "bright", sunlight)}
+      areaKind={areaKind}
+      onAreaKindChange={setAreaKind}
       lightPreset={lightPreset}
       onLightPresetChange={setLightPreset}
       hasWalls={(gmVision?.walls.length ?? 0) > 0}
@@ -668,7 +768,14 @@ export function EncounterMap({
                   {showGrid && calibration && (
                     <GridLines calibration={calibration} width={size.width} height={size.height} />
                   )}
-                  <TerrainOverlay difficult={difficult} cellSizePx={calibration?.cellSizePx ?? 50} />
+                  <TerrainOverlay
+                    difficult={difficult}
+                    water={water}
+                    runningWater={runningWater}
+                    ice={ice}
+                    traps={gmTraps ?? foundTraps ?? []}
+                    cellSizePx={calibration?.cellSizePx ?? 50}
+                  />
 
                   {/* Shapes render below tokens; measurements render above them. */}
                   <ShapeLayer
@@ -697,7 +804,13 @@ export function EncounterMap({
                   {/* A player's dynamic vision: dark where their characters can't see, below the tokens, since the server
                 sends only the creatures they perceive (one heard through a wall shows in the dark). */}
                   {playerVision && (
-                    <FogOverlay width={size.width} height={size.height} vision={playerVision} variant="player" />
+                    <FogOverlay
+                      width={size.width}
+                      height={size.height}
+                      vision={playerVision}
+                      variant="player"
+                      markRadius={(calibration?.cellSizePx ?? 50) * 0.35}
+                    />
                   )}
 
                   {visibleTokens.map((encounterToken) => {
@@ -734,6 +847,7 @@ export function EncounterMap({
                       role={role}
                       walls={gmVision ? gmVision.walls : (playerVision?.walls ?? [])}
                       lights={gmVision?.lights ?? []}
+                      areas={gmVision?.areas ?? []}
                       tokenPositions={
                         new Map(
                           tokens.flatMap((placed) => (placed.position ? [[placed.actorId, placed.position]] : []))
@@ -743,7 +857,8 @@ export function EncounterMap({
                       cellSizePx={calibration?.cellSizePx ?? 50}
                       showWalls={role === "gm" && (gmVision?.enabled === true || isVisionTool(tool))}
                       erasing={role === "gm" && tool === "vision-erase"}
-                      onToggleDoor={(wallId, open) => void commands.setDoorOpen(wallId, open)}
+                      aiming={activeTargeting !== null && activeTargeting.mode !== "template" && !moveSceneId}
+                      onDoorMenu={(wallId, x, y) => setDoorMenu({ wallId, x, y })}
                     />
                   )}
                   <MarkLayer annotations={annotations} preview={preview} sizes={sizes} color={sessionColor} />
@@ -784,6 +899,16 @@ export function EncounterMap({
                       y1={gesture.origin.y}
                       x2={gesture.current.x}
                       y2={gesture.current.y}
+                    />
+                  )}
+                  {/* Live outline of the area of light or obscurement being painted (snapped to whole cells on commit). */}
+                  {gesture?.kind === "vision-area" && (
+                    <rect
+                      className={`vision-area-preview vision-area-${areaKind}`}
+                      x={Math.min(gesture.origin.x, gesture.current.x)}
+                      y={Math.min(gesture.origin.y, gesture.current.y)}
+                      width={Math.abs(gesture.origin.x - gesture.current.x)}
+                      height={Math.abs(gesture.origin.y - gesture.current.y)}
                     />
                   )}
                   {/* Live outline of the terrain stroke being dragged (snapped to whole cells on commit). */}
@@ -846,6 +971,30 @@ export function EncounterMap({
               onClose={() => setSpotMenu(null)}
             />
           )}
+          {doorMenu &&
+            (() => {
+              const walls: readonly MapWall[] = gmVision ? gmVision.walls : (playerVision?.walls ?? []);
+              const wall = walls.find((candidate) => candidate.id === doorMenu.wallId);
+              // Who works on the door: a player's own character, the GM's acting creature, on the live table.
+              const workerId = moveSceneId ? null : role === "gm" ? activeActorId : ownActorId;
+              const worker = workerId && tokensById.get(workerId)?.position ? actorsById.get(workerId) : undefined;
+              return wall ? (
+                <DoorMenu
+                  role={role}
+                  wall={wall}
+                  x={doorMenu.x}
+                  y={doorMenu.y}
+                  actorName={worker?.name ?? null}
+                  busy={commands.visionBusy}
+                  onOpen={(open) => commands.setDoorOpen(wall.id, open)}
+                  onWork={(how) => {
+                    if (worker) commands.workDoor(wall.id, worker.id, how);
+                  }}
+                  onSave={(door, object) => commands.saveDoor(wall.id, door, object)}
+                  onClose={() => setDoorMenu(null)}
+                />
+              ) : null;
+            })()}
           {contextMenu &&
             (() => {
               const actor = actorsById.get(contextMenu.actorId);
@@ -871,6 +1020,54 @@ export function EncounterMap({
                         )
                       }
                     : {})}
+                  height={(() => {
+                    const placedToken = tokensById.get(actor.id);
+                    const at = placedToken?.position;
+                    if (!at || moveSceneId) return undefined;
+                    // Creatures within 5 feet and at least one size larger, to ride (the server decides).
+                    const mayRide = role === "gm" || actor.id === moverId;
+                    const riding = mayRide
+                      ? actor.effects?.find((effect) => effect.tags.includes("riding"))
+                      : undefined;
+                    const mounts =
+                      state?.combat.active && mayRide
+                        ? tokens.flatMap((other) => {
+                            const candidate = actorsById.get(other.actorId);
+                            if (!candidate || candidate.id === actor.id || !other.position) return [];
+                            if (
+                              SIZE_ORDER.indexOf(candidate.size ?? "medium") <=
+                              SIZE_ORDER.indexOf(actor.size ?? "medium")
+                            )
+                              return [];
+                            const apart = creatureDistanceFeet(calibration ?? null, placedToken, other);
+                            return apart !== null && apart <= 5 ? [{ id: candidate.id, name: candidate.name }] : [];
+                          })
+                        : [];
+                    return (
+                      <>
+                        <MountControl
+                          name={actor.name}
+                          riding={riding ? (riding.sourceName ?? "its mount") : null}
+                          controls={riding?.tags.includes("controls-mount") ?? true}
+                          mounts={mounts}
+                          busy={busyActorId === actor.id}
+                          onMount={(mountId, control) => void commands.mount(actor.id, mountId, control)}
+                        />
+                        <HeightControl
+                          name={actor.name}
+                          altitudeFeet={placedToken.altitudeFeet ?? 0}
+                          airborne={placedToken.airborne}
+                          mode={actor.id === moverId ? moveMode : "walk"}
+                          canMove={actor.id === moverId && state?.combat.active === true}
+                          gm={role === "gm"}
+                          busy={busyActorId === actor.id}
+                          onMove={(feet) => void commands.submitMove(actor.id, at, feet)}
+                          onSet={(feet, airborne) => void commands.setAltitude(actor.id, feet, airborne)}
+                          onFall={(intoWater) => void commands.fall(actor.id, intoWater)}
+                        />
+                      </>
+                    );
+                  })()}
                   onOpenSheet={() => setSheetActorId(actor.id)}
                   onReturnToTray={() => void commands.submitMove(actor.id, null)}
                   onClose={() => setContextMenu(null)}

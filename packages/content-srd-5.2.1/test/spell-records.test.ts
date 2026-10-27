@@ -18,6 +18,56 @@ describe("a spell card's text", () => {
   });
 });
 
+describe("a spell card's text, kept to its own spell", () => {
+  it("carries no heading of the next section, as the source's Tsunami did", () => {
+    for (const record of loadSpells()) expect(record.description, record.id).not.toContain("###");
+    expect(spell("tsunami").description).toMatch(/A creature that moves out of the wall falls to the ground\.$/);
+  });
+});
+
+describe("a spell's map template", () => {
+  it("covers the area the text gives a wall or a storm", () => {
+    expect(spell("storm-of-vengeance").area).toEqual({ shape: "cylinder", sizeFeet: 300, widthFeet: null });
+    expect(spell("tsunami").area).toEqual({ shape: "line", sizeFeet: 300, widthFeet: 50, heightFeet: 300 });
+    expect(spell("wind-wall").area).toEqual({ shape: "line", sizeFeet: 50, widthFeet: 5 });
+    expect(spell("wall-of-ice").area).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
+  });
+});
+
+describe("a spell's higher-slot rows", () => {
+  const rolls = (id: string) =>
+    Object.fromEntries(
+      spell(id)
+        .castingOptions.filter((option) => option.type.startsWith("slot_level_"))
+        .map((option) => [Number(option.type.slice("slot_level_".length)), option.damageRoll])
+    );
+
+  it("prints Conjure Celestial's healing as the total at each level", () => {
+    expect(rolls("conjure-celestial")).toEqual({ 8: "5d12", 9: "6d12" });
+  });
+
+  it("prints each row as the text's base dice plus the increase, never the increase alone", () => {
+    // "The damage increases by 1d6 for each spell slot level above 3": a row's dice less the increases it adds name
+    // dice the card prints, the spell's own.
+    const increase = /increases? by (\d+)d(\d+)\b[^.]*?for (?:each|every) (?:spell )?slot level above (\d)/;
+    let checked = 0;
+    for (const record of loadSpells()) {
+      const match = increase.exec(record.higherLevel ?? "");
+      if (!match) continue;
+      const [perLevel, die, above] = [Number(match[1]), Number(match[2]), Number(match[3])];
+      for (const option of record.castingOptions) {
+        const dice = /^(\d+)d(\d+)\b/.exec(option.damageRoll ?? "");
+        if (!option.type.startsWith("slot_level_") || !dice || Number(dice[2]) !== die) continue;
+        const level = Number(option.type.slice("slot_level_".length));
+        const base = Number(dice[1]) - perLevel * (level - above);
+        expect(record.description, `${record.id} at level ${level}`).toContain(`${base}d${die}`);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(200);
+  });
+});
+
 describe("a spell card's header", () => {
   it("prints casting times in the SRD's words, including the long ones the source shortened", () => {
     expect(spell("fire-bolt").castingTime).toBe("Action");

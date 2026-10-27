@@ -11,6 +11,7 @@ import {
   type DamageType,
   type TraitMechanic
 } from "@vtt/schemas";
+import { immunityMinutesOf } from "./save-outcomes.js";
 
 type Trait = Readonly<{ name: string; description: string }>;
 
@@ -123,10 +124,44 @@ function turnEndAura(trait: Trait): TraitMechanic | null {
   };
 }
 
+/** "While underwater, the aboleth is surrounded by mucus. Constitution Saving Throw: DC 14, each creature in a 5-foot
+ *  Emanation originating from the aboleth at the end of the aboleth's turn. Failure: The target is cursed. Until the
+ *  curse ends, the target's skin becomes slimy, the target can breathe air and water, and it can't regain Hit Points
+ *  unless it is underwater." Its acid every 10 minutes out of water is downtime, the GM's. */
+function turnEndSaveAura(trait: Trait): TraitMechanic | null {
+  const match =
+    /^While underwater, the [\w -]+? is surrounded by mucus\. ([A-Z][a-z]+) Saving Throw: DC (\d+), each creature in a (\d+)-foot Emanation originating from the [\w -]+? at the end of the [\w' -]+? turn\. Failure: The target is cursed\./.exec(
+      trait.description
+    );
+  const ability = match ? abilityOf(match[1]!) : null;
+  if (!match || !ability) return null;
+  return {
+    kind: "aura",
+    name: trait.name,
+    trigger: "bearer-turn-end",
+    rangeFeet: Number(match[3]),
+    affects: "all",
+    underwaterOnly: true,
+    save: {
+      ability,
+      dc: Number(match[2]),
+      successDamage: "none",
+      failureConditions: [],
+      failureEffect: {
+        name: "Cursed (slimy skin)",
+        tags: ["curse", "water-breathing", "no-healing-on-land"],
+        modifiers: []
+      }
+    },
+    reminder:
+      "Out of water, the cursed creature takes 6 (1d12) Acid damage at the end of every 10 minutes unless moisture is applied to its skin."
+  };
+}
+
 /** "Constitution Saving Throw: DC 10, any creature that starts its turn in a 5-foot Emanation originating from the
  *  ghast. Failure: The target has the Poisoned condition until the start of its next turn. Success: The target is
  *  immune to this ghast's Stench for 24 hours." A pit fiend's names "any enemy ... in the aura" of a 20-foot
- *  Emanation; a gibbering mouther's "within 20 feet", its failure a d8 table the GM reads; a sea hag's "any Beast or
+ *  Emanation; a gibbering mouther's "within 20 feet", its failure a d8 table the server rolls; a sea hag's "any Beast or
  *  Humanoid that starts its turn within 30 feet of the hag and can see the hag's true form", whose sight the GM
  *  judges. */
 function turnStartAura(trait: Trait): TraitMechanic | null {
@@ -155,15 +190,24 @@ function turnStartAura(trait: Trait): TraitMechanic | null {
     affects: match[3] === "enemy" ? "enemies" : "all",
     ...(creatureTypes.length > 0 ? { creatureTypes } : {}),
     ...(NOT_WHILE_INCAPACITATED.test(text) ? { notWhileIncapacitated: true as const } : {}),
+    // "... and can see the hag's true form": only a creature that sees the bearer makes the save.
+    ...(/\bthat starts its turn [^.]*\band can see the\b/.test(text) ? { seenOnly: true as const } : {}),
     save: {
       ability,
       dc: Number(match[2]),
       successDamage: "none",
       failureConditions: conditionId ? [conditionId] : [],
       ...(conditionId ? { failureDuration: { type: "until-bearer-next-turn" as const } } : {}),
-      ...(match[7] && /^The target is immune to this\b/.test(match[7]) ? { immuneOnSuccess: true as const } : {})
+      ...(match[7] && /^The target is immune to this\b/.test(match[7])
+        ? { immuneOnSuccess: true as const, ...immunityMinutesOf(match[7]) }
+        : {})
     },
-    ...(conditionId ? {} : { reminder: `On a failed save: ${failure}`.slice(0, 600) })
+    // A gibbering mouther's "rolls 1d8 to determine what it does during the current turn" is a table the server rolls.
+    ...(conditionId
+      ? {}
+      : /^The target rolls 1d8 to determine what it does during the current turn:/.test(failure)
+        ? { failureTable: "gibbering" as const }
+        : { reminder: `On a failed save: ${failure}`.slice(0, 600) })
   };
 }
 
@@ -221,33 +265,442 @@ function meleeHitDamage(trait: Trait): TraitMechanic | null {
   return match && damage ? { kind: "melee-hit-damage", name: trait.name, damage } : null;
 }
 
-/** "Whenever the golem starts its turn Bloodied, roll 1d6. On a 6, the golem goes berserk." */
+/** "Whenever the golem starts its turn Bloodied, roll 1d6. On a 6, the golem goes berserk." A flesh golem's "creator,
+ *  if within 60 feet of the berserk golem, can try to calm it by taking an action to make a DC 15 Charisma (Persuasion)
+ *  check". */
 function berserk(trait: Trait): TraitMechanic | null {
   const match =
     /^Whenever the [\w -]+? starts its turn Bloodied, roll 1d6\. On a (\d), the [\w -]+? goes berserk\./.exec(
       trait.description
     );
-  return match ? { kind: "berserk", name: trait.name, on: Number(match[1]) } : null;
+  const calm =
+    /\bif within (\d+) feet of the berserk [\w -]+?, can try to calm it by taking an action to make a DC (\d+) Charisma \(Persuasion\) check\b/.exec(
+      trait.description
+    );
+  return match
+    ? {
+        kind: "berserk",
+        name: trait.name,
+        on: Number(match[1]),
+        ...(calm ? { calm: { dc: Number(calm[2]), withinFeet: Number(calm[1]) } } : {})
+      }
+    : null;
+}
+
+/** "The elemental sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet." */
+function illumination(trait: Trait): TraitMechanic | null {
+  const match =
+    /^The [\w' -]+? sheds Bright Light in a (\d+)-foot radius and Dim Light for an additional (\d+) feet\.$/.exec(
+      trait.description
+    );
+  return match ? { kind: "light", name: trait.name, brightFeet: Number(match[1]), dimFeet: Number(match[2]) } : null;
+}
+
+const ROLLS_BY_WORD: Readonly<Record<string, ReadonlyArray<"attack" | "check" | "save">>> = {
+  "ability checks and attack rolls": ["check", "attack"],
+  "attack rolls and ability checks": ["attack", "check"],
+  "attack rolls": ["attack"],
+  // A D20 Test is an attack roll, an ability check or a saving throw.
+  "D20 Test": ["attack", "check", "save"],
+  "D20 Tests": ["attack", "check", "save"]
+};
+
+/** "While in sunlight, the drider has Disadvantage on ability checks and attack rolls." / "While in Bright Light, the
+ *  cloaker has Disadvantage on attack rolls." / a vampire's "**Sunlight:** The vampire takes 20 Radiant damage if it
+ *  starts its turn in sunlight. While in sunlight, it has Disadvantage on attack rolls and ability checks." */
+function lightSensitivity(trait: Trait): TraitMechanic | null {
+  const match = /While in (sunlight|Bright Light), (?:the [\w' -]+?|it) has Disadvantage on ([A-Za-z0-9 ]+?)\./.exec(
+    trait.description
+  );
+  const rolls = match ? ROLLS_BY_WORD[match[2]!] : undefined;
+  if (!match || !rolls) return null;
+  const burns = /takes (\d+) ([A-Z][a-z]+) damage if it starts its turn in sunlight/.exec(trait.description);
+  const type = burns ? damageTypeOf(burns[2]!) : null;
+  return {
+    kind: "light-sensitivity",
+    name: trait.name,
+    light: match[1] === "sunlight" ? "sunlight" : "bright",
+    rolls: [...rolls],
+    ...(burns && type ? { damageAtTurnStart: { amount: Number(burns[1]), type } } : {})
+  };
+}
+
+/** "The stalker has the Invisible condition." */
+function alwaysInvisible(trait: Trait): TraitMechanic | null {
+  return /^The [\w' -]+? has the Invisible condition\.$/.test(trait.description)
+    ? { kind: "invisible", name: trait.name }
+    : null;
+}
+
+/** "Whenever the golem is subjected to Acid damage, it (takes no damage and instead) regains a number of Hit Points
+ *  equal to the Acid damage dealt." */
+function absorption(trait: Trait): TraitMechanic | null {
+  const match =
+    /^Whenever the [\w' -]+? is subjected to ([A-Z][a-z]+) damage, it (?:takes no damage and instead )?regains a number of Hit Points equal to the \1 damage dealt\.$/.exec(
+      trait.description
+    );
+  return match ? { kind: "absorbs", name: trait.name, damageType: match[1]!.toLowerCase() as never } : null;
+}
+
+/** "If the golem takes Fire damage, it has Disadvantage on attack rolls and ability checks until the end of its next
+ *  turn", "If the elemental takes Cold damage, its Speed decreases by 20 feet until the end of its next turn." */
+function damageWeakens(trait: Trait): TraitMechanic | null {
+  const match =
+    /^If the [\w' -]+? takes ([A-Z][a-z]+) damage, (?:it has (Disadvantage) on attack rolls and ability checks|its Speed decreases by (\d+) feet) until the end of its next turn\.$/.exec(
+      trait.description
+    );
+  if (!match) return null;
+  const modifiers = match[2]
+    ? [
+        {
+          type: "roll-mode" as const,
+          roll: "attack" as const,
+          mode: "disadvantage" as const,
+          when: [{ type: "on-attack-roll" as const }]
+        },
+        {
+          type: "roll-mode" as const,
+          roll: "check" as const,
+          mode: "disadvantage" as const,
+          when: [{ type: "on-ability-check" as const }]
+        }
+      ]
+    : [{ type: "speed" as const, amount: -Number(match[3]) }];
+  return { kind: "damage-weakens", name: trait.name, damageType: match[1]!.toLowerCase() as never, modifiers };
+}
+
+/** "Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapacitated condition." */
+function blurredForm(trait: Trait): TraitMechanic | null {
+  return /^Attack rolls against the [\w' -]+? are made with Disadvantage unless the [\w' -]+? has the Incapacitated condition\.$/.test(
+    trait.description
+  )
+    ? { kind: "blurred", name: trait.name }
+    : null;
+}
+
+/** "Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has
+ *  Disadvantage on the saving throw." */
+function engulfsEntrants(trait: Trait): TraitMechanic | null {
+  const match =
+    /\bOther creatures can enter that space, but a creature that does so is subjected to the [\w -]+?[\u2019']s ([A-Z][\w ]*?) and has Disadvantage on the saving throw\b/.exec(
+      trait.description
+    );
+  return match
+    ? { kind: "engulfs-entrants", name: trait.name, actionId: match[1]!.toLowerCase().replace(/[^a-z0-9]+/g, "-") }
+    : null;
+}
+
+/** "A spellcaster who wears the guardian's amulet can cause the guardian to store one spell of level 4 or lower." */
+function spellStoring(trait: Trait): TraitMechanic | null {
+  const match = /\bcan cause the [\w -]+? to store one spell of level (\d) or lower\b/.exec(trait.description);
+  return match ? { kind: "spell-storing", name: trait.name, maxLevel: Number(match[1]) } : null;
+}
+
+/** "If the guardian is within 60 feet of the amulet's wearer, half of any damage the wearer takes (round up) is
+ *  transferred to the guardian" (Bound). */
+function sharesWearerDamage(trait: Trait): TraitMechanic | null {
+  const match =
+    /\bIf the [\w -]+? is within (\d+) feet of the amulet[\u2019']s wearer, half of any damage the wearer takes \(round up\) is transferred to the [\w -]+?\./.exec(
+      trait.description
+    );
+  return match ? { kind: "shares-wearer-damage", name: trait.name, withinFeet: Number(match[1]) } : null;
+}
+
+const DAMAGE_TYPE_LIST: readonly DamageType[] = [
+  "acid",
+  "bludgeoning",
+  "cold",
+  "fire",
+  "force",
+  "lightning",
+  "necrotic",
+  "piercing",
+  "poison",
+  "psychic",
+  "radiant",
+  "slashing",
+  "thunder"
+];
+
+/** "The hag has a soul bag. ... The bag has AC 15, HP 20, and Resistance to all damage", "The erinyes has a magic rope.
+ *  ... The rope has AC 20, HP 90, and Immunity to Poison and Psychic damage ... the erinyes can fully restore it when
+ *  finishing a Short or Long Rest", "The heart is a Tiny object that has AC 17, HP 10, and Immunity to all damage except
+ *  Fire", and a lich's spirit jar, which prints no statistics. */
+function carriedObject(trait: Trait): TraitMechanic | null {
+  const text = trait.description;
+  const has = /^The [\w -]+? has an? (soul bag|magic rope)\./.exec(text);
+  const heart =
+    /\bThe heart is a Tiny object that has AC (\d+), HP (\d+), and Immunity to all damage except ([A-Z][a-z]+)\b/.exec(
+      text
+    );
+  if (/\bif it has a spirit jar\b/.test(text)) return { kind: "carried-object", name: trait.name, tag: "spirit-jar" };
+  if (heart) {
+    const except = heart[3]!.toLowerCase();
+    return {
+      kind: "carried-object",
+      name: trait.name,
+      tag: "heart",
+      object: {
+        name: "Heart",
+        armorClass: Number(heart[1]),
+        hitPoints: Number(heart[2]),
+        immunities: DAMAGE_TYPE_LIST.filter((type) => type !== except)
+      }
+    };
+  }
+  if (!has) return null;
+  const stats =
+    /\bThe (?:bag|rope) has AC (\d+), HP (\d+), and (Resistance to all damage|Immunity to Poison and Psychic damage)\b/.exec(
+      text
+    );
+  if (!stats) return null;
+  const name = has[1] === "soul bag" ? "Soul Bag" : "Magic Rope";
+  return {
+    kind: "carried-object",
+    name: trait.name,
+    tag: has[1]!.replace(/ /g, "-"),
+    object: {
+      name,
+      armorClass: Number(stats[1]),
+      hitPoints: Number(stats[2]),
+      ...(stats[3] === "Resistance to all damage" ? { resistances: [...DAMAGE_TYPE_LIST] } : {})
+    },
+    ...(/\bcan fully restore it when finishing a Short or Long Rest\b/.test(text)
+      ? { restoresAtRest: true as const }
+      : {})
+  };
+}
+
+/** "If the limb isn't destroyed within 24 hours, roll 1d12. On a 12, the limb turns into a Troll." */
+function spawns(trait: Trait): TraitMechanic | null {
+  const match =
+    /\bIf the [\w -]+? isn[\u2019']t destroyed within (\d+) hours, roll 1d(\d+)\. On an? (\d+), the [\w -]+? turns into an? ([A-Z][\w ]*?)\./.exec(
+      trait.description
+    );
+  return match
+    ? {
+        kind: "spawns",
+        name: trait.name,
+        afterHours: Number(match[1]),
+        die: Number(match[2]),
+        on: Number(match[3]),
+        monsterId: match[4]!.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+      }
+    : null;
+}
+
+/** "When the incubus finishes a Long Rest, it can shape-shift into a Succubus, using that stat block instead of this
+ *  one." */
+function formAtRest(trait: Trait): TraitMechanic | null {
+  const match =
+    /\bfinishes a Long Rest, it can shape-shift into an? ([A-Z][a-z]+), using that stat block instead of this one\b/.exec(
+      trait.description
+    );
+  return match ? { kind: "form-at-rest", name: trait.name, monsterId: match[1]!.toLowerCase() } : null;
+}
+
+/** "The mimic adheres to anything that touches it. A Huge or smaller creature adhered to the mimic has the Grappled
+ *  condition (escape DC 13)", printed "(Object Form Only)". */
+function adhesive(trait: Trait): TraitMechanic | null {
+  const match =
+    /\bA (Tiny|Small|Medium|Large|Huge) or smaller creature adhered to the [\w -]+? has the Grappled condition \(escape DC (\d+)\)/.exec(
+      trait.description
+    );
+  const form = /\((\w+) Form Only\)/.exec(trait.name)?.[1];
+  return match && form
+    ? {
+        kind: "adhesive",
+        name: trait.name,
+        maxSize: match[1]!.toLowerCase() as "huge",
+        escapeDc: Number(match[2]),
+        forms: [form.toLowerCase()]
+      }
+    : null;
+}
+
+/** "The nightmare can grant Resistance to Fire damage to a rider while it is on the nightmare." */
+function confersResistance(trait: Trait): TraitMechanic | null {
+  const match = /\bcan grant Resistance to ([A-Z][a-z]+) damage to a rider while it is on the\b/.exec(
+    trait.description
+  );
+  const type = match ? damageTypeOf(match[1]!) : null;
+  return type ? { kind: "confers-resistance", name: trait.name, damageType: type } : null;
+}
+
+/** "The sahuagin can magically control sharks within 120 feet of itself, using a special telepathy." */
+function controlsKind(trait: Trait): TraitMechanic | null {
+  const match = /\bcan magically control ([a-z]+)s within (\d+) feet of itself\b/.exec(trait.description);
+  return match ? { kind: "controls-kind", name: trait.name, nameHas: match[1]!, withinFeet: Number(match[2]) } : null;
+}
+
+/** "Wisdom (Insight) checks made to ascertain its intentions or sincerity are made with Disadvantage." */
+function inscrutable(trait: Trait): TraitMechanic | null {
+  return /\bWisdom \(Insight\) checks made to ascertain its intentions or sincerity are made with Disadvantage\b/.test(
+    trait.description
+  )
+    ? { kind: "inscrutable", name: trait.name, skill: "insight" }
+    : null;
+}
+
+/** "The golem can't shape-shift." */
+function immutableForm(trait: Trait): TraitMechanic | null {
+  return /^The [\w -]+? can[\u2019']t shape-shift\.$/.test(trait.description)
+    ? { kind: "immutable-form", name: trait.name }
+    : null;
+}
+
+/** "A creature must succeed on a DC 15 Wisdom (Perception) check to notice the cube if the creature hasn't witnessed
+ *  the cube move or otherwise act." */
+function transparent(trait: Trait): TraitMechanic | null {
+  const match =
+    /\bmust succeed on a DC (\d+) Wisdom \(Perception\) check to notice the [\w -]+? if the creature hasn[\u2019']t witnessed\b/.exec(
+      trait.description
+    );
+  return match ? { kind: "transparent", name: trait.name, dc: Number(match[1]) } : null;
+}
+
+/** "If the tarrasque is targeted by a Magic Missile spell or a spell that requires a ranged attack roll, roll 1d6. On a
+ *  1-5, the tarrasque is unaffected. On a 6, the tarrasque is unaffected and reflects the spell." */
+function reflectiveCarapace(trait: Trait): TraitMechanic | null {
+  return /\btargeted by a Magic Missile spell or a spell that requires a ranged attack roll, roll 1d6\b/.test(
+    trait.description
+  )
+    ? { kind: "reflective-carapace", name: trait.name }
+    : null;
+}
+
+/** "The ground in a 10-foot Emanation originating from the mouther is Difficult Terrain." */
+function difficultGround(trait: Trait): TraitMechanic | null {
+  const match = /^The ground in a (\d+)-foot Emanation originating from the [\w -]+? is Difficult Terrain\.$/.exec(
+    trait.description
+  );
+  return match ? { kind: "difficult-ground", name: trait.name, rangeFeet: Number(match[1]) } : null;
+}
+
+/** The key a creature's pick is stored under: the trait's name as a slug ("Draconic Origin": draconic-origin). */
+export const pickKeyOf = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+/** "Related to a type of dragon associated with one of the following damage types (DM's choice): Acid, Cold, Fire,
+ *  Lightning, or Poison" (a half-dragon's Draconic Origin): the GM's pick for each creature, which its actions deal. */
+function damageTypePick(trait: Trait): TraitMechanic | null {
+  const listed = /\bone of the following damage types \(DM[\u2019']s choice\): ([A-Za-z, ]+)\./.exec(
+    trait.description
+  )?.[1];
+  if (!listed) return null;
+  const options = listed
+    .split(/,\s*(?:or\s+)?|\s+or\s+/)
+    .map(damageTypeOf)
+    .filter((type): type is DamageType => type !== null);
+  return options.length >= 2
+    ? { kind: "pick", name: trait.name, key: pickKeyOf(trait.name), of: "damage-type", options }
+    : null;
+}
+
+/** "The commoner has proficiency in one skill of the DM's choice and has Advantage whenever it makes an ability check
+ *  using that skill" (Training). */
+function skillPick(trait: Trait): TraitMechanic | null {
+  return /\bproficiency in one skill of the DM[\u2019']s choice and has Advantage whenever it makes an ability check using that skill\b/.test(
+    trait.description
+  )
+    ? { kind: "pick", name: trait.name, key: pickKeyOf(trait.name), of: "skill", skillAdvantage: true }
+    : null;
 }
 
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
+  spellStoring,
+  sharesWearerDamage,
+  formAtRest,
+  adhesive,
+  confersResistance,
+  controlsKind,
+  inscrutable,
+  immutableForm,
+  transparent,
+  reflectiveCarapace,
+  damageTypePick,
+  skillPick,
   regeneration,
   undeadFortitude,
   turnEndAura,
+  turnEndSaveAura,
   turnStartAura,
   grappleTurnStart,
   deathBurst,
   meleeHitDamage,
-  berserk
+  berserk,
+  illumination,
+  lightSensitivity,
+  alwaysInvisible,
+  absorption,
+  damageWeakens,
+  blurredForm,
+  engulfsEntrants,
+  difficultGround
+];
+
+/** "Nonmagical ammunition is destroyed immediately after hitting the pudding ... Any nonmagical weapon takes a
+ *  cumulative -1 penalty to attack rolls immediately after dealing damage to the pudding" (Corrosive Form). */
+function corrodesGear(trait: Trait): TraitMechanic | null {
+  const ammunition = /\bNonmagical ammunition is destroyed immediately after hitting\b/.test(trait.description);
+  const weapons = /\bAny nonmagical weapon takes a cumulative -1 penalty to attack rolls\b/.test(trait.description);
+  return ammunition || weapons
+    ? {
+        kind: "corrodes-gear",
+        name: trait.name,
+        ...(weapons ? { weapons: true as const } : {}),
+        ...(ammunition ? { ammunition: true as const } : {})
+      }
+    : null;
+}
+
+/** "The elemental takes 3 (1d6) Cold damage for every 5 feet the elemental moves in water" (Water Susceptibility); "The
+ *  vampire takes 20 Acid damage if it ends its turn in running water" (Vampire Weakness's Running Water). */
+function waterWeakness(trait: Trait): TraitMechanic | null {
+  const moving = /takes \d+ \((\d+d\d+)\) ([A-Z][a-z]+) damage for every 5 feet the [\w' -]+? moves in water/.exec(
+    trait.description
+  );
+  const running = /takes (\d+) ([A-Z][a-z]+) damage if it ends its turn in running water/.exec(trait.description);
+  const movingType = moving ? damageTypeOf(moving[2]!) : null;
+  const runningType = running ? damageTypeOf(running[2]!) : null;
+  if (!movingType && !runningType) return null;
+  return {
+    kind: "water-weakness",
+    name: trait.name,
+    ...(moving && movingType ? { moving: { formula: moving[1]!, type: movingType } } : {}),
+    ...(running && runningType ? { endsTurnInRunning: { amount: Number(running[1]), type: runningType } } : {})
+  };
+}
+
+/** "It must be submerged at least once every 4 hours to avoid suffocating outside water." */
+function driesOut(trait: Trait): TraitMechanic | null {
+  const match = /must be submerged at least once every (\d+) hours to avoid suffocating outside water/.exec(
+    trait.description
+  );
+  return match ? { kind: "dries-out", name: trait.name, hours: Number(match[1]) } : null;
+}
+
+/** Readers that run beside the one a trait matches, for what a trait does besides it (Corrosive Form's acid on whoever
+ *  hits the pudding, and on their gear; a vampire's running water beside its sunlight). */
+const ALSO: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
+  corrodesGear,
+  carriedObject,
+  spawns,
+  waterWeakness,
+  driesOut
 ];
 
 /** Every trait the engine can run, in the stat block's order; the rest stay prose. */
 export function traitMechanicsOf(traits: readonly Trait[]): TraitMechanic[] {
   return traits.flatMap((trait) => {
+    const also = ALSO.flatMap((read) => read(trait) ?? []);
     for (const read of READERS) {
       const mechanic = read(trait);
-      if (mechanic) return [mechanic];
+      if (mechanic) return [mechanic, ...also];
     }
-    return [];
+    return also;
   });
 }

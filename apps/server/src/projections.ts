@@ -1,7 +1,9 @@
 import type {
   Annotation,
+  CommandedOrders,
   GameState,
   GmView,
+  KnownDefences,
   PendingReaction,
   PendingRuleAsk,
   PendingSave,
@@ -12,17 +14,26 @@ import type {
   PlayerInitiativeEntry,
   PlayerRollCall,
   PlayerRollRecord,
+  PlayerSensedCreature,
+  PlayerVision,
   PlayerView,
   PresenceStatus,
   RollRecord
 } from "@vtt/domain";
+import { commandedBySession } from "./authorization.js";
+import type { RepeatSave } from "@vtt/schemas";
 import { actionPools } from "./effective-actions.js";
 import { HASTED_TAG } from "./effects.js";
 import { healthBandOf } from "./hit-points.js";
 import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
+import { OFF_PLANE_TAG } from "./off-plane.js";
 import { visibleTerrain } from "./terrain.js";
+import { playerTraps } from "./traps.js";
 import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
+import { sensedBy } from "./vision/detect.js";
+import { huntersLoreOf } from "./hunters-lore.js";
 import type { SightContent } from "./vision/senses.js";
+import { rowAsSeen } from "./disguised-items.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
 
@@ -72,6 +83,7 @@ function shownAttackRoll(
     .find(
       (candidate) =>
         candidate.purpose === "attack" &&
+        candidate.free !== true &&
         candidate.actorId === pending.sourceActorId &&
         (candidate.dice.length === 0 || candidate.dice.some((die) => die.sides === 20))
     );
@@ -131,7 +143,11 @@ export function projectPublicInitiative(
   });
 }
 
-function visibleToPlayerAnnotation(state: GameState, annotation: Annotation, playerSessionId: string | undefined) {
+export function visibleToPlayerAnnotation(
+  state: GameState,
+  annotation: Annotation,
+  playerSessionId: string | undefined
+) {
   switch (annotation.visibility) {
     case "public":
       return true;
@@ -196,6 +212,7 @@ const PENDING_SAVE_FIELDS = {
   proposedDamage: "player",
   proposedDamageParts: "player",
   halfOnSuccess: "player",
+  fullOnSuccess: "player",
   conditionIds: "player",
   saveBonus: "player",
   createdAt: "player",
@@ -213,16 +230,54 @@ const PENDING_SAVE_FIELDS = {
   onSuccessEffect: "never",
   failureNote: "never",
   breaksConcentration: "never",
+  // What a success ends, and what a failure drops, are narrated when they land.
+  successEndsSpell: "never",
+  dropsRowId: "never",
   zoneId: "never",
+  touchedZone: "never",
   // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
   magical: "never",
   // What a success earns is the stat block's text, the GM's knowledge.
   immuneOnSuccess: "never",
+  immuneMinutes: "never",
   // What the damage drains, and where a failure pushes, are narrated when they land.
   drain: "never",
   failurePush: "never",
+  successPush: "never",
+  successMovesOut: "never",
+  failureMovesTo: "never",
+  unseats: "never",
   // The save's own roll mode is read when it is answered.
-  advantageAtSize: "never"
+  advantageAtSize: "never",
+  disadvantageTypes: "never",
+  advantageFrom: "never",
+  // What a failure does beyond conditions is narrated when it lands, and an automatic success when it is answered.
+  failureKills: "never",
+  // Which of the source's pools a kill spends names its item.
+  spendsOnKill: "never",
+  autoSucceeds: "never",
+  disadvantageFrom: "never",
+  // A failure's return to a creature's true form is narrated when it lands.
+  endsForm: "never",
+  // What a failure does at each Hit Point band names the thresholds, the stat block's text; it is narrated as it lands.
+  failureByHitPoints: "never",
+  // What a failure by a margin does is the stat block's text; it is narrated as it lands.
+  failureByMargin: "never",
+  // Which of the target's things a failure marks is narrated when it lands.
+  objectPenalty: "never",
+  failureBanishes: "never",
+  banishedForGood: "never",
+  // What a swallower's failure lets out is narrated when it lands.
+  regurgitates: "never",
+  // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
+  gmApplies: "player",
+  // Who the caster's Temporary Hit Points go to is the caster's pick, told when they land.
+  vitality: "never",
+  damageSource: "never",
+  // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
+  spell: "never",
+  // Who was asked to answer it would name them; the player is told only that it waits (`awaitingAnswer`).
+  confirmed: "derived"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -233,21 +288,51 @@ const ON_FAIL_EFFECT_FIELDS = {
   escapeDc: "player",
   modifiers: "player",
   duration: "player",
-  repeatSave: "player",
+  // What a second failure brings, a failed repeat's damage dice and what gives the repeats Disadvantage (Heightened
+  // Spell) stay with the GM (`playerRepeatSave`): each is read when the save is answered.
+  repeatSave: "derived",
   endsOnDamage: "player",
+  endsOnSourceSideDamage: "player",
   speedZero: "player",
   endsWhenSourceDefeated: "player",
+  // "If you have the Incapacitated condition" is the action's printed text (Turn Undead).
+  endsOnIncapacitated: "player",
   rangeFeet: "player",
   endsOnSpellHealing: "player",
+  endsOutOfSight: "player",
+  // Who may end it and the check it takes are the printed text's, read by the one who owes the save.
+  endedBy: "player",
+  // What a rest or a day does to its bearer is the stat block's text; its effect lands when it happens.
+  atRest: "never",
   armorClassBonus: "player",
+  // The light a failure sheds is the spell's own text (Faerie Fire's Dim Light).
+  light: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived",
   castId: "never",
+  // The level a spell was cast at is the caster's to know.
+  spell: "never",
   sourceActionId: "never",
   ongoingDamage: "never",
   currentTurn: "player",
-  magical: "never"
+  magical: "never",
+  // What holds the creature a failure restrains (a Net's AC and Hit Points) reaches players by name on the effect.
+  heldBy: "never",
+  // The DC of the action that ends it is the caster's number; the option it carries shows in its name.
+  endAction: "never",
+  optionId: "never",
+  // Kept off as the landed effect keeps them off (`playerEffect`); its name says what it is.
+  conditionImmunities: "never",
+  suppressesConditions: "never",
+  // The form a failure gives is the caster's pick, named in the effect's `name`; its stat block and terms stay the GM's.
+  form: "never",
+  // The size a failure changes is the spell's own text (Enlarge/Reduce).
+  sizeChange: "player",
+  // The dice of its hours (Torpor's 4d6) are rolled as it lands; the landed effect shows what came of them.
+  hoursRolled: "never",
+  // Where a failure makes the creature move names its source or a hidden glyph's spot; it is told as it binds.
+  compelled: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -265,13 +350,35 @@ const PENDING_REACTION_FIELDS = {
   weighed: "player",
   acBonus: "player",
   rollsAttack: "player",
+  // How far the falling creature falls: its height, which is as public as the token it answers for.
+  fallFeet: "player",
+  // The reactor's own slots, which its owner already reads on the sheet; only the reactor's owner gets the prompt.
+  slotLevels: "player",
   createdAt: "player",
   sourceName: "derived",
   sourceActorId: "never",
   // Names the attacker's action and how it rolled, which the reactor's player has no need of.
   parkedAttack: "never",
+  // The cast a Counterspell decides: its action, targets and slot are the caster's, not the reactor's.
+  parkedCast: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
-  attackTotal: "derived"
+  attackTotal: "derived",
+  // What set off a stat block's reaction: a hit, a turn's start or end, a move's end, damage. Public as the event was.
+  cause: "player",
+  // The attack's target as it stands, and the allies a Redirect Attack may hand it to: masked or left out when hidden.
+  targetName: "derived",
+  redirectChoices: "derived",
+  // What kind of roll the reactor is asked to answer, and what its own answer does.
+  rollKind: "player",
+  answerDoes: "player",
+  answerEither: "player",
+  damageResponse: "player",
+  // The save it waits on and who else was asked are the GM's bookkeeping.
+  saveId: "never",
+  asked: "never",
+  drain: "never",
+  hitKinds: "never",
+  damageSource: "never"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;
 
 const PENDING_RULE_ASK_FIELDS = {
@@ -289,9 +396,42 @@ function isHiddenSource(sourceActorId: string | null, publicActorIds: ReadonlySe
   return sourceActorId !== null && !publicActorIds.has(sourceActorId);
 }
 
+/** A vision block with what its player's characters sense unseen, as fresh arrays: the block itself may be cached. */
+function withSensed(vision: PlayerVision, sensed: readonly PlayerSensedCreature[]): PlayerVision {
+  if (!vision.enabled || sensed.length === 0) return vision;
+  return { ...vision, sensed: sensed.map((creature) => ({ ...creature })) };
+}
+
+/** The orders a commanded creature's commander may give it, read off how it was summoned and commanded. */
+function ordersFor(source: Actor): { orders?: CommandedOrders } {
+  const orders: CommandedOrders = {
+    ...(source.control?.commandedWith ? { command: source.control.commandedWith } : {}),
+    ...(source.summon?.dismiss ? { dismiss: source.summon.dismiss } : {}),
+    ...(source.summon?.sight === "bonus-action" ? { look: true as const } : {}),
+    ...(source.effects.some((effect) => effect.tags.includes(OFF_PLANE_TAG)) ? { away: true as const } : {})
+  };
+  return Object.keys(orders).length > 0 ? { orders } : {};
+}
+
+/** A creature this player acts for: their own character, or one their character commands (a summon, a dominated
+ *  creature), whose saves, reactions and asks are theirs to answer. */
+/** Alert's Initiative Swap offers a player's own characters are in, both ends player characters; absent when there are
+ *  none. */
+function swapOffersFor(
+  state: GameState,
+  playerSessionId: string | undefined
+): Partial<Pick<PlayerCombatView, "initiativeSwapOffers">> {
+  const offers = state.combat.initiativeSwapOffers.filter(
+    (offer) => ownedBy(state, offer.actorId, playerSessionId) || ownedBy(state, offer.withActorId, playerSessionId)
+  );
+  return offers.length > 0 ? { initiativeSwapOffers: offers.map((offer) => ({ ...offer })) } : {};
+}
+
 function ownedBy(state: GameState, actorId: string, playerSessionId: string | undefined): boolean {
-  const owner = state.actors.find((actor) => actor.id === actorId)?.ownerSessionId ?? null;
-  return owner !== null && owner === playerSessionId;
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return false;
+  const owner = actor.ownerSessionId;
+  return (owner !== null && owner === playerSessionId) || commandedBySession(state, actor, playerSessionId);
 }
 
 /** The combat a player sees. A creature none of their characters perceive (dynamic vision) or that stands wholly under
@@ -368,6 +508,8 @@ export function projectPlayerCombat(
     playerDamageMode: state.combat.playerDamageMode,
     // Filtered to public actors; a player checks for their own id to show the "Roll initiative" prompt.
     pendingInitiative: state.combat.pendingInitiative.filter((actorId) => publicActorIds.has(actorId)),
+    // An Initiative Swap offer names only the two characters in it, and reaches only their players.
+    ...swapOffersFor(state, playerSessionId),
     playerInitiativeMode: state.combat.playerInitiativeMode,
     underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
@@ -375,11 +517,22 @@ export function projectPlayerCombat(
     fog: { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) },
     // Only the revealed part: terrain under the fog would show the layout of ground players haven't seen.
     terrain: visibleTerrain(state.combat, sight.enabled ? exploredRectsOf(state) : undefined),
+    // The traps the party has found, by name and area; a hidden one leaves no trace, and no DC reaches anyone.
+    traps: playerTraps(state.combat.traps),
     // Where their own characters see now and what the party has seen; computed on the server whenever the map reaches
     // them, before a fight as in one.
     vision:
       sight.enabled && state.combat.mapAssetId
-        ? visionOf(state, sight.viewerIds, content)
+        ? withSensed(
+            visionOf(state, sight.viewerIds, content),
+            // What a player's own characters sense unseen (Divine Sense); a spectator senses through no one.
+            playerSessionId === undefined
+              ? []
+              : sensedBy(state, sight.viewerIds, content, (actorId) => {
+                  const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
+                  return token !== undefined && showsToken(token);
+                })
+          )
         : { enabled: false as const },
     // legendaryUsed is omitted: a monster's remaining legendary actions are GM knowledge.
     // While the GM reviews an earlier turn players get only the flag; turn labels can name hidden combatants.
@@ -396,10 +549,12 @@ export function projectPlayerCombat(
           ...copyPlayerFields(entry, PENDING_SAVE_FIELDS),
           actionName: hiddenSource ? withoutSourceName(entry.actionName, entry.sourceName) : entry.actionName,
           sourceName: hiddenSource ? HIDDEN_SOURCE : entry.sourceName,
+          ...(entry.confirmed ? { awaitingAnswer: true as const } : {}),
           ...(onFail
             ? {
                 onFailEffect: {
                   ...copyPlayerFields(onFail, ON_FAIL_EFFECT_FIELDS),
+                  ...(onFail.repeatSave ? { repeatSave: playerRepeatSave(onFail.repeatSave) } : {}),
                   name: onFailHidden ? withoutSourceName(onFail.name, onFail.sourceName) : onFail.name,
                   sourceName: onFailHidden ? HIDDEN_SOURCE : onFail.sourceName,
                   sourceActorId: null
@@ -411,6 +566,27 @@ export function projectPlayerCombat(
     pendingRuleAsks: state.combat.pendingRuleAsks
       .filter((entry) => ownedBy(state, entry.actorId, playerSessionId))
       .map((entry) => copyPlayerFields(entry, PENDING_RULE_ASK_FIELDS)),
+    // What happens at once as their own character's turn starts or ends, for them to order: each step's name, with a
+    // hidden source left out of it, and the creature it lands on only when they can see it.
+    ...(state.combat.turnSteps && ownedBy(state, state.combat.turnSteps.actorId, playerSessionId)
+      ? {
+          turnSteps: {
+            id: state.combat.turnSteps.id,
+            actorId: state.combat.turnSteps.actorId,
+            boundary: state.combat.turnSteps.boundary,
+            steps: state.combat.turnSteps.steps.map((step) => ({
+              key: step.key,
+              name:
+                step.sourceActorId !== undefined && isHiddenSource(step.sourceActorId, publicActorIds)
+                  ? withoutSourceName(step.name, step.sourceName ?? "")
+                  : step.name,
+              ...(step.targetName && step.targetActorId && publicActorIds.has(step.targetActorId)
+                ? { targetName: step.targetName }
+                : {})
+            }))
+          }
+        }
+      : {}),
     pendingReactions: state.combat.pendingReactions
       .filter((entry) => ownedBy(state, entry.actorId, playerSessionId))
       .map((entry) => {
@@ -418,6 +594,14 @@ export function projectPlayerCombat(
         return {
           ...copyPlayerFields(entry, PENDING_REACTION_FIELDS),
           sourceName: isHiddenSource(entry.sourceActorId, publicActorIds) ? HIDDEN_SOURCE : entry.sourceName,
+          ...(entry.targetName !== undefined
+            ? {
+                targetName: isHiddenSource(entry.targetActorId, publicActorIds) ? HIDDEN_SOURCE : entry.targetName
+              }
+            : {}),
+          ...(entry.redirectChoices
+            ? { redirectChoices: entry.redirectChoices.filter((choice) => publicActorIds.has(choice.actorId)) }
+            : {}),
           // The roll the prompt answers, only when the player already saw it in their dice log.
           ...(attackRoll !== null ? { attackRoll } : {}),
           // Whether the reactor's own reaction lasts (Shield): a fact of their own spell.
@@ -452,12 +636,83 @@ function playerEffect(
     hitPointMaximumGain: _hitPointMaximumGain,
     temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
     conditionImmunities: _conditionImmunities,
-    ...visible
+    // A granted move names the turn it belongs to and the creature it must flee, which can be hidden; its own
+    // character's grant reaches a player through `actor:movement`.
+    grantedMove: _grantedMove,
+    grantedTeleport: _grantedTeleport,
+    teleportEachTurn: _teleportEachTurn,
+    // Whether a Concentration spell ends once no creature keeps it is the engine's bookkeeping.
+    endsWhenUnaffected: _endsWhenUnaffected,
+    // A long casting's targets and slot are the caster's plan; its name says what is being cast.
+    longCast: _longCast,
+    // What a spell's level, its caster's numbers or its choice set, and the engine's bookkeeping: the hit points it
+    // restores each turn, the kinds of creature it wards against, the conditions it holds off, the carried row it is
+    // bound to and how that row swings, the actions it gives (their DCs and damage types), its once-a-turn and
+    // shrinking marks, and how its bearer's Unarmed Strike lands. Its name says what it is; the owner's sheet reads its
+    // actions from the available-actions read.
+    hitPointsEachTurn: _hitPointsEachTurn,
+    conditionWards: _conditionWards,
+    suppressedConditions: _suppressedConditions,
+    itemId: _itemId,
+    weapon: _weapon,
+    optionId: _optionId,
+    bonusActions: _bonusActions,
+    grantedSpellAction: _grantedSpellAction,
+    // A held spell's numbers and its caster are the GM's; the owner's sheet reads the action that releases it.
+    storedCast: _storedCast,
+    storeAwaits: _storeAwaits,
+    endAction: _endAction,
+    usedOnTurn: _usedOnTurn,
+    // The pool it was paid from is its source's sheet, an exact quantity.
+    refundsUses: _refundsUses,
+    shrinksEachLongRest: _shrinksEachLongRest,
+    unarmedStrike: _unarmedStrike,
+    // What a hit on the bearer costs its attacker names a save's DC; the server applies it.
+    struck: _struck,
+    // What a rest or a day does to its bearer names dice and a DC; it lands when it happens.
+    atRest: _atRest,
+    // The light it sheds reaches players only as the lit ground in their own sight, which the server draws.
+    light: _light,
+    findDc: _findDc,
+    detects: _detects,
+    // What holds the creature reaches players by name, so anyone can attack it; its Armor Class and the Hit Points
+    // it has left are the GM's.
+    heldBy,
+    // A form's stat block, the definition it replaced and its terms are the GM's; its name reaches the table, as the
+    // effect's own name says it. What size the bearer has is on the actor.
+    form,
+    sizeChange: _sizeChange,
+    ownSize: _ownSize,
+    // Where a compelled move must go names its source or a hidden glyph's spot, and a forced attack its pick; the
+    // server refuses any other move or attack and says why.
+    compelled: _compelled,
+    forcedAttack: _forcedAttack,
+    ...rest
   } = effect;
+  const visible = {
+    ...rest,
+    ...(heldBy ? { heldBy: { name: heldBy.name } } : {}),
+    ...(form ? { form: { name: form.name } } : {})
+  };
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
-  const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
-  if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
-  return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
+  // A readied spell's Metamagic picks are the engine's to apply at its release.
+  const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;
+  const yours = mine ? { yours: true as const, ...(held ? { readiedSpell: held } : {}) } : {};
+  const repeat = visible.repeatSave ? { repeatSave: playerRepeatSave(visible.repeatSave) } : {};
+  if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...repeat, ...yours };
+  return {
+    ...visible,
+    ...repeat,
+    name: withoutSourceName(visible.name, effect.sourceName),
+    sourceName: HIDDEN_SOURCE
+  };
+}
+
+/** A repeat save as a player reads it: the save, when it comes and the count so far. What a failed one turns the effect
+ *  into, the dice it deals and what gives it Disadvantage stay with the GM. */
+function playerRepeatSave(repeat: RepeatSave): RepeatSave {
+  const { next: _next, failureDamage: _failureDamage, disadvantageFrom: _disadvantageFrom, ...shown } = repeat;
+  return structuredClone(shown);
 }
 
 /** The GM's calls for a roll as one player sees them: only the calls naming their own characters, only those
@@ -483,6 +738,8 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
         entries: entries.map((entry) => ({
           actorId: entry.actorId,
           ...(entry.saveId !== undefined ? { saveId: entry.saveId } : {}),
+          // Their own character's gear, which their sheet already lists.
+          ...(entry.situations ? { situations: entry.situations.map((one) => ({ ...one })) } : {}),
           answered: entry.result !== undefined,
           ...(entry.result !== undefined && !call.blind ? { result: { ...entry.result } } : {})
         })),
@@ -492,18 +749,56 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
   });
 }
 
-/** Resting as one player sees it: their own characters' requests, and the party's Short Rest only when one of their
- *  characters is in it, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
+/** Resting as one player sees it: their own characters' requests, and the party's Short and Long Rests only when one of
+ *  their characters is in them, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
 function playerRest(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["rest"] {
   const shortRest = state.rest.shortRest;
   const members = shortRest?.actorIds.filter((id) => yourActorIds.has(id)) ?? [];
+  // The Long Rest's own members only: neither when it started nor who else rests reaches a player.
+  const yours = (state.rest.longRest?.members ?? []).filter((member) => yourActorIds.has(member.actorId));
   return {
     requests: state.rest.requests.filter((id) => yourActorIds.has(id)),
     shortRest:
       shortRest && members.length > 0
         ? { actorIds: members, done: shortRest.done.filter((id) => yourActorIds.has(id)) }
+        : null,
+    longRest:
+      yours.length > 0
+        ? {
+            actorIds: yours.map((member) => member.actorId),
+            interrupted: yours.filter((member) => member.interrupted).map((member) => member.actorId),
+            shortRestEarned: yours.filter((member) => member.shortRestEarned).map((member) => member.actorId)
+          }
         : null
   };
+}
+
+/** The party's crafting projects as a player sees them, from an allow-list: those of their own characters and of the
+ *  visible party characters, so a character can offer to help. What a project cost stays with its crafter's player (a
+ *  purse is owner-only), and when one started and a scroll's numbers stay with the GM. A helper is named only when it
+ *  is one of theirs or a visible party character. */
+function playerCrafting(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["crafting"] {
+  const named = (actorId: string) =>
+    yourActorIds.has(actorId) ||
+    state.actors.some(
+      (actor) =>
+        actor.id === actorId && actor.kind === "player-character" && actor.visibility === "public" && !actor.archived
+    );
+  return state.crafting.projects
+    .filter((project) => named(project.crafterId))
+    .map((project) => ({
+      id: project.id,
+      crafterId: project.crafterId,
+      itemId: project.itemId,
+      itemName: project.itemName,
+      kind: project.kind,
+      toolId: project.toolId,
+      ...(project.spellId !== undefined ? { spellId: project.spellId } : {}),
+      helperIds: project.helperIds.filter(named),
+      workMinutes: project.workMinutes,
+      doneMinutes: project.doneMinutes,
+      ...(yourActorIds.has(project.crafterId) ? { paidCp: project.paidCp } : {})
+    }));
 }
 
 /** "Fighter 5 / Rogue 2" for the identity card; null (field omitted) when the sheet records no class. */
@@ -532,6 +827,8 @@ const PLAYER_ACTOR_FIELDS = {
   tokenAssetId: "table",
   conditions: "table",
   deathSaves: "table",
+  // When it died and how, which the revival rules read: the GM's.
+  death: "never",
   armorClass: "party",
   // Only says the GM set the character's AC by hand; the number is `armorClass`, which the party already sees.
   armorClassOverride: "party",
@@ -544,25 +841,40 @@ const PLAYER_ACTOR_FIELDS = {
   healthDisplay: "derived",
   replaySceneId: "derived",
   actionUses: "derived",
+  readyAt: "derived",
   heroicInspiration: "derived",
+  heroicInspirationToGive: "derived",
+  experiencePoints: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
+  nourishment: "derived",
+  // How long its surroundings have worn on it (heat, frigid water, time out of water) is the server's bookkeeping.
+  exposure: "never",
   lastLongRestAt: "never",
   spellSlots: "derived",
   pactSlots: "derived",
   preparedSpellIds: "derived",
   spellbook: "derived",
+  knownForms: "derived",
   preparation: "derived",
+  restStep: "derived",
   inventory: "derived",
   currency: "derived",
   notes: "never",
   conditionImmunities: "never",
+  // A creature's attitude is the GM's: players learn it from how the GM has them roll.
+  attitude: "never",
+  // What the GM chose where a stat block leaves a choice (a half-dragon's damage type) is the GM's until it shows.
+  statBlockPicks: "never",
   legendary: "never",
   lastUsedAt: "never",
   firstClaimedAt: "never",
   sample: "never",
   archived: "never",
   sheetPreview: "never",
+  // Who summoned a creature and what keeps it is the GM's; its commander's player is told only that it commands it.
+  summon: "never",
+  control: "derived",
   // The owner's own turn-card pins and use counts: never another player's, whatever the party tier.
   favouriteOptionIds: "derived",
   optionUseCounts: "derived"
@@ -580,10 +892,24 @@ const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filte
 
 /** Copies the listed fields. Optional ones that are unset are left out. */
 /** A carried row for a player. The GM's pick of a resistance type stays the GM's until the bearer attunes, when
- *  the item's properties are learned (and the resistance starts to apply). */
-function playerInventoryRow(item: Actor["inventory"][number]): Actor["inventory"][number] {
-  const { chosenDamageType, ...row } = item;
-  return chosenDamageType !== undefined && item.attuned ? { ...row, chosenDamageType } : row;
+ *  the item's properties are learned (and the resistance starts to apply); so does which kind an item that needs
+ *  attunement is (an Ioun Stone's). A copy that passes for another item is that item until it is identified
+ *  (`disguised-items.ts`). */
+function playerInventoryRow(
+  source: Actor["inventory"][number],
+  catalog: SightContent["catalog"]
+): Actor["inventory"][number] {
+  const item = rowAsSeen(source, catalog);
+  const { chosenDamageType, variantId, storedCasts, disguisedAs: _disguisedAs, ...row } = item;
+  // Identify tells its caster what attuning would: the copy's kind and the type the GM picked.
+  const learned = item.attuned || item.identified === true || item.magic?.attunementRequired !== true;
+  return {
+    ...row,
+    ...(chosenDamageType !== undefined && (item.attuned || item.identified === true) ? { chosenDamageType } : {}),
+    ...(variantId !== undefined && learned ? { variantId } : {}),
+    // The spells a Ring of Spell Storing holds are known to the creature attuned to it, which casts them.
+    ...(storedCasts !== undefined && item.attuned ? { storedCasts } : {})
+  };
 }
 
 function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): Pick<Actor, K> {
@@ -611,8 +937,12 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * the claim picker, and nothing more of its sheet.
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
+ * | readyAt (a timed pool's return)         |  Y   |  -  |       -        |     -      |          Y          |
+ * | experiencePoints                        |  Y   |  -  |       -        |     -      |          Y          |
+ * | heroicInspirationToGive (a gift to make)|  Y   |  -  |       -        |     -      |          -          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
+ * | restStep (what a finished rest opened)  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | favouriteOptionIds, optionUseCounts     |  Y   |  -  |       -        |     -      |          -          |
@@ -646,6 +976,12 @@ export function projectPlayerView(
       .filter((actor) => playerSessionId !== undefined && actor.ownerSessionId === playerSessionId)
       .map((actor) => actor.id)
   );
+  // The creatures their characters command (a summoned spirit, a dominated ogre): theirs to act for, so they get its
+  // stat block, exact Hit Points and uses, and the effects it holds on others are theirs to end.
+  const commandedIds = new Set(
+    state.actors.filter((actor) => commandedBySession(state, actor, playerSessionId)).map((actor) => actor.id)
+  );
+  const actsFor = new Set([...yourActorIds, ...commandedIds]);
   return {
     revision: state.revision,
     // The tier actually applied, so the client can tell "no sheet" from "sheet withheld".
@@ -669,6 +1005,7 @@ export function projectPlayerView(
     rollCalls: projectPlayerRollCalls(state, playerSessionId),
     combat: projectPlayerCombat(state, playerSessionId, now, content, sight),
     rest: playerRest(state, yourActorIds),
+    crafting: playerCrafting(state, yourActorIds),
     // Tiers subtract fields. An actor is removed only by gm-only visibility, archiving or sight.
     actors: state.actors
       .filter((actor) => actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id))
@@ -676,14 +1013,20 @@ export function projectPlayerView(
         const {
           ownerSessionId,
           actionUses,
+          readyAt,
           heroicInspiration,
+          heroicInspirationToGive,
+          experiencePoints,
           choiceOverrides,
           hitDice,
+          nourishment,
           spellSlots,
           pactSlots,
           preparedSpellIds,
           spellbook,
+          knownForms,
           preparation,
+          restStep,
           inventory,
           currency,
           replaySceneId,
@@ -712,10 +1055,36 @@ export function projectPlayerView(
             : undefined;
         const classLine = (theirs && cardVisible) || available ? classLineOf(storedSheet) : null;
         const species = available ? (storedSheet?.character?.race?.name ?? null) : null;
+        const commanded = commandedIds.has(source.id);
+        // The stat block of a creature this player commands: a bundled one, or the scaled copy a summon stored.
+        const commandedSheet =
+          commanded && source.definitionId
+            ? (state.definitions.find((entry) => entry.id === source.definitionId)?.definition ??
+              content.definition?.(source.definitionId))
+            : undefined;
+        if (commanded)
+          return {
+            ...pickFields(source, PARTY_FIELDS),
+            hp: {
+              kind: "exact" as const,
+              current: source.hp.current,
+              maximum: source.hp.maximum,
+              temporary: source.hp.temporary
+            },
+            effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, actsFor)),
+            // A commanded creature is never a player character, so no one claims it.
+            claimStatus: "available" as const,
+            presence: null,
+            commanded: true as const,
+            ...ordersFor(source),
+            ...(commandedSheet ? { definition: commandedSheet, pools: actionPools(commandedSheet.actions) } : {}),
+            actionUses: { ...actionUses },
+            ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
+          };
         return {
           ...pickFields(source, source.kind === "player-character" ? PARTY_FIELDS : TABLE_FIELDS),
           hp: playerHp(source),
-          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, yourActorIds)),
+          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, actsFor)),
           claimStatus:
             ownerSessionId === null ? ("available" as const) : mine ? ("mine" as const) : ("claimed" as const),
           presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
@@ -726,6 +1095,14 @@ export function projectPlayerView(
           ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
           ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
+          // When a pool spent for a time comes back: the owner's own sheet resource, as its spent count is.
+          ...(resourcesVisible
+            ? { readyAt: Object.fromEntries(Object.entries(readyAt).map(([key, value]) => [key, { ...value }])) }
+            : {}),
+          // XP is a sheet resource, gated like the uses.
+          ...(resourcesVisible && experiencePoints !== undefined ? { experiencePoints } : {}),
+          // A gift to make is the owner's decision alone.
+          ...(mine && heroicInspirationToGive ? { heroicInspirationToGive } : {}),
           // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.
           ...(resourcesVisible
             ? {
@@ -741,6 +1118,8 @@ export function projectPlayerView(
           ...(resourcesVisible && hitDice
             ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } }
             : {}),
+          // Today's food and water is a sheet resource, gated like the Hit Point Dice.
+          ...(resourcesVisible && nourishment ? { nourishment: { ...nourishment } } : {}),
           // Sheet resources reach the owner always and another player only at the top tier.
           ...(resourcesVisible
             ? {
@@ -748,19 +1127,39 @@ export function projectPlayerView(
                 pactSlots: pactSlots === null ? null : { ...pactSlots },
                 preparedSpellIds: [...preparedSpellIds],
                 spellbook: spellbook.map((entry) => ({ ...entry })),
+                ...(knownForms ? { knownForms: { ids: [...knownForms.ids], swapOpen: knownForms.swapOpen } } : {}),
                 preparation: preparation === null ? null : { ...preparation },
-                inventory: inventory.map(playerInventoryRow),
+                restStep:
+                  restStep === null
+                    ? null
+                    : { after: restStep.after, ...(restStep.swaps ? { swaps: { ...restStep.swaps } } : {}) },
+                inventory: inventory.map((row) => playerInventoryRow(row, content.catalog)),
                 currency: { ...currency }
               }
             : {}),
           // The turn card's pins and counts are the owner's alone, so even the top party tier leaves them out.
           ...(mine && favouriteOptionIds ? { favouriteOptionIds: [...favouriteOptionIds] } : {}),
           ...(mine && optionUseCounts ? { optionUseCounts: { ...optionUseCounts } } : {}),
-          ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
+          ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {}),
+          // Hunter's Lore: what this player's own Hunter knows of the creature its Hunter's Mark marks, for this player
+          // alone and while the mark lasts. A creature they can't perceive was left out above.
+          ...knownDefencesFor(state, source, yourActorIds, content)
         };
       }),
     rolls: state.rolls.filter((roll) => visibleToPlayer(state, roll, playerSessionId, sight)).map(playerRoll)
   };
+}
+
+/** The `knownDefences` field for one player's read of a creature, built from an explicit list in `hunters-lore.ts`. */
+function knownDefencesFor(
+  state: GameState,
+  source: Actor,
+  yourActorIds: ReadonlySet<string>,
+  content: SightContent
+): { knownDefences?: KnownDefences } {
+  if (yourActorIds.size === 0 || source.kind === "player-character") return {};
+  const known = huntersLoreOf(state, source, yourActorIds, content);
+  return known ? { knownDefences: known } : {};
 }
 
 export function projectGmView(state: GameState, presenceFor: PresenceLookup, now = Date.now()): GmView {

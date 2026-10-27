@@ -3,10 +3,12 @@
  * riders already there (Divine Order, Blessed Strikes, Channel Divinity, the domain spell tiers) are
  * not restated here.
  */
-import { potentSpellcasting, type ClassMechanicsModule } from "./overlay.js";
+import { potentSpellcasting, wisdomOnChecks, type ClassMechanicsModule } from "./overlay.js";
 
 export const cleric: ClassMechanicsModule = {
   features: {
+    // "Whenever you gain a Cleric level, you can replace one of your cantrips."
+    spellcasting: { replaces: [{ offer: "class-cantrips", when: "level-up", amount: 1 }] },
     // "You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you
     // finish a Long Rest."
     "channel-divinity": {
@@ -16,10 +18,13 @@ export const cleric: ClassMechanicsModule = {
     "divine-order": {
       options: {
         /**
-         * "You know one extra cantrip from the Cleric spell list." The Arcana/Religion bonus (Wisdom
-         * modifier, minimum +1) stays prose: `check-bonus` takes a flat integer.
+         * "You know one extra cantrip from the Cleric spell list" and "a bonus to your Intelligence (Arcana or
+         * Religion) checks. The bonus equals your Wisdom modifier (minimum of +1)."
          */
-        thaumaturge: { extraPicks: [{ offer: "class-cantrips", amount: 1 }] }
+        thaumaturge: {
+          extraPicks: [{ offer: "class-cantrips", amount: 1 }],
+          modifiers: [wisdomOnChecks(["arcana", "religion"])]
+        }
       }
     },
 
@@ -30,8 +35,8 @@ export const cleric: ClassMechanicsModule = {
 
     /**
      * Gives the existing pool the SRD's Magic action activation (a synthesised action would be "other").
-     * Choosing the spell happens at use time, so it is not a build-time `choice`; Greater Divine
-     * Intervention's 2d4 Long Rest recharge is prose.
+     * Choosing the spell happens at use time, so it is not a build-time `choice`: the server mints a cast for each
+     * spell it may cast, on this pool (`divine-intervention.ts`).
      */
     "divine-intervention": {
       actions: [
@@ -49,7 +54,8 @@ export const cleric: ClassMechanicsModule = {
     /**
      * "The option you chose for Blessed Strikes grows more powerful." Each option `requires` the
      * matching level-7 pick, so exactly one survives and is adopted without a prompt. Divine Strike's
-     * 2d8 is already on the record via `damageByLevel`; Potent Spellcasting's temporary HP stay prose.
+     * 2d8 is already on the record via `damageByLevel`; Potent Spellcasting's Temporary Hit Points are read by its
+     * feature id (`class-features.ts`).
      */
     "improved-blessed-strikes": {
       choice: {
@@ -72,9 +78,27 @@ export const cleric: ClassMechanicsModule = {
         ]
       }
     }
-
-    // Not modeled: Sear Undead (ability-scaled dice count) and Life Domain's healing riders (no healing
-    // rider vocabulary).
+    // Sear Undead is Turn Undead's `damageDiceByAbility` in sources/authored/classes.json.
   },
-  subclasses: { "life-domain": {} }
+  subclasses: {
+    "life-domain": {
+      // "When a spell you cast with a spell slot restores Hit Points to a creature, that creature regains additional
+      // Hit Points ... equal 2 plus the spell slot's level."
+      "disciple-of-life": {
+        modifiers: [{ type: "healing-bonus", amount: 2, perSlotLevel: true, when: [{ type: "on-healing" }] }]
+      },
+      // "Immediately after you cast a spell with a spell slot that restores Hit Points to one or more creatures other
+      // than yourself, you regain Hit Points equal to 2 plus the spell slot's level."
+      "blessed-healer": {
+        modifiers: [
+          { type: "healing-bonus", amount: 2, perSlotLevel: true, self: true, when: [{ type: "on-healing" }] }
+        ]
+      },
+      // "Instead use the highest number possible for each die" of a spell's or Channel Divinity's healing; an item's
+      // healing rolls as usual.
+      "supreme-healing": {
+        modifiers: [{ type: "healing-dice-maximized", when: [{ type: "on-healing" }] }]
+      }
+    }
+  }
 };

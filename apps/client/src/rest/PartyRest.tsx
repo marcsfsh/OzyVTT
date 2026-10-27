@@ -1,13 +1,39 @@
 import { useState } from "react";
-import { isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
-import { Badge, Button, Modal, Stepper, useToast } from "@vtt/ui";
+import { gameTimeSpanLabel, isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
+import { Badge, Button, Field, Modal, SegmentedControl, Select, Stepper, Switch, useToast } from "@vtt/ui";
 import { pathForSection } from "../codex/routes";
+import { CraftingProjects } from "../crafting/CraftingProjects";
 import { command } from "../lib/command";
 import { navigate } from "../router";
+import { NEEDS } from "../sheet/FoodAndWater";
 import { gameDate, useGmCalendar } from "./game-date";
+import { LongRestUnderWay } from "./LongRestUnderWay";
 import "./rest.css";
 
-const NO_REST = { clockHours: 0, requests: [] as readonly string[], shortRest: null };
+const NO_REST = {
+  clockHours: 0,
+  clockMinutes: 0,
+  requests: [] as readonly string[],
+  dawnHour: null as number | null,
+  shortRest: null,
+  longRest: null,
+  survival: false
+};
+
+/** "06:00" for an hour of the day. */
+const hourLabel = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
+
+/** "Food 1/1 lb · Water 4/8 pints · 2 days unfed": what a character ate and drank today, against its need. */
+function nourishmentNote(actor: GmActor): string {
+  const today = actor.nourishment;
+  if (!today) return "Not tracked yet";
+  const need = NEEDS[actor.size ?? "medium"];
+  const unfed = today.daysUnfed > 0 ? ` · ${today.daysUnfed} ${today.daysUnfed === 1 ? "day" : "days"} unfed` : "";
+  return `Food ${today.foodPounds}/${need.food} lb · Water ${today.waterPints}/${need.water} pints${unfed}`;
+}
+
+/** The minutes the GM can add to the hours passed, from a single minute (10 rounds) up to most of an hour. */
+const MINUTE_STEPS = [0, 1, 5, 10, 15, 20, 30, 45] as const;
 
 /** Why a character can't rest at all now (no Short Rest either); null when nothing stands in the way. */
 function blockedNote(state: GmView, actor: GmActor): string | null {
@@ -28,13 +54,19 @@ function restNote(state: GmView, actor: GmActor): string | null {
 
 /**
  * The GM's rests: game time and passing it, players' Long Rest requests, and resting the party together. A Short
- * Rest stays open while each player spends Hit Dice on their own device, until the GM finishes it. The clock reads
+ * Rest stays open while each player spends Hit Dice on their own device, and a Long Rest while its 8 hours can be
+ * interrupted, until the GM finishes it. Downtime passed here works the party's crafting projects. The clock reads
  * the Codex calendar's date with the game's hour, the one clock both share.
  */
 export function PartyRest({ state, token }: Readonly<{ state: GmView; token: string | null }>) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hours, setHours] = useState(8);
+  // Passing time on the road (SRD Travel Pace): the server logs how far the party went.
+  const [pace, setPace] = useState<"stay" | "slow" | "normal" | "fast">("stay");
+  // Downtime (SRD 5.2.1 Crafting): crafters work their projects through the time passed.
+  const [downtime, setDowntime] = useState(false);
+  const [minuteStep, setMinuteStep] = useState(0);
   const [unpicked, setUnpicked] = useState<ReadonlySet<string>>(new Set());
   const { toast } = useToast();
   // Read defensively: the first state a signing-in GM receives can still be player-shaped.
@@ -43,9 +75,14 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const byId = (actorId: string) => state.actors.find((actor) => actor.id === actorId);
   const requests = rest.requests.map(byId).filter((actor): actor is GmActor => actor !== undefined);
   const shortRest = rest.shortRest;
+  // A player-shaped first state carries its own cut of the Long Rest, with no members.
+  const longRest = rest.longRest && "members" in rest.longRest ? rest.longRest : null;
+  const projects = state.crafting?.projects ?? [];
   const picked = party.filter((actor) => !unpicked.has(actor.id));
   const calendar = useGmCalendar(token, open);
-  const clock = gameDate(calendar.data, rest.clockHours);
+  const clock = gameDate(calendar.data, rest.clockHours, rest.clockMinutes);
+  const minutes = MINUTE_STEPS[minuteStep] ?? 0;
+  const span = hours * 60 + minutes > 0 ? gameTimeSpanLabel(hours * 60 + minutes) : null;
 
   /** Opens with everyone who can rest ticked; a character who can't (down, dead, in the fight) starts unticked. */
   const openDialog = () => {
@@ -75,14 +112,33 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const startRest = (kind: "short" | "long") =>
     send(
       () => command("rest:party", { kind, actorIds: picked.map((actor) => actor.id) }),
-      kind === "long"
-        ? "The party finished a Long Rest. 8 hours passed."
-        : "The Short Rest is open on each player's device.",
-      kind === "long"
+      kind === "long" ? "The Long Rest is under way." : "The Short Rest is open on each player's device."
     );
+  const finishRest = (kind: "short" | "long", apply: boolean) =>
+    send(
+      () => command("rest:finish", { apply, kind }),
+      !apply
+        ? `The ${kind === "long" ? "Long" : "Short"} Rest was called off.`
+        : kind === "long"
+          ? "The Long Rest is over."
+          : "The Short Rest is over. An hour passed.",
+      true
+    );
+  const openRest = shortRest ? "short" : longRest ? "long" : null;
   const unclaimed = shortRest?.actorIds.some((actorId) => !byId(actorId)?.ownerSessionId) ?? false;
+  /** A meal for everyone, or everyone's fill at a source: one command per living character. */
+  const feedAll = async (choice: Readonly<{ food?: "meal"; water?: "fill" }>, success: string) => {
+    setBusy(true);
+    let failure: string | null = null;
+    for (const actor of party.filter((member) => !isDead(member))) {
+      const result = await command("actor:nourish", { actorId: actor.id, ...choice });
+      if (!result.ok) failure ??= result.message ?? "That was refused.";
+    }
+    setBusy(false);
+    toast(failure ?? success, { tone: failure ? "error" : "success" });
+  };
 
-  const label = shortRest ? "Short Rest open" : "Rest";
+  const label = shortRest ? "Short Rest open" : longRest ? "Long Rest open" : "Rest";
   return (
     <>
       <Button className="party-rest-open" onClick={openDialog} aria-haspopup="dialog">
@@ -99,29 +155,13 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
         title="Rest"
         size="md"
         footer={
-          shortRest ? (
+          openRest ? (
             <>
-              <Button
-                variant="ghost"
-                disabled={busy}
-                onClick={() =>
-                  void send(() => command("rest:finish", { apply: false }), "The Short Rest was called off.", true)
-                }
-              >
+              <Button variant="ghost" disabled={busy} onClick={() => void finishRest(openRest, false)}>
                 Call off
               </Button>
-              <Button
-                variant="primary"
-                disabled={busy}
-                onClick={() =>
-                  void send(
-                    () => command("rest:finish", { apply: true }),
-                    "The Short Rest is over. An hour passed.",
-                    true
-                  )
-                }
-              >
-                Finish Short Rest
+              <Button variant="primary" disabled={busy} onClick={() => void finishRest(openRest, true)}>
+                {openRest === "long" ? "Finish Long Rest" : "Finish Short Rest"}
               </Button>
             </>
           ) : (
@@ -156,19 +196,140 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
               </p>
             )}
             <div className="party-rest-row">
-              <Stepper value={hours} onChange={setHours} min={1} max={72} disabled={busy} aria-label="Hours to pass" />
-              <Button
+              <SegmentedControl
+                size="sm"
+                ariaLabel="Travel pace"
+                options={[
+                  { value: "stay", label: "Stay", title: "The party stays where it is" },
+                  { value: "slow", label: "Slow", title: "2 miles an hour, Advantage on Perception and Survival" },
+                  { value: "normal", label: "Normal", title: "3 miles an hour, Disadvantage on Stealth" },
+                  {
+                    value: "fast",
+                    label: "Fast",
+                    title: "4 miles an hour, Disadvantage on Perception, Survival and Stealth"
+                  }
+                ]}
+                value={pace}
+                onChange={(value) => setPace(value as typeof pace)}
+              />
+            </div>
+            <div className="party-rest-row">
+              <Stepper
+                value={hours}
+                onChange={setHours}
+                min={0}
+                max={72}
+                format={(value) => `${value} h`}
                 disabled={busy}
+                aria-label="Hours to pass"
+              />
+              <Stepper
+                value={minuteStep}
+                onChange={setMinuteStep}
+                min={0}
+                max={MINUTE_STEPS.length - 1}
+                format={(value) => `${MINUTE_STEPS[value] ?? 0} min`}
+                disabled={busy}
+                aria-label="Minutes to pass"
+              />
+              <Button
+                disabled={busy || span === null}
                 onClick={() =>
-                  void send(() => command("time:pass", { hours }), `${hours} ${hours === 1 ? "hour" : "hours"} passed.`)
+                  void send(
+                    () =>
+                      command("time:pass", {
+                        hours,
+                        minutes,
+                        ...(pace !== "stay" ? { pace } : {}),
+                        ...(downtime && pace === "stay" ? { downtime: true } : {})
+                      }),
+                    `${span} passed.`
+                  )
                 }
               >
-                Pass {hours} {hours === 1 ? "hour" : "hours"}
+                {span ? `${pace === "stay" ? "Pass" : "Travel"} ${span}` : "Pass time"}
               </Button>
             </div>
+            {pace === "stay" && (
+              <Switch
+                checked={downtime}
+                disabled={busy}
+                label="Downtime: crafters work on their projects"
+                onChange={setDowntime}
+              />
+            )}
             <p className="party-rest-hint">
-              Time that passes here moves the Codex calendar too. A Long Rest can start 16 hours after a
-              character&apos;s last one ends.
+              Time that passes here moves the Codex calendar too, and counts down spells and effects: a minute is 10
+              rounds. A fight&apos;s rounds don&apos;t move the clock. A Long Rest can start 16 hours after a
+              character&apos;s last one ends. While the party travels, each character&apos;s checks read the pace until
+              time passes without one.
+            </p>
+            <Field label="Dawn" htmlFor="party-rest-dawn">
+              <Select
+                id="party-rest-dawn"
+                value={rest.dawnHour === null || rest.dawnHour === undefined ? "" : String(rest.dawnHour)}
+                disabled={busy}
+                onChange={(event) => {
+                  const hour = event.target.value === "" ? null : Number(event.target.value);
+                  void send(
+                    () => command("time:set-dawn", { hour }),
+                    hour === null
+                      ? "Items regain their dawn charges at a Long Rest."
+                      : `Dawn comes at ${hourLabel(hour)}.`
+                  );
+                }}
+              >
+                <option value="">At each Long Rest</option>
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <p className="party-rest-hint">
+              What a magic item regains at dawn comes back when the clock passes this hour. Left at each Long Rest, a
+              Long Rest gives it back.
+            </p>
+          </section>
+
+          <section className="party-rest-section" aria-label="Food and water">
+            <span className="party-rest-heading">Food and water</span>
+            <Switch
+              checked={rest.survival}
+              disabled={busy}
+              label="Track food and water by the day"
+              onChange={(enabled) =>
+                void send(
+                  () => command("survival:set-tracking", { enabled }),
+                  enabled ? "Food and water are tracked now." : "Food and water are no longer tracked."
+                )
+              }
+            />
+            {rest.survival && party.length > 0 && (
+              <>
+                <ul className="party-rest-list">
+                  {party.map((actor) => (
+                    <li key={actor.id} className="party-rest-member is-static">
+                      <span className="party-rest-name">{actor.name}</span>
+                      <span className="party-rest-note">{nourishmentNote(actor)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="party-rest-row">
+                  <Button disabled={busy} onClick={() => void feedAll({ food: "meal" }, "Everyone ate a meal.")}>
+                    Everyone eats a meal
+                  </Button>
+                  <Button disabled={busy} onClick={() => void feedAll({ water: "fill" }, "Everyone drank their fill.")}>
+                    Everyone drinks their fill
+                  </Button>
+                </div>
+              </>
+            )}
+            <p className="party-rest-hint">
+              At each midnight a character eats the Rations and drinks from the Waterskins it carries. Less than half a
+              day&apos;s water, or less than half its food, can cost a level of Exhaustion that stays until it eats and
+              drinks its fill.
             </p>
           </section>
 
@@ -211,7 +372,9 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
             </section>
           )}
 
-          {shortRest ? (
+          {longRest ? (
+            <LongRestUnderWay state={state} rest={longRest} busy={busy} send={send} />
+          ) : shortRest ? (
             <section className="party-rest-section" aria-label="Short Rest under way">
               <span className="party-rest-heading">Short Rest under way</span>
               <ul className="party-rest-list">
@@ -267,10 +430,13 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                 </ul>
               )}
               <p className="party-rest-hint">
-                A Long Rest happens at once and passes 8 hours. A Short Rest opens on each player&apos;s device.
+                A Short Rest opens on each player&apos;s device. A Long Rest stays open for its 8 hours, so a fight or
+                damage can interrupt it, until you finish it.
               </p>
             </section>
           )}
+
+          {(projects.length > 0 || downtime) && <CraftingProjects state={state} busy={busy} send={send} />}
         </div>
       </Modal>
     </>

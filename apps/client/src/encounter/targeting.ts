@@ -9,6 +9,7 @@ import type {
   HitOptionChoice,
   RulesBlocked
 } from "@vtt/domain";
+import type { CastShaping } from "@vtt/schemas";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
 
@@ -21,31 +22,108 @@ export type TargetingTemplate = Readonly<{
   sizeFeet: number;
   widthFeet: number | null;
   placed: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }> | null;
+  /** How many areas one use places (Fire Storm's ten Cubes), and the ones already set down beside the one moving. */
+  count?: number;
+  others?: ReadonlyArray<Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>>;
+  /** A Line that stops where it is aimed, never past `sizeFeet` (a Javelin of Lightning's bolt). */
+  toTarget?: true;
 }>;
-export type TargetingSession = Readonly<{
-  action: ContentActionSummary;
-  attackerId: string;
-  /** "none": no target to pick (Search, Study), only the skill it is made with. */
-  mode: "single" | "multi" | "template" | "none";
-  selected: readonly string[];
-  template: TargetingTemplate | null;
-  /** The spell slot a spell is cast with, sent with every resolve of this session. */
-  slotLevel?: number;
-  /** How much of its pool an action whose user picks the cost spends (Lay on Hands' points). */
-  spend?: number;
-  /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
-  darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
-  /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
-  damageType?: NonNullable<ContentActionSummary["damageTypes"]>[number];
-  /** The skill a check action is made with (Search, Influence); absent, Escape a Grapple uses the better one. */
-  skill?: string;
-  /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
-  ability?: AbilityId;
-  /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
-  conditionId?: string;
-  /** The GM places a spell's lingering area and resolves no action: the zone it is for. */
-  placeZoneId?: string;
+export type TargetingSession = Readonly<
+  {
+    action: ContentActionSummary;
+    attackerId: string;
+    /** "none": no target to pick (Search, Study), only the skill it is made with. */
+    mode: "single" | "multi" | "template" | "none";
+    selected: readonly string[];
+    template: TargetingTemplate | null;
+    /** The spell slot a spell is cast with, sent with every resolve of this session. */
+    slotLevel?: number;
+    /** How much of its pool an action whose user picks the cost spends (Lay on Hands' points). */
+    spend?: number;
+    /** The conditions a touch also ends, each for points of its pool (Restoring Touch). */
+    conditionIds?: readonly string[];
+    /** The Hit Points each target takes of a pool its user divides (Preserve Life); absent, the server splits evenly. */
+    healingShares?: Readonly<Record<string, number>>;
+    /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
+    darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
+    /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
+    damageType?: NonNullable<ContentActionSummary["damageTypes"]>[number];
+    /** The skill a check action is made with (Search, Influence); absent, Escape a Grapple uses the better one. */
+    skill?: string;
+    /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
+    ability?: AbilityId;
+    /** Who a cantrip's Temporary Hit Points go to once its damage lands (Improved Potent Spellcasting); absent, the
+     *  caster. */
+    vitalityTo?: string;
+    /** Who regains an area's healing (Land's Aid); absent, nobody. */
+    aidTo?: string;
+    /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
+    conditionId?: string;
+    /** The option picked for an action that offers several (Fire Shield's warm or chill); it starts on the first. */
+    optionId?: string;
+    /** The option picked for each target, for an action that asks for one per target (Eyebite). */
+    targetOptions?: Readonly<Record<string, string>>;
+    /** The carried weapon a grant binds to (Magic Weapon, Shillelagh). */
+    itemId?: string;
+    /** The target's armor or weapon the action acts on (a rust monster's Antennae); absent, the server's default. */
+    objectItemId?: string;
+    /** The GM places a spell's lingering area and resolves no action: the zone it is for. */
+    placeZoneId?: string;
+    /** How the caster shapes the cast (Metamagic, Sculpt Spells), with the creatures each pick names once chosen. */
+    shaping?: readonly CastShaping[];
+    /** The creature a summon brings, and its creature type, where its user picks (Find Familiar's form). */
+    summonPick?: Readonly<{ monsterId: string; form?: string }>;
+    summonType?: string;
+    /** A Thief's Fast Hands takes this item action as a Bonus Action. */
+    fastHands?: true;
+    /** The space a leap or a throw sets its creature down in (a bulette's Deadly Leap, a kraken's Fling), or a failed
+     *  save moves its target to (Telekinesis), and how high it lifts it there. */
+    destination?: AnnotationPoint;
+    destinationAltitudeFeet?: number;
+  } & ShapeChoice
+>;
+
+/** What a shape-shifting use picks: its form (Wild Shape's Wolf) or each target's own (Animal Shapes), whether the
+ *  user's gear melds into the form or is worn, and which of its effects it takes (Enlarge or Reduce). */
+export type ShapeChoice = Readonly<{
+  form?: string;
+  targetForms?: Readonly<Record<string, string>>;
+  gear?: "merged" | "worn";
+  option?: string;
+  /** The creature types a barrier wards (Magic Circle); none picked wards them all. */
+  creatureTypes?: readonly string[];
 }>;
+
+/** The picks a shape-shift starts with: its one form when it has only one, gear melded, and the first effect. */
+export function startingShapeChoice(action: ContentActionSummary): ShapeChoice {
+  const forms = action.forms;
+  const only = forms && !forms.perTarget && forms.options.length === 1 ? forms.options[0] : undefined;
+  return {
+    ...(only ? { form: only.id } : {}),
+    ...(forms?.gearChoice ? { gear: "merged" as const } : {}),
+    ...(action.options && action.options.length > 0 ? { option: action.options[0]!.id } : {})
+  };
+}
+
+/** Whether a shape-shift still waits for its form: one form, or one for each chosen target. */
+export function formUnchosen(action: ContentActionSummary, choice: ShapeChoice, targetIds: readonly string[]): boolean {
+  const forms = action.forms;
+  if (!forms || forms.options.length === 0) return false;
+  if (forms.perTarget) return targetIds.some((id) => choice.targetForms?.[id] === undefined);
+  return choice.form === undefined;
+}
+
+/** The picks as `action:resolve` and `action:use` take them, for the targets chosen. */
+export function shapeChoicePayload(choice: ShapeChoice, targetIds: readonly string[]) {
+  const perTarget = Object.entries(choice.targetForms ?? {}).filter(([id]) => targetIds.includes(id));
+  return {
+    ...(choice.form !== undefined ? { form: choice.form } : {}),
+    ...(perTarget.length > 0 ? { targetForms: perTarget.map(([targetId, form]) => ({ targetId, form })) } : {}),
+    ...(choice.gear !== undefined ? { gear: choice.gear } : {}),
+    ...(choice.option !== undefined ? { option: choice.option } : {}),
+    ...(choice.creatureTypes && choice.creatureTypes.length > 0 ? { creatureTypes: [...choice.creatureTypes] } : {})
+  };
+}
 
 let session: TargetingSession | null = null;
 let result: ActionResolution | null = null;
@@ -73,37 +151,75 @@ const subscribe = (listener: () => void) => {
   };
 };
 
+/** The template an area is drawn as: the SRD shape as a drawable one (sphere, cylinder and emanation as a circle, cube
+ *  as a square), grown with a higher slot where the spell says so (Fog Cloud), as the server will place it. */
+function templateOf(
+  action: ContentActionSummary,
+  area: NonNullable<ContentActionSummary["area"]>,
+  slotLevel: number | undefined
+): TargetingTemplate {
+  const shape: AnnotationShapeKind =
+    area.shape === "sphere" || area.shape === "cylinder" || area.shape === "emanation"
+      ? "circle"
+      : area.shape === "cube"
+        ? "square"
+        : area.shape;
+  return {
+    shape,
+    // A higher slot grows the area where the spell says so (Fog Cloud), as the server will place it.
+    sizeFeet: Math.min(
+      1000,
+      area.sizeFeet +
+        (slotLevel !== undefined && action.areaPerSlot
+          ? action.areaPerSlot.feet * Math.max(0, slotLevel - action.areaPerSlot.level)
+          : 0)
+    ),
+    widthFeet: area.widthFeet,
+    placed: null,
+    ...(area.count !== undefined ? { count: area.count, others: [] } : {}),
+    ...(area.toTarget ? { toTarget: true as const } : {})
+  };
+}
+
+/** The area a use is placed as: the picked option's (Wall of Fire's ring), else the action's own. */
+export function pickedArea(
+  picking: Readonly<{ action: ContentActionSummary; option?: string }>
+): ContentActionSummary["area"] {
+  return picking.action.options?.find((entry) => entry.id === picking.option)?.area ?? picking.action.area;
+}
+
 export function beginTargeting(
   action: ContentActionSummary,
   attackerId: string,
   slotLevel?: number,
-  dartsAtSlot?: number
+  dartsAtSlot?: number,
+  shaping?: readonly CastShaping[],
+  options: Readonly<{ fastHands?: boolean }> = {}
 ) {
-  const area = action.area;
+  // An option starts on the first, and so does the area it is placed as.
+  const area = pickedArea({ action, ...(action.options?.[0] ? { option: action.options[0].id } : {}) });
   const dartTotal = dartsAtSlot ?? action.darts;
   // A check action starts on its usual skill; Escape a Grapple starts on the better of its two, the server's pick.
   const usualSkill = action.id === "escape-grapple" ? undefined : action.checkSkills?.[0]?.id;
   const slot = {
     ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(shaping && shaping.length > 0 ? { shaping } : {}),
     ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {}),
     ...(usualSkill !== undefined ? { skill: usualSkill } : {}),
     // A picked cost starts at one; the picker raises it.
-    ...(action.useCost === "chosen" ? { spend: 1 } : {})
+    ...(action.useCost === "chosen" ? { spend: 1 } : {}),
+    // An option starts on the first, as the server reads none.
+    ...(action.choices?.options?.[0] ? { optionId: action.choices.options[0].id } : {}),
+    ...(options.fastHands ? { fastHands: true as const } : {}),
+    ...startingShapeChoice(action)
   };
   if (area) {
-    // Map the SRD area shape onto a drawable annotation shape (sphere/cylinder/emanation → circle, cube → square).
-    const shape: AnnotationShapeKind =
-      area.shape === "sphere" || area.shape === "cylinder" || area.shape === "emanation"
-        ? "circle"
-        : area.shape === "cube"
-          ? "square"
-          : area.shape;
     session = {
       action,
       attackerId,
       mode: "template",
       selected: [],
-      template: { shape, sizeFeet: area.sizeFeet, widthFeet: area.widthFeet, placed: null },
+      template: templateOf(action, area, slotLevel),
       ...slot
     };
   } else {
@@ -112,12 +228,15 @@ export function beginTargeting(
     session = {
       action,
       attackerId,
+      // A leap picks only its space; a throw picks its one creature, then the space.
       mode:
-        action.attackBonus !== null || action.targeting === "single"
-          ? "single"
-          : action.targeting === "none"
-            ? "none"
-            : "multi",
+        action.destination?.who === "user"
+          ? "none"
+          : action.attackBonus !== null || action.targeting === "single" || action.destination?.who === "target"
+            ? "single"
+            : action.targeting === "none"
+              ? "none"
+              : "multi",
       selected: [],
       template: null,
       ...slot
@@ -175,6 +294,16 @@ export function toggleTarget(actorId: string) {
     const { [actorId]: _dropped, ...counts } = session.darts.counts;
     session = { ...session, darts: { ...session.darts, counts: dropping ? counts : { ...counts, [actorId]: 1 } } };
   }
+  // A creature no longer targeted is no longer one the cast's shaping names.
+  if (session.shaping && (dropping || session.mode === "single")) {
+    const kept = session.selected;
+    session = {
+      ...session,
+      shaping: session.shaping.map((entry) =>
+        entry.creatureIds ? { ...entry, creatureIds: entry.creatureIds.filter((id) => kept.includes(id)) } : entry
+      )
+    };
+  }
   emit();
 }
 /** Picks the damage type an action deals, for one whose caster chooses (Chromatic Orb). */
@@ -184,10 +313,47 @@ export function setDamageType(damageType: string) {
   session = { ...session, damageType: picked };
   emit();
 }
+/** Picks the creature a summon brings, by its place in the action's choices. */
+export function setSummonPick(index: number) {
+  const picked = session?.action.summonChoices?.forms?.[index];
+  if (!session || !picked) return;
+  session = { ...session, summonPick: { monsterId: picked.monsterId, ...(picked.form ? { form: picked.form } : {}) } };
+  emit();
+}
+/** Picks the creature type a summon takes (a familiar's Celestial, Fey or Fiend). */
+export function setSummonType(creatureType: string) {
+  if (!session?.action.summonChoices?.creatureTypes?.includes(creatureType)) return;
+  session = { ...session, summonType: creatureType };
+  emit();
+}
 /** Picks the condition a failed save imposes, for an action whose caster chooses one (Blindness/Deafness). */
 export function setConditionChoice(conditionId: string) {
   if (!session?.action.conditionChoices?.includes(conditionId)) return;
   session = { ...session, conditionId };
+  emit();
+}
+/** Picks the option an action resolves with (Fire Shield's chill shield); with a target, that target's own. */
+export function setChoiceOption(optionId: string, targetId?: string) {
+  if (!session?.action.choices?.options?.some((option) => option.id === optionId)) return;
+  session =
+    targetId === undefined
+      ? { ...session, optionId }
+      : { ...session, targetOptions: { ...session.targetOptions, [targetId]: optionId } };
+  emit();
+}
+/** Picks the carried weapon a grant binds to, or the item a cast is on (Identify); undefined leaves it to the server
+ *  (the first weapon that fits, or no item). */
+export function setBoundItem(itemId: string | undefined) {
+  if (!session?.action.choices?.bindsWeapon && !session?.action.choices?.pickItem) return;
+  const { itemId: _previous, ...rest } = session;
+  session = itemId === undefined ? rest : { ...rest, itemId };
+  emit();
+}
+/** Picks the target's armor or weapon the action acts on; undefined leaves it to the server (worn armor first). */
+export function setObjectItem(objectItemId: string | undefined) {
+  if (!session?.action.choices?.object) return;
+  const { objectItemId: _previous, ...rest } = session;
+  session = objectItemId === undefined ? rest : { ...rest, objectItemId };
   emit();
 }
 /** Picks the skill a check action is made with; undefined lets Escape a Grapple use the better one. */
@@ -198,20 +364,116 @@ export function setCheckSkill(skill: string | undefined) {
   session = skill === undefined ? rest : { ...rest, skill };
   emit();
 }
+/** Picks a shape-shift's form, or one target's own when each takes its own (Animal Shapes). */
+export function setShapeForm(form: string, targetId?: string) {
+  if (!session?.action.forms?.options.some((option) => option.id === form)) return;
+  session =
+    targetId === undefined
+      ? { ...session, form }
+      : { ...session, targetForms: { ...(session.targetForms ?? {}), [targetId]: form } };
+  emit();
+}
+/** Picks whether the user's gear melds into the form or is worn by it. */
+export function setShapeGear(gear: "merged" | "worn") {
+  if (!session?.action.forms?.gearChoice) return;
+  session = { ...session, gear };
+  emit();
+}
+/** Adds or takes away one of the creature types a barrier's cast wards (Magic Circle). */
+export function toggleWardType(type: string) {
+  if (!session?.action.wardTypes?.includes(type)) return;
+  const picked = session.creatureTypes ?? [];
+  session = {
+    ...session,
+    creatureTypes: picked.includes(type) ? picked.filter((entry) => entry !== type) : [...picked, type]
+  };
+  emit();
+}
+
+/** Picks which of its effects a use takes (Enlarge or Reduce), or the form of the area a cast leaves; a form with its
+ *  own area (Wall of Fire's ring) is drawn as that area, placed afresh. */
+export function setEffectOption(option: string) {
+  if (!session?.action.options?.some((entry) => entry.id === option)) return;
+  const before = pickedArea(session);
+  const after = pickedArea({ action: session.action, option });
+  session = {
+    ...session,
+    option,
+    ...(session.mode === "template" && after && after !== before
+      ? { template: templateOf(session.action, after, session.slotLevel) }
+      : {})
+  };
+  emit();
+}
 /** Picks the ability a cast chooses (Hex). */
 export function setChosenAbility(ability: AbilityId) {
   if (!session?.action.choosesAbility) return;
   session = { ...session, ability };
   emit();
 }
-/** Whether the session has what its Roll needs: its targets or placed area, and a chosen ability for a cast that takes
- *  one. */
+
+/** Who the cast's Temporary Hit Points go to (Improved Potent Spellcasting); the caster when `actorId` is its own. */
+export function setVitalityTo(actorId: string) {
+  if (!session?.action.vitality) return;
+  const { vitalityTo: _old, ...rest } = session;
+  session = actorId === session.attackerId ? rest : { ...rest, vitalityTo: actorId };
+  emit();
+}
+/** Who regains an area's healing (Land's Aid); "" picks nobody. */
+export function setAidTo(actorId: string) {
+  if (!session?.action.areaHeal) return;
+  const { aidTo: _old, ...rest } = session;
+  session = actorId === "" ? rest : { ...rest, aidTo: actorId };
+  emit();
+}
+/** The picks of a cast's shaping that name creatures among its targets: Careful Spell's and Sculpt Spells' protected
+ *  creatures, and Heightened Spell's one target when the spell has several. */
+export const SHAPING_CREATURE_PICKS: ReadonlySet<string> = new Set([
+  "careful-spell",
+  "sculpt-spells",
+  "heightened-spell"
+]);
+
+/** Chooses the creatures one of the cast's shaping picks names; the server checks how many and whom. */
+export function setShapingCreatures(id: CastShaping["id"], creatureIds: readonly string[]) {
+  if (!session?.shaping?.some((entry) => entry.id === id)) return;
+  session = {
+    ...session,
+    shaping: session.shaping.map((entry) => (entry.id === id ? { ...entry, creatureIds: [...creatureIds] } : entry))
+  };
+  emit();
+}
+
+/** Whether a shaping pick still has creatures to choose: protected creatures, or Heightened Spell's target among
+ *  several. */
+const shapingUnchosen = (picking: TargetingSession) =>
+  (picking.shaping ?? []).some(
+    (entry) =>
+      SHAPING_CREATURE_PICKS.has(entry.id) &&
+      (entry.creatureIds ?? []).length === 0 &&
+      !(entry.id === "heightened-spell" && picking.mode === "single")
+  );
+
+/** Whether the session has what its Roll needs: its targets or placed area, a chosen ability for a cast that takes
+ *  one, and the creatures its shaping names. */
 export function targetingReady(picking: TargetingSession): boolean {
   if (picking.action.choosesAbility && picking.ability === undefined) return false;
+  if (shapingUnchosen(picking)) return false;
+  if (formUnchosen(picking.action, picking, picking.selected)) return false;
+  // A chosen cost of nothing spends nothing (Restoring Touch with no Hit Points and no condition picked).
+  if (picking.action.useCost === "chosen" && picking.spend === 0 && (picking.conditionIds ?? []).length === 0)
+    return false;
+  // A divided pool can't give out more than it holds.
+  if (picking.action.dividesHealing !== undefined && sharedOut(picking) > picking.action.dividesHealing) return false;
   if (picking.mode === "template") return Boolean(picking.template?.placed);
+  // A leap or a throw waits for the space it lands in.
+  if (picking.action.destination && picking.destination === undefined) return false;
   if (picking.mode === "none") return true;
   return picking.selected.length > 0;
 }
+/** The Hit Points of a divided pool given to the creatures still selected (Preserve Life). */
+export const sharedOut = (picking: TargetingSession): number =>
+  picking.selected.reduce((sum, id) => sum + (picking.healingShares?.[id] ?? 0), 0);
 /** Sets how many darts a selected target takes, within the darts the action has left to assign. */
 export function setTargetDarts(actorId: string, count: number) {
   if (!session?.darts || !session.selected.includes(actorId)) return;
@@ -225,6 +487,35 @@ export function setTargetDarts(actorId: string, count: number) {
 /** The targets as the server reads darts: each named once per dart it takes. */
 const dartTargetIds = (selected: readonly string[], darts: TargetingSession["darts"]) =>
   darts ? selected.flatMap((id) => Array.from({ length: darts.counts[id] ?? 1 }, () => id)) : [...selected];
+/** Sets the placed area down beside the others, and starts another (Fire Storm's next Cube). */
+export function placeAnotherTemplate() {
+  const template = session?.template;
+  if (!session || !template?.placed) return;
+  const others = [...(template.others ?? []), template.placed];
+  if (others.length >= (template.count ?? 1)) return;
+  session = { ...session, template: { ...template, others, placed: null } };
+  emit();
+}
+/** Whether a tap on the map now picks the space a leap or a throw lands in: a leap's at once, a throw's once its
+ *  creature is chosen. */
+export function picksDestination(picking: TargetingSession | null): boolean {
+  const destination = picking?.action.destination;
+  if (!picking || !destination) return false;
+  return destination.who === "user" || picking.selected.length === 1;
+}
+/** Sets the space a leap or a throw lands in. */
+export function setDestination(point: AnnotationPoint) {
+  if (!session || !picksDestination(session)) return;
+  session = { ...session, destination: point };
+  emit();
+}
+/** Sets how high the action lifts its target at that space (Telekinesis), within the feet it moves it. */
+export function setDestinationAltitude(feet: number) {
+  const destination = session?.action.destination;
+  if (!session || !destination?.lifts) return;
+  session = { ...session, destinationAltitudeFeet: Math.max(0, Math.min(destination.feet, feet)) };
+  emit();
+}
 export function setTemplatePlacement(origin: AnnotationPoint, target: AnnotationPoint) {
   if (session?.template) {
     session = { ...session, template: { ...session.template, placed: { origin, target } } };
@@ -235,6 +526,22 @@ export function setTemplatePlacement(origin: AnnotationPoint, target: Annotation
 export function setTargetingSpend(spend: number) {
   if (!session || session.action.useCost !== "chosen") return;
   session = { ...session, spend };
+  emit();
+}
+/** Picks or drops a condition the touch also ends (Restoring Touch). */
+export function toggleConditionPick(conditionId: string) {
+  if (!session?.action.conditionPicks?.conditions.includes(conditionId)) return;
+  const picked = session.conditionIds ?? [];
+  session = {
+    ...session,
+    conditionIds: picked.includes(conditionId) ? picked.filter((id) => id !== conditionId) : [...picked, conditionId]
+  };
+  emit();
+}
+/** The Hit Points one target takes of a pool its user divides (Preserve Life). */
+export function setHealingShare(targetId: string, points: number) {
+  if (!session || session.action.dividesHealing === undefined) return;
+  session = { ...session, healingShares: { ...session.healingShares, [targetId]: Math.max(0, points) } };
   emit();
 }
 export function clearTargeting() {
@@ -272,13 +579,24 @@ export type ResolveOptions = Readonly<{
   reroll?: boolean;
   /** How far Push mastery shoves on the confirmed hit (0 declines); absent pushes the full distance. */
   pushFeet?: number;
+  /** Tactical Master's Push, Sap or Slow in place of the weapon's own mastery, on every look and the confirm. */
+  mastery?: "push" | "sap" | "slow";
   /** Extras the confirmed hit carries (Sneak Attack, a smite), from the preview's offers. */
   hitOptions?: readonly HitOptionChoice[];
+  /** The confirmed melee hit knocks its target out if it drops it to 0 (SRD Knocking Out a Creature). */
+  knockOut?: boolean;
+  /** An answer to the previewed attack roll (Bardic Inspiration, Peerless Aim), applied to the held die. */
+  answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
+  /** Roll the damage and hold it, so it can be answered before it counts (Empowered Spell, Heroic Inspiration). */
+  damageLook?: boolean;
+  /** An answer to the held damage: the dice it rerolls, by their place in the look. */
+  damageAnswer?: Readonly<{ id: "empowered-spell" | "heroic-inspiration"; dice: readonly number[] }>;
 }>;
 
 export function resolveTargeting(
   revision: number | undefined,
-  onResult: (ok: boolean, message?: string) => void,
+  /** With what the action sensed for its user's player alone (Find Traps), told on a success. */
+  onResult: (ok: boolean, message?: string, sensed?: readonly string[]) => void,
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
@@ -290,12 +608,24 @@ export function resolveTargeting(
     template,
     slotLevel,
     spend,
+    conditionIds,
+    healingShares,
     darts,
     damageType,
     skill,
     ability,
-    conditionId
+    vitalityTo,
+    aidTo,
+    conditionId,
+    shaping,
+    summonPick,
+    summonType,
+    optionId,
+    targetOptions,
+    itemId,
+    objectItemId
   } = session;
+  const shapeChoice = shapeChoicePayload(session, selected);
   if (session.placeZoneId !== undefined) {
     if (!template?.placed) return;
     const zoneId = session.placeZoneId;
@@ -317,20 +647,61 @@ export function resolveTargeting(
   // server holds the die for it. Templates, multi-target and save/utility actions resolve straight
   // through. An explicit `commit` in opts wins (the Confirm tap).
   const isAttack = action.attackBonus !== null && mode === "single";
-  const commit = opts.commit ?? !isAttack;
+  // A look at the damage is a preview of it, whatever the action.
+  const commit = opts.damageLook ? false : (opts.commit ?? !isAttack);
   const extra = {
+    ...(session.fastHands ? { fastHands: true } : {}),
     ...(opts.override ? { override: opts.override } : {}),
     ...(opts.rollMode ? { rollMode: opts.rollMode } : {}),
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
     ...(opts.reroll ? { reroll: true } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
+    ...(opts.mastery !== undefined ? { mastery: opts.mastery } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
+    ...(opts.knockOut ? { knockOut: true } : {}),
+    ...(opts.answer ? { answer: { ...opts.answer } } : {}),
+    ...(opts.damageLook ? { damageLook: true } : {}),
+    ...(opts.damageAnswer ? { damageAnswer: { id: opts.damageAnswer.id, dice: [...opts.damageAnswer.dice] } } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     ...(spend !== undefined ? { spend } : {}),
+    ...(conditionIds && conditionIds.length > 0 ? { conditionIds: [...conditionIds] } : {}),
+    // The division of a pool among the creatures still selected; a target given nothing takes nothing.
+    ...(healingShares && action.dividesHealing !== undefined
+      ? {
+          healingShares: Object.fromEntries(
+            selected.map((id) => [id, healingShares[id] ?? 0] as const).filter(([, points]) => points > 0)
+          )
+        }
+      : {}),
     ...(damageType !== undefined ? { damageType } : {}),
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
+    ...(vitalityTo !== undefined ? { vitalityTo } : {}),
+    ...(aidTo !== undefined ? { aidTo } : {}),
     ...(conditionId !== undefined ? { conditionId } : {}),
+    ...(optionId !== undefined ? { optionId } : {}),
+    // Only the picks for creatures still selected.
+    ...(targetOptions && action.choices?.optionsPerTarget
+      ? {
+          targetOptions: Object.fromEntries(Object.entries(targetOptions).filter(([id]) => selected.includes(id)))
+        }
+      : {}),
+    ...(itemId !== undefined ? { itemId } : {}),
+    ...(objectItemId !== undefined ? { objectItemId } : {}),
+    ...(session.destination ? { destination: session.destination } : {}),
+    ...(session.destination && action.destination?.lifts && (session.destinationAltitudeFeet ?? 0) > 0
+      ? { destinationAltitudeFeet: session.destinationAltitudeFeet }
+      : {}),
+    ...(shaping && shaping.length > 0 ? { shaping: shaping.map((entry) => ({ ...entry })) } : {}),
+    ...(summonPick || summonType
+      ? {
+          summon: {
+            ...(summonPick ? { picks: [{ ...summonPick }] } : {}),
+            ...(summonType ? { creatureType: summonType } : {})
+          }
+        }
+      : {}),
+    ...shapeChoice,
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };
@@ -339,12 +710,24 @@ export function resolveTargeting(
       ? { actorId: attackerId, actionId: action.id, ...extra }
       : mode === "template"
         ? template?.placed
-          ? {
-              actorId: attackerId,
-              actionId: action.id,
-              template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
-              ...extra
-            }
+          ? (template.others ?? []).length > 0
+            ? {
+                actorId: attackerId,
+                actionId: action.id,
+                // Every area set down, and the one moving now.
+                templates: [...template.others!, template.placed].map((placed) => ({
+                  shape: template.shape,
+                  origin: placed.origin,
+                  target: placed.target
+                })),
+                ...extra
+              }
+            : {
+                actorId: attackerId,
+                actionId: action.id,
+                template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
+                ...extra
+              }
           : null
         : selected.length > 0
           ? { actorId: attackerId, actionId: action.id, targetIds: dartTargetIds(selected, darts), ...extra }
@@ -373,7 +756,11 @@ export function resolveTargeting(
         asked: { type: "action.resolve", payload: { commandId: newId(), ...payload, commit: true } }
       };
     emit();
-    onResult(response.ok, response.blocked ? undefined : response.message);
+    onResult(
+      response.ok,
+      response.blocked ? undefined : response.message,
+      response.ok ? response.resolution?.sensed : undefined
+    );
   });
 }
 
@@ -382,18 +769,19 @@ export function resolveActionDirect(
   attackerId: string,
   actionId: string,
   revision: number | undefined,
-  onResult: (ok: boolean, message?: string) => void,
+  onResult: (ok: boolean, message?: string, sensed?: readonly string[]) => void,
   override?: { reason: string },
   /** A spell readied to cast later, at a chosen slot level. */
   readied?: Readonly<{ slotLevel?: number }>,
-  /** A spell with nothing to aim, cast now at a chosen slot level. */
-  cast?: Readonly<{ slotLevel?: number }>
+  /** A spell with nothing to aim, cast now at a chosen slot level and shaped as its caster chose. */
+  cast?: Readonly<{ slotLevel?: number; shaping?: readonly CastShaping[] }>
 ) {
   const extra = readied
     ? { ready: true, ...(readied.slotLevel !== undefined ? { slotLevel: readied.slotLevel } : {}) }
-    : cast?.slotLevel !== undefined
-      ? { slotLevel: cast.slotLevel }
-      : {};
+    : {
+        ...(cast?.slotLevel !== undefined ? { slotLevel: cast.slotLevel } : {}),
+        ...(cast?.shaping && cast.shaping.length > 0 ? { shaping: cast.shaping.map((entry) => ({ ...entry })) } : {})
+      };
   void command("action:resolve", {
     actorId: attackerId,
     actionId,
@@ -411,7 +799,154 @@ export function resolveActionDirect(
         asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId, ...extra } }
       };
     emit();
-    onResult(response.ok, response.blocked ? undefined : response.message);
+    onResult(
+      response.ok,
+      response.blocked ? undefined : response.message,
+      response.ok ? response.resolution?.sensed : undefined
+    );
+  });
+}
+
+/** What an attack on a door or a wall came to, as the map's status line says it. */
+export function objectAttackLine(
+  reply: Readonly<{ outcome?: "hit" | "crit" | "miss"; damage?: number; destroyed?: boolean }>
+): string {
+  if (reply.outcome === "miss") return "Miss.";
+  const hit = reply.outcome === "crit" ? "Critical hit" : "Hit";
+  const damage = reply.damage !== undefined ? ` · ${reply.damage} damage` : "";
+  return `${hit}${damage}.${reply.destroyed ? " It breaks." : ""}`;
+}
+
+/**
+ * Aims the live session at a door or a wall of the map. An attack strikes it as an object (`object:attack`); a spell
+ * acts on it (`action:resolve` with `wallId`: Knock, Arcane Lock, Passwall, Disintegrate). The server checks reach,
+ * range and sight, and whether the spell acts on walls at all.
+ */
+export function resolveAtWall(
+  wallId: string,
+  revision: number | undefined,
+  onResult: (ok: boolean, message?: string) => void
+) {
+  if (!session || busy) return;
+  const { attackerId, action, slotLevel } = session;
+  busy = true;
+  blockedPrompt = null;
+  emit();
+  const done = (ok: boolean, message?: string) => {
+    busy = false;
+    if (ok) session = null;
+    emit();
+    onResult(ok, message);
+  };
+  const expected = revision !== undefined ? { expectedRevision: revision } : {};
+  if (action.attackBonus !== null) {
+    void command("object:attack", { actorId: attackerId, actionId: action.id, target: { wallId }, ...expected }).then(
+      (reply) => done(reply.ok, reply.ok ? objectAttackLine(reply) : reply.message)
+    );
+    return;
+  }
+  void command("action:resolve", {
+    actorId: attackerId,
+    actionId: action.id,
+    wallId,
+    commit: true,
+    ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...expected
+  }).then((response) => {
+    if (response.ok && response.resolution) result = response.resolution;
+    done(response.ok, response.message);
+  });
+}
+
+/** Aims the live spell at a flame set on the map (`action:resolve` with `lightId`: Druidcraft's Fire Play). The server
+ *  checks the spell lights flames, the range and whether it can snuff one. */
+export function resolveAtLight(
+  lightId: string,
+  revision: number | undefined,
+  onResult: (ok: boolean, message?: string) => void
+) {
+  if (!session || busy) return;
+  const { attackerId, action, slotLevel } = session;
+  busy = true;
+  blockedPrompt = null;
+  emit();
+  void command("action:resolve", {
+    actorId: attackerId,
+    actionId: action.id,
+    lightId,
+    commit: true,
+    ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(revision !== undefined ? { expectedRevision: revision } : {})
+  }).then((response) => {
+    if (response.ok && response.resolution) result = response.resolution;
+    busy = false;
+    if (response.ok) session = null;
+    emit();
+    onResult(response.ok, response.message);
+  });
+}
+
+/** Aims the live attack at what holds a creature (a Net, a web, a rope): `object:attack` on the effect that holds it.
+ *  Breaking it frees the creature. */
+export function resolveAtHeld(
+  actorId: string,
+  effectId: string,
+  revision: number | undefined,
+  onResult: (ok: boolean, message?: string) => void
+) {
+  if (!session || busy || session.action.attackBonus === null) return;
+  const { attackerId, action } = session;
+  busy = true;
+  emit();
+  void command("object:attack", {
+    actorId: attackerId,
+    actionId: action.id,
+    target: { actorId, effectId },
+    ...(revision !== undefined ? { expectedRevision: revision } : {})
+  }).then((reply) => {
+    busy = false;
+    if (reply.ok) session = null;
+    emit();
+    onResult(reply.ok, reply.ok ? objectAttackLine(reply) : reply.message);
+  });
+}
+
+/** Take the targeted action's own move before the rest of it (Pounce): the server spends the action and grants the
+ *  move now; the action picked again after the move makes the rest at no further cost. */
+export function takeMoveFirst(onResult: (ok: boolean, message?: string, sensed?: readonly string[]) => void) {
+  if (!session || busy) return;
+  const { attackerId, action } = session;
+  busy = true;
+  emit();
+  void command("action:resolve", { actorId: attackerId, actionId: action.id, moveFirst: true }).then((response) => {
+    busy = false;
+    if (response.ok) session = null;
+    else if (response.blocked?.overridable)
+      blockedPrompt = {
+        blocked: response.blocked,
+        retry: (confirmed) =>
+          void command("action:resolve", {
+            actorId: attackerId,
+            actionId: action.id,
+            moveFirst: true,
+            override: confirmed
+          }).then((retried) => {
+            if (retried.ok) session = null;
+            blockedPrompt = null;
+            emit();
+            onResult(retried.ok, retried.message);
+          }),
+        asked: {
+          type: "action.resolve",
+          payload: { commandId: newId(), actorId: attackerId, actionId: action.id, moveFirst: true }
+        }
+      };
+    emit();
+    onResult(
+      response.ok,
+      response.blocked ? undefined : response.message,
+      response.ok ? response.resolution?.sensed : undefined
+    );
   });
 }
 

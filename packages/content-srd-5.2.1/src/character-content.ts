@@ -10,15 +10,20 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionSchema,
+  DamageFormulaSchema,
+  DamageTypeSchema,
   DiceFormulaSchema,
   HealingFormulaSchema,
   EffectGrantSchema,
   GrantWhenSchema,
   HitDieSchema,
+  HoursSchema,
+  HitRiderSchema,
   ModifierSchema,
   PickBudgetScalingSchema,
   SaveFailureEffectSchema,
   SaveOutcomeFields,
+  SummonCreatureSchema,
   type Modifier
 } from "@vtt/schemas";
 
@@ -78,7 +83,7 @@ export const contentRecordBase = {
 /** Uses regained on a rest: a flat `limit` or a `scaling` rule. `pool` shares one counter across features. */
 export const FeatureUsesSchema = z
   .object({
-    limit: z.number().int().min(1).max(20).optional().describe("A flat count"),
+    limit: z.number().int().min(1).max(100).optional().describe("A flat count (a Staff of the Magi's 50 charges)"),
     scaling: z
       .discriminatedUnion("type", [
         z
@@ -113,9 +118,14 @@ export const FeatureUsesSchema = z
       ])
       .optional()
       .describe("The four ways 5e actually scales a feature's uses."),
-    /** "own-turn": back at the start of the bearer's next turn ("until the start of your next turn"). */
-    per: z.enum(["turn", "own-turn", "encounter", "short-rest", "long-rest"]),
-    pool: ContentIdSchema.optional().describe("Shares one counter across every feature carrying the same pool id")
+    /** "own-turn": back at the start of the bearer's next turn ("until the start of your next turn"); "never": spent
+     *  for good (a Necklace of Fireballs' beads, a Ring of Three Wishes); "time": back once `afterHours` of game time
+     *  pass from its first use (Wings of Flying's 1d12 hours). */
+    per: z.enum(["turn", "own-turn", "encounter", "short-rest", "long-rest", "never", "time"]),
+    pool: ContentIdSchema.optional().describe("Shares one counter across every feature carrying the same pool id"),
+    afterHours: HoursSchema.optional().describe(
+      'With per "time": the hours of game time after its first use that it comes back, rolled then (Wings of Flying: 1d12; Horn of Valhalla: 168)'
+    )
   })
   .strict()
   .superRefine((uses, context) => {
@@ -123,6 +133,12 @@ export const FeatureUsesSchema = z
       context.addIssue({
         code: "custom",
         message: "Limited uses need either a flat `limit` or a `scaling` rule."
+      });
+    if ((uses.per === "time") !== (uses.afterHours !== undefined))
+      context.addIssue({
+        code: "custom",
+        path: ["afterHours"],
+        message: "Uses that come back after a time need the hours (afterHours), and only they take them."
       });
   })
   .describe(
@@ -139,11 +155,19 @@ export const FeatureAttackSchema = z
     rangeFeet: z.number().int().positive().optional(),
     rangeNormalFeet: z.number().int().positive().optional(),
     count: z.number().int().min(1).max(10).optional(),
-    criticalBonusDice: z.number().int().min(1).max(4).optional()
+    criticalBonusDice: z.number().int().min(1).max(4).optional(),
+    /** A printed to-hit that stands in for the derived one (a Ring of the Ram's "+7 bonus"). */
+    bonus: z
+      .number()
+      .int()
+      .min(-5)
+      .max(20)
+      .optional()
+      .describe('A printed to-hit that stands in for the derived one (a Ring of the Ram\'s "+7 bonus")')
   })
   .strict()
   .describe(
-    'An attack a feature grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is derived: the feature names the ability (or "spellcasting") and the builder resolves the number.'
+    'An attack a feature grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is derived: the feature names the ability (or "spellcasting") and the builder resolves the number, unless a printed `bonus` stands in.'
   );
 
 /**
@@ -191,11 +215,61 @@ export const FeatureSaveSchema = z
     "A save a feature forces. `ability` is what the target rolls; `dc` is how the number is derived; the outcome fields are a stat block's."
   );
 
+/** A hit rider on a feature: the DC of its saves is derived like a feature save's ("8 plus your Dexterity modifier and
+ *  Proficiency Bonus"), and how many effects one hit carries may grow with level (Improved Cunning Strike's two). */
+export const FeatureHitRiderSchema = HitRiderSchema.omit({ saveDc: true })
+  .extend({
+    saveDc: FeatureSaveDcSchema.optional(),
+    effectsChooseByLevel: z
+      .array(z.object({ level: ContentLevelSchema, choose: z.number().int().min(1).max(3) }).strict())
+      .max(4)
+      .optional()
+      .describe("How many effects one hit may carry from a class level on; the highest matching level wins"),
+    appliesDaysPerLevel: z
+      .literal(true)
+      .optional()
+      .describe(
+        "What the hit applies lasts a number of days equal to the class level, in game minutes (Quivering Palm's vibrations)"
+      )
+  })
+  .strict();
+
 /** A rollable action a feature adds (Second Wind, Breath Weapon): `ActionSchema` with derived attack/save. */
-export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true })
+export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true, ridesHit: true })
   .extend({
     attack: FeatureAttackSchema.optional(),
     save: FeatureSaveSchema.optional(),
+    ridesHit: FeatureHitRiderSchema.optional(),
+    /** An attack with the item's own weapon, hurled as if it had the Thrown property at these ranges (Hammer of
+     *  Thunderbolts: 20/60): the weapon's attack and damage, from range. */
+    hurlsWeapon: z
+      .object({
+        normalFeet: z.number().int().min(5).max(600),
+        longFeet: z.number().int().min(5).max(1200)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "An attack with the item's own weapon hurled as if it had the Thrown property at these ranges (Hammer of Thunderbolts: 20/60), with the weapon's attack and damage"
+      ),
+    /** An attack with the item's own weapon as its bearer swings it, reaching from where the item's force is (a Dancing
+     *  Sword: "The weapon uses your attack roll and adds your ability modifier to damage rolls"). */
+    swingsWeapon: z
+      .literal(true)
+      .optional()
+      .describe("An attack with the item's own weapon as its bearer swings it (a Dancing Sword's)"),
+    /** Offered only through an effect another of the item's actions grants (`ActionGrant.itemAction`), never from the
+     *  carried row: a Feather Token's whip outlasts the token. */
+    grantedOnly: z
+      .literal(true)
+      .optional()
+      .describe("Offered only through an effect another of the item's actions grants, never from the carried row"),
+    /** It spends none of its feature's uses, where another of the feature's actions does (ending Quivering Palm's
+     *  vibrations, which the 4 Focus Points paid for when they started). */
+    spendsNoUses: z
+      .literal(true)
+      .optional()
+      .describe("It spends none of its feature's uses, where another of the feature's actions does"),
     /** Damage that grows with level. It replaces `damage` at the highest matching level (Sneak Attack, Divine Smite). */
     damageByLevel: z
       .array(
@@ -214,18 +288,52 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       .describe(
         "Damage that grows with level (Sneak Attack, Divine Smite). The highest matching level replaces `damage`"
       ),
+    /** Damage dice counted by an ability modifier, from a class level on ("a number of d8s equal to your Wisdom modifier
+     *  (minimum of 1d8)", Sear Undead on Turn Undead). It replaces `damage` from that level. */
+    damageDiceByAbility: z
+      .object({
+        level: ContentLevelSchema,
+        ability: AbilitySchema,
+        die: z.enum(["d4", "d6", "d8", "d10", "d12"]),
+        type: DamageTypeSchema,
+        minimum: z.number().int().min(1).max(5).default(1)
+      })
+      .strict()
+      .optional()
+      .describe(
+        'Damage dice counted by an ability modifier from a class level on ("a number of d8s equal to your Wisdom modifier (minimum of 1d8)"), replacing `damage` from that level'
+      ),
     /** Healing that grows with level. It replaces `healing.formula` at the highest matching level (Divine Spark's heal,
      *  Wholeness of Body's Martial Arts die). */
     healingByLevel: z
+      .array(
+        z
+          .object({
+            level: ContentLevelSchema,
+            formula: HealingFormulaSchema,
+            self: z.literal(true).optional(),
+            temporary: z.literal(true).optional()
+          })
+          .strict()
+      )
+      .max(20)
+      .optional()
+      .describe(
+        "Healing that grows with level (Divine Spark's heal, Wholeness of Body's Martial Arts die). The highest matching level replaces `healing.formula`; a row with `self` or `temporary` gives an action with no healing below that level its own (Heightened Focus's Temporary Hit Points)"
+      ),
+    /** The area's healing that grows with level (Land's Aid: 2d6, 3d6 at 10, 4d6 at 14). The highest matching level
+     *  replaces `areaHeal.formula`. */
+    areaHealByLevel: z
       .array(z.object({ level: ContentLevelSchema, formula: HealingFormulaSchema }).strict())
       .max(20)
       .optional()
       .describe(
-        "Healing that grows with level (Divine Spark's heal, Wholeness of Body's Martial Arts die). The highest matching level replaces `healing.formula`"
+        "The area's healing that grows with level (Land's Aid). The highest matching level replaces `areaHeal`"
       ),
     /** What the built action adds to its first damage part and its healing, read off the character when it is built:
      *  a multiple of its level ("1d10 plus your Fighter level", "five times your Cleric level") and an ability
-     *  modifier ("add your Wisdom modifier"). */
+     *  modifier ("add your Wisdom modifier"). A reroll answer takes the level multiple as its bonus (Indomitable), and
+     *  a reaction that reduces damage adds all of it to its roll (Deflect Attacks). */
     adds: z
       .object({
         classLevel: z.number().int().min(1).max(10).optional(),
@@ -252,6 +360,23 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       .describe(
         "The granted effect's `damage-bonus` amounts become the named printed class column at the character's level (Rage Damage), and the action's text says the number"
       ),
+    /** The die an answer to a roll rolls, growing with level (the Bardic Inspiration die: d6, a d8 at level 5, a d10 at
+     *  10, a d12 at 15). It replaces the amount of the action's `answer`, and of the answer its grant carries, at the
+     *  highest matching level. */
+    answerAmountByLevel: z
+      .array(z.object({ level: ContentLevelSchema, amount: DamageFormulaSchema }).strict())
+      .max(20)
+      .optional()
+      .describe(
+        "The die an answer to a roll rolls, growing with level (the Bardic Inspiration die). The highest matching level replaces the amount of the action's answer and of its grant's answer"
+      ),
+    /** A reaction that changes with level. It replaces `reaction` at the highest matching level (Deflect Energy lets
+     *  Deflect Attacks meet every damage type at Monk 13). */
+    reactionByLevel: z
+      .array(z.object({ level: ContentLevelSchema, reaction: ActionSchema.shape.reaction.unwrap() }).strict())
+      .max(20)
+      .optional()
+      .describe("A reaction that changes with level. The highest matching level replaces `reaction`"),
     /** A compound plan that grows with level. It replaces `multiattack` at the highest matching level (Flurry of
      *  Blows' third strike at Monk 10). */
     multiattackByLevel: z
@@ -304,7 +429,33 @@ export const FeatureGrantsFieldsSchema = z
              *  per Long Rest), "at-will" costs nothing (Armor of Shadows). Absent: only with a slot. */
             withoutSlot: z.enum(["free", "at-will"]).optional(),
             /** False when it can be cast only without a slot (an invocation's spell the Warlock does not know). */
-            withSlot: z.boolean().default(true)
+            withSlot: z.boolean().default(true),
+            /** Which of its castings are a Magic action, whatever the spell's casting time: the one without a slot
+             *  (Pact of the Chain's Find Familiar) or every one the feature gives (Wild Companion's). */
+            asMagicAction: z.enum(["without-slot", "every-casting"]).optional(),
+            /** The components every casting the feature gives goes without (Wild Companion's and Dragon Companion's
+             *  "without Material components"). */
+            waives: z
+              .array(z.enum(["verbal", "somatic", "material"]))
+              .min(1)
+              .max(3)
+              .optional(),
+            /** Its casting without a slot targets only its caster ("cast Mage Armor on yourself"). */
+            self: z.literal(true).optional(),
+            /** Its casting without a slot gives its healing dice their highest faces (Fiendish Vigor). */
+            maximized: z.literal(true).optional(),
+            /** How the feature changes the creatures the spell brings when cast this way: the creature type it takes
+             *  (Wild Companion's Fey familiar), that it leaves when its caster finishes a Long Rest, more forms to pick
+             *  (Pact of the Chain), and casting it without Concentration for a minute (Dragon Companion). */
+            summon: z
+              .object({
+                creatureTypes: z.array(ContentIdSchema).min(1).max(6).optional(),
+                untilLongRest: z.literal(true).optional(),
+                moreCreatures: z.array(SummonCreatureSchema).min(1).max(12).optional(),
+                concentrationOptional: z.literal(true).optional()
+              })
+              .strict()
+              .optional()
           })
           .strict()
       )
@@ -333,17 +484,13 @@ export const FeatureGrantsSchema = FeatureGrantsFieldsSchema.superRefine((grants
 );
 
 /**
- * Rider types an item may not carry: they are baked into the sheet and cannot be reversed on unequip
- * (`hp.maximum` with current HP tracked against it; ability scores feeding everything). Feats and
- * features may use them.
+ * Rider types an item may not carry: the attunement limit would decide the item's own attunement. Feats and features may
+ * use it. An item's ability score and its Hit Points per level are read live while it is worn, so taking it off gives
+ * them back.
  */
-export const ITEM_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
-  "hit-points-per-level",
-  "ability-score",
-  "attunement-slots"
-]);
+export const ITEM_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze(["attunement-slots"]);
 export const ITEM_REFUSED_MODIFIER_MESSAGE =
-  "An item cannot change hit points, an ability score or the attunement limit. Those are baked into the sheet or decide the item's own attunement, and cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (All three stay available on a feat.)";
+  "An item can't change the attunement limit, which would decide the item's own attunement. A feat can.";
 
 /** The rider fields shared by `FeatureRecord`, `FeatureOption` and magic items (spread into `EquipmentReferenceSchema`). */
 export const featureRiders = {
@@ -355,7 +502,7 @@ export const featureRiders = {
     .describe("Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)"),
   actions: z
     .array(FeatureActionSchema)
-    .max(8)
+    .max(16)
     .default([])
     .describe("Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon)"),
   /** Effects the feature can grant, in the actor-side EffectGrant vocabulary (Rage, Bardic Inspiration). */
@@ -378,8 +525,8 @@ export const featureRiders = {
 export const PickBudgetKeySchema = z
   .string()
   .regex(
-    /^[a-z0-9-]+(:[a-z0-9-]+)?$/,
-    'A pick budget names an offer key ("class-cantrips") or a feature\'s own pick ("feature:expertise").'
+    /^[a-z0-9-]+(:[a-z0-9-]+(\/[2-9])?)?$/,
+    'A pick budget names an offer key ("class-cantrips") or a feature\'s own pick ("feature:expertise", and "feature:magic-initiate-cleric/2" for its second).'
   )
   .max(80);
 
@@ -453,7 +600,12 @@ export const ReplaceableChoiceSchema = z
       .min(1)
       .max(5)
       .default(1)
-      .describe("How many of that offer's answers may be swapped at once")
+      .describe("How many of that offer's answers may be swapped at once"),
+    /** A name several clauses share one allowance under (Mystic Arcanum: "replace one of your arcanum spells" across
+     *  its four arcana). */
+    shares: ContentIdSchema.optional().describe(
+      'A name several clauses share one allowance under: Mystic Arcanum\'s "replace one of your arcanum spells" is one swap across its four arcana'
+    )
   })
   .strict()
   .describe(
@@ -512,6 +664,27 @@ const featureChoiceBase = {
     .optional()
     .describe(
       'Floor on a spell pick\'s level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell"; both bounds at 6 make the pick exact'
+    ),
+  /** The answer the build takes when the ledger holds none (the High Elf's Prestidigitation, swapped later). */
+  default: ContentIdSchema.optional().describe(
+    "The answer the build takes when the ledger holds none (a High Elf knows Prestidigitation until a Long Rest swaps it), so a sheet made before the pick existed still builds and the builder starts on it"
+  ),
+  /** Only spells cast with this casting time (Spell Mastery: "spells ... that have a casting time of an action"). */
+  castingTime: z
+    .enum(["action", "bonus-action", "reaction"])
+    .optional()
+    .describe('Only spells cast with this casting time (Spell Mastery: "a casting time of an action")'),
+  /** Only spells with the Ritual tag (Pact of the Tome's "two level 1 spells that have the Ritual tag"). */
+  ritual: z
+    .literal(true)
+    .optional()
+    .describe("Only spells with the Ritual tag (Pact of the Tome's two level 1 rituals)"),
+  /** Only spells in the character's spellbook (Spell Mastery, Signature Spells), checked as the pick is made. */
+  fromSpellbook: z
+    .literal(true)
+    .optional()
+    .describe(
+      "Only spells in the character's spellbook (Spell Mastery, Signature Spells): the server checks the pick against the book when a build or a rest's re-choice makes it"
     ),
   /** The ceiling an ability-score pick from this choice may reach; absent = 20 (epic boons use 30). */
   maximum: z
@@ -603,6 +776,13 @@ export const FeatureOptionSchema = z
     level: ContentLevelSchema.optional().describe(
       'The class level this option may first be chosen at: an invocation\'s "Prerequisite: Level 5+ Warlock". A build below it is not offered the option'
     ),
+    /** It may be chosen more than once (an invocation's "Repeatable. You can gain this invocation more than once"). */
+    repeatable: z
+      .literal(true)
+      .optional()
+      .describe(
+        'It may be chosen more than once: an invocation\'s "Repeatable. You can gain this invocation more than once"'
+      ),
     /** A pick this option asks for once chosen, from a list of its own. */
     choice: FeatureOptionChoiceSchema.optional().describe(
       "A second-order pick this option owes once chosen, from a list of its own"
@@ -730,6 +910,20 @@ export const FeatureRecordSchema = z
       .describe(
         "Spell lists the class's own prepared and cantrip picks may also draw on, the spells counting as that class's (Magical Secrets: the Bard's picks may come from the Cleric, Druid and Wizard lists). Widens an existing budget; it adds no picks"
       ),
+    /** A free casting of a spell other features grant, on this feature's own uses, which the spells share (Natural
+     *  Recovery: "one of the level 1+ spells that you have prepared from your Circle Spells feature"). */
+    freeCastOf: z
+      .object({
+        /** The features whose granted spells it casts, with the options chosen under them. */
+        features: z.array(ContentIdSchema).min(1).max(8),
+        /** The lowest level of spell it casts (Natural Recovery's "level 1+"). */
+        minLevel: z.number().int().min(0).max(9).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A free casting of a spell other features grant, on this feature's own `uses`, which every such spell shares: Natural Recovery casts \"one of the level 1+ spells that you have prepared from your Circle Spells feature\" once per Long Rest. `features` names the granting features (their chosen options' grants count)"
+      ),
     ...featureRiders,
     /** This feature replaces an earlier one of the same id lineage (Indomitable at 9/13/17). */
     replacesFeatureId: ContentIdSchema.optional().describe(
@@ -780,7 +974,10 @@ export const StartingEquipmentOptionSchema = z
           .object({
             id: ContentIdSchema,
             name: z.string().min(1).max(120),
-            quantity: z.number().int().min(1).max(99).default(1)
+            quantity: z.number().int().min(1).max(99).default(1),
+            /** The item is one of these, picked as the kit is taken (the Bard's "Musical Instrument of your choice");
+             *  `id` is the one it gives when no pick is recorded. */
+            pickFrom: z.array(ContentIdSchema).min(2).max(40).optional()
           })
           .strict()
       )

@@ -23,6 +23,7 @@ import {
   useToast
 } from "@vtt/ui";
 import { abilityModifier } from "@vtt/rules-5e";
+import { SheetCrafting } from "../crafting/SheetCrafting";
 import { DicePanel } from "../dice/DicePanel";
 import { useRollPreference, type SheetAttackMode } from "../dice/roll-preference";
 import { signed } from "../encounter/format";
@@ -33,12 +34,14 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { ChecksTab } from "./ChecksTab";
 import { FeaturesTab, NextLevel } from "./FeaturesTab";
+import { experienceOf } from "./Experience";
 import { GearTab } from "./GearTab";
 import { GmTools } from "./GmTools";
 import { HitPointDice } from "./HitPointDice";
+import { HeroicGift, hasGift } from "./HeroicGift";
 import { HpCard } from "./HitPoints";
 import { IdentityEditor } from "./IdentityEditor";
-import { LatestRoll, useSessionRoll } from "./LatestRoll";
+import { CheckAnswers, LatestRoll, useSessionRoll } from "./LatestRoll";
 import { LevelBox } from "./LevelBox";
 import { NotesTab } from "./NotesTab";
 import { PlayFight } from "./PlayFight";
@@ -152,7 +155,7 @@ export function CharacterSheet({
     role === "gm" && state && "definitions" in state && "definitionId" in actor
       ? (state as GmView).definitions.find((entry) => entry.id === actor.definitionId)?.definition
       : undefined;
-  const { definitionId, definition, serverActions, facts, derived, rechoices, spellChoices, showEdited } =
+  const { definitionId, definition, serverActions, facts, derived, rechoices, spellChoices, conversions, showEdited } =
     useSheetDefinition(actor, role, sayUnloaded, liveDefinition);
   const { busy, edit } = useSheetEdit(say);
   // With the roll history the latest-roll line shows each result, so only a refusal is a toast.
@@ -218,6 +221,7 @@ export function CharacterSheet({
   const level = characterLevel(definition);
   const canLevel = mayLevel(role, state, actor) && onLevel !== undefined && level !== null;
   const levelUpTo = levelUpTarget(level, state);
+  const experience = experienceOf(actor);
   // What the next level brings, asked only of a viewer who may take it there.
   const next = useNextLevel(actor.id, canLevel && levelUpTo !== null, `${level}:${definitionId ?? ""}`);
   const inspired = heroicInspirationOf(actor);
@@ -225,10 +229,12 @@ export function CharacterSheet({
   const hp = exactHp(actor);
   const pools = poolsOf(serverActions);
   const restAsked = state?.rest?.requests.includes(actor.id) ?? false;
+  const restOpen = state?.rest?.shortRest?.actorIds.includes(actor.id) ?? false;
   const session = useSessionRoll(state, actor.id);
+  // The latest check, or loose save, this sheet rolled, while it is still the character's latest roll.
   const canReroll =
-    rolls.lastCheck !== null &&
-    (state === undefined || rolls.lastCheck.rollId === session?.id) &&
+    ((rolls.lastCheck !== null && (state === undefined || rolls.lastCheck.rollId === session?.id)) ||
+      (rolls.lastSave !== null && state !== undefined && rolls.lastSave.rollId === session?.id)) &&
     (role === "gm" || inspired === true);
   const hitDice = "hitDice" in actor ? actor.hitDice : null;
   const constitution = definition ? abilityModifier(definition.abilityScores.con) : null;
@@ -269,7 +275,7 @@ export function CharacterSheet({
   const openLog = state ? () => (layout === "wide" ? setDocked(true) : setDiceOpen(true)) : null;
   const lastRoll = session ? (
     <LatestRoll roll={session} role={role} rolls={rolls} canReroll={canReroll} onOpenLog={openLog} />
-  ) : canReroll ? (
+  ) : canReroll || (rolls.lastCheck?.answers?.length ?? 0) > 0 ? (
     // Without the roll history (a sheet with no state) the server judges the reroll.
     <LatestRollReroll role={role} rolls={rolls} />
   ) : null;
@@ -316,6 +322,7 @@ export function CharacterSheet({
       phoneViews={phoneViews}
       showHitDice={layout !== "wide"}
       restAsked={restAsked}
+      restOpen={restOpen}
       inFight={controller.inFight}
       savesOwed={controller.savesOwed}
       death={deathCard}
@@ -333,6 +340,10 @@ export function CharacterSheet({
       busy={busy}
       edit={edit}
       onEdited={showEdited}
+      helping={controller.inFight ? undefined : state}
+      inFight={controller.inFight}
+      party={state}
+      onFeedback={say}
     />
   ) : null;
   const spellsBody = definition ? (
@@ -371,8 +382,9 @@ export function CharacterSheet({
       }}
     />
   ) : null;
+  // The GM keeps a creature's gear too: a mount's saddle and barding.
   const gearBody =
-    actor.kind === "player-character" ? (
+    actor.kind === "player-character" || role === "gm" ? (
       <GearTab
         actor={actor}
         role={role}
@@ -382,9 +394,15 @@ export function CharacterSheet({
         serverActions={serverActions}
         facts={facts}
         attunementSlots={derived?.attunementSlots ?? 3}
+        carrying={derived?.carrying ?? null}
         inFight={controller.inFight}
         actionBlocked={controller.itemBlocked}
         onUseAction={controller.itemAction}
+        crafting={
+          actor.kind === "player-character" ? (
+            <SheetCrafting actor={actor} state={state} busy={busy} edit={edit} />
+          ) : null
+        }
         others={
           role === "gm" && state
             ? state.actors
@@ -410,7 +428,37 @@ export function CharacterSheet({
       derived={derived}
       pools={pools}
       serverActions={serverActions}
+      conversions={conversions}
+      rechoices={rechoices}
+      busy={busy}
+      edit={edit}
+      onFeedback={say}
       onUse={(actionId) => controller.sendThroughServer(actionId)}
+      experience={
+        experience !== undefined && level !== null
+          ? {
+              points: experience,
+              level,
+              ...(canLevel && levelUpTo === level + 1 ? { onLevelUp: onLevel! } : {})
+            }
+          : undefined
+      }
+      {...(controller.inFight
+        ? {}
+        : {
+            rest: {
+              rechoices,
+              afterLongRest: role === "gm" || actor.restStep?.after === "long-rest" || Boolean(actor.preparation),
+              afterAnyRest: role === "gm" || Boolean(actor.restStep) || Boolean(actor.preparation),
+              busy,
+              onRechoose: (choice, option) =>
+                void edit("actor:rechoose", { actorId: actor.id, offer: choice.offer, id: option.id }).then(
+                  (result) => {
+                    if (result.ok) say(`${choice.label}: ${option.name}.`);
+                  }
+                )
+            }
+          })}
       next={
         canLevel && levelUpTo !== null ? (
           <NextLevel level={levelUpTo} lines={next?.lines ?? []} onLevelUp={onLevel!} />
@@ -458,6 +506,15 @@ export function CharacterSheet({
       onFeedback={say}
     />
   );
+  // A creature in a form (Wild Shape's Wolf, Polymorph's Beast) reads the form's statistics, so the sheet says so.
+  const inForm = (actor.effects as ReadonlyArray<Readonly<{ name: string; form?: Readonly<{ name: string }> }>>).find(
+    (effect) => effect.form !== undefined
+  );
+  const formBanner = inForm?.form ? (
+    <p className="cs-form-banner" role="status">
+      {actor.name} is in {inForm.form.name} form. The sheet shows the form's statistics.
+    </p>
+  ) : null;
   const missing =
     !definition && role === "gm" && definitionId && !unloaded ? (
       <p className="cs-note">Loading the stat block.</p>
@@ -474,6 +531,8 @@ export function CharacterSheet({
       tabIndex={0}
     >
       {missing}
+      {formBanner}
+      {hasGift(actor) && <HeroicGift actor={actor} state={state} onFeedback={say} />}
       {aimedHere && definition && controller.liveCombat && role === "player" && (
         <PlayerActionRunner
           actorId={actor.id}
@@ -559,7 +618,14 @@ export function CharacterSheet({
           <div className="cs-col cs-col-right scroll-y" aria-label="Hit Points and details">
             <HpCard actor={actor} role={role} onFeedback={say} />
             {hitDice && hitDice.entries.length > 0 && actor.kind === "player-character" && (
-              <HitPointDice actorId={actor.id} hitDice={hitDice} constitution={constitution} onFeedback={say} />
+              <HitPointDice
+                actorId={actor.id}
+                hitDice={hitDice}
+                constitution={constitution}
+                canSpend={role === "gm" || restOpen}
+                canReroll={role === "gm" || inspired === true}
+                onFeedback={say}
+              />
             )}
             {role === "gm" && <GmTools actor={actor} state={state} onFeedback={say} />}
             <div ref={setDetailHost} className="cs-detail-host" />
@@ -772,6 +838,7 @@ function LatestRollReroll({
       <Button size="sm" disabled={rolls.rolling} onClick={() => void rolls.rerollCheck()}>
         {role === "gm" ? "Reroll" : "Reroll · Heroic Inspiration"}
       </Button>
+      <CheckAnswers rolls={rolls} />
     </div>
   );
 }

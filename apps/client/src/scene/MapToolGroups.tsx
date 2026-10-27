@@ -1,4 +1,4 @@
-import type { AnnotationShapeKind, AnnotationVisibility } from "@vtt/domain";
+import type { AnnotationShapeKind, AnnotationVisibility, MapTrap, SceneEnvironment } from "@vtt/domain";
 import {
   Button,
   Field,
@@ -12,11 +12,17 @@ import {
   IconSparkle,
   IconTerrain,
   IconWall,
+  IconWarning,
   IconX
 } from "@vtt/ui";
 import {
+  AREA_KINDS,
   drawingAudienceOptions,
+  GROUND_TOOLS,
+  TRAP_KINDS,
+  TRAP_TIERS,
   LIGHT_PRESETS,
+  type AreaKindId,
   NEEDS_GRID,
   type ClearScope,
   type LightPresetId,
@@ -231,22 +237,26 @@ export function TerrainGroup({
   return (
     <>
       <p className="map-toolbar-note">
-        Entering difficult terrain costs double movement. Moves are charged and previewed along the cheapest path.
+        Difficult terrain and ice cost double movement, and so does swimming without a Swim Speed. Moves are charged and
+        previewed along the cheapest path.
       </p>
       <div className="map-toolbar-choices" role="group" aria-label="Terrain tools">
-        <button
-          type="button"
-          className="map-toolbar-choice tap-target interactive"
-          aria-pressed={tool === "terrain-difficult"}
-          disabled={terrainBusy || !calibrated}
-          title={calibrated ? "Drag an area to mark it difficult" : NEEDS_GRID}
-          onClick={() => onPickTool(tool === "terrain-difficult" ? "select" : "terrain-difficult")}
-        >
-          <span className="map-toolbar-row-icon" aria-hidden="true">
-            <IconTerrain />
-          </span>
-          Difficult
-        </button>
+        {GROUND_TOOLS.map((entry) => (
+          <button
+            key={entry.tool}
+            type="button"
+            className="map-toolbar-choice tap-target interactive"
+            aria-pressed={tool === entry.tool}
+            disabled={terrainBusy || !calibrated}
+            title={calibrated ? entry.title : NEEDS_GRID}
+            onClick={() => onPickTool(tool === entry.tool ? "select" : entry.tool)}
+          >
+            <span className={`map-toolbar-row-icon map-ground-swatch map-ground-${entry.op}`} aria-hidden="true">
+              {entry.op === "difficult" ? <IconTerrain /> : null}
+            </span>
+            {entry.label}
+          </button>
+        ))}
         <button
           type="button"
           className="map-toolbar-choice tap-target interactive"
@@ -271,9 +281,228 @@ export function TerrainGroup({
   );
 }
 
+const STATE_LABEL: Readonly<Record<MapTrap["state"], string>> = {
+  armed: "Armed",
+  sprung: "Sprung",
+  disarmed: "Safe"
+};
+
+/** The GM's traps (SRD 5.2.1 Gameplay Toolbox): pick one and its band of levels, drag its trapped area on the map, then
+ *  mark it found, set it off, arm it again, make it safe or remove it. Players see a trap only once it is found. */
+export function TrapsGroup({
+  id,
+  tool,
+  calibrated,
+  terrainBusy,
+  traps = [],
+  trapKind,
+  onTrapKindChange,
+  trapTier,
+  onTrapTierChange,
+  onEditTrap,
+  onSpringTrap,
+  onRemoveTrap,
+  onPickTool
+}: MapRailProps & { id: string; onPickTool: (tool: MapTool) => void }) {
+  const tierLabel = (tier: number) => TRAP_TIERS.find((entry) => entry.tier === tier)?.label ?? `Band ${tier}`;
+  return (
+    <>
+      <p className="map-toolbar-note">
+        A trap stays hidden from the players until someone finds it or sets it off. Its DC never reaches them.
+      </p>
+      <Field label="Trap" htmlFor={`${id}-kind`} className="map-toolbar-field">
+        <Select id={`${id}-kind`} value={trapKind} onChange={(event) => onTrapKindChange(event.target.value)}>
+          {TRAP_KINDS.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Party levels" htmlFor={`${id}-tier`} className="map-toolbar-field">
+        <Select
+          id={`${id}-tier`}
+          value={String(trapTier)}
+          onChange={(event) => onTrapTierChange(Number(event.target.value))}
+        >
+          {TRAP_TIERS.map((entry) => (
+            <option key={entry.tier} value={String(entry.tier)}>
+              {entry.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <div className="map-toolbar-choices" role="group" aria-label="Trap tools">
+        <button
+          type="button"
+          className="map-toolbar-choice tap-target interactive"
+          aria-pressed={tool === "trap-place"}
+          disabled={terrainBusy || !calibrated}
+          title={calibrated ? "Drag the trapped area on the map." : NEEDS_GRID}
+          onClick={() => onPickTool(tool === "trap-place" ? "select" : "trap-place")}
+        >
+          <span className="map-toolbar-row-icon" aria-hidden="true">
+            <IconWarning />
+          </span>
+          Set a trap
+        </button>
+      </div>
+      {!calibrated && <p className="map-toolbar-note">{NEEDS_GRID}</p>}
+      {traps.length === 0 ? (
+        <p className="map-toolbar-note">No traps on this map.</p>
+      ) : (
+        <ul className="map-trap-list" aria-label="Traps on this map">
+          {traps.map((trap) => (
+            <li key={trap.id} className="map-trap-row">
+              <span className="map-trap-name">
+                {trap.name}
+                <span className="map-trap-meta">
+                  {" · "}
+                  {tierLabel(trap.tier)} · {STATE_LABEL[trap.state]}
+                  {trap.found ? " · Found" : " · Hidden"}
+                </span>
+              </span>
+              <span className="map-trap-actions">
+                <Button
+                  variant="secondary"
+                  disabled={terrainBusy}
+                  onClick={() => onEditTrap(trap.id, { found: !trap.found })}
+                >
+                  {trap.found ? "Hide" : "Reveal"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={terrainBusy || trap.state === "disarmed"}
+                  onClick={() => onSpringTrap(trap.id)}
+                >
+                  Set off
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={terrainBusy}
+                  onClick={() => onEditTrap(trap.id, { state: trap.state === "armed" ? "disarmed" : "armed" })}
+                >
+                  {trap.state === "armed" ? "Make safe" : "Arm"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={terrainBusy}
+                  aria-label={`Remove ${trap.name}`}
+                  onClick={() => onRemoveTrap(trap.id)}
+                >
+                  Remove
+                </Button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+/** A player's found traps: each one still armed offers the ways its text gives to make it safe, taken by their own
+ *  character standing within 5 feet. The server checks the distance and rolls any check. */
+export function FoundTrapsGroup({ foundTraps = [], disarmerName, terrainBusy, onDisarmTrap }: MapRailProps) {
+  const armed = foundTraps.filter((trap) => trap.state === "armed");
+  return (
+    <>
+      <p className="map-toolbar-note">
+        {disarmerName
+          ? `${disarmerName} must stand within 5 feet of a trap to make it safe.`
+          : "Claim your character to make a trap safe."}
+      </p>
+      {armed.length === 0 ? (
+        <p className="map-toolbar-note">No armed traps found.</p>
+      ) : (
+        <ul className="map-trap-list" aria-label="Traps the party has found">
+          {armed.map((trap) => (
+            <li key={trap.id} className="map-trap-row">
+              <span className="map-trap-name">{trap.name}</span>
+              <span className="map-trap-actions">
+                {trap.ways.map((way) => (
+                  <Button
+                    key={way.id}
+                    variant="secondary"
+                    disabled={terrainBusy || !disarmerName}
+                    onClick={() => onDisarmTrap(trap.id, way.id)}
+                  >
+                    {way.name}
+                  </Button>
+                ))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+/** The live scene's climate and weather (SRD 5.2.1 Gameplay Toolbox, Environmental Effects). */
+export function WeatherGroup({ id, terrainBusy, environment, onEnvironmentChange }: MapRailProps & { id: string }) {
+  if (!environment) return null;
+  const toggles: ReadonlyArray<{ key: "cold" | "heat" | "highAltitude" | "frigidWater" | "deepWater"; label: string }> =
+    [
+      { key: "cold", label: "Extreme cold" },
+      { key: "heat", label: "Extreme heat" },
+      { key: "highAltitude", label: "High altitude" },
+      { key: "frigidWater", label: "Frigid water" },
+      { key: "deepWater", label: "Deep water" }
+    ];
+  return (
+    <>
+      <p className="map-toolbar-note">
+        Cold and heat ask everyone on the map a Constitution save at the end of each hour that passes. Rain, snow and
+        wind act on sight, flames and fliers at once.
+      </p>
+      <Field label="Precipitation" htmlFor={`${id}-precipitation`} className="map-toolbar-field">
+        <Select
+          id={`${id}-precipitation`}
+          value={environment.precipitation}
+          disabled={terrainBusy}
+          onChange={(event) =>
+            onEnvironmentChange({ precipitation: event.target.value as SceneEnvironment["precipitation"] })
+          }
+        >
+          <option value="none">No precipitation</option>
+          <option value="rain">Heavy rain</option>
+          <option value="snow">Heavy snowfall</option>
+        </Select>
+      </Field>
+      <Field label="Wind" htmlFor={`${id}-wind`} className="map-toolbar-field">
+        <Select
+          id={`${id}-wind`}
+          value={environment.wind}
+          disabled={terrainBusy}
+          onChange={(event) => onEnvironmentChange({ wind: event.target.value as SceneEnvironment["wind"] })}
+        >
+          <option value="none">Calm</option>
+          <option value="strong">Strong wind</option>
+          <option value="sandstorm">Sandstorm</option>
+        </Select>
+      </Field>
+      {toggles.map((toggle) => (
+        <Switch
+          key={toggle.key}
+          className="map-toolbar-switch"
+          checked={environment[toggle.key]}
+          disabled={terrainBusy}
+          onChange={(on) => onEnvironmentChange({ [toggle.key]: on })}
+          label={toggle.label}
+        />
+      ))}
+    </>
+  );
+}
+
 const WALL_TOOLS: ReadonlyArray<{ id: VisionTool; label: string; title: string }> = [
   { id: "vision-wall", label: "Wall", title: "Drag a wall. Sight and light stop at it, and so does movement." },
-  { id: "vision-door", label: "Door", title: "Drag a door. It starts closed, and a tap opens or closes it." },
+  {
+    id: "vision-door",
+    label: "Door",
+    title: "Drag a door. It starts closed, and a tap on its handle opens its menu."
+  },
   { id: "vision-window", label: "Window", title: "Drag a window. Sight goes through it, and movement stops at it." },
   { id: "vision-erase", label: "Remove", title: "Tap a wall, door, window or light to remove it." }
 ];
@@ -329,6 +558,10 @@ export function LightGroup({
   onVisionEnabledChange,
   ambient,
   onAmbientChange,
+  sunlight,
+  onSunlightChange,
+  areaKind,
+  onAreaKindChange,
   lightPreset,
   onLightPresetChange,
   onForgetExplored,
@@ -360,7 +593,7 @@ export function LightGroup({
           className="map-toolbar-choice tap-target interactive"
           aria-pressed={tool === "vision-erase"}
           disabled={visionBusy}
-          title="Tap a light to remove it."
+          title="Tap a light or an area to remove it."
           onClick={() => onPickTool(tool === "vision-erase" ? "select" : "vision-erase")}
         >
           <span className="map-toolbar-row-icon" aria-hidden="true">
@@ -387,6 +620,39 @@ export function LightGroup({
           ? `Tap the map to place it. It sheds bright light for ${preset.brightFeet} ft and dim light for ${preset.dimFeet} ft more.`
           : "Choose Place, then tap the map."}
       </p>
+      <div className="map-toolbar-choices" role="group" aria-label="Area tools">
+        <button
+          type="button"
+          className="map-toolbar-choice tap-target interactive"
+          aria-pressed={tool === "vision-area"}
+          disabled={visionBusy}
+          title="Drag over the map to paint an area of light or obscurement."
+          onClick={() => onPickTool(tool === "vision-area" ? "select" : "vision-area")}
+        >
+          <span className="map-toolbar-row-icon" aria-hidden="true">
+            <IconTerrain />
+          </span>
+          Paint area
+        </button>
+      </div>
+      <Field label="Area to paint" htmlFor={`${id}-area`} className="map-toolbar-field">
+        <Select
+          id={`${id}-area`}
+          value={areaKind}
+          onChange={(event) => onAreaKindChange(event.target.value as AreaKindId)}
+        >
+          {AREA_KINDS.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <p className="map-toolbar-note">
+        {tool === "vision-area"
+          ? "Drag over the map to paint it. Remove, then a tap on it, takes it away."
+          : "A lit room in a dark dungeon, a dark cellar in daylight, fog or foliage: choose Paint area, then drag."}
+      </p>
       <Field label="Ambient light" className="map-toolbar-field">
         <SegmentedControl
           ariaLabel="Ambient light"
@@ -401,6 +667,18 @@ export function LightGroup({
           ]}
         />
       </Field>
+      <Switch
+        className="map-toolbar-switch"
+        checked={sunlight && ambient === "bright"}
+        disabled={visionBusy || ambient !== "bright"}
+        onChange={onSunlightChange}
+        label="Sunlight"
+      />
+      <p className="map-toolbar-note">
+        {ambient === "bright"
+          ? "Daylight outdoors is sunlight. Sunlight Sensitivity and similar traits read it."
+          : "Sunlight needs bright ambient light."}
+      </p>
       <Switch
         className="map-toolbar-switch"
         checked={visionEnabled}

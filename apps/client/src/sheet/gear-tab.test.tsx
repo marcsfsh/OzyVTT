@@ -38,7 +38,38 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
   rarity: item.rarity ?? null,
   attunement: item.attunement ?? null,
   ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
-  ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
+  ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
+  ...(item.study ? { study: { ...item.study } } : {}),
+  ...(item.uses?.limit !== undefined && item.uses.per === "never" ? { uses: { limit: item.uses.limit } } : {}),
+  ...(item.variants
+    ? {
+        variants: item.variants.map((variant) => ({ id: variant.id, name: variant.name })),
+        variantChoice: {
+          by: item.variantChoice?.by ?? ("gm" as const),
+          ...(item.variantChoice?.activation ? { activation: item.variantChoice.activation } : {})
+        }
+      }
+    : {}),
+  ...(item.container
+    ? {
+        container: {
+          ...(item.container.capacityLb !== undefined ? { capacityLb: item.container.capacityLb } : {}),
+          ...(item.container.pieces ? { pieces: item.container.pieces.count } : {}),
+          ...(item.container.compartments
+            ? {
+                compartments: item.container.compartments.map(({ id, name, capacityLb, count }) => ({
+                  id,
+                  name,
+                  ...(capacityLb !== undefined ? { capacityLb } : {}),
+                  ...(count !== undefined ? { count } : {})
+                }))
+              }
+            : {}),
+          ...(item.container.weighsLb !== undefined ? { weighsLb: item.container.weighsLb } : {}),
+          ...(item.container.retrieval ? { retrieval: item.container.retrieval } : {})
+        }
+      }
+    : {})
 }));
 /** The spell reference's fields a scroll's spell list reads. */
 const SPELLS = loadSpells().map((spell) => ({
@@ -50,9 +81,13 @@ const SPELLS = loadSpells().map((spell) => ({
 })) as unknown as readonly ContentSpellSummary[];
 
 const emit = socket.emit as unknown as ReturnType<typeof vi.fn>;
-/** Answers the catalog and spell reads, the sheet's action rows and derived numbers (`attunementSlots`), and every
- *  command with ok. */
-function serve(attunementSlots = 3, actions: readonly unknown[] = []) {
+/** Answers the catalog and spell reads, the sheet's action rows and derived numbers (`attunementSlots`, `carrying`),
+ *  and every command with ok. */
+function serve(
+  attunementSlots = 3,
+  actions: readonly unknown[] = [],
+  carrying: Readonly<{ pounds: number; capacity: number; dragLimit?: number }> | null = null
+) {
   emit.mockImplementation((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
     if (event === "content:equipment") ack?.({ ok: true, equipment: CATALOG, attribution: "SRD 5.2.1, CC BY 4.0." });
     else if (event === "content:spells") ack?.({ ok: true, spells: SPELLS, attribution: "SRD 5.2.1, CC BY 4.0." });
@@ -68,7 +103,8 @@ function serve(attunementSlots = 3, actions: readonly unknown[] = []) {
           skills: [],
           defences: { resistances: [], immunities: [], vulnerabilities: [] },
           spellSaveDcBonus: 0,
-          attunementSlots
+          attunementSlots,
+          carrying
         }
       });
     else ack?.({ ok: true });
@@ -198,6 +234,46 @@ describe("the sheet's inventory", () => {
     await user.click(give);
     expect(sent("character:give-item")).toEqual([
       expect.objectContaining({ actorId: HERO, toActorId: FRIEND, itemId: "ring-of-resistance" })
+    ]);
+  });
+
+  it("lets the GM mark a manual studied, and shows a studied copy's magic spent", async () => {
+    serve();
+    const actor = hero({
+      inventory: [
+        {
+          id: "manual-of-bodily-health",
+          name: "Manual of Bodily Health",
+          quantity: 1,
+          equipped: false,
+          attuned: false
+        },
+        {
+          id: "tome-of-clear-thought",
+          name: "Tome of Clear Thought",
+          quantity: 1,
+          equipped: false,
+          attuned: false,
+          dormant: true
+        }
+      ]
+    });
+    render(<CharacterSheet actor={actor} role="gm" state={stateWith(actor)} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    const user = userEvent.setup();
+    await openGear(user);
+    expect(rowOf("Tome of Clear Thought").textContent).toContain("Magic spent");
+    await user.click(rowOf("Manual of Bodily Health"));
+    const drawer = within(screen.getByRole("dialog", { name: "Manual of Bodily Health" }));
+    expect(
+      await drawer.findByText("48 hours of study over 6 days or fewer raise Constitution by 2, to at most 30.")
+    ).toBeTruthy();
+    const mark = drawer.getByRole("button", { name: "Mark it studied" });
+    expect(mark.classList.contains("cs-gm-control")).toBe(true);
+    await user.click(mark);
+    expect(sent("character:study-item")).toEqual([
+      expect.objectContaining({ actorId: HERO, itemId: "manual-of-bodily-health" })
     ]);
   });
 
@@ -449,5 +525,239 @@ describe("the hand-set Armor Class", () => {
     await user.click(screen.getByRole("button", { name: "Set AC" }));
     await user.click(screen.getByRole("button", { name: "Use worn gear" }));
     expect(sent("actor:set-armor-class").at(-1)).toMatchObject({ actorId: HERO, armorClass: null });
+  });
+});
+
+describe("an item's charge pools", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  /** A server row spending one pool of the staff. */
+  const staffRow = (id: string, name: string, usesLimit: number, usesPool: string | null) => ({
+    id,
+    name,
+    activation: "other",
+    available: true,
+    violations: [],
+    usesRemaining: null,
+    description: name,
+    attackBonus: null,
+    reachFeet: null,
+    rangeFeet: null,
+    rangeNormalFeet: null,
+    attackCount: null,
+    saveAbility: null,
+    saveDc: null,
+    damage: [],
+    usesLimit,
+    usesPer: "long-rest",
+    usesPool,
+    requiresEffectTag: null,
+    multiattack: null,
+    reaction: null
+  });
+
+  it("lists every pool of an item in its detail, each with what is left", async () => {
+    serve(3, [
+      staffRow("item-staff-of-thunder-and-lightning-lightning", "Lightning", 1, null),
+      staffRow("item-staff-of-thunder-and-lightning-thunder", "Thunder", 1, null)
+    ]);
+    const bearer = hero({
+      actionUses: { "item-staff-of-thunder-and-lightning-thunder": 1 },
+      inventory: [
+        {
+          id: "staff-of-thunder-and-lightning",
+          name: "Staff of Thunder and Lightning",
+          quantity: 1,
+          equipped: true,
+          attuned: true
+        }
+      ]
+    });
+    render(<CharacterSheet actor={bearer} role="gm" state={stateWith(bearer)} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(await screen.findByText("Staff of Thunder and Lightning"));
+    expect(await screen.findByText(/Lightning · 1 of 1 left/)).toBeTruthy();
+    expect(screen.getByText(/Thunder · 0 of 1 left/)).toBeTruthy();
+  });
+});
+
+describe("an item's kinds, forms and attunement prerequisites", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const holding = (row: Record<string, unknown>) =>
+    hero({ inventory: [{ quantity: 1, equipped: true, attuned: false, ...row }] });
+
+  it("says who may attune a Holy Avenger, and that attuning takes a Short Rest", async () => {
+    serve();
+    const actor = holding({
+      id: "holy-avenger",
+      name: "Holy Avenger",
+      baseId: "longsword",
+      magic: { isMagic: true, attunementRequired: true, slot: "weapon" }
+    });
+    render(<CharacterSheet actor={actor} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf(/Holy Avenger/));
+    expect(
+      await screen.findByText("Requires attunement by a Paladin. Attune or end it during a Short Rest.")
+    ).toBeTruthy();
+  });
+
+  it("lets the GM say which stone an Ioun Stone is, in violet", async () => {
+    serve();
+    const actor = holding({
+      id: "ioun-stone",
+      name: "Ioun Stone",
+      magic: { isMagic: true, attunementRequired: true, slot: "wondrous" }
+    });
+    render(<CharacterSheet actor={actor} role="gm" state={stateWith(actor)} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf("Ioun Stone"));
+    const drawer = within(screen.getByRole("dialog", { name: "Ioun Stone" }));
+    await user.selectOptions(await drawer.findByRole("combobox", { name: "Kind of Ioun Stone" }), "protection");
+    expect(sent("character:set-inventory").at(-1)).toMatchObject({
+      actorId: HERO,
+      item: { id: "ioun-stone", variantId: "protection" }
+    });
+  });
+
+  it("names the stone on its row once the bearer knows it", async () => {
+    serve();
+    render(
+      <CharacterSheet
+        actor={holding({ id: "ioun-stone", name: "Ioun Stone", attuned: true, variantId: "insight" })}
+        role="player"
+        onClose={() => {}}
+      />,
+      { wrapper: ToastProvider }
+    );
+    await openGear(userEvent.setup());
+    expect(await screen.findByText("Ioun Stone (Insight)")).toBeTruthy();
+  });
+
+  it("offers a Rod of Lordly Might's forms to its holder, and sends the one picked", async () => {
+    serve();
+    const actor = holding({
+      id: "rod-of-lordly-might",
+      name: "Rod of Lordly Might",
+      attuned: true,
+      variantId: "spear",
+      magic: { isMagic: true, attunementRequired: true, slot: "held" }
+    });
+    render(<CharacterSheet actor={actor} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf(/Rod of Lordly Might/));
+    const forms = within(await screen.findByRole("group", { name: "Form of Rod of Lordly Might" }));
+    expect(forms.getByRole("button", { name: "Spear" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Changing it takes a Bonus Action in a fight.")).toBeTruthy();
+    await user.click(forms.getByRole("button", { name: "Battleaxe" }));
+    expect(sent("item:set-form")).toEqual([
+      expect.objectContaining({ actorId: HERO, itemId: "rod-of-lordly-might", variantId: "battleaxe" })
+    ]);
+    await user.click(forms.getByRole("button", { name: "Its own" }));
+    expect(sent("item:set-form").at(-1)).toMatchObject({ variantId: null });
+  });
+});
+
+describe("what the character carries", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows the uses left in a Healer's Kit on its row", async () => {
+    serve();
+    const actor = hero({
+      inventory: [{ id: "healers-kit", name: "Healer's Kit", quantity: 2, equipped: false, attuned: false }],
+      actionUses: { "healers-kit-uses": 3 }
+    });
+    render(<CharacterSheet actor={actor} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    expect(rowOf(/Healer's Kit/).textContent).toContain("7 of 10 uses left");
+    await user.click(rowOf(/Healer's Kit/));
+    expect(await screen.findByText("7 of 10 uses left in this one. The next starts full.")).toBeTruthy();
+  });
+
+  it("weighs the load, and says when it is more than the character can carry", async () => {
+    serve(3, [], { pounds: 160, capacity: 150, dragLimit: 300 });
+    render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    await openGear(userEvent.setup());
+    expect(await screen.findByText("160 of 150 lb.")).toBeTruthy();
+    expect(screen.getByText("That is more than Aria can carry, so Aria's Speed is at most 5 feet.")).toBeTruthy();
+  });
+
+  it("says when the load is more than the character can drag", async () => {
+    serve(3, [], { pounds: 310, capacity: 150, dragLimit: 300 });
+    render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    await openGear(userEvent.setup());
+    expect(
+      await screen.findByText("That is more than Aria can drag, lift or push, so Aria's Speed is 0.")
+    ).toBeTruthy();
+  });
+});
+
+describe("containers", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const packed = (over: Record<string, unknown> = {}) =>
+    hero({
+      inventory: [
+        { id: "backpack", name: "Backpack", quantity: 1, equipped: false, attuned: false },
+        { id: "rope", name: "Rope", quantity: 1, equipped: false, attuned: false, containerId: "backpack" },
+        { id: "bag-of-holding", name: "Bag of Holding", quantity: 1, equipped: false, attuned: false },
+        { id: "dagger", name: "Dagger", quantity: 1, equipped: true, attuned: false }
+      ],
+      ...over
+    });
+
+  it("lists what a container holds under it, with its load", async () => {
+    serve();
+    render(<CharacterSheet actor={packed()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    await openGear(userEvent.setup());
+    expect(rowOf("Backpack").textContent).toContain("5 of 30 lb inside");
+    const inside = within(await screen.findByRole("list", { name: "In the Backpack" }));
+    expect(inside.getByText("Rope")).toBeTruthy();
+  });
+
+  it("puts a thing in a container, and takes it out, from its detail", async () => {
+    serve();
+    render(<CharacterSheet actor={packed()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf("Dagger"));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Where the Dagger is" }), "bag-of-holding");
+    expect(sent("character:set-inventory").at(-1)).toMatchObject({
+      item: { id: "dagger", containerId: "bag-of-holding" }
+    });
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(rowOf("Rope"));
+    expect(screen.getByRole("button", { name: "Equip" }).hasAttribute("disabled")).toBe(true);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Where the Rope is" }), "");
+    const out = sent("character:set-inventory").at(-1) as { item: { containerId?: string } };
+    expect(out.item.containerId).toBeUndefined();
+  });
+
+  it("names a Handy Haversack's pouches as places to put a thing", async () => {
+    serve();
+    const actor = packed({
+      inventory: [
+        { id: "handy-haversack", name: "Handy Haversack", quantity: 1, equipped: false, attuned: false },
+        { id: "rope", name: "Rope", quantity: 1, equipped: false, attuned: false }
+      ]
+    });
+    render(<CharacterSheet actor={actor} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf("Rope"));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Where the Rope is" }), "handy-haversack|left");
+    expect(sent("character:set-inventory").at(-1)).toMatchObject({
+      item: { id: "rope", containerId: "handy-haversack", compartment: "left" }
+    });
   });
 });

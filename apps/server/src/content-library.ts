@@ -20,7 +20,7 @@ import type {
   ContentStartingEquipmentOption,
   ContentSubclassSummary
 } from "@vtt/domain";
-import { choosesAbility } from "@vtt/domain";
+import { actionChoicesOf, choosesAbility } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
 import {
@@ -35,6 +35,7 @@ import {
   loadFeats,
   loadLanguages,
   loadMonsterDefinitions,
+  loadSummonStatBlocks,
   loadNames,
   loadSkills,
   loadSpecies,
@@ -223,7 +224,7 @@ export class ContentLibrary {
   /** Play-time only and audience-free: resolves any homebrew monster row (even draft or deleted) so a live
    *  actor keeps its actions mid-fight. Never use it for browse. */
   monsterForInstance(definitionId: string): ActorDefinition | undefined {
-    const bundled = SRD_ONLY_CATALOG.monstersById.get(definitionId);
+    const bundled = SRD_ONLY_CATALOG.monstersById.get(definitionId) ?? summonStatBlocks().get(definitionId);
     if (bundled) return bundled;
     const homebrew = this.homebrew?.monsterForInstance(definitionId);
     // Its spells as cast actions, as the catalog gives a bundled stat block's.
@@ -257,6 +258,7 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     reachFeet: action.attack?.reachFeet ?? null,
     rangeFeet: action.attack?.rangeFeet ?? null,
     rangeNormalFeet: action.attack?.rangeNormalFeet ?? null,
+    ...(action.targets?.rangeFeet !== undefined ? { targetRangeFeet: action.targets.rangeFeet } : {}),
     saveAbility: action.save?.ability ?? null,
     saveDc: action.save?.dc ?? null,
     damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })),
@@ -266,6 +268,7 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     usesPer: action.uses?.per ?? null,
     usesRecharge: action.uses?.recharge ?? null,
     usesPool: action.uses?.pool ?? null,
+    ...(action.uses?.afterHours !== undefined ? { usesAfterHours: action.uses.afterHours } : {}),
     ...(action.useCost !== undefined ? { useCost: action.useCost } : {}),
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack ?? null,
@@ -274,6 +277,18 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     reaction: action.reaction ?? null,
     ...(action.legendary ? { legendaryCost: action.legendary.cost } : {}),
     ...(action.legendary?.oncePerRound ? { legendaryOncePerRound: true as const } : {}),
+    ...(action.move?.first ? { moveFirst: true as const } : {}),
+    ...(action.destination ? { destination: { who: action.destination.who, feet: action.destination.feet } } : {}),
+    // Telekinesis: the space a failed save moves the target to, and how high it lifts it.
+    ...(action.failureMove
+      ? {
+          destination: {
+            who: "target" as const,
+            feet: action.failureMove.feet,
+            ...(action.failureMove.lifts ? { lifts: true as const } : {})
+          }
+        }
+      : {}),
     ...(action.replacesAttack ? { replacesAttack: true as const } : {}),
     ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
@@ -282,6 +297,11 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
+    ...(action.vitality ? { vitality: { ...action.vitality } } : {}),
+    ...(action.areaHeal ? { areaHeal: { ...action.areaHeal } } : {}),
+    // What it asks for as it resolves; a self grant that asks is aimed at no one, so the pick comes before the tap.
+    ...(actionChoicesOf(action) ? { choices: actionChoicesOf(action)! } : {}),
+    ...(actionChoicesOf(action) && action.grants?.target === "self" ? { targeting: "none" as const } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool (Preserve Life).
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
@@ -572,6 +592,26 @@ const featSummaryOf = (entry: FeatReference): ContentFeatSummary => ({
   feature: featureSummaryOf(entry.feature)
 });
 
+/** A container's printed limits, allow-listed for the catalog. */
+const containerSummary = (
+  container: NonNullable<EquipmentReference["container"]>
+): NonNullable<ContentEquipmentSummary["container"]> => ({
+  ...(container.capacityLb !== undefined ? { capacityLb: container.capacityLb } : {}),
+  ...(container.pieces ? { pieces: container.pieces.count } : {}),
+  ...(container.compartments
+    ? {
+        compartments: container.compartments.map((compartment) => ({
+          id: compartment.id,
+          name: compartment.name,
+          ...(compartment.capacityLb !== undefined ? { capacityLb: compartment.capacityLb } : {}),
+          ...(compartment.count !== undefined ? { count: compartment.count } : {})
+        }))
+      }
+    : {}),
+  ...(container.weighsLb !== undefined ? { weighsLb: container.weighsLb } : {}),
+  ...(container.retrieval ? { retrieval: container.retrieval } : {})
+});
+
 const nameBundleOf = (entry: ReturnType<typeof loadNames>[number]): ContentNameBundle => ({
   speciesId: entry.speciesId,
   source: entry.source,
@@ -679,7 +719,34 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
     ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
     // The levels a Spell Scroll can bear, as its name says, for the picker's spell step.
-    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
+    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
+    // A manual's or tome's study, as its text prints it, so the GM's sheet can offer it.
+    ...(item.study ? { study: { ...item.study } } : {}),
+    // The uses one copy holds (a Healer's Kit's ten), which its row counts down.
+    ...(item.uses?.limit !== undefined && item.uses.per === "never" ? { uses: { limit: item.uses.limit } } : {}),
+    // The kinds its text lists (an Ioun Stone's stones) or the forms its holder picks (a Rod of Lordly Might's), by
+    // name only: what a carried copy is stays on its row.
+    ...(item.variants
+      ? {
+          variants: item.variants.map((variant) => ({ id: variant.id, name: variant.name })),
+          variantChoice: {
+            by: item.variantChoice?.by ?? ("gm" as const),
+            ...(item.variantChoice?.activation ? { activation: item.variantChoice.activation } : {})
+          }
+        }
+      : {}),
+    // How it sheds light, as its own text says: whether it is lit on the row, has a hood to lower or a Cone to aim.
+    ...(item.light
+      ? {
+          light: {
+            ...(item.light.always ? { always: true as const } : {}),
+            ...(item.light.hooded ? { hooded: true as const } : {}),
+            ...(item.light.cone ? { cone: true as const } : {})
+          }
+        }
+      : {}),
+    // What a container holds, as its text prints it, for the sheet's load and compartments.
+    ...(item.container ? { container: containerSummary(item.container) } : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();
@@ -781,6 +848,18 @@ type CatalogData = ReturnType<typeof buildCatalogData>;
 
 /** The SRD-only catalog, built once at import. */
 const SRD_ONLY_CATALOG: CatalogData = buildCatalogData(EMPTY_HOMEBREW_SLICE);
+
+let summonBlocks: ReadonlyMap<string, ActorDefinition> | null = null;
+/** The stat blocks the SRD prints inside its summoning spells, by id: resolved in play, never browsed (`summons.ts`
+ *  brings them onto the map, scaled to the cast). */
+function summonStatBlocks(): ReadonlyMap<string, ActorDefinition> {
+  summonBlocks ??= new Map(
+    loadSummonStatBlocks().flatMap((definition) =>
+      definition.source.externalId ? [[definition.source.externalId, definition] as const] : []
+    )
+  );
+  return summonBlocks;
+}
 
 /** A thin per-audience wrapper over built catalog data; audiences that merge to the same data share it. */
 /** The glossary is bundled SRD text alone (no homebrew), so one copy serves every view. */

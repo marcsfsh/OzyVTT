@@ -17,6 +17,8 @@ import {
   fillIn,
   joinAndClaim,
   openGmSection,
+  pageScale,
+  pinch,
   pinchDuringDrag,
   positionOf,
   press,
@@ -41,7 +43,12 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
   await expect(gm.getByRole("heading", { name: "Review and make live" })).toBeVisible();
   await expectPageFits(gm);
   await press(gm.getByRole("button", { name: "Make live" }));
-  await press(gm.getByRole("button", { name: "Go to the table" }));
+  // With a fight running, making another scene live parks it, which the GM confirms.
+  const confirm = gm.getByRole("dialog", { name: "Make scene live?" });
+  const table = gm.getByRole("button", { name: "Go to the table" });
+  await expect(confirm.or(table)).toBeVisible();
+  if (await confirm.isVisible()) await press(confirm.getByRole("button", { name: "Make live" }));
+  await press(table);
 }
 
 /** A new scene on a freshly uploaded map, made from the Scenes tab's steps and made live; the GM ends at the table. */
@@ -212,6 +219,34 @@ test("a player joins and claims a character", async ({ open }) => {
   await press(player.getByRole("button", { name: "Join as Player" }));
   await expect(player.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
   await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
+});
+
+test("a stray pinch on a phone leaves the page at its size, and a finger still scrolls", async ({
+  open,
+  hasTouch,
+  request
+}) => {
+  test.skip(!hasTouch, "A laptop has no touch screen to pinch.");
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await openGmSection(gm, "Roster");
+  const roster = gm.locator(".party-roster-body");
+  await expect(roster.getByRole("heading", { name: PARTY[0] })).toBeVisible();
+
+  await drag(gm, roster, { x: 0, y: -240 });
+  await expect.poll(() => roster.evaluate((list) => list.scrollTop)).toBeGreaterThan(0);
+  await pinch(gm, roster);
+  expect(await pageScale(gm)).toBe(1);
+  await expectPageFits(gm);
+
+  // This device can let two fingers zoom the page.
+  await gm.goto("/settings/device");
+  const allow = gm.getByRole("switch", { name: "Let pinch zoom the page" });
+  await press(allow);
+  await expect(allow).toHaveAttribute("aria-checked", "true");
+  await pinch(gm, gm.getByRole("heading", { name: "Device", level: 2 }));
+  await expect.poll(() => pageScale(gm)).toBeGreaterThan(1);
 });
 
 test("the GM runs a fight on a new scene and the player moves their token", async ({ open, hasTouch }) => {
@@ -496,6 +531,128 @@ test("a player answers the GM's call with a physical die, then rerolls it with H
   await expect(card).toBeHidden();
 });
 
+test("the GM paints darkness over part of the live map, and bright light that is sunlight", async ({
+  open,
+  request
+}) => {
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await liveSceneOnNewMap(gm, "Smoke cellar.png", battleMap(700, 518));
+
+  const rail = gm.getByRole("toolbar", { name: "Map tools" });
+  await press(rail.getByRole("button", { name: "Light" }));
+  const light = gm.getByRole("group", { name: "Light" });
+  await expect(light.getByRole("switch", { name: "Sunlight" })).toBeVisible();
+  await expectPageFits(gm);
+  await press(light.getByRole("switch", { name: "Sunlight" }));
+  await expect(light.getByRole("switch", { name: "Sunlight" })).toBeChecked();
+  await light.getByLabel("Area to paint").selectOption("dark");
+  await press(light.getByRole("button", { name: "Paint area" }));
+  await expect(light.getByRole("button", { name: "Paint area" })).toHaveAttribute("aria-pressed", "true");
+  await gm.keyboard.press("Escape");
+
+  // A drag over the map paints it, drawn for the GM in violet.
+  const map = gm.getByRole("group", { name: /Interactive tokens are layered above this map/ });
+  await drag(gm, map, { x: 90, y: 60 });
+  await expect(gm.locator("[data-area-id] .vision-area-dark")).toHaveCount(1);
+  await expectPageFits(gm);
+});
+
+test("the GM paints water on a gridded map, sets a hidden trap and turns the weather cold", async ({
+  open,
+  request
+}) => {
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+
+  // A scene on a new map with its grid set, so ground and traps snap to its squares.
+  await openGmSection(gm, "Scenes");
+  await press(gm.getByRole("button", { name: /^New( scene)?$/ }).first());
+  const chooser = gm.waitForEvent("filechooser");
+  await press(gm.getByRole("button", { name: /Upload a map/ }));
+  await (await chooser).setFiles({ name: "Smoke grotto.png", mimeType: "image/png", buffer: battleMap(700, 546) });
+  await expect(gm.getByText("Map uploaded.")).toBeVisible();
+  await press(gm.getByRole("button", { name: "Set the grid" }).first());
+  await expect(gm.getByRole("heading", { name: "Grid", exact: true })).toBeVisible();
+  await press(gm.getByRole("button", { name: "Continue" }));
+  const from = await onPreview(gm, { x: 64, y: 64 });
+  const to = await onPreview(gm, { x: 256, y: 256 });
+  await drag(gm, gm.locator(".map-preview"), { x: to.x - from.x, y: to.y - from.y }, from);
+  await press(gm.getByRole("button", { name: "Measure this area" }));
+  await press(gm.getByRole("button", { name: "Looks right" }));
+  await press(gm.getByRole("button", { name: "Confirm grid" }));
+  await press(gm.getByRole("button", { name: "Back to the scene" }));
+  const continueStep = gm.getByRole("button", { name: "Continue" });
+  if (await continueStep.isDisabled()) await press(gm.getByRole("button", { name: /^Smoke grotto/ }));
+  await press(continueStep);
+  await makeLiveFromSteps(gm, ["Light", "Sound", "Review"]);
+
+  const rail = gm.getByRole("toolbar", { name: "Map tools" });
+  const map = gm.getByRole("group", { name: /Interactive tokens are layered above this map/ });
+  await press(rail.getByRole("button", { name: "Terrain" }));
+  await press(gm.getByRole("group", { name: "Terrain" }).getByRole("button", { name: "Water", exact: true }));
+  await expectPageFits(gm);
+  await gm.keyboard.press("Escape");
+  await drag(gm, map, { x: 90, y: 60 });
+  await expect(gm.locator(".terrain-water")).toHaveCount(1);
+
+  await press(rail.getByRole("button", { name: "Traps" }));
+  const traps = gm.getByRole("group", { name: "Traps" });
+  await traps.getByLabel("Trap", { exact: true }).selectOption("spiked-pit");
+  await press(traps.getByRole("button", { name: "Set a trap" }));
+  await gm.keyboard.press("Escape");
+  await drag(gm, map, { x: 40, y: 40 });
+  await expect(gm.locator(".terrain-trap-hidden")).toHaveCount(1);
+  await press(rail.getByRole("button", { name: "Traps" }));
+  const row = gm.getByRole("list", { name: "Traps on this map" }).getByRole("listitem");
+  await expect(row).toContainText("Spiked Pit");
+  await expect(row).toContainText("Hidden");
+  await press(row.getByRole("button", { name: "Reveal" }));
+  await expect(row).toContainText("Found");
+  await expectPageFits(gm);
+
+  await press(rail.getByRole("button", { name: "Weather" }));
+  const weather = gm.getByRole("group", { name: "Weather" });
+  await press(weather.getByRole("switch", { name: "Extreme cold" }));
+  await expect(weather.getByRole("switch", { name: "Extreme cold" })).toBeChecked();
+  await expectPageFits(gm);
+});
+
+test("the GM draws a door on the live map and locks it from the door's menu", async ({ open, request, hasTouch }) => {
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await liveSceneOnNewMap(gm, "Smoke vault.png", battleMap(700, 532));
+
+  const rail = gm.getByRole("toolbar", { name: "Map tools" });
+  await press(rail.getByRole("button", { name: "Walls" }));
+  await press(gm.getByRole("group", { name: "Walls" }).getByRole("button", { name: "Door" }));
+  await gm.keyboard.press("Escape");
+  const map = gm.getByRole("group", { name: /Interactive tokens are layered above this map/ });
+  await drag(gm, map, { x: 0, y: 70 });
+  const handle = gm.locator("[data-door-id]");
+  await expect(handle).toHaveCount(1);
+
+  // With Select, the handle opens the door's menu. The handle is a map mark, so its size follows the zoom.
+  await press(rail.getByRole("button", { name: "Select" }));
+  if (hasTouch) await handle.tap();
+  else await handle.click();
+  const menu = gm.getByRole("menu", { name: "Door" });
+  await expect(menu.getByRole("menuitem", { name: "Open the door" })).toBeVisible();
+  await expectPageFits(gm);
+  await press(menu.getByRole("menuitem", { name: "Edit lock and strength" }));
+  await press(menu.getByRole("switch", { name: "Locked" }));
+  await expectPageFits(gm);
+  await press(menu.getByRole("button", { name: "Save door" }));
+  await expect(menu).toBeHidden();
+  // The GM sees the door held shut and its hit points; players get neither.
+  await expect(gm.locator("[data-door-id] .vision-door-lock")).toHaveCount(1);
+  await expect(gm.locator(".vision-object-hp")).toHaveText("18/18 HP");
+  await expectPageFits(gm);
+});
+
 test("the GM presents a map on a paired table screen", async ({ open, request }) => {
   // Start from a paused presentation of an uploaded map, whichever journeys ran before this one.
   await ensureGmPassword(request);
@@ -607,4 +764,157 @@ test("the GM plays music on the table screen and sees that the room hears it", a
   await openGmSection(gm, "Shared screen");
   await press(gm.getByRole("button", { name: "Stop all" }));
   await expect(music).toHaveCount(0);
+});
+
+test("a player turns on the situation their Crowbar names and rolls a Strength check it fits", async ({ open }) => {
+  const hero = PARTY[0];
+  const player = await open("/");
+  await ensureGmPassword(player.request);
+  // The GM's side is the API: it hands the character an equipped Crowbar.
+  const { token } = (
+    await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
+  ).data;
+  const headers = { authorization: `Bearer ${token}` };
+  const { game } = (await (await player.request.get("/api/v1/game", { headers })).json()).data;
+  const { id: actorId, ownerSessionId } = game.actors.find((actor: { name: string }) => actor.name === hero);
+  const gm = (path: string, data: Record<string, unknown>) =>
+    player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+  // An earlier journey's player may still hold the character: the GM frees it for this player.
+  if (ownerSessionId)
+    expect((await gm(`/api/v1/game/claims/${actorId}/force-release`, { actorId, inFight: true })).ok()).toBe(true);
+  const crowbar = { id: "crowbar", name: "Crowbar", category: "adventuring-gear", quantity: 1, equipped: true };
+  expect((await gm(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item: crowbar })).ok()).toBe(true);
+  await joinAndClaim(player, hero);
+
+  await press(player.getByRole("tab", { name: "My character" }));
+  const sheet = player.getByRole("region", { name: `${hero} character sheet` });
+  // On a phone the checks are a tab of their own; on a laptop they are the sheet's left column.
+  const checksTab = sheet.getByRole("tab", { name: "Checks" });
+  if (await checksTab.isVisible()) await press(checksTab);
+  const prying = sheet.getByRole("button", { name: "Prying with the Crowbar (Advantage)" });
+  await expect(prying).toBeVisible();
+  await expectPageFits(player);
+  await press(prying);
+  await expect(prying).toHaveAttribute("aria-pressed", "true");
+  await press(sheet.getByRole("button", { name: /^Roll Athletics,/ }).first());
+  // The roll names the situation for the GM, and the toggle is spent.
+  await expect(player.getByText(/Strength \(Athletics\), prying with the Crowbar/).first()).toBeVisible();
+  await expect(prying).toHaveAttribute("aria-pressed", "false");
+  await expectPageFits(player);
+});
+
+test("a player rolls a tool's Utilize use and starts crafting from the sheet, and the GM sees the project", async ({
+  open
+}) => {
+  const hero = PARTY[1];
+  const player = await open("/");
+  await ensureGmPassword(player.request);
+  // The GM's side is the API: Calligrapher's Supplies in the pack and coins for the raw materials.
+  const { token } = (
+    await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
+  ).data;
+  const headers = { authorization: `Bearer ${token}` };
+  const api = (path: string, data: Record<string, unknown> = {}) =>
+    player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+  const { game } = (await (await player.request.get("/api/v1/game", { headers })).json()).data;
+  // A Utilize use in a fight waits for the character's turn, so an earlier journey's fight ends.
+  if (game.combat.active) expect((await api("/api/v1/game/encounter/end")).ok()).toBe(true);
+  const { id: actorId, ownerSessionId } = game.actors.find((actor: { name: string }) => actor.name === hero);
+  if (ownerSessionId) expect((await api(`/api/v1/game/claims/${actorId}/force-release`, { actorId })).ok()).toBe(true);
+  const supplies = { id: "calligraphers-supplies", name: "Calligrapher's Supplies", category: "tool", quantity: 1 };
+  expect((await api(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item: supplies })).ok()).toBe(true);
+  const currency = { pp: 0, gp: 20, ep: 0, sp: 0, cp: 0 };
+  expect((await api(`/api/v1/game/actors/${actorId}/currency`, { actorId, currency })).ok()).toBe(true);
+  await joinAndClaim(player, hero);
+
+  await press(player.getByRole("tab", { name: "My character" }));
+  const sheet = player.getByRole("region", { name: `${hero} character sheet` });
+  const checksTab = sheet.getByRole("tab", { name: "Checks" });
+  if (await checksTab.isVisible()) await press(checksTab);
+  const use = sheet.getByRole("button", {
+    name: "Roll Write text with impressive flourishes that guard against forgery with Calligrapher's Supplies, DC 15"
+  });
+  await expect(use).toBeVisible();
+  await expectPageFits(player);
+  await press(use);
+  await expect(
+    player.getByRole("status", {
+      name: /^Latest roll: Write text with impressive flourishes that guard against forgery,/
+    })
+  ).toBeVisible();
+
+  await press(sheet.getByRole("tab", { name: "Gear" }));
+  const crafting = sheet.getByRole("region", { name: "Crafting" });
+  await press(crafting.getByRole("button", { name: "Start a project" }));
+  const dialog = player.getByRole("dialog", { name: "Start a project" });
+  const what = dialog.getByRole("combobox", { name: "What to make" });
+  await expect(what.locator("option", { hasText: /^Ink \(1-ounce bottle\)/ })).toHaveCount(1);
+  await what.selectOption("tool:calligraphers-supplies:ink");
+  await expect(dialog.getByText(/^Ink \(1-ounce bottle\) takes 5 GP of raw materials/)).toBeVisible();
+  await expectPageFits(player);
+  await press(dialog.getByRole("button", { name: "Start" }));
+  await expect(dialog).toBeHidden();
+  await expect(crafting.getByText("Ink (1-ounce bottle)", { exact: true })).toBeVisible();
+  await expectPageFits(player);
+
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await openGmSection(gm, "Table");
+  await press(gm.getByRole("button", { name: /^Rest/ }));
+  const panel = gm.getByRole("dialog", { name: "Rest" }).getByRole("region", { name: "Crafting" });
+  await expect(panel.getByText("Ink (1-ounce bottle) · 5 GP paid")).toBeVisible();
+  await expectPageFits(gm);
+  // The project goes, so a later run starts from the same table.
+  await press(panel.getByRole("button", { name: "Call off" }));
+  await press(
+    gm.getByRole("dialog", { name: "Call off Ink (1-ounce bottle)?" }).getByRole("button", { name: "Call off" })
+  );
+  await expect(panel.getByText("Ink (1-ounce bottle) · 5 GP paid")).toBeHidden();
+});
+
+test("a player packs a thing into a container from the Gear tab and sees what it holds", async ({ open }) => {
+  const hero = PARTY[1];
+  const player = await open("/");
+  await ensureGmPassword(player.request);
+  // The GM's side is the API: a second Backpack and Rope, named apart from the ones the character starts with.
+  const { token } = (
+    await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
+  ).data;
+  const headers = { authorization: `Bearer ${token}` };
+  const api = (path: string, data: Record<string, unknown> = {}) =>
+    player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+  const { game } = (await (await player.request.get("/api/v1/game", { headers })).json()).data;
+  // Taking a thing out of a container in a fight waits for the character's turn, so an earlier journey's fight ends.
+  if (game.combat.active) expect((await api("/api/v1/game/encounter/end")).ok()).toBe(true);
+  const { id: actorId, ownerSessionId } = game.actors.find((actor: { name: string }) => actor.name === hero);
+  if (ownerSessionId) expect((await api(`/api/v1/game/claims/${actorId}/force-release`, { actorId })).ok()).toBe(true);
+  for (const item of [
+    { id: "packed-backpack", recordId: "backpack", name: "Old Backpack", category: "adventuring-gear", quantity: 1 },
+    {
+      id: "packed-rope",
+      recordId: "rope",
+      name: "Spare Rope",
+      category: "adventuring-gear",
+      quantity: 1,
+      weightEach: 5
+    }
+  ])
+    expect((await api(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item })).ok()).toBe(true);
+  await joinAndClaim(player, hero);
+
+  await press(player.getByRole("tab", { name: "My character" }));
+  const sheet = player.getByRole("region", { name: `${hero} character sheet` });
+  await press(sheet.getByRole("tab", { name: "Gear" }));
+  await press(sheet.getByRole("button", { name: /^Spare Rope/ }).first());
+  await sheet.getByRole("combobox", { name: "Where the Spare Rope is" }).selectOption("packed-backpack");
+  await press(sheet.getByRole("button", { name: "Back", exact: true }));
+  const inside = sheet.getByRole("list", { name: "In the Old Backpack" });
+  await expect(inside.getByRole("button", { name: /^Spare Rope/ })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: /^Old Backpack/ }).first()).toContainText("5 of 30 lb inside");
+  await expectPageFits(player);
+  // Taken out again, so a later run starts from the same pack.
+  await press(inside.getByRole("button", { name: /^Spare Rope/ }));
+  await sheet.getByRole("combobox", { name: "Where the Spare Rope is" }).selectOption("");
+  await press(sheet.getByRole("button", { name: "Back", exact: true }));
+  await expect(sheet.getByRole("list", { name: "In the Old Backpack" })).toBeHidden();
 });

@@ -12,6 +12,8 @@ export * from "./death.js";
 export * from "./rest-clock.js";
 /** Articles and counts, shared so a line the server writes and one the client builds read the same. */
 export * from "./words.js";
+/** Object Armor Class and Hit Points by the SRD's tables, shared so the GM's editor and the server agree. */
+export * from "./objects.js";
 
 /** Codex field vocabulary, shared so the GM UI and the server's prune and default audiences read one copy. */
 export * from "./codex-entities.js";
@@ -31,6 +33,8 @@ export {
   EffectInstanceSchema,
   HealthDisplaySchema,
   ModifierSchema,
+  ObjectStatsSchema,
+  type ObjectStats,
   type Actor,
   type ActorDefinition,
   type DeathSaves,
@@ -43,6 +47,7 @@ export {
 /** Re-exported because the client cannot import `@vtt/schemas`; a hand-copied list would drift. */
 export {
   catalogIdOf,
+  rowUsesKey,
   ItemMagicMarkerSchema,
   ItemSlotSchema,
   RIDER_TRIGGER_KINDS,
@@ -79,6 +84,8 @@ export * from "./views.js";
 export * from "./results.js";
 /** The content catalogs' wire rows. */
 export * from "./content.js";
+/** What a summoning action's user picks: the creature and its creature type. */
+export * from "./summon-choices.js";
 /** The Socket.IO contract both ends are typed against. */
 export * from "./socket.js";
 /** The table's music and ambient sound board (ADR-0024). */

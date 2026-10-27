@@ -91,6 +91,29 @@ export function ShapeLayer({
           <AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} color={color} />
         </g>
       )}
+      {/* The areas already set down for a use that places several (Fire Storm's Cubes). */}
+      {activeTargeting?.mode === "template" &&
+        calibration &&
+        (activeTargeting.template?.others ?? []).map((placed, index) => {
+          const template = activeTargeting.template!;
+          const snap = sizedShapePreview(calibration, template.shape, placed.origin, placed.target, template.sizeFeet);
+          return (
+            <g key={index} className="annotation-shape live">
+              <AnnotationGlyph
+                data={{
+                  kind: "shape",
+                  shape: template.shape,
+                  origin: snap.origin,
+                  target: snap.target,
+                  sizeFeet: snap.feet
+                }}
+                arrowSize={arrowSize}
+                labelSize={labelSize}
+                color="#ff2e9a"
+              />
+            </g>
+          );
+        })}
       {activeTargeting?.mode === "template" &&
         activeTargeting.template?.placed &&
         calibration &&
@@ -102,7 +125,8 @@ export function ShapeLayer({
             activeTargeting.template.shape,
             activeTargeting.template.placed.origin,
             activeTargeting.template.placed.target,
-            activeTargeting.template.sizeFeet
+            activeTargeting.template.sizeFeet,
+            activeTargeting.template.toTarget === true
           );
           return (
             <g className="annotation-shape live">
@@ -122,6 +146,19 @@ export function ShapeLayer({
           );
         })()}
 
+      {/* The space a leap or a throw lands in. */}
+      {activeTargeting?.destination && (
+        <circle
+          className="destination-marker"
+          cx={activeTargeting.destination.x}
+          cy={activeTargeting.destination.y}
+          r={(calibration?.cellSizePx ?? 50) * 0.45}
+          fill="none"
+          stroke="#ff2e9a"
+          strokeWidth={Math.max(2, (calibration?.cellSizePx ?? 50) / 12)}
+          strokeDasharray="6 4"
+        />
+      )}
       {/* GM fog: dimmed, above the map and shapes but below tokens; the GM always sees everything. */}
     </>
   );

@@ -1,6 +1,6 @@
 import type { Actor } from "@vtt/domain";
-import type { ActorDefinition } from "@vtt/schemas";
-import { experienceForChallenge } from "@vtt/rules-5e";
+import { MASKED_TYPE_TAG, type ActorDefinition } from "@vtt/schemas";
+import { experienceForChallenge, experienceInLair } from "@vtt/rules-5e";
 
 /** The extension key challenge rating and creature type actually live under. */
 export const STATBLOCK_EXTENSION = "open5e.srd-2024";
@@ -18,12 +18,15 @@ export function statblockFacts(definition: ActorDefinition): {
   challengeRating: number | null;
   creatureType: string | null;
   experiencePoints: number | null;
+  /** The XP it is worth fought in its lair, for a legendary creature with one; else null. */
+  experiencePointsInLair: number | null;
 } {
   const extension = (definition.extensions ?? {})[STATBLOCK_EXTENSION];
   const bag = (extension && typeof extension === "object" ? extension : {}) as {
     challengeRating?: unknown;
     type?: unknown;
     experiencePoints?: unknown;
+    traits?: unknown;
   };
   // Narrowed by checks (no cast): the bag is untyped. Null means "nothing to show", which the publish gate refuses.
   const challengeRating = typeof bag.challengeRating === "number" ? bag.challengeRating : null;
@@ -36,13 +39,42 @@ export function statblockFacts(definition: ActorDefinition): {
         ? bag.experiencePoints
         : challengeRating === null
           ? null
-          : experienceForChallenge(challengeRating)
+          : experienceForChallenge(challengeRating),
+    experiencePointsInLair:
+      challengeRating === null
+        ? null
+        : experienceInLair(
+            challengeRating,
+            (Array.isArray(bag.traits) ? bag.traits : []).flatMap((trait: unknown) =>
+              typeof (trait as { name?: unknown }).name === "string" ? [(trait as { name: string }).name] : []
+            )
+          )
   };
 }
 
 /** A creature's type for the rules that name one: its stat block's, else Humanoid for a player character (every SRD
- *  species is a Humanoid); null when neither says. */
-export function creatureTypeOf(actor: Pick<Actor, "kind">, definition: ActorDefinition | undefined): string | null {
+ *  species is a Humanoid); null when neither says. Spells and other magic read the type a live effect masks it as
+ *  (Arcanist's Magic Aura: "Spells and other magical effects treat the target as if it were a creature of the chosen
+ *  type"); a rule that isn't magic (Animal Handling, a stat block's own trait) asks for the `true` type. */
+/** The type tags a stat block prints ("Fiend (Demon)": demon), lower case. */
+export function typeTagsOf(definition: ActorDefinition | undefined): string[] {
+  const tags = (definition?.extensions[STATBLOCK_EXTENSION] as { typeTags?: unknown } | undefined)?.typeTags;
+  return Array.isArray(tags)
+    ? tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.toLowerCase())
+    : [];
+}
+
+export function creatureTypeOf(
+  actor: Pick<Actor, "kind"> & Partial<Pick<Actor, "effects">>,
+  definition: ActorDefinition | undefined,
+  read: "magic" | "true" = "magic"
+): string | null {
+  if (read === "magic") {
+    const masked = (actor.effects ?? [])
+      .flatMap((effect) => effect.tags)
+      .find((tag) => tag.startsWith(MASKED_TYPE_TAG));
+    if (masked) return masked.slice(MASKED_TYPE_TAG.length);
+  }
   const printed = definition ? statblockFacts(definition).creatureType : null;
   if (printed !== null) return printed.toLowerCase();
   return actor.kind === "player-character" ? "humanoid" : null;

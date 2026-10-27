@@ -33,6 +33,7 @@ import {
   SkillReferenceSchema,
   SpellReferenceSchema,
   SRD_SKILL_ABILITY,
+  ToolboxRecordSchema,
   WeaponPropertyReferenceSchema,
   WeaponReferenceSchema,
   type ArmorReference,
@@ -44,6 +45,7 @@ import {
   type RuleReference,
   type SkillReference,
   type SpellReference,
+  type ToolboxRecord,
   type WeaponPropertyReference,
   type WeaponReference
 } from "./schemas.js";
@@ -66,6 +68,12 @@ function loadBundle<S extends z.ZodType>(file: string, schema: S): z.output<S> {
 /** All SRD 5.2.1 monster definitions, validated on first load and cached. */
 export function loadMonsterDefinitions(): readonly ActorDefinition[] {
   return loadBundle("monsters.v1.json", z.array(ActorDefinitionSchema));
+}
+
+/** The stat blocks SRD 5.2.1 prints inside its summoning spells (Draconic Spirit, Giant Insect, Otherworldly Steed,
+ *  Animated Object, Unseen Servant): no Challenge Rating, so apart from the bestiary, and scaled when summoned. */
+export function loadSummonStatBlocks(): readonly ActorDefinition[] {
+  return loadBundle("summons.v1.json", z.array(ActorDefinitionSchema));
 }
 
 /** The 15 SRD 5.2.1 conditions as reference text (Blinded, Charmed, ... Unconscious). */
@@ -148,7 +156,7 @@ export function loadEquipment(): readonly EquipmentReference[] {
       source: weapon.source,
       category: "weapon",
       slot: "weapon",
-      costGp: null,
+      costGp: weapon.costGp ?? null,
       weightLb: null,
       description: null,
       weapon: {
@@ -172,7 +180,7 @@ export function loadEquipment(): readonly EquipmentReference[] {
     source: piece.source,
     category: piece.acBase <= 3 ? "shield" : "armor",
     slot: piece.acBase <= 3 ? "shield" : "armor",
-    costGp: null,
+    costGp: piece.costGp ?? null,
     weightLb: null,
     description: null,
     weapon: null,
@@ -190,7 +198,25 @@ export function loadEquipment(): readonly EquipmentReference[] {
     weapon: item.weapon ?? null,
     armor: item.armor ?? null
   }));
-  return [...gear, ...weapons, ...armor, ...magic].sort((left, right) => left.name.localeCompare(right.name));
+  const poisons: EquipmentReference[] = loadPoisons().map((item) => ({
+    ...item,
+    weapon: item.weapon ?? null,
+    armor: item.armor ?? null
+  }));
+  return [...gear, ...weapons, ...armor, ...magic, ...poisons].sort((left, right) =>
+    left.name.localeCompare(right.name)
+  );
+}
+
+/** The SRD 5.2.1 Gameplay Toolbox's records: traps with their mechanics, poisons, environmental effects, contagions,
+ *  curses and the chapter's other sections. */
+export function loadToolbox(): readonly ToolboxRecord[] {
+  return loadBundle("toolbox.v1.json", z.array(ToolboxRecordSchema));
+}
+
+/** The Gameplay Toolbox's sample poisons as consumables, with their effects. Also folded into `loadEquipment()`. */
+export function loadPoisons(): readonly EquipmentReference[] {
+  return loadBundle("poisons.v1.json", z.array(EquipmentReferenceSchema));
 }
 
 /** The 13 SRD 5.2.1 damage-type descriptions. */

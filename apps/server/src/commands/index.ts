@@ -7,18 +7,23 @@ import { characterSheetCommands } from "./character-sheet.js";
 import { characterCommands } from "./characters.js";
 import { effectCommands } from "./effects.js";
 import { encounterCommands } from "./encounter.js";
+import { experienceCommands } from "./experience.js";
 import { createKit, type CommandContext, type GamePrincipal } from "./kit.js";
 import { mapCommands } from "./map.js";
 import { createCommandRunner, runRead, type AnyCommand, type ReadSpec, type SocketEventOf } from "./pipeline.js";
 import { reactionCommands } from "./reactions.js";
 import { restingCommands } from "./resting.js";
+import { craftingCommands } from "./crafting.js";
 import { gameReads, viewFor } from "./reads.js";
 import { rollCommands } from "./rolls.js";
 import { rulingCommands } from "./rulings.js";
 import { saveCommands } from "./saves.js";
 import { sceneCommands } from "./scenes.js";
 import { soundCommands } from "./sound.js";
+import { summonCommands } from "./summons.js";
 import { tableSettingCommands } from "./table-settings.js";
+import { objectCommands } from "./objects.js";
+import { hazardCommands } from "./hazards.js";
 import { visionCommands } from "./vision.js";
 
 export { describeFailure, failureReply, NOT_JOINED_REPLY, SESSION_ENDED_REPLY } from "./failures.js";
@@ -32,19 +37,24 @@ export const gameCommands: readonly AnyCommand[] = [
   ...actorCommands,
   ...actorHealthCommands,
   ...restingCommands,
+  ...craftingCommands,
   ...characterCommands,
   ...characterSheetCommands,
   ...actionCommands,
   ...saveCommands,
   ...rollCommands,
+  ...experienceCommands,
   ...reactionCommands,
   ...effectCommands,
   ...rulingCommands,
   ...tableSettingCommands,
   ...sceneCommands,
   ...mapCommands,
+  ...summonCommands,
   ...soundCommands,
-  ...visionCommands
+  ...visionCommands,
+  ...objectCommands,
+  ...hazardCommands
 ];
 export { gameReads };
 

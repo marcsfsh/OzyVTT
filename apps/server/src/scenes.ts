@@ -1,4 +1,11 @@
-import { DEFAULT_RULE_EXCEPTIONS, EMPTY_SCENE_VISION, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
+import {
+  CALM_ENVIRONMENT,
+  DEFAULT_RULE_EXCEPTIONS,
+  EMPTY_SCENE_VISION,
+  type GameState,
+  type Scene,
+  type SceneCombat
+} from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
@@ -36,12 +43,15 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     legendaryUsed: combat.legendaryUsed,
     fog: combat.fog,
     terrain: combat.terrain,
+    environment: combat.environment,
+    traps: combat.traps,
     vision: combat.vision,
     pendingSaves: combat.pendingSaves,
     pendingReactions: combat.pendingReactions,
     pendingDamage: combat.pendingDamage,
     pendingRuleAsks: combat.pendingRuleAsks,
-    pendingInitiative: combat.pendingInitiative
+    pendingInitiative: combat.pendingInitiative,
+    initiativeWindow: combat.initiativeWindow
   };
 }
 
@@ -72,13 +82,16 @@ function emptySceneCombat(): SceneCombat {
     reactionsUsed: [],
     legendaryUsed: {},
     fog: { enabled: false, shapes: [] },
-    terrain: { difficult: [] },
+    terrain: { difficult: [], water: [], runningWater: [], ice: [] },
+    environment: { ...CALM_ENVIRONMENT },
+    traps: [],
     vision: { ...EMPTY_SCENE_VISION },
     pendingSaves: [],
     pendingReactions: [],
     pendingDamage: [],
     pendingRuleAsks: [],
-    pendingInitiative: []
+    pendingInitiative: [],
+    initiativeWindow: []
   };
 }
 
@@ -281,7 +294,18 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
     scenes,
     activeSceneId: sceneId,
     historyCursor: null,
-    historyDirty: false
+    historyDirty: false,
+    // A held fall belongs to the table it began on.
+    pendingFalls: [],
+    // A creature off the plane comes back on the map it left; a new table places it by hand.
+    offPlane: [],
+    timeStop: null,
+    heldMove: null,
+    turnSteps: null,
+    // A second turn of round 1 belongs to the table it began on.
+    secondTurn: null,
+    secondTurnsTaken: [],
+    initiativeSwapOffers: []
   };
   // Switching away from a launched replay ends it. Runs after the swap so the park still had a slot.
   if (departingId !== null) dropReplayScene(state, departingId);
@@ -357,7 +381,17 @@ export function activateNewScene(
     scenes: [...scenes, scene],
     activeSceneId: scene.id,
     historyCursor: null,
-    historyDirty: false
+    historyDirty: false,
+    pendingFalls: [],
+    // A creature off the plane comes back on the map it left; a new table places it by hand.
+    offPlane: [],
+    timeStop: null,
+    heldMove: null,
+    turnSteps: null,
+    // A second turn of round 1 belongs to the table it began on.
+    secondTurn: null,
+    secondTurnsTaken: [],
+    initiativeSwapOffers: []
   };
   // Launching a replay from a replay ends the first one, so repeated launches don't hit the scene cap.
   if (departingId !== null) dropReplayScene(state, departingId);

@@ -1,4 +1,6 @@
 import type { GameState } from "@vtt/domain";
+import { GIBBERING_TAG } from "./random-outcomes.js";
+import { ridersOf, WHILE_RIDDEN_TAG } from "./mounts.js";
 import { parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition, TraitMechanic } from "@vtt/schemas";
 import { conditionLabel, isIncapacitated } from "./condition-rules.js";
@@ -9,7 +11,10 @@ import { HAZARDS } from "./hazards.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor } from "./hit-points.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { applyFailureEffect, createPendingSaves } from "./saving-throws.js";
+import { insideAnObject, shuntOutOfEarth } from "./wall-passage.js";
 import { creatureTypeOf } from "./statblock-facts.js";
+import type { SightContent } from "./vision/senses.js";
+import { sightRules } from "./vision/rules.js";
 import {
   AURA_IMMUNE_TAG,
   REGENERATING_AT_ZERO_TAG,
@@ -51,26 +56,217 @@ const bloodied = (actor: Actor) => actor.hp.current > 0 && actor.hp.current * 2 
 /** The start of `actorId`'s turn: its own Regeneration, Berserk and Barbed Hide, then the auras it starts its turn
  *  in. */
 export function traitsAtTurnStart(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
+  return [
+    ...ownTraitsAtTurnStart(state, actorId, deps).flatMap((trait) => trait.run()),
+    ...aurasAtTurnStart(state, actorId, deps)
+  ];
+}
+
+/** One trait's part of a turn's start or end, run on its own so the turn's controller can order it among the turn's
+ *  other steps. */
+export type TraitStep = Readonly<{ name: string; run: () => EffectNarration[] }>;
+
+/** The traits of `actorId`'s own stat block that act as its turn starts, each only when it would do something now:
+ *  Regeneration, Berserk, Barbed Hide and Sunlight. */
+export function ownTraitsAtTurnStart(state: GameState, actorId: string, deps: TraitTurnDeps): TraitStep[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const definition = definitionOf(actor, deps);
-  const events: EffectNarration[] = [];
-  regenerate(state, actor, definition, events);
-  goBerserk(state, actor, definition, deps, events);
+  // Each runs against the creature as it is when its turn in the order comes.
+  const step = (name: string, body: (now: Actor, events: EffectNarration[]) => void): TraitStep => ({
+    name,
+    run: () => {
+      const now = state.actors.find((candidate) => candidate.id === actorId);
+      if (!now) return [];
+      const events: EffectNarration[] = [];
+      body(now, events);
+      return events;
+    }
+  });
+  const steps: TraitStep[] = [];
+  const regeneration = traitOf(definition, "regeneration");
+  if (regeneration && regenerationActs(actor))
+    steps.push(step(regeneration.name, (now, events) => regenerate(state, now, definition, events)));
+  const berserk = traitOf(definition, "berserk");
+  const raging = actor.effects.some((effect) => effect.tags.includes(BERSERK_TAG));
+  if (berserk && actor.hp.current > 0 && raging !== bloodied(actor))
+    steps.push(step(berserk.name, (now, events) => goBerserk(state, now, definition, deps, events)));
   for (const aura of traitMechanicsOf(definition))
-    if (aura.kind === "aura" && aura.trigger === "bearer-turn-start") grappleDamage(state, actor, aura, deps, events);
+    if (aura.kind === "aura" && aura.trigger === "bearer-turn-start" && grapplePartners(state, actor, aura).length > 0)
+      steps.push(step(aura.name, (now, events) => grappleDamage(state, now, aura, deps, events)));
+  const sunlight = traitMechanicsOf(definition).find(
+    (trait) => trait.kind === "light-sensitivity" && trait.damageAtTurnStart !== undefined
+  );
+  if (
+    sunlight &&
+    actor.hp.current > 0 &&
+    sightRules(state, sightContentOf(deps), deps.distanceFeet).lightAt(actor.id)?.sunlight === true
+  )
+    steps.push(step(sunlight.name, (now, events) => burnInSunlight(state, now, definition, deps, events)));
+  return steps;
+}
+
+/** Whether Regeneration does anything as this turn starts: Hit Points to regain, or a stopped one that leaves a
+ *  creature at 0 Hit Points dead. */
+function regenerationActs(actor: Actor): boolean {
+  const stopped = actor.effects.some((effect) => effect.tags.includes(REGENERATION_STOPPED_TAG));
+  const down = actor.effects.some((effect) => effect.tags.includes(REGENERATING_AT_ZERO_TAG));
+  if (actor.hp.current <= 0 && !down) return false;
+  return stopped || actor.hp.current < actor.hp.maximum;
+}
+
+/** The saves of the auras `actorId` starts its turn in (Stench, Fear Aura, Gibbering). */
+export function aurasAtTurnStart(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  const events: EffectNarration[] = [];
   aurasStartedIn(state, actor, deps, events);
   return events;
 }
 
-/** The end of `actorId`'s turn: its auras that burn what is near it. */
+const sightContentOf = (deps: TraitTurnDeps): SightContent => ({
+  definition: deps.resolveDefinition,
+  ...(deps.catalog ? { catalog: deps.catalog } : {})
+});
+
+/** A vampire's Sunlight: "The vampire takes 20 Radiant damage if it starts its turn in sunlight", read from where it
+ *  stands with dynamic vision on (with it off, the light is the GM's). */
+function burnInSunlight(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  deps: TraitTurnDeps,
+  events: EffectNarration[]
+): void {
+  const burning = traitMechanicsOf(definition).filter(
+    (trait) => trait.kind === "light-sensitivity" && trait.damageAtTurnStart !== undefined
+  );
+  if (burning.length === 0 || actor.hp.current <= 0) return;
+  if (sightRules(state, sightContentOf(deps), deps.distanceFeet).lightAt(actor.id)?.sunlight !== true) return;
+  for (const trait of burning)
+    if (trait.kind === "light-sensitivity" && trait.damageAtTurnStart)
+      events.push(
+        ...dealTraitDamage(state, actor, actor, trait.name, [{ ...trait.damageAtTurnStart }], deps, {
+          fromSunlight: true
+        })
+      );
+}
+
+/** The end of `actorId`'s turn: its auras that burn what is near it, or ask a save of it (Mucus Cloud). */
 export function traitsAtTurnEnd(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
+  return [
+    ...aurasSavingAtTurnEnd(state, actorId, deps),
+    ...burningTraitsAtTurnEnd(state, actorId, deps).flatMap((trait) => trait.run()),
+    // A Ring of Elemental Command of Earth's wearer that ends its turn in the rock.
+    ...shuntOutOfEarth(state, actorId),
+    // A ghost that ends its turn in a wall (Incorporeal Movement).
+    ...insideAnObject(state, actorId, {
+      resolveDefinition: deps.resolveDefinition,
+      rollDie: deps.rollDie,
+      ...(deps.catalog ? { catalog: deps.catalog } : {}),
+      ...(deps.newId ? { newId: deps.newId } : {}),
+      ...(deps.now ? { now: deps.now } : {})
+    })
+  ];
+}
+
+/** The auras that burn what is near `actorId` as its turn ends (Fire Aura, Heat Aura), each only when it reaches
+ *  someone or the map can't say. */
+export function burningTraitsAtTurnEnd(state: GameState, actorId: string, deps: TraitTurnDeps): TraitStep[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  return endAuras(state, actor, deps)
+    .filter(
+      (aura) =>
+        !aura.save && aura.damage && auraActive(actor, aura) && (reached(state, actor, aura, deps)?.length ?? 1) > 0
+    )
+    .map((aura) => ({
+      name: aura.name,
+      run: () => {
+        const now = state.actors.find((candidate) => candidate.id === actorId);
+        const events: EffectNarration[] = [];
+        if (now) burnAround(state, now, aura, deps, events);
+        return events;
+      }
+    }));
+}
+
+/** The auras that ask a save of what is near `actorId` as its turn ends (Mucus Cloud): prompts, answered in any
+ *  order. */
+export function aurasSavingAtTurnEnd(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [];
-  for (const aura of traitMechanicsOf(definitionOf(actor, deps)))
-    if (aura.kind === "aura" && aura.trigger === "bearer-turn-end") burnAround(state, actor, aura, deps, events);
+  for (const aura of endAuras(state, actor, deps)) if (aura.save) saveAround(state, actor, aura, deps, events);
   return events;
+}
+
+function endAuras(state: GameState, actor: Actor, deps: TraitTurnDeps): Aura[] {
+  return traitMechanicsOf(definitionOf(actor, deps)).filter(
+    (aura): aura is Aura =>
+      aura.kind === "aura" &&
+      aura.trigger === "bearer-turn-end" &&
+      // "While underwater": only in an underwater fight.
+      (!aura.underwaterOnly || state.combat.underwater)
+  );
+}
+
+/** "Constitution Saving Throw: DC 14, each creature in a 5-foot Emanation originating from the aboleth at the end of
+ *  the aboleth's turn": a save for each creature in reach, its failure the trait's declared effect. */
+function saveAround(state: GameState, bearer: Actor, aura: Aura, deps: TraitTurnDeps, events: EffectNarration[]) {
+  if (!aura.save || !auraActive(bearer, aura) || !deps.newId) return;
+  const targets = reached(state, bearer, aura, deps);
+  if (targets === null) {
+    events.push({
+      kind: "effect",
+      text: `${bearer.name}'s ${aura.name}: each creature within ${aura.rangeFeet} feet makes a DC ${aura.save.dc} ${aura.save.ability.toUpperCase()} save. The map can't measure, so call for it by hand.`,
+      actorId: bearer.id,
+      gmOnly: true
+    });
+    return;
+  }
+  if (targets.length === 0) return;
+  const save = aura.save;
+  const declared = save.failureEffect;
+  createPendingSaves(state, {
+    sourceActorId: bearer.id,
+    sourceName: bearer.name,
+    actionName: aura.name,
+    ability: save.ability,
+    dc: save.dc,
+    targetIds: targets.map((target) => target.id),
+    proposedDamage: 0,
+    halfOnSuccess: false,
+    conditionIds: save.failureConditions,
+    ...(declared
+      ? {
+          onFailEffect: {
+            name: `${declared.name} by ${bearer.name}`.slice(0, 120),
+            tags: [...declared.tags],
+            linkedConditionIds: save.failureConditions.filter((id) => id !== "prone"),
+            escapeDc: null,
+            sourceActorId: bearer.id,
+            sourceName: bearer.name,
+            sourceActionId: traitActionId(aura.name),
+            modifiers: [...declared.modifiers]
+          }
+        }
+      : {}),
+    newSaveId: deps.newId,
+    createdAt: Date.parse((deps.now ?? (() => new Date().toISOString()))())
+  });
+  events.push({
+    kind: "condition",
+    text: `${bearer.name}'s ${aura.name}: ${targets.map((target) => target.name).join(", ")} ${targets.length === 1 ? "makes" : "make"} a DC ${save.dc} ${save.ability.toUpperCase()} save.`,
+    actorId: bearer.id
+  });
+  if (aura.reminder)
+    events.push({
+      kind: "effect",
+      text: `${bearer.name}'s ${aura.name}: ${aura.reminder}`,
+      actorId: bearer.id,
+      gmOnly: true
+    });
 }
 
 /**
@@ -120,7 +316,8 @@ function regenerate(
 }
 
 /** SRD Berserk (the golems): "Whenever the golem starts its turn Bloodied, roll 1d6. On a 6, the golem goes berserk
- *  ... until it is destroyed or it is no longer Bloodied." The server rolls the d6; what it attacks is the GM's. */
+ *  ... until it is destroyed or it is no longer Bloodied." The server rolls the d6, and its attacks then go to the
+ *  nearest creature it sees (`action-targets.ts`); what it smashes with none in sight is the GM's. */
 function goBerserk(
   state: GameState,
   actor: Actor,
@@ -157,7 +354,18 @@ function goBerserk(
       sourceName: actor.name,
       sourceActionId: traitActionId(trait.name),
       startedRound: state.combat.round,
-      duration: { type: "manual" }
+      duration: { type: "manual" },
+      // "The golem's creator ... can try to calm it by taking an action": End an Effect within reach of its words.
+      ...(trait.calm
+        ? {
+            endedBy: {
+              name: "Calm the golem",
+              by: "others" as const,
+              withinFeet: trait.calm.withinFeet,
+              check: { ability: "cha" as const, skill: "persuasion", dc: trait.calm.dc }
+            }
+          }
+        : {})
     })
   );
   events.push({
@@ -183,7 +391,8 @@ function dealTraitDamage(
   target: Actor,
   traitName: string,
   parts: ReadonlyArray<{ amount: number; type: string }>,
-  deps: TraitTurnDeps
+  deps: TraitTurnDeps,
+  extra: Readonly<{ fromSunlight?: true }> = {}
 ): EffectNarration[] {
   const { application, events } = applyDamageDetailed(
     state,
@@ -192,7 +401,8 @@ function dealTraitDamage(
       amount: parts.reduce((sum, part) => sum + part.amount, 0),
       parts,
       sourceName: bearer.name,
-      sourceActorId: bearer.id
+      sourceActorId: bearer.id,
+      ...extra
     },
     { role: "gm" },
     {
@@ -225,7 +435,7 @@ function reached(state: GameState, bearer: Actor, aura: Aura, deps: TraitTurnDep
     // "Of the azer's choice": it chooses its enemies. "Any enemy": the same.
     if (aura.affects !== "all" && !areEnemies(bearer, other, deps.resolveDefinition)) return false;
     // "Any Beast or Humanoid": a creature of another type is spared; one whose type nothing says is the GM's.
-    const type = aura.creatureTypes ? creatureTypeOf(other, definitionOf(other, deps)) : null;
+    const type = aura.creatureTypes ? creatureTypeOf(other, definitionOf(other, deps), "true") : null;
     if (type !== null && !aura.creatureTypes!.includes(type)) return false;
     const apart = distanceFeet(bearer.id, other.id);
     return apart !== null && apart <= aura.rangeFeet + DISTANCE_TOLERANCE_FEET;
@@ -280,15 +490,20 @@ function burnAround(state: GameState, bearer: Actor, aura: Aura, deps: TraitTurn
 /** SRD Barbed Hide: "At the start of each of its turns, the devil deals 5 (1d10) Piercing damage to any creature it
  *  is grappling or any creature grappling it." */
 function grappleDamage(state: GameState, bearer: Actor, aura: Aura, deps: TraitTurnDeps, events: EffectNarration[]) {
-  if (!aura.damage || !auraActive(bearer, aura)) return;
-  const grapples = (holder: Actor, held: Actor) =>
-    held.effects.some((effect) => effect.sourceActorId === holder.id && effect.linkedConditionIds.includes("grappled"));
-  const partners = fighting(state).filter(
-    (other) => other.id !== bearer.id && other.hp.current > 0 && (grapples(bearer, other) || grapples(other, bearer))
-  );
-  if (partners.length === 0) return;
+  const partners = grapplePartners(state, bearer, aura);
+  if (partners.length === 0 || !aura.damage) return;
   const parts = rollTraitDamage(aura.damage, deps.rollDie);
   for (const partner of partners) events.push(...dealTraitDamage(state, bearer, partner, aura.name, parts, deps));
+}
+
+/** The creatures Barbed Hide reaches: any the bearer grapples or that grapples it, while the aura acts. */
+function grapplePartners(state: GameState, bearer: Actor, aura: Aura): Actor[] {
+  if (!aura.damage || !auraActive(bearer, aura)) return [];
+  const grapples = (holder: Actor, held: Actor) =>
+    held.effects.some((effect) => effect.sourceActorId === holder.id && effect.linkedConditionIds.includes("grappled"));
+  return fighting(state).filter(
+    (other) => other.id !== bearer.id && other.hp.current > 0 && (grapples(bearer, other) || grapples(other, bearer))
+  );
 }
 
 /**
@@ -304,6 +519,11 @@ function aurasStartedIn(state: GameState, actor: Actor, deps: TraitTurnDeps, eve
     for (const aura of traitMechanicsOf(definitionOf(bearer, deps))) {
       if (aura.kind !== "aura" || aura.trigger !== "turn-start-inside" || !aura.save) continue;
       if (!auraActive(bearer, aura) || !(reached(state, bearer, aura, deps) ?? []).some((one) => one.id === actor.id))
+        continue;
+      // "While you ride the goat": only while a creature rides the bearer.
+      if (aura.whileRidden && ridersOf(state, bearer.id).length === 0) continue;
+      // A gaze that works only on a creature that sees its bearer (Vile Appearance).
+      if (aura.seenOnly && !sightRules(state, sightContentOf(deps), deps.distanceFeet).canSee(actor.id, bearer.id))
         continue;
       const key = traitActionId(aura.name);
       if (
@@ -329,17 +549,37 @@ function aurasStartedIn(state: GameState, actor: Actor, deps: TraitTurnDeps, eve
           ? {
               onFailEffect: {
                 name: `${conditionLabel(linked[0]!)} by ${bearer.name} (${aura.name})`.slice(0, 120),
-                tags: [],
+                tags: aura.whileRidden ? [WHILE_RIDDEN_TAG] : [],
                 linkedConditionIds: linked,
                 escapeDc: null,
                 sourceActorId: bearer.id,
                 sourceName: bearer.name,
                 ...(save.failureDuration ? { duration: save.failureDuration } : {}),
+                // "The Frightened creature repeats the save at the end of each of its turns" (a Goat of Terror).
+                ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
+                // "Or until the goat reverts to figurine form".
+                ...(aura.whileRidden ? { endsWhenSourceDefeated: true } : {}),
                 sourceActionId: key
               }
             }
-          : {}),
+          : aura.failureTable === "gibbering"
+            ? {
+                // "What it does during the current turn": the roll's limits last until this turn ends.
+                onFailEffect: {
+                  name: `${aura.name} (${bearer.name})`.slice(0, 120),
+                  tags: [GIBBERING_TAG],
+                  linkedConditionIds: [],
+                  escapeDc: null,
+                  sourceActorId: bearer.id,
+                  sourceName: bearer.name,
+                  duration: { type: "until-bearer-turn-end" },
+                  currentTurn: true,
+                  sourceActionId: key
+                }
+              }
+            : {}),
         ...(save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+        ...(save.immuneMinutes !== undefined ? { immuneMinutes: save.immuneMinutes } : {}),
         newSaveId: deps.newId,
         createdAt: Date.parse((deps.now ?? (() => new Date().toISOString()))())
       });

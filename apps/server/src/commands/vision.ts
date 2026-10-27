@@ -1,5 +1,9 @@
 import {
   DoorSetOpenSchema,
+  ItemSetFormSchema,
+  ItemSetLightSchema,
+  VisionAreaAddSchema,
+  VisionAreaRemoveSchema,
   LightAddSchema,
   LightMoveSchema,
   LightRemoveSchema,
@@ -13,8 +17,12 @@ import {
 } from "@vtt/domain/commands";
 import { GameAccessDeniedError } from "../authorization.js";
 import { CommandRejectedError } from "../game-store.js";
+import { setItemLight } from "../item-light.js";
+import { setItemForm } from "../inventory.js";
 import {
   addLight,
+  addVisionArea,
+  removeVisionArea,
   addWalls,
   clearWalls,
   doorWithinReach,
@@ -28,7 +36,9 @@ import {
   setVisionEnabled
 } from "../vision/edit.js";
 import { playerViewerIds } from "../vision/audience.js";
-import { isGmGrade, type Kit } from "./kit.js";
+import { heldShutAgainst, isHiddenDoor } from "../doors.js";
+import { spendObjectInteraction } from "../object-interactions.js";
+import { initiatorOf, isGmGrade, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Dynamic vision (ADR-0023): the GM's walls, doors, windows and lights, the scene's ambient light and its switch, and
@@ -82,9 +92,105 @@ export const visionCommands = [
     malformed: "The ambient light is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }, kit) {
-      const { ambient, sceneId } = request;
+      const { ambient, sunlight, sceneId } = request;
       const geometry = await sceneGeometry(kit, sceneId);
-      await execute((state) => setVisionAmbient(state, sceneId, geometry, ambient));
+      await execute((state) => setVisionAmbient(state, sceneId, geometry, ambient, sunlight));
+    }
+  }),
+
+  defineCommand({
+    type: "vision.add-area",
+    operationId: "addVisionArea",
+    description:
+      "Paints an area of light or obscurement over the scene's ambient light (GM-grade only): `bright`, `dim` or `dark` set its light level (a lit room in a dark dungeon, a shadowed cellar in daylight; `sunlight` makes a bright one sunlit), `lightly-obscured` (patchy fog, moderate foliage) gives Disadvantage on Wisdom (Perception) checks that rely on sight, `heavily-obscured` (dense fog or foliage) blocks sight into and through it, and `magical-darkness` stays dark whatever light reaches it, seen into only by Blindsight, Truesight and Devil's Sight. A `rect` snaps to whole cells; fog and magical Darkness may be a `circle` of `radiusFeet` instead. `sceneId` targets a prepared scene. The area's id is the commandId.",
+    summary: "Paint an area of light, darkness or fog over the scene (GM).",
+    schema: VisionAreaAddSchema,
+    malformed: "The area is malformed.",
+    issueMessage: true,
+    gmOnly: GM_ONLY,
+    async run({ request, execute }, kit) {
+      const { commandId, kind, sunlight, rect, circle, sceneId } = request;
+      const geometry = await sceneGeometry(kit, sceneId);
+      await execute((state) =>
+        addVisionArea(state, sceneId, geometry, {
+          id: commandId,
+          kind,
+          ...(sunlight !== undefined ? { sunlight } : {}),
+          ...(rect ? { rect } : {}),
+          ...(circle ? { circle } : {})
+        })
+      );
+    }
+  }),
+
+  defineCommand({
+    type: "vision.remove-area",
+    operationId: "removeVisionArea",
+    description:
+      "Removes an area of light, darkness or fog (GM-grade only), whether the GM painted it or a spell made it. `sceneId` targets a prepared scene.",
+    summary: "Remove an area of light, darkness or fog (GM).",
+    schema: VisionAreaRemoveSchema,
+    malformed: "The area command is malformed.",
+    gmOnly: GM_ONLY,
+    async run({ request, execute }) {
+      await execute((state) => removeVisionArea(state, request.sceneId, request.areaId));
+    }
+  }),
+
+  defineCommand({
+    type: "item.set-light",
+    operationId: "setItemLight",
+    description:
+      "Lights or puts out a light source a creature carries (a Torch, a Lamp, a Lantern, a Candle, a magic item that glows), lowers or raises a Hooded Lantern's hood, or aims a Bullseye Lantern's Cone (`facingDegrees`, from the right of the map, clockwise). Lighting a Candle, Lamp, Lantern or Torch needs a Tinderbox or another flame in hand, and a Lamp or Lantern burns a flask of Oil for 6 hours; a Torch or Candle burns for an hour, then is used up. Lighting one and moving a hood take the creature's Bonus Action on its turn in a fight. A lit light is held (equipped), and stowing it puts it out. GM-grade for any creature; a player session for their own claimed character.",
+    summary: "Light, put out, hood or aim a carried light source.",
+    schema: ItemSetLightSchema,
+    malformed: "The light command is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      const { actorId, itemId, lit, hoodLowered, facingDegrees } = request;
+      let said: string | null = null;
+      const { duplicate } = await execute((state) => {
+        said = setItemLight(
+          state,
+          {
+            actorId,
+            itemId,
+            ...(lit !== undefined ? { lit } : {}),
+            ...(hoodLowered !== undefined ? { hoodLowered } : {}),
+            ...(facingDegrees !== undefined ? { facingDegrees } : {})
+          },
+          initiatorOf(principal),
+          kit.equipmentCatalog()
+        );
+      });
+      if (!duplicate && said !== null)
+        kit.context.appendLog({ kind: "action", text: said, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
+    }
+  }),
+
+  defineCommand({
+    type: "item.set-form",
+    operationId: "setItemForm",
+    description:
+      "Puts a carried item in one of the forms its holder chooses (a Rod of Lordly Might's flame blade, a Quarterstaff of the Acrobat's pole), or back in its own form with a null `variantId`. The item must be held (equipped), and a form the item says takes a Bonus Action takes the creature's Bonus Action on its turn in a fight. The kinds the GM says a found item is (an Ioun Stone's) are set with character.set-inventory instead. GM-grade for any creature; a player session for their own claimed character.",
+    summary: "Change the form of a carried item.",
+    schema: ItemSetFormSchema,
+    malformed: "The item form command is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      const { actorId, itemId, variantId } = request;
+      let said = "";
+      const { duplicate } = await execute((state) => {
+        said = setItemForm(
+          state,
+          { actorId, itemId, variantId },
+          initiatorOf(principal),
+          kit.equipmentCatalog(),
+          (id) => kit.resolveDefinitionIn(state, id)
+        );
+      });
+      if (!duplicate)
+        kit.context.appendLog({ kind: "action", text: said, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
     }
   }),
 
@@ -168,7 +274,7 @@ export const visionCommands = [
     type: "door.set-open",
     operationId: "setDoorOpen",
     description:
-      "Opens or closes a door. The GM opens any door, on the live table or (with `sceneId`) a prepared scene; a player only one within 5 feet of their own character's token on the live table, with no wall between them.",
+      "Opens or closes a door. The GM opens any door, on the live table or (with `sceneId`) a prepared scene; a player only one within 5 feet of their own character's token on the live table, with no wall between them. In a fight that is the character's one free object interaction on its turn, and a second takes the Utilize action.",
     summary: "Open or close a door; a player, one beside their own character.",
     schema: DoorSetOpenSchema,
     malformed: "The door command is malformed.",
@@ -180,11 +286,24 @@ export const visionCommands = [
       const { duplicate } = await execute((state) => {
         if (player) {
           const mine = playerViewerIds(state, player.sessionId);
-          // Out of reach and unknown look the same, so a door the player hasn't found isn't confirmed.
-          const reachable = mine.find((actorId) => doorWithinReach(state, wallId, [actorId]));
-          if (reachable === undefined)
+          const door = state.combat.vision.walls.find((wall) => wall.id === wallId);
+          // Out of reach, unknown and secret look the same, so a door the player hasn't found isn't confirmed.
+          const reachable =
+            door && !isHiddenDoor(door) ? mine.filter((actorId) => doorWithinReach(state, wallId, [actorId])) : [];
+          if (reachable.length === 0)
             throw new GameAccessDeniedError("Move your character next to the door to open or close it.");
-          opener = reachable;
+          // A locked, stuck, barred or jammed door opens only for a creature it doesn't hold shut against: one with
+          // the key, or one an Arcane Lock names.
+          // In a fight the creature whose turn it is opens it, as its one free object interaction or a Utilize action.
+          const onTurn = reachable.filter((actorId) => actorId === state.combat.turnActorId);
+          const candidates = onTurn.length > 0 ? onTurn : reachable;
+          const free = open
+            ? candidates.find((actorId) => heldShutAgainst(state, door!, actorId) === null)
+            : candidates[0];
+          if (free === undefined) throw new CommandRejectedError(heldShutAgainst(state, door!, candidates[0]!)!);
+          opener = free;
+          const actor = state.actors.find((candidate) => candidate.id === free)!;
+          spendObjectInteraction(state, actor, { role: "player" }, `${open ? "Open" : "Close"} the door`);
         }
         setDoorOpen(state, sceneId, wallId, open);
       });

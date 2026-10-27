@@ -1,10 +1,13 @@
 import { z } from "zod";
 import {
+  ActionAreaSchema,
   ActionReactionSchema,
+  CastShapingIdSchema,
   CharacterChoiceSchema,
   DamageTypeSchema,
   SaveConditionSchema,
-  type CharacterChoice
+  type CharacterChoice,
+  type DamageSource
 } from "@vtt/schemas";
 import { CharacterDraftSchema } from "./character-draft.js";
 import { AbilityIdSchema, BuilderAbilityMethodSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
@@ -42,6 +45,8 @@ export type MutationResult = {
 export type DiceRollResult = MutationResult & { rollId?: string; hiddenFromRoller?: boolean };
 /** A spellbook addition's reply: whether the spell is in the book now (a copy from a scroll can fail its check). */
 export type SpellbookResult = MutationResult & { inBook?: boolean };
+/** A conversion's reply: the line the table reads of what it did. */
+export type ConversionResult = MutationResult & { line?: string };
 export type EncounterStartEntry = Readonly<{
   actorId: string;
   score?: number;
@@ -57,6 +62,24 @@ export type SampleRemovalResult = MutationResult & {
   kept?: ReadonlyArray<Readonly<{ name: string; reason: string }>>;
 };
 export type SceneCreateResult = MutationResult & { sceneId?: string };
+
+/** A way the roller may still change a roll it sees, sent back as `answer` with its next look: a Bardic Inspiration
+ *  die, Indomitable's reroll, Stroke of Luck. */
+export type RollAnswerOffer = Readonly<{
+  /** What the answer names: the action's id, or `effect:<id>` for an effect that carries one. */
+  id: string;
+  name: string;
+  /** What it does, for its button: "+1d8", "Reroll +9", "Reroll with Advantage", "The d20 becomes 20". */
+  does: string;
+  /** What using it spends ("a use", "the Reaction and a use"), or null. */
+  cost: string | null;
+  /** The die may be added or taken off (Boon of Fate); `subtract` on the answer takes it off. */
+  either?: true;
+  /** It rerolls the d20, so a typed roll's answer carries the face the physical reroll shows. */
+  rerolls?: true;
+}>;
+/** An answer a roll took, as its result says it: "Bardic Inspiration +5", "Indomitable: rerolled". */
+export type RollAnswered = Readonly<{ name: string; change: string }>;
 
 /** Server-computed outcome of resolving a definition action (rolls already recorded in the roll history). */
 export type ActionResolutionAttack = Readonly<{
@@ -74,6 +97,10 @@ export type ActionResolutionAttack = Readonly<{
   /** Dice an effect adds to the roll, in `total` (Bless +1d4, Bane -1d4). A preview leaves `total` null: they roll
    *  when the attack is confirmed. */
   bonusDice?: ReadonlyArray<Readonly<{ label: string; dice: string; total: number | null }>>;
+  /** What answered the roll after it was seen, already in `total` and `outcome`. */
+  answered?: readonly RollAnswered[];
+  /** On a preview, the answers the attacker may still give it. */
+  answers?: readonly RollAnswerOffer[];
 }>;
 /** Every source behind an attack's advantage/disadvantage, so the table can see the math (ADR-0020). */
 export type ActionRollMode = Readonly<{
@@ -110,9 +137,48 @@ export type HitOffer = Readonly<{
   slotLevels?: readonly number[];
   /** What the engine could not check, so the attacker vouches for it ("No map to check for an ally within 5 feet"). */
   unverified?: string;
+  /** The save it opens on the target and what a failure deals, as sentences ("The target makes a Charisma saving
+   *  throw. A failure deals 8d10 Psychic."). */
+  save?: string;
+  /** Effects to pick with it (Brutal Strike's Forceful Blow, a Cunning Strike's Trip), each with what it costs. */
+  effects?: ReadonlyArray<HitOfferEffect>;
+  /** How many different effects one hit may carry. */
+  effectsChoose?: number;
+  /** It is chosen with one effect or not at all (Open Hand Technique). */
+  effectRequired?: true;
+  /** It rolls the weapon's own dice again rather than adding any (Savage Attacker); `dice` names them. */
+  rerolls?: true;
 }>;
+/** One effect a hit offer carries: its id, its name and what it costs ("-1d6"). */
+export type HitOfferEffect = Readonly<{ id: string; name: string; cost?: string }>;
 /** One extra chosen at confirm, and how. */
-export type HitOptionChoice = Readonly<{ id: string; damageType?: string; slotLevel?: number }>;
+export type HitOptionChoice = Readonly<{
+  id: string;
+  damageType?: string;
+  slotLevel?: number;
+  effects?: readonly string[];
+}>;
+/** A way the roller may answer its own damage roll after seeing it, sent back as `damageAnswer` with the dice it
+ *  picks: Empowered Spell rerolls up to `dice` of the spell's own dice, Heroic Inspiration one die of any. */
+export type DamageAnswerOffer = Readonly<{
+  id: "empowered-spell" | "heroic-inspiration";
+  name: string;
+  /** How many dice it may reroll. */
+  dice: number;
+  /** Only the action's own dice (`own` on the held dice), never a rider's. */
+  ownOnly: boolean;
+  /** What using it spends ("1 Sorcery Point", "Heroic Inspiration"), or null when it is free now. */
+  cost: string | null;
+}>;
+/** A damage roll looked at before it counts (`damageLook`): its dice in the order thrown, which the confirm deals, what
+ *  answered it, and what may still answer it. */
+export type HeldDamageLook = Readonly<{
+  dice: ReadonlyArray<Readonly<{ sides: number; face: number; own: boolean }>>;
+  answered: readonly RollAnswered[];
+  answers: readonly DamageAnswerOffer[];
+  /** A heal's look (Cure Wounds, a potion): the Hit Points its roll restores, before what the healer's features add. */
+  healing?: number;
+}>;
 /** The damage an action with no attack roll and no save owes one target (Magic Missile, a smite resolved alone). */
 export type DamageTarget = Readonly<{
   targetId: string;
@@ -135,6 +201,9 @@ export type ActionResolution = Readonly<{
   rollMode?: ActionRollMode;
   /** Flat typed damage added by active effects (Rage +2 melee), included in damageTotal. */
   bonusDamage?: ReadonlyArray<{ amount: number; type: string; source: string }>;
+  /** A melee hit can knock its target out (SRD Knocking Out a Creature): on a preview, offered; on a confirm, chosen,
+   *  so the damage it owes leaves the target at 1 Hit Point and Unconscious if it would drop it to 0. */
+  knockOut?: "offered" | "chosen";
   /** Source-linked effects the hit applied to targets (Bite: Grappled + Restrained). */
   effectsApplied?: ReadonlyArray<{
     targetId: string;
@@ -150,6 +219,8 @@ export type ActionResolution = Readonly<{
   warnings?: readonly string[];
   /** Lines for the whole table to read (an accomplished push, the save a Topple forced); see `ActionTableNarration`. */
   tableNarration?: readonly ActionTableNarration[];
+  /** What the action let its user sense, for whoever took it alone (Find Traps: a trap's nature, never where it is). */
+  sensed?: readonly string[];
   /** Present when the GM overrode a strict-mode rejection; the override is logged and journaled. */
   overridden?: Readonly<{ rule: string; reason: string }> | null;
   /** Hit points the action restored (Cure Wounds): the one roll, and what each target regained, capped at its maximum. */
@@ -159,8 +230,17 @@ export type ActionResolution = Readonly<{
   }> | null;
   /** On a previewed hit, the push its weapon mastery offers (SRD "up to 10 feet"); the confirm says how far with `pushFeet`. */
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
+  /** Tactical Master: the weapon's own mastery, the properties that may take its place for this attack, and the one
+   *  this look took. */
+  masteryOptions?: Readonly<{
+    own: Readonly<{ id: string; name: string }>;
+    alternatives: ReadonlyArray<Readonly<{ id: "push" | "sap" | "slow"; name: string }>>;
+    picked?: "push" | "sap" | "slow";
+  }>;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer. */
-  reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
+  reactionPrompts?: ReadonlyArray<
+    Readonly<{ actorId: string; actorName: string; actionName: string; holdsDamage?: true }>
+  >;
   /** An extra attack this swing opened (Cleave's swing at a second creature), for the result card to offer. */
   opens?: Readonly<{ actionId: string; actionName: string }>;
   /** The attack would hit, and the target's reaction (Parry, Shield) may still turn it into a miss. Nothing past the
@@ -180,9 +260,19 @@ export type ActionResolution = Readonly<{
   preview?: boolean;
   /** On a previewed hit, the extras the attacker may add when confirming (`hitOptions`). */
   hitOffers?: readonly HitOffer[];
+  /** On a previewed hit, the attacker may answer its damage roll after seeing it: a look (`damageLook`) rolls and holds
+   *  the damage first. */
+  damageLook?: "offered";
+  /** A look at the damage before it counts: the dice the confirm deals, and the answers they may still take. */
+  heldDamage?: HeldDamageLook;
   /** No attack roll and no save, but damage: what each target is owed, applied or proposed like a hit. A darts action
    *  (Magic Missile) owes each creature only what its own darts dealt. */
   damageTargets?: readonly DamageTarget[];
+  /** What deals its damage (its spell, the carried row it was made with, how the attack was made), for a defence that
+   *  reads it as the damage lands. */
+  damageSource?: DamageSource;
+  /** The creatures this action brought onto the map (Summon Dragon's spirit), which appear on it for the table. */
+  summoned?: ReadonlyArray<Readonly<{ actorId: string; name: string }>>;
 }>;
 /** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
 export type RulesBlocked = Readonly<{ rule: string; message: string; overridable: boolean }>;
@@ -228,6 +318,8 @@ export type DeathSaveResult = MutationResult & {
     /** The d20 mode when it had Advantage or Disadvantage; absent for a plain roll. */ rollMode?:
       "advantage" | "disadvantage" | "normal";
     /** What gave the death save Advantage or Disadvantage. */ rollModeSources?: ActionRollMode;
+    /** What answered the roll, already in its numbers. */ answered?: readonly RollAnswered[];
+    /** On a preview, the answers the dying character may still give it. */ answers?: readonly RollAnswerOffer[];
   }>;
 };
 /** A check the server rolled. A blind roll's numbers stay with the GM: the roller gets `hiddenFromRoller` alone. */
@@ -243,8 +335,14 @@ export type CheckRollOutcome = Readonly<{
   rollMode?: ActionRollMode;
   /** Reliable Talent counted a d20 of 9 or lower as 10. */
   reliableTalent?: true;
+  /** Why it failed whatever it rolled (a Blinded roller's check that needs sight). */
+  autoFailed?: string;
   /** The d20 was typed from a physical die. */
   typed?: true;
+  /** What answered the check, already in its numbers. */
+  answered?: readonly RollAnswered[];
+  /** The answers the roller may still give it (`check.answer`). */
+  answers?: readonly RollAnswerOffer[];
   rollId: string;
 }>;
 export type CheckRollResult = MutationResult & { check?: CheckRollOutcome; hiddenFromRoller?: boolean };
@@ -273,6 +371,10 @@ export type SaveAnswerResult = MutationResult & {
     /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode;
     /** The typed breakdown behind `appliedDamage`; absent when the save applied no damage. */ parts?: DamageApplication["parts"];
     /** Flat reduction taken off before Resistance. */ flatReduction?: number;
+    /** What answered the save, already in its numbers. */ answered?: readonly RollAnswered[];
+    /** On a preview, the answers the saving creature may still give it. */ answers?: readonly RollAnswerOffer[];
+    /** The confirm waits on another creature's answer to the roll (Countercharm). */ awaitingAnswer?: true;
+    /** The damage waits on the target's own reaction to taking it (Stone's Endurance). */ damageHeld?: true;
   };
 };
 /** A loose saving throw (none was owed): its total and d20, or the condition that failed it without a roll. */
@@ -295,6 +397,44 @@ export type ReactionAnswerResult = MutationResult & {
 };
 /** One action's strict-mode availability for an actor, with every violated rule named (server-computed; ADR-0020
  *  explainability), plus the action's display values. */
+/** One way a spell's cast can be shaped, as the cast offers it: its cost in Sorcery Points, whether this spell can take
+ *  it now and why not, whether it counts toward the options one spell may carry, the creatures it names (Careful
+ *  Spell's up to the Charisma modifier, Heightened Spell's one, Sculpt Spells' 1 plus the spell's level, with
+ *  `plusLevel` when that is 1 plus the slot's level), and the types Transmuted Spell can change to. */
+const CastShapingOfferSchema = z.strictObject({
+  id: CastShapingIdSchema,
+  name: z.string(),
+  cost: z.number().int().min(0).max(2),
+  available: z.boolean(),
+  reason: z.string().optional(),
+  counted: z.boolean(),
+  creatures: z
+    .strictObject({ count: z.number().int().min(1).max(10), plusLevel: z.literal(true).optional() })
+    .optional(),
+  damageTypes: z.array(DamageTypeSchema).optional()
+});
+const CastShapingOffersSchema = z
+  .strictObject({
+    /** How many counted options one spell may carry: 1, or 2 while Sorcery Incarnate's Innate Sorcery is active. */
+    limit: z.number().int().min(1).max(2),
+    /** Sorcery Points left to pay with. */
+    points: z.number().int().min(0),
+    /** One option's cost is waived on this turn (Arcane Apotheosis). */
+    free: z.literal(true).optional(),
+    options: z.array(CastShapingOfferSchema)
+  })
+  .describe(
+    "The ways the caster may shape this spell's cast (Metamagic options it knows, Sculpt Spells), each with its Sorcery Point cost and whether this spell can take it now. Send the picks as `action.resolve`'s `shaping`; the server checks them again."
+  );
+export type CastShapingOffers = Wire<z.infer<typeof CastShapingOffersSchema>>;
+/** One form a shape-shift may take, as the sheet lists it. */
+const FormOptionSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  challengeRating: z.number().nullable(),
+  size: z.string(),
+  fly: z.boolean()
+});
 export const ActionAvailabilitySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
@@ -350,6 +490,11 @@ export const ActionAvailabilitySchema = z.strictObject({
     .int()
     .nullable()
     .describe("Normal range band; shots beyond it up to rangeFeet roll at disadvantage"),
+  targetRangeFeet: z
+    .number()
+    .int()
+    .optional()
+    .describe("How far its targets may be when it says so without an attack (Lay on Hands' touch is 5)"),
   attackCount: z.number().int().nullable(),
   saveAbility: z.string().nullable(),
   saveDc: z.number().int().nullable().describe("Save DC including item riders"),
@@ -359,7 +504,7 @@ export const ActionAvailabilitySchema = z.strictObject({
     .int()
     .nullable()
     .describe("Total limited uses including any item that raised the pool; null when unlimited"),
-  usesPer: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
+  usesPer: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]).nullable(),
   usesPool: z.string().nullable().describe("Shared pool key; actions naming one pool spend one counter"),
   /** How many uses one activation spends when it is more than one, or `chosen` when the user picks it each time. */
   useCost: z.union([z.number().int(), z.literal("chosen")]).nullable(),
@@ -403,8 +548,32 @@ export const ActionAvailabilitySchema = z.strictObject({
     ),
   /** The conditions its caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s `conditionId`. */
   conditionChoices: z.array(SaveConditionSchema).optional(),
-  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple). */
-  checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional(),
+  /** What it asks its user to choose as it resolves: an option (Fire Shield's warm or chill), one for each target, or
+   *  the carried weapon it binds to. */
+  choices: z
+    .strictObject({
+      options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
+      optionsPerTarget: z.literal(true).optional(),
+      bindsWeapon: z
+        .strictObject({
+          weaponIds: z.array(z.string()).optional(),
+          melee: z.literal(true).optional(),
+          ammunition: z.enum(["only", "also"]).optional()
+        })
+        .optional(),
+      object: z
+        .strictObject({ kinds: z.array(z.enum(["armor", "weapon"])), metal: z.literal(true).optional() })
+        .optional()
+    })
+    .optional()
+    .describe(
+      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`; `ammunition`: only a stack of ammunition (`only`), or one as well as a weapon (`also`)), and `object`, the target's armor or weapon it acts on (sent as `objectItemId`; absent, the target's worn armor, else its weapon in hand)"
+    ),
+  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple), and
+   *  the tools its user may help with through Help with a Check, which carry their name. */
+  checkSkills: z
+    .array(z.strictObject({ id: z.string(), ability: AbilityIdSchema, name: z.string().optional() }))
+    .optional(),
   /** The weapon mastery property this character uses with this swing (Graze on Borin's Greatsword): present only when
    *  the character chose the weapon's kind under Weapon Mastery. */
   mastery: z
@@ -420,6 +589,44 @@ export const ActionAvailabilitySchema = z.strictObject({
     .describe(
       'Why it can\'t be used now, in one short sentence for the sheet ("Not prepared.", "No level 2 spell slots left.", "You used your Bonus Action this turn."). Present exactly when `available` is false. The character comes first (Stunned, 0 Hit Points), then the option itself, then the turn, then targeting; `violations` keeps the full account. A hint only: resolution checks again.'
     ),
+  /** A Thief's Fast Hands can take this item action as a Bonus Action (`action.resolve`'s `fastHands`): whether that
+   *  form can be used now, and why not. */
+  fastHands: z
+    .strictObject({ available: z.boolean(), reason: z.string().optional() })
+    .optional()
+    .describe(
+      "A Thief's Fast Hands can take this item action (a Utilize action, or a magic item's Magic action) as a Bonus Action with `action.resolve`'s `fastHands`: whether that form can be used now, and why not"
+    ),
+  /** The ways its caster may shape this spell's cast (Metamagic, Sculpt Spells), for the cast to offer. */
+  shaping: CastShapingOffersSchema.optional(),
+  /** Its user may answer this action's damage roll after seeing it (Empowered Spell on a spell, Heroic Inspiration):
+   *  `action.resolve` with `commit: false` and `damageLook` rolls the damage and holds it for the answer. */
+  damageLook: z.literal(true).optional(),
+  /** Its area grows by `feet` for each slot level above `level`, the spell's own (Fog Cloud's radius by 20), so the
+   *  template drawn for a higher slot is the size the server places. */
+  areaPerSlot: z.strictObject({ feet: z.number().int().min(1), level: z.number().int().min(0).max(9) }).optional(),
+  /** The forms a shape-shift may take now, for the user to pick (`action.resolve`'s `form`): Wild Shape's known forms,
+   *  the bestiary's Beasts for Polymorph, a werewolf's printed forms with its true form. Wild Shape also lists the
+   *  forms its user may learn, how many it knows and whether a Long Rest opened one to replace. */
+  forms: z
+    .strictObject({
+      options: z.array(FormOptionSchema),
+      perTarget: z.literal(true).optional(),
+      gearChoice: z.literal(true).optional(),
+      learnable: z.array(FormOptionSchema).optional(),
+      knownLimit: z.number().int().optional(),
+      swapOpen: z.boolean().optional()
+    })
+    .optional()
+    .describe(
+      "The forms a shape-shift may take now, sent back as the resolve's `form` (or `targetForms`, one per target, when `perTarget`); `gearChoice` lets the user say whether its gear melds or is worn. For Wild Shape, the Beasts its user may learn (`learnable`), how many it knows (`knownLimit`) and whether one may be replaced now (`swapOpen`)"
+    ),
+  /** The effects a use picks one of (Enlarge or Reduce), or the form of the area a cast leaves (Wall of Fire's ring),
+   *  sent back as the resolve's `option`; an option with an `area` is placed as that area. */
+  options: z.array(z.strictObject({ id: z.string(), name: z.string(), area: ActionAreaSchema.optional() })).optional(),
+  /** The creature types a cast's barrier may ward, for its user to pick one or more of (Magic Circle, Hallow); sent
+   *  back as the resolve's `creatureTypes`, all of them when none is picked. */
+  wardTypes: z.array(z.string()).optional(),
   /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
    *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
    *  (a spell area's later save). */
@@ -494,15 +701,62 @@ const DerivedSkillRowSchema = z.strictObject({
 });
 export type DerivedSkillRow = Wire<z.infer<typeof DerivedSkillRowSchema>>;
 /** A tool the character is proficient with, checked with the ability its SRD entry names. */
+/** One printed Utilize use: what it does and its DC. */
+const DerivedUtilizeUseSchema = z.strictObject({
+  label: z.string(),
+  dc: z.number().int().min(1).max(40),
+  /** The skill the check uses with it (Thieves' Tools' lock: Sleight of Hand). */
+  skill: z.string().optional().describe("The skill the check uses with it (Thieves' Tools' lock: Sleight of Hand)"),
+  /** The use works for a creature its user picks within 5 feet (Cobbler's Tools' footwear), sent as `forActorId`. */
+  forAnother: z
+    .literal(true)
+    .optional()
+    .describe(
+      "The use works for a creature its user picks within 5 feet (Cobbler's Tools' footwear), sent as `forActorId`"
+    )
+});
 const DerivedToolRowSchema = z.strictObject({
   id: z.string(),
   name: z.string(),
   ability: AbilityIdSchema,
   bonus: z.number().int(),
   mode: RollModeSummarySchema,
-  reliableTalent: z.boolean()
+  reliableTalent: z.boolean(),
+  /** The character is proficient with the tool, so its checks add the Proficiency Bonus. */
+  proficient: z
+    .boolean()
+    .describe("The character is proficient with the tool, so its checks add the Proficiency Bonus"),
+  /** The tool is in the character's pack, which every use of it needs. */
+  carried: z.boolean().describe("The tool is in the character's pack, which every use of it needs"),
+  uses: z
+    .array(DerivedUtilizeUseSchema)
+    .describe(
+      "What the tool's Utilize line lets it do, each with its printed DC (Thieves' Tools: Pick a lock, DC 15), rolled with `check.roll`'s `tool` and `use` (its place in this list). It needs the tool carried, and in a fight it takes the Utilize action. Empty when the tool prints none"
+    )
 });
 export type DerivedToolRow = Wire<z.infer<typeof DerivedToolRowSchema>>;
+/** A carried piece of gear's printed Utilize uses, each a check at its DC (a Grappling Hook's catch). */
+const DerivedGearUsesSchema = z.strictObject({
+  id: z.string().describe("The item's catalog id, sent as `check.roll`'s `item`"),
+  name: z.string(),
+  uses: z.array(
+    DerivedUtilizeUseSchema.extend({
+      ability: AbilityIdSchema,
+      bonus: z.number().int().describe("The check's bonus"),
+      mode: RollModeSummarySchema
+    })
+  )
+});
+export type DerivedGearUses = Wire<z.infer<typeof DerivedGearUsesSchema>>;
+/** A situation the character's riders name for its checks (a Book's topic, prying with a Crowbar), offered as a toggle
+ *  beside the checks. */
+const DerivedSituationSchema = z.strictObject({
+  situation: z.string().describe('The plain words, e.g. "consulting an accurate Book about its topic"'),
+  source: z.string().describe("The item, feature or effect whose rider names it"),
+  effect: z.string().describe('What it gives a check it fits, e.g. "+5" or "Advantage"'),
+  abilities: z.array(AbilityIdSchema).describe("The abilities whose checks it can fit; empty for any"),
+  skills: z.array(z.string()).describe("The skills whose checks it can fit; empty for any")
+});
 /** One damage type a defence covers, and what grants it (null for the stat block itself). */
 const DerivedDefenceSchema = z.strictObject({
   type: z.string().describe('A damage type, e.g. "fire"'),
@@ -518,7 +772,18 @@ const ActorDerivedSheetSchema = z.strictObject({
   tools: z
     .array(DerivedToolRowSchema)
     .describe(
-      "The tools the character is proficient with that the SRD names an ability for, each with its check bonus"
+      "The tools the character is proficient with or carries that the SRD names an ability for, each with its check bonus"
+    ),
+  /** The carried gear with printed Utilize uses (a Grappling Hook's catch, tying a Rope's knot). */
+  gearUses: z
+    .array(DerivedGearUsesSchema)
+    .describe("The carried gear with printed Utilize uses, each a check at its DC (a Grappling Hook's catch)"),
+  /** A Thief's Fast Hands: a Utilize use, a magic item's Magic action and a Sleight of Hand check can be a Bonus
+   *  Action. */
+  fastHands: z
+    .boolean()
+    .describe(
+      "A Thief's Fast Hands: a Utilize use, a magic item's Magic action and a Dexterity (Sleight of Hand) check can be taken as a Bonus Action"
     ),
   /** 10 plus the Wisdom (Perception) bonus, 5 more with Advantage on such checks or 5 less with Disadvantage. */
   passivePerception: z
@@ -560,6 +825,25 @@ const ActorDerivedSheetSchema = z.strictObject({
     .min(1)
     .max(10)
     .describe("How many items the character can attune to at once: 3, or 4 with Use Magic Device"),
+  /** What the creature carries against what it can; over capacity its Speed is at most 5 feet, over twice it 0. */
+  carrying: z
+    .strictObject({
+      pounds: z
+        .number()
+        .min(0)
+        .describe(
+          "What its rows and coins weigh, in pounds (fifty coins to the pound), what its containers hold counted as they weigh it"
+        ),
+      capacity: z
+        .number()
+        .min(0)
+        .describe("The most it can carry: Strength times 15 pounds for a Small or Medium creature, by size"),
+      dragLimit: z.number().min(0).describe("The most it can drag, lift or push: twice its capacity")
+    })
+    .nullable()
+    .describe(
+      "What the creature carries against its carrying capacity. Beyond it, its Speed is no more than 5 feet, and beyond twice it 0. Null for a creature with no sheet or stat block"
+    ),
   /** The weapon kinds chosen under Weapon Mastery, in the order chosen, each with the property it grants and the SRD
    *  text of what that property does. Empty for a sheet that records no such choice. */
   weaponMasteries: z
@@ -574,6 +858,25 @@ const ActorDerivedSheetSchema = z.strictObject({
     )
     .describe(
       "The weapon kinds the character chose under Weapon Mastery, in the order chosen, whether or not it carries one. Empty for a sheet that records no such choice (an import)."
+    ),
+  /** The class table's printed columns no use counts, each class at its own level. */
+  classColumns: z
+    .array(
+      z.strictObject({
+        classId: z.string(),
+        className: z.string().describe("The class as the sheet names it"),
+        id: z.string().describe("The column's id, e.g. bardic-inspiration"),
+        name: z.string().describe('The column as the class table prints it, e.g. "Bardic Die"'),
+        value: z.string().describe('Its value at the character\'s level in that class, e.g. "d8", "3d6", "+2"')
+      })
+    )
+    .describe(
+      "The columns a class table prints that no use counts (the Bardic Die, Martial Arts, Sneak Attack, Rage Damage, Eldritch Invocations, Weapon Mastery), each class at the character's level in it. A column wired to a pool (Rages, Focus Points, Sorcery Points) is a use instead. Empty for a sheet with no class the catalog knows."
+    ),
+  situations: z
+    .array(DerivedSituationSchema)
+    .describe(
+      "The situations the character's equipped items, features and effects name for its checks (a Book's topic, prying with a Crowbar), each with what it gives and the checks it can fit. A check roll that names one gets its rider; the GM judges whether the roll fits."
     )
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
@@ -585,7 +888,11 @@ const RechoiceSchema = z.strictObject({
   label: z.string(),
   per: z.enum(["short-rest", "long-rest"]),
   options: z.array(z.strictObject({ id: z.string(), name: z.string() })),
-  chosen: z.string().nullable()
+  chosen: z.string().nullable(),
+  /** A pick of several (Weapon Mastery's weapon kinds): the answers in force, each swapped by `replacing` it. */
+  held: z.array(z.string()).optional(),
+  /** How many of `held` one rest lets the character swap: Weapon Mastery's "change one of those" is 1. */
+  swaps: z.number().int().min(1).optional()
 });
 export type Rechoice = Wire<z.infer<typeof RechoiceSchema>>;
 /** What a prepared caster may change about its spells (SRD Spell Preparation by Class): for each class that changes its
@@ -606,12 +913,52 @@ const SpellChoicesSchema = z.strictObject({
     .strictObject({
       spellIds: z.array(z.string()),
       freeLeft: z.number().int().min(0),
+      /** Free additions a feature gives for spells of one school, beyond the levels' (Evocation Savant's one each time
+       *  a new level of spell slots opens). */
+      freeOfSchool: z.strictObject({ school: z.string(), left: z.number().int().min(0) }).nullable(),
       maxLevel: z.number().int().min(0).max(9),
       addable: z.array(z.string())
     })
     .nullable()
 });
 export type SpellChoices = Wire<z.infer<typeof SpellChoicesSchema>>;
+/** One way a character's feature turns one resource into another or recovers one (Font of Magic, Arcane Recovery), as
+ *  `actor.convert` would apply it now: what it costs and gives, when it may be used, why it can't be now, and what
+ *  the user picks. */
+export const ConversionOfferSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  /** What it costs and what it gives, in a sentence. */
+  line: z.string(),
+  /** When it may be used: at any moment, as a Bonus Action or a Magic action on the character's turn in a fight, in
+   *  the step a finished Short Rest opens, over a minute outside a fight, or from rolling Initiative to the end of the
+   *  character's first turn. */
+  timing: z.enum(["no-action", "bonus-action", "magic-action", "after-short-rest", "one-minute", "on-initiative"]),
+  /** Why it can't be used now; null when it can. */
+  reason: z.string().nullable(),
+  pick: z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("none") }),
+    /** One slot to spend, from those left. */
+    z.strictObject({
+      kind: z.literal("slot"),
+      options: z.array(z.strictObject({ level: z.number().int(), pact: z.boolean(), left: z.number().int() }))
+    }),
+    /** One slot to make, with what each costs. */
+    z.strictObject({
+      kind: z.literal("create-slot"),
+      options: z.array(z.strictObject({ level: z.number().int(), cost: z.number().int() }))
+    }),
+    /** Spent slots to recover, their levels adding up to at most `budget`. */
+    z.strictObject({
+      kind: z.literal("recover-slots"),
+      budget: z.number().int(),
+      options: z.array(z.strictObject({ level: z.number().int(), spent: z.number().int() }))
+    }),
+    /** How many uses or points, from `min` to `max`. */
+    z.strictObject({ kind: z.literal("count"), min: z.number().int(), max: z.number().int(), unit: z.string() })
+  ])
+});
+export type ConversionOffer = Wire<z.infer<typeof ConversionOfferSchema>>;
 /** What `actor:available-actions` answers: the table's rules mode, each action's availability, the sheet, and the
  *  picks the character may re-make on a rest. */
 export const AvailableActionsReplySchema = z.strictObject({
@@ -621,7 +968,12 @@ export const AvailableActionsReplySchema = z.strictObject({
     "Display only, and the sheet's single source for every number beside a roll button. Derived from the actor's live loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts: a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this request, outside the broadcast game-state projection, on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see."
   ),
   rechoices: z.array(RechoiceSchema),
-  spellChoices: SpellChoicesSchema.nullable()
+  spellChoices: SpellChoicesSchema.nullable(),
+  conversions: z
+    .array(ConversionOfferSchema)
+    .describe(
+      "The ways the character's features turn one resource into another or recover one (Font of Magic, Arcane Recovery, restoring a use with a Rage), each with why it can't be used now; `actor.convert` applies one"
+    )
 });
 export type AvailableActionsReply = Wire<z.infer<typeof AvailableActionsReplySchema>>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string } & Partial<AvailableActionsReply>;
@@ -649,7 +1001,69 @@ export const ActorMovementReplySchema = z.strictObject({
   /** Prone: it can only crawl, each foot costing an extra foot (two in Difficult Terrain). */
   crawling: z.boolean().optional(),
   /** It drags a creature it grapples that isn't Tiny or two sizes smaller, each foot costing an extra foot. */
-  dragging: z.boolean().optional()
+  dragging: z.boolean().optional(),
+  /** A move an action or feature granted it for this turn, beside its own (Pounce, Tactical Shift): the feet left,
+   *  the way it travels when only one, whether it provokes Opportunity Attacks, and whether it is a jump. */
+  granted: z
+    .strictObject({
+      name: z.string(),
+      feet: z.number().min(0),
+      mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]).optional(),
+      provokes: z.boolean(),
+      jump: z.boolean().optional()
+    })
+    .optional(),
+  /** It passes through walls and creatures as through Difficult Terrain (a ghost's Incorporeal Movement). */
+  throughWalls: z.boolean().optional(),
+  /** How narrow an opening it passes with no extra movement: any gap (`point`: Amorphous, "as narrow as 1 inch"), or
+   *  one a Tiny creature fits (`tiny`: a swarm). */
+  opening: z.enum(["point", "tiny"]).optional(),
+  /** Burrowing, it goes through walls: freely through earth and stone (`free`: Earth Glide), or at half its Burrow
+   *  Speed (`half`: Tunneler). */
+  burrowsThroughWalls: z.enum(["free", "half"]).optional(),
+  /** Difficult Terrain costs it nothing extra (Freedom of Movement). */
+  ignoresDifficultTerrain: z.boolean().optional(),
+  /** It moves across painted water as if it were solid ground (Water Walk, a Monk's Acrobatic Movement on its turn). */
+  walksOnWater: z.boolean().optional(),
+  /** It can't pass through liquid (a vampire's mist), so painted water bars its way on the ground. */
+  barredByWater: z.boolean().optional(),
+  /** It is on the Border Ethereal: the walls and creatures of the world it left are no obstacle, and it may rise or
+   *  descend, each foot up or down costing an extra foot (Etherealness). */
+  ethereal: z.boolean().optional(),
+  /** A teleport granted it for this turn (Misty Step): up to `feet` to an unoccupied space it can see. */
+  teleport: z.strictObject({ name: z.string(), feet: z.number().min(0) }).optional(),
+  /** It may end a move in another creature's space (Air Form, a swarm), so no creature bars its way; a creature's
+   *  space still costs as Difficult Terrain. */
+  passesCreatures: z.boolean().optional(),
+  /** It may pass through the space of any creature larger than itself, as Difficult Terrain, and not stop there
+   *  (Halfling Nimbleness). */
+  nimble: z.boolean().optional(),
+  /** The swarms on the map the asker can see. Any creature may cross a swarm's space, as Difficult Terrain. */
+  swarmIds: z.array(z.uuid()).max(200).optional(),
+  /** The ground the spell areas the asker can see change for this mover, in grid cells near it, as the server charges
+   *  it: Difficult Terrain (each cell), and where its footprint (named by its top-left cell) has its Speed halved,
+   *  costs double again on the ground (Plant Growth), or pays double for a step toward an area's caster (Gust of
+   *  Wind's Line, the caster's position in image pixels). `cleared`: cells whose painted Difficult Terrain an area lifts
+   *  (Speak with Plants). */
+  areaGround: z
+    .strictObject({
+      difficult: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      cleared: z
+        .array(z.strictObject({ column: z.number().int(), row: z.number().int() }))
+        .max(4000)
+        .optional(),
+      halved: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      costlyGround: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      toward: z
+        .array(
+          z.strictObject({
+            caster: z.strictObject({ x: z.number(), y: z.number() }),
+            cells: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000)
+          })
+        )
+        .max(10)
+    })
+    .optional()
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;
@@ -671,6 +1085,60 @@ export const NextLevelReplySchema = z.strictObject({
 });
 export type NextLevelReply = Wire<z.infer<typeof NextLevelReplySchema>>;
 export type NextLevelResult = MutationResult & Partial<NextLevelReply>;
+
+/** One thing a character could start making: its raw materials and the 8-hour days of work it takes alone. */
+const CraftOfferSchema = z.strictObject({
+  id: z.string().describe("The catalog item, sent as `crafting.start`'s `itemId`"),
+  name: z.string(),
+  kind: z.enum(["item", "potion-of-healing", "spell-scroll", "magic-item"]),
+  materialsCp: z.number().int().min(0).describe("What its raw materials cost, in copper pieces"),
+  days: z.number().min(0).describe("The 8-hour days of work it takes one worker; helpers divide them"),
+  baseIds: z
+    .array(z.string())
+    .optional()
+    .describe("A magic weapon's or armor's choice of base, sent as `baseId`; the base's price is paid unless carried")
+});
+/** What `actor:crafting-offers` answers its owner or the GM (SRD 5.2.1 Crafting). */
+export const CraftingOffersReplySchema = z.strictObject({
+  tools: z
+    .array(
+      z.strictObject({
+        toolId: z.string(),
+        name: z.string(),
+        carried: z.boolean().describe("The tool is in the pack, which crafting with it needs"),
+        items: z.array(CraftOfferSchema)
+      })
+    )
+    .describe("The tools the character is proficient with, each with what its Craft line makes and the price"),
+  scrolls: z
+    .strictObject({
+      carried: z.boolean().describe("Calligrapher's Supplies are in the pack"),
+      spells: z.array(
+        z.strictObject({
+          id: z.string(),
+          name: z.string(),
+          level: z.number().int().min(0).max(9),
+          days: z.number(),
+          materialsCp: z.number().int().min(0)
+        })
+      )
+    })
+    .nullable()
+    .describe(
+      "Scribing Spell Scrolls with proficiency in Arcana or with Calligrapher's Supplies: the prepared spells it can scribe, with the Spell Scroll Costs table's days and gold; null without the proficiency"
+    ),
+  magicItems: z
+    .array(
+      CraftOfferSchema.extend({
+        rarity: z.string(),
+        toolIds: z.array(z.string()).describe("The tools it can be made with that the character is proficient with")
+      })
+    )
+    .describe("Magic items it can craft with Arcana proficiency and a tool it is proficient with"),
+  purseCp: z.number().int().min(0).describe("What its purse holds, in copper pieces")
+});
+export type CraftingOffersReply = Wire<z.infer<typeof CraftingOffersReplySchema>>;
+export type CraftingOffersResult = MutationResult & Partial<CraftingOffersReply>;
 
 /** What `vision:preview` answers the GM: where one creature (or the whole party) sees now, as image-pixel polygons
  *  (`[x0, y0, x1, y1, ...]`), and the creatures it perceives. Empty while the scene's vision is off. */
@@ -702,6 +1170,18 @@ export type ScenePreviewReply = Omit<Wire<z.infer<typeof ScenePreviewReplySchema
 export type ScenePreviewResult = { ok: boolean; message?: string } & Partial<ScenePreviewReply>;
 export type WallAddResult = MutationResult & { wallIds?: readonly string[] };
 export type LightAddResult = MutationResult & { lightId?: string };
+/** What working on a door came to: the line the table reads, and whether the door came open. */
+export type DoorUseResult = MutationResult & { text?: string; opened?: boolean };
+/** A disarm: what happened, as the table heard it. The trap's DC never reaches a player. */
+export type TrapDisarmResult = MutationResult & { text?: string };
+/** An attack on an object: hit or miss, and whether it broke. A player is told neither the object's Armor Class nor
+ *  the Hit Points it has left. */
+export type ObjectAttackResult = MutationResult & {
+  outcome?: "hit" | "crit" | "miss";
+  total?: number;
+  damage?: number;
+  destroyed?: boolean;
+};
 
 /** What `character:draft` answers: the caller's parked build and when it was last saved, or null for none. */
 export const CharacterDraftReplySchema = z.strictObject({

@@ -8,6 +8,8 @@ import {
   type DamageType
 } from "@vtt/schemas";
 import type { Wire } from "./wire.js";
+import type { ActionAvailability, CastShapingOffers } from "./results.js";
+import type { SummonChoices } from "./summon-choices.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
 const slug = (max = 80) =>
@@ -231,7 +233,12 @@ export const ContentEquipmentSummarySchema = z.strictObject({
   attunement: z
     .strictObject({
       required: z.boolean(),
-      restrictedTo: z.array(slug()).max(8).describe("Class or species ids the item is meant for; advisory only")
+      restrictedTo: z
+        .array(slug())
+        .max(8)
+        .describe(
+          "Who may attune, any one of: a class id, a species id, spellcaster, or creature-attuned-to-a-<item id>. A player's attune is refused when the character meets none"
+        )
     })
     .nullable()
     .describe(
@@ -251,6 +258,78 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .optional()
     .describe(
       "The spell levels one copy of a Spell Scroll can bear (0 is a cantrip), for the picker's spell step; absent on anything else"
+    ),
+  /** The uses one carried copy holds (a Healer's Kit's ten). */
+  uses: z
+    .strictObject({ limit: z.number().int().min(1).max(100) })
+    .optional()
+    .describe(
+      "The uses one carried copy holds (a Healer's Kit's ten), spent from its row and counted in its holder's `actionUses` under `<row id>-uses`; spending the last takes one copy from the stack. Absent on anything else"
+    ),
+  /** A manual or tome: its study raises a score for good (`character.study-item`). */
+  study: z
+    .strictObject({
+      ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]),
+      amount: z.number().int(),
+      maximum: z.number().int(),
+      hours: z.number().int(),
+      days: z.number().int()
+    })
+    .optional()
+    .describe(
+      "A manual or tome: `hours` of study within `days` raise the reader's `ability` by `amount`, never above `maximum`, as its text prints it; absent on anything else"
+    ),
+  /** The kinds a carried copy can be (an Ioun Stone's stones) or the forms its holder puts it in (a Rod's buttons). */
+  variants: z
+    .array(z.strictObject({ id: slug(60), name: z.string().max(80) }))
+    .max(16)
+    .optional()
+    .describe(
+      "The kinds the record covers, of which one carried copy is one (an Ioun Stone's fourteen stones), or the forms its holder puts it in (a Rod of Lordly Might's buttons); the copy's pick is its row's `variantId`. Absent on anything else"
+    ),
+  /** Who picks a copy's kind: the GM (what was found) or its holder, at the cost of `activation` in a fight. */
+  variantChoice: z
+    .strictObject({
+      by: z.enum(["gm", "holder"]),
+      activation: z.enum(["action", "bonus-action"]).optional()
+    })
+    .optional()
+    .describe(
+      "Who picks a copy's kind: the GM says what a found copy is (`gm`), or its holder changes its form with item.set-form (`holder`), which takes `activation` on its turn in a fight. Present with `variants`"
+    ),
+  /** A light source: lit and put out on the row unless it always glows, with a hood to lower or a Cone to aim. */
+  light: z
+    .strictObject({
+      always: z.literal(true).optional(),
+      hooded: z.literal(true).optional(),
+      cone: z.literal(true).optional()
+    })
+    .optional()
+    .describe(
+      "How the item sheds light, as its own text says: lit and put out on its row (item.set-light) unless `always` (it glows while held), with a hood to lower (`hooded`) or a Cone to aim (`cone`). Absent on anything that sheds none"
+    ),
+  /** A container: what it holds, so the sheet can show the load and offer its compartments. */
+  container: z
+    .strictObject({
+      capacityLb: z.number().optional(),
+      pieces: z.number().int().optional(),
+      compartments: z
+        .array(
+          z.strictObject({
+            id: slug(40),
+            name: z.string().max(60),
+            capacityLb: z.number().optional(),
+            count: z.number().int().optional()
+          })
+        )
+        .max(4)
+        .optional(),
+      weighsLb: z.number().optional(),
+      retrieval: z.enum(["utilize", "utilize-or-bonus-action"]).optional()
+    })
+    .optional()
+    .describe(
+      "What a container holds as its text prints it: up to `capacityLb` pounds, `pieces` of ammunition, or a load in each of its `compartments`; `weighsLb` when it weighs the same whatever it holds, and `retrieval` when taking a thing out costs more than the free object interaction in a fight. A row is put in one by its `containerId` (and `compartment`). Absent on anything that holds nothing"
     )
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
@@ -814,6 +893,12 @@ export type ContentActionArea = Readonly<{
   shape: "cone" | "line" | "sphere" | "cube" | "emanation" | "cylinder";
   sizeFeet: number;
   widthFeet: number | null;
+  /** How many of these areas one use places (Fire Storm's ten Cubes); `action.resolve`'s `templates`. */
+  count?: number;
+  /** Each area must touch another. */
+  contiguous?: true;
+  /** A Line that ends where it is aimed, no longer than `sizeFeet`. */
+  toTarget?: true;
 }>;
 /** A cast whose granted effect carries this tag takes an ability its caster chooses (Hex: the target has Disadvantage on
  *  ability checks made with it). */
@@ -824,6 +909,142 @@ export const ENHANCED_ABILITY_TAG = "enhanced-ability";
 export const choosesAbility = (action: Readonly<{ grants?: Readonly<{ tags: readonly string[] }> }>): boolean =>
   action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true ||
   action.grants?.tags.includes(ENHANCED_ABILITY_TAG) === true;
+/** The choices an action asks for as it resolves: an option of its grant or failed save (Fire Shield's warm or
+ *  chill, Bestow Curse's curse), one for each target where the text says so, the carried weapon its grant binds to
+ *  (Magic Weapon), and the armor or weapon of its target it acts on (a rust monster's Antennae). Sent as
+ *  `action.resolve`'s `optionId`, `targetOptions`, `itemId` and `objectItemId`. */
+export type ActionChoices = Readonly<{
+  options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
+  optionsPerTarget?: true;
+  bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true; ammunition?: "only" | "also" }>;
+  object?: Readonly<{ kinds: ReadonlyArray<"armor" | "weapon">; metal?: true }>;
+  /** Any item the user carries may be named (Identify). */
+  pickItem?: true;
+}>;
+/** Teleport's familiarity picks, the rows of its Teleportation Outcome table. */
+export const TELEPORT_FAMILIARITY: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "permanent-circle", name: "Permanent circle" },
+  { id: "linked-object", name: "Linked object" },
+  { id: "very-familiar", name: "Very familiar" },
+  { id: "seen-casually", name: "Seen casually" },
+  { id: "viewed-once", name: "Viewed once or described" },
+  { id: "false-destination", name: "False destination" }
+];
+/** Greater Restoration's harms, one of which its caster picks to end. */
+export const RESTORATION_PICKS: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "exhaustion", name: "An Exhaustion level" },
+  { id: "charmed", name: "Charmed" },
+  { id: "petrified", name: "Petrified" },
+  { id: "curse", name: "A curse" },
+  { id: "ability-score", name: "A lowered ability score" },
+  { id: "hit-point-maximum", name: "A lowered Hit Point maximum" },
+  // What another effect's own text says Greater Restoration ends (Befuddlement, Contact Other Plane's Incapacitated).
+  { id: "other", name: "Another effect it ends" }
+];
+/** Scrying's save modifiers, picked as it is cast: how well the caster knows the target, and what of it the caster
+ *  has. `bonus` adds to the target's Wisdom save. */
+export const SCRYING_PICKS: ReadonlyArray<Readonly<{ id: string; name: string; bonus: number }>> = (
+  [
+    ["secondhand", "Secondhand", 5],
+    ["firsthand", "Firsthand", 0],
+    ["extensive", "Extensive", -5]
+  ] as const
+).flatMap(([knowledge, known, knowledgeBonus]) =>
+  (
+    [
+      ["", "no connection", 0],
+      ["likeness", "a likeness", -2],
+      ["possession", "a possession", -4],
+      ["body-part", "a body part", -10]
+    ] as const
+  ).map(([connection, held, connectionBonus]) => ({
+    id: connection ? `${knowledge}-${connection}` : knowledge,
+    name: `${known}, ${held} (${knowledgeBonus + connectionBonus >= 0 ? "+" : ""}${knowledgeBonus + connectionBonus})`,
+    bonus: knowledgeBonus + connectionBonus
+  }))
+);
+/** The horizontal directions a compelling spell can name (Compulsion), by eighths of a turn from north. */
+export const COMPASS_HEADINGS: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "north", name: "North" },
+  { id: "northeast", name: "Northeast" },
+  { id: "east", name: "East" },
+  { id: "southeast", name: "Southeast" },
+  { id: "south", name: "South" },
+  { id: "southwest", name: "Southwest" },
+  { id: "west", name: "West" },
+  { id: "northwest", name: "Northwest" }
+];
+/** Wish's uses, picked as it is cast: duplicating a spell, and the effects the spell lists. */
+export const WISH_USES: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "duplicate", name: "Duplicate a spell" },
+  { id: "object-creation", name: "Object Creation" },
+  { id: "instant-health", name: "Instant Health" },
+  { id: "resistance", name: "Resistance" },
+  { id: "spell-immunity", name: "Spell Immunity" },
+  { id: "sudden-learning", name: "Sudden Learning" },
+  { id: "roll-redo", name: "Roll Redo" },
+  { id: "reshape-reality", name: "Reshape Reality" }
+];
+type ChoosingAction = Readonly<{
+  teleportOutcome?: true;
+  wishUses?: true;
+  restores?: true;
+  setsHeading?: true;
+  scryingModifiers?: true;
+  identifiesItem?: true;
+  grants?: Readonly<{
+    options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
+    optionsPerTarget?: true;
+    bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true; ammunition?: true }>;
+  }>;
+  /** It remakes a carried Melee weapon or a stack of ammunition (Oil of Sharpness). */
+  rebindsRow?: unknown;
+  save?: Readonly<{
+    failureEffect?: Readonly<{
+      options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
+      optionsPerTarget?: true;
+    }>;
+  }>;
+  object?: Readonly<{ kinds: ReadonlyArray<"armor" | "weapon">; metal?: true }>;
+}>;
+/** What an action asks its user to choose as it resolves, or null when it asks nothing. */
+export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
+  const chooser = action.grants?.options
+    ? action.grants
+    : action.teleportOutcome
+      ? { options: TELEPORT_FAMILIARITY }
+      : action.wishUses
+        ? { options: WISH_USES }
+        : action.restores
+          ? { options: RESTORATION_PICKS }
+          : action.setsHeading
+            ? { options: COMPASS_HEADINGS }
+            : action.scryingModifiers
+              ? { options: SCRYING_PICKS.map(({ id, name }) => ({ id, name })) }
+              : action.save?.failureEffect;
+  const granted = action.grants?.bindsWeapon;
+  // An oil that remakes a row asks for a Melee weapon or a stack of ammunition.
+  const binds: ActionChoices["bindsWeapon"] = granted
+    ? {
+        ...(granted.weaponIds ? { weaponIds: [...granted.weaponIds] } : {}),
+        ...(granted.melee ? { melee: true as const } : {}),
+        ...(granted.ammunition ? { ammunition: "only" as const } : {})
+      }
+    : action.rebindsRow !== undefined
+      ? { melee: true, ammunition: "also" }
+      : undefined;
+  const object = action.object;
+  if (!chooser?.options && !binds && !object && !action.identifiesItem) return null;
+  return {
+    ...(chooser?.options ? { options: chooser.options.map((option) => ({ id: option.id, name: option.name })) } : {}),
+    ...(chooser && "optionsPerTarget" in chooser && chooser.optionsPerTarget
+      ? { optionsPerTarget: true as const }
+      : {}),
+    ...(binds ? { bindsWeapon: binds } : {}),
+    ...(object ? { object: { kinds: [...object.kinds], ...(object.metal ? { metal: true as const } : {}) } } : {}),
+    ...(action.identifiesItem ? { pickItem: true as const } : {})
+  };
+}
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
 export type ContentActionSummary = Readonly<{
   id: string;
@@ -835,16 +1056,19 @@ export type ContentActionSummary = Readonly<{
   rangeFeet: number | null;
   /** Normal range band for two-range weapons; shots beyond it (up to rangeFeet) roll at disadvantage. */ rangeNormalFeet:
     number | null;
+  /** How far its targets may be when it says so without an attack (Lay on Hands' touch is 5). */ targetRangeFeet?: number;
   saveAbility: string | null;
   saveDc: number | null;
   damage: ReadonlyArray<{ formula: string; type: string }>;
   area: ContentActionArea | null;
   attackCount: number | null;
   usesLimit: number | null;
-  usesPer: "turn" | "own-turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | null;
+  usesPer: "turn" | "own-turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | "never" | "time" | null;
   /** d6 threshold for usesPer "recharge" ("Recharge 5-6" → 5); rolled automatically at the start of the owner's turn. */ usesRecharge:
     number | null;
   usesPool: string | null;
+  /** For usesPer "time": the hours of game time after the first use before the pool comes back ("1d12", "168"). */
+  usesAfterHours?: string;
   /** Uses one activation spends when it is more than one, or `chosen` when the user picks it (Lay on Hands). */ useCost?:
     number | "chosen";
   requiresEffectTag: string | null;
@@ -861,17 +1085,44 @@ export type ContentActionSummary = Readonly<{
   /** How many creatures one use heals when it can be more than one (Prayer of Healing's five). */ healTargets?: number;
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** "Can't take this action again until the start of its next turn." */ legendaryOncePerRound?: true;
+  /** Its own move comes before the rest of it ("moves up to half its Speed, and it makes one Rend attack"), so it can
+   *  be taken move first: `action.resolve`'s `moveFirst`. */ moveFirst?: true;
+  /** It sets a creature down in a space its use picks within `feet` of its user: the user itself (a bulette's Deadly
+   *  Leap) or its one target (a kraken's Fling, or Telekinesis on a failed save, within `feet` of where it stands);
+   *  `action.resolve`'s `destination`. `lifts`: the use also names how high it lifts the target
+   *  (`destinationAltitudeFeet`). */ destination?: Readonly<{
+    who: "user" | "target";
+    feet: number;
+    lifts?: true;
+  }>;
   /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
   /** Added to a hit and never taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
   /** The conditions the caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s
    *  `conditionId`. */ conditionChoices?: readonly string[];
-  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple);
-   *  `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
-    Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>
+  /** Conditions its user may also end on the target, each for `pointsEach` of its pool (Restoring Touch);
+   *  `action.resolve`'s `conditionIds`. */ conditionPicks?: Readonly<{
+    conditions: readonly string[];
+    pointsEach: number;
+  }>;
+  /** The Hit Points a heal its user divides among its targets (Preserve Life's five times the Cleric level);
+   *  `action.resolve`'s `healingShares`. */ dividesHealing?: number;
+  /** The creature and creature type its user picks when it summons (Find Familiar's forms); `action.resolve`'s
+   *  `summon`. */ summonChoices?: SummonChoices;
+  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple),
+   *  and the tools Help with a Check may help with, by name; `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
+    Readonly<{ id: string; ability: z.infer<typeof AbilitySchema>; name?: string }>
   >;
   /** The cast chooses an ability (Hex); `action.resolve`'s `ability`. */ choosesAbility?: boolean;
+  /** Once its damage lands, its user gives itself or a creature within `rangeFeet` this many Temporary Hit Points
+   *  (Improved Potent Spellcasting); `action.resolve`'s `vitalityTo`. */ vitality?: Readonly<{
+    rangeFeet: number;
+    amount: number;
+  }>;
+  /** One creature its user picks in its area regains this many Hit Points (Land's Aid); `action.resolve`'s `aidTo`. */
+  areaHeal?: Readonly<{ formula: string }>;
+  /** An option, one for each target, or a carried weapon it asks for (`actionChoicesOf`). */ choices?: ActionChoices;
   /** A stat block's spell list (Spellcasting, Divine Aid): the numbers its casts are made with. */ spellList?: Readonly<{
     ability: z.infer<typeof AbilitySchema>;
     saveDc: number;
@@ -879,6 +1130,14 @@ export type ContentActionSummary = Readonly<{
   }>;
   /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
   /** The spell it casts. */ spellId?: string;
+  /** The ways its caster may shape the cast (Metamagic, Sculpt Spells), from the server's availability read. */ shaping?: CastShapingOffers;
+  /** Its damage may be looked at before it counts, for Empowered Spell or Heroic Inspiration to answer; from the
+   *  server's availability read. */ damageLook?: true;
+  /** How its area grows with a higher slot (Fog Cloud), from the server's availability read. */ areaPerSlot?: ActionAvailability["areaPerSlot"];
+  /** The forms a shape-shift may take (Wild Shape, Polymorph), from the server's availability read; `action.resolve`'s
+   *  `form`, or `targetForms` when each target takes its own. */ forms?: ActionAvailability["forms"];
+  /** The effects a use picks one of (Enlarge or Reduce); `action.resolve`'s `option`. */ options?: ActionAvailability["options"];
+  /** The creature types its barrier may ward (Magic Circle); `action.resolve`'s `creatureTypes`. */ wardTypes?: ActionAvailability["wardTypes"];
 }>;
 export type ContentActionsResult = {
   ok: boolean;

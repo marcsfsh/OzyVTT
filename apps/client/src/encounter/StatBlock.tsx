@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { experienceForChallenge } from "@vtt/rules-5e";
+import { experienceForChallenge, experienceInLair } from "@vtt/rules-5e";
 import { RichText } from "./RichText";
 import { formatChallenge } from "./format";
 import {
@@ -73,8 +73,10 @@ export function StatBlock({ monster, className }: Readonly<{ monster: StatBlockR
   const speeds = speedsOf(monster);
   const hitPoints = monster.hitPoints as { maximum?: number; formula?: string } | undefined;
   const initiative = typeof monster.initiativeBonus === "number" ? monster.initiativeBonus : modifierOf(scores.dex);
-  const actions = actionsOf(monster);
-  const legendary = monster.legendary as { actionsPerRound?: number } | undefined;
+  // A spell of a Spellcasting list (and Protective Magic's Counterspell) is printed inside its entry, as SRD 5.2.1 does;
+  // the turn list offers it on its own.
+  const actions = actionsOf(monster).filter((action) => typeof action.partOf !== "string");
+  const legendary = monster.legendary as { actionsPerRound?: number; actionsInLair?: number } | undefined;
   const name = typeof monster.name === "string" && monster.name.trim() ? monster.name : "Untitled monster";
   const skills = Object.entries((bag.skills as Record<string, number> | undefined) ?? {});
   const senses = [
@@ -87,11 +89,34 @@ export function StatBlock({ monster, className }: Readonly<{ monster: StatBlockR
     .filter((mode) => typeof speeds[mode] === "number" && speeds[mode]! > 0)
     .map((mode) => `${title(mode)} ${speeds[mode]} ft.${mode === "fly" && speeds.hover ? " (hover)" : ""}`);
   const traits = Array.isArray(bag.traits) ? (bag.traits as Array<{ name: string; description: string }>) : [];
-  const typeLine = `${title(typeof monster.size === "string" ? monster.size : "medium")} ${
-    typeof bag.type === "string" ? title(bag.type) : "Being"
+  // "Medium or Small Humanoid (Wizard)", "Medium Swarm of Tiny Beasts", "Huge Fiend (Demon)": as SRD 5.2.1 prints it.
+  const sizes = Array.isArray(bag.sizes) && bag.sizes.length > 0 ? (bag.sizes as string[]) : [monster.size];
+  const swarm = bag.swarm as { size?: unknown; of?: unknown } | undefined;
+  const tags = Array.isArray(bag.typeTags) ? (bag.typeTags as unknown[]).filter((tag) => typeof tag === "string") : [];
+  const kind =
+    swarm && typeof swarm.size === "string" && typeof swarm.of === "string"
+      ? `Swarm of ${title(swarm.size)} ${swarm.of}`
+      : typeof bag.type === "string"
+        ? title(bag.type)
+        : "Being";
+  const typeLine = `${sizes.map((size) => title(typeof size === "string" ? size : "medium")).join(" or ")} ${kind}${
+    tags.length > 0 ? ` (${tags.join(", ")})` : ""
   }${typeof bag.alignment === "string" && bag.alignment ? `, ${title(bag.alignment)}` : ""}`;
   const immunities = [defences(monster, "damageImmunities"), defences(monster, "conditionImmunities")].filter(Boolean);
-  const experience = rating === null ? null : experienceForChallenge(rating);
+  // The XP the stat block prints, else its rating's; a legendary creature with a lair prints a second for it.
+  const experience =
+    typeof bag.experiencePoints === "number"
+      ? bag.experiencePoints
+      : rating === null
+        ? null
+        : experienceForChallenge(rating);
+  const inLair =
+    rating === null
+      ? null
+      : experienceInLair(
+          rating,
+          traits.map((trait) => trait.name)
+        );
 
   return (
     <article className={className ? `sb ${className}` : "sb"} aria-label={`${name} stat block`}>
@@ -141,12 +166,13 @@ export function StatBlock({ monster, className }: Readonly<{ monster: StatBlockR
           <Line label="Resistances">{defences(monster, "damageResistances")}</Line>
         )}
         {immunities.length > 0 && <Line label="Immunities">{immunities.join("; ")}</Line>}
+        {typeof bag.gear === "string" && bag.gear.trim() && <Line label="Gear">{bag.gear}</Line>}
         {senses.length > 0 && <Line label="Senses">{senses.join("; ")}</Line>}
         <Line label="Languages">{typeof bag.languages === "string" && bag.languages ? bag.languages : "None"}</Line>
         <Line label="CR">
           {rating === null
             ? "None"
-            : `${formatChallenge(rating)} (XP ${experience?.toLocaleString("en") ?? "None"}; PB ${signed(proficiency)})`}
+            : `${formatChallenge(rating)} (XP ${experience?.toLocaleString("en") ?? "None"}${inLair !== null ? `, or ${inLair.toLocaleString("en")} in lair` : ""}; PB ${signed(proficiency)})`}
         </Line>
       </div>
       {traits.length > 0 && (
@@ -165,7 +191,9 @@ export function StatBlock({ monster, className }: Readonly<{ monster: StatBlockR
       {legendary?.actionsPerRound !== undefined && (
         <Entries
           heading="Legendary Actions"
-          intro={`Legendary Action Uses: ${legendary.actionsPerRound}. Immediately after another turn, it can expend a use to take one of these actions. It regains all expended uses at the start of each of its turns.`}
+          intro={`Legendary Action Uses: ${legendary.actionsPerRound}${
+            legendary.actionsInLair !== undefined ? ` (${legendary.actionsInLair} in Lair)` : ""
+          }. Immediately after another creature's turn, it can expend a use to take one of these actions. It regains all expended uses at the start of each of its turns.`}
           actions={actions.filter((action) => activationOf(action) === "legendary")}
         />
       )}

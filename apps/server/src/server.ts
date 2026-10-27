@@ -21,6 +21,7 @@ import { AudioAssetStore } from "./audio-assets.js";
 import { ContentLibrary, type ContentReader } from "./content-library.js";
 import { equipmentCatalogOf } from "./equipment-derivation.js";
 import { reconcileMagicMarkers } from "./inventory.js";
+import { refreshBuiltSheets, refreshIsDue, type SheetRefresh } from "./sheet-refresh.js";
 import { AuthService } from "./auth.js";
 import { developmentClientUrl } from "./client-hosting.js";
 import { CombatLogStore, projectFeedRow } from "./combat-log.js";
@@ -73,6 +74,11 @@ import { SoundStore } from "./sound-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
 import { hiddenFrom, hideRollsOfHidden, rememberExplored } from "./vision/audience.js";
+import { pruneEndedSight } from "./vision/cast-sight.js";
+import { pruneEndedWalls } from "./spell-walls.js";
+import { pruneEndedZones } from "./spell-zones.js";
+import { burnOutLights } from "./item-light.js";
+import { keepDeathRecords } from "./death.js";
 import { stampSceneChanges } from "./scenes.js";
 import type { SightContent } from "./vision/senses.js";
 
@@ -121,9 +127,24 @@ export function createServer(options: CreateServerOptions) {
     // failure here must not undo the command; the next one catches up.
     afterMutate: (state, before) => {
       try {
+        // A spell's light, fog and area go with the cast that kept them, and a Torch burns down on the game clock.
+        pruneEndedZones(state);
+        pruneEndedSight(state);
+        pruneEndedWalls(state);
+        burnOutLights(state, sightContent().catalog);
+      } catch (error) {
+        console.error("ending lights failed:", error instanceof Error ? error.message : error);
+      }
+      try {
         rememberExplored(state, sightContent());
       } catch (error) {
         console.error("remembering what the party saw failed:", error instanceof Error ? error.message : error);
+      }
+      try {
+        // When each creature died, for the revival spells' time limits.
+        keepDeathRecords(state, before);
+      } catch (error) {
+        console.error("keeping the times of death failed:", error instanceof Error ? error.message : error);
       }
       try {
         hideRollsOfHidden(state, before, sightContent());
@@ -412,27 +433,80 @@ export function createServer(options: CreateServerOptions) {
       console.error("re-deriving armor classes failed:", error instanceof Error ? error.message : error)
     );
   }
+  /** The play catalog's homebrew as the built sheets last saw it; a change rebuilds every one of them. */
+  let sheetsSawHomebrew: string | undefined;
+  /** Characters a homebrew change reached while they were in a fight, rebuilt once it ends. */
+  const sheetsAwaitingRefresh = new Set<string>();
+  /** The reason the GM was last told a character's sheet couldn't take the current content, so it is told once. */
+  const refreshRefusalsTold = new Map<string, string>();
   /** Re-derives stored ACs once the content behind them changed (a homebrew write, a content upgrade at start), and
-   *  fills prose facts on definitions imported before those fields existed. Skipped while the GM has rewound the
-   *  fight, so a content edit doesn't dirty the timeline; the next change or restart catches up. */
+   *  fills prose facts on definitions imported before those fields existed. Built characters are rebuilt from their
+   *  ledgers with the current content (`sheet-refresh.ts`). Skipped while the GM has rewound the fight, so a content
+   *  edit doesn't dirty the timeline; the next change or restart catches up. */
   async function reconcileContentDerived() {
     const current = committedState.read();
     if (current.combat.historyCursor !== null) return;
-    const catalog = equipmentCatalogOf(contentLibrary.forAudience("play"));
+    const play = contentLibrary.forAudience("play");
+    const catalog = equipmentCatalogOf(play);
+    const homebrew = homebrewStore.fingerprintFor("play");
+    const everyone = sheetsSawHomebrew !== undefined && sheetsSawHomebrew !== homebrew;
+    sheetsSawHomebrew = homebrew;
     const definitionsIn = (state: GameState) => (definitionId: string) =>
       storedDefinition(state, definitionId) ?? contentLibrary.monsterForInstance(definitionId);
+    let refresh: SheetRefresh | undefined;
     const reconcile = (state: GameState) => {
+      refresh = refreshBuiltSheets(
+        state,
+        { library: play, policy: state.builderPolicy, catalog },
+        { everyone, also: sheetsAwaitingRefresh }
+      );
+      const refreshed = refresh.rebuilt.length + refresh.stamped.length > 0;
       const filled = fillStoredProseFacts(state);
       const sped = fillMissingSpeeds(state, definitionsIn(state));
       const marked = reconcileMagicMarkers(state, catalog);
-      return reconcileArmorClasses(state, definitionsIn(state), catalog) || filled || sped || marked;
+      return reconcileArmorClasses(state, definitionsIn(state), catalog) || refreshed || filled || sped || marked;
     };
     // A dry run first, so an unchanged campaign takes no revision.
-    if (!reconcile(structuredClone(current))) return;
-    const { state } = await store.execute({ id: randomUUID(), type: "content.reconcile" }, (draft) => {
-      reconcile(draft);
-    });
-    await publishGameState(state);
+    if (reconcile(structuredClone(current))) {
+      const { state } = await store.execute({ id: randomUUID(), type: "content.reconcile" }, (draft) => {
+        reconcile(draft);
+      });
+      await publishGameState(state);
+    }
+    if (refresh) tellRefresh(refresh);
+  }
+  /** Notes which characters wait on a fight, and tells the GM what was rebuilt and what the content refused. */
+  function tellRefresh(refresh: SheetRefresh) {
+    for (const actorId of [...refresh.rebuilt, ...refresh.stamped]) {
+      sheetsAwaitingRefresh.delete(actorId);
+      refreshRefusalsTold.delete(actorId);
+    }
+    for (const actorId of refresh.waiting) sheetsAwaitingRefresh.add(actorId);
+    if (refresh.rebuilt.length > 0)
+      appendLog({
+        kind: "encounter",
+        text: `Rebuilt with the current rules, keeping hit points, spent uses and gear: ${refresh.rebuilt
+          .map((actorId) => committedState.read().actors.find((actor) => actor.id === actorId)?.name ?? "a character")
+          .join(", ")}.`,
+        actorIds: refresh.rebuilt,
+        gmOnly: true
+      });
+    for (const failure of refresh.failed) {
+      sheetsAwaitingRefresh.delete(failure.actorId);
+      if (refreshRefusalsTold.get(failure.actorId) === failure.reason) continue;
+      refreshRefusalsTold.set(failure.actorId, failure.reason);
+      appendLog({
+        kind: "encounter",
+        text: `${failure.name}'s sheet keeps its earlier rules. The current rules refuse its build: ${failure.reason} Rebuild ${failure.name} in the Level flow to take them.`,
+        actorIds: [failure.actorId],
+        gmOnly: true
+      });
+    }
+  }
+  /** Whether a character the content refresh left for later is out of its fight now. */
+  function refreshWaits(state: GameState): boolean {
+    if (state.combat.historyCursor !== null) return false;
+    return refreshIsDue(state, { also: sheetsAwaitingRefresh, skip: new Set(refreshRefusalsTold.keys()) });
   }
   // Homebrew usage lookup, memoised for one microtask: the library list asks per row and building the
   // index walks the whole campaign. Gone before the next request, so never stale.
@@ -578,6 +652,11 @@ export function createServer(options: CreateServerOptions) {
           );
     }
     broadcast();
+    // A character the content refresh passed over during a fight is rebuilt once the fight ends.
+    if (refreshWaits(state))
+      void reconcileContentDerived().catch((error: unknown) =>
+        console.error("rebuilding sheets failed:", error instanceof Error ? error.message : error)
+      );
   }
   /** Presents a newly-live scene's map on the shared screen. Best-effort: a viewer failure must not undo the committed scene switch. */
   async function presentSceneMap(mapAssetId: string) {

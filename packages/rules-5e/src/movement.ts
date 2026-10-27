@@ -24,17 +24,25 @@ const SIZE_RANK: Readonly<Record<string, number>> = { tiny: 0, small: 1, medium:
 
 /** What another creature's space is to a mover (SRD "Moving around Other Creatures"): an ally's or a Tiny creature's
  *  is open ground; anyone else's is Difficult Terrain, and the mover may pass through it only when that creature is
- *  Incapacitated or two sizes larger or smaller. */
+ *  Incapacitated or two sizes larger or smaller. A nimble mover (Halfling Nimbleness: "the space of any creature that
+ *  is a size larger than you") also passes any creature larger than itself. */
 export type SpacePassage = "open" | "difficult" | "blocked";
 
 export function spacePassage(
-  input: Readonly<{ ally: boolean; incapacitated: boolean; moverSize?: string; occupantSize?: string }>
+  input: Readonly<{
+    ally: boolean;
+    incapacitated: boolean;
+    moverSize?: string;
+    occupantSize?: string;
+    nimble?: boolean;
+  }>
 ): SpacePassage {
   if (input.ally || input.occupantSize === "tiny") return "open";
-  const gap = Math.abs(
-    (SIZE_RANK[input.moverSize ?? "medium"] ?? 2) - (SIZE_RANK[input.occupantSize ?? "medium"] ?? 2)
-  );
-  return input.incapacitated || gap >= 2 ? "difficult" : "blocked";
+  const mover = SIZE_RANK[input.moverSize ?? "medium"] ?? 2;
+  const occupant = SIZE_RANK[input.occupantSize ?? "medium"] ?? 2;
+  return input.incapacitated || Math.abs(mover - occupant) >= 2 || (input.nimble === true && occupant > mover)
+    ? "difficult"
+    : "blocked";
 }
 
 export type MovementPath = Readonly<{
@@ -125,10 +133,20 @@ export function movementPath(
     /** Whether the footprint may step from one position to the next, such as no wall being in the way
      *  (`footprintStepBlocked`). Every step is open when absent. */
     isStepOpen?: (from: GridCell, to: GridCell) => boolean;
+    /** Whether the footprint squeezes through on that step (`footprintStepPassage`), which costs as Difficult Terrain
+     *  does. No step squeezes when absent. */
+    isStepSqueezed?: (from: GridCell, to: GridCell) => boolean;
     /** Cells added to every step's cost (1 while crawling, climbing or swimming without the speed). */
     extraPerStep?: number;
     /** Whether the mover's Speed is halved at this position, its top-left cell given (Spirit Guardians' Emanation). */
     isHalved?: (column: number, row: number) => boolean;
+    /** Whether this step costs double for the way it goes (Gust of Wind: moving closer to its caster in the Line). */
+    isStepCostly?: (from: GridCell, to: GridCell) => boolean;
+    /** Whether entering this cell is swimming (painted water). A swimming step costs `swimExtra` more cells, in place
+     *  of `extraPerStep` when that is less: swimming doesn't add to crawling or to swimming already counted. */
+    isWater?: (column: number, row: number) => boolean;
+    /** Cells a swimming step adds: 1 without a Swim Speed used to swim (SRD Swimming), 0 with one. */
+    swimExtra?: number;
     maxNodes?: number;
   }>
 ): MovementPath | null {
@@ -136,9 +154,9 @@ export function movementPath(
   const { from, to } = input;
   const straight = Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row));
   if (straight === 0) return { steps: [from], costCells: 0, difficultSteps: 0 };
-  // No path costs more than walking straight through difficult ground (2 per step), so nothing cheaper lies
-  // further than that from the start.
-  const radius = straight * 2 + 1;
+  // No path costs more than walking straight through difficult ground (2 per step), or swimming through it (3), so
+  // nothing cheaper lies further than that from the start.
+  const radius = straight * (input.isWater && (input.swimExtra ?? 0) > 0 ? 3 : 2) + 1;
   const width = radius * 2 + 1;
   const keyOf = (column: number, row: number) => (row - from.row + radius) * width + (column - from.column + radius);
   const inBox = (column: number, row: number) =>
@@ -193,6 +211,19 @@ export function movementPath(
   const goalKey = keyOf(to.column, to.row);
   const limit = input.maxNodes ?? 40_000;
   const extraPerStep = Math.max(0, input.extraPerStep ?? 0);
+  const swimExtra = Math.max(0, input.swimExtra ?? 0);
+  const waterCache = new Map<number, boolean>();
+  const enteringWater = (column: number, row: number) => {
+    if (!input.isWater) return false;
+    const key = keyOf(column, row);
+    const cached = waterCache.get(key);
+    if (cached !== undefined) return cached;
+    let water = false;
+    for (let dc = 0; dc < size && !water; dc++)
+      for (let dr = 0; dr < size && !water; dr++) water = input.isWater(column + dc, row + dr);
+    waterCache.set(key, water);
+    return water;
+  };
   let expanded = 0;
 
   while (queue.size > 0) {
@@ -205,9 +236,13 @@ export function movementPath(
       const row = node.row + stepRow;
       if (!inBox(column, row) || !footprintFits(column, row)) continue;
       if (input.isStepOpen && !input.isStepOpen({ column: node.column, row: node.row }, { column, row })) continue;
-      const difficult = enteringIsDifficult(column, row);
+      const difficult =
+        enteringIsDifficult(column, row) ||
+        input.isStepSqueezed?.({ column: node.column, row: node.row }, { column, row }) === true;
       const halved = input.isHalved?.(column, row) === true;
-      const cost = node.cost + ((difficult ? 2 : 1) + extraPerStep) * (halved ? 2 : 1);
+      const costly = input.isStepCostly?.({ column: node.column, row: node.row }, { column, row }) === true;
+      const extraHere = enteringWater(column, row) ? Math.max(extraPerStep, swimExtra) : extraPerStep;
+      const cost = node.cost + ((difficult ? 2 : 1) + extraHere) * (halved ? 2 : 1) * (costly ? 2 : 1);
       const key = keyOf(column, row);
       const known = best.get(key);
       if (known !== undefined && known <= cost) continue;
@@ -330,6 +365,180 @@ export function footprintStepBlocked(
       if (row + 1 < size && crosses(cell, { column: cell.column, row: cell.row + 1 })) return true;
     }
   return false;
+}
+
+/**
+ * How a footprint passes from one position to the next: `open`; `squeeze` through a narrow opening (SRD 5.2.1
+ * Difficult Terrain: "A narrow opening sized for a creature one size smaller than you"), where a footprint one cell
+ * narrower fits through somewhere inside its own and every wall in the way ends within the footprint's reach, as the
+ * jambs of a door do (a wall running clean across the footprint is no opening); or `blocked`. A one-cell footprint has
+ * no narrower one, so its opening is measured (`laneWidth`): a Small or Medium creature walks through three quarters
+ * of a square, squeezes through half of one (a Tiny creature's space) and is barred by less; a Tiny one needs the half.
+ */
+export function footprintStepPassage(
+  from: GridCell,
+  to: GridCell,
+  sizeCells: number,
+  crosses: (a: GridPoint, b: GridPoint) => boolean,
+  walls: readonly GridSegment[] = [],
+  mover: Readonly<{ tiny?: boolean }> = {}
+): "open" | "squeeze" | "blocked" {
+  const size = Math.max(1, Math.round(sizeCells));
+  if (size < 2) {
+    if (footprintStepBlocked(from, to, 1, crosses)) return "blocked";
+    const width = laneWidth(from, to, walls);
+    if (mover.tiny === true) return width >= TINY_LANE - 1e-9 ? "open" : "blocked";
+    return width >= OPEN_LANE - 1e-9 ? "open" : width >= TINY_LANE - 1e-9 ? "squeeze" : "blocked";
+  }
+  if (!footprintStepBlocked(from, to, sizeCells, crosses)) return "open";
+  const narrower = [0, 1].some((column) =>
+    [0, 1].some((row) => {
+      const shift = (cell: GridCell) => ({ column: cell.column + column, row: cell.row + row });
+      return !footprintStepBlocked(shift(from), shift(to), size - 1, crosses);
+    })
+  );
+  if (!narrower) return "blocked";
+  const low = { column: Math.min(from.column, to.column), row: Math.min(from.row, to.row) };
+  const high = { column: Math.max(from.column, to.column) + size, row: Math.max(from.row, to.row) + size };
+  // Strictly inside: a wall that only touches the footprint's edge runs clean across it.
+  const inside = (point: GridPoint) =>
+    point.column > low.column + 1e-9 &&
+    point.column < high.column - 1e-9 &&
+    point.row > low.row + 1e-9 &&
+    point.row < high.row - 1e-9;
+  const opening = walls.every(
+    (wall) =>
+      !footprintStepBlocked(from, to, size, (a, b) => segmentsMeet(a, b, wall.a, wall.b)) ||
+      inside(wall.a) ||
+      inside(wall.b)
+  );
+  return opening ? "squeeze" : "blocked";
+}
+
+/** A Tiny creature's space across, and the narrowest opening a Small or Medium creature walks through unhindered,
+ *  in squares. Walls traced over a map rarely sit on the grid lines, so a little short of a full square still counts. */
+const TINY_LANE = 0.5;
+const OPEN_LANE = 0.75;
+/** Walls closer than this to the way a step goes run alongside it, as a corridor's do, and make no opening. */
+const ALONGSIDE = Math.sin((20 * Math.PI) / 180);
+
+const nearIndex = new WeakMap<readonly GridSegment[], (cells: readonly GridCell[]) => GridSegment[]>();
+/** The walls filed under the given cells, bucketed once per wall list, as `wallCrossing` does. */
+function wallsNear(walls: readonly GridSegment[], cells: readonly GridCell[]): GridSegment[] {
+  let lookup = nearIndex.get(walls);
+  if (!lookup) {
+    const buckets = new Map<string, GridSegment[]>();
+    const everywhere: GridSegment[] = [];
+    for (const wall of walls) {
+      const left = Math.floor(Math.min(wall.a.column, wall.b.column) - 1e-6);
+      const right = Math.floor(Math.max(wall.a.column, wall.b.column) + 1e-6);
+      const top = Math.floor(Math.min(wall.a.row, wall.b.row) - 1e-6);
+      const bottom = Math.floor(Math.max(wall.a.row, wall.b.row) + 1e-6);
+      if ((right - left + 1) * (bottom - top + 1) > 4096) {
+        everywhere.push(wall);
+        continue;
+      }
+      for (let column = left; column <= right; column++)
+        for (let row = top; row <= bottom; row++) {
+          const key = `${column},${row}`;
+          const bucket = buckets.get(key) ?? [];
+          bucket.push(wall);
+          buckets.set(key, bucket);
+        }
+    }
+    lookup = (wanted) => {
+      const found = new Set<GridSegment>(everywhere);
+      for (const cell of wanted) for (const wall of buckets.get(`${cell.column},${cell.row}`) ?? []) found.add(wall);
+      return [...found];
+    };
+    nearIndex.set(walls, lookup);
+  }
+  return lookup(cells);
+}
+
+/**
+ * How wide an opening a one-cell footprint passes through on a step, in squares, up to a full one: the clear lane
+ * either side of the line its centre takes, between the walls that cross the way. Callers have checked that the
+ * centre line itself is clear (`footprintStepBlocked`).
+ */
+export function laneWidth(from: GridCell, to: GridCell, walls: readonly GridSegment[]): number {
+  const dc = to.column - from.column;
+  const dr = to.row - from.row;
+  const length = Math.hypot(dc, dr);
+  if (length === 0 || walls.length === 0) return 1;
+  const start = { column: from.column + 0.5, row: from.row + 0.5 };
+  // Along the step and across it, from the starting centre.
+  const along = (point: GridPoint) => ((point.column - start.column) * dc + (point.row - start.row) * dr) / length;
+  const across = (point: GridPoint) => ((point.row - start.row) * dc - (point.column - start.column) * dr) / length;
+  let low = -0.5;
+  let high = 0.5;
+  const cells = [from, to, { column: from.column, row: to.row }, { column: to.column, row: from.row }];
+  for (const wall of wallsNear(walls, cells)) {
+    const wallLength = Math.hypot(wall.b.column - wall.a.column, wall.b.row - wall.a.row);
+    if (wallLength === 0) continue;
+    const sine =
+      Math.abs((wall.b.column - wall.a.column) * dr - (wall.b.row - wall.a.row) * dc) / (wallLength * length);
+    if (sine < ALONGSIDE) continue;
+    // The part of the wall between the two centres, along the step.
+    const s1 = along(wall.a);
+    const s2 = along(wall.b);
+    let enter = 0;
+    let leave = 1;
+    if (Math.abs(s2 - s1) < 1e-12) {
+      if (s1 < -1e-9 || s1 > length + 1e-9) continue;
+    } else {
+      const u0 = (0 - s1) / (s2 - s1);
+      const u1 = (length - s1) / (s2 - s1);
+      enter = Math.max(0, Math.min(u0, u1));
+      leave = Math.min(1, Math.max(u0, u1));
+      if (enter > leave + 1e-12) continue;
+    }
+    const t1 = across(wall.a);
+    const t2 = across(wall.b);
+    const a = t1 + (t2 - t1) * enter;
+    const b = t1 + (t2 - t1) * leave;
+    const near = Math.min(a, b);
+    const far = Math.max(a, b);
+    if (near <= 1e-9 && far >= -1e-9) return 0;
+    if (far < 0) low = Math.max(low, far);
+    else high = Math.min(high, near);
+  }
+  return Math.max(0, high - low);
+}
+
+/**
+ * Whether a creature that slips through narrow gaps may take a step past walls, its body flowing through one gap: one
+ * that "can move through a space as narrow as 1 inch" (`point`: Amorphous, Compression) needs one clear lane through its
+ * footprint along the step, and one that moves "through any opening large enough for a Tiny" creature (`tiny`: a swarm)
+ * a lane clear for a quarter of a square either side. A closed door or a wall with no gap stops both.
+ */
+export function slipsThroughStep(
+  from: GridCell,
+  to: GridCell,
+  sizeCells: number,
+  crosses: (a: GridPoint, b: GridPoint) => boolean,
+  gap: "point" | "tiny"
+): boolean {
+  const size = Math.max(1, Math.round(sizeCells));
+  const dc = Math.sign(to.column - from.column);
+  const dr = Math.sign(to.row - from.row);
+  const widths = gap === "point" ? [0] : [-0.25, 0, 0.25];
+  const cells = Array.from({ length: size }, (_, index) => index);
+  /** Whether the line its body's centres sweep along one row (or column) is clear, as wide as the gap needs: from its
+   *  first cell's centre to its last one's after the step. Cell centres never lie on a grid line. */
+  const across = (row: number) =>
+    widths.every((offset) => {
+      const y = from.row + row + 0.5 + offset;
+      const near = from.column + (dc >= 0 ? 0.5 : size - 0.5);
+      return !crosses({ column: near, row: y }, { column: near + dc * size, row: y });
+    });
+  const down = (column: number) =>
+    widths.every((offset) => {
+      const x = from.column + column + 0.5 + offset;
+      const near = from.row + (dr >= 0 ? 0.5 : size - 0.5);
+      return !crosses({ column: x, row: near }, { column: x, row: near + dr * size });
+    });
+  return (dc === 0 || cells.some(across)) && (dr === 0 || cells.some(down));
 }
 
 /** Whether a point lies in any of the rects, edges included. */

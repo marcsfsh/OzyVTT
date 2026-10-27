@@ -2,7 +2,15 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ActorAction } from "@vtt/schemas";
-import { areaOfProse, drainOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
+import {
+  areaOfProse,
+  drainOfProse,
+  leapOfProse,
+  moveOfProse,
+  multiattackOfProse,
+  teleportOfProse,
+  withProseFacts
+} from "../src/action-prose.js";
 import { loadSpells } from "../src/index.js";
 
 const action = (fields: Partial<ActorAction>): ActorAction =>
@@ -40,21 +48,24 @@ describe("reading an action's prose facts", () => {
     expect(areaOfProse("a 20-foot-radius Sphere")).toEqual({ shape: "sphere", sizeFeet: 20, widthFeet: null });
     expect(areaOfProse("a 15-foot Emanation")).toEqual({ shape: "emanation", sizeFeet: 15, widthFeet: null });
     expect(areaOfProse("a 10-foot Cube")).toEqual({ shape: "cube", sizeFeet: 10, widthFeet: null });
-    // A Cylinder keeps its radius, however its height is printed, and a square on the ground is a Cube.
+    // A Cylinder keeps its radius and its height, however it is printed, and a square on the ground is a Cube.
     expect(areaOfProse("in a 5-foot-radius, 40-foot-high Cylinder")).toEqual({
       shape: "cylinder",
       sizeFeet: 5,
-      widthFeet: null
+      widthFeet: null,
+      heightFeet: 40
     });
     expect(areaOfProse("in a 40-foot-tall, 20-foot-radius Cylinder")).toEqual({
       shape: "cylinder",
       sizeFeet: 20,
-      widthFeet: null
+      widthFeet: null,
+      heightFeet: 40
     });
     expect(areaOfProse("in a 50-foot-radius, 100 foot high Cylinder")).toEqual({
       shape: "cylinder",
       sizeFeet: 50,
-      widthFeet: null
+      widthFeet: null,
+      heightFeet: 100
     });
     // A Line printed before its size, in words.
     expect(areaOfProse("A Line of strong wind 60 feet long and 10 feet wide blasts from you")).toEqual({
@@ -200,6 +211,13 @@ describe("reading a Multiattack", () => {
       sheet("Claws", "Tail", "Hurl Flame")
     );
     expect(barbed?.alternatives).toEqual([[{ actionId: "hurl-flame", count: 2 }]]);
+    expect(barbed).not.toHaveProperty("alternativesAfter");
+    expect(
+      multiattackOfProse(
+        "The golem makes two Slam attacks, or it makes three Slam attacks if it used Hasten this turn.",
+        sheet("Slam", "Hasten")
+      )
+    ).toMatchObject({ alternatives: [[{ actionId: "slam", count: 3 }]], alternativesAfter: "hasten" });
     expect(
       multiattackOfProse(
         "The lion makes two Rend attacks. It can replace one attack with a use of Roar.",
@@ -245,7 +263,7 @@ describe("the bundles carry what their prose says, so play never reads it", () =
     const lightningBolt = loadSpells().find((spell) => spell.id === "lightning-bolt")!;
     expect(lightningBolt.area).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
     const areaOf = (id: string) => loadSpells().find((spell) => spell.id === id)!.area;
-    expect(areaOf("flame-strike")).toEqual({ shape: "cylinder", sizeFeet: 10, widthFeet: null });
+    expect(areaOf("flame-strike")).toEqual({ shape: "cylinder", sizeFeet: 10, widthFeet: null, heightFeet: 40 });
     expect(areaOf("gust-of-wind")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 10 });
     expect(areaOf("entangle")).toEqual({ shape: "cube", sizeFeet: 20, widthFeet: null });
     expect(
@@ -253,5 +271,59 @@ describe("the bundles carry what their prose says, so play never reads it", () =
         .filter((spell) => areaOfProse(spell.description) !== null && spell.area === null)
         .map((spell) => spell.id)
     ).toEqual([]);
+  });
+});
+
+describe("reading the moves an action makes its creature take", () => {
+  it("reads a move's share of Speed, its way of moving, and whether it provokes, goes straight or comes first", () => {
+    expect(
+      moveOfProse("Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.")
+    ).toEqual({ speed: "half", provokes: true, first: true });
+    expect(
+      moveOfProse(
+        "If the roc has a creature Grappled, the roc flies up to half its Fly Speed without provoking Opportunity Attacks and drops that creature."
+      )
+    ).toEqual({ speed: "half", mode: "fly", provokes: false, dropsHeld: true });
+    expect(moveOfProse("The sahuagin swims up to its Swim Speed straight toward an enemy it can see.")).toEqual({
+      speed: "full",
+      mode: "swim",
+      provokes: true,
+      straight: true
+    });
+    expect(
+      moveOfProse("The xorn moves up to its Speed or Burrow Speed straight toward an enemy it can sense.")
+    ).toEqual({ speed: "full", provokes: true, straight: true });
+    // The kraken's move follows its save.
+    expect(
+      moveOfProse(
+        "Constitution Saving Throw: DC 23, each creature in a 15-foot Emanation. The kraken then moves up to its Speed."
+      )
+    ).toEqual({ speed: "full", provokes: true });
+    expect(moveOfProse("The target moves up to its Speed away from you.")).toBeNull();
+  });
+
+  it("reads a teleport's range and a jump's distance and cost", () => {
+    expect(teleportOfProse("The dog teleports up to 40 feet to an unoccupied space it can see.")).toEqual({ feet: 40 });
+    expect(
+      teleportOfProse(
+        "The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the balor can see."
+      )
+    ).toEqual({ feet: 60 });
+    expect(
+      teleportOfProse(
+        "If within 5 feet of a Large or bigger tree, the dryad teleports to an unoccupied space within 5 feet of a second Large or bigger tree that is within 60 feet of the previous tree."
+      )
+    ).toEqual({ feet: 65 });
+    expect(leapOfProse("The bulette jumps up to 30 feet by spending 10 feet of movement.")).toEqual({
+      feet: 30,
+      costFeet: 10
+    });
+  });
+
+  it("fills them on the action as it enters the system", () => {
+    const filled = withProseFacts(
+      action({ description: "The dog teleports up to 40 feet to an unoccupied space it can see." })
+    );
+    expect(filled.teleport).toEqual({ feet: 40 });
   });
 });

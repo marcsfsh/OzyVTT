@@ -127,11 +127,12 @@ describe("a Wand of Fireballs spends a charge, rolls real damage, and refuses at
   it("carries the authored cast out of the COMMITTED bundle, through the real content library", () => {
     // The first link: if the overlay did not merge, this fails.
     const record = view.equipmentRecord("wand-of-fireballs")!;
-    // No `atLevel`: it would equal Fireball's own level, and `castAction` only reads it when it is higher.
+    // No `atLevel`: it would equal Fireball's own level. Up to 3 charges cast it up to level 5.
     expect(record.casts).toEqual([
       {
         spellId: "fireball",
         saveDc: 15,
+        chargesRaiseLevel: 3,
         consumesSpellSlot: false,
         uses: { limit: 7, per: "long-rest", pool: CHARGES }
       }
@@ -299,7 +300,15 @@ describe("an item action with a printed DC, a condition read off its prose, and 
     const action = effectiveActions(definition, actor, catalog).find(
       (entry) => entry.id === "item-rod-of-rulership-command-obedience"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureConditions: ["charmed"] });
+    // Charmed for 8 hours, ended early by harm from its user's side.
+    expect(action.save).toEqual({
+      ability: "wis",
+      dc: 15,
+      successDamage: "none",
+      failureConditions: ["charmed"],
+      failureDuration: { type: "minutes", minutes: 480 },
+      endsOnSourceSideDamage: true
+    });
     expect(action.uses).toEqual({ limit: 1, per: "long-rest" });
 
     resolveDefinitionAction(
@@ -376,7 +385,9 @@ describe("a staff's resistance and its shared charge pool", () => {
     expect(ids).toEqual([
       "item-staff-of-charming-cast-charm-person",
       "item-staff-of-charming-cast-command",
-      "item-staff-of-charming-cast-comprehend-languages"
+      "item-staff-of-charming-cast-comprehend-languages",
+      // Reflect Enchantment spends a charge of the same pool.
+      "item-staff-of-charming-reflect-enchantment"
     ]);
 
     actor.actionUses = { "staff-of-charming-charges": 9 };
@@ -384,11 +395,13 @@ describe("a staff's resistance and its shared charge pool", () => {
       state,
       actions.find((entry) => entry.id === "item-staff-of-charming-cast-command")!,
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(8) },
-      deps([1], definition)
+      deps([2], definition)
     );
     expect(actor.actionUses["staff-of-charming-charges"]).toBe(10);
-    // The last charge rolls a d20; on a 1 the staff's own text decides, so the GM is told.
-    expect(last.warnings?.[0]).toMatch(/^Staff of Charming's last charge is spent and the d20 shows 1/);
+    // The last charge rolls a d20; above 1 the staff keeps working (a 1 destroys it, item-charge-costs.test.ts).
+    expect(last.warnings).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Staff of Charming's last charge is spent; the d20 shows 2/)])
+    );
 
     newTurn(state);
     // A different cast on the same pool is refused too: one pool.
@@ -416,10 +429,10 @@ describe("a held item's bonus to spell attack rolls", () => {
       ["talisman-of-ultimate-evil", 2]
     ] as const)
       expect(view.equipmentRecord(id)!.modifiers, id).toContainEqual({ type: "spell-attack-bonus", amount });
-    // Ring of Warmth stays prose.
+    // A ring that prints no such bonus gets none: the Ring of Warmth only takes 2d8 off Cold damage.
     const warmth = view.equipmentRecord("ring-of-warmth")!;
     expect(warmth.category).toBe("ring");
-    expect(warmth.modifiers).toEqual([]);
+    expect(warmth.modifiers.map((modifier) => modifier.type)).toEqual(["damage-reduction"]);
   });
 
   it("lands on its holder's spell attacks and on no weapon swing", () => {
@@ -464,30 +477,6 @@ describe("the whole-entry absences are absent at the engine", () => {
   const worn = (id: string, name: string, category: string) =>
     fight(stateWith([item({ id, name, quantity: 1, equipped: true, attuned: true, category })]));
 
-  it.each([
-    ["staff-of-healing", "Staff of Healing", "staff"],
-    ["rod-of-resurrection", "Rod of Resurrection", "rod"],
-    ["wand-of-magic-missiles", "Wand of Magic Missiles", "wand"],
-    ["wand-of-web", "Wand of Web", "wand"]
-  ])("offers %s no action at all, so its wrong effect cannot be pressed", (id, name, category) => {
-    const definition = definitionOf();
-    const state = worn(id, name, category);
-    const mine = effectiveActions(definition, state.actors[0], catalog).filter((entry) =>
-      entry.id.startsWith(`item-${id}-`)
-    );
-    expect(
-      mine.map((entry) => entry.name),
-      `${name} still derives an action`
-    ).toEqual([]);
-    // And the row itself carries no rider: the absence is in the bundle.
-    const record = view.equipmentRecord(id)!;
-    expect({ casts: record.casts, actions: record.actions, modifiers: record.modifiers }).toEqual({
-      casts: [],
-      actions: [],
-      modifiers: []
-    });
-  });
-
   // `grants.conditionImmunities` has no source filter, so an authored immunity would refuse non-magical
   // paralysis (a Ghoul's Claw, a Giant Spider's Web) that the SRD lets land ("Magic can neither... cause
   // you to have the Paralyzed or Restrained condition"). With the ring worn, a non-magical Paralyzed lands.
@@ -511,8 +500,8 @@ describe("the whole-entry absences are absent at the engine", () => {
   });
 });
 
-describe("the two entries that cast nothing and keep the rest", () => {
-  it("leaves Staff of Power its AC and saving-throw halves and NO cast at all", () => {
+describe("the staffs that cast at their printed charge costs", () => {
+  it("gives Staff of Power its AC and saving-throw halves and its spells at their charge costs", () => {
     const definition = definitionOf();
     const state = fight(
       stateWith([
@@ -527,19 +516,28 @@ describe("the two entries that cast nothing and keep the rest", () => {
       ])
     );
     const derivation = deriveEquipment(state.actors[0], definition, catalog);
-    // What remains: +2 to the derived AC and to the save the server rolls.
+    // +2 to the derived AC and to the save the server rolls.
     expect(derivation.armorClass).toBe(2);
     expect(saveTotalFor(definition, state.actors[0], "dex", derivation)).toBe(4);
-    // Both casts were removed, so the 20-charge pool has nothing drawing on it.
-    expect(view.equipmentRecord("staff-of-power")!.casts).toEqual([]);
+    const casts = effectiveActions(definition, state.actors[0], catalog).filter((entry) =>
+      entry.id.startsWith("item-staff-of-power-cast-")
+    );
+    expect(casts.map((entry) => [entry.id, entry.useCost ?? 1, entry.uses?.limit])).toContainEqual([
+      "item-staff-of-power-cast-fireball",
+      5,
+      20
+    ]);
+    expect(casts).toHaveLength(9);
+    // It swings as a magic Quarterstaff too, in one hand or two, and can be thrown as an improvised weapon.
     expect(
-      effectiveActions(definition, state.actors[0], catalog).filter((entry) =>
-        entry.id.startsWith("item-staff-of-power-")
-      )
-    ).toEqual([]);
+      effectiveActions(definition, state.actors[0], catalog)
+        .filter((entry) => entry.id.startsWith("item-staff-of-power") && !entry.id.includes("-cast-"))
+        .map((entry) => entry.id)
+        .sort()
+    ).toEqual(["item-staff-of-power", "item-staff-of-power-thrown-improvised", "item-staff-of-power-two-handed"]);
   });
 
-  it("leaves Staff of the Magi four at-will casts and Ring of Shooting Stars its two cantrips and its own action", () => {
+  it("leaves Staff of the Magi its at-will casts and Ring of Shooting Stars its casts and its own actions", () => {
     const definition = definitionOf();
     const magi = fight(
       stateWith([
@@ -553,16 +551,18 @@ describe("the two entries that cast nothing and keep the rest", () => {
         })
       ])
     );
+    // The zero-charge casts spend nothing; the rest share the 50 charges.
     expect(
       effectiveActions(definition, magi.actors[0], catalog)
-        .filter((entry) => entry.id.startsWith("item-staff-of-the-magi-"))
+        .filter((entry) => entry.id.startsWith("item-staff-of-the-magi-cast-") && entry.uses === undefined)
         .map((entry) => entry.id)
         .sort()
     ).toEqual([
       "item-staff-of-the-magi-cast-arcane-lock",
       "item-staff-of-the-magi-cast-detect-magic",
       "item-staff-of-the-magi-cast-enlargereduce",
-      "item-staff-of-the-magi-cast-light"
+      "item-staff-of-the-magi-cast-light",
+      "item-staff-of-the-magi-cast-protection-from-evil-and-good"
     ]);
 
     const ring = fight(
@@ -582,7 +582,9 @@ describe("the two entries that cast nothing and keep the rest", () => {
     );
     expect(actions.map((entry) => entry.id).sort()).toEqual([
       "item-ring-of-shooting-stars-cast-dancing-lights",
+      "item-ring-of-shooting-stars-cast-faerie-fire",
       "item-ring-of-shooting-stars-cast-light",
+      "item-ring-of-shooting-stars-lightning-spheres",
       "item-ring-of-shooting-stars-shooting-stars"
     ]);
     // Shooting Stars is the ring's own printed effect: DC 15, 5d4 Radiant.
@@ -616,9 +618,23 @@ describe("the two entries that cast nothing and keep the rest", () => {
       ability: "wis",
       dc: 13,
       successDamage: "none",
-      failureConditions: ["charmed"]
+      failureConditions: ["charmed"],
+      endsOnSourceSideDamage: true
     });
-    expect(dcOf("fear")).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["frightened"] });
+    expect(dcOf("fear")).toEqual({
+      ability: "wis",
+      dc: 13,
+      successDamage: "none",
+      failureConditions: ["frightened"],
+      // Fear's own failure: the creature drops what it is holding, and Dashes away on each of its turns.
+      failureEffect: {
+        name: "Fear",
+        tags: ["drops-held", "dash-only"],
+        modifiers: [],
+        compelled: { way: "away", dashes: true, minFeet: 5 }
+      },
+      repeatUnseenSource: true
+    });
     // Speak with Animals forces no save, so a `saveDc` would have no reader.
     expect(dcOf("speak-with-animals")).toBeUndefined();
     expect(

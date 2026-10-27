@@ -93,7 +93,8 @@ describe("recipient-safe encounter projections", () => {
       underwater: false,
       reactionsUsed: [],
       fog: { enabled: false, shapes: [] },
-      terrain: { difficult: [] },
+      terrain: { difficult: [], water: [], runningWater: [], ice: [] },
+      traps: [],
       vision: { enabled: false },
       rewound: false,
       pendingSaves: [],
@@ -146,7 +147,7 @@ describe("recipient-safe encounter projections", () => {
       ],
       annotations: [],
       fog: { enabled: false, shapes: [] },
-      terrain: { difficult: [] }
+      terrain: { difficult: [], water: [], runningWater: [], ice: [] }
     });
   });
 
@@ -184,7 +185,7 @@ describe("recipient-safe encounter projections", () => {
       ],
       annotations: [],
       fog: { enabled: false, shapes: [] },
-      terrain: { difficult: [] }
+      terrain: { difficult: [], water: [], runningWater: [], ice: [] }
     });
     expect(JSON.stringify(scene)).not.toContain(HIDDEN);
     // Players get the same tokens and no turn order before the fight.

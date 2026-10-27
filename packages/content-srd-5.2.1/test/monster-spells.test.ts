@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadMonsterDefinitions, loadSpells } from "../src/index.js";
-import { spellIdOfName } from "../scripts/monster-spells.js";
+import { spellIdOfName } from "../src/monster-spellcasting.js";
 
 // The spells SRD stat blocks cast, read from their Spellcasting lists and their other casting actions at build time.
 
@@ -10,11 +10,11 @@ const actionOf = (slug: string, actionId: string) =>
   monsters.find((monster) => monster.source.externalId === slug)?.actions.find((action) => action.id === actionId);
 
 describe("monster spellcasting in the bundle", () => {
-  it("reads every Spellcasting list but the pit fiend's Hellfire, and names only spells the SRD holds", () => {
+  it("reads every Spellcasting list, and names only spells the SRD holds", () => {
     const lists = monsters.flatMap((monster) =>
       monster.actions.filter((action) => /spellcasting/i.test(action.name) && !action.castsSpells)
     );
-    expect(lists.map((action) => action.id)).toEqual(["hellfire-spellcasting"]);
+    expect(lists.map((action) => action.id)).toEqual([]);
     const named = monsters.flatMap((monster) =>
       monster.actions.flatMap((action) => action.castsSpells?.spells.map((entry) => entry.spellId) ?? [])
     );
@@ -37,6 +37,8 @@ describe("monster spellcasting in the bundle", () => {
       ability: "int",
       saveDc: 17,
       attackBonus: 9,
+      // "Requiring no spell components."
+      waives: ["verbal", "somatic", "material"],
       self: true,
       spells: [{ id: "ice-wall", spellId: "wall-of-ice", name: "Wall of Ice", atLevel: 8 }]
     });
@@ -66,10 +68,18 @@ describe("monster spellcasting in the bundle", () => {
 
   it("leaves reactions as they are, and casts a legendary action's spell at the list's numbers", () => {
     expect(actionOf("mage", "protective-magic")?.castsSpells).toBeUndefined();
+    // "The mage casts Counterspell or Shield in response to the spell's trigger": the Counterspell half is a cast of
+    // its own, from the same three uses a day.
+    expect(actionOf("mage", "protective-magic-counterspell")).toMatchObject({
+      activation: "reaction",
+      uses: { limit: 3, per: "long-rest", pool: "protective-magic" },
+      castsSpells: { saveDc: 14, self: true, spells: [{ spellId: "counterspell" }] }
+    });
     expect(actionOf("adult-copper-dragon", "mind-jolt")?.castsSpells).toEqual({
       ability: "cha",
       saveDc: 17,
       attackBonus: 9,
+      waives: ["material"],
       self: true,
       spells: [{ id: "mind-jolt", spellId: "mind-spike", name: "Mind Spike", atLevel: 4 }]
     });

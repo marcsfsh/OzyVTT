@@ -13,6 +13,8 @@ import type {
 } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
 import { storedDefinition } from "../actor-roster.js";
+import { withMonsterSpells } from "../monster-spells.js";
+import type { ActorDefinition } from "@vtt/schemas";
 import type { CharacterDraftStore } from "../character-drafts.js";
 import type { Initiator } from "../authorization.js";
 import type { CombatLogStore } from "../combat-log.js";
@@ -21,14 +23,19 @@ import type { ContentAudience, ContentLibrary } from "../content-library.js";
 import type { EffectNarration } from "../effects.js";
 import type { InitiativeRollDeps, InitiativeRollSink, TurnAdvanceDeps } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
+import { liveDefinitionIn } from "../live-abilities.js";
 import type { GameStore } from "../game-store.js";
 import type { SoundDeps } from "../sound-board.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import { withoutSourceName } from "../hidden-source.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { ZoneDeps } from "../spell-zones.js";
+import type { SummonDeps } from "../summons.js";
 import type { TokenMapGeometry } from "../token-placement.js";
+import type { SquareGridCalibration } from "../grid-calibration.js";
 import { hiddenFrom, playerSight } from "../vision/audience.js";
+import { sceneSight } from "../vision/sight.js";
+import type { FallDeps } from "../falling.js";
 import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
@@ -97,7 +104,11 @@ export type CommandContext = Readonly<{
   readState: () => GameState;
   combatLog: Pick<CombatLogStore, "list" | "exportSince">;
   contentLibrary: ContentLibrary;
-  mapCatalog: Readonly<{ get: (assetId: string) => { kind: string } | undefined | null }>;
+  mapCatalog: Readonly<{
+    get: (
+      assetId: string
+    ) => { kind: string; calibration?: { calibration?: SquareGridCalibration | null } | null } | undefined | null;
+  }>;
   tokenCatalog: Readonly<{
     get: (assetId: string) => unknown;
     touchLastUsed: (assetId: string) => void;
@@ -198,9 +209,25 @@ export function createKit(context: CommandContext) {
   };
 
   /** Play-time definition lookup: imported stat blocks first; `monsterForInstance` ignores homebrew status so
-   *  a soft-deleted creature's live tokens keep working. */
-  const resolveDefinitionIn = (state: GameState, definitionId: string) =>
-    storedDefinition(state, definitionId) ?? contentLibrary.monsterForInstance(definitionId);
+   *  a soft-deleted creature's live tokens keep working. A stored sheet is read with the ability scores its creature's
+   *  worn items and effects give it now (`live-abilities.ts`). */
+  // An imported stat block's spells become cast actions as the catalog's do, read once for each stored definition.
+  const casts = new WeakMap<ActorDefinition, ActorDefinition>();
+  const withCasts = (definition: ActorDefinition) => {
+    const known = casts.get(definition);
+    if (known) return known;
+    const expanded = withMonsterSpells(definition, (spellId) =>
+      contentLibrary.forAudience("play").spellRecord(spellId)
+    );
+    casts.set(definition, expanded);
+    return expanded;
+  };
+  const resolveDefinitionIn = (state: GameState, definitionId: string) => {
+    const stored = storedDefinition(state, definitionId);
+    return stored
+      ? liveDefinitionIn(state, definitionId, withCasts(stored), equipmentCatalogOf(playCatalog()))
+      : contentLibrary.monsterForInstance(definitionId);
+  };
 
   /** Drains a resolution's `tableNarration` into the feed (the one writer, for every resolve path).
    *  `appendLog` re-derives visibility from live state; the resolver's `gmOnly` only adds to it. */
@@ -266,6 +293,50 @@ export function createKit(context: CommandContext) {
       now: () => new Date().toISOString()
     }),
 
+    /** What bringing a summon's creatures reads in `state` (`summons.ts`): the live map, stat blocks, the server's dice
+     *  and ids, and the bestiary by creature type for "another Beast that has a Challenge Rating of 0". A spell-printed
+     *  stat block (one that scales) is never such a pick. */
+    summonDeps: (state: GameState, geometry: TokenMapGeometry | null): SummonDeps => ({
+      geometry,
+      newId: context.newId,
+      rollDie: (sides) => context.random(sides),
+      resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+      catalog: equipmentCatalogOf(playCatalog()),
+      monstersOfType: (creatureType, maxChallenge) =>
+        playCatalog()
+          .monsterSummaries()
+          .filter(
+            (summary) =>
+              summary.type.toLowerCase() === creatureType &&
+              summary.challengeRating <= maxChallenge &&
+              contentLibrary.monsterForInstance(summary.id)?.summonScaling === undefined
+          )
+          .map((summary) => summary.id)
+    }),
+
+    /** What a fall reads in `state` (`falling.ts`): stat blocks and items, the server's dice, where creatures stand
+     *  for a Feather Fall's range, and who sees whom with dynamic vision on. */
+    fallDeps: (
+      state: GameState,
+      distance: (state: GameState, actorIdA: string, actorIdB: string) => number | null,
+      commandId: string
+    ): FallDeps => {
+      let sight: ReturnType<typeof sceneSight> | null = null;
+      return {
+        resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+        catalog: equipmentCatalogOf(playCatalog()),
+        random: (sides) => context.random(sides),
+        newId: context.newId,
+        now: () => new Date().toISOString(),
+        commandId,
+        distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB),
+        sees: (viewerId, targetId) => {
+          sight ??= sceneSight(state, sightContent());
+          return !sight.enabled || sight.sees(viewerId, targetId);
+        }
+      };
+    },
+
     /** The deps a turn change runs with in `state`: recharge and ongoing-damage dice, repeat saves, the spell areas
      *  on the live map, and where creatures stand for the auras that reach them. */
     turnAdvanceDeps: (
@@ -292,7 +363,8 @@ export function createKit(context: CommandContext) {
     /** What an initiative roll reads about its roller in `state`: stat blocks and items for its riders. */
     initiativeRollDeps: (state: GameState): InitiativeRollDeps => ({
       resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
-      catalog: equipmentCatalogOf(playCatalog())
+      catalog: equipmentCatalogOf(playCatalog()),
+      rollDie: (sides) => context.random(sides)
     }),
 
     /** Server-thrown initiative dice land in `state.rolls` attributed to the combatant; hidden ones are GM-only. */
@@ -397,8 +469,12 @@ export function createKit(context: CommandContext) {
           actorIds: [actorId],
           gmOnly: hidden
         });
-      // A reaction window opened: the table hears why nothing landed yet.
-      const waiting = resolution.waitingOnReaction ? "The attack waits" : "The damage waits";
+      // A reaction window opened: the table hears why nothing landed yet (a cast waits on a Counterspell).
+      const waiting = !resolution.waitingOnReaction
+        ? "The damage waits"
+        : resolution.attack === null
+          ? "The spell waits"
+          : "The attack waits";
       for (const prompt of resolution.reactionPrompts ?? []) {
         const promptHidden = hidden || actorHidden(prompt.actorId);
         context.appendLog({

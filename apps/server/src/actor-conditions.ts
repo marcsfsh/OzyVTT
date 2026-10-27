@@ -1,8 +1,17 @@
 import type { Actor, GameState } from "@vtt/domain";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
-import type { Initiator } from "./authorization.js";
+import { requireGm, type Initiator } from "./authorization.js";
 import { adjustableActor } from "./hit-points.js";
-import { applyCondition, conditionGained, type ConditionImmunitySource, type EffectNarration } from "./effects.js";
+import {
+  addEffect,
+  applyCondition,
+  CANT_STAND_TAG,
+  conditionGained,
+  immuneToCondition,
+  makeEffect,
+  type ConditionImmunitySource,
+  type EffectNarration
+} from "./effects.js";
 import { conditionLabel, exhaustionLevel } from "./condition-rules.js";
 import { deriveEquipment } from "./equipment-derivation.js";
 import { currentSpeedFeet, effectiveSpeedFeet } from "./speed.js";
@@ -16,7 +25,64 @@ import {
   type RulesOverride
 } from "./rules-families.js";
 
-type SetConditionOptions = ConditionImmunitySource & Readonly<{ override?: RulesOverride | null }>;
+type SetConditionOptions = ConditionImmunitySource &
+  Readonly<{
+    override?: RulesOverride | null;
+    /** The charmer or the source of fear the GM names for Charmed or Frightened. */
+    sourceActorId?: string;
+  }>;
+
+/** The tag on the effect that carries a Charmed or Frightened set by hand with its source named. */
+export const HAND_SET_TAG = "hand-set";
+
+/** The conditions whose source the rules read (SRD Charmed, Frightened). */
+const SOURCED_CONDITIONS: ReadonlySet<string> = new Set(["charmed", "frightened"]);
+
+/** Charmed or Frightened set by hand with its source named: it rides an effect from that creature, so the charmer
+ *  check (`resolution/economy.ts`) and Frightened's line of sight and approach read it. */
+function setSourcedCondition(
+  state: GameState,
+  actor: Actor,
+  conditionId: string,
+  sourceActorId: string,
+  scope: Initiator,
+  options: SetConditionOptions
+): EffectNarration[] {
+  requireGm(scope, "Only the GM names who imposed a condition.");
+  if (!SOURCED_CONDITIONS.has(conditionId))
+    throw new CommandRejectedError("Only Charmed and Frightened name the creature that imposed them.");
+  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
+  if (!source) throw new CommandRejectedError("The creature named as its source isn't here.");
+  if (source.id === actor.id) throw new CommandRejectedError(`${actor.name} can't be its own source.`);
+  if (immuneToCondition(actor, conditionId, { ...options, state }))
+    return [
+      {
+        kind: "condition",
+        text: `${actor.name} is immune to ${conditionLabel(conditionId)}, so it isn't applied.`,
+        actorId: actor.id,
+        immune: true
+      }
+    ];
+  const events: EffectNarration[] = [];
+  addEffect(
+    state,
+    actor.id,
+    makeEffect({
+      id: `${HAND_SET_TAG}:${conditionId}:${source.id}`,
+      name: `${conditionLabel(conditionId)} by ${source.name}`,
+      tags: [HAND_SET_TAG],
+      sourceActorId: source.id,
+      sourceName: source.name,
+      sourceActionId: `${HAND_SET_TAG}-${conditionId}`,
+      startedRound: state.combat.round,
+      duration: { type: "manual" },
+      linkedConditionIds: [conditionId]
+    }),
+    events,
+    options
+  );
+  return events;
+}
 
 /**
  * Runs one rule through the ladder for a condition change: strict throws (a player may then ask the GM), assisted lets
@@ -75,9 +141,52 @@ function checkPlayerRemoval(
   );
 }
 
+/** SRD Dropping Prone: "On your turn, you can give yourself the Prone condition without using an action or any of your
+ *  Speed, but you can't do so if your Speed is 0." In a fight, a player drops its creature Prone only on its turn. */
+function dropProne(
+  state: GameState,
+  actor: Actor,
+  options: SetConditionOptions | undefined,
+  events: EffectNarration[]
+): void {
+  if (!state.combat.active || !state.combat.initiative.some((entry) => entry.actorId === actor.id)) return;
+  if (state.combat.turnActorId !== actor.id) {
+    policeConditionRule(
+      state,
+      actor,
+      "movement.drop-prone",
+      `${actor.name} can drop Prone only on its own turn.`,
+      options,
+      events
+    );
+    return;
+  }
+  const definition = actor.definitionId ? options?.resolveDefinition?.(actor.definitionId) : undefined;
+  if (currentSpeedFeet(actor, deriveEquipment(actor, definition, options?.catalog)) === 0)
+    policeConditionRule(
+      state,
+      actor,
+      "movement.drop-prone",
+      `${actor.name} can't drop Prone while its Speed is 0.`,
+      options,
+      events
+    );
+}
+
 /** SRD Prone: standing up costs half your Speed, so it happens on your own turn, with movement you have. */
 function standUp(state: GameState, actor: Actor, scope: Initiator, options: SetConditionOptions | undefined) {
   const events: EffectNarration[] = [];
+  // SRD Hideous Laughter: the target "can't end the Prone condition on itself". The GM's housekeeping stays free.
+  const held = actor.effects.find((effect) => effect.tags.includes(CANT_STAND_TAG));
+  if (held && scope.role === "player")
+    policeConditionRule(
+      state,
+      actor,
+      "movement.cant-stand",
+      `${actor.name} can't stand up while ${held.name} lasts.`,
+      options,
+      events
+    );
   // Off your turn there is no movement to spend; the GM's own housekeeping stays free.
   if (scope.role === "player" && state.combat.active && state.combat.turnActorId !== actor.id) {
     policeConditionRule(
@@ -153,6 +262,8 @@ export function setCondition(
   if (level !== undefined && conditionId !== "exhaustion")
     throw new CommandRejectedError("Only exhaustion has levels.");
   const present = actor.conditions.some((condition) => condition.id === conditionId);
+  if (active && options?.sourceActorId !== undefined)
+    return setSourcedCondition(state, actor, conditionId, options.sourceActorId, scope, options);
   if (!active) {
     if (!present) return [];
     const events =
@@ -166,10 +277,15 @@ export function setCondition(
             })()
           : [];
     actor.conditions = actor.conditions.filter((condition) => condition.id !== conditionId);
+    // A hand-set source goes with the condition it carried.
+    actor.effects = actor.effects.filter(
+      (effect) => !(effect.tags.includes(HAND_SET_TAG) && effect.linkedConditionIds.includes(conditionId))
+    );
     return events;
   }
   const previousExhaustion = exhaustionLevel(actor);
   const events: EffectNarration[] = [];
+  if (conditionId === "prone" && !present && scope.role === "player") dropProne(state, actor, options, events);
   // Lowering Exhaustion is taking some of it off.
   if (scope.role === "player" && conditionId === "exhaustion" && level !== undefined && level < previousExhaustion)
     checkPlayerRemoval(state, actor, conditionId, options, events);
@@ -193,5 +309,5 @@ export function setCondition(
   if (written === "full") throw new CommandRejectedError("That combatant already has too many conditions.");
   // A re-set that changes nothing (Paralyzed again) has nothing new to break; Exhaustion always moved a level.
   if (present && conditionId !== "exhaustion") return events;
-  return [...events, ...conditionGained(state, actor, conditionId, previousExhaustion)];
+  return [...events, ...conditionGained(state, actor, conditionId, previousExhaustion, options)];
 }

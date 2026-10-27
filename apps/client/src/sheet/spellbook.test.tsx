@@ -1,17 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ActorDefinition, ContentSpellSummary, GmActor, SpellChoices } from "@vtt/domain";
+import type { ActorDefinition, ContentActionSummary, ContentSpellSummary, GmActor, SpellChoices } from "@vtt/domain";
 
 vi.mock("../socket", () => ({
   socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn(), connected: true, timeout: () => ({ emit: vi.fn() }) }
 }));
 
-const spell = (id: string, name: string, level: number) =>
+const spell = (id: string, name: string, level: number, school = "abjuration") =>
   ({
     id,
     name,
     level,
+    school,
     classes: [],
     castingOptions: [],
     cantripScaling: [],
@@ -24,7 +25,9 @@ const SPELLS = [
   spell("spiritual-weapon", "Spiritual Weapon", 2),
   spell("magic-missile", "Magic Missile", 1),
   spell("web", "Web", 2),
-  spell("misty-step", "Misty Step", 2)
+  spell("misty-step", "Misty Step", 2, "conjuration"),
+  spell("fireball", "Fireball", 3, "evocation"),
+  { ...spell("detect-magic", "Detect Magic", 1), ritual: true } as ContentSpellSummary
 ];
 vi.mock("../encounter/spells", async (original) => ({
   ...(await original<typeof import("../encounter/spells")>()),
@@ -67,7 +70,13 @@ const caster = (spells: ReadonlyArray<readonly [string, string, number, string]>
 const mount = (
   definition: ActorDefinition,
   choices: SpellChoices,
-  extra: Partial<{ canPrepare: boolean; gm: boolean; actor: Record<string, unknown> }> = {}
+  extra: Partial<{
+    canPrepare: boolean;
+    gm: boolean;
+    actor: Record<string, unknown>;
+    serverActions: ContentActionSummary[];
+    cast: (actionId: string) => void;
+  }> = {}
 ) => {
   const edit = vi.fn(async () => ({ ok: true, inBook: true }));
   render(
@@ -92,7 +101,8 @@ const mount = (
       rolls={{ rollFlat: vi.fn() } as unknown as SheetRolls}
       onFeedback={() => {}}
       routeSpell={() => false}
-      castSpellAction={vi.fn()}
+      castSpellAction={extra.cast ?? vi.fn()}
+      serverActions={extra.serverActions ?? []}
       canPrepare={extra.canPrepare ?? true}
       spellChoices={choices}
     />
@@ -156,12 +166,27 @@ const WIZARD_CHOICES: SpellChoices = {
   spellbook: {
     spellIds: ["magic-missile", "spiritual-weapon", "web"],
     freeLeft: 2,
+    freeOfSchool: null,
     maxLevel: 2,
     addable: ["misty-step"]
   }
 };
 
 describe("a Wizard's spellbook", () => {
+  it("casts a ritual from the book as a Ritual when the server lists that cast (Ritual Adept)", async () => {
+    const user = userEvent.setup();
+    const cast = vi.fn();
+    const ritual = { id: "spell-detect-magic-ritual", name: "Detect Magic (ritual)" } as ContentActionSummary;
+    mount(
+      WIZARD,
+      { ...WIZARD_CHOICES, spellbook: { ...WIZARD_CHOICES.spellbook!, spellIds: ["magic-missile", "detect-magic"] } },
+      { canPrepare: false, serverActions: [ritual], cast }
+    );
+    await user.click(screen.getByRole("button", { name: "Spellbook" }));
+    await user.click(screen.getByRole("button", { name: "Cast Detect Magic as a Ritual" }));
+    expect(cast).toHaveBeenCalledWith("spell-detect-magic-ritual");
+  });
+
   it("lists what is in the book beyond the sheet, and adds one of the levels' spells free", async () => {
     const user = userEvent.setup();
     const edit = mount(WIZARD, WIZARD_CHOICES);
@@ -177,6 +202,35 @@ describe("a Wizard's spellbook", () => {
     expect(edit).toHaveBeenCalledWith("character:add-to-spellbook", {
       actorId: ME,
       spellId: "misty-step",
+      from: "level"
+    });
+  });
+
+  // SRD Evocation Savant: "whenever you gain access to a new level of spell slots in this class, you can add one Wizard
+  // spell from the Evocation school to your spellbook for free".
+  it("adds an Evoker's free Evocation spell once the levels' free spells are spent", async () => {
+    const user = userEvent.setup();
+    const evoker: SpellChoices = {
+      swaps: WIZARD_CHOICES.swaps,
+      spellbook: {
+        ...WIZARD_CHOICES.spellbook!,
+        freeLeft: 0,
+        freeOfSchool: { school: "evocation", left: 1 },
+        maxLevel: 3,
+        addable: ["misty-step", "fireball"]
+      }
+    };
+    const edit = mount(WIZARD, evoker);
+    await user.click(screen.getByRole("button", { name: "Spellbook" }));
+    const book = screen.getByRole("group", { name: "Spellbook" });
+    await user.click(within(book).getByRole("button", { name: "Add from your levels (1)" }));
+    expect(screen.getByText(/1 more Evocation spell free\./)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Misty Step/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Fireball/ }));
+    await user.click(screen.getByRole("button", { name: "Add Fireball" }));
+    expect(edit).toHaveBeenCalledWith("character:add-to-spellbook", {
+      actorId: ME,
+      spellId: "fireball",
       from: "level"
     });
   });

@@ -34,14 +34,16 @@ export function CommonActionChips({
   if (actions.length === 0) return null;
   const called = (action: ContentActionSummary) =>
     action.requiresEffectTag !== null && effectTags.includes(action.requiresEffectTag);
+  // A Bonus Action form a feature gives comes forward every turn; one an effect calls for (moving a Sphere of
+  // Annihilation its user controls) only while the effect lasts.
+  const everyTurnBonus = (action: ContentActionSummary) =>
+    action.activation === "bonus-action" && action.requiresEffectTag === null;
   const isPrimary = (action: ContentActionSummary) =>
-    (PRIMARY_BUILTINS as readonly string[]).includes(action.id) ||
-    action.activation === "bonus-action" ||
-    called(action);
+    (PRIMARY_BUILTINS as readonly string[]).includes(action.id) || everyTurnBonus(action) || called(action);
   const primary = [
     ...actions.filter((action) => called(action) && !(PRIMARY_BUILTINS as readonly string[]).includes(action.id)),
     ...PRIMARY_BUILTINS.flatMap((id) => actions.filter((action) => action.id === id)),
-    ...actions.filter((action) => action.activation === "bonus-action" && !called(action))
+    ...actions.filter((action) => everyTurnBonus(action) && !called(action))
   ];
   const rest = actions.filter((action) => !isPrimary(action));
   const shown = more ? [...primary, ...rest] : primary.length > 0 ? primary : actions;

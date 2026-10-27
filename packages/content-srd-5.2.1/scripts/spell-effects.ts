@@ -5,10 +5,19 @@
  * the caster makes ("Make a ranged spell attack"), never one the text only mentions. `test/spell-effects.test.ts`
  * pins the cases.
  */
-import { DamageTypeSchema, type ActionArea, type DamageType, type OnHitRider } from "@vtt/schemas";
+import {
+  DamageTypeSchema,
+  MASKED_TYPE_TAG,
+  type ActionArea,
+  type DamageType,
+  type GrantOption,
+  type OnHitRider
+} from "@vtt/schemas";
+import { CREATURE_TYPE_IDS as CREATURE_TYPES } from "../src/enums.js";
 import { areaOfProse } from "../src/action-prose.js";
 import type { SpellEffect, SpellLaterAction, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
+import { spellSummonFieldsFor, SPELL_SUMMON_REVIEWED_IDS } from "./spell-summons.js";
 
 /** Spells whose printed damage is not dealt by the cast to its targets, and why. They cast with no damage and the
  *  GM applies the rest from the text, or a later action does (`LATER_ACTIONS`). */
@@ -17,7 +26,6 @@ const NO_CAST_DAMAGE: Readonly<Record<string, string>> = {
   "conjure-animals": "the pack harms on later turns",
   "conjure-elemental": "the spirit harms on later turns",
   "conjure-woodland-beings": "the spirits harm on later turns",
-  "contact-other-plane": "harms the caster on a failed save",
   "delayed-blast-fireball": "detonates later",
   "dimension-door": "harms the caster when the destination is occupied",
   "divine-favor": "a rider on later weapon hits",
@@ -37,7 +45,6 @@ const NO_CAST_DAMAGE: Readonly<Record<string, string>> = {
   "hunters-mark": "a rider on later hits",
   "meld-into-stone": "harms the caster if the stone is destroyed",
   "phantasmal-force": "harms on later turns",
-  "power-word-kill": "kills outright, or harms only above 100 Hit Points",
   "prismatic-spray": "a random ray per creature",
   "prismatic-wall": "a wall",
   "produce-flame": "the flame is hurled on later turns",
@@ -75,6 +82,8 @@ const CAST_DAMAGE: Readonly<Record<string, Damage>> = {
   "spiritual-weapon": [{ formula: "1d8", type: "force", addsModifier: true }],
   "arcane-sword": [{ formula: "4d12", type: "force", addsModifier: true }],
   "conjure-fey": [{ formula: "3d12", type: "psychic", addsModifier: true }],
+  // The caster's own failed save: "you take 6d6 Psychic damage" (`CAST_SELF_SAVES`).
+  "contact-other-plane": [{ formula: "6d6", type: "psychic" }],
   // A type the caster chooses (`DAMAGE_CHOICES`); the first is the default.
   "chromatic-orb": [{ formula: "3d8", type: "acid" }],
   "sorcerous-burst": [{ formula: "1d8", type: "acid" }]
@@ -88,8 +97,30 @@ const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
   "conjure-elemental": ["lightning", "thunder", "fire", "cold"],
   // Radiant for a good or neutral caster, Necrotic for an evil one.
   "spirit-guardians": ["radiant", "necrotic"],
+  // "Radiant or Necrotic damage (your choice when you cast this spell)".
+  forbiddance: ["radiant", "necrotic"],
+  // The explosive rune's "Acid, Cold, Fire, Lightning, or Thunder damage (your choice when you create the glyph)".
+  "glyph-of-warding": ["thunder", "acid", "cold", "fire", "lightning"],
   // The Resistance the touched creature gains: "one damage type of your choice".
-  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"]
+  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"],
+  // Hallow's Resistance or Vulnerability: "one damage type of your choice".
+  hallow: [
+    "acid",
+    "bludgeoning",
+    "cold",
+    "fire",
+    "force",
+    "lightning",
+    "necrotic",
+    "piercing",
+    "poison",
+    "psychic",
+    "radiant",
+    "slashing",
+    "thunder"
+  ],
+  // Wish's Resistance: "one damage type you choose".
+  wish: [...DamageTypeSchema.options]
 };
 
 /** Spell attack rolls one cast makes, where the text's wording misleads the reader. */
@@ -106,48 +137,216 @@ const CAST_ATTACKS: Readonly<Record<string, number>> = {
 };
 
 /** How many creatures a cast targets (SRD "up to three creatures", "one additional creature for each spell slot level
- *  above 1"), for the spells a table casts in a fight. */
+ *  above 1"), for every spell whose text names a number of creatures it picks. The caster counts among them where the
+ *  text adds it ("You and up to eight willing creatures"). An area's targets are whoever its template covers, and a
+ *  spell that picks "any number" has no row. */
 const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>> = {
   aid: { count: 3 },
   "animal-friendship": { count: 1, perSlot: 1 },
+  "animal-messenger": { count: 1 },
+  antipathysympathy: { count: 1 },
+  "arcanists-magic-aura": { count: 1 },
+  "astral-projection": { count: 9 },
+  awaken: { count: 1 },
   bane: { count: 3, perSlot: 1 },
   banishment: { count: 1, perSlot: 1 },
+  // "Up to three willing creatures (including yourself) for each spell slot level above 7": the caster alone at 7.
+  etherealness: { count: 1 },
+  // The creatures that climb the rope into its space, eight at most.
+  "rope-trick": { count: 8 },
+  barkskin: { count: 1 },
+  befuddlement: { count: 1 },
+  "bestow-curse": { count: 1 },
   bless: { count: 3, perSlot: 1 },
+  blight: { count: 1 },
   blindnessdeafness: { count: 1, perSlot: 1 },
+  // The first target and the three bolts that leap from it, one more for each slot level above 6.
+  "chain-lightning": { count: 4, perSlot: 1 },
   "charm-monster": { count: 1, perSlot: 1 },
   "charm-person": { count: 1, perSlot: 1 },
+  "continual-flame": { count: 1 },
+  clone: { count: 1 },
   command: { count: 1, perSlot: 1 },
+  contagion: { count: 1 },
+  counterspell: { count: 1 },
   "cure-wounds": { count: 1 },
+  darkvision: { count: 1 },
+  "death-ward": { count: 1 },
+  disintegrate: { count: 1 },
+  "dispel-magic": { count: 1 },
   "dissonant-whispers": { count: 1 },
   "dominate-beast": { count: 1 },
   "dominate-monster": { count: 1 },
   "dominate-person": { count: 1 },
+  "dragons-breath": { count: 1 },
+  dream: { count: 1 },
   "enhance-ability": { count: 1, perSlot: 1 },
+  // "Up to twelve creatures can partake of the feast."
+  "heroes-feast": { count: 12 },
+  enlargereduce: { count: 1 },
+  eyebite: { count: 1 },
+  // "Choose up to five falling creatures within range."
+  "feather-fall": { count: 5 },
+  "finger-of-death": { count: 1 },
+  "flesh-to-stone": { count: 1 },
   fly: { count: 1, perSlot: 1 },
+  foresight: { count: 1 },
   "freedom-of-movement": { count: 1, perSlot: 1 },
   "gaseous-form": { count: 1, perSlot: 1 },
+  geas: { count: 1 },
+  "greater-invisibility": { count: 1 },
+  "greater-restoration": { count: 1 },
+  guidance: { count: 1 },
+  harm: { count: 1 },
   haste: { count: 1 },
+  heal: { count: 1 },
   "healing-word": { count: 1 },
+  "hellish-rebuke": { count: 1 },
   heroism: { count: 1, perSlot: 1 },
+  hex: { count: 1 },
   "hideous-laughter": { count: 1, perSlot: 1 },
   "hold-monster": { count: 1, perSlot: 1 },
   "hold-person": { count: 1, perSlot: 1 },
+  "hunters-mark": { count: 1 },
+  imprisonment: { count: 1 },
   "inflict-wounds": { count: 1 },
   invisibility: { count: 1, perSlot: 1 },
+  "irresistible-dance": { count: 1 },
   jump: { count: 1, perSlot: 1 },
+  "lesser-restoration": { count: 1 },
+  levitate: { count: 1 },
+  light: { count: 1 },
   longstrider: { count: 1, perSlot: 1 },
   "mage-armor": { count: 1 },
   "mass-cure-wounds": { count: 6 },
   "mass-healing-word": { count: 6 },
+  "mass-suggestion": { count: 12 },
+  maze: { count: 1 },
+  message: { count: 1 },
+  "mind-blank": { count: 1 },
+  "mind-spike": { count: 1 },
+  "modify-memory": { count: 1 },
+  nondetection: { count: 1 },
+  "phantasmal-force": { count: 1 },
   "phantasmal-killer": { count: 1 },
+  "plane-shift": { count: 9 },
   polymorph: { count: 1 },
+  "power-word-heal": { count: 1 },
+  "power-word-kill": { count: 1 },
   "power-word-stun": { count: 1 },
   "prayer-of-healing": { count: 5 },
+  "protection-from-energy": { count: 1 },
+  "protection-from-evil-and-good": { count: 1 },
+  "protection-from-poison": { count: 1 },
+  "raise-dead": { count: 1 },
+  "ray-of-enfeeblement": { count: 1 },
+  regenerate: { count: 1 },
+  reincarnate: { count: 1 },
+  "remove-curse": { count: 1 },
+  "resilient-sphere": { count: 1 },
+  resistance: { count: 1 },
+  resurrection: { count: 1 },
+  revivify: { count: 1 },
   "sacred-flame": { count: 1 },
+  sanctuary: { count: 1 },
+  slow: { count: 6 },
+  scrying: { count: 1 },
+  sending: { count: 1 },
+  sequester: { count: 1 },
   "shield-of-faith": { count: 1 },
+  "spare-the-dying": { count: 1 },
   "spider-climb": { count: 1, perSlot: 1 },
+  stoneskin: { count: 1 },
   suggestion: { count: 1 },
-  "vicious-mockery": { count: 1 }
+  "telepathic-bond": { count: 8 },
+  teleport: { count: 9 },
+  // Instant Health: "you and up to twenty other creatures"; Resistance and Spell Immunity take up to ten.
+  wish: { count: 20 },
+  tongues: { count: 1 },
+  "true-polymorph": { count: 1 },
+  "true-resurrection": { count: 1 },
+  "true-seeing": { count: 1 },
+  "vicious-mockery": { count: 1 },
+  "warding-bond": { count: 1 },
+  "water-breathing": { count: 10 },
+  "water-walk": { count: 10 },
+  "wind-walk": { count: 11 },
+  "word-of-recall": { count: 6 }
+};
+
+/** Spells whose targets are creatures the caster can see (SRD "a creature you can see within range"). */
+const SEEN_TARGETS: ReadonlySet<string> = new Set([
+  "animal-friendship",
+  "animal-messenger",
+  "animal-shapes",
+  "bane",
+  "banishment",
+  "befuddlement",
+  "blight",
+  "blindnessdeafness",
+  "chain-lightning",
+  "charm-monster",
+  "charm-person",
+  "command",
+  "compulsion",
+  "counterspell",
+  "disintegrate",
+  "dissonant-whispers",
+  "dominate-beast",
+  "dominate-monster",
+  "dominate-person",
+  "enlargereduce",
+  "enthrall",
+  "eyebite",
+  "finger-of-death",
+  "flesh-to-stone",
+  "geas",
+  "harm",
+  "haste",
+  "heal",
+  "healing-word",
+  "hex",
+  "hideous-laughter",
+  "hold-monster",
+  "hold-person",
+  "hunters-mark",
+  "imprisonment",
+  "irresistible-dance",
+  "levitate",
+  "magic-missile",
+  "mass-heal",
+  "mass-healing-word",
+  "mass-suggestion",
+  "maze",
+  "mind-spike",
+  "modify-memory",
+  "phantasmal-force",
+  "phantasmal-killer",
+  "polymorph",
+  "power-word-heal",
+  "power-word-kill",
+  "power-word-stun",
+  "sacred-flame",
+  "seeming",
+  "suggestion",
+  "telekinesis",
+  "teleport",
+  "true-polymorph"
+]);
+
+/** The creature types a spell can target, where its text names them ("Choose a Humanoid", "Target a Beast"). */
+const TARGET_TYPES: Readonly<Record<string, readonly string[]>> = {
+  "animal-friendship": ["beast"],
+  "animal-messenger": ["beast"],
+  awaken: ["beast", "plant"],
+  // "Each Humanoid in a 20-foot-radius Sphere": the area's other creatures are left out.
+  "calm-emotions": ["humanoid"],
+  "charm-person": ["humanoid"],
+  "dominate-beast": ["beast"],
+  "dominate-person": ["humanoid"],
+  "hold-person": ["humanoid"],
+  reincarnate: ["humanoid"],
+  simulacrum: ["beast", "humanoid"]
 };
 
 /** Missiles one cast makes, each striking a creature of the caster's choice. */
@@ -162,12 +361,17 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "conjure-elemental",
   "conjure-woodland-beings",
   "delayed-blast-fireball",
+  // The Wisdom save belongs to probing deeper on a later turn (`LATER_ACTIONS`).
+  "detect-thoughts",
   "dragons-breath",
   "dream",
   "faithful-hound",
   "flaming-sphere",
   "forcecage",
   "freedom-of-movement",
+  // Its Strength save belongs to the creature or object it is exerted on, the cast's own use and each later one
+  // (`LATER_ACTIONS`).
+  "telekinesis",
   "gaseous-form",
   "guardian-of-faith",
   "haste",
@@ -181,6 +385,8 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "sleet-storm",
   "spirit-guardians",
   "stinking-cloud",
+  // Only a creature the wall would enclose saves, which is the GM's to see; the line itself asks no one.
+  "wall-of-stone",
   "web",
   "zone-of-truth"
 ]);
@@ -197,6 +403,221 @@ const save = (ability: "str" | "dex" | "con" | "int" | "wis" | "cha") => ({
 const ONCE_PER_TURN = "A creature makes this save only once per turn.";
 /** Entering the area or ending a turn in it, once per turn: the shape most lingering areas print. */
 const ENTER_OR_END_ONCE: Zone = { on: ["enter", "end-turn"], oncePerTurn: true };
+/** "The area is Difficult Terrain" for every creature. */
+const DIFFICULT: NonNullable<Zone["terrain"]> = { cost: 2 };
+/** A row for an area that only lasts on the map (its ground, its barrier), with nothing to roll. */
+const lasting = (name: string, when: string, zone: Zone): Later => ({
+  name,
+  activation: "other",
+  when,
+  damage: [],
+  zone
+});
+
+/** The creature types Magic Circle and Hallow's ward name. */
+const CIRCLE_TYPES = ["celestial", "elemental", "fey", "fiend", "undead"] as const;
+const HALLOW_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead"] as const;
+
+/** What a creature of these types can't do to whoever holds the ward: attack it without Disadvantage, or give it the
+ *  Charmed or Frightened condition. */
+const wardAgainst = (types: readonly string[]) => ({
+  modifiers: [
+    {
+      type: "roll-mode" as const,
+      roll: "incoming-attack" as const,
+      mode: "disadvantage" as const,
+      when: [
+        { type: "on-attack-roll" as const },
+        { type: "source-creature-type-is" as const, creatureTypes: [...types] }
+      ]
+    }
+  ],
+  conditionWards: {
+    conditionIds: ["charmed" as const, "frightened" as const],
+    creatureTypes: [...types],
+    possession: true as const
+  }
+});
+
+/** Magic Circle facing out (keeping the chosen types out and warding those inside) or reversed (holding them in and
+ *  warding those outside). */
+function magicCircleForms(): Later[] {
+  const form = (option: Readonly<{ id: string; name: string }>, reversed: boolean): Later => ({
+    ...lasting(
+      reversed ? "reversed" : "barrier",
+      reversed
+        ? "A creature of a chosen type can't leave the Cylinder, teleports out only after a Charisma save, and has Disadvantage on attacks against those outside it, who it can't charm or frighten."
+        : "A creature of a chosen type can't enter the Cylinder, teleports in only after a Charisma save, and has Disadvantage on attacks against those inside it, who it can't charm or frighten.",
+      {
+        on: [],
+        choosesTypes: true,
+        bars: { way: reversed ? "out" : "in", types: [...CIRCLE_TYPES], teleportSave: "cha" },
+        holds: { ...wardAgainst(CIRCLE_TYPES), ...(reversed ? { outside: true as const } : {}) }
+      }
+    ),
+    option
+  });
+  return [
+    form({ id: "facing-out", name: "Keeps them out, wards those inside" }, false),
+    form({ id: "reversed", name: "Holds them in, wards those outside" }, true)
+  ];
+}
+
+/** Wall of Fire's forms: a straight wall burning on its left or right as drawn, or a ring 20 feet across burning
+ *  inside or outside, each 5d8 Fire damage to a creature entering the wall or ending its turn in it or within 10 feet
+ *  of the burning side. */
+function wallOfFireForms(): Later[] {
+  const ring = { shape: "cylinder" as const, sizeFeet: 10, widthFeet: null, heightFeet: 20 };
+  const form = (
+    name: string,
+    option: Readonly<{ id: string; name: string }>,
+    side: "left" | "right" | "inside" | "outside"
+  ): Later => {
+    const ringed = side === "inside" || side === "outside";
+    const burning = ringed ? `${side} the ring within 10 feet of it` : `within 10 feet of its ${side} side`;
+    return {
+      name,
+      activation: "other",
+      when: `A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn ${burning}.`,
+      damage: [{ formula: "5d8", type: "fire" }],
+      ...(ringed ? { area: ring } : {}),
+      zone: { on: ["enter", "end-turn"], band: { feet: 10, side }, ...(ringed ? { ring: true as const } : {}) },
+      option
+    };
+  };
+  return [
+    form("burn", { id: "left", name: "Straight, burning on the left" }, "left"),
+    form("burn right", { id: "right", name: "Straight, burning on the right" }, "right"),
+    form("burn inside", { id: "ring-inside", name: "Ring, burning inside" }, "inside"),
+    form("burn outside", { id: "ring-outside", name: "Ring, burning outside" }, "outside")
+  ];
+}
+
+/** One of Conjure Celestial's ways to shine: Healing Light on the caster and its allies with Searing Light on the rest,
+ *  or one light on every creature; on the cast and whenever the Cylinder or a creature meets it, once a turn. */
+function celestialLight(
+  name: string,
+  option: Readonly<{ id: string; name: string }>,
+  heals: "allies" | "all" | null
+): Later {
+  return {
+    name,
+    activation: "other",
+    when: `${option.name}: Healing Light restores 4d12 plus your spellcasting ability modifier, and Searing Light asks for the save. Each creature in the Cylinder, entering it or ending its turn there is bathed once a turn.`,
+    save: save("dex"),
+    damage: [{ formula: "6d12", type: "radiant" }],
+    zone: {
+      on: ["enter", "end-turn"],
+      oncePerTurn: true,
+      atCast: true,
+      dicePerSlot: 1,
+      ...(heals ? { heals: { formula: "4d12", addsModifier: true, who: heals } } : {})
+    },
+    option
+  };
+}
+
+/** Symbol's six glyphs, each a hidden glyph that glows when a creature comes onto it (SRD 5.2.1 text): Death,
+ *  Discord, Fear, Pain, Sleep and Stunning. Fear's "must move at least 30 feet away from the glyph" binds the
+ *  Frightened creature's moves (`compelled-moves.ts`). */
+function symbolGlyphs(): Later[] {
+  const MINUTE = { type: "rounds" as const, rounds: 10 };
+  const glyph = (
+    id: string,
+    name: string,
+    when: string,
+    saved: NonNullable<Later["save"]>,
+    damage: Later["damage"] = []
+  ): Later => ({
+    name: `${id} glyph`,
+    activation: "other",
+    when: `A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, ${when}`,
+    save: saved,
+    damage,
+    zone: {
+      on: ["enter", "end-turn"],
+      oncePerTurn: true,
+      around: "point",
+      feet: 60,
+      hidden: true,
+      glyph: { feet: 5, growsToFeet: 60, rounds: 100 }
+    },
+    option: { id, name }
+  });
+  const fails = (
+    ability: "con" | "wis",
+    rest: Partial<NonNullable<Later["save"]>> = {}
+  ): NonNullable<Later["save"]> => ({
+    ability,
+    successDamage: "none",
+    failureConditions: [],
+    ...rest
+  });
+  return [
+    glyph(
+      "death",
+      "Death",
+      "makes a Constitution save against 10d10 Necrotic damage, half on a success.",
+      { ability: "con", successDamage: "half", failureConditions: [] },
+      [{ formula: "10d10", type: "necrotic" }]
+    ),
+    glyph(
+      "discord",
+      "Discord",
+      "makes a Wisdom save or argues for 1 minute, with Disadvantage on attack rolls and ability checks.",
+      fails("wis", {
+        failureDuration: MINUTE,
+        failureEffect: {
+          name: "Discord",
+          tags: ["discord"],
+          modifiers: [
+            { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] },
+            { type: "roll-mode", roll: "check", mode: "disadvantage", when: [{ type: "on-ability-check" }] }
+          ]
+        }
+      })
+    ),
+    // "While Frightened, the target must move at least 30 feet away from the glyph on each of its turns, if able."
+    glyph(
+      "fear",
+      "Fear",
+      "makes a Wisdom save or is Frightened for 1 minute, moving at least 30 feet away from the glyph on each of its turns.",
+      fails("wis", {
+        failureConditions: ["frightened"],
+        failureDuration: MINUTE,
+        failureEffect: {
+          name: "Symbol of Fear",
+          tags: [],
+          modifiers: [],
+          compelled: { way: "away", minFeet: 30, fromArea: true }
+        }
+      })
+    ),
+    glyph(
+      "pain",
+      "Pain",
+      "makes a Constitution save or is Incapacitated for 1 minute.",
+      fails("con", { failureConditions: ["incapacitated"], failureDuration: MINUTE })
+    ),
+    glyph(
+      "sleep",
+      "Sleep",
+      "makes a Wisdom save or is Unconscious for 10 minutes, until it takes damage or is shaken awake.",
+      fails("wis", {
+        failureConditions: ["unconscious"],
+        failureDuration: { type: "rounds", rounds: 100 },
+        endsOnDamage: true,
+        failureEffect: { name: "Symbol of Sleep", tags: ["wakeable"], modifiers: [] }
+      })
+    ),
+    glyph(
+      "stunning",
+      "Stunning",
+      "makes a Wisdom save or is Stunned for 1 minute.",
+      fails("wis", { failureConditions: ["stunned"], failureDuration: MINUTE })
+    )
+  ];
+}
 
 /**
  * What a spell lets its caster do after the cast (SRD 5.2.1 text): the attacks a summoned thing or a held flame
@@ -205,6 +626,209 @@ const ENTER_OR_END_ONCE: Zone = { on: ["enter", "end-turn"], oncePerTurn: true }
  * that moment; the rest stay with the GM, whom the cast reminds.
  */
 const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
+  // Each effect is an option of the cast. The whirlpool is its vortex: "Any creature in the water and within 25 feet
+  // of the whirlpool is pulled 10 feet toward it. When a creature enters the whirlpool for the first time on a turn or
+  // ends its turn there, it makes a Strength saving throw ... 2d8 Bludgeoning damage ... half as much damage." The
+  // flood, the trench and the redirected flow change the water the GM paints; swimming away and choosing another
+  // effect on a later turn are the GM's.
+  "control-water": [
+    {
+      name: "whirlpool",
+      activation: "other",
+      when: `A creature in the water within 25 feet is pulled 10 feet toward the vortex as its turn starts; one entering it or ending its turn there makes the save, once a turn. Swimming away takes an action and a Strength (Athletics) check against your spell save DC.`,
+      save: save("str"),
+      damage: [{ formula: "2d8", type: "bludgeoning" }],
+      area: { shape: "cube", sizeFeet: 5, widthFeet: null },
+      zone: { ...ENTER_OR_END_ONCE, pulls: { withinFeet: 25, feet: 10 } },
+      option: { id: "whirlpool", name: "Whirlpool" }
+    },
+    {
+      ...lasting("flood", "The standing water in the Cube rises by up to 20 feet, or a 20-foot wave crosses it.", {
+        on: []
+      }),
+      option: { id: "flood", name: "Flood" }
+    },
+    {
+      ...lasting("part water", "A trench crosses the Cube, the water walled to either side, until the spell ends.", {
+        on: []
+      }),
+      option: { id: "part-water", name: "Part Water" }
+    },
+    {
+      ...lasting("redirect flow", "The flowing water in the Cube moves the way you choose.", { on: [] }),
+      option: { id: "redirect-flow", name: "Redirect Flow" }
+    }
+  ],
+  "animal-shapes": [
+    {
+      name: "transform again",
+      activation: "action",
+      when: "On your later turns, a Magic action transforms the targets again, each into a Large or smaller Beast of Challenge Rating 4 or lower.",
+      laterTurnsOnly: true,
+      damage: [],
+      shapeShift: {
+        from: "bestiary",
+        onTargets: true,
+        creatureTypes: ["beast"],
+        maxChallenge: 4,
+        maxSize: "large",
+        keeps: ["mental", "type"],
+        noSpells: true,
+        gear: "merged",
+        leaveAs: "bonus-action"
+      }
+    }
+  ],
+  shapechange: [
+    {
+      name: "new form",
+      activation: "action",
+      when: "Until the spell ends, a Magic action shape-shifts you into a different eligible form.",
+      damage: [],
+      shapeShift: {
+        from: "bestiary",
+        notCreatureTypes: ["construct", "undead"],
+        challengeOf: "user",
+        keeps: ["mental", "proficiencies", "spellcasting", "type"],
+        gear: "choice"
+      }
+    }
+  ],
+  // "An alarm alerts you whenever a creature touches or enters the warded area", sparing the creatures you designate:
+  // your allies.
+  alarm: [
+    {
+      name: "alarm",
+      activation: "other",
+      when: "Whenever a creature other than your allies enters the warded area, the alarm alerts you.",
+      damage: [],
+      zone: { on: ["enter"], alerts: true, affects: "enemies" }
+    }
+  ],
+  // "The aura prevents creatures other than Constructs and Undead from passing or reaching through it."
+  "antilife-shell": [
+    lasting("barrier", "Creatures other than Constructs and Undead can't pass or reach through the Emanation.", {
+      on: [],
+      around: "caster",
+      feet: 10,
+      bars: { way: "both", except: ["construct", "undead"], reach: true }
+    })
+  ],
+  // "While in the aura, you and your allies have Resistance to Necrotic damage, and your Hit Point maximums can't be
+  // reduced", and "if an ally with 0 Hit Points starts its turn in the aura, that ally regains 1 Hit Point."
+  "aura-of-life": [
+    lasting(
+      "aura",
+      "You and your allies in the aura have Resistance to Necrotic damage, and your Hit Point maximums can't be reduced; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
+      {
+        on: ["start-turn"],
+        around: "caster",
+        feet: 30,
+        affects: "allies",
+        holds: { modifiers: [{ type: "damage-resistance", damageTypes: ["necrotic"] }], keepsMaximum: true },
+        revives: 1
+      }
+    )
+  ],
+  // "A creature of the chosen kind makes a Wisdom saving throw when it comes within 120 feet of the target": the area is
+  // round the targeted creature and moves with it, acting on the creature type picked with the form. A creature that
+  // ends its turn more than 120 feet from the target saves again; a success frees it and leaves it immune for 1 minute.
+  antipathysympathy: [
+    {
+      name: "antipathy",
+      activation: "other",
+      when: "A creature of the chosen kind that comes within 120 feet of the target makes a Wisdom save or is Frightened of the target, and must use its movement to get as far from it as it can.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: ["frightened"],
+        repeatBeyondFeet: 120,
+        immuneOnSuccess: true,
+        immuneMinutes: 1
+      },
+      // "The Frightened creature must use its movement on its turns to get as far away as possible from the target".
+      failureEffect: { name: "Antipathy", tags: [], modifiers: [], compelled: { way: "away", allMovement: true } },
+      damage: [],
+      zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
+      option: { id: "antipathy", name: "Antipathy" }
+    },
+    {
+      name: "sympathy",
+      activation: "other",
+      when: "A creature of the chosen kind that comes within 120 feet of the target makes a Wisdom save or is Charmed by the target, and must use its movement to get as close to it as it can.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: ["charmed"],
+        repeatBeyondFeet: 120,
+        repeatOnDamage: { fromSourceOnly: true },
+        immuneOnSuccess: true,
+        immuneMinutes: 1
+      },
+      // "Must use its movement on its turns to get as close as possible to the target ... If the creature is within 5
+      // feet of the target, the creature can't willingly move away."
+      failureEffect: {
+        name: "Sympathy",
+        tags: [],
+        modifiers: [],
+        compelled: { way: "toward", allMovement: true, holdsNear: true }
+      },
+      damage: [],
+      zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
+      option: { id: "sympathy", name: "Sympathy" }
+    }
+  ],
+  // "When you cast the spell and as a Bonus Action on your later turns, you can move the hand up to 60 feet and then
+  // cause one of the following effects": each reaches from the hand (`spell-summons.ts`), and the cast takes one free.
+  "arcane-hand": [
+    {
+      name: "clenched fist",
+      activation: "bonus-action",
+      withCast: true,
+      when: "The hand moves up to 60 feet and strikes a target within 5 feet of it with a melee spell attack.",
+      attackRange: melee(125),
+      // "The damage of the Clenched Fist increases by 2d8 ... for each spell slot level above 5."
+      damage: [{ formula: "5d8", type: "force", perSlot: "2d8" }]
+    },
+    {
+      name: "forceful hand",
+      activation: "bonus-action",
+      withCast: true,
+      when: "The hand moves up to 60 feet and pushes a Huge or smaller creature within 5 feet of it that fails a Strength save up to 5 feet plus five times your spellcasting ability modifier, following it.",
+      save: {
+        ability: "str",
+        successDamage: "none",
+        failureConditions: [],
+        failurePush: { feet: 5, upTo: true, maxTargetSize: "huge" }
+      },
+      pushPerModifier: 5,
+      damage: []
+    },
+    {
+      name: "grasping hand",
+      activation: "bonus-action",
+      withCast: true,
+      when: "The hand moves up to 60 feet and grapples a Huge or smaller creature within 5 feet of it that fails a Dexterity save.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["grappled"], failureMaxSize: "huge" },
+      damage: []
+    },
+    {
+      name: "crush",
+      activation: "bonus-action",
+      bearerOnly: true,
+      when: "While the hand grapples a creature, a Bonus Action crushes it.",
+      // "... and the damage of the Grasping Hand increases by 2d6 for each spell slot level above 5."
+      damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true, perSlot: "2d6" }]
+    },
+    {
+      name: "interposing hand",
+      activation: "bonus-action",
+      withCast: true,
+      interposes: true,
+      when: "The hand moves up to 60 feet and grants you Half Cover against attacks and other effects from or through its space, which is Difficult Terrain for your enemies.",
+      damage: []
+    }
+  ],
   "arcane-sword": [
     {
       name: "attack",
@@ -219,23 +843,37 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the area or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters the area or ends its turn there makes the save. ${ONCE_PER_TURN} The area is Difficult Terrain.`,
       save: { ability: "str", successDamage: "none", failureConditions: ["restrained"] },
       damage: [{ formula: "3d6", type: "bludgeoning" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
+  // "A straight wall up to 100 feet long ... or a ringed wall up to 60 feet in diameter": the form is the cast's option.
   "blade-barrier": [
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.`,
       save: save("dex"),
       damage: [{ formula: "6d10", type: "force" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters" },
+      option: { id: "straight", name: "Straight wall" }
+    },
+    {
+      name: "ring save",
+      activation: "other",
+      when: `A creature that enters the ringed wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.`,
+      save: save("dex"),
+      damage: [{ formula: "6d10", type: "force" }],
+      area: { shape: "cylinder", sizeFeet: 30, widthFeet: null, heightFeet: 20 },
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters", ring: true },
+      option: { id: "ring", name: "Ringed wall" }
     }
   ],
-  // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
+  // "A storm cloud appears at a point within range that you can see above yourself. It takes the shape of a Cylinder
+  // that is 10 feet tall with a 60-foot radius", and each bolt strikes "a point you can see under the cloud". "If you're
+  // outdoors in a storm when you cast this spell ... the spell's damage increases by 1d10."
   "call-lightning": [
     {
       name: "bolt",
@@ -243,7 +881,27 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "Until the spell ends, a Magic action calls down another bolt at a point under the cloud.",
       save: save("dex"),
       damage: [{ formula: "3d10", type: "lightning" }],
-      area: { shape: "sphere", sizeFeet: 5, widthFeet: null }
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+      inArea: true
+    },
+    {
+      ...lasting("cloud", "The storm cloud stays where it formed, reaching 60 feet out from its middle.", {
+        on: [],
+        around: "caster",
+        feet: 60,
+        stays: true
+      }),
+      option: { id: "clear", name: "No storm" }
+    },
+    {
+      ...lasting("storm cloud", "In a storm, the cloud is the storm's, and the spell's damage is 1d10 more.", {
+        on: [],
+        around: "caster",
+        feet: 60,
+        stays: true,
+        extraDice: 1
+      }),
+      option: { id: "storm", name: "Outdoors in a storm" }
     }
   ],
   cloudkill: [
@@ -253,17 +911,45 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The Sphere moves 10 feet away from you at the start of each of your turns.`,
       save: save("con"),
       damage: [{ formula: "5d8", type: "poison" }],
-      zone: ENTER_OR_END_ONCE
+      // "The fog lasts for the duration or until strong wind (such as the one created by Gust of Wind) disperses it":
+      // destroying fog ends it too.
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10, endsBy: ["wind", "water"] }
     }
   ],
+  // "You have Advantage on Strength saving throws while you're within 5 feet of the pack, and when you move on your
+  // turn, you can also move the pack up to 30 feet to an unoccupied space you can see."
   "conjure-animals": [
     {
       name: "save",
       activation: "other",
-      when: `When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. ${ONCE_PER_TURN}`,
+      when: `When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. ${ONCE_PER_TURN} You have Advantage on Strength saving throws within 5 feet of the pack.`,
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
       damage: [{ formula: "3d10", type: "slashing" }],
-      zone: { ...ENTER_OR_END_ONCE, around: "point", feet: 10, affects: "enemies" }
+      zone: {
+        ...ENTER_OR_END_ONCE,
+        around: "point",
+        feet: 10,
+        affects: "enemies",
+        casterHolds: {
+          feet: 5,
+          modifiers: [
+            {
+              type: "roll-mode",
+              roll: "save",
+              mode: "advantage",
+              when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }]
+            }
+          ]
+        }
+      }
+    },
+    {
+      name: "move",
+      activation: "other",
+      when: "When you move on your turn, you can also move the pack up to 30 feet to an unoccupied space.",
+      damage: [],
+      area: { shape: "sphere", sizeFeet: 10, widthFeet: null },
+      movesArea: { feet: 30, withCasterMove: true, unoccupied: true }
     }
   ],
   "conjure-elemental": [
@@ -271,8 +957,19 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "save",
       activation: "other",
       when: "A creature that enters the spirit's space or starts its turn within 5 feet of it makes the save, if the spirit has no creature Restrained; the Restrained target repeats it at the start of each of its turns, taking 4d8 on a failure.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
-      damage: [{ formula: "8d8", type: "lightning" }]
+      // "At the start of each of its turns, the Restrained target repeats the save. On a failed save, the target takes
+      // 4d8 damage of the spirit's type. On a successful save, the target isn't Restrained by the spirit."
+      save: {
+        ability: "dex",
+        successDamage: "none",
+        failureConditions: ["restrained"],
+        repeatAtTurnStart: true,
+        repeatFailureDamage: [{ formula: "4d8", type: "lightning" }]
+      },
+      damage: [{ formula: "8d8", type: "lightning" }],
+      // A Large spirit: its space and 5 feet around it reach 10 feet from its point. The caster's chosen element is
+      // its damage type.
+      zone: { on: ["enter", "start-turn"], around: "point", feet: 10, affects: "enemies", holdsOne: true }
     }
   ],
   "conjure-fey": [
@@ -284,6 +981,55 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       attackRange: melee(65),
       onHit: [{ conditions: [{ id: "frightened" }], duration: { type: "until-source-next-turn" } }],
       damage: [{ formula: "3d12", type: "psychic", addsModifier: true }]
+    }
+  ],
+  // "The ground in the Emanation is Difficult Terrain for your enemies."
+  "conjure-minor-elementals": [
+    lasting("ground", "The ground in the Emanation is Difficult Terrain for your enemies.", {
+      on: [],
+      around: "caster",
+      feet: 15,
+      terrain: { cost: 2, for: "enemies" }
+    })
+  ],
+  // "Create Water ... Alternatively, the water falls as rain in a 30-foot Cube within range, extinguishing exposed flames
+  // there", or "Destroy Water ... Alternatively, you destroy fog in a 30-foot Cube within range." Water in an open
+  // container is description.
+  "create-or-destroy-water": [
+    {
+      name: "rain",
+      activation: "other",
+      when: "Rain falls over the Cube and puts out the exposed flames there.",
+      damage: [],
+      zone: { on: [], douses: true, instant: true },
+      option: { id: "create", name: "Create Water: rain" }
+    },
+    {
+      name: "destroy fog",
+      activation: "other",
+      when: "The fog in the Cube is destroyed.",
+      damage: [],
+      zone: { on: [], destroysFog: true, instant: true },
+      option: { id: "destroy", name: "Destroy Water: fog" }
+    }
+  ],
+  // "For each creature you can see in the Cylinder, choose which of these lights shines on it": Healing Light (4d12 plus
+  // your spellcasting ability modifier) or Searing Light (a Dexterity save against 6d12 Radiant damage); "when you move
+  // on your turn, you can also move the Cylinder up to 30 feet", and "whenever the Cylinder moves into the space of a
+  // creature you can see and whenever a creature you can see enters the Cylinder or ends its turn there, you can bathe
+  // it in one of the lights. A creature can be affected by this spell only once per turn." The caster picks as it
+  // casts which light each creature gets: by side, or one light for all.
+  "conjure-celestial": [
+    celestialLight("light", { id: "by-side", name: "Heal you and your allies, sear the rest" }, "allies"),
+    celestialLight("healing light", { id: "heal-all", name: "Healing Light on everyone" }, "all"),
+    celestialLight("searing light", { id: "sear-all", name: "Searing Light on everyone" }, null),
+    {
+      name: "move",
+      activation: "other",
+      when: "When you move on your turn, you can also move the Cylinder up to 30 feet.",
+      damage: [],
+      area: { shape: "cylinder", sizeFeet: 10, widthFeet: null, heightFeet: 40 },
+      movesArea: { feet: 30, withCasterMove: true }
     }
   ],
   "conjure-woodland-beings": [
@@ -303,7 +1049,9 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "The bead explodes when the spell ends: 12d6, plus 1d6 for each of your turns that ended while it lasted.",
       save: save("dex"),
       damage: [{ formula: "12d6", type: "fire" }],
-      area: { shape: "sphere", sizeFeet: 20, widthFeet: null }
+      area: { shape: "sphere", sizeFeet: 20, widthFeet: null },
+      // "If a creature touches the bead": its Dexterity save, and a success throws it up to 40 feet.
+      zone: { on: ["spell-end"], grows: true, touched: { throwFeet: 40 } }
     }
   ],
   "dragons-breath": [
@@ -316,13 +1064,70 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       area: { shape: "cone", sizeFeet: 15, widthFeet: null }
     }
   ],
+  // "The ground there is Difficult Terrain", and "at the end of each of your turns for the duration, each creature on
+  // the ground in the area makes a Dexterity saving throw. On a failed save, a creature has the Prone condition, and
+  // its Concentration is broken."
+  earthquake: [
+    {
+      name: "tremor",
+      activation: "other",
+      when: "At the end of each of your turns, each creature on the ground in the area makes the save: Prone and its Concentration broken on a failure. The ground is Difficult Terrain.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
+      damage: [],
+      zone: { on: ["caster-turn-end"], terrain: DIFFICULT, grounded: true }
+    }
+  ],
+  // "For the duration, these plants turn the ground in the area into Difficult Terrain."
+  entangle: [
+    lasting("ground", "The plants turn the ground in the area into Difficult Terrain.", {
+      on: [],
+      terrain: { cost: 2, kind: "plants" }
+    })
+  ],
+  // "The hound remains for the duration or until the two of you are more than 300 feet apart", "No one but you can see
+  // the hound", "When a Small or larger creature comes within 30 feet of it ... the hound starts barking loudly", and "On
+  // your later turns, you can take a Magic action to move the hound up to 30 feet." The password is the GM's.
   "faithful-hound": [
     {
       name: "bite",
       activation: "other",
-      when: "At the start of each of your turns, the hound bites one enemy within 5 feet of it.",
+      when: "At the start of each of your turns, the hound bites one enemy within 5 feet of it. It barks when a Small or larger creature comes within 30 feet of it.",
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
-      damage: [{ formula: "4d8", type: "force" }]
+      damage: [{ formula: "4d8", type: "force" }],
+      zone: {
+        on: ["caster-turn-start"],
+        around: "point",
+        feet: 5,
+        affects: "enemies",
+        hidden: true,
+        warns: { feet: 30, sizes: ["small", "medium", "large", "huge", "gargantuan"] },
+        leash: 300
+      }
+    },
+    {
+      name: "move",
+      activation: "action",
+      when: "On your later turns, a Magic action moves the hound up to 30 feet.",
+      laterTurnsOnly: true,
+      damage: [],
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+      movesArea: { feet: 30 }
+    }
+  ],
+  // "When a creature of a chosen type enters the spell's area for the first time on a turn or ends its turn there, the
+  // creature takes 5d10 Radiant or Necrotic damage", and "creatures can't teleport into the area". Every type the
+  // spell names is chosen.
+  forbiddance: [
+    {
+      name: "ward",
+      activation: "other",
+      when: "An Aberration, Celestial, Elemental, Fey, Fiend or Undead that enters the area for the first time on a turn or ends its turn there takes the damage. No creature can teleport into the area.",
+      damage: [{ formula: "5d10", type: "radiant" }],
+      zone: {
+        ...ENTER_OR_END_ONCE,
+        types: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
+        noTeleport: true
+      }
     }
   ],
   "flame-blade": [
@@ -348,17 +1153,190 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "bonus-action",
       when: "As a Bonus Action, you can roll the sphere up to 30 feet; a creature whose space you move it into makes the save, and the sphere stops for the turn.",
       save: save("dex"),
-      damage: [{ formula: "2d6", type: "fire" }]
+      damage: [{ formula: "2d6", type: "fire" }],
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+      movesArea: { feet: 30 }
+    }
+  ],
+  // "A creature that ends its turn in the Line must make the same save. Any creature in the Line must spend 2 feet of
+  // movement for every 1 foot it moves when moving closer to you", and "As a Bonus Action on your later turns, you can
+  // change the direction in which the Line blasts from you."
+  "gust-of-wind": [
+    {
+      name: "gust",
+      activation: "other",
+      when: "A creature that ends its turn in the Line makes the save, and a failure pushes it 15 feet away from you. Moving closer to you in the Line costs 2 feet for every foot.",
+      save: { ability: "str", successDamage: "none", failureConditions: [], failurePush: { feet: 15 } },
+      damage: [],
+      // "The gust disperses gas or vapor, and it extinguishes candles and similar unprotected flames in the area."
+      zone: { on: ["end-turn"], towardCaster: true, wind: true }
+    },
+    {
+      name: "turn",
+      activation: "bonus-action",
+      when: "As a Bonus Action on your later turns, you point the Line another way from you.",
+      laterTurnsOnly: true,
+      damage: [],
+      area: { shape: "line", sizeFeet: 60, widthFeet: 10 },
+      movesArea: { feet: 60, fromCaster: true }
     }
   ],
   grease: [
     {
       name: "save",
       activation: "other",
-      when: "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone.",
+      when: "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone. The grease is Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
       damage: [],
-      zone: { on: ["enter", "end-turn"] }
+      zone: { on: ["enter", "end-turn"], terrain: DIFFICULT }
+    }
+  ],
+  // "An immobile, shimmering barrier appears in a 10 foot Emanation around you", and "any spell of level 5 or lower cast
+  // from outside the barrier can't affect anything within it".
+  "globe-of-invulnerability": [
+    lasting("barrier", "A spell of level 5 or lower cast from outside the barrier can't affect anything within it.", {
+      on: [],
+      around: "caster",
+      feet: 10,
+      stays: true,
+      wardsSpells: 5
+    })
+  ],
+  // "A 10-foot Emanation springs into existence around you and remains stationary": the creatures inside it at the cast
+  // move through it freely, "all other creatures and objects are barred from passing through it", and "spells of level
+  // 3 or lower can't be cast through it". Its light and its one-way sight are the GM's.
+  "tiny-hut": [
+    lasting(
+      "hut",
+      "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside. Those outside can't see in. It ends if you leave it.",
+      {
+        on: [],
+        around: "caster",
+        feet: 10,
+        stays: true,
+        wardsSpells: 3,
+        bars: { way: "both", insiders: true },
+        endsWhenCasterLeaves: true,
+        veil: { oneWay: true },
+        // "You can command the interior to have Dim Light or Darkness".
+        picks: {
+          pick: "one",
+          parts: [
+            { id: "as-it-is", name: "Light inside as it is", trigger: {} },
+            { id: "dim", name: "Dim Light inside", trigger: { lighting: "dim" } },
+            { id: "dark", name: "Darkness inside", trigger: { lighting: "dark" } }
+          ]
+        }
+      }
+    )
+  ],
+  // "No one can cast spells, take Magic actions, or create other magical effects inside the aura, and those things can't
+  // target or otherwise affect anything inside it. Magical properties of magic items don't work inside the aura", "no
+  // one can teleport into or out of it", and "Ongoing spells ... are suppressed in the area" (`antimagic`). The field's
+  // ward on every school keeps spells, their areas and their lasting areas off the creatures inside.
+  "antimagic-field": [
+    lasting("field", "No spell, Magic action or magic item works in the aura, and nothing magical reaches into it.", {
+      on: [],
+      around: "caster",
+      feet: 10,
+      antimagic: true,
+      holds: {
+        modifiers: [
+          {
+            type: "spell-ward",
+            schools: [
+              "abjuration",
+              "conjuration",
+              "divination",
+              "enchantment",
+              "evocation",
+              "illusion",
+              "necromancy",
+              "transmutation"
+            ]
+          }
+        ]
+      }
+    })
+  ],
+  // "You decide what sort of security the spell provides, choosing any of the following properties": the dark and foggy
+  // edge sight can't pass, nothing teleporting in or out, and no Divination spell targeting the creatures inside. Sound
+  // across the edge, sensors and planar travel are the GM's.
+  "private-sanctum": [
+    lasting("sanctum", "The warded Cube holds the properties picked as it was cast.", {
+      on: [],
+      picks: {
+        pick: "any",
+        parts: [
+          { id: "fog", name: "Dark, foggy edge", trigger: { veil: {} } },
+          { id: "no-teleport", name: "No teleporting", trigger: { noTeleport: true, noTeleportOut: true } },
+          {
+            id: "no-divination",
+            name: "No Divination targeting",
+            trigger: { holds: { modifiers: [{ type: "spell-ward", schools: ["divination"] }] } }
+          }
+        ]
+      }
+    })
+  ],
+  // Hallowed Ward: "Creatures of the chosen types can't willingly enter the area, and any creature that is possessed by
+  // or that has the Charmed or Frightened condition from such creatures isn't possessed, Charmed, or Frightened by them
+  // while in the area." Its extra effect is picked as it is cast; the creatures an effect names are the warded types for
+  // Extradimensional Interference, Fear and Vulnerability, and every other creature for Courage and Resistance.
+  hallow: [
+    lasting("ward", "Creatures of the warded types can't enter the area, and can't charm or frighten those in it.", {
+      on: [],
+      choosesTypes: true,
+      exclusive: true,
+      bars: { way: "in", types: [...HALLOW_TYPES] },
+      holds: {
+        conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...HALLOW_TYPES], possession: true },
+        suppresses: true
+      },
+      picks: {
+        pick: "one",
+        parts: [
+          {
+            id: "courage",
+            name: "Courage",
+            trigger: { alsoHolds: { conditionImmunities: ["frightened"], forTypes: "others" } }
+          },
+          { id: "darkness", name: "Darkness", trigger: { lighting: "dark", lightingFirm: true } },
+          { id: "daylight", name: "Daylight", trigger: { lighting: "bright" } },
+          {
+            id: "extradimensional",
+            name: "Extradimensional Interference",
+            trigger: { noTeleport: true, noTeleportOut: true, teleportWardsOnly: true }
+          },
+          { id: "fear", name: "Fear", trigger: { alsoHolds: { conditions: ["frightened"], forTypes: "warded" } } },
+          { id: "peaceful-rest", name: "Peaceful Rest", trigger: {} },
+          {
+            id: "resistance",
+            name: "Resistance",
+            trigger: { alsoHolds: { chosenDamage: "resistance", forTypes: "others" } }
+          },
+          { id: "silence", name: "Silence", trigger: { alsoHolds: { conditions: ["deafened"] } } },
+          { id: "tongues", name: "Tongues", trigger: {} },
+          {
+            id: "vulnerability",
+            name: "Vulnerability",
+            trigger: { alsoHolds: { chosenDamage: "vulnerability", forTypes: "warded" } }
+          }
+        ]
+      }
+    })
+  ],
+  // Explosive Rune: a creature that sets the glyph off (stepping on it) makes it erupt in a "20-foot-radius Sphere
+  // centered on the glyph", and "once a glyph is triggered, this spell ends". The glyph is nearly imperceptible.
+  "glyph-of-warding": [
+    {
+      name: "explosive rune",
+      activation: "other",
+      when: "A creature that steps onto the glyph sets it off: each creature in the 20-foot-radius Sphere makes the save, and the spell ends.",
+      save: save("dex"),
+      // "The damage of an explosive rune increases by 1d8 for each spell slot level above 3."
+      damage: [{ formula: "5d8", type: "thunder", perSlot: "1d8" }],
+      zone: { on: ["enter", "spell-end"], around: "point", feet: 5, once: true, hidden: true }
     }
   ],
   "guardian-of-faith": [
@@ -369,6 +1347,216 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: save("dex"),
       damage: [{ formula: "20", type: "radiant" }],
       zone: { on: ["enter", "start-turn"], around: "point", feet: 10, affects: "enemies", damageCap: 60 }
+    }
+  ],
+  // "You can make the messenger terrifying to the target. If you do so, the messenger can deliver a message of no more
+  // than ten words, and then the target makes a Wisdom saving throw. On a failed save, the target gains no benefit from
+  // its rest, and it takes 3d6 Psychic damage when it wakes up."
+  dream: [
+    {
+      name: "terrifying message",
+      activation: "other",
+      when: "The messenger turns terrifying: after its message of ten words or fewer, the target makes the Wisdom save, and a failure denies it the benefit of its rest and deals it 3d6 Psychic damage as it wakes.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: [],
+        // It waits for the sleeper's next rest, past the 8 hours the spell lasts.
+        failureDuration: { type: "minutes", minutes: 1440 },
+        atRest: { at: "long-rest", noBenefit: "long", damage: [{ formula: "3d6", type: "psychic" }], once: true }
+      },
+      failureEffect: { name: "Dream's nightmare", tags: [], modifiers: [] },
+      damage: []
+    }
+  ],
+  // "As a Magic action on your next turn, you can try to probe deeper into the target's mind. If you probe deeper, the
+  // target makes a Wisdom saving throw. ... On a successful save, the spell ends. Either way, the target knows that you
+  // are probing into its mind, and ... the target can take an action on its turn to make an Intelligence (Arcana) check
+  // against your spell save DC, ending the spell on a success." What the caster learns is the GM's.
+  // "If you sense such effects, you can take the Magic action to see a faint aura around any visible creature or object
+  // in the area that bears the magic, and if an effect was created by a spell, you learn the spell's school of magic."
+  "detect-magic": [
+    {
+      name: "see the auras",
+      activation: "action",
+      when: "A Magic action shows the faint aura round each creature in sight within 30 feet that bears magic, and the school of the spells on it.",
+      reveals: true,
+      damage: []
+    }
+  ],
+  // "When you cast the spell and as a Magic action on your later turns before the spell ends, you can exert your will on
+  // one creature or object that you can see within range ... Creature. You can try to move a Huge or smaller creature.
+  // The target must succeed on a Strength saving throw, or you move it up to 30 feet in any direction within the spell's
+  // range. Until the end of your next turn, the creature has the Restrained condition, and if you lift it into the air,
+  // it is suspended there ... Object ... If the object is worn or carried by a creature, that creature must succeed on a
+  // Strength saving throw, or you pull the object away". Fine control of objects is the table's.
+  telekinesis: [
+    {
+      name: "move a creature",
+      activation: "action",
+      withCast: true,
+      when: "With the cast and as a Magic action on later turns, a Huge or smaller creature you see within 60 feet makes a Strength save or is moved up to 30 feet to the space you pick, lifted if you choose, and Restrained until the end of your next turn.",
+      targets: { count: 1, rangeFeet: 60, seen: true, maxSize: "huge" },
+      save: {
+        ability: "str",
+        successDamage: "none",
+        failureConditions: ["restrained"],
+        failureDuration: { type: "until-source-turn-end" }
+      },
+      failureEffect: { name: "Telekinesis", tags: ["telekinetic", "suspended"], modifiers: [] },
+      failureMove: { feet: 30, lifts: true },
+      damage: []
+    },
+    {
+      name: "pull an object",
+      activation: "action",
+      withCast: true,
+      when: "With the cast and as a Magic action on later turns, a creature you see within 60 feet makes a Strength save or the weapon it holds is pulled from its hands.",
+      targets: { count: 1, rangeFeet: 60, seen: true },
+      object: { kinds: ["weapon"], does: "pulled-on-failure" },
+      save: { ability: "str", successDamage: "none", failureConditions: [] },
+      damage: []
+    }
+  ],
+  // "For the duration, you can take a Bonus Action to designate a direction that is horizontal to you."
+  compulsion: [
+    {
+      name: "direction",
+      activation: "bonus-action",
+      when: "A Bonus Action names a direction: each creature the spell charms uses as much of its movement as possible to move that way on its next turn, then repeats the save.",
+      setsHeading: true,
+      damage: []
+    }
+  ],
+  // "Break Enchantment. As a Magic action, you touch a creature that is possessed by or has the Charmed or Frightened
+  // condition from one or more creatures of the types above ... Dismissal. As a Magic action, you target one creature
+  // you can see within 5 feet of you that has one of the creature types above. The target must succeed on a Charisma
+  // saving throw or be sent back to its home plane". Either ends the spell.
+  "dispel-evil-and-good": [
+    {
+      name: "Break Enchantment",
+      activation: "action",
+      when: "A Magic action touches a creature to end the Charmed, Frightened and possession that Celestials, Elementals, Fey, Fiends or Undead gave it, and ends the spell.",
+      targets: { count: 1, rangeFeet: 5 },
+      breaksEnchantment: { creatureTypes: [...CIRCLE_TYPES] },
+      endsSpell: true,
+      damage: []
+    },
+    {
+      name: "Dismissal",
+      activation: "action",
+      when: "A Magic action makes a Celestial, Elemental, Fey, Fiend or Undead the caster sees within 5 feet succeed on a Charisma save or be sent home, and ends the spell.",
+      targets: { count: 1, rangeFeet: 5, seen: true, creatureTypes: [...CIRCLE_TYPES] },
+      save: {
+        ability: "cha",
+        successDamage: "none",
+        failureConditions: [],
+        failureBanishes: [...CIRCLE_TYPES],
+        banishedForGood: true
+      },
+      endsSpell: true,
+      damage: []
+    }
+  ],
+  "detect-thoughts": [
+    {
+      name: "probe",
+      activation: "action",
+      laterTurnsOnly: true,
+      when: "On a later turn, a Magic action probes the target's mind: it makes the Wisdom save, a success ending the spell, and may then take an action for an Intelligence (Arcana) check that ends it.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: [],
+        successEndsSpell: true,
+        endedBy: {
+          name: "Push the probe out",
+          by: "bearer",
+          check: { ability: "int", skill: "arcana" },
+          endsSpell: true
+        }
+      },
+      failureEffect: { name: "Detect Thoughts", tags: [], modifiers: [] },
+      damage: []
+    }
+  ],
+  // "While Charmed, the creature takes 5d10 Psychic damage if it acts in a manner directly counter to your command. It
+  // takes this damage no more than once each day." The GM judges the defiance.
+  geas: [
+    {
+      name: "defiance",
+      activation: "other",
+      bearerOnly: true,
+      gmOnly: true,
+      uses: { limit: 1, per: "time", afterHours: "24" },
+      when: "When the charmed creature acts directly counter to the command, the GM deals it 5d10 Psychic damage, once a day at most.",
+      damage: [{ formula: "5d10", type: "psychic" }]
+    }
+  ],
+  // "If you are the target, you can move up or down as part of your move. Otherwise, you can take a Magic action to
+  // move the target, which must remain within the spell's range."
+  levitate: [
+    {
+      name: "raise",
+      activation: "action",
+      liftFeet: 20,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn", pool: "levitate-height" },
+      when: "On your turn, a Magic action raises the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you rise as part of your move.",
+      damage: []
+    },
+    {
+      name: "lower",
+      activation: "action",
+      liftFeet: -20,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn", pool: "levitate-height" },
+      when: "On your turn, a Magic action lowers the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you sink as part of your move.",
+      damage: []
+    }
+  ],
+  // "On each of your turns, such a phantasm can deal 2d8 Psychic damage to the target if it is in the phantasm's area
+  // or within 5 feet of the phantasm." Where the phantasm is, and whether the target is near it, are the caster's to
+  // say and the GM's to refuse.
+  "phantasmal-force": [
+    {
+      name: "harm",
+      activation: "other",
+      bearerOnly: true,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn" },
+      when: "On each of your turns, the phantasm can deal 2d8 Psychic damage to the creature that perceives it, if it is in the phantasm's area or within 5 feet of it.",
+      damage: [{ formula: "2d8", type: "psychic" }]
+    }
+  ],
+  // "Until the spell ends, the target can revert to cloud form, which also requires a Magic action followed by a
+  // 1-minute transformation."
+  "wind-walk": [
+    {
+      name: "cloud form",
+      activation: "action",
+      when: "Until the spell ends, a target in its normal form takes a Magic action to become a cloud again, with the Stunned condition for the minute of its transformation.",
+      shapeShift: {
+        from: "printed",
+        printed: [
+          {
+            id: "cloud",
+            name: "Cloud",
+            speeds: { walk: 0, fly: 300, hover: true },
+            noActions: true,
+            allowsActions: ["dash"],
+            conditionImmunities: ["prone"],
+            modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+          }
+        ],
+        keeps: [],
+        gear: "worn",
+        leaveAs: "action",
+        revertRounds: 10,
+        descendsSafely: true,
+        takesRounds: 10
+      },
+      damage: []
     }
   ],
   // "If the target drops to 0 Hit Points before this spell ends, you can take a Bonus Action on a later turn to curse a
@@ -382,6 +1570,29 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       movesGrant: true,
       laterTurnsOnly: true
     }
+  ],
+  // "Creatures of your choice have Advantage on all saving throws, and other creatures have Disadvantage on attack
+  // rolls against them. In addition, when a Fiend or an Undead hits an affected creature with a melee attack roll, the
+  // attacker must succeed on a Constitution saving throw or have the Blinded condition until the end of its next turn."
+  // The creatures chosen are the caster and its allies.
+  "holy-aura": [
+    lasting(
+      "aura",
+      "You and your allies in the aura have Advantage on saving throws, and attack rolls against them have Disadvantage; a Fiend or an Undead that hits one with a melee attack makes a Constitution save or is Blinded.",
+      {
+        on: [],
+        around: "caster",
+        feet: 30,
+        affects: "allies",
+        holds: {
+          modifiers: [
+            { type: "roll-mode", roll: "save", mode: "advantage" },
+            { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+          ],
+          struck: { creatureTypes: ["fiend", "undead"], save: { ability: "con", conditions: ["blinded"] } }
+        }
+      }
+    )
   ],
   "heat-metal": [
     {
@@ -403,24 +1614,45 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       movesGrant: true
     }
   ],
+  // "Hailstones turn ground in the Cylinder into Difficult Terrain until the end of your next turn."
+  "ice-storm": [
+    lasting(
+      "ground",
+      "Hailstones turn the ground in the Cylinder into Difficult Terrain until the end of your next turn.",
+      {
+        on: [],
+        terrain: { cost: 2, kind: "ice" },
+        untilCasterNextTurnEnd: true
+      }
+    )
+  ],
   "incendiary-cloud": [
     {
       name: "save",
       activation: "other",
-      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The cloud moves 10 feet away from you at the start of each of your turns.`,
+      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The cloud moves 10 feet away from you at the start of each of your turns, the way you pick, until a strong wind disperses it.`,
       save: save("dex"),
       damage: [{ formula: "10d8", type: "fire" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10, steered: true, endsBy: ["wind"] }
+    },
+    // "The cloud moves 10 feet away from you in a direction you choose at the start of each of your turns."
+    {
+      name: "steer",
+      activation: "other",
+      when: "At the start of each of your turns, move the cloud 10 feet the way you pick, farther from you; if you don't, it moves straight away from you as your turn ends.",
+      damage: [],
+      area: { shape: "sphere", sizeFeet: 20, widthFeet: null },
+      movesArea: { feet: 10, steersDrift: true }
     }
   ],
   "insect-plague": [
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the area for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters the area for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN} The area is Difficult Terrain.`,
       save: save("con"),
       damage: [{ formula: "4d10", type: "piercing" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
   moonbeam: [
@@ -428,9 +1660,157 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "save",
       activation: "other",
       when: `A creature the Cylinder moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} A Magic action on your later turns moves the Cylinder up to 60 feet.`,
-      save: save("con"),
+      // A shape-shifted creature that fails reverts to its true form.
+      save: { ...save("con"), failureEndsForm: true },
       damage: [{ formula: "2d10", type: "radiant" }],
       zone: ENTER_OR_END_ONCE
+    },
+    // "On each of your later turns, you can take a Magic action to move the Cylinder up to 60 feet."
+    {
+      name: "move",
+      activation: "action",
+      when: "On your later turns, a Magic action moves the Cylinder up to 60 feet; a creature it moves onto makes the save.",
+      laterTurnsOnly: true,
+      damage: [],
+      area: { shape: "cylinder", sizeFeet: 5, widthFeet: null },
+      movesArea: { feet: 60 }
+    }
+  ],
+  // "If you are within range of the illusion, you can take a Magic action to cause the image to move to any other spot
+  // within range." The image itself is the GM's to run.
+  "major-image": [
+    lasting("image", "The image stands where it was placed.", { on: [] }),
+    {
+      name: "move",
+      activation: "action",
+      when: "While you are within 120 feet of the image, a Magic action moves it to any other spot within 120 feet of you.",
+      damage: [],
+      area: { shape: "cube", sizeFeet: 20, widthFeet: null },
+      movesArea: { feet: 120, anywhereInRange: true, casterInRange: true }
+    }
+  ],
+  // "As a Magic action, you can cause the image to move to any spot within range."
+  "silent-image": [
+    lasting("image", "The image stands where it was placed.", { on: [] }),
+    {
+      name: "move",
+      activation: "action",
+      when: "A Magic action moves the image to any spot within 60 feet of you.",
+      damage: [],
+      area: { shape: "cube", sizeFeet: 15, widthFeet: null },
+      movesArea: { feet: 60, anywhereInRange: true }
+    }
+  ],
+  // "As a Magic action on your later turns, you can control the hand thus again": it opens or closes an unlocked door.
+  "mage-hand": [
+    {
+      name: "control",
+      activation: "action",
+      when: "As a Magic action on your later turns, you control the hand again, opening or closing an unlocked door within 30 feet.",
+      damage: [],
+      laterTurnsOnly: true
+    }
+  ],
+  // Magic Circle: a creature of a chosen type "can't willingly enter the Cylinder by nonmagical means", teleports in only
+  // after a Charisma save, "has Disadvantage on attack rolls against targets within the Cylinder", and "Targets within
+  // the Cylinder can't be possessed by or gain the Charmed or Frightened condition from the creature"; or, reversed,
+  // the circle holds such creatures in and protects those outside (`magicCircleForms`).
+  "magic-circle": magicCircleForms(),
+  // Overgrowth: "A creature moving through that area must spend 4 feet of movement for every 1 foot it moves." The
+  // plants stay overgrown, so the area stays until the GM ends it.
+  // "You can exclude one or more areas of any size within the spell's area from being affected": each 10-foot square
+  // the caster leaves out as it casts.
+  // "If another creature that can see the wall moves within 20 feet of it or starts its turn there, the creature must
+  // succeed on a Constitution saving throw or have the Blinded condition for 1 minute", "You and creatures you designate
+  // ... can pass through and be near the wall without harm" (the caster and its allies here), and "When a creature
+  // reaches into or passes through the wall, it does so one layer at a time through all the layers" (`layers`,
+  // `resolution/prismatic.ts`). Placed through a creature's space, the spell fails (`refusesOccupied`).
+  "prismatic-wall": [
+    {
+      name: "glare",
+      activation: "other",
+      when: "A creature that can see the wall and moves within 20 feet of it or starts its turn there makes the save or is Blinded for 1 minute; one passing into the wall makes a Dexterity save for each of its seven layers.",
+      save: {
+        ability: "con",
+        successDamage: "none",
+        failureConditions: ["blinded"],
+        failureDuration: { type: "rounds", rounds: 10 }
+      },
+      damage: [],
+      zone: {
+        on: ["enter", "start-turn"],
+        affects: "enemies",
+        nearFeet: 20,
+        seenOnly: true,
+        layers: true,
+        refusesOccupied: true
+      }
+    }
+  ],
+  // "All creatures and objects in that area that aren't anchored to the ground fall upward and reach the top of the
+  // Cylinder", a creature that succeeds on the Dexterity save having caught hold of something fixed; one that comes into
+  // the Cylinder later falls up the same way (`falling.ts` lifts and drops them).
+  "reverse-gravity": [
+    {
+      name: "pull",
+      activation: "other",
+      when: "A creature that enters the Cylinder makes the Dexterity save or falls upward to its top, staying there until the spell ends.",
+      save: {
+        ability: "dex",
+        successDamage: "none",
+        failureConditions: [],
+        failureEffect: { name: "Fallen upward", tags: ["gravity-reversed"], modifiers: [] }
+      },
+      damage: [],
+      zone: { on: ["enter"] }
+    }
+  ],
+  "plant-growth": [
+    lasting("ground", "A creature moving through the overgrown area spends 4 feet of movement for every foot.", {
+      on: [],
+      terrain: { cost: 4, kind: "plants" }
+    }),
+    {
+      name: "leave out",
+      activation: "other",
+      when: "As you cast it, leave a 10-foot square of the Sphere out of the overgrowth, as many times as you like.",
+      damage: [],
+      area: { shape: "cube", sizeFeet: 10, widthFeet: null },
+      cutsArea: true
+    }
+  ],
+  // "You can also turn Difficult Terrain caused by plant growth (such as thickets and undergrowth) into ordinary terrain
+  // that lasts for the duration. Or you can turn ordinary terrain where plants are present into Difficult Terrain that
+  // lasts for the duration." The immobile Emanation stays where it was cast; the plants' answers are the GM's.
+  "speak-with-plants": [
+    {
+      ...lasting("plants", "The plants in the Emanation speak with you; the ground is as it was.", {
+        on: [],
+        around: "caster",
+        feet: 30,
+        stays: true
+      }),
+      option: { id: "talk", name: "Leave the ground as it is" }
+    },
+    {
+      ...lasting("thicket", "The plants in the Emanation make its ground Difficult Terrain.", {
+        on: [],
+        around: "caster",
+        feet: 30,
+        stays: true,
+        terrain: { cost: 2, kind: "plants" }
+      }),
+      option: { id: "thicket", name: "Make the ground Difficult Terrain" }
+    },
+    {
+      ...lasting("clearing", "The plants in the Emanation clear their Difficult Terrain into ordinary ground.", {
+        on: [],
+        around: "caster",
+        feet: 30,
+        stays: true,
+        clearsTerrain: true
+      }),
+      option: { id: "clearing", name: "Clear the plants' Difficult Terrain" }
     }
   ],
   "produce-flame": [
@@ -442,23 +1822,50 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "1d8", type: "fire" }]
     }
   ],
+  // "While in the aura, you and each creature you choose have a +10 bonus to Dexterity (Stealth) checks": the caster
+  // and its allies.
+  "pass-without-trace": [
+    lasting("aura", "You and your allies in the aura have a +10 bonus to Dexterity (Stealth) checks.", {
+      on: [],
+      around: "caster",
+      feet: 30,
+      affects: "allies",
+      holds: {
+        modifiers: [
+          {
+            type: "check-bonus",
+            amount: 10,
+            when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
+          }
+        ]
+      }
+    })
+  ],
+  // "Creatures have the Deafened condition while entirely inside it" and "Immunity to Thunder damage".
+  silence: [
+    lasting("aura", "A creature inside the Sphere has the Deafened condition and Immunity to Thunder damage.", {
+      on: [],
+      holds: { modifiers: [{ type: "damage-immunity", damageTypes: ["thunder"] }], conditions: ["deafened"] }
+    })
+  ],
   "sleet-storm": [
     {
       name: "save",
       activation: "other",
-      when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
+      when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration. The ground is Difficult Terrain.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
       damage: [],
-      zone: { on: ["enter", "start-turn"] }
+      // "Exposed flames in the area are doused."
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "ice" }, douses: true }
     }
   ],
   "spike-growth": [
     {
       name: "spikes",
       activation: "other",
-      when: "A creature that moves into or within the area takes the damage for every 5 feet it travels.",
+      when: "A creature that moves into or within the area takes the damage for every 5 feet it travels. The area is Difficult Terrain.",
       damage: [{ formula: "2d4", type: "piercing" }],
-      zone: { on: ["travel"] }
+      zone: { on: ["travel"], terrain: { cost: 2, kind: "plants" } }
     }
   ],
   "spirit-guardians": [
@@ -494,7 +1901,89 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         failureDuration: { type: "until-bearer-turn-end" }
       },
       damage: [],
-      zone: { on: ["start-turn"] }
+      // "The cloud lingers in the air for the duration or until a strong wind (such as the one created by Gust of Wind)
+      // disperses it."
+      zone: { on: ["start-turn"], endsBy: ["wind"] }
+    }
+  ],
+  // "The glyph is nearly imperceptible", and "Once triggered, the glyph glows, filling a 60-foot-radius Sphere with Dim
+  // Light for 10 minutes, after which time the spell ends. Each creature in the Sphere when the glyph activates is
+  // targeted by its effect, as is a creature that enters the Sphere for the first time on a turn or ends its turn there.
+  // A creature is targeted only once per turn." The effect is picked as it is inscribed.
+  symbol: symbolGlyphs(),
+  // "At the start of each of your later turns, the storm produces different effects": acid on turn 2, six lightning
+  // bolts on turn 3, hail on turn 4, and on turns 5 to 10 freezing rain that leaves the area "Difficult Terrain and
+  // Heavily Obscured, ranged attacks with weapons are impossible there, and strong wind blows through the area".
+  "storm-of-vengeance": [
+    lasting("storm", "At the start of each of your later turns, the storm under the cloud changes.", {
+      on: [],
+      schedule: [
+        { turn: 2, row: "acid rain" },
+        { turn: 3, row: "lightning" },
+        { turn: 4, row: "hail" },
+        { turn: 5, row: "freezing rain" }
+      ]
+    }),
+    {
+      name: "acid rain",
+      activation: "other",
+      when: "Turn 2: each creature under the cloud takes the damage.",
+      damage: [{ formula: "4d6", type: "acid" }],
+      zone: { on: ["caster-turn-start"], everyone: true }
+    },
+    lasting("lightning", "Turn 3: you call six bolts down on six creatures under the cloud.", { on: [] }),
+    {
+      name: "bolts",
+      activation: "other",
+      when: "On the storm's third turn, six bolts strike six different creatures you pick under the cloud; each makes the save.",
+      save: save("dex"),
+      damage: [{ formula: "10d6", type: "lightning" }],
+      inArea: true,
+      targetCount: 6,
+      atRow: "lightning"
+    },
+    {
+      name: "hail",
+      activation: "other",
+      when: "Turn 4: each creature under the cloud takes the damage.",
+      damage: [{ formula: "2d6", type: "bludgeoning" }],
+      zone: { on: ["caster-turn-start"], everyone: true }
+    },
+    {
+      name: "freezing rain",
+      activation: "other",
+      when: "Turns 5 to 10: each creature under the cloud takes the damage; the area is Difficult Terrain and Heavily Obscured, ranged weapon attacks there miss, and a strong wind blows.",
+      damage: [{ formula: "1d6", type: "cold" }],
+      zone: {
+        on: ["caster-turn-start"],
+        everyone: true,
+        terrain: DIFFICULT,
+        obscures: true,
+        stopsRangedWeapons: true,
+        wind: true
+      }
+    }
+  ],
+  // "At the start of each of your turns after the wall appears, the wall, along with any creatures in it, moves 50 feet
+  // away from you. Any Huge or smaller creature inside the wall or whose space the wall enters when it moves must
+  // succeed on a Strength saving throw or take 5d10 Bludgeoning damage", "At the end of the turn, the wall's height is
+  // reduced by 50 feet, and the damage the wall deals on later rounds is reduced by 1d10", and a creature in the wall
+  // "must succeed on a Strength (Athletics) check against your spell save DC to move at all".
+  tsunami: [
+    {
+      name: "wave",
+      activation: "other",
+      when: "At the start of each of your turns the wall moves 50 feet away from you with the creatures in it, and each Huge or smaller creature it holds makes the save. It then loses 50 feet of height and 1d10 of damage. A creature in it moves only after a Strength (Athletics) check.",
+      save: save("str"),
+      damage: [{ formula: "5d10", type: "bludgeoning" }],
+      zone: {
+        on: [],
+        drifts: 50,
+        carries: true,
+        sizes: ["tiny", "small", "medium", "large", "huge"],
+        fadesFeet: 50,
+        athleticsToMove: true
+      }
     }
   ],
   // "Until the spell ends, you can take a Magic action to create a new Line of radiance."
@@ -524,33 +2013,67 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       drain: { damageType: "necrotic", heals: "half" }
     }
   ],
-  "wall-of-fire": [
+  // "A straight wall up to 60 feet long ... or a ringed wall up to 20 feet in diameter", and "one side of the wall,
+  // selected by you when you cast this spell, deals 5d8 Fire damage to each creature that ends its turn within 10 feet
+  // of that side or inside the wall": each form and burning side is an option of the cast.
+  "wall-of-fire": wallOfFireForms(),
+  // "You can form it into a hemispherical dome or a globe with a radius of up to 10 feet, or you can shape a flat
+  // surface made up of ten 10-foot-by-10-foot panels": each form is an option of the cast, raised round what it places.
+  "wall-of-force": [
     {
-      name: "burn",
-      activation: "other",
-      when: "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn within 10 feet of the burning side.",
-      damage: [{ formula: "5d8", type: "fire" }],
-      zone: { on: ["enter", "end-turn"] }
+      ...lasting("wall", "The wall stands where it was placed while the spell lasts.", { on: [] }),
+      option: { id: "flat", name: "Flat, ten 10-foot panels" }
+    },
+    {
+      ...lasting("globe", "The dome or globe stands round the point it was placed on while the spell lasts.", {
+        on: []
+      }),
+      area: { shape: "sphere", sizeFeet: 10, widthFeet: null },
+      option: { id: "globe", name: "Dome or globe, 10-foot radius" }
+    }
+  ],
+  // "The wall is 6 inches thick and is composed of ten 10-foot-by-10-foot panels ... Alternatively, you can create
+  // 10-foot-by-20-foot panels that are only 3 inches thick" (`spell-walls.ts` prints each form's panels).
+  "wall-of-stone": [
+    {
+      ...lasting("wall", "The wall stands where it was placed while the spell lasts.", { on: [] }),
+      option: { id: "thick", name: "Ten 10-foot panels, 6 inches thick" }
+    },
+    {
+      ...lasting("thin wall", "The wall stands where it was placed while the spell lasts.", { on: [] }),
+      area: { shape: "line", sizeFeet: 200, widthFeet: 5 },
+      option: { id: "thin", name: "Ten 10-by-20-foot panels, 3 inches thick" }
     }
   ],
   "wall-of-thorns": [
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN} Moving through the wall costs 4 feet for every foot.`,
       save: save("dex"),
       damage: [{ formula: "7d8", type: "slashing" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: { cost: 4, kind: "plants" } }
     }
+  ],
+  // "Arrows, bolts, and other ordinary projectiles launched at targets behind the wall are deflected upward and miss
+  // automatically"; "Small or smaller flying creatures or objects can't pass through the wall."
+  "wind-wall": [
+    lasting(
+      "wall",
+      "Arrows, bolts and other ordinary projectiles shot or thrown across the wall miss, and Small or smaller flying creatures can't pass through it.",
+      { on: [], deflects: true, bars: { way: "both", sizes: ["tiny", "small"], flying: true } }
+    )
   ],
   web: [
     {
       name: "save",
       activation: "other",
-      when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action.",
+      when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action. The webs are Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
       damage: [],
-      zone: { on: ["enter", "start-turn"] }
+      // "The webs are flammable. Any 5-foot Cube of webs exposed to fire burns away in 1 round, dealing 2d4 Fire damage
+      // to any creature that starts its turn in the fire."
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" }, burns: { formula: "2d4" } }
     }
   ],
   "zone-of-truth": [
@@ -565,13 +2088,76 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ]
 };
 
-/** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell and Feather
- *  Fall answer triggers the engine doesn't see (a spell being cast, a fall), so they stay with the GM. */
+/** Spells whose cast teleports the caster on the map, taken at once with no GM ask (`granted-moves.ts`). Teleport,
+ *  Plane Shift and Word of Recall go somewhere off the map, which stays with the GM. */
+const CAST_TELEPORTS: Readonly<Record<string, NonNullable<SpellEffect["teleport"]>>> = {
+  // "You teleport up to 30 feet to an unoccupied space you can see."
+  "misty-step": { feet: 30 },
+  // "You teleport to a location within range": seen or not. "If you ... would arrive in a space occupied by a
+  // creature ... you ... each take 4d6 Force damage, and the teleportation fails."
+  "dimension-door": { feet: 500, unseen: true, failDamage: "4d6", passenger: true }
+};
+
+/** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell answers a
+ *  trigger the engine doesn't see (a spell being cast), so it stays with the GM. */
 const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"]>>> = {
   // +5 AC until the start of the caster's next turn, including against the triggering attack.
   shield: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true },
-  "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 }
+  "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 },
+  // "When you or a creature you can see within 60 feet of you falls": the cast lands on the falling creature.
+  "feather-fall": { trigger: "falls", response: "cast-on-faller", rangeFeet: 60 },
+  // "When you see a creature within 60 feet of yourself casting a spell with Verbal, Somatic, or Material components":
+  // the caster makes a Constitution saving throw.
+  counterspell: { trigger: "casts-spell", response: "counter", ability: "con", rangeFeet: 60 }
 };
+
+/** Spells that make a creature at 0 Hit Points Stable, and whose range doubles with the cantrip's tiers. */
+const STABILIZES: ReadonlySet<string> = new Set(["spare-the-dying"]);
+const RANGE_DOUBLES: ReadonlySet<string> = new Set(["spare-the-dying"]);
+/** "No sound can be created within or pass through" its area: no spell with a Verbal component is cast inside it. */
+const SILENCES_AREA: ReadonlySet<string> = new Set(["silence"]);
+/** "A nonmagical object that isn't being worn or carried also takes the damage if it's in the spell's area." */
+const HARMS_OBJECTS: ReadonlySet<string> = new Set(["shatter", "meteor-swarm"]);
+
+/** Damage the objects in a spell's area take apart from its creatures' (Earthquake: "The tremor deals 50 Bludgeoning
+ *  damage to any structure in contact with the ground in the area when you cast the spell and at the end of each of
+ *  your turns until the spell ends"). */
+const OBJECT_DAMAGE: Readonly<Record<string, ReadonlyArray<{ formula: string; type: string }>>> = {
+  earthquake: [{ formula: "50", type: "bludgeoning" }]
+};
+/** Area spells whose caster picks the creatures in the area it affects ("each creature of your choice in a 30-foot
+ *  Sphere"), so the cast picks them; the rest of the area's creatures are spared. */
+const PICKS_IN_AREA: ReadonlySet<string> = new Set([
+  "holy-aura",
+  "mass-cure-wounds",
+  "pass-without-trace",
+  "sleep",
+  "slow",
+  "weird"
+]);
+/** "Three bolts then leap from that target to as many as three other targets ... within 30 feet of the first target." */
+const CHAIN_FEET: Readonly<Record<string, number>> = { "chain-lightning": 30 };
+/** "Using a Higher-Level Spell Slot": the feet an area grows for each slot level above the spell's (Fog Cloud's radius by
+ *  20 feet, Confusion's by 5, Create or Destroy Water's Cube by 5). */
+const AREA_PER_SLOT: Readonly<Record<string, number>> = {
+  "fog-cloud": 20,
+  confusion: 5,
+  "create-or-destroy-water": 5,
+  // "You can increase the size of the Cube by 100 feet for each spell slot level above 4."
+  "private-sanctum": 100
+};
+
+/** Cantrips that light or snuff a flame (`resolution/cast-lights.ts`): Fire Play ("light or snuff out a candle, a
+ *  torch, or a small campfire") within Druidcraft's 30 feet and Prestidigitation's 10, and Beckon Fire's embers that
+ *  "can light candles, torches, or lamps" within Elementalism's 30. */
+const KINDLES: Readonly<Record<string, NonNullable<SpellEffect["kindles"]>>> = {
+  druidcraft: { feet: 30, snuffs: true },
+  prestidigitation: { feet: 10, snuffs: true },
+  elementalism: { feet: 30 }
+};
+
+/** A Self spell's other creatures stand this near its caster ("The creatures must be within 10 feet of you"). */
+const COMPANION_FEET: Readonly<Record<string, number>> = { etherealness: 10 };
 
 /** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
 const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
@@ -601,6 +2187,10 @@ const CAST_CURES: Readonly<Record<string, Readonly<{ conditions: readonly string
   "lesser-restoration": { conditions: ["blinded", "deafened", "paralyzed", "poisoned"], one: true },
   "protection-from-poison": { conditions: ["poisoned"] }
 };
+
+/** Spells whose healing is their area's, on each creature it bathes, not the cast's on picked targets (Conjure
+ *  Celestial's Healing Light, `LATER_ACTIONS`). */
+const NO_CAST_HEALING: ReadonlySet<string> = new Set(["conjure-celestial"]);
 
 /** Healing the text gives as no single roll: Mass Heal's 700 divided among its targets, Power Word Heal's "regains all
  *  its Hit Points", and False Life's Temporary Hit Points. */
@@ -662,11 +2252,99 @@ const markDamage = (type: DamageType): Modifier => ({
   when: [{ type: "on-hit" }, { type: "by-effect-source" }]
 });
 
+/** One choice a grant or a failed save offers, with what it adds. */
+const option = (id: string, name: string, rest: Partial<Omit<GrantOption, "id" | "name">> = {}): GrantOption => ({
+  id,
+  name,
+  tags: [],
+  modifiers: [],
+  ...rest
+});
+const ABILITIES = [
+  ["str", "Strength"],
+  ["dex", "Dexterity"],
+  ["con", "Constitution"],
+  ["int", "Intelligence"],
+  ["wis", "Wisdom"],
+  ["cha", "Charisma"]
+] as const;
+/** The SRD skills, for a spell that picks one (Guidance). */
+const SKILLS: ReadonlyArray<readonly [id: string, name: string]> = [
+  ["acrobatics", "Acrobatics"],
+  ["animal-handling", "Animal Handling"],
+  ["arcana", "Arcana"],
+  ["athletics", "Athletics"],
+  ["deception", "Deception"],
+  ["history", "History"],
+  ["insight", "Insight"],
+  ["intimidation", "Intimidation"],
+  ["investigation", "Investigation"],
+  ["medicine", "Medicine"],
+  ["nature", "Nature"],
+  ["perception", "Perception"],
+  ["performance", "Performance"],
+  ["persuasion", "Persuasion"],
+  ["religion", "Religion"],
+  ["sleight-of-hand", "Sleight of Hand"],
+  ["stealth", "Stealth"],
+  ["survival", "Survival"]
+];
+const titled = (type: string) => `${type[0]!.toUpperCase()}${type.slice(1)}`;
+/** Resistance's eleven types. */
+const RESISTANCE_TYPES: readonly DamageType[] = [
+  "acid",
+  "bludgeoning",
+  "cold",
+  "fire",
+  "lightning",
+  "necrotic",
+  "piercing",
+  "poison",
+  "radiant",
+  "slashing",
+  "thunder"
+];
+/** The kinds of creature Protection from Evil and Good guards against; Dispel Evil and Good leaves Aberrations out. */
+const OTHERWORLDLY = ["aberration", "celestial", "elemental", "fey", "fiend", "undead"];
+/** Disadvantage on attack rolls against the bearer from creatures of these kinds. */
+const attackedWithDisadvantageBy = (creatureTypes: readonly string[]): Modifier => ({
+  type: "roll-mode",
+  roll: "incoming-attack",
+  mode: "disadvantage",
+  when: [{ type: "on-attack-roll" }, { type: "source-creature-type-is", creatureTypes: [...creatureTypes] }]
+});
+/** A roll mode on one ability's checks, saves or attack rolls. */
+const onAbility = (
+  roll: "check" | "save" | "attack",
+  mode: "advantage" | "disadvantage",
+  ability: (typeof ABILITIES)[number][0]
+): Modifier => ({
+  type: "roll-mode",
+  roll,
+  mode,
+  when: [
+    { type: roll === "check" ? "on-ability-check" : roll === "save" ? "on-saving-throw" : "on-attack-roll" },
+    { type: "ability-is", abilities: [ability] }
+  ]
+});
+/** Alter Self's natural weapon: the Unarmed Strike deals 1d6 of this type with the spellcasting ability. */
+const naturalWeapon = (id: string, name: string, damageType: DamageType) =>
+  option(id, name, { unarmedStrike: { dice: "1d6", damageType, ability: "spellcasting" } });
+/** A die on the bearer's weapon and Unarmed Strike damage rolls, or with a minus taken off them (Reduce's 1d4 less,
+ *  never below 1). */
+const weaponDamageDie = (dice: string, leavesOne = false): Modifier => ({
+  type: "damage-bonus",
+  amount: 0,
+  dice,
+  ...(leavesOne ? { leavesOne: true as const } : {}),
+  when: [{ type: "on-damage-roll" }, { type: "attack-kind-is", kinds: ["weapon", "unarmed"] }]
+});
+
 /**
  * What a cast leaves on the creatures it targets (or the one its attack hits) while it lasts, in the effect vocabulary
- * the engine reads (SRD 5.2.1 text). The durations are the spells' own, "until ended" past 10 minutes (the engine keeps
- * no clock outside a fight); a Concentration spell's effects also end with the caster's Concentration. Mage Armor's AC
- * and Haste's Speed are measured on the creature when it lands (`grant.ts`).
+ * the engine reads (SRD 5.2.1 text). A grant "until ended" lasts the spell's own duration at the level it was cast
+ * (`grant.ts`), and a Concentration spell's effects also end with the caster's Concentration; a duration given here is
+ * one the text prints apart from the spell's (Guiding Bolt's light).
  */
 const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   // "Its Speed is reduced by 10 feet until the start of your next turn."
@@ -694,13 +2372,87 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     onHit: true,
     duration: { type: "until-source-turn-end" }
   }),
-  // "Until the end of your next turn, it ... can't benefit from the Invisible condition"; its Dim Light is the GM's.
+  // "Until the end of your next turn, it emits Dim Light in a 10-foot radius and can't benefit from the Invisible
+  // condition."
   "starry-wisp": spellGrant({
     name: "Starry Wisp",
     tags: ["outlined"],
     target: "target",
     onHit: true,
-    duration: { type: "until-source-turn-end" }
+    duration: { type: "until-source-turn-end" },
+    light: { brightFeet: 0, dimFeet: 10 }
+  }),
+  // "For the duration, you see creatures and objects that have the Invisible condition as if they were visible."
+  "see-invisibility": spellGrant({
+    name: "See Invisibility",
+    tags: ["see-invisibility"],
+    target: "self",
+    duration: { type: "manual" },
+    modifiers: [{ type: "sense", sense: "see-invisibility", feet: 0 }]
+  }),
+  // "This spell gives the willing creature you touch Truesight with a range of 120 feet."
+  "true-seeing": spellGrant({
+    name: "True Seeing",
+    tags: ["true-seeing"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "sense", sense: "truesight", feet: 120 }]
+  }),
+  // "For the duration, you sense the location of any Aberration, Celestial, Elemental, Fey, Fiend, or Undead within 30
+  // feet of yourself. You also sense whether the Hallow spell is active there and, if so, where. The spell is blocked
+  // by 1 foot of stone, dirt, or wood; 1 inch of metal; or a thin sheet of lead."
+  // "You sense the presence of magical effects within 30 feet of yourself ... The spell is blocked by 1 foot of stone"
+  // (`vision/detect.ts`): the creatures in sight bearing magic, shown once its Magic action looks.
+  "detect-magic": spellGrant({
+    name: "Detect Magic",
+    tags: ["detect-magic"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: { kinds: ["magic"], feet: 30, blockedByWalls: true, afterAction: true }
+  }),
+  // "You sense the location of poisons, poison- or venom-bearing creatures, and magical contagions within 30 feet of
+  // yourself. You sense the kind of poison, creature, or contagion in each case."
+  "detect-poison-and-disease": spellGrant({
+    name: "Detect Poison and Disease",
+    tags: ["detect-poison-and-disease"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: { kinds: ["poison"], feet: 30, blockedByWalls: true }
+  }),
+  // Sense Thoughts: the minds within 30 feet, blocked by a thick enough barrier (`vision/detect.ts`).
+  "detect-thoughts": spellGrant({
+    name: "Detect Thoughts",
+    tags: ["detect-thoughts"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: { kinds: ["minds"], feet: 30, blockedByWalls: true }
+  }),
+  // "You make yourself ... look different until the spell ends": the disguise is an effect on the caster for the hour,
+  // which a Hat of Disguise ends when it comes off. How it looks and who sees through it are the GM's.
+  "disguise-self": spellGrant({
+    name: "Disguise Self",
+    tags: ["disguised"],
+    target: "self",
+    duration: { type: "manual" }
+  }),
+  "detect-evil-and-good": spellGrant({
+    name: "Detect Evil and Good",
+    tags: ["detect-evil-and-good"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: {
+      creatureTypes: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
+      feet: 30,
+      blockedByWalls: true
+    }
+  }),
+  // "For the duration, a willing creature you touch has Darkvision with a range of 150 feet."
+  darkvision: spellGrant({
+    name: "Darkvision",
+    tags: ["darkvision-spell"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "darkvision", feet: 150 }]
   }),
   bless: spellGrant({
     name: "Bless",
@@ -716,14 +2468,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: rounds(100),
     armorClassBonus: 2
   }),
-  // The next attack roll against the creature before the end of the caster's next turn, whoever makes it, which
-  // spends the light; it lasts until the start of the caster's turn after, as Vex does.
+  // "The next attack roll made against it before the end of your next turn has Advantage": whoever makes it spends the
+  // light.
   "guiding-bolt": spellGrant({
     name: "Guiding Bolt's light",
     tags: ["until-attacked"],
     target: "target",
     onHit: true,
-    duration: rounds(2),
+    duration: { type: "until-source-turn-end" },
     modifiers: [attackedWithAdvantage]
   }),
   "hunters-mark": spellGrant({
@@ -733,9 +2485,10 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [markDamage("force")]
   }),
+  // "You place a curse on a creature", which Remove Curse ends.
   hex: spellGrant({
     name: "Hex",
-    tags: ["hexed"],
+    tags: ["hexed", "curse"],
     target: "target",
     duration: { type: "manual" },
     modifiers: [markDamage("necrotic")]
@@ -784,15 +2537,27 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
   }),
-  // "Any creature has Disadvantage on attack rolls against you." An attacker that perceives the caster with
-  // Blindsight or Truesight is the GM's to spare.
+  // "Any creature has Disadvantage on attack rolls against you. An attacker is immune to this effect if it perceives
+  // you with Blindsight or Truesight."
+  // Three duplicates for a minute, counted on the tag; the server rolls their d6s on each hit (`mirror-image.ts`).
+  "mirror-image": spellGrant({
+    name: "Mirror Image",
+    tags: ["mirror-image", "mirror-image-3"],
+    target: "self",
+    duration: rounds(10)
+  }),
   blur: spellGrant({
     name: "Blur",
     tags: ["blur"],
     target: "self",
     duration: rounds(10),
     modifiers: [
-      { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+      {
+        type: "roll-mode",
+        roll: "incoming-attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "other-lacks-sense", senses: ["blindsight", "truesight"] }]
+      }
     ]
   }),
   // "Your attacks with weapons deal an extra 1d4 Radiant damage on a hit."
@@ -825,8 +2590,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
       { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
     ]
   }),
-  // "An Armor Class of 17 if its AC is lower than that", measured as the spell lands.
-  barkskin: spellGrant({ name: "Barkskin", tags: ["barkskin"], target: "target", duration: { type: "manual" } }),
+  // "The target has an Armor Class of 17 if its AC is lower than that."
+  barkskin: spellGrant({
+    name: "Barkskin",
+    tags: ["barkskin"],
+    target: "target",
+    duration: { type: "manual" },
+    armorClassFloor: 17
+  }),
   // "The first time the target would drop to 0 Hit Points before the spell ends, the target instead drops to 1 Hit
   // Point, and the spell ends."
   "death-ward": spellGrant({
@@ -842,12 +2613,17 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "target",
     duration: { type: "manual" }
   }),
-  // "Advantage on ability checks using the chosen ability", one for every target the cast takes.
+  // "Advantage on ability checks using the chosen ability", any but Constitution, picked for each target the cast
+  // takes.
   "enhance-ability": spellGrant({
     name: "Enhance Ability",
-    tags: ["enhance-ability", "enhanced-ability"],
+    tags: ["enhance-ability"],
     target: "targets",
-    duration: { type: "manual" }
+    duration: { type: "manual" },
+    optionsPerTarget: true,
+    options: ABILITIES.filter(([ability]) => ability !== "con").map(([ability, name]) =>
+      option(ability, name, { modifiers: [onAbility("check", "advantage", ability)] })
+    )
   }),
   // "A creature you touch has the Invisible condition until the spell ends."
   "greater-invisibility": spellGrant({
@@ -866,11 +2642,127 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     conditions: ["invisible"]
   }),
+  // "Grants up to ten willing creatures of your choice within range the ability to breathe underwater until the spell
+  // ends": a creature holding its breath breathes again.
+  "water-breathing": spellGrant({
+    name: "Water Breathing",
+    tags: ["water-breathing"],
+    target: "targets",
+    duration: { type: "manual" }
+  }),
+  // "Move across any liquid surface ... as if it were harmless solid ground": painted water costs no swimming and its
+  // dangers don't reach the creature; a Bonus Action passes into the liquid and back (Pass the Surface).
+  "water-walk": spellGrant({
+    name: "Water Walk",
+    tags: ["water-walking"],
+    target: "targets",
+    duration: { type: "manual" }
+  }),
+  // "Any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a Wisdom
+  // saving throw or either choose a new target or lose the attack or spell", and it ends "if the warded creature
+  // makes an attack roll, casts a spell, or deals damage".
+  sanctuary: spellGrant({
+    name: "Sanctuary",
+    tags: ["sanctuary", "until-it-acts"],
+    target: "target",
+    duration: rounds(10),
+    ward: { ability: "wis" }
+  }),
+  // "The target's base AC becomes 13 plus its Dexterity modifier", a way to work out AC that riders add to.
   "mage-armor": spellGrant({
     name: "Mage Armor",
     tags: ["mage-armor"],
     target: "target",
+    duration: { type: "manual" },
+    baseArmorClass: 13
+  }),
+  // "If a creature lands before the spell ends, the creature takes no damage from the fall, and the spell ends for
+  // that creature." The engine lands a creature that carries it without damage (`falling.ts`).
+  "feather-fall": spellGrant({
+    name: "Feather Fall",
+    tags: ["feather-fall"],
+    target: "targets",
+    duration: rounds(10)
+  }),
+  // "Once on each of its turns until the spell ends, that creature can jump up to 30 feet by spending 10 feet of
+  // movement": a jump the movement rules take once a turn (`jumping.ts`).
+  jump: spellGrant({
+    name: "Jump",
+    tags: ["jump"],
+    target: "targets",
+    duration: rounds(10),
+    modifiers: [{ type: "movement", rule: "leap", feet: 30, costFeet: 10 }]
+  }),
+  // "You step into the border regions of the Ethereal Plane": its token stays on the map, unseen and untouchable from
+  // this plane, moving through it in any direction, until the caster ends it (8 hours); "if you appear in an occupied
+  // space, you are shunted to the nearest unoccupied space and take Force damage equal to twice the number of feet you
+  // are moved" (`ethereal.ts`, `off-plane.ts`). From a higher slot, willing creatures within 10 feet go too.
+  etherealness: spellGrant({
+    name: "Etherealness",
+    tags: ["ethereal", "ethereal-shunt"],
+    target: "self-and-targets",
     duration: { type: "manual" }
+  }),
+  // "You banish a creature ... into a labyrinthine demiplane": off the map while the caster concentrates. "The target
+  // can take a Study action to try to escape ... a DC 20 Intelligence (Investigation) check": its way out ends it.
+  maze: spellGrant({
+    name: "Maze",
+    tags: ["maze", "off-plane"],
+    target: "target",
+    duration: rounds(100),
+    endAction: {
+      activation: "action",
+      kind: "check",
+      ability: "int",
+      skill: "investigation",
+      dc: 20,
+      label: "Find the way out"
+    }
+  }),
+  // "Roll 1d6 at the end of each of your turns": the server rolls it, and on a 4 or more the caster is off the map
+  // until the start of its next turn (`off-plane.ts`).
+  blink: spellGrant({
+    name: "Blink",
+    tags: ["blink"],
+    target: "self",
+    duration: rounds(10)
+  }),
+  // "Move from inside it to inside another tree of the same kind within 500 feet ... You must use 5 feet of movement to
+  // enter a tree ... using another 5 feet of movement ... only once on each of your turns": a 500-foot teleport, seen
+  // or not, for 10 feet of movement, on each of the caster's turns while it concentrates (`granted-moves.ts`).
+  "tree-stride": spellGrant({
+    name: "Tree Stride",
+    tags: ["tree-stride"],
+    target: "self",
+    duration: rounds(10),
+    teleportEachTurn: { feet: 500, unseen: true, costFeet: 10 }
+  }),
+  // "You step into a stone object or surface ... Nothing of your presence remains visible or otherwise detectable by
+  // nonmagical senses. While merged with the stone, you can't see what occurs outside it, and any Wisdom (Perception)
+  // checks you make to hear sounds outside it are made with Disadvantage ... can cast spells on yourself": off the map,
+  // untouchable both ways, back where it entered (`off-plane.ts`), for 8 hours.
+  "meld-into-stone": spellGrant({
+    name: "Meld into Stone",
+    tags: ["off-plane", "meld-into-stone"],
+    target: "self",
+    duration: { type: "minutes", minutes: 480 },
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "disadvantage",
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
+      }
+    ]
+  }),
+  // "Up to eight Medium or smaller creatures" climb into the extradimensional space at the rope's top for the hour:
+  // "Attacks, spells, and other effects can't pass into or out of the space ... Anything inside the space drops out when
+  // the spell ends" (`off-plane.ts`, back to the space each left).
+  "rope-trick": spellGrant({
+    name: "Inside the Rope Trick",
+    tags: ["off-plane", "rope-trick"],
+    target: "targets",
+    duration: { type: "minutes", minutes: 60 }
   }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({
@@ -896,19 +2788,415 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [{ type: "speed", amount: 10 }]
   }),
-  // "The target also has a Swim Speed equal to its Speed." Its other protections stay with the GM.
+  // "Spells and other magical effects can neither reduce the target's Speed nor cause the target to have the Paralyzed
+  // or Restrained conditions. The target also has a Swim Speed equal to its Speed ... the target can spend 5 feet of
+  // movement to automatically escape from nonmagical restraints": the tags the engine reads (effects.ts, speed.ts,
+  // resolution/builtins.ts), so a Net or a constrictor still holds it until it slips free.
   "freedom-of-movement": spellGrant({
     name: "Freedom of Movement",
-    tags: ["freedom-of-movement"],
+    tags: ["freedom-of-movement", "slips-restraints"],
     target: "targets",
     duration: { type: "manual" },
     modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
   }),
+  // "Until the spell ends, the target can take a Magic action to exhale", the type chosen at the cast: the touched
+  // creature's own action, at the caster's numbers.
+  // "Choose a spell of level 5 or lower that you can cast, that has a casting time of an action, and that can target
+  // you. You cast that spell, called the contingent spell, as part of casting Contingency." The next such spell its
+  // caster casts within a minute is held for the 10 days (`stored-casts.ts`); casting Contingency again replaces it.
+  contingency: spellGrant({
+    name: "Contingency",
+    tags: ["contingency"],
+    target: "self",
+    duration: { type: "minutes", minutes: 14_400 },
+    storeAwaits: { via: "contingency", maxLevel: 5 }
+  }),
+  // "Spell Glyph. You can store a prepared spell of level 3 or lower in the glyph by casting it as part of creating the
+  // glyph", up to the slot's level: the next such spell its caster casts within a minute makes the glyph a spell glyph.
+  "glyph-of-warding": spellGrant({
+    name: "Glyph of Warding",
+    tags: ["glyph-of-warding"],
+    target: "self",
+    duration: rounds(10),
+    storeAwaits: { via: "glyph", maxLevel: 3 }
+  }),
+  // "You or a willing creature you touch enters a trance state to act as a dream messenger. While in the trance, the
+  // messenger is Incapacitated and has a Speed of 0." Ending the effect is emerging from the trance, which ends the spell.
+  dream: spellGrant({
+    name: "Dream messenger's trance",
+    tags: ["dream-trance"],
+    target: "self",
+    duration: { type: "manual" },
+    conditions: ["incapacitated"],
+    speedZero: true
+  }),
+  // "Until the spell ends, the target can revert to cloud form": each target keeps the spell, and its action to become
+  // a cloud again, for the spell's duration.
+  "wind-walk": spellGrant({
+    name: "Wind Walk",
+    tags: ["wind-walk"],
+    target: "targets",
+    duration: { type: "manual" },
+    grantsLaterAction: "cloud form"
+  }),
+  "dragons-breath": spellGrant({
+    name: "Dragon's Breath",
+    tags: ["dragons-breath"],
+    target: "target",
+    duration: rounds(10),
+    grantsLaterAction: "exhale"
+  }),
+  // "Choose a skill. Until the spell ends, the creature adds 1d4 to any ability check using the chosen skill."
+  guidance: spellGrant({
+    name: "Guidance",
+    tags: ["guidance"],
+    target: "target",
+    duration: rounds(10),
+    options: SKILLS.map(([skill, name]) =>
+      option(skill, name, {
+        modifiers: [
+          {
+            type: "check-bonus",
+            amount: 0,
+            dice: "1d4",
+            when: [{ type: "on-ability-check" }, { type: "skill-is", skills: [skill] }]
+          }
+        ]
+      })
+    )
+  }),
+  // "Choose a damage type ... the creature reduces the total damage taken by 1d4. A creature can benefit from this
+  // spell only once per turn."
+  resistance: spellGrant({
+    name: "Resistance",
+    tags: ["resistance"],
+    target: "target",
+    duration: rounds(10),
+    options: RESISTANCE_TYPES.map((type) =>
+      option(type, titled(type), {
+        modifiers: [
+          {
+            type: "damage-reduction",
+            amount: 0,
+            dice: "1d4",
+            oncePerTurn: true,
+            when: [{ type: "on-taking-damage" }, { type: "damage-type-is", damageTypes: [type] }]
+          }
+        ]
+      })
+    )
+  }),
+  // "When you make a Charisma check, you can replace the number you roll with a 15." The lie-detecting magic is the
+  // GM's.
+  glibness: spellGrant({
+    name: "Glibness",
+    tags: ["glibness"],
+    target: "self",
+    duration: { type: "manual" },
+    modifiers: [
+      {
+        type: "d20-minimum",
+        roll: "check",
+        minimum: 15,
+        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["cha"] }]
+      }
+    ]
+  }),
+  // "Immunity to Psychic damage and the Charmed condition." What it hides from divination is the GM's.
+  "mind-blank": spellGrant({
+    name: "Mind Blank",
+    tags: ["mind-blank"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [
+      { type: "damage-immunity", damageTypes: ["psychic"] },
+      { type: "spell-ward", schools: ["divination"] }
+    ],
+    conditionImmunities: ["charmed"]
+  }),
+  // "The target gains an Intelligence of 10", for good; its Charmed for 30 days is the cast's `inflicts`. The language
+  // it learns and a natural plant's statistics are the GM's.
+  awaken: spellGrant({
+    name: "Awakened",
+    tags: ["awakened"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "ability-score-minimum", ability: "int", score: 10 }]
+  }),
+  // "You hide a target that you touch from Divination spells ... The target can't be targeted by any Divination
+  // spell." A place or an object, and scrying sensors, are the GM's.
+  nondetection: spellGrant({
+    name: "Nondetection",
+    tags: ["nondetection"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "spell-ward", schools: ["divination"] }]
+  }),
+  // Mask: "Choose a creature type other than the target's actual type. Spells and other magical effects treat the
+  // target as if it were a creature of the chosen type." The pick is the effect's tag, which creatureTypeOf reads.
+  "arcanists-magic-aura": spellGrant({
+    name: "Arcanist's Magic Aura",
+    tags: ["arcanists-magic-aura"],
+    target: "target",
+    duration: { type: "manual" },
+    options: CREATURE_TYPES.map((type) =>
+      option(type, `Mask: ${type[0]!.toUpperCase()}${type.slice(1)}`, { tags: [`${MASKED_TYPE_TAG}${type}`] })
+    )
+  }),
+  // "Resistance to Poison damage ... Immunity to the Frightened and Poisoned conditions. Its Hit Point maximum also
+  // increases by 2d10, and it gains the same number of Hit Points", rolled for each, for 24 hours.
+  "heroes-feast": spellGrant({
+    name: "Heroes' Feast",
+    tags: ["heroes-feast"],
+    target: "targets",
+    duration: { type: "minutes", minutes: 1440 },
+    modifiers: [{ type: "damage-resistance", damageTypes: ["poison"] }],
+    conditionImmunities: ["frightened", "poisoned"],
+    hitPointMaximumGain: { amount: 0, formula: "2d10" }
+  }),
+  // "For the duration, the target regains 1 Hit Point at the start of each of its turns."
+  regenerate: spellGrant({
+    name: "Regenerate",
+    tags: ["regenerate"],
+    target: "target",
+    duration: { type: "manual" },
+    hitPointsEachTurn: 1
+  }),
+  // "Advantage on Wisdom saving throws and Death Saving Throws and regains the maximum number of Hit Points possible
+  // from any healing."
+  "beacon-of-hope": spellGrant({
+    name: "Beacon of Hope",
+    tags: ["beacon-of-hope"],
+    target: "targets",
+    duration: rounds(10),
+    modifiers: [
+      onAbility("save", "advantage", "wis"),
+      { type: "roll-mode", roll: "death-save", mode: "advantage" },
+      { type: "healing-received-maximized" }
+    ]
+  }),
+  // "Creatures of those types have Disadvantage on attack rolls against the target. The target also can't be possessed
+  // by or gain the Charmed or Frightened conditions from them."
+  "protection-from-evil-and-good": spellGrant({
+    name: "Protection from Evil and Good",
+    tags: ["protection-from-evil-and-good"],
+    target: "target",
+    duration: rounds(100),
+    modifiers: [attackedWithDisadvantageBy(OTHERWORLDLY)],
+    conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...OTHERWORLDLY], possession: true }
+  }),
+  // "Celestials, Elementals, Fey, Fiends, and Undead have Disadvantage on attack rolls against you."
+  "dispel-evil-and-good": spellGrant({
+    name: "Dispel Evil and Good",
+    tags: ["dispel-evil-and-good"],
+    target: "self",
+    duration: rounds(10),
+    modifiers: [attackedWithDisadvantageBy(OTHERWORLDLY.filter((type) => type !== "aberration"))]
+  }),
+  // "The warm shield grants you Resistance to Cold damage, and the chill shield grants you Resistance to Fire damage",
+  // and a creature within 5 feet that hits you with a melee attack roll takes 2d8 Fire or Cold.
+  "fire-shield": spellGrant({
+    name: "Fire Shield",
+    tags: ["fire-shield"],
+    target: "self",
+    duration: { type: "manual" },
+    struck: { withinFeet: 5, damage: [{ formula: "2d8", type: "fire" }] },
+    options: [
+      option("warm", "Warm Shield", {
+        modifiers: [{ type: "damage-resistance", damageTypes: ["cold"] }],
+        damageType: "fire"
+      }),
+      option("chill", "Chill Shield", {
+        modifiers: [{ type: "damage-resistance", damageTypes: ["fire"] }],
+        damageType: "cold"
+      })
+    ]
+  }),
+  // "That weapon becomes a magic weapon with a +1 bonus to attack rolls and damage rolls", +2 from a level 3 slot and
+  // +3 from a level 6 slot. One of the caster's own weapons.
+  "magic-weapon": spellGrant({
+    name: "Magic Weapon",
+    tags: ["magic-weapon"],
+    target: "self",
+    duration: { type: "manual" },
+    bindsWeapon: {
+      nonmagical: true,
+      bonusBySlot: [
+        { level: 2, bonus: 1 },
+        { level: 3, bonus: 2 },
+        { level: 6, bonus: 3 }
+      ]
+    }
+  }),
+  // "You can use your spellcasting ability instead of Strength for the attack and damage rolls of melee attacks using
+  // that weapon, and the weapon's damage die becomes a d8 ... it can be Force damage", d10 at level 5, d12 at 11, 2d6
+  // at 17.
+  shillelagh: spellGrant({
+    name: "Shillelagh",
+    tags: ["shillelagh"],
+    target: "self",
+    duration: rounds(10),
+    bindsWeapon: {
+      weaponIds: ["club", "quarterstaff"],
+      ability: "spellcasting",
+      dice: [
+        { level: 1, formula: "1d8" },
+        { level: 5, formula: "1d10" },
+        { level: 11, formula: "1d12" },
+        { level: 17, formula: "2d6" }
+      ],
+      damageTypes: ["force"]
+    }
+  }),
+  // "Guided by a flash of magical insight, you make one attack with the weapon used in the spell's casting. The attack
+  // uses your spellcasting ability for the attack and damage rolls instead of using Strength or Dexterity. If the attack
+  // deals damage, it can be Radiant damage or the weapon's normal damage type (your choice)." Extra Radiant at levels 5,
+  // 11 and 17. The weapon must be one the caster is proficient with.
+  "true-strike": spellGrant({
+    name: "True Strike",
+    tags: ["true-strike"],
+    target: "self",
+    duration: { type: "until-source-turn-end" },
+    bindsWeapon: {
+      needsProficiency: true,
+      attacksNow: true,
+      ability: "spellcasting",
+      damageTypes: ["radiant"],
+      extraDamage: {
+        type: "radiant",
+        dice: [
+          { level: 5, formula: "1d6" },
+          { level: 11, formula: "2d6" },
+          { level: 17, formula: "3d6" }
+        ]
+      }
+    }
+  }),
+  // "You take the Dash action, and until the spell ends, you can take that action again as a Bonus Action."
+  "expeditious-retreat": spellGrant({
+    name: "Expeditious Retreat",
+    tags: ["expeditious-retreat"],
+    target: "self",
+    duration: rounds(100),
+    dashesNow: true,
+    bonusActions: ["dash"]
+  }),
+  // "You can take the Disengage action as a Bonus Action" while the spell lasts.
+  "conjure-woodland-beings": spellGrant({
+    name: "Conjure Woodland Beings",
+    tags: ["conjure-woodland-beings"],
+    target: "self",
+    duration: rounds(100),
+    bonusActions: ["disengage"]
+  }),
+  // "Any attack you make deals an extra 2d8 damage when you hit a creature within 15 feet of yourself. This damage is
+  // Acid, Cold, Fire, or Lightning (your choice when you make the attack)": the cast picks a default, each hit another.
+  "conjure-minor-elementals": spellGrant({
+    name: "Conjure Minor Elementals",
+    tags: ["conjure-minor-elementals"],
+    target: "self",
+    duration: rounds(100),
+    // "The damage increases by 1d8 for each spell slot level above 4."
+    extraDamagePerSlot: "1d8",
+    options: (["acid", "cold", "fire", "lightning"] as const).map((type) =>
+      option(type, titled(type), {
+        modifiers: [
+          {
+            type: "extra-damage",
+            formula: "2d8",
+            damageType: type,
+            // The type picked at the cast is the default; each attack may pick another.
+            damageTypes: ["acid", "cold", "fire", "lightning"],
+            doubleOnCritical: true,
+            when: [{ type: "on-hit" }, { type: "versus-within", feet: 15 }]
+          }
+        ]
+      })
+    )
+  }),
+  // Aquatic Adaptation's Swim Speed, or a natural weapon for the Unarmed Strike: 1d6 with the spellcasting ability.
+  "alter-self": spellGrant({
+    name: "Alter Self",
+    tags: ["alter-self"],
+    target: "self",
+    duration: { type: "manual" },
+    options: [
+      option("aquatic-adaptation", "Aquatic Adaptation", {
+        modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
+      }),
+      option("change-appearance", "Change Appearance"),
+      naturalWeapon("claws", "Claws", "slashing"),
+      naturalWeapon("fangs", "Fangs", "piercing"),
+      naturalWeapon("horns", "Horns", "piercing"),
+      naturalWeapon("hooves", "Hooves", "bludgeoning")
+    ]
+  }),
+  // "Until the spell ends, the target has a +1 bonus to AC and saving throws, and it has Resistance to all damage." The
+  // tag shares its damage with the caster and ends the bond at 60 feet apart (warding-bond.ts).
+  "warding-bond": spellGrant({
+    name: "Warding Bond",
+    tags: ["warding-bond"],
+    target: "target",
+    duration: { type: "manual" },
+    armorClassBonus: 1,
+    modifiers: [
+      { type: "save-bonus", amount: 1, when: [{ type: "on-saving-throw" }] },
+      {
+        type: "damage-resistance",
+        damageTypes: [...DamageTypeSchema.options]
+      }
+    ]
+  }),
+  // "You gain the Invisible condition ... the invisibility ends immediately after you make an attack roll, deal damage,
+  // or cast a spell", while the double lasts.
+  mislead: spellGrant({
+    name: "Mislead",
+    tags: ["mislead", "invisible-until-it-acts"],
+    target: "self",
+    duration: { type: "manual" },
+    conditions: ["invisible"]
+  }),
+  // "The target has the Invisible condition ... it has the Unconscious condition ... This spell also ends if the target
+  // takes any damage." The end the caster sets is the GM's.
+  sequester: spellGrant({
+    name: "Sequester",
+    tags: ["sequester"],
+    target: "target",
+    duration: { type: "manual" },
+    conditions: ["invisible", "unconscious"],
+    endsOnDamage: true
+  }),
+  // Booming Voice: "Advantage on Charisma (Intimidation) checks". The other wonders are the GM's.
+  thaumaturgy: spellGrant({
+    name: "Thaumaturgy",
+    tags: ["thaumaturgy"],
+    target: "self",
+    duration: rounds(10),
+    options: [
+      option("altered-eyes", "Altered Eyes"),
+      option("booming-voice", "Booming Voice", {
+        modifiers: [
+          {
+            type: "roll-mode",
+            roll: "check",
+            mode: "advantage",
+            when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["intimidation"] }]
+          }
+        ]
+      }),
+      option("fire-play", "Fire Play"),
+      option("invisible-hand", "Invisible Hand"),
+      option("phantom-sound", "Phantom Sound"),
+      option("tremors", "Tremors")
+    ]
+  }),
+  // "The target's Speed is doubled", whatever its Speed is at each moment.
   haste: spellGrant({
     name: "Haste",
     tags: ["hasted"],
     target: "target",
     duration: rounds(10),
+    speedMultiplier: 2,
     armorClassBonus: 2,
     modifiers: [
       {
@@ -924,8 +3212,15 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
 /** What a failed save against the cast leaves on the creature while the spell lasts (SRD 5.2.1 text). */
 const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   bane: { name: "Bane", tags: ["baned"], duration: rounds(10), modifiers: d20Dice("-1d4") },
-  // Outlined in light: attack rolls against it have Advantage, and it can't benefit from the Invisible condition.
-  "faerie-fire": { name: "Faerie Fire", tags: ["outlined"], duration: rounds(10), modifiers: [attackedWithAdvantage] },
+  // Outlined in light: it sheds Dim Light in a 10-foot radius, attack rolls against it have Advantage "if the attacker
+  // can see it", and it can't benefit from the Invisible condition.
+  "faerie-fire": {
+    name: "Faerie Fire",
+    tags: ["outlined"],
+    duration: rounds(10),
+    modifiers: [{ ...attackedWithAdvantage, when: [{ type: "on-attack-roll" }, { type: "seen-by-other" }] }],
+    light: { brightFeet: 0, dimFeet: 10 }
+  },
   // "Speed is halved, it takes a -2 penalty to AC and Dexterity saving throws, and it can't take Reactions", with
   // one action or Bonus Action a turn, one attack with the Attack action and a chance a somatic spell fails.
   slow: {
@@ -940,10 +3235,228 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
       }
     ]
   },
+  // "Rises vertically up to 20 feet and remains suspended there for the duration", moving only "as if it were
+  // climbing"; when it ends the target "floats gently to the ground" (`falling.ts` raises and lowers it).
+  levitate: { name: "Levitate", tags: ["levitating"], modifiers: [] },
+  // "Transported to a harmless demiplane for the duration ... When the spell ends, the target reappears in the space it
+  // left or in the nearest unoccupied space": it leaves the map until the effect ends (`off-plane.ts`). An Aberration,
+  // a Celestial, an Elemental, a Fey or a Fiend gone the full minute doesn't come back (`banished-home`).
+  banishment: { name: "Banished", tags: ["off-plane", "banished-home"], modifiers: [] },
+  // Imprisoned "until the spell is dispelled": off the map until the GM ends it. Its form, and the trigger that frees
+  // it, are the GM's.
+  // "While imprisoned, the target doesn't need to breathe, eat, or drink ... Divination spells can't locate or perceive
+  // the imprisoned target, and the target can't teleport", in the form the caster picks: Burial, Hedged Prison and
+  // Minimus Containment take it from the map; Chaining holds it Restrained in place, unmovable by any means; Slumber
+  // leaves it Unconscious, and nothing wakes it.
+  imprisonment: {
+    name: "Imprisoned",
+    tags: ["imprisoned", "no-teleport", "sustained"],
+    modifiers: [{ type: "spell-ward", schools: ["divination"] }],
+    options: [
+      option("burial", "Burial", { tags: ["off-plane"] }),
+      option("chaining", "Chaining", { conditions: ["restrained"], tags: ["unmovable"] }),
+      option("hedged-prison", "Hedged Prison", { tags: ["off-plane"] }),
+      option("minimus-containment", "Minimus Containment", { tags: ["off-plane"] }),
+      option("slumber", "Slumber", { conditions: ["unconscious"] })
+    ]
+  },
+  // "Must immediately use its Reaction, if available, to move as far away from you as it can, using the safest route":
+  // the server spends the Reaction and gives the creature a move of its Speed that must end farther away.
+  "dissonant-whispers": {
+    name: "Dissonant Whispers",
+    tags: ["flees-with-reaction"],
+    duration: rounds(1),
+    modifiers: []
+  },
   // "Can't cast spells or take the Magic action", until a repeated save every 30 days or a spell ends it.
-  befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
+  // "The effect can also be ended by the Greater Restoration, Heal, or Wish spell."
+  befuddlement: { name: "Befuddlement", tags: ["no-spells", "restorable", "cured-by-heal"], modifiers: [] },
+  // "A Greater Restoration spell cast on you ends this effect."
+  "contact-other-plane": { name: "Contact Other Plane", tags: ["restorable"], modifiers: [] },
   // "Another 5d4 Acid damage at the end of its next turn" (the save carries the damage).
   "vitriolic-sphere": { name: "Vitriolic Sphere", tags: ["vitriolic-sphere"], duration: rounds(1), modifiers: [] },
+  // "Has Disadvantage on ability checks and attack rolls for the duration", and the save at the end of each of its turns
+  // ends the spell on a success.
+  "phantasmal-killer": {
+    name: "Phantasmal Killer",
+    tags: ["phantasmal-killer"],
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "disadvantage" },
+      { type: "roll-mode", roll: "check", mode: "disadvantage" }
+    ]
+  },
+  // "A shimmering sphere encloses a Large or smaller creature or object": nothing passes its wall, in or out, and
+  // Disintegrate destroys it (`enclosures.ts`). Rolling the sphere along is the GM's.
+  "resilient-sphere": { name: "Resilient Sphere", tags: ["enclosed"], modifiers: [] },
+  // "Fall upward and reach the top of the area ... it remains there, oscillating slightly, for the duration", and "When
+  // the spell ends, affected objects and creatures fall downward" (`falling.ts`).
+  "reverse-gravity": { name: "Fallen upward", tags: ["gravity-reversed"], modifiers: [] },
+  // "Become cursed for the duration" with the curse the caster picks, which Remove Curse ends: Disadvantage on one
+  // ability's checks and saves, Disadvantage on attack rolls against the caster, the Wisdom save each turn (the GM's to
+  // ask), or an extra 1d8 Necrotic when the caster's attack hits it.
+  "bestow-curse": {
+    name: "Bestow Curse",
+    tags: ["curse"],
+    modifiers: [],
+    options: [
+      ...ABILITIES.map(([ability, name]) =>
+        option(ability, `${name} curse`, {
+          modifiers: [onAbility("check", "disadvantage", ability), onAbility("save", "disadvantage", ability)]
+        })
+      ),
+      option("against-you", "Attacks against you", {
+        modifiers: [
+          {
+            type: "roll-mode",
+            roll: "attack",
+            mode: "disadvantage",
+            when: [{ type: "on-attack-roll" }, { type: "versus-effect-source" }]
+          }
+        ]
+      }),
+      // "In combat, the target must succeed on a Wisdom saving throw at the start of each of its turns or be forced to
+      // take the Dodge action on that turn."
+      option("dodge", "Forced to Dodge", {
+        tags: ["curse-dodge"],
+        turnStartSave: { ability: "wis", failureTags: ["dodge-only"] }
+      }),
+      option("necrotic", "Extra Necrotic damage", {
+        modifiers: [
+          {
+            type: "extra-damage",
+            formula: "1d8",
+            damageType: "necrotic",
+            doubleOnCritical: true,
+            when: [{ type: "on-hit" }, { type: "by-effect-source" }]
+          }
+        ]
+      })
+    ]
+  },
+  // Picked for each creature: immune to Charmed and Frightened, one it has held off; or Indifferent (the GM's).
+  "calm-emotions": {
+    name: "Calm Emotions",
+    tags: ["calm-emotions"],
+    modifiers: [],
+    optionsPerTarget: true,
+    options: [
+      option("calm", "Calmed", {
+        conditionImmunities: ["charmed", "frightened"],
+        suppressesConditions: ["charmed", "frightened"]
+      }),
+      option("indifferent", "Indifferent", { tags: ["indifferent"] })
+    ]
+  },
+  // "Follow the command on its next turn": Flee spends its turn on the Dash away, Grovel is Prone and ends its turn,
+  // Halt neither moves nor acts. Approach and Drop are the GM's to move and drop.
+  command: {
+    name: "Command",
+    tags: ["commanded"],
+    duration: { type: "until-bearer-turn-end" },
+    modifiers: [],
+    options: [
+      option("approach", "Approach"),
+      option("drop", "Drop", { tags: ["no-actions"] }),
+      // "The target spends its turn moving away from you by the fastest available means."
+      option("flee", "Flee", { tags: ["dash-only"], compelled: { way: "away", dashes: true, allMovement: true } }),
+      option("grovel", "Grovel", { conditions: ["prone"], tags: ["no-actions"], speedZero: true }),
+      option("halt", "Halt", { tags: ["no-actions"], speedZero: true })
+    ]
+  },
+  // One of three for the duration: Asleep (Unconscious, waking on damage or a shake), Panicked (Frightened, and its
+  // turns spent on the Dash), Sickened (Poisoned).
+  eyebite: {
+    name: "Eyebite",
+    tags: ["eyebite"],
+    modifiers: [],
+    options: [
+      option("asleep", "Asleep", { conditions: ["unconscious"], tags: ["wakeable"], endsOnDamage: true }),
+      // "On each of its turns, the Frightened target must take the Dash action and move away from you".
+      option("panicked", "Panicked", {
+        conditions: ["frightened"],
+        tags: ["dash-only"],
+        compelled: { way: "away", dashes: true, minFeet: 5 }
+      }),
+      option("sickened", "Sickened", { conditions: ["poisoned"] })
+    ]
+  },
+  // "A -10 penalty to Wisdom (Perception) checks and Passive Perception until the spell ends."
+  enthrall: {
+    name: "Enthrall",
+    tags: ["enthralled"],
+    modifiers: [
+      {
+        type: "check-bonus",
+        amount: -10,
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
+      }
+    ]
+  },
+  // "Must use all its movement to dance in place, and has Disadvantage on Dexterity saving throws and attack rolls, and
+  // other creatures have Advantage on attack rolls against it", ended by its own action and a Wisdom save.
+  "irresistible-dance": {
+    name: "Irresistible Dance",
+    tags: ["dancing"],
+    speedZero: true,
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "disadvantage" },
+      onAbility("save", "disadvantage", "dex"),
+      attackedWithAdvantage
+    ],
+    endAction: { activation: "action", kind: "save", ability: "wis", dc: "spellcasting", label: "Collect itself" }
+  },
+  // "You also always know the target's location ... if it has the Invisible condition, it gains no benefit from that
+  // condition against you."
+  "mind-spike": { name: "Mind Spike", tags: ["outlined-to-source"], modifiers: [] },
+  // "Disadvantage on Strength-based D20 Tests for the duration. During that time, it also subtracts 1d8 from all its
+  // damage rolls."
+  "ray-of-enfeeblement": {
+    name: "Ray of Enfeeblement",
+    tags: ["enfeebled"],
+    modifiers: [
+      onAbility("attack", "disadvantage", "str"),
+      onAbility("check", "disadvantage", "str"),
+      onAbility("save", "disadvantage", "str"),
+      { type: "damage-bonus", amount: 0, dice: "-1d8", leavesOne: true, when: [{ type: "on-damage-roll" }] }
+    ]
+  },
+  // "Choose one ability ... While Poisoned, the target has Disadvantage on saving throws made with the chosen ability."
+  contagion: {
+    name: "Contagion",
+    tags: ["contagion"],
+    modifiers: [],
+    options: ABILITIES.map(([ability, name]) =>
+      option(ability, name, { modifiers: [onAbility("save", "disadvantage", ability)] })
+    )
+  },
+  // "The target can't end the Prone condition on itself until the spell ends."
+  "hideous-laughter": { name: "Hideous Laughter", tags: ["cant-stand"], modifiers: [] },
+  // "The spell ends on a target if it takes damage or someone within 5 feet of it takes an action to shake it out of
+  // the spell's effect" (Shake Awake).
+  sleep: { name: "Sleep", tags: ["wakeable"], modifiers: [] },
+  // "A Remove Curse, Greater Restoration, or Wish spell ends this spell."
+  geas: { name: "Geas", tags: ["curse"], modifiers: [] },
+  // "You create a phantasmal object, creature, or other phenomenon ... perceivable only to the target for the duration."
+  "phantasmal-force": { name: "Phantasmal Force", tags: [], modifiers: [] },
+  // "Each target ... drops whatever it is holding and has the Frightened condition for the duration. A Frightened
+  // creature takes the Dash action and moves away from you by the safest route on each of its turns unless there is
+  // nowhere to move."
+  fear: {
+    name: "Fear",
+    tags: ["drops-held", "dash-only"],
+    modifiers: [],
+    compelled: { way: "away", dashes: true, minFeet: 5 }
+  },
+  // "Each Charmed target must use as much of its movement as possible to move in that direction on its next turn": the
+  // direction the caster's Bonus Action names (`LATER_ACTIONS`).
+  compulsion: {
+    name: "Compulsion",
+    tags: [],
+    modifiers: [],
+    compelled: { way: "heading", allMovement: true, once: true }
+  },
+  // "Can't take Bonus Actions or Reactions, and it rolls 1d10 at the start of each of its turns" (`random-outcomes.ts`).
+  confusion: { name: "Confusion", tags: ["confused", "no-bonus-actions", "no-reactions"], modifiers: [] },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
   "vicious-mockery": {
     name: "Vicious Mockery",
@@ -953,16 +3466,326 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   }
 };
 
+/** What a successful save against the cast still leaves on the creature (SRD 5.2.1 text). */
+const SAVE_SUCCESS_EFFECTS: Readonly<Record<string, FailureEffect>> = {
+  // "On a successful save, its Speed is 0 until the start of your next turn."
+  "flesh-to-stone": {
+    name: "Flesh to Stone",
+    tags: [],
+    speedZero: true,
+    duration: { type: "until-source-next-turn" },
+    modifiers: []
+  },
+  // "On a successful save, the target has Disadvantage on the next attack roll it makes until the start of your next
+  // turn."
+  "ray-of-enfeeblement": {
+    name: "Ray of Enfeeblement",
+    tags: ["until-own-attack"],
+    duration: { type: "until-source-next-turn" },
+    modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage" }]
+  },
+  // "The target dances comically until the end of its next turn, during which it must spend all its movement to dance
+  // in place."
+  "irresistible-dance": {
+    name: "Irresistible Dance",
+    tags: ["dancing"],
+    duration: { type: "until-bearer-turn-end" },
+    speedZero: true,
+    modifiers: []
+  }
+};
+
+type ShapeShift = NonNullable<SpellEffect["shapeShift"]>;
+type PrintedForm = NonNullable<ShapeShift["printed"]>[number];
+
+/**
+ * The forms a cast shape-shifts creatures into (SRD 5.2.1 text): where they come from, what each creature keeps of its
+ * own statistics, and what ends the form. Every one keeps its Hit Points and Hit Point Dice.
+ */
+/** Gaseous Form's misty cloud, which a Potion of Gaseous Form gives too. */
+export const MISTY_CLOUD: PrintedForm = {
+  id: "misty-cloud",
+  name: "Misty cloud",
+  speeds: { walk: 0, fly: 10, hover: true },
+  noSpeech: true,
+  noAttacks: true,
+  sharesSpaces: true,
+  conditionImmunities: ["prone"],
+  modifiers: [
+    { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] },
+    ...(["str", "dex", "con"] as const).map((ability): Modifier => ({
+      type: "roll-mode",
+      roll: "save",
+      mode: "advantage",
+      when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: [ability] }]
+    }))
+  ]
+};
+
+const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
+  // "Any Beast you choose that has a Challenge Rating equal to or less than the target's ... retains its alignment,
+  // personality, creature type, Hit Points, and Hit Point Dice ... gains a number of Temporary Hit Points equal to the
+  // Hit Points of the Beast form ... The spell ends early on the target if it has no Temporary Hit Points left ... it
+  // can't speak or cast spells. The target's gear melds into the new form."
+  polymorph: {
+    from: "bestiary",
+    creatureTypes: ["beast"],
+    challengeOf: "target",
+    keeps: ["type"],
+    noSpells: true,
+    noSpeech: true,
+    gear: "merged",
+    temporaryHitPoints: "each-form",
+    endsWithoutTemporaryHitPoints: true
+  },
+  // Creature into Creature: "any kind you choose that has a Challenge Rating equal to or less than the target's ...
+  // retains its Hit Points, Hit Point Dice, alignment, and personality ... Temporary Hit Points equal to the Hit Points
+  // of the new form ... can't speak or cast spells. The target's gear melds".
+  "true-polymorph": {
+    from: "bestiary",
+    challengeOf: "target",
+    keeps: [],
+    noSpells: true,
+    noSpeech: true,
+    gear: "merged",
+    temporaryHitPoints: "each-form"
+  },
+  // "A Challenge Rating no higher than your level or Challenge Rating ... can't be a Construct or an Undead ... you
+  // retain your creature type; alignment; personality; Intelligence, Wisdom, and Charisma scores; Hit Points; Hit Point
+  // Dice; proficiencies; and ability to communicate. If you have the Spellcasting feature, you retain it too ... you
+  // determine whether your equipment drops to the ground or changes in size and shape to fit the new form."
+  shapechange: {
+    from: "bestiary",
+    notCreatureTypes: ["construct", "undead"],
+    challengeOf: "user",
+    keeps: ["mental", "proficiencies", "spellcasting", "type"],
+    gear: "choice",
+    temporaryHitPoints: "first-form"
+  },
+  // "Each target shape-shifts into a Large or smaller Beast of your choice that has a Challenge Rating of 4 or lower ...
+  // retains its creature type; Hit Points; Hit Point Dice; alignment; ability to communicate; and Intelligence, Wisdom,
+  // and Charisma scores ... can't cast spells. The target's equipment melds ... Temporary Hit Points equal to the Hit
+  // Points of the first form ... until the target ends it as a Bonus Action."
+  "animal-shapes": {
+    from: "bestiary",
+    onTargets: true,
+    creatureTypes: ["beast"],
+    maxChallenge: 4,
+    maxSize: "large",
+    keeps: ["mental", "type"],
+    noSpells: true,
+    gear: "merged",
+    temporaryHitPoints: "first-form",
+    leaveAs: "bonus-action"
+  },
+  // "A willing creature you touch shape-shifts ... into a misty cloud ... ends on the target if it drops to 0 Hit Points
+  // or if it takes a Magic action to end the spell on itself ... only method of movement is a Fly Speed of 10 feet, and
+  // it can hover ... can enter and occupy the space of another creature ... Resistance to Bludgeoning, Piercing, and
+  // Slashing damage ... Immunity to the Prone condition ... Advantage on Strength, Dexterity, and Constitution saving
+  // throws ... can't talk ... can't attack or cast spells." Narrow openings and liquids stay the GM's.
+  "gaseous-form": {
+    from: "printed",
+    onTargets: true,
+    printed: [MISTY_CLOUD],
+    keeps: [],
+    noSpells: true,
+    gear: "worn",
+    endsAtZeroHitPoints: true,
+    leaveAs: "action"
+  },
+  // "You and up to ten willing creatures ... assume gaseous forms ... a Fly Speed of 300 feet and can hover ... Immunity
+  // to the Prone condition ... Resistance to Bludgeoning, Piercing, and Slashing damage. The only actions a target can
+  // take in this form are the Dash action or a Magic action to begin reverting ... Reverting takes 1 minute, during
+  // which the target has the Stunned condition." "If a target is in cloud form and flying when the effect ends, the
+  // target descends 60 feet per round for 1 minute until it lands, which it does safely."
+  "wind-walk": {
+    from: "printed",
+    onTargets: true,
+    printed: [
+      {
+        id: "cloud",
+        name: "Cloud",
+        speeds: { walk: 0, fly: 300, hover: true },
+        noActions: true,
+        allowsActions: ["dash"],
+        conditionImmunities: ["prone"],
+        modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+      }
+    ],
+    keeps: [],
+    gear: "worn",
+    leaveAs: "action",
+    revertRounds: 10,
+    descendsSafely: true
+  }
+};
+
+/** Strength checks and saves with Advantage (Enlarge) or Disadvantage (Reduce). */
+const strengthRolls = (mode: "advantage" | "disadvantage"): Modifier[] => [
+  {
+    type: "roll-mode",
+    roll: "check",
+    mode,
+    when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str"] }]
+  },
+  {
+    type: "roll-mode",
+    roll: "save",
+    mode,
+    when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }]
+  }
+];
+
+/** Effects a cast picks one of, each landing as a failed save's effect or on a willing creature (SRD 5.2.1 text). */
+const CAST_EFFECT_OPTIONS: Readonly<Record<string, NonNullable<SpellEffect["effectOptions"]>>> = {
+  // "Enlarge. The target's size increases by one category ... Advantage on Strength checks and Strength saving throws.
+  // The target's attacks with its enlarged weapons or Unarmed Strikes deal an extra 1d4 damage on a hit." "Reduce. The
+  // target's size decreases by one category ... Disadvantage on Strength checks and Strength saving throws ... 1d4 less
+  // damage (this can't reduce the damage below 1)".
+  enlargereduce: [
+    {
+      id: "enlarge",
+      name: "Enlarge",
+      effect: {
+        name: "Enlarged",
+        tags: ["enlarged"],
+        sizeChange: { step: 1 },
+        modifiers: [
+          ...strengthRolls("advantage"),
+          {
+            type: "extra-damage",
+            formula: "1d4",
+            doubleOnCritical: true,
+            when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["weapon", "unarmed"] }]
+          }
+        ]
+      }
+    },
+    {
+      id: "reduce",
+      name: "Reduce",
+      effect: {
+        name: "Reduced",
+        tags: ["reduced"],
+        sizeChange: { step: -1 },
+        modifiers: [...strengthRolls("disadvantage"), weaponDamageDie("-1d4", true)]
+      }
+    }
+  ]
+};
+
+/** Spells whose save only an unwilling creature makes ("If the target is an unwilling creature, it can make a ...
+ *  saving throw"): a creature on the caster's side takes the effect with no save. */
+const UNWILLING_ONLY: ReadonlySet<string> = new Set(["enlargereduce", "true-polymorph", "levitate", "seeming"]);
+
+/** What a cast does to its targets with no roll (SRD 5.2.1 text): Awaken's "The awakened target has the Charmed
+ *  condition for 30 days or until you or your allies deal damage to it." */
+const CAST_INFLICTS: Readonly<Record<string, NonNullable<SpellEffect["inflicts"]>>> = {
+  awaken: { conditions: ["charmed"], duration: { type: "minutes", minutes: 43_200 }, endsOnSourceSideDamage: true }
+};
+
+/** The most its target may be (SRD 5.2.1 text): Animal Messenger's "A Tiny Beast". */
+const TARGET_MAX_SIZE: Readonly<Record<string, NonNullable<SpellEffect["targetMaxSize"]>>> = {
+  "animal-messenger": "tiny",
+  // "The space can hold up to eight Medium or smaller creatures."
+  "rope-trick": "medium"
+};
+
+/** The highest score its target may have: Awaken's "a Beast or Plant creature with an Intelligence of 3 or less". */
+const TARGET_ABILITY_MAX: Readonly<Record<string, NonNullable<SpellEffect["targetAbilityMax"]>>> = {
+  awaken: { ability: "int", score: 3 }
+};
+
+/** Spells whose target is the caster or a willing creature: Light and Continual Flame's object "that isn't being worn
+ *  or carried by someone else" (the caster's own, or one a willing creature hands over), Nondetection's and
+ *  Arcanist's Magic Aura's "willing creature". */
+const WILLING_TARGETS: ReadonlySet<string> = new Set([
+  "etherealness",
+  "rope-trick",
+  "light",
+  "continual-flame",
+  "nondetection",
+  "arcanists-magic-aura"
+]);
+
+/** Saves the caster makes itself at a printed DC (SRD Contact Other Plane: "When you cast this spell, make a DC 15
+ *  Intelligence saving throw"). */
+const CAST_SELF_SAVES: Readonly<Record<string, NonNullable<SpellEffect["selfSave"]>>> = {
+  "contact-other-plane": { dc: 15 }
+};
+
+/** What a cast ends on its target (SRD 5.2.1 text): Dispel Magic's spells of level 3 or lower, and Remove Curse's
+ *  curses. */
+const CAST_DISPELS: Readonly<Record<string, NonNullable<SpellEffect["dispel"]>>> = {
+  "dispel-magic": { automaticLevel: 3 }
+};
+const CAST_ENDS_CURSES: ReadonlySet<string> = new Set(["remove-curse"]);
+/** Greater Restoration: the caster picks one harm the cast ends (an Exhaustion level, Charmed or Petrified, a curse, a
+ *  lowered ability score or Hit Point maximum). */
+const CAST_RESTORES: ReadonlySet<string> = new Set(["greater-restoration"]);
+/** Scrying: the caster picks its knowledge of the target and its connection to it, which modify the save. */
+const CAST_SCRYING_MODIFIERS: ReadonlySet<string> = new Set(["scrying"]);
+/** What only a Dispel Magic of this slot level or higher ends (Imprisonment: level 9). */
+const DISPELLED_FROM_SLOT: Readonly<Record<string, number>> = { imprisonment: 9 };
+
+/** Concentration spells that keep a part of their own besides what they leave on creatures, so they don't end when no
+ *  creature is affected any more: Entangle's tangled ground, an earthquake's shaking ground and fissures, Reverse
+ *  Gravity's Cylinder, and the storm cloud of Storm of Vengeance. */
+const PERSISTS_WITHOUT_TARGETS: ReadonlySet<string> = new Set([
+  "earthquake",
+  "entangle",
+  "reverse-gravity",
+  "storm-of-vengeance"
+]);
+
 /** Areas the text gives no template shape for (a wall, a thing placed at a point), so the GM can place them on the
- *  map: a straight wall as a 5-foot-wide Line (a ringed one is the GM's to draw), and a sphere, guardian or pack as the
- *  circle its later area reaches around its point. */
+ *  map: a straight wall as a Line as long and thick as the text's (5 feet wide when thinner; a ringed or bent one is
+ *  the GM's to draw), and a sphere, guardian, pack or cloud as the circle it covers around its point. */
 const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "blade-barrier": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  // "The area can have a radius up to 60 feet" round the touched point.
+  hallow: { shape: "sphere", sizeFeet: 60, widthFeet: null },
+  // "A Cube that can be as small as 5 feet to as large as 100 feet on each side".
+  "private-sanctum": { shape: "cube", sizeFeet: 100, widthFeet: null },
+  // The bolt's point and the 5 feet around it: "Each creature within 5 feet of that point".
+  "call-lightning": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "conjure-animals": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // The Large spirit and the 5 feet it reaches around it.
+  "conjure-elemental": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // "A 100-foot-radius circle centered on that point."
+  earthquake: { shape: "cylinder", sizeFeet: 100, widthFeet: null },
+  // "Up to ten 10-foot Cubes, which you arrange as you like. Each Cube must be contiguous with at least one other Cube."
+  "fire-storm": { shape: "cube", sizeFeet: 10, widthFeet: null, count: 10, contiguous: true },
+  // "Four different points ... Each creature in a 40-foot-radius Sphere centered on each of those points."
+  "meteor-swarm": { shape: "sphere", sizeFeet: 40, widthFeet: null, count: 4 },
+  // "Up to 2,500 square feet ... (the area of a 50-foot square)".
+  "guards-and-wards": { shape: "cube", sizeFeet: 50, widthFeet: null },
+  // "Up to 40,000 square feet of floor space": a 200-foot square.
+  forbiddance: { shape: "cube", sizeFeet: 200, widthFeet: null },
+  // The hound and the 5 feet it bites in.
+  "faithful-hound": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },
+  // The cage, "up to 20 feet on a side".
+  forcecage: { shape: "cube", sizeFeet: 20, widthFeet: null },
   "guardian-of-faith": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // "Up to 90 feet long, 30 feet high, and 1 inch thick"; the globe is the GM's to draw.
+  "prismatic-wall": { shape: "line", sizeFeet: 90, widthFeet: 5 },
+  // "Spreading to a radius of 300 feet": the creatures under the cloud.
+  "storm-of-vengeance": { shape: "cylinder", sizeFeet: 300, widthFeet: null },
+  // The glyph itself, "no larger than 10 feet in diameter"; set off, it fills a 60-foot-radius Sphere.
+  symbol: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+  // "Up to 300 feet long, 300 feet high, and 50 feet thick."
+  tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50, heightFeet: 300 },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },
-  "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 }
+  // "A flat surface made up of ten 10-foot-by-10-foot panels" in a row; the dome and the globe are the GM's to draw.
+  "wall-of-force": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  // Ten 10-foot panels in a row; the text's "radius of up to 10 feet" names the dome, which the GM draws.
+  "wall-of-ice": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  // "Ten 10-foot-by-10-foot panels", in a row.
+  "wall-of-stone": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 },
+  // "Up to 50 feet long, 15 feet high, and 1 foot thick."
+  "wind-wall": { shape: "line", sizeFeet: 50, widthFeet: 5 }
 };
 
 /** The area a spell's cast covers, for the map template: the reviewed one, else what the text names. */
@@ -978,7 +3801,7 @@ export function spellEffectFor(
   types: readonly string[],
   range: SpellRange
 ): SpellEffect {
-  const healing = CAST_HEALING[id] ?? healingOfText(description);
+  const healing = NO_CAST_HEALING.has(id) ? null : (CAST_HEALING[id] ?? healingOfText(description));
   const attacks = CAST_ATTACKS[id] ?? (/\bmakes? an? (?:ranged|melee) spell attack\b/i.test(description) ? 1 : 0);
   const attackRange = attacks > 0 ? spellAttackRangeOf(description, range) : null;
   const reaction = CAST_REACTIONS[id];
@@ -988,11 +3811,17 @@ export function spellEffectFor(
   const targets = CAST_TARGETS[id];
   const grant = CAST_GRANTS[id];
   const failureEffect = SAVE_FAILURE_EFFECTS[id];
+  const successEffect = SAVE_SUCCESS_EFFECTS[id];
   const onHit = CAST_ON_HIT[id];
   const missDamage = CAST_MISS_DAMAGE[id];
   const drain = CAST_DRAINS[id];
   const cures = CAST_CURES[id];
   const burst = CAST_BURSTS[id];
+  const teleport = CAST_TELEPORTS[id];
+  const dispel = CAST_DISPELS[id];
+  const selfSave = CAST_SELF_SAVES[id];
+  const shapeShift = CAST_SHAPE_SHIFTS[id];
+  const effectOptions = CAST_EFFECT_OPTIONS[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
@@ -1002,6 +3831,13 @@ export function spellEffectFor(
     ...(burst ? { burst: structuredClone(burst) } : {}),
     damage: castDamage(id, roll, types, healing !== null),
     ...(choices ? { damageTypes: [...choices] } : {}),
+    // "If you roll an 8 on a d8 for this spell, you can roll another d8, and add it to the damage."
+    ...(id === "sorcerous-burst" ? { explodingDice: true as const } : {}),
+    ...(id === "teleport" ? { teleportOutcome: true as const } : {}),
+    ...(id === "identify" ? { identifiesItem: true as const } : {}),
+    // "You sense any trap within range that is within line of sight": the traps the map holds, by their nature.
+    ...(id === "find-traps" ? { sensesTraps: { feet: 120 } } : {}),
+    ...(id === "wish" ? { wishUses: true as const } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
     ...(darts ? { darts } : {}),
@@ -1012,7 +3848,39 @@ export function spellEffectFor(
       : {}),
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
-    ...(reaction ? { reaction } : {})
+    ...(successEffect ? { successEffect: structuredClone(successEffect) } : {}),
+    ...(reaction ? { reaction } : {}),
+    ...(teleport ? { teleport: { ...teleport } } : {}),
+    ...(selfSave ? { selfSave: { ...selfSave } } : {}),
+    ...(dispel ? { dispel: { ...dispel } } : {}),
+    ...(CAST_ENDS_CURSES.has(id) ? { endsCurses: true as const } : {}),
+    ...(CAST_RESTORES.has(id) ? { restores: true as const } : {}),
+    ...(CAST_SCRYING_MODIFIERS.has(id) ? { scryingModifiers: true as const } : {}),
+    ...(DISPELLED_FROM_SLOT[id] !== undefined ? { dispelledFromSlot: DISPELLED_FROM_SLOT[id] } : {}),
+    ...(PERSISTS_WITHOUT_TARGETS.has(id) ? { persistsWithoutTargets: true as const } : {}),
+    ...(SEEN_TARGETS.has(id) ? { seenTargets: true as const } : {}),
+    ...(TARGET_TYPES[id] ? { targetTypes: [...TARGET_TYPES[id]] } : {}),
+    ...(STABILIZES.has(id) ? { stabilizes: true as const } : {}),
+    ...(RANGE_DOUBLES.has(id) ? { rangeDoubles: true as const } : {}),
+    ...(SILENCES_AREA.has(id) ? { silencesArea: true as const } : {}),
+    ...(PICKS_IN_AREA.has(id) ? { picksInArea: true as const } : {}),
+    ...(CHAIN_FEET[id] !== undefined ? { chainFeet: CHAIN_FEET[id] } : {}),
+    ...(shapeShift ? { shapeShift: structuredClone(shapeShift) } : {}),
+    ...(effectOptions ? { effectOptions: structuredClone(effectOptions) } : {}),
+    ...(UNWILLING_ONLY.has(id) ? { unwillingOnly: true as const } : {}),
+    ...(CAST_INFLICTS[id] ? { inflicts: structuredClone(CAST_INFLICTS[id]) } : {}),
+    ...(TARGET_MAX_SIZE[id] ? { targetMaxSize: TARGET_MAX_SIZE[id] } : {}),
+    ...(TARGET_ABILITY_MAX[id] ? { targetAbilityMax: { ...TARGET_ABILITY_MAX[id] } } : {}),
+    ...(WILLING_TARGETS.has(id) ? { willingTargets: true as const } : {}),
+    ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {}),
+    ...(HARMS_OBJECTS.has(id) ? { harmsObjects: true as const } : {}),
+    ...(OBJECT_DAMAGE[id] ? { objectDamage: [...OBJECT_DAMAGE[id]] } : {}),
+    ...(COMPANION_FEET[id] !== undefined ? { companionFeet: COMPANION_FEET[id] } : {}),
+    ...(KINDLES[id] ? { kindles: { ...KINDLES[id] } } : {}),
+    // "If you maintain Concentration on this spell for the full duration, the spell lasts until dispelled."
+    ...(id === "true-polymorph" ? { permanentAfterFull: true as const } : {}),
+    // The creatures it brings and the commands it gives (`spell-summons.ts`).
+    ...spellSummonFieldsFor(id)
   };
 }
 
@@ -1051,7 +3919,9 @@ const UPCAST_CORRECTIONS: Readonly<Record<string, Readonly<Record<number, Upcast
   // +2d6 for each slot level above 6; the source prints +1d6.
   "wall-of-ice": { 7: { roll: "12d6" }, 8: { roll: "14d6" }, 9: { roll: "16d6" } },
   // +10 Hit Points for each slot level above 6; the source prints no amounts.
-  heal: { 7: { roll: "80" }, 8: { roll: "90" }, 9: { roll: "100" } }
+  heal: { 7: { roll: "80" }, 8: { roll: "90" }, 9: { roll: "100" } },
+  // The Healing Light's 4d12 gains 1d12 for each slot level above 7; the source prints the increase alone.
+  "conjure-celestial": { 8: { roll: "5d12" }, 9: { roll: "6d12" } }
 };
 
 /** One spell's higher-slot and cantrip rows with the reviewed corrections, sorted as the source sorts them. */
@@ -1082,6 +3952,7 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_TARGETS),
   ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS),
+  ...Object.keys(CAST_TELEPORTS),
   ...Object.keys(CAST_GRANTS),
   ...Object.keys(CAST_ON_HIT),
   ...Object.keys(CAST_MISS_DAMAGE),
@@ -1090,5 +3961,27 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_CURES),
   ...Object.keys(CAST_HEALING),
   ...Object.keys(SAVE_FAILURE_EFFECTS),
-  ...Object.keys(SPELL_AREAS)
+  ...Object.keys(SAVE_SUCCESS_EFFECTS),
+  ...Object.keys(SPELL_AREAS),
+  ...Object.keys(CAST_DISPELS),
+  ...Object.keys(CAST_SELF_SAVES),
+  ...CAST_ENDS_CURSES,
+  ...CAST_RESTORES,
+  ...CAST_SCRYING_MODIFIERS,
+  ...Object.keys(DISPELLED_FROM_SLOT),
+  ...PERSISTS_WITHOUT_TARGETS,
+  ...SEEN_TARGETS,
+  ...Object.keys(TARGET_TYPES),
+  ...UNWILLING_ONLY,
+  ...Object.keys(TARGET_MAX_SIZE),
+  ...Object.keys(CAST_INFLICTS),
+  ...Object.keys(TARGET_ABILITY_MAX),
+  ...WILLING_TARGETS,
+  ...STABILIZES,
+  ...RANGE_DOUBLES,
+  ...SILENCES_AREA,
+  ...PICKS_IN_AREA,
+  ...Object.keys(CHAIN_FEET),
+  ...Object.keys(AREA_PER_SLOT),
+  ...SPELL_SUMMON_REVIEWED_IDS
 ];

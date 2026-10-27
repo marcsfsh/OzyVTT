@@ -1,21 +1,71 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { spellDurationAt, spellSpanOf } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { EffectInstance, SpellZone } from "@vtt/domain";
-import { addEffect, CONCENTRATING_TAG, makeEffect, type EffectNarration } from "../effects.js";
-import { laterRowOf, laterSpellActionId } from "../item-actions.js";
-import { castThisTurnKey } from "../lasting-spells.js";
-import { endZone } from "../spell-zone-state.js";
-import { zoneRowOf } from "../spell-zones.js";
-import { tableLineOf, type ResolveContext } from "./context.js";
+import { catalogIdOf, MAX_EFFECT_MINUTES, type ActorDefinition, type SaveFailureDuration } from "@vtt/schemas";
+import { holdsFeature } from "../class-features.js";
+import {
+  addEffect,
+  CONCENTRATING_TAG,
+  LASTS_IF_HELD_TAG,
+  concentrationOn,
+  makeEffect,
+  turnEndDuration,
+  type EffectNarration
+} from "../effects.js";
+import { isItemActionId, itemActionRest, laterRowOf, laterSpellActionId } from "../item-actions.js";
+import { CommandRejectedError } from "../game-store.js";
+import { itemRowOfAction } from "../item-charges.js";
+import { castThisTurnKey, withCastKey } from "../lasting-spells.js";
+import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
+import { areaAtLevel, endZone, withParts } from "../spell-zone-state.js";
+import { placeZoneSight, refuseOccupied, refuseOverlap, refuseStraddlers, zoneChoicesOf } from "./zone-casts.js";
+import { actOnCast, pickedZoneRow, pickedZoneType, zoneRowOf } from "../spell-zones.js";
+import { abilityModifier, tableLineOf, type ResolveContext } from "./context.js";
+import { shapedZone, shapingOf } from "./metamagic.js";
+import { castWithoutConcentration } from "./summon.js";
 
-/** A spell's printed duration as an effect duration: up to ten minutes counts rounds; longer ones last until
- *  ended (the engine keeps no clock outside a fight). */
-export function spellEffectDuration(duration: string): EffectInstance["duration"] {
-  const match = duration.match(/^(?:up to )?(\d+) (round|minute|hour|day)s?$/i);
-  if (!match) return { type: "manual" };
-  const count = Number.parseInt(match[1], 10);
-  const unit = match[2].toLowerCase();
-  const rounds = unit === "round" ? count : unit === "minute" ? count * 10 : Infinity;
-  return rounds <= 100 ? { type: "rounds", remaining: rounds } : { type: "manual" };
+type SpellLifetime = Pick<SpellReference, "duration" | "concentration" | "upcastDurations">;
+
+/** A spell's duration at the level it is cast, as the text and its higher-level rows print it (Dominate Beast from a
+ *  level 6 slot lasts up to 1 hour): up to ten minutes in rounds, longer in minutes of game time, and one that lasts
+ *  until dispelled or is instantaneous with no end of its own. */
+export function spellSaveDuration(spell: SpellLifetime, level: number): SaveFailureDuration | undefined {
+  const span = spellSpanOf(spellDurationAt(spell, level).duration);
+  if (!span) return undefined;
+  return "rounds" in span
+    ? { type: "rounds", rounds: Math.min(100, span.rounds) }
+    : { type: "minutes", minutes: Math.min(MAX_EFFECT_MINUTES, span.minutes) };
+}
+
+/** The same as an effect's duration. */
+export function spellEffectDuration(spell: SpellLifetime, level: number): EffectInstance["duration"] {
+  const duration = spellSaveDuration(spell, level);
+  if (!duration) return { type: "manual" };
+  return duration.type === "rounds"
+    ? { type: "rounds", remaining: duration.rounds }
+    : { type: "minutes", remaining: (duration as { minutes: number }).minutes };
+}
+
+/** Whether a cast at this level needs Concentration: Major Image from a level 4 slot doesn't. */
+export const castsWithConcentration = (spell: SpellLifetime, level: number) =>
+  spellDurationAt(spell, level).concentration;
+
+/** Conditions a failure leaves bare, which no effect holds (Prone ends by standing up). */
+const BARE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
+
+/** A spell that is nothing but what it leaves on creatures: a grant, a failure's effect or its held conditions, with
+ *  no later actions, area or summons of its own (`persistsWithoutTargets`). Its Concentration ends once no creature
+ *  keeps any of it (`endIdleConcentration`). */
+function onlyOnCreatures(spell: SpellReference): boolean {
+  const effect = spell.effect;
+  if (!effect || effect.persistsWithoutTargets || (effect.laterActions ?? []).length > 0) return false;
+  return (
+    effect.grant !== undefined ||
+    effect.failureEffect !== undefined ||
+    // A form on its targets (Polymorph): the spell ends once none of them keeps it.
+    effect.shapeShift !== undefined ||
+    (spell.save?.failureConditions ?? []).some((conditionId) => !BARE_CONDITIONS.has(conditionId))
+  );
 }
 
 /** The spell an action casts, when the catalog knows it. */
@@ -37,7 +87,16 @@ const isLaterAction = (ctx: ResolveContext, spell: SpellReference) => laterRowOf
  */
 export function startConcentration(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
-  if (!spell?.concentration) return;
+  if (!spell || !castsWithConcentration(spell, castLevelOf(ctx, spell))) return;
+  // Cast without Concentration where its caster may (Dragon Companion): it lasts its minute on its own.
+  if (castWithoutConcentration(ctx)) return;
+  // Cast through a spell its caster holds (a Crystal Ball's Detect Thoughts through Scrying): it takes no
+  // Concentration of its own, and what it leaves joins that cast, ending when it does.
+  if (ctx.action.castThrough) {
+    const holding = concentrationOn(ctx.attacker, ctx.action.castThrough);
+    if (holding?.castId) ctx.castId = holding.castId;
+    return;
+  }
   // What the spell lets its caster do once it is up (Spirit Guardians' save, moving Hex) is no new cast.
   if (isLaterAction(ctx, spell)) return;
   ctx.castId = ctx.input.commandId;
@@ -50,21 +109,30 @@ export function startConcentration(ctx: ResolveContext): void {
 export function beginConcentration(ctx: ResolveContext, spell: SpellReference, castId: string, level: number): void {
   const { state, attacker, deps } = ctx;
   const ended: EffectNarration[] = [];
+  // SRD Extended Spell: "If the affected spell requires Concentration, you have Advantage on any saving throw you make
+  // to maintain that Concentration."
+  const extended = spell.id === ctx.action.spellId && shapingOf(ctx.input.shaping, "extended-spell") !== undefined;
   addEffect(
     state,
     attacker.id,
     makeEffect({
       id: `${castId}:concentration`,
-      name: `Concentrating on ${spell.name}`,
-      tags: [CONCENTRATING_TAG],
+      name: `Concentrating on ${spell.name}${extended ? " (Extended Spell)" : ""}`,
+      ...(extended
+        ? { modifiers: [{ type: "roll-mode" as const, roll: "concentration" as const, mode: "advantage" as const }] }
+        : {}),
+      // True Polymorph: "If you maintain Concentration on this spell for the full duration, the spell lasts until
+      // dispelled" (`effects.ts`).
+      tags: spell.effect?.permanentAfterFull ? [CONCENTRATING_TAG, LASTS_IF_HELD_TAG] : [CONCENTRATING_TAG],
       sourceActorId: attacker.id,
       sourceName: attacker.name,
       startedRound: state.combat.round,
-      duration: spellEffectDuration(spell.duration),
+      duration: spellEffectDuration(spell, level),
       endsWhenSourceDefeated: true,
       concentration: true,
       castId,
-      spell: { id: spell.id, level }
+      spell: { id: spell.id, level },
+      ...(onlyOnCreatures(spell) ? { endsWhenUnaffected: true as const } : {})
     }),
     ended,
     deps
@@ -72,7 +140,7 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
   ctx.effectsApplied.push({
     targetId: attacker.id,
     targetName: attacker.name,
-    name: `Concentrating on ${spell.name}`,
+    name: `Concentrating on ${spell.name}${extended ? " (Extended Spell)" : ""}`,
     conditionIds: []
   });
   // The previous Concentration ending is the table's news.
@@ -83,8 +151,18 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
 export function markCastTurn(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
   const { state, attacker } = ctx;
-  if (!spell || isLaterAction(ctx, spell) || state.combat.turnActorId !== attacker.id) return;
-  if (!(spell.effect?.laterActions ?? []).some((row) => row.laterTurnsOnly)) return;
+  if (!spell || state.combat.turnActorId !== attacker.id) return;
+  if (isLaterAction(ctx, spell)) {
+    // The cast's own free use of a later action is spent (Arcane Hand's first effect).
+    if (!ctx.withCast) return;
+    const key = withCastKey(attacker.id, spell.id);
+    state.combat = {
+      ...state.combat,
+      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+    };
+    return;
+  }
+  if (!(spell.effect?.laterActions ?? []).some((row) => row.laterTurnsOnly || row.withCast)) return;
   const key = castThisTurnKey(attacker.id, spell.id);
   state.combat = {
     ...state.combat,
@@ -97,7 +175,8 @@ export function markCastTurn(ctx: ResolveContext): void {
  *  replaces the last ("The spell ends if you cast it again"). */
 export function markSpellUp(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
-  if (!spell || spell.concentration || !(spell.effect?.laterActions ?? []).length || isLaterAction(ctx, spell)) return;
+  if (!spell || !(spell.effect?.laterActions ?? []).length || isLaterAction(ctx, spell)) return;
+  if (castsWithConcentration(spell, castLevelOf(ctx, spell))) return;
   const { state, attacker, input } = ctx;
   addEffect(
     state,
@@ -109,55 +188,286 @@ export function markSpellUp(ctx: ResolveContext): void {
       sourceName: attacker.name,
       sourceActionId: ctx.action.id,
       startedRound: state.combat.round,
-      duration: spellEffectDuration(spell.duration),
+      // Ice Storm's hailstones last "until the end of your next turn", whatever the spell's own duration; an item's
+      // cast may last its own time (Oil of Slipperiness' Grease: 8 hours).
+      duration: zoneRowOf(spell)?.zone?.untilCasterNextTurnEnd
+        ? turnEndDuration(state, "until-source-turn-end", attacker.id)
+        : ctx.action.castLastsMinutes !== undefined
+          ? { type: "minutes", remaining: ctx.action.castLastsMinutes }
+          : spellEffectDuration(spell, castLevelOf(ctx, spell)),
       spell: { id: spell.id, level: castLevelOf(ctx, spell) }
     })
   );
   ctx.effectsApplied.push({ targetId: attacker.id, targetName: attacker.name, name: spell.name, conditionIds: [] });
 }
 
+/** The area a cast's zone stands on: the picked form's (a ringed wall), the action's own (an item that doubles Web's),
+ *  else the spell's, grown with the slot it was cast at. */
+function placedAreaOf(
+  ctx: ResolveContext,
+  spell: SpellReference,
+  row: NonNullable<ReturnType<typeof zoneRowOf>>
+): SpellZone["area"] {
+  const area = (row.option ? row.area : undefined) ?? ctx.action.area ?? spell.area;
+  return area ? areaAtLevel(area, spell, castLevelOf(ctx, spell)) : null;
+}
+
 /** The cast's save DC, for the zone's later saves: the cast's own, the caster's later action's, or the caster's spell
  *  save DC. */
 function zoneDc(ctx: ResolveContext, spell: SpellReference, rowName: string): number {
   const later = ctx.siblings.find((action) => action.id === laterSpellActionId(spell.id, rowName));
-  return ctx.action.save?.dc ?? later?.save?.dc ?? ctx.deps.definition?.spellcasting?.saveDc ?? 10;
+  return (
+    ctx.action.save?.dc ?? itemCastDc(ctx, spell) ?? later?.save?.dc ?? ctx.deps.definition?.spellcasting?.saveDc ?? 10
+  );
+}
+
+/** The DC an item prints for the spell it casts ("Web (save DC 13)"), for a cast from that item. */
+function itemCastDc(ctx: ResolveContext, spell: SpellReference): number | undefined {
+  if (!isItemActionId(ctx.action.id)) return undefined;
+  const rest = itemActionRest(ctx.action.id);
+  const row = ctx.attacker.inventory.find((item) => rest === `${item.id}-cast-${spell.id}`);
+  const record = row ? ctx.deps.catalog?.equipmentRecord(catalogIdOf(row)) : undefined;
+  return record?.casts.find((cast) => cast.spellId === spell.id)?.saveDc;
 }
 
 /**
- * A cast that leaves an area acting on creatures later (Spirit Guardians, Moonbeam, Web): its zone, on the area the
- * GM placed with the cast, or around the caster for an Emanation. Cast without a template (a player's cast), the area
- * waits for the GM to place it. The creatures the cast itself caught have made this turn's save already.
+ * A cast that leaves an area acting on creatures later (Spirit Guardians, Moonbeam, Web, Glyph of Warding): its zone, on
+ * the area placed with the cast, or around the caster for an Emanation, in a fight or out of one. It lasts while the
+ * caster's Concentration does, or the effect a spell with none leaves on its caster (`markSpellUp`), so it runs on the
+ * game clock and across fights as that effect does. Cast without a template (a player's cast), the area waits for the
+ * GM to place it. The creatures the cast itself caught have made this turn's save already.
  */
+/** The caster and every creature within `feet` of it as it casts, measured on the map. */
+function insidersAtCast(ctx: ResolveContext, feet: number): string[] {
+  const { state, attacker, deps } = ctx;
+  const near = (actorId: string) => {
+    const apart = deps.distanceFeet?.(attacker.id, actorId) ?? null;
+    return apart !== null && apart <= feet + DISTANCE_TOLERANCE_FEET;
+  };
+  return [
+    attacker.id,
+    ...state.combat.tokens
+      .filter((token) => token.position !== null && token.actorId !== attacker.id && near(token.actorId))
+      .map((token) => token.actorId)
+  ];
+}
+
 export function openSpellZone(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
-  const row = spell ? zoneRowOf(spell) : undefined;
-  if (!spell || !row?.zone || isLaterAction(ctx, spell) || !ctx.state.combat.active) return;
+  // The form or glyph the cast picked (Wall of Fire's ring, a Symbol's effect), else the first.
+  const row = spell ? (pickedZoneRow(spell, ctx.input.option) ?? zoneRowOf(spell)) : undefined;
+  if (!spell || !row?.zone || isLaterAction(ctx, spell)) return;
   const { state, attacker, input, targets } = ctx;
-  const aroundCaster = row.zone.around === "caster";
-  const duration = spellEffectDuration(spell.duration);
+  // An Emanation, or an area round the creature the cast targets: neither is placed as a template.
+  const aroundCaster = row.zone.around === "caster" || row.zone.around === "target";
+  const anchorId = row.zone.around === "target" ? targets[0]?.id : undefined;
+  const pickedType = pickedZoneType(spell, input.option);
+  const duration = spellEffectDuration(spell, castLevelOf(ctx, spell));
   const caught = ctx.action.save !== undefined || ctx.action.damage.length > 0;
+  const casterAt = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position ?? null;
+  const spellUp =
+    ctx.castId === null ? attacker.effects.find((effect) => effect.id === `${input.commandId}:spell`) : undefined;
+  // A dome that can't hold whole every creature in it fails (Tiny Hut), and so does a second Hallow over the first.
+  refuseStraddlers(ctx, row.zone);
+  refuseOverlap(ctx, spell.id, row.zone);
+  refuseOccupied(ctx, row.zone);
   const zone: SpellZone = {
     id: input.commandId,
     spellId: spell.id,
     name: spell.name,
     laterActionId: laterSpellActionId(spell.id, row.name),
     casterId: attacker.id,
-    castId: spell.concentration ? ctx.castId : null,
-    rounds: !spell.concentration && duration.type === "rounds" ? Math.max(1, duration.remaining) : null,
+    castId: ctx.castId,
+    ...(spellUp ? { effectId: spellUp.id } : {}),
+    rounds: ctx.castId === null && !spellUp && duration.type === "rounds" ? Math.max(1, duration.remaining) : null,
     startedRound: state.combat.round,
     level: castLevelOf(ctx, spell),
     dc: zoneDc(ctx, spell, row.name),
     annotationId: !aroundCaster && input.areaPlaced === true ? input.commandId : null,
-    area: aroundCaster ? null : (spell.area ?? null),
+    // The template it is placed with: an item's own area (a doubled Web), grown with the slot (Fog Cloud).
+    area: aroundCaster ? null : placedAreaOf(ctx, spell, row),
     damageDealt: 0,
+    // The damage type the caster chose for it (Conjure Elemental's element), or Transmuted Spell's.
+    ...(input.damageType && (spell.effect?.damageTypes ?? []).includes(input.damageType as never)
+      ? { damageType: input.damageType }
+      : {}),
+    ...shapedZone(ctx, row.damage),
+    ...(row.zone.on.includes("spell-end") ? { burstsOnEnd: true as const } : {}),
+    // "An immobile barrier": it stays where its caster stood.
+    ...(row.zone.stays && casterAt ? { anchor: { x: casterAt.x, y: casterAt.y } } : {}),
+    // Tiny Hut: "Creatures and objects within the Emanation when you cast the spell can move through it freely".
+    ...(row.zone.bars?.insiders ? { insiders: insidersAtCast(ctx, row.zone.feet ?? 5) } : {}),
+    // Made during its caster's Time Stop, so it ends the Time Stop when it affects another creature.
+    ...(state.combat.timeStop?.actorId === attacker.id ? { inTimeStop: true as const } : {}),
+    // Storm of Vengeance counts its turns from the cast's.
+    ...(row.zone.schedule ? { stage: 1 } : {}),
+    // Fire burns it away (Web).
+    ...(row.zone.burns ? { flammable: true as const } : {}),
+    // Its Healing Light with the caster's spellcasting modifier (Conjure Celestial).
+    ...(row.zone.heals
+      ? {
+          healing: row.zone.heals.addsModifier
+            ? formulaWith(row.zone.heals.formula, spellcastingModifier(ctx))
+            : row.zone.heals.formula
+        }
+      : {}),
+    ...(anchorId ? { targetId: anchorId } : {}),
+    ...(pickedType ? { types: [pickedType] } : {}),
+    // The types its barrier wards and the properties it takes, as its caster chose (Magic Circle, Private Sanctum).
+    ...zoneChoicesOf(ctx, spell, row.zone),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };
   // The same caster's earlier cast of this spell is gone ("The spell ends if you cast it again"; a new Concentration
   // ended the old one anyway).
   for (const existing of state.combat.spellZones)
-    if (existing.spellId === spell.id && existing.casterId === attacker.id) endZone(state, existing.id);
+    if (existing.spellId === spell.id && existing.casterId === attacker.id && !row.zone.exclusive)
+      endZone(state, existing.id);
   state.combat = { ...state.combat, spellZones: [...state.combat.spellZones, zone].slice(-20) };
   if (!aroundCaster && zone.annotationId === null)
     ctx.warnings.push(`Place ${spell.name}'s area on the map (Spell areas), and the server will run it.`);
+  // Its edge that sight can't pass and the light inside it (Private Sanctum, Tiny Hut).
+  placeZoneSight(ctx, zone, withParts(row.zone, zone.parts));
+  // An area that acts as it is cast acts on the creatures the cast caught (Conjure Celestial's lights).
+  if (row.zone.atCast) actAtCast(ctx, zone, "is bathed in");
+}
+
+/** An area that acts as it is made acts on the creatures its use caught (Conjure Celestial's lights, a djinni's
+ *  whirlwind). */
+function actAtCast(ctx: ResolveContext, zone: SpellZone, meeting: Parameters<typeof actOnCast>[4]): void {
+  if (ctx.targets.length === 0) return;
+  const events = actOnCast(
+    ctx.state,
+    zone,
+    ctx.targets.map((target) => target.id),
+    {
+      geometry: null,
+      resolveDefinition: ctx.deps.resolveDefinition ?? (() => undefined),
+      ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {}),
+      rollDie: ctx.deps.random,
+      newId: ctx.deps.newRollId,
+      now: ctx.deps.now
+    },
+    meeting
+  );
+  for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+}
+
+/** "4d12" with a modifier added: "4d12 + 4", "4d12 - 1". */
+const formulaWith = (formula: string, modifier: number) =>
+  modifier === 0 ? formula : `${formula} ${modifier > 0 ? "+" : "-"} ${Math.abs(modifier)}`;
+
+/** The caster's spellcasting ability modifier, from its sheet's or stat block's spellcasting. */
+function spellcastingModifier(ctx: ResolveContext): number {
+  const ability = ctx.deps.definition?.spellcasting?.ability;
+  return ability ? abilityModifier(ctx.deps.definition, ability) : 0;
+}
+
+/** SRD Nature's Ward: "Resistance to a damage type associated with your current land choice": Fire for Arid, Cold for
+ *  Polar, Lightning for Temperate and Poison for Tropical. */
+const LAND_RESISTANCES: Readonly<Record<string, string>> = {
+  arid: "fire",
+  polar: "cold",
+  temperate: "lightning",
+  tropical: "poison"
+};
+
+/** The damage type a Circle of the Land Druid's Nature's Ward resists now, from its current land; undefined without
+ *  the feature or a land. */
+function naturesWardOf(definition: ActorDefinition | undefined): string | undefined {
+  if (!holdsFeature(definition, "natures-ward", "Nature's Ward")) return undefined;
+  const land = (definition?.character?.choices ?? []).find(
+    (choice) => choice.payload?.featureId === "circle-of-the-land-spells"
+  )?.id;
+  return land ? LAND_RESISTANCES[land] : undefined;
+}
+
+/**
+ * An item's or a feature's action that leaves an area acting on creatures later (spread Caltrops, spilled Ball Bearings, a set Hunting
+ * Trap): its zone, carrying the action's own save and damage, on the area placed with it. Nothing is rolled as it is
+ * set down, and it stays until the GM ends it (the items gathered up) or it goes off once; a feature's area (Nature's
+ * Sanctuary) lasts its rounds. Returns whether it opened one.
+ */
+export function openActionZone(ctx: ResolveContext): boolean {
+  const { state, attacker, input, action, deps } = ctx;
+  const trigger = action.zone;
+  if (!trigger || action.spellId !== undefined) return false;
+  const aroundCaster = trigger.around === "caster";
+  const casterAt = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position ?? null;
+  const row = itemRowOfAction(action.id, attacker.inventory);
+  const record = row ? deps.catalog?.equipmentRecord(catalogIdOf(row)) : undefined;
+  // "Caltrops (bag of 20)" lies on the map as Caltrops.
+  const name = (record?.name.replace(/\s*\([^)]*\)$/, "") || action.name).slice(0, 120);
+  // A bag already spread lies on the map until it is gathered up (the GM ends its area).
+  const down = state.combat.spellZones.filter(
+    (zone) => zone.rule && zone.casterId === attacker.id && zone.laterActionId === action.id
+  ).length;
+  // A flask poured out is used up as it goes, so only gear that stays on the map (Caltrops) counts what is down.
+  if (row && !record?.consumedOnUse && down >= row.quantity)
+    throw new CommandRejectedError(
+      `${name}: ${attacker.name} has none left to set down. Gather up the ones on the map first.`
+    );
+  // A djinni's whirlwind lasts while the djinni keeps Concentration on it, and what its save holds ends with it.
+  if (trigger.concentration) {
+    ctx.castId = input.commandId;
+    const ended: EffectNarration[] = [];
+    addEffect(
+      state,
+      attacker.id,
+      makeEffect({
+        id: `${input.commandId}:concentration`,
+        name: `Concentrating on ${name}`.slice(0, 120),
+        tags: [CONCENTRATING_TAG],
+        sourceActorId: attacker.id,
+        sourceName: attacker.name,
+        startedRound: state.combat.round,
+        duration: { type: "manual" },
+        endsWhenSourceDefeated: true,
+        concentration: true,
+        castId: input.commandId
+      }),
+      ended,
+      deps
+    );
+    for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
+  }
+  const zone: SpellZone = {
+    id: input.commandId,
+    spellId: record?.id ?? "area",
+    name,
+    laterActionId: action.id.slice(0, 120),
+    casterId: attacker.id,
+    castId: trigger.concentration ? input.commandId : null,
+    // A planted Rod of Alertness glows for its 10 minutes.
+    rounds: trigger.lastsRounds ?? null,
+    startedRound: state.combat.round,
+    level: 0,
+    dc: action.save?.dc ?? 10,
+    annotationId: !aroundCaster && input.areaPlaced === true ? input.commandId : null,
+    area: aroundCaster ? null : (action.area ?? null),
+    rule: {
+      trigger: structuredClone(trigger),
+      ...(action.save ? { save: structuredClone(action.save) } : {}),
+      damage: structuredClone(action.damage),
+      ...(action.drain ? { drain: structuredClone(action.drain) } : {})
+    },
+    damageDealt: 0,
+    // It stays where its user stood (the rod planted in the ground).
+    ...(trigger.stays && casterAt ? { anchor: { x: casterAt.x, y: casterAt.y } } : {}),
+    // Spilled oil waits for fire to reach it.
+    ...(trigger.kindled ? { flammable: true as const } : {}),
+    // Nature's Sanctuary shares the Resistance its Druid's land gives.
+    ...(trigger.naturesWard && naturesWardOf(ctx.deps.definition)
+      ? { damageType: naturesWardOf(ctx.deps.definition)! }
+      : {}),
+    ...(state.combat.timeStop?.actorId === attacker.id ? { inTimeStop: true as const } : {}),
+    entered: [],
+    affected: []
+  };
+  state.combat = { ...state.combat, spellZones: [...state.combat.spellZones, zone].slice(-20) };
+  if (!aroundCaster && zone.annotationId === null)
+    ctx.warnings.push(`Place ${name}'s area on the map (Spell areas), and the server will run it.`);
+  // A whirlwind conjured onto creatures catches them as it appears.
+  if (trigger.atCast) actAtCast(ctx, zone, "is caught by");
+  return true;
 }
