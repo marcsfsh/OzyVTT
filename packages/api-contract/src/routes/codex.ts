@@ -1401,7 +1401,7 @@ export const getCodexRevealAudit = defineRoute({
 export const getCodexSceneLinks = defineRoute({
   method: "get",
   path: CODEX_PATHS.sceneLinks,
-  operationId: "getCodexSceneLinks",
+  operationId: "getCodexEncounterLinks",
   tag: "Codex",
   summary: "Read the Codex records that name each table scene",
   description:

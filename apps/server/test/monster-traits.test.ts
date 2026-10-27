@@ -478,7 +478,7 @@ describe("auras", () => {
     expect(actor(state, IDS.hero).conditions).toEqual([]);
   });
 
-  it("makes a creature that succeeds immune to that ghast's Stench for the fight", () => {
+  it("makes a creature that succeeds immune to that ghast's Stench for the encounter", () => {
     const state = game("ghast");
     advance(state, [], near);
     advance(state, [], near);

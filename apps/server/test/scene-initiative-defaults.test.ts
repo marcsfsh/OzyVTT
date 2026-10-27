@@ -39,35 +39,35 @@ const actors = [
   { id: MON, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } }
 ];
 
-describe("a scene's fight settings", () => {
-  it("are kept, replaced, cleared, copied by a duplicate and read only from the live scene", () => {
+describe("an encounter's settings", () => {
+  it("are kept, replaced, cleared, copied by a duplicate and read only from the live encounter", () => {
     const game = GameStateSchema.parse({ schemaVersion: 1, actors });
-    createScene(game, { sceneId: SCENE, name: "Warren", mapAssetId: MAP, combatantIds: [PC, MON] }, GEOMETRY);
-    expect(game.combat.scenes[0].initiativeDefaults).toBeUndefined();
+    createScene(game, { encounterId: SCENE, name: "Warren", mapAssetId: MAP, combatantIds: [PC, MON] }, GEOMETRY);
+    expect(game.combat.encounters[0].initiativeDefaults).toBeUndefined();
 
     setSceneInitiativeDefaults(game, SCENE, { playersRollInitiative: true });
-    expect(game.combat.scenes[0].initiativeDefaults).toEqual({ playersRollInitiative: true });
+    expect(game.combat.encounters[0].initiativeDefaults).toEqual({ playersRollInitiative: true });
     // Parked scenes give the next fight nothing: only the live one counts.
     expect(liveInitiativeDefaults(game)).toEqual({});
 
     duplicateScene(game, SCENE, OTHER);
-    expect(game.combat.scenes[1].initiativeDefaults).toEqual({ playersRollInitiative: true });
+    expect(game.combat.encounters[1].initiativeDefaults).toEqual({ playersRollInitiative: true });
 
     activateScene(game, SCENE, IMPLICIT);
     expect(liveInitiativeDefaults(game)).toEqual({ playersRollInitiative: true });
 
     setSceneInitiativeDefaults(game, SCENE, {});
-    expect(game.combat.scenes.find((scene) => scene.id === SCENE)?.initiativeDefaults).toBeUndefined();
+    expect(game.combat.encounters.find((scene) => scene.id === SCENE)?.initiativeDefaults).toBeUndefined();
     expect(() => setSceneInitiativeDefaults(game, IMPLICIT.replace("f", "e"), {})).toThrow(/no longer exists/);
     // Still schema-valid with the field present and absent.
     expect(() => GameStateSchema.parse(game)).not.toThrow();
   });
 
-  it("refuses a replay's scene", () => {
+  it("refuses a replay's encounter", () => {
     const game = GameStateSchema.parse({
       schemaVersion: 1,
       actors,
-      combat: { scenes: [{ id: SCENE, name: "Replay", mapAssetId: MAP, replayOf: { archiveId: 1, actorIds: [] } }] }
+      combat: { encounters: [{ id: SCENE, name: "Replay", mapAssetId: MAP, replayOf: { archiveId: 1, actorIds: [] } }] }
     });
     expect(() => setSceneInitiativeDefaults(game, SCENE, { groupMonsters: true })).toThrow(/replay/);
   });
@@ -106,8 +106,8 @@ async function boot() {
   return { base: `http://127.0.0.1:${address.port}`, server, gmToken, playerToken, mapId: map.metadata.id };
 }
 
-describe("encounter.start with a scene's fight settings", () => {
-  it("takes the live scene's choice when the request omits it, and the request's own when it names one", async () => {
+describe("encounter.start with an encounter's settings", () => {
+  it("takes the live encounter's choice when the request omits it, and the request's own when it names one", async () => {
     const { base, server, gmToken, playerToken, mapId } = await boot();
     const post = async (path: string, token: string, body: unknown) =>
       fetch(`${base}/api/v1${path}`, {
@@ -116,7 +116,7 @@ describe("encounter.start with a scene's fight settings", () => {
         body: JSON.stringify(body)
       });
 
-    const created = await post("/game/scenes", gmToken, {
+    const created = await post("/game/encounters", gmToken, {
       name: "Warren",
       mapAssetId: mapId,
       combatantIds: [PC, MON],
@@ -124,14 +124,17 @@ describe("encounter.start with a scene's fight settings", () => {
       initiativeDefaults: { playersRollInitiative: true }
     });
     expect(created.status).toBe(200);
-    const sceneId = server.store.snapshot.combat.activeSceneId!;
-    expect(server.store.snapshot.combat.scenes.find((scene) => scene.id === sceneId)?.initiativeDefaults).toEqual({
+    const encounterId = server.store.snapshot.combat.activeEncounterId!;
+    expect(
+      server.store.snapshot.combat.encounters.find((scene) => scene.id === encounterId)?.initiativeDefaults
+    ).toEqual({
       playersRollInitiative: true
     });
 
     // Players can't change it, and never receive it.
     expect(
-      (await post(`/game/scenes/${sceneId}/initiative-defaults`, playerToken, { initiativeDefaults: {} })).status
+      (await post(`/game/encounters/${encounterId}/initiative-defaults`, playerToken, { initiativeDefaults: {} }))
+        .status
     ).toBe(403);
     const playerGame = await (
       await fetch(`${base}/api/v1/game`, { headers: { authorization: `Bearer ${playerToken}` } })
@@ -152,13 +155,13 @@ describe("encounter.start with a scene's fight settings", () => {
     expect((await post("/game/encounter/end", gmToken, {})).status).toBe(200);
 
     // A fight that ended marks its scene, so Prep reads it as Completed.
-    expect(server.store.snapshot.combat.scenes.find((scene) => scene.id === sceneId)?.fightEndedAt).toEqual(
+    expect(server.store.snapshot.combat.encounters.find((scene) => scene.id === encounterId)?.endedAt).toEqual(
       expect.any(Number)
     );
 
     // Cleared over HTTP: with neither, the fight starts as it always has.
     expect(
-      (await post(`/game/scenes/${sceneId}/initiative-defaults`, gmToken, { initiativeDefaults: {} })).status
+      (await post(`/game/encounters/${encounterId}/initiative-defaults`, gmToken, { initiativeDefaults: {} })).status
     ).toBe(200);
     expect((await post("/game/encounter/start", gmToken, { mapAssetId: mapId })).status).toBe(200);
     expect(server.store.snapshot.combat.pendingInitiative).toEqual([]);
@@ -175,13 +178,15 @@ describe("encounter.start with a scene's fight settings", () => {
     await new Promise((resolve) => socket.emit("session:join", { token: gmToken }, resolve));
     const reply = await new Promise<{ ok: boolean }>((resolve) =>
       socket.emit(
-        "scene:set-initiative-defaults",
-        { commandId: randomUUID(), sceneId, initiativeDefaults: { groupMonsters: true } },
+        "encounter:set-initiative-defaults",
+        { commandId: randomUUID(), encounterId, initiativeDefaults: { groupMonsters: true } },
         resolve
       )
     );
     expect(reply.ok).toBe(true);
-    expect(server.store.snapshot.combat.scenes.find((scene) => scene.id === sceneId)?.initiativeDefaults).toEqual({
+    expect(
+      server.store.snapshot.combat.encounters.find((scene) => scene.id === encounterId)?.initiativeDefaults
+    ).toEqual({
       groupMonsters: true
     });
   });

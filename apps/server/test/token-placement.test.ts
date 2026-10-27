@@ -93,12 +93,12 @@ describe("authoritative encounter token placement", () => {
     expect(state.combat.tokens[0].position).toEqual({ x: 579.5, y: 20.5 });
   });
 
-  it("places a token on a live scene between fights, and refuses with no live map", () => {
+  it("places a token on a live encounter between encounters, and refuses with no live map", () => {
     const state = activeState();
     state.combat = { ...state.combat, active: false, turnActorId: null };
     moveEncounterToken(state, ACTOR, { x: 50, y: 50 }, geometry);
     expect(state.combat.tokens[0].position).not.toBeNull();
     state.combat = { ...state.combat, mapAssetId: null };
-    expect(() => moveEncounterToken(state, ACTOR, { x: 50, y: 50 }, geometry)).toThrow("Make a scene live");
+    expect(() => moveEncounterToken(state, ACTOR, { x: 50, y: 50 }, geometry)).toThrow("Make an encounter live");
   });
 });

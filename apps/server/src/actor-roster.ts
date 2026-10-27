@@ -520,7 +520,7 @@ export function assertNotArchived(state: GameState, actorId: string) {
  *  would invalidate), or none. */
 export function fightHolding(state: GameState, actorId: string): "live" | "paused" | null {
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) return "live";
-  return state.combat.scenes.some(
+  return state.combat.encounters.some(
     (scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId)
   )
     ? "paused"
@@ -560,7 +560,7 @@ export function rebuildActorDefinition(
   const fight = fightHolding(state, actorId);
   if (fight === "live") throw new CommandRejectedError("End the encounter before rebuilding a character who is in it.");
   if (fight === "paused")
-    throw new CommandRejectedError("End the paused encounter in the prepared scene that uses this character first.");
+    throw new CommandRejectedError("End the parked combat in the encounter that uses this character first.");
 
   // Carry over the old sheet's `hp-roll` rows for levels the new build doesn't cover, so levelling back
   // up restores the original rolls.
@@ -739,18 +739,18 @@ export function removeActor(state: GameState, actorId: string) {
   }
   // A parked scene can hold a paused, still-active fight; block removal if this actor is in one.
   if (
-    state.combat.scenes.some(
+    state.combat.encounters.some(
       (scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId)
     )
   ) {
-    throw new CommandRejectedError("End the paused encounter in the prepared scene that uses this combatant first.");
+    throw new CommandRejectedError("End the parked combat in the encounter that uses this combatant first.");
   }
   // A removed actor can no longer sustain effects on others (its grapples release, ADR-0020).
   endEffectsSustainedBy(state, actorId);
   state.actors = state.actors.filter((item) => item.id !== actorId);
   // Drop the actor from every inactive prepared scene so no scene references a combatant that no longer exists.
   if (
-    state.combat.scenes.some(
+    state.combat.encounters.some(
       (scene) =>
         !scene.combat.active &&
         (scene.combat.initiative.some((entry) => entry.actorId === actorId) ||
@@ -759,7 +759,7 @@ export function removeActor(state: GameState, actorId: string) {
   ) {
     state.combat = {
       ...state.combat,
-      scenes: state.combat.scenes.map((scene) =>
+      encounters: state.combat.encounters.map((scene) =>
         scene.combat.active
           ? scene
           : {

@@ -475,7 +475,7 @@ export function PlayerEncounterPanel({
       )}
       {/* Questions this player has waiting. */}
       <MyPendingAsks state={state} />
-      {!inFight && myActor && <p className="table-panel-empty">{myActor.name} isn't in this fight.</p>}
+      {!inFight && myActor && <p className="table-panel-empty">{myActor.name} isn't in this encounter.</p>}
       {/* The death save waits in the prompt slot above the tabs; this tab says what Unconscious leaves. */}
       {inFight && dying && myActor && <UnconsciousNote name={myActor.name} />}
       {runner}
@@ -678,7 +678,7 @@ export function PlayerEncounterPanel({
 
   return (
     <TablePanel
-      label={fighting ? `The fight · round ${combat.round}` : "The table"}
+      label={fighting ? `The encounter · round ${combat.round}` : "The table"}
       top={slots?.top}
       tabs={tabs}
       active={tab}

@@ -77,7 +77,7 @@ export function riseAtTurnStart(state: GameState, actorId: string, deps: RaiseDe
     if (!raised) {
       events.push({
         kind: "effect",
-        text: `${corpse.name} rises as a ${monsterId.replace(/-/g, " ")} under ${maker.name}'s orders. Add it to the fight.`,
+        text: `${corpse.name} rises as a ${monsterId.replace(/-/g, " ")} under ${maker.name}'s orders. Add it to the encounter.`,
         actorId: corpse.id,
         gmOnly: true
       });

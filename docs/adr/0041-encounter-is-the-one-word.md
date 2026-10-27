@@ -49,6 +49,16 @@ before the change; the internal rename waits so this change stays reviewable.
   and sound stores' JSON keys are renamed by new migrations in those stores, and stored integration credentials with
   `scene:write` get `encounter:write`. SQL column names stay as they are: they never leave the server, and renaming
   them belongs with the internal names (issue #167).
+- **Inside an encounter's page.** Its tabs are Combat (who is in it, XP and its Encounter settings), Setup (its
+  state, map, light and sound) and Tokens, since an encounter's page can't have a tab called Encounter.
+- **What keeps "scene".** The Codex's session prep has its own narrative scenes (a title, a place and notes), and
+  the current scene a session points at; they are not encounters and keep their name, on screen and in the API
+  (`current-scene`, `sceneId` there). The combat log's `scene` kind, a GM-only category for switching encounters,
+  stays a wire value until the internal rename.
+- **Names a tool meets.** OpenAPI operation ids follow the paths (`createEncounter`, `listReplays` and so on), the
+  sound board's `sound:set-scene-preset` is `sound:set-encounter-preset`, the Codex's links are at
+  `/codex/encounter-links`, and the refusal codes `scene_room_full` and `in_fight` are `encounter_room_full` and
+  `in_encounter`.
 - **Generated output.** `npm run map` regenerates the app map, the OpenAPI document and the schemas; nothing generated
   is edited by hand.
 
@@ -71,5 +81,11 @@ new names. Reverting would need migrations the other way.
 
 ## Validation evidence
 
-To be added with the code: the glossary test under its new rules, the redirect of every old address, both transports
-for the renamed commands, the old-campaign migration test, the credential snapshot and the regenerated OpenAPI.
+- `play-vocabulary.test.ts` retires "scene" and "fight" with "encounter" as the replacement, with one exemption for
+  the Tonight board's narrative Scenes.
+- `router.test.ts`: `/scenes`, `/scenes/<id>?step=...` and `/scenes?view=maps` land on their `/encounters` pages.
+- `encounter-rename.test.ts`, and migration tests in `game-store.test.ts` (state, snapshots, journal and receipts),
+  `codex-prep.test.ts` (a session's prep and an older backup), `integration-credentials.test.ts` (a `scene:write`
+  credential keeps working as `encounter:write`) and the sound board's preset.
+- The credential snapshot and the OpenAPI document are regenerated; every client, server and smoke test runs under
+  the new names.

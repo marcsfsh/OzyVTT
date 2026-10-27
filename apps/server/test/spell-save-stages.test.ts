@@ -187,7 +187,7 @@ describe("saves repeated when the target takes damage", () => {
     expect(conditions(table.state, FOE)).toEqual(["prone"]);
   });
 
-  it("repeats Dominate Person's save as damage lands, and gives the first save Advantage in a fight", () => {
+  it("repeats Dominate Person's save as damage lands, and gives the first save Advantage in an encounter", () => {
     const table = caster();
     makeFoeA(table.state, "humanoid");
     cast(table, "dominate-person");

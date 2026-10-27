@@ -31,7 +31,7 @@ describe("claims", () => {
     expect(state.actors[1]!.firstClaimedAt).toBeUndefined();
   });
 
-  it("asks the GM twice before releasing a character who is in the running fight", () => {
+  it("asks the GM twice before releasing a character who is in the running encounter", () => {
     const state = table();
     claimCharacter(state, HERO, SESSION);
     state.combat = { ...state.combat, active: true, initiative: [{ actorId: HERO, score: 12, tieBreaker: 0 }] };
@@ -42,9 +42,9 @@ describe("claims", () => {
       refusal = error;
     }
     expect(refusal).toBeInstanceOf(CommandRejectedError);
-    expect((refusal as CommandRejectedError).code).toBe("in_fight");
+    expect((refusal as CommandRejectedError).code).toBe("in_encounter");
     expect((refusal as Error).message).toBe(
-      "Hero is in the fight. Releasing Hero takes the player's turn controls away until someone claims Hero again."
+      "Hero is in the encounter. Releasing Hero takes the player's turn controls away until someone claims Hero again."
     );
     expect(state.actors[0]!.ownerSessionId).toBe(SESSION);
     expect(forceReleaseCharacter(state, HERO, { inFight: true })).toEqual({ sessionId: SESSION, name: "Hero" });

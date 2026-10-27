@@ -114,7 +114,7 @@ const mount = () =>
     wrapper: ToastProvider
   });
 
-describe("a spell cast from the Spells tab outside a fight", () => {
+describe("a spell cast from the Spells tab outside an encounter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearTargeting();

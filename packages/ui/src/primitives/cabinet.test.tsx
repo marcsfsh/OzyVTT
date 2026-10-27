@@ -104,11 +104,11 @@ describe("LifeBar", () => {
 });
 
 describe("VcrCounter", () => {
-  it("reads PLAY and the round in a fight, STOP and dashes between fights", () => {
+  it("reads PLAY and the round in an encounter, STOP and dashes between encounters", () => {
     const { rerender } = render(<VcrCounter round={3} />);
     expect(screen.getByRole("img", { name: "Round 3" })).toHaveTextContent("PLAYRND 03");
     rerender(<VcrCounter round={null} />);
-    expect(screen.getByRole("img", { name: "No fight running" })).toHaveTextContent("STOPRND --");
+    expect(screen.getByRole("img", { name: "No encounter running" })).toHaveTextContent("STOPRND --");
   });
 });
 
@@ -213,7 +213,7 @@ describe("Toast", () => {
   function Trigger({ undo }: Readonly<{ undo?: () => void }>) {
     const { toast } = useToast();
     return (
-      <button type="button" onClick={() => toast("Scene saved", { tone: "success", undo })}>
+      <button type="button" onClick={() => toast("Encounter saved", { tone: "success", undo })}>
         Save
       </button>
     );
@@ -230,11 +230,11 @@ describe("Toast", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     const region = screen.getByRole("region", { name: "Notifications" });
-    expect(screen.getByRole("status")).toHaveTextContent("DONEScene saved");
+    expect(screen.getByRole("status")).toHaveTextContent("DONEEncounter saved");
     act(() => vi.advanceTimersByTime(4900));
-    expect(region).toHaveTextContent("Scene saved");
+    expect(region).toHaveTextContent("Encounter saved");
     act(() => vi.advanceTimersByTime(200));
-    expect(region).not.toHaveTextContent("Scene saved");
+    expect(region).not.toHaveTextContent("Encounter saved");
   });
 
   it("holds still while the pointer or focus is on it", () => {
@@ -244,16 +244,16 @@ describe("Toast", () => {
       </ToastProvider>
     );
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    const toast = screen.getByText("Scene saved").closest(".nh-toast")!;
+    const toast = screen.getByText("Encounter saved").closest(".nh-toast")!;
     act(() => vi.advanceTimersByTime(3000));
     fireEvent.pointerEnter(toast);
     act(() => vi.advanceTimersByTime(10_000));
     expect(toast).toBeInTheDocument();
     fireEvent.pointerLeave(toast);
     act(() => vi.advanceTimersByTime(1900));
-    expect(screen.getByText("Scene saved")).toBeInTheDocument();
+    expect(screen.getByText("Encounter saved")).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(200));
-    expect(screen.queryByText("Scene saved")).toBeNull();
+    expect(screen.queryByText("Encounter saved")).toBeNull();
   });
 
   it("offers Undo when the action can be undone, and closes on it", () => {
@@ -266,7 +266,7 @@ describe("Toast", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(undo).toHaveBeenCalledOnce();
-    expect(screen.queryByText("Scene saved")).toBeNull();
+    expect(screen.queryByText("Encounter saved")).toBeNull();
   });
 });
 

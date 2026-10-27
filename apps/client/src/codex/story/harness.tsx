@@ -116,7 +116,7 @@ export function renderGmStory(View: ComponentType, at: string, feeds: GmStoryFee
     scenes: [],
     actors: feeds.actors ?? [],
     party: feeds.party ?? [],
-    activeSceneId: null,
+    activeEncounterId: null,
     onActivateScene: vi.fn(),
     onOpenReplay,
     gameHours: feeds.gameHours ?? null,

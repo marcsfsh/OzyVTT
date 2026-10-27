@@ -162,7 +162,7 @@ export { NameField } from "./primitives/NameField";
 export { FeatureList, type FeatureItem } from "./primitives/FeatureList";
 export { ReviewSummary, type ReviewSection } from "./primitives/ReviewSummary";
 
-/* The record surfaces' pieces (the Codex, the Compendium and the Scenes, Maps and Settings lists): who sees a record,
+/* The record surfaces' pieces (the Codex, the Compendium and the Encounters, Maps and Settings lists): who sees a record,
    and a list's filters, dropdowns and sort. They say Hidden, Everyone or the characters' names. */
 export {
   EVERYONE,

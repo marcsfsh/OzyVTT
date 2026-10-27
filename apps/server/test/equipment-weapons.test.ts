@@ -291,7 +291,7 @@ describe("Ammunition", () => {
     expect(row(table, "arrows-20")).toMatchObject({ quantity: 3, ammunitionLeft: 59 });
   });
 
-  it("recovers half the arrows fired, rounded down, when the fight ends", async () => {
+  it("recovers half the arrows fired, rounded down, when the encounter ends", async () => {
     const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
     fight(table, IDS.fighter);
     resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30);
@@ -340,7 +340,7 @@ describe("Ammunition", () => {
     expect(resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30).attack?.total).toBe(20);
   });
 
-  it("spends an arrow on a shot outside a fight, refuses with none, and picks up half of them later", async () => {
+  it("spends an arrow on a shot outside an encounter, refuses with none, and picks up half of them later", async () => {
     const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
     write(table, IDS.fighter, edit(table, IDS.fighter, "arrows-20", { quantity: 1 }));
     const { server, gmToken, post, log, close } = await serve(table);
@@ -369,7 +369,7 @@ describe("Ammunition", () => {
     expect((await pickUp()).status).toBe(409);
   });
 
-  it("leaves a fight's arrows on the ground until the fight ends", async () => {
+  it("leaves an encounter's arrows on the ground until the encounter ends", async () => {
     const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
     fight(table, IDS.fighter);
     resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30);
@@ -380,7 +380,7 @@ describe("Ammunition", () => {
       actorId: IDS.fighter
     });
     expect(pickUp.status).toBe(409);
-    expect((await pickUp.json()).error.message).toBe("Ammunition is picked up after the fight.");
+    expect((await pickUp.json()).error.message).toBe("Ammunition is picked up after the encounter.");
   });
 
   it("recovers nothing from a single piece, and clears the count", () => {

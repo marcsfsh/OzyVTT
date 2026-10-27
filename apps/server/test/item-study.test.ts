@@ -128,11 +128,11 @@ describe("studying a manual", () => {
     expect(withStoredStudies([...unstudied, forged], [])).toEqual(unstudied);
   });
 
-  it("waits for the fight to end and refuses a book that isn't studied", () => {
+  it("waits for the encounter to end and refuses a book that isn't studied", () => {
     const state = table();
     state.combat.active = true;
     state.combat.initiative = [{ actorId: HERO } as GameState["combat"]["initiative"][number]];
-    expect(() => studyItem(state, HERO, MANUAL, deps)).toThrow(/End the fight/);
+    expect(() => studyItem(state, HERO, MANUAL, deps)).toThrow(/End the encounter/);
     state.combat.active = false;
     actor(state).inventory = [...actor(state).inventory, { ...manual(), id: "bag-of-holding", name: "Bag of Holding" }];
     expect(() => studyItem(state, HERO, "bag-of-holding", deps)).toThrow(/isn't a book a reader studies/);

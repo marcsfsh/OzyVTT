@@ -24,7 +24,7 @@ import { placeFightMenu } from "./FightMenu";
 const NATURAL = 1028;
 const trigger = (top: number, right = 800) => ({ top, bottom: top + 44, right });
 
-describe("the fight menu opens where there is room", () => {
+describe("the encounter menu opens where there is room", () => {
   it("opens downward on a laptop, unchanged", () => {
     // 1280x900, GM in combat: the topbar sits at y=192.
     const box = placeFightMenu(trigger(192, 1152), NATURAL, { width: 1280, height: 900 });
@@ -84,7 +84,7 @@ describe("the fight menu opens where there is room", () => {
   });
 });
 
-describe("the fight menu stays inside the viewport horizontally", () => {
+describe("the encounter menu stays inside the viewport horizontally", () => {
   it("right-aligns to its trigger when there is room", () => {
     expect(placeFightMenu(trigger(192, 1152), NATURAL, { width: 1280, height: 900 }).left).toBe(768);
   });

@@ -332,7 +332,7 @@ export function PartyRosterTab({
               <details className="party-archived">
                 <summary>Archived ({archived.length})</summary>
                 <p className="party-archived-note">
-                  Archived characters are hidden from players and never appear in fight prep.
+                  Archived characters are hidden from players and never appear in encounter prep.
                 </p>
                 <ul className="nh-gallery party-gallery">{archived.map((actor) => card(actor, true))}</ul>
               </details>

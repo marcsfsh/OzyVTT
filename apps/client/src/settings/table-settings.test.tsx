@@ -79,7 +79,7 @@ describe("the rules assistant's checks", () => {
 });
 
 describe("one name for one setting", () => {
-  it("names the health display, players' hits and players' initiative as the fight's options do", async () => {
+  it("names the health display, players' hits and players' initiative as the encounter's options do", async () => {
     const state = gmView((view) => {
       view.combat.healthDisplay = { style: "band", audience: "all" };
     });
@@ -112,8 +112,8 @@ describe("one name for one setting", () => {
       />
     );
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /Fight options/ }));
-    const menu = within(screen.getByRole("menu", { name: "Fight options" }));
+    await user.click(screen.getByRole("button", { name: /Encounter options/ }));
+    const menu = within(screen.getByRole("menu", { name: "Encounter options" }));
     expect(menu.getByRole("option", { name: "Applied by the GM" })).toBeTruthy();
     expect(menu.getByRole("option", { name: "Wait until everyone has rolled" })).toBeTruthy();
     expect(menu.getByRole("option", { name: "Status badge" })).toBeTruthy();

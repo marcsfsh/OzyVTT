@@ -28,7 +28,7 @@ describe("Supreme Sneak's Stealth Attack at the end of the turn", () => {
     expect(hiddenAfterStealthAttack(visionGame())).toBe(false);
   });
 
-  it("leaves it to the GM with the scene's vision off", () => {
+  it("leaves it to the GM with the encounter's vision off", () => {
     expect(hiddenAfterStealthAttack(visionGame({ enabled: false }))).toBe(true);
   });
 

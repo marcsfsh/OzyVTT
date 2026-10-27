@@ -15,7 +15,7 @@ const catalog = [
   { id: "worg", experiencePoints: 100 }
 ] as unknown as ContentMonsterSummary[];
 
-describe("the scene's encounter reading", () => {
+describe("the encounter's difficulty reading", () => {
   const party = [pc("a", 7), pc("b", 7), pc("c", 7)];
   const foes = [
     foe("t", "Troll", "troll"),

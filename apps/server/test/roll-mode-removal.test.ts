@@ -39,7 +39,7 @@ describe("the retired table-wide roll mode", () => {
         rulesMode: "assisted",
         initiative: [{ actorId: HERO, score: 18 }],
         tokens: [{ actorId: HERO, position: { x: 50, y: 50 }, sizePx: 40, gridSizePx: 50 }],
-        scenes: [
+        encounters: [
           { id: SCENE, name: "Parked Ambush", mapAssetId: MAP, combat: { rollMode: "auto", rulesMode: "freeform" } }
         ]
       }
@@ -48,10 +48,10 @@ describe("the retired table-wide roll mode", () => {
     const parsed = GameStateSchema.parse(stored);
 
     expect(parsed).not.toHaveProperty("combat.rollMode");
-    expect(parsed.combat.scenes[0]?.combat).not.toHaveProperty("rollMode");
+    expect(parsed.combat.encounters[0]?.combat).not.toHaveProperty("rollMode");
     // Only that key is stripped; the neighbouring policy survives.
     expect(parsed.combat.rulesMode).toBe("assisted");
-    expect(parsed.combat.scenes[0]?.combat.rulesMode).toBe("freeform");
+    expect(parsed.combat.encounters[0]?.combat.rulesMode).toBe("freeform");
     expect(parsed.revision).toBe(12);
   });
 

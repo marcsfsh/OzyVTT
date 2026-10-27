@@ -51,6 +51,30 @@ describe("IntegrationCredentialStore", () => {
       expect((await readFile(databasePath)).includes(Buffer.from(issued.token))).toBe(false);
     }));
 
+  it("gives a credential saved with the scene scopes the encounter scopes", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-integration-credentials-"));
+    const databasePath = join(directory, "credentials.sqlite");
+    try {
+      const store = new IntegrationCredentialStore(databasePath);
+      await store.initialize();
+      const issued = store.create({ name: "Old script", scopes: ["game:read"], gameId: null });
+      store.close();
+      // Back to how an older build left it: migration 2 not applied, and the scope under its scene name.
+      const database = new DatabaseSync(databasePath);
+      database.prepare("DELETE FROM migrations WHERE store = 'integration-credentials' AND version = 2").run();
+      database.prepare("UPDATE integration_credentials SET scopes_json = ?").run('["game:read","scene:write"]');
+      database.close();
+
+      const reopened = new IntegrationCredentialStore(databasePath);
+      await reopened.initialize();
+      expect(reopened.list()[0]?.scopes).toEqual(["game:read", "encounter:write"]);
+      expect(reopened.verify(issued.token, "encounter:write")?.name).toBe("Old script");
+      reopened.close();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   // The codex scopes need no store change; pin that they mint and verify, and that `codex:write`
   // does not grant read.
   it("mints and verifies the codex scopes, and keeps read and write independent", async () =>
@@ -91,7 +115,7 @@ describe("IntegrationCredentialStore", () => {
       const initialTime = Date.parse("2026-07-16T00:00:00.000Z");
       const expiresAt = "2026-07-16T01:00:00.000Z";
       const issued = store.create({ name: "Admin tool", scopes: ["admin"], gameId: null, expiresAt });
-      expect(store.verify(issued.token, "scene:write")?.lastUsedAt).toBe("2026-07-16T00:00:00.000Z");
+      expect(store.verify(issued.token, "encounter:write")?.lastUsedAt).toBe("2026-07-16T00:00:00.000Z");
 
       const rotated = store.rotate(issued.metadata.id, "2026-07-16T02:00:00.000Z")!;
       expect(rotated.token).not.toBe(issued.token);

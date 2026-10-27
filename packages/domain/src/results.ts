@@ -28,8 +28,8 @@ export type RefusalCode =
   | "needs_confirm"
   | "refused"
   | "history_review"
-  | "scene_room_full"
-  | "in_fight"
+  | "encounter_room_full"
+  | "in_encounter"
   | "unauthenticated"
   | "internal_error";
 export type MutationResult = {
@@ -61,7 +61,7 @@ export type SampleRemovalResult = MutationResult & {
   removed?: readonly string[];
   kept?: ReadonlyArray<Readonly<{ name: string; reason: string }>>;
 };
-export type SceneCreateResult = MutationResult & { sceneId?: string };
+export type SceneCreateResult = MutationResult & { encounterId?: string };
 
 /** A way the roller may still change a roll it sees, sent back as `answer` with its next look: a Bardic Inspiration
  *  die, Indomitable's reroll, Stroke of Luck. */
@@ -731,7 +731,7 @@ const DerivedToolRowSchema = z.strictObject({
   uses: z
     .array(DerivedUtilizeUseSchema)
     .describe(
-      "What the tool's Utilize line lets it do, each with its printed DC (Thieves' Tools: Pick a lock, DC 15), rolled with `check.roll`'s `tool` and `use` (its place in this list). It needs the tool carried, and in a fight it takes the Utilize action. Empty when the tool prints none"
+      "What the tool's Utilize line lets it do, each with its printed DC (Thieves' Tools: Pick a lock, DC 15), rolled with `check.roll`'s `tool` and `use` (its place in this list). It needs the tool carried, and in an encounter it takes the Utilize action. Empty when the tool prints none"
     )
 });
 export type DerivedToolRow = Wire<z.infer<typeof DerivedToolRowSchema>>;
@@ -1151,12 +1151,12 @@ export type VisionPreviewReply = Wire<z.infer<typeof VisionPreviewReplySchema>>;
 export type VisionPreviewResult = { ok: boolean; message?: string } & Partial<VisionPreviewReply>;
 
 /**
- * What `scene:preview` answers the GM: what one audience would receive if the scene were live now, from the same
+ * What `encounter:preview` answers the GM: what one audience would receive if the scene were live now, from the same
  * projections that build the real feeds. `screen` is the shared screen's map (its encounter and turn order, as the
  * presentation carries them); `player` is that character's player's combat and the creatures in it.
  */
 export const ScenePreviewReplySchema = z.strictObject({
-  sceneId: z.uuid(),
+  encounterId: z.uuid(),
   live: z.boolean(),
   mapAssetId: z.uuid(),
   actorId: z.uuid().nullable(),

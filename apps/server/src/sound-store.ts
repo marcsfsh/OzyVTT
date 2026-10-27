@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { SoundBoardSchema, type SoundBoard } from "@vtt/domain";
 import { migrate, openDatabase, transaction, type Migration } from "./database.js";
+import { renameEncounterJson } from "./encounter-rename.js";
 
 /**
  * The sound board's own store (ADR-0024): one row, its own revision and its own idempotency receipts. It is
@@ -25,6 +26,18 @@ const MIGRATIONS: readonly Migration[] = [
           updated_at TEXT NOT NULL
         ) STRICT;
       `)
+  },
+  {
+    // An encounter's saved sound is keyed `encounterId` now (ADR-0041).
+    version: 2,
+    up: (database) => {
+      const row = database.prepare("SELECT state_json FROM sound_board_state WHERE id = 1").get() as
+        { state_json: string } | undefined;
+      if (row)
+        database
+          .prepare("UPDATE sound_board_state SET state_json = ? WHERE id = 1")
+          .run(renameEncounterJson(row.state_json));
+    }
   }
 ];
 

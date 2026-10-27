@@ -91,7 +91,7 @@ export function ToolUses({
       <p className="cs-sub">
         {inFight
           ? "Each use takes your action, and needs the item in your pack."
-          : "Each use needs the item in your pack. In a fight it takes your action."}
+          : "Each use needs the item in your pack. In an encounter it takes your action."}
       </p>
       <ul className="cs-tool-uses" aria-label="Tool uses">
         {rows.map((row) => (

@@ -70,7 +70,7 @@ const sectionNames = (name: string) =>
 describe("the GM's top bar", () => {
   it("shows Play, Prep, Codex and Compendium, lighting Prep on each of its pages", async () => {
     setViewport(1280);
-    goTo("/scenes/maps");
+    goTo("/encounters/maps");
     render(<GmTopBar state={gmView()} token="gm" />);
     expect(sectionNames("GM sections")).toEqual(["Play", "Prep", "Codex", "Compendium"]);
     expect(screen.getByRole("tab", { name: "Prep" })).toHaveAttribute("aria-selected", "true");
@@ -99,15 +99,15 @@ describe("the GM's top bar", () => {
     await user.click(screen.getByRole("tab", { name: "Prep" }));
     expect(window.location.pathname).toBe("/prep/tokens");
     await user.click(screen.getByRole("tab", { name: "Prep" }));
-    expect(window.location.pathname).toBe("/scenes");
+    expect(window.location.pathname).toBe("/encounters");
   });
 
-  it("puts the live scene picker in the bar on Play, and opens the table screen's settings from its lamp", async () => {
+  it("puts the live encounter picker in the bar on Play, and opens the table screen's settings from its lamp", async () => {
     const user = userEvent.setup();
     setViewport(1280);
     goTo("/table");
     render(<GmTopBar state={gmView()} token="gm" />);
-    expect(screen.getByLabelText("Scenes")).toHaveTextContent("No scene live");
+    expect(screen.getByLabelText("Encounters")).toHaveTextContent("No encounter live");
     await user.click(await screen.findByLabelText("Table screen, on"));
     await user.click(screen.getByRole("menuitem", { name: "Table screen settings" }));
     expect(window.location.pathname).toBe("/viewer-controls");

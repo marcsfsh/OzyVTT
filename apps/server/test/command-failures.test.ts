@@ -51,10 +51,10 @@ describe("describeFailure", () => {
     expect(
       describeFailure(new CommandRejectedError("Finish reviewing the combat history first.", "history_review"))
     ).toMatchObject({ status: 409, code: "conflict", details: { reason: "history_review" } });
-    expect(failureReply(new CommandRejectedError("No room for another scene.", "scene_room_full"))).toEqual({
+    expect(failureReply(new CommandRejectedError("No room for another encounter.", "encounter_room_full"))).toEqual({
       ok: false,
-      code: "scene_room_full",
-      message: "No room for another scene."
+      code: "encounter_room_full",
+      message: "No room for another encounter."
     });
     // A rules block's code is the rule that blocked it, beside what an override needs.
     expect(failureReply(new RulesBlockedError("cover.total", "The target has Total Cover."))).toEqual({

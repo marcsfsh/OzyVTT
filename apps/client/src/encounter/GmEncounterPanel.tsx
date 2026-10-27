@@ -107,13 +107,15 @@ export function GmEncounterPanel({
   const [groupMonsters, setGroupMonsters] = useState(true);
   // The live scene's fight settings seed both switches, and a change to them or to the live scene seeds them again;
   // the start sends what the switches show (ADR-0039).
-  const liveDefaults = state.combat.scenes.find((scene) => scene.id === state.combat.activeSceneId)?.initiativeDefaults;
+  const liveDefaults = state.combat.encounters.find(
+    (scene) => scene.id === state.combat.activeEncounterId
+  )?.initiativeDefaults;
   const defaultPlayersRoll = liveDefaults?.playersRollInitiative ?? false;
   const defaultGroup = liveDefaults?.groupMonsters ?? true;
   useEffect(() => {
     setPlayersRollInitiative(defaultPlayersRoll);
     setGroupMonsters(defaultGroup);
-  }, [state.combat.activeSceneId, defaultPlayersRoll, defaultGroup]);
+  }, [state.combat.activeEncounterId, defaultPlayersRoll, defaultGroup]);
   // A pending history rewrite/discard the GM must confirm (see the Previous/Next flow).
   const [confirm, setConfirm] = useState<{
     message: string;
@@ -184,8 +186,8 @@ export function GmEncounterPanel({
       if (!startMapId)
         throw new Error(
           selectedMap && selectedMap.kind !== "battlemap"
-            ? "Pick a battle map before starting the fight. Regional and world maps stay available outside fights."
-            : "Pick a battle map first, or make a scene live from the Scenes tab."
+            ? "Pick a battle map before starting the encounter. Regional and world maps stay available outside encounters."
+            : "Pick a battle map first, or make an encounter live from Encounters."
         );
       // No scores: the server rolls every staged combatant, so a previous fight's order never carries over.
       const entries = rosterActors(state.actors)
@@ -199,7 +201,7 @@ export function GmEncounterPanel({
         groupMonsters,
         expectedRevision: state.revision
       });
-    }, "The fight has started, and initiative was rolled.");
+    }, "The encounter has started, and initiative was rolled.");
   const changeScore = (actorId: string, score: number) =>
     void run(
       () => command("initiative:set", { actorId, score, expectedRevision: state.revision }),
@@ -268,14 +270,14 @@ export function GmEncounterPanel({
   const end = async () => {
     if (
       !(await askConfirm({
-        title: "End the fight?",
+        title: "End the encounter?",
         body: "Turn order stays saved for reference, but the shared screen will hide it.",
-        confirmLabel: "End the fight",
+        confirmLabel: "End the encounter",
         danger: true
       }))
     )
       return;
-    void run(() => command("encounter:end", { expectedRevision: state.revision }), "Fight ended.");
+    void run(() => command("encounter:end", { expectedRevision: state.revision }), "Encounter ended.");
   };
   // SRD Experience Points: the characters in the fight share the XP of the monsters they brought to 0 Hit Points.
   const fightExperience = fightExperienceOf(state);
@@ -284,7 +286,7 @@ export function GmEncounterPanel({
     const names = fightExperience.recipients.map((actor) => actor.name);
     if (
       !(await askConfirm({
-        title: "Award the fight's XP?",
+        title: "Award the encounter's XP?",
         body: `${listOf(names)} share the XP of ${listOf(fightExperience.defeated.map((actor) => actor.name))}${inLair ? ", at the lair XP for a legendary creature" : ""}.`,
         confirmLabel: "Award XP"
       }))
@@ -299,7 +301,7 @@ export function GmEncounterPanel({
           // A creature with no lair XP gives its usual XP.
           ...(inLair ? { inLairIds: fightExperience.defeated.map((actor) => actor.id) } : {})
         }),
-      `${listOf(names)} share the fight's XP.`
+      `${listOf(names)} share the encounter's XP.`
     );
   };
   // The quick-start door: everyone active is pre-listed in the staging tray, archived characters
@@ -309,7 +311,7 @@ export function GmEncounterPanel({
     .map((actor) => actor.id);
   // Only a live scene owns its map. `combat.mapAssetId` stays set after a fight ends and must not
   // lock the GM to it.
-  const sceneLive = state.combat.activeSceneId !== null;
+  const sceneLive = state.combat.activeEncounterId !== null;
   // The just-picked map first: the shell's library is refetched only on a tab change, so a map
   // uploaded from this panel is not in it yet.
   const nameOf = (id: string | null) =>
@@ -321,13 +323,13 @@ export function GmEncounterPanel({
   const quickStartMapId =
     pickedMap?.id ?? state.combat.mapAssetId ?? (selectedMap?.kind === "battlemap" ? selectedMap.id : null);
   const panelMapName = sceneLive
-    ? (nameOf(state.combat.mapAssetId) ?? "the live scene's map")
+    ? (nameOf(state.combat.mapAssetId) ?? "the live encounter's map")
     : (pickedMap?.name ?? nameOf(quickStartMapId) ?? (selectedMap?.kind === "battlemap" ? selectedMap.name : null));
   const readyToStart =
     stagedIds.length > 0 && (sceneLive ? state.combat.mapAssetId !== null : quickStartMapId !== null);
   /**
    * Picking a map from the quick-start door. With no scene live it is just a choice. With a scene
-   * live the server requires the fight to use that scene's map, so one `scene.create {activate}`
+   * live the server requires the fight to use that scene's map, so one `encounter.create {activate}`
    * parks the current scene and goes live on a new one named after the map. Only offered before a
    * fight starts.
    */
@@ -337,7 +339,7 @@ export function GmEncounterPanel({
     if (!sceneLive || map.id === state.combat.mapAssetId) return;
     void run(
       () =>
-        command("scene:create", {
+        command("encounter:create", {
           name: map.name.slice(0, 120),
           mapAssetId: map.id,
           combatantIds: stagedIds,
@@ -376,7 +378,7 @@ export function GmEncounterPanel({
       onAdd={(actorId) => tick(actorId, true)}
       onRemove={(actorId) => tick(actorId, false)}
       mapName={panelMapName}
-      mapNote={sceneLive ? "A scene is live. Choosing another map makes a new scene live on it." : undefined}
+      mapNote={sceneLive ? "An encounter is live. Choosing another map makes a new encounter live on it." : undefined}
       selectedMapId={quickStartMapId}
       onSelectMap={chooseQuickStartMap}
       mapFallback={mapLibrary}
@@ -567,7 +569,7 @@ export function GmEncounterPanel({
   const startControls = (
     <div className="table-panel-foot-start">
       <Button variant="primary" className="table-panel-primary" disabled={busy || !readyToStart} onClick={start}>
-        Start the fight
+        Start the encounter
       </Button>
       <p className="start-fight-count">{rollsLine(stagedActors, playersRollInitiative)}</p>
     </div>
@@ -578,7 +580,7 @@ export function GmEncounterPanel({
   // What waits on the GM leads the Fight tab, and the tab's count follows the GM to the other tabs.
   const fightLabel = (
     <>
-      Fight
+      Encounter
       {needsCount > 0 && (
         <span className="table-tab-count">
           <span aria-hidden="true">{needsCount}</span>
@@ -655,7 +657,7 @@ export function GmEncounterPanel({
   return (
     <>
       <TablePanel
-        label={fighting ? `The fight · round ${state.combat.round}` : "The table"}
+        label={fighting ? `The encounter · round ${state.combat.round}` : "The table"}
         tabs={tabs}
         active={tab}
         onActive={setTab}

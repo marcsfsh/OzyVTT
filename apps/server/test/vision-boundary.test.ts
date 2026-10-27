@@ -30,7 +30,7 @@ const initialState = (mapAssetId?: string, mode: "vision" | "fog" = "vision") =>
   GameStateSchema.parse({
     schemaVersion: 1,
     combat: {
-      scenes: mapAssetId
+      encounters: mapAssetId
         ? [
             {
               id: SCENE,
@@ -184,7 +184,7 @@ describe("dynamic vision end to end", () => {
   it("keeps a goblin hidden by walls out of every player channel, the table screen and the replay", async () => {
     // The GM prepared the crypt: the goblin behind a wall, vision on. Staged there, it is already a secret.
     const { server, gm, received, http, gmToken, playerToken, mapAssetId } = await table(true);
-    expect(mapAssetId).toBe(server.store.snapshot.combat.scenes[0]!.mapAssetId);
+    expect(mapAssetId).toBe(server.store.snapshot.combat.encounters[0]!.mapAssetId);
     // More walls go up in the prepared scene, and then it goes live and the fight starts.
     expect(
       await emit(gm, "wall:add", {
@@ -193,10 +193,10 @@ describe("dynamic vision end to end", () => {
           { x: 600, y: 0 },
           { x: 600, y: 100 }
         ],
-        sceneId: SCENE
+        encounterId: SCENE
       })
     ).toMatchObject({ ok: true });
-    expect(await emit(gm, "scene:activate", { sceneId: SCENE })).toMatchObject({ ok: true });
+    expect(await emit(gm, "encounter:activate", { encounterId: SCENE })).toMatchObject({ ok: true });
     expect(await emit(gm, "encounter:start", { mapAssetId })).toMatchObject({ ok: true });
     // A few turns pass. The goblin moves about behind the wall.
     for (let turn = 0; turn < 3; turn++) {
@@ -238,9 +238,9 @@ describe("dynamic vision end to end", () => {
     // The fight ends and the GM shares it: the replay keeps the goblin hidden in every turn.
     expect(await emit(gm, "encounter:end", {})).toMatchObject({ ok: true });
     const archives = (await (await http(ENCOUNTER_ARCHIVE_PATHS.collection, gmToken)).json()) as {
-      data: { encounters: Array<{ id: number }> };
+      data: { replays: Array<{ id: number }> };
     };
-    const archiveId = archives.data.encounters[0]!.id;
+    const archiveId = archives.data.replays[0]!.id;
     const share = await http(ENCOUNTER_ARCHIVE_PATHS.visibility.replace("{id}", String(archiveId)), gmToken, {
       method: "POST",
       body: JSON.stringify({ playerVisible: true })
@@ -256,7 +256,7 @@ describe("dynamic vision end to end", () => {
   it("keeps a goblin wholly under the fog out of every player channel, the table screen and the replay", async () => {
     // The GM prepared the crypt with fog: the goblin wholly under it, the orc's space partly revealed.
     const { server, gm, player, received, http, gmToken, playerToken, mapAssetId } = await table(true, "fog");
-    expect(await emit(gm, "scene:activate", { sceneId: SCENE })).toMatchObject({ ok: true });
+    expect(await emit(gm, "encounter:activate", { encounterId: SCENE })).toMatchObject({ ok: true });
     expect(await emit(gm, "encounter:start", { mapAssetId })).toMatchObject({ ok: true });
     // A few turns pass. The goblin moves about under the fog.
     for (let turn = 0; turn < 3; turn++) {
@@ -299,9 +299,9 @@ describe("dynamic vision end to end", () => {
     // The fight ends and the GM shares it: the replay keeps the goblin hidden in every turn.
     expect(await emit(gm, "encounter:end", {})).toMatchObject({ ok: true });
     const archives = (await (await http(ENCOUNTER_ARCHIVE_PATHS.collection, gmToken)).json()) as {
-      data: { encounters: Array<{ id: number }> };
+      data: { replays: Array<{ id: number }> };
     };
-    const archiveId = archives.data.encounters[0]!.id;
+    const archiveId = archives.data.replays[0]!.id;
     const share = await http(ENCOUNTER_ARCHIVE_PATHS.visibility.replace("{id}", String(archiveId)), gmToken, {
       method: "POST",
       body: JSON.stringify({ playerVisible: true })
@@ -427,7 +427,7 @@ describe("dynamic vision end to end", () => {
       ok: false
     });
     expect(
-      await emit(player, "door:set-open", { wallId: door.wallIds[0], open: true, sceneId: randomUUID() })
+      await emit(player, "door:set-open", { wallId: door.wallIds[0], open: true, encounterId: randomUUID() })
     ).toMatchObject({ ok: false });
   });
 

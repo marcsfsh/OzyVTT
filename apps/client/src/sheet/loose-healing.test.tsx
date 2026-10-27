@@ -135,7 +135,7 @@ const mount = (role: "gm" | "player") =>
     wrapper: ToastProvider
   });
 
-describe("healing outside a fight", () => {
+describe("healing outside an encounter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     serve();

@@ -244,7 +244,7 @@ function wakeNaturalSleepers(
     actor.conditions = actor.conditions.filter((condition) => condition.id !== "unconscious");
     events.push({
       kind: "condition",
-      text: `${alarm.bearer.name}'s ${alarm.name} wakes ${actor.name} as the fight begins.`,
+      text: `${alarm.bearer.name}'s ${alarm.name} wakes ${actor.name} as the encounter begins.`,
       actorId: actor.id
     });
   }
@@ -428,11 +428,11 @@ export function startEncounter(
   if (input.entries.length === 0 || input.entries.length > 200)
     throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
   // When a prepared scene is live, the encounter must run on that scene's map so park/resume stays coherent.
-  if (state.combat.activeSceneId !== null) {
-    const activeScene = state.combat.scenes.find((scene) => scene.id === state.combat.activeSceneId);
+  if (state.combat.activeEncounterId !== null) {
+    const activeScene = state.combat.encounters.find((scene) => scene.id === state.combat.activeEncounterId);
     if (activeScene && activeScene.mapAssetId !== input.mapAssetId)
       throw new CommandRejectedError(
-        "This scene uses a different map. Start on the scene's map, or switch scenes first."
+        "This encounter uses a different map. Start on the encounter's map, or switch encounters first."
       );
   }
   // Preserve any positions already placed during scene prep (or a prior setup); new combatants start unplaced.
@@ -551,9 +551,9 @@ export function removeCombatant(
   if (!actor || !state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("That combatant is not in this encounter.");
   if (state.combat.initiative.length === 1)
-    throw new CommandRejectedError("It is the last one in the fight. End the fight to take it out.");
+    throw new CommandRejectedError("It is the last one in the encounter. End the encounter to take it out.");
   if (state.combat.turnActorId === actorId)
-    throw new CommandRejectedError("Advance past its turn before taking it out of the fight.");
+    throw new CommandRejectedError("Advance past its turn before taking it out of the encounter.");
   const events: EffectNarration[] = [
     ...releaseSwallowedBy(state, actorId, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined),
     ...endEffectsSustainedBy(state, actorId),
@@ -724,14 +724,14 @@ export function orderTiedCharacters(state: GameState, scope: Initiator, actorId:
   const other = state.combat.initiative.find((entry) => entry.actorId === beforeActorId);
   const kindOf = (id: string) => state.actors.find((actor) => actor.id === id)?.kind;
   if (!own || !other || kindOf(actorId) !== "player-character" || kindOf(beforeActorId) !== "player-character")
-    throw new CommandRejectedError("Both must be characters in this fight.");
+    throw new CommandRejectedError("Both must be characters in this encounter.");
   if (own.score !== other.score)
     throw new CommandRejectedError("Only characters tied on the same score are ordered so.");
   const current = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   const acted = (id: string) =>
     state.combat.round > 1 || state.combat.initiative.findIndex((entry) => entry.actorId === id) < current;
   if (acted(actorId) || acted(beforeActorId))
-    throw new CommandRejectedError("Ties are settled before either character takes a turn in this fight.");
+    throw new CommandRejectedError("Ties are settled before either character takes a turn in this encounter.");
   setInitiativeScore(state, actorId, own.score, Math.min(1000, other.tieBreaker + 1));
 }
 

@@ -160,7 +160,7 @@ describe("the sheet's tabs", () => {
     ).toBeTruthy();
   });
 
-  it("drops Play from the table's Sheet tab in a fight, where the Turn tab holds it", () => {
+  it("drops Play from the table's Sheet tab in an encounter, where the Turn tab holds it", () => {
     render(
       <CharacterSheet
         actor={hero()}

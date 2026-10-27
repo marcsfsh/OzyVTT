@@ -620,7 +620,7 @@ describe("conditions that bring others, and what they do", () => {
   });
 });
 
-describe("the fight's end and a Long Rest end only what they should", () => {
+describe("the encounter's end and a Long Rest end only what they should", () => {
   it("encounter end sweeps turn-measured effects and keeps those that last until ended", () => {
     const state = game();
     addEffect(state, IDS.hero, makeEffect({ id: "blessed", name: "Shrine blessing", duration: { type: "manual" } }));

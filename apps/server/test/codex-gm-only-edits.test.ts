@@ -506,7 +506,7 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
       ["hidden map parent", () => store.setMapParent(secretMap.id, map.id)],
       [
         "pin scenes",
-        () => store.updateMarker(pin.id, { sceneIds: [crypto.randomUUID()], actorId: crypto.randomUUID() })
+        () => store.updateMarker(pin.id, { encounterIds: [crypto.randomUUID()], actorId: crypto.randomUUID() })
       ],
       ["hidden pin", () => store.updateMarker(hiddenPin.id, { label: "Lantern lair", pageIds: [order.id] })],
       ["hidden pin move", () => store.moveMarker(hiddenPin.id, 0.3, 0.3)],
@@ -541,7 +541,7 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
               prep: prepNotes("Next: the ambush."),
               attendees: ["Sam"],
               status: "played",
-              sceneIds: [crypto.randomUUID()]
+              encounterIds: [crypto.randomUUID()]
             },
             undefined
           )

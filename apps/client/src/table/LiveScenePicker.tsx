@@ -11,19 +11,19 @@ import "./live-scene-picker.css";
  * the live scene.
  */
 export function LiveScenePicker({ state, compact = false }: Readonly<{ state: GmView; compact?: boolean }>) {
-  const scenes = state.combat.scenes ?? [];
-  const live = scenes.find((scene) => scene.id === state.combat.activeSceneId) ?? null;
+  const scenes = state.combat.encounters ?? [];
+  const live = scenes.find((scene) => scene.id === state.combat.activeEncounterId) ?? null;
   const actions = useSceneActions(scenes, { combatActive: state.combat.active });
   return (
     <>
       <Menu
         className={cx("live-scene", compact && "is-compact")}
         triggerClassName="live-scene-trigger"
-        label={live ? `Scenes · ${live.name} is live` : "Scenes"}
+        label={live ? `Encounters · ${live.name} is live` : "Encounters"}
         trigger={
           <>
-            {!compact && <span className="live-scene-word">Scene</span>}
-            <span className="live-scene-name">{live?.name ?? "No scene live"}</span>
+            {!compact && <span className="live-scene-word">Encounter</span>}
+            <span className="live-scene-name">{live?.name ?? "No encounter live"}</span>
           </>
         }
       >
@@ -39,9 +39,9 @@ export function LiveScenePicker({ state, compact = false }: Readonly<{ state: Gm
             Open {live.name}
           </MenuItem>
         )}
-        <MenuItem onClick={() => void navigate(SCENES_PATHS.list)}>All scenes</MenuItem>
+        <MenuItem onClick={() => void navigate(SCENES_PATHS.list)}>All encounters</MenuItem>
         <MenuItem icon={<IconPlus />} onClick={() => void navigate(SCENES_PATHS.newScene)}>
-          New scene
+          New encounter
         </MenuItem>
       </Menu>
       {actions.dialogs}

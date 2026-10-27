@@ -139,7 +139,7 @@ export type GmTab =
 /** One address per surface; the server reserves `GET /viewer`, hence `/viewer-controls`. */
 const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
   table: "/table",
-  scenes: "/scenes",
+  scenes: "/encounters",
   roster: "/roster",
   codex: "/codex",
   compendium: "/compendium",
@@ -162,14 +162,24 @@ const RETIRED_PATHS: Readonly<Record<string, string>> = {
   "/setup": "/settings",
   // The Homebrew tab became the Compendium.
   "/homebrew": "/compendium",
-  // Prep has no page of its own: its first page is Scenes.
-  "/prep": "/scenes"
+  // Prep has no page of its own: its first page is Encounters.
+  "/prep": "/encounters"
 };
+
+/** Prep's scenes became encounters (ADR-0041): an old address lands on the same page under its new name. */
+function movedFromScenes(path: string, query: URLSearchParams): string | null {
+  if (path !== "/scenes" && !path.startsWith("/scenes/")) return null;
+  const moved = `/encounters${path.slice("/scenes".length)}`;
+  const search = query.toString();
+  return redirectForRetiredPath(moved, query) ?? `${moved}${search ? `?${search}` : ""}`;
+}
 
 /** Where a retired address goes, or null when the address is not retired. `?view=maps` moves too, and so does the
  *  map library's `?map=` for one map's grid. */
 export function redirectForRetiredPath(path: string, query: URLSearchParams): string | null {
-  if (path === "/scenes" && query.get("view") === "maps") return "/scenes/maps";
+  const moved = movedFromScenes(path, query);
+  if (moved) return moved;
+  if (path === "/encounters" && query.get("view") === "maps") return "/encounters/maps";
   return redirectForOldMapAddress(path, query) ?? RETIRED_PATHS[path] ?? null;
 }
 
@@ -196,7 +206,7 @@ export function litGmTab(path: string): GmTab | null {
 export type GmSection = "play" | "prep" | "codex" | "compendium";
 export const GM_SECTIONS: ReadonlyArray<Readonly<{ id: GmSection; label: string; path: string }>> = [
   { id: "play", label: "Play", path: "/table" },
-  { id: "prep", label: "Prep", path: "/scenes" },
+  { id: "prep", label: "Prep", path: "/encounters" },
   { id: "codex", label: "Codex", path: "/codex" },
   { id: "compendium", label: "Compendium", path: "/compendium" }
 ];
@@ -204,9 +214,9 @@ export const GM_SECTIONS: ReadonlyArray<Readonly<{ id: GmSection; label: string;
 /** Prep's pages, in its section bar's order. Each keeps the address it had before Prep grouped it. */
 export type PrepPage = "scenes" | "party" | "maps" | "tokens" | "sound" | "replays";
 export const PREP_PAGES: ReadonlyArray<Readonly<{ id: PrepPage; label: string; path: string }>> = [
-  { id: "scenes", label: "Scenes", path: "/scenes" },
+  { id: "scenes", label: "Encounters", path: "/encounters" },
   { id: "party", label: "Party", path: "/roster" },
-  { id: "maps", label: "Maps", path: "/scenes/maps" },
+  { id: "maps", label: "Maps", path: "/encounters/maps" },
   { id: "tokens", label: "Tokens", path: "/prep/tokens" },
   { id: "sound", label: "Sound", path: "/viewer-controls/sound" },
   { id: "replays", label: "Replays", path: "/replays" }
@@ -216,7 +226,7 @@ export const PREP_PAGES: ReadonlyArray<Readonly<{ id: PrepPage; label: string; p
 export function prepPageFor(path: string): PrepPage | null {
   const segments = path.split("/").filter(Boolean);
   switch (segments[0]) {
-    case "scenes":
+    case "encounters":
       return segments[1] === "maps" ? "maps" : "scenes";
     case "roster":
     case "characters":
@@ -301,7 +311,7 @@ export function isKnownPath(path: string): boolean {
     if (segments.length === 2) return segments[1].length > 0;
     return segments.length === 3 && segments[2] === "level";
   }
-  if (segments[0] === "scenes") return scenesViewOf(segments, new URLSearchParams()) !== null;
+  if (segments[0] === "encounters") return scenesViewOf(segments, new URLSearchParams()) !== null;
   // The Compendium's views and each record's own address.
   if (segments[0] === "compendium") return compendiumViewOf(segments, new URLSearchParams()) !== null;
   // The player's own tab: one segment, nothing under it.
@@ -339,7 +349,7 @@ export function layerOf(path: string, query: URLSearchParams = new URLSearchPara
   }
   if (segments[0] === "builder" && segments.length === 1) return { kind: "builder" };
   if (segments[0] === "replays" && segments.length === 2) return { kind: "replay", archiveId: Number(segments[1]) };
-  if (segments[0] === "scenes" && segments.length >= 2) {
+  if (segments[0] === "encounters" && segments.length >= 2) {
     const view = scenesViewOf(segments, query);
     return view ? { kind: "scenes", view } : null;
   }

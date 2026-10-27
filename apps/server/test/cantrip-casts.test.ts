@@ -56,7 +56,7 @@ describe("a cast action for every spell on a sheet", () => {
   });
 });
 
-describe("casting a spell that rolls nothing, in a fight", () => {
+describe("casting a spell that rolls nothing, in an encounter", () => {
   it("spends the Magic action, and refuses a second action spell that turn", () => {
     const { state, resolve } = fight(wizard);
     const resolution = resolve("spell-mage-hand", { targetIds: [] });

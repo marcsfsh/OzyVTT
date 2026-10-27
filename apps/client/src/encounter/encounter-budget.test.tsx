@@ -20,7 +20,7 @@ const actor = (over: Partial<GmActor> & Pick<GmActor, "id" | "kind">): GmActor =
 const hero = (id: string, level: number) =>
   actor({ id, kind: "player-character", hitDice: { die: 10, maximum: level, remaining: level, entries: [] } as never });
 
-describe("the staged fight's XP against the SRD budget", () => {
+describe("the staged encounter's XP against the SRD budget", () => {
   it("names the difficulty the monsters' XP reaches for the staged characters' levels", async () => {
     // Four level 1 characters: Low 200, Moderate 300, High 400. Three goblins and an ogre: 600 XP.
     const actors = [

@@ -957,46 +957,46 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof TokenSetAltitudeSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  "scene:create": (
+  "encounter:create": (
     payload: CommandPayload<typeof SceneCreateSchema>,
     acknowledgement: (result: SceneCreateResult) => void
   ) => void;
-  "scene:rename": (
+  "encounter:rename": (
     payload: CommandPayload<typeof SceneRenameSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM sets how a scene's fight starts when Start the fight leaves a choice out (ADR-0039). */
-  "scene:set-initiative-defaults": (
+  "encounter:set-initiative-defaults": (
     payload: CommandPayload<typeof SceneSetInitiativeDefaultsSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  "scene:remove": (
+  "encounter:remove": (
     payload: CommandPayload<typeof SceneIdSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  "scene:activate": (
+  "encounter:activate": (
     payload: CommandPayload<typeof SceneIdSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** Launch one recorded moment of an archived fight; combatants are cloned so live characters are never rewritten. GM only. */
   "replay:launch": (
     payload: CommandPayload<typeof ReplayLaunchSchema>,
-    acknowledgement: (result: MutationResult & { sceneId?: string; actorIds?: readonly string[] }) => void
+    acknowledgement: (result: MutationResult & { encounterId?: string; actorIds?: readonly string[] }) => void
   ) => void;
-  "scene:set-combatants": (
+  "encounter:set-combatants": (
     payload: CommandPayload<typeof SceneSetCombatantsSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  "scene:duplicate": (
+  "encounter:duplicate": (
     payload: CommandPayload<typeof SceneIdSchema>,
     acknowledgement: (result: SceneCreateResult) => void
   ) => void;
-  "scene:reorder": (
+  "encounter:reorder": (
     payload: CommandPayload<typeof SceneReorderSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM only: what the shared screen or one party character's player would receive if the scene were live now. */
-  "scene:preview": (
+  "encounter:preview": (
     payload: CommandPayload<typeof ScenePreviewSchema>,
     acknowledgement: (result: ScenePreviewResult) => void
   ) => void;
@@ -1185,7 +1185,7 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof SoundPauseSchema>,
     acknowledgement: (result: SoundCommandResult) => void
   ) => void;
-  "sound:set-scene-preset": (
+  "sound:set-encounter-preset": (
     payload: CommandPayload<typeof SoundScenePresetSchema>,
     acknowledgement: (result: SoundCommandResult) => void
   ) => void;

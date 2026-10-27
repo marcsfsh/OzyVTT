@@ -839,7 +839,7 @@ const PLAYER_ACTOR_FIELDS = {
   effects: "derived",
   ownerSessionId: "derived",
   healthDisplay: "derived",
-  replaySceneId: "derived",
+  replayEncounterId: "derived",
   actionUses: "derived",
   readyAt: "derived",
   heroicInspiration: "derived",
@@ -1029,7 +1029,7 @@ export function projectPlayerView(
           restStep,
           inventory,
           currency,
-          replaySceneId,
+          replayEncounterId,
           favouriteOptionIds,
           optionUseCounts
         } = source;
@@ -1090,7 +1090,7 @@ export function projectPlayerView(
           presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
           // Replay clone marker, copied explicitly. An opaque scene id that keeps clones out of the party strip
           // and claim screen; the entry stays so the map still renders the clone's token.
-          ...(replaySceneId !== undefined ? { replaySceneId } : {}),
+          ...(replayEncounterId !== undefined ? { replayEncounterId } : {}),
           ...(classLine !== null ? { classLine } : {}),
           ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),

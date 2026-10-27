@@ -113,12 +113,13 @@ export function EncounterMeter({
       </ul>
       {reading.kind === "unknown-xp" && (
         <p className="encounter-meter-note">
-          The catalog gives no XP for {reading.missing.join(", ")}, so the fight&apos;s difficulty can&apos;t be read.
+          The catalog gives no XP for {reading.missing.join(", ")}, so the encounter&apos;s difficulty can&apos;t be
+          read.
         </p>
       )}
       {reading.kind === "no-party" && (
         <p className="encounter-meter-note">
-          This fight is worth <b>{reading.xp.toLocaleString()} XP</b>. Stage the characters to see how hard it is.
+          This encounter is worth <b>{reading.xp.toLocaleString()} XP</b>. Stage the characters to see how hard it is.
         </p>
       )}
       {reading.kind === "reading" && <Meter reading={reading} />}

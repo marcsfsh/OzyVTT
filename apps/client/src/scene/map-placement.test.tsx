@@ -92,7 +92,7 @@ describe("placing on the map", () => {
     act(() => armPlacement(GOBLIN));
     fireEvent.pointerDown(svgPoint(), { button: 0, clientX: 320, clientY: 180, pointerId: 1, pointerType: "mouse" });
     expect(moves()).toEqual([
-      expect.objectContaining({ actorId: GOBLIN, position: { x: 320, y: 180 }, sceneId: SCENE })
+      expect.objectContaining({ actorId: GOBLIN, position: { x: 320, y: 180 }, encounterId: SCENE })
     ]);
     expect(screen.queryByText(/where Goblin goes/)).toBeNull();
   });
@@ -108,7 +108,7 @@ describe("placing on the map", () => {
     ).toEqual(["Place Goblin here", "Place a light here · Torch · 20 ft + 20 ft"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Place Goblin here" }));
     expect(moves()).toEqual([
-      expect.objectContaining({ actorId: GOBLIN, position: { x: 200, y: 150 }, sceneId: SCENE })
+      expect.objectContaining({ actorId: GOBLIN, position: { x: 200, y: 150 }, encounterId: SCENE })
     ]);
     expect(screen.queryByRole("menu", { name: "Place here" })).toBeNull();
   });

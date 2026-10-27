@@ -218,7 +218,7 @@ describe("whom an action reaches", () => {
 });
 
 describe("what works only underwater", () => {
-  it("refuses a seahorse's Bubble Dash in a dry fight and grants the swim underwater", () => {
+  it("refuses a seahorse's Bubble Dash in a dry encounter and grants the swim underwater", () => {
     const built = table("seahorse");
     expect(() => use(built, "bubble-dash", [])).toThrow(RulesBlockedError);
     built.state.combat = { ...built.state.combat, underwater: true };

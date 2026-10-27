@@ -31,7 +31,7 @@ function buildGame(overrides: Record<string, unknown> = {}): GameState {
       mapAssetId: MAP,
       initiative: [],
       tokens: [],
-      scenes: [{ id: SCENE, name: "Parked ambush", mapAssetId: SCENE_MAP, combat: {} }],
+      encounters: [{ id: SCENE, name: "Parked ambush", mapAssetId: SCENE_MAP, combat: {} }],
       ...overrides
     }
   });
@@ -58,7 +58,7 @@ describe("manual fog of war (state + fold semantics)", () => {
   it("defaults off with no shapes, and pre-fog saves parse with the default (additive-state)", () => {
     const game = buildGame();
     expect(game.combat.fog).toEqual({ enabled: false, shapes: [] });
-    expect(game.combat.scenes[0].combat.fog).toEqual({ enabled: false, shapes: [] });
+    expect(game.combat.encounters[0].combat.fog).toEqual({ enabled: false, shapes: [] });
   });
 
   it("paints ordered reveal/hide strokes that fold over 'all hidden'", () => {
@@ -130,19 +130,19 @@ describe("manual fog of war (state + fold semantics)", () => {
     expect(game.combat.fog.shapes).toEqual([]);
   });
 
-  it("targets a parked scene's private prep via sceneId, never the live slot or a missing scene", () => {
+  it("targets a parked encounter's private prep via encounterId, never the live slot or a missing encounter", () => {
     const game = buildGame();
     setFogEnabled(game, SCENE, true);
     paintFog(game, SCENE, GRIDLESS, { id: shapeId(1), op: "reveal", rect: { x: 0, y: 0, width: 100, height: 100 } });
-    expect(game.combat.scenes[0].combat.fog.enabled).toBe(true);
-    expect(game.combat.scenes[0].combat.fog.shapes).toHaveLength(1);
+    expect(game.combat.encounters[0].combat.fog.enabled).toBe(true);
+    expect(game.combat.encounters[0].combat.fog.shapes).toHaveLength(1);
     expect(game.combat.fog).toEqual({ enabled: false, shapes: [] }); // the live table untouched
     expect(() => setFogEnabled(game, "60000000-0000-4000-8000-00000000dead", true)).toThrowError(/no longer exists/);
-    const live = buildGame({ activeSceneId: SCENE });
+    const live = buildGame({ activeEncounterId: SCENE });
     expect(() => setFogEnabled(live, SCENE, true)).toThrowError(/live/);
   });
 
-  it("never dirties the combat timeline and survives a rewind (scene dressing, not combat state)", () => {
+  it("never dirties the combat timeline and survives a rewind (encounter dressing, not combat state)", () => {
     const game = buildActiveGame();
     const before = structuredClone(game);
     setFogEnabled(game, undefined, true);

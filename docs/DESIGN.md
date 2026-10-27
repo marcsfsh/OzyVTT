@@ -12,7 +12,7 @@ CSS is reference material, not production code. A missing state uses the same pr
 
 ## Product principles
 
-- Combat first. The table surface serves running a fight; anything else earns its place.
+- Combat first. The table surface serves running an encounter; anything else earns its place.
 - Rank before you place. For each screen, write down what the person needs there, in order. The order decides size
   and position: on the table the map comes first, whose turn it is second and any decision someone owes third.
   Anything past the first five goes behind one click, in a menu, a tab or the next page.
@@ -20,8 +20,8 @@ CSS is reference material, not production code. A missing state uses the same pr
   map in the middle, tools on the left, one tabbed sidebar on the right, turn order across the top, and a character
   header with hit points and AC. Break a convention only with a reason in an ADR.
 - The obvious action is the correct one. Each view has one primary action, and its label names its result.
-- Everything needed, nothing more. Each new setting is a small tax on every future decision. Settings that shape a
-  fight belong to the scene in Prep, not to the table.
+- Everything needed, nothing more. Each new setting is a small tax on every future decision. Settings that shape an
+  encounter belong to the encounter in Prep, not to the table.
 - Role clarity is part of the UX. A player should never wonder whether something is for them, and the GM should
   always be able to tell what players and the table screen can see.
 
@@ -41,9 +41,9 @@ Neon appears only where it means something, and each 80s element has one job.
 | Sunset scene                             | Arrival            | The title and join screens only. Dusk paints it at night; Dawn paints it as daybreak.                                                              |
 | Horizon line (`--grad-horizon`, 2px)     | The top of the app | The bottom edge of every top bar, laptop and phone                                                                                                 |
 | Chrome lettering (`.chrome`)             | Who is acting      | The wordmark, the acting creature's name and YOUR TURN. Nowhere else. Dawn prints it as solid ink with the same pink and cyan split.               |
-| Cabinet lamp                             | Available, or on   | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live scene                                                          |
+| Cabinet lamp                             | Available, or on   | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live encounter                                                      |
 | Life bar                                 | Hit points         | Every hit point readout                                                                                                                            |
-| VCR counter                              | The round          | PLAY and RND 03 during a fight, STOP and RND -- between fights, at the start of the turn order and beside YOUR TURN                                |
+| VCR counter                              | The round          | PLAY and RND 03 during an encounter, STOP and RND -- between encounters, at the start of the turn order and beside YOUR TURN                       |
 | Arcade button                            | Press this         | The one primary action in a view                                                                                                                   |
 | Neon grid (`--grid-neon`)                | Map squares        | The grid drawn over a map image                                                                                                                    |
 | Reticle                                  | The target         | The creature an attack or spell is aimed at                                                                                                        |
@@ -145,7 +145,7 @@ surround, a control over the map is a plate in the theme's surface, and lamps st
 | Role                 | Token                              | Face                          | Use                                                                                                                                 |
 | -------------------- | ---------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Wordmark             | `--font-wordmark`, `--font-script` | Bungee and Mr Dafoe           | OZY in chrome and vtt in neon script. The wordmark only.                                                                            |
-| Display              | `--font-display`                   | Bungee                        | Record titles (a creature, a character, a scene, a page), page titles and the primary button. One or two per view.                  |
+| Display              | `--font-display`                   | Bungee                        | Record titles (a creature, a character, an encounter, a page), page titles and the primary button. One or two per view.             |
 | UI                   | `--font-label`, `--font-body`      | Bai Jamjuree 500, 600 and 700 | Everything else: labels, body, tabs, buttons and names.                                                                             |
 | Numbers and readouts | `--font-numeric`                   | VT323                         | Every game number at 15px or more (HP, AC, initiative, to-hit, DC, XP, dice), the VCR counter, and tags such as NEXT, WAIT and HIT. |
 | Code                 | `--font-mono`                      | Space Mono                    | The API reference only.                                                                                                             |
@@ -160,21 +160,21 @@ surround, a control over the map is a plate in the theme's surface, and lamps st
 
 The shells:
 
-- GM, laptop. A 56px top bar: the wordmark; Play, Prep, Codex and Compendium; the live scene picker on Play; then, on
+- GM, laptop. A 56px top bar: the wordmark; Play, Prep, Codex and Compendium; the live encounter picker on Play; then, on
   the right, the table screen lamp, who is connected, search (Ctrl K), the theme switch (the current theme's mark,
   which opens Dusk and Dawn) and settings (a toothed gear, so it never reads as the theme's sun). Each section has a 52px bar under it
   for its pages, with the section's search or its primary at the right end.
-- GM, phone. The same four sections as a bottom tab bar. The top bar belongs to the page on screen. In a fight, Play
-  stacks the VCR counter and scene picker, the turn order, the map, and the acting creature's card (portrait and
+- GM, phone. The same four sections as a bottom tab bar. The top bar belongs to the page on screen. In an encounter, Play
+  stacks the VCR counter and encounter picker, the turn order, the map, and the acting creature's card (portrait and
   chrome name, life bar, pending card, lamps, an Actions row that opens the full list) above End turn. Under the strips
   the map (its tools above it) has a fixed height and scrolls away; the panel below is one screen tall, so scrolled to
   the end its tabs sit under the turn order. Its content scrolls only once the map has gone. No handle resizes the map.
 - Player, laptop. The wordmark; Table, Sheet and Codex; the claimed character on the right; settings.
-- Player, phone. Bottom tabs Table, Sheet, Codex and Log on every screen. In a fight, Table holds the turn card and a
+- Player, phone. Bottom tabs Table, Sheet, Codex and Log on every screen. In an encounter, Table holds the turn card and a
   small map with Open map.
 
-Prep holds Scenes, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. Its front
-page pins New map and New scene side by side at the top, then the Maps and Scenes tabs, each a sortable table. The table screen's controls open from the
+Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. Its front
+page pins New map and New encounter side by side at the top, then the Maps and Encounters tabs, each a sortable table. The table screen's controls open from the
 table screen button in the top bar. The rules reference opens from search and from the Compendium. Settings is the gear.
 
 The table (Play), as a docked workbench (ADR-0025):
@@ -184,28 +184,28 @@ The table (Play), as a docked workbench (ADR-0025):
 - Turn order, 64px, across the top of the map: the VCR counter, then a tile per combatant with portrait, name and
   initiative. The acting tile has the sun frame, the next one carries a NEXT tag beside its portrait, tiles that have
   acted dim their portrait decoration to 45%; their name and initiative keep readable contrast. Hidden combatants
-  show a dashed violet portrait and the crossed eye, to the GM only. A Fight
-  menu at the end holds adding combatants, rerolling and ending the fight.
+  show a dashed violet portrait and the crossed eye, to the GM only. An Encounter
+  menu at the end holds adding combatants, rerolling and ending the encounter.
 - The map fills the rest. Nothing floats over it except tokens, marks, the reticle and a zoom control in the bottom
   right corner.
-- Sidebar, 360px, on the right, with tabs Fight, Log, Party and Notes (players get Turn, Log and Party). During a fight,
-  Fight shows the acting creature: portrait and chrome name; the life bar with AC and speed; a pending card when the game waits on
+- Sidebar, 360px, on the right, with tabs Encounter, Log, Party and Notes (players get Turn, Log and Party). During an encounter,
+  Encounter shows the acting creature: portrait and chrome name; the life bar with AC and speed; a pending card when the game waits on
   someone; the four lamps; its actions grouped under Action, Bonus action and Reaction, each heading marked in its lamp
   colour; and End turn pinned at the bottom with who is next.
 
-Before a fight, the same frame changes in three places:
+Before an encounter, the same frame changes in three places:
 
-- The strip above the map shows the VCR counter at STOP, "No fight running" with how many of the party and how many
+- The strip above the map shows the VCR counter at STOP, "No encounter running" with how many of the party and how many
   enemies are on the map, and the join address with a Copy button.
 - The map shows every token with its plain ring; nobody wears the sun frame.
-- Fight shows Start a fight: In this fight lists the staged combatants, ticked, with hidden creatures marked; the two
+- Encounter shows Start an encounter: In this encounter lists the staged combatants, ticked, with hidden creatures marked; the two
   initiative switches; Surprised as one chip per combatant, with the rule underneath; and START THE FIGHT pinned at the
   bottom over a live count and an accurate description of who rolls. With players rolling, say that the players roll
   for their claimed characters; do not promise an automatic roll for everyone. The list is the staged combatants,
-  including tokens still in the tray, with Add combatants available. Once fight settings are saved on scenes (ADR-0037, phase 8), the switches
-  start from the scene's values. On a phone, Start a fight is a card under the map with the combatants' faces and
-  three rows (In this fight, Initiative, Surprised), each opening a sheet, above the primary; the header holds the
-  STOP counter, the scene picker and a Join button.
+  including tokens still in the tray, with Add combatants available. The switches start from the
+  encounter's Encounter settings (ADR-0039). On a phone, Start an encounter is a card under the map with the combatants' faces and
+  three rows (In this encounter, Initiative, Surprised), each opening a sheet, above the primary; the header holds the
+  STOP counter, the encounter picker and a Join button.
 
 The table screen (the shared TV) is for reading across a room. Gameplay has no controls; pairing, fullscreen and
 optional local map framing remain available as device utilities.
@@ -318,7 +318,7 @@ from the mockups.
   replay them with new command IDs or announce success before an acknowledgement. When
   the connection returns the bar says "Back at the table" for 2 seconds, then goes.
 - Empty states: one line saying what is missing and one button that fixes it, in the space the content would fill. For
-  example, the log says "No rolls yet." above the dice, and a scene without a map says "No map yet." with Pick a map.
+  example, the log says "No rolls yet." above the dice, and an encounter without a map says "No map yet." with Pick a map.
   No illustrations; the sunset belongs to arrival screens.
 - Icons are 20px stroked SVG. Never render an emoji or a text symbol as an icon.
 
@@ -337,7 +337,7 @@ from the mockups.
   right end. A phone lists the app's sections as bottom tabs and the page's own views as a segmented strip under its
   header.
 - A record reads as one document. The middle of the page shows the record as the people who use it see it: a Codex page
-  as players read it, a stat block as the table prints it, a scene as its map. A panel on the right answers what the GM
+  as players read it, a stat block as the table prints it, an encounter as its map. A panel on the right answers what the GM
   asks about it: who sees it, where it is used, what it links to and its history. On a phone that panel folds into one
   row at the end of the document.
 - A preview is the real thing, drawn by the component the real page uses. See it as switches the page in place to what
@@ -347,11 +347,10 @@ from the mockups.
 - Making something is a set of steps: steps down the left, each marked done (cyan check), current (cyan outline) or
   needing a choice (amber !); questions in the middle; a live preview on the right. On a phone the steps are a strip of
   chips and the preview is a bar above Next.
-- Prep is a list, a preview and a setup column: scenes on the left with their status (a Live lamp, Ready, Needs a map,
+- Prep is a list, a preview and a setup column: encounters on the left with their status (a Live lamp, Ready, Needs a map,
   Draft, defined in IMPLEMENTATION.md using `factsOf` and `needsOf`), the whole staged map in the middle (fitted, never cropped), and on the right the encounter (monsters, XP and a difficulty meter against the
-  party's budget), the fight settings saved on the scene (ADR-0037, phase 8; until then they stay in the start-a-fight
-  step) and a Ready to go checklist, with Make live at the bottom.
-- Decisions owed wait in one place: a pending card on the GM's Fight tab, a prompt at the top of a player's Table tab.
+  party's budget), its Encounter settings (ADR-0039) and a Ready to go checklist, with Make live at the bottom.
+- Decisions owed wait in one place: a pending card on the GM's Encounter tab, a prompt at the top of a player's Table tab.
 - Time is a timeline. History is a list of versions with Compare and Restore.
 - A map is present without taking over. Anything placed on a map has two ways in: a button and then a click on the map,
   or a right-click at the spot, which is a long press on a phone.
@@ -361,7 +360,7 @@ from the mockups.
 - On a laptop the header holds the numbers read most: portrait, name in Bungee, species, class, level, subclass and
   background; AC, initiative, speed and proficiency in VT323 boxes; the life bar with Change HP; and Rest as one menu
   with Short rest and Long rest. The phone uses the compact UI-font identity with AC and HP; its rest row has the two
-  separate buttons drawn in sheet-phone. Rest controls are hidden in a fight. Keep the other vitals and HP editing
+  separate buttons drawn in sheet-phone. Rest controls are hidden in an encounter. Keep the other vitals and HP editing
   reachable from the compact header's details sheet, without forcing laptop-sized boxes into it.
 - Laptop: abilities as 2 by 3 tiles (name, modifier in VT323 at 34px, score under it), saving throws and senses; then
   skills with a cyan square for proficiency; then Spells, Gear, Features and Notes as tabs.
@@ -370,7 +369,7 @@ from the mockups.
 - Spells group by level with that level's slot pips in `--party`. On a laptop a spell's cost, range and effect sit
   in a column right beside its name, never at the far edge of the panel. Tags say REACTION, BONUS, RITUAL and CONC; an active
   effect shows in cyan with its time left.
-- In a fight a player's phone shows the turn card on Table: YOUR TURN in chrome with the VCR counter, the four lamps,
+- In an encounter a player's phone shows the turn card on Table: YOUR TURN in chrome with the VCR counter, the four lamps,
   any active effect, slot pips, actions grouped by cost and End turn. Off-turn it shows who is acting in the sun frame,
   only an available Reaction lamp lit, any prompt the player owes at the top, and the small map. A spent reaction,
   incapacitation or server refusal keeps it unlit. Extra actions and movement beyond 30 ft must remain legible.

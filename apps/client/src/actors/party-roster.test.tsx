@@ -98,19 +98,19 @@ describe("the Roster", () => {
     ).toBeInTheDocument();
   });
 
-  it("asks again before releasing a character mid-fight", async () => {
+  it("asks again before releasing a character mid-encounter", async () => {
     const user = userEvent.setup();
     command.mockResolvedValueOnce({
       ok: false,
-      code: "in_fight",
-      message: "Borin is in the fight. Releasing Borin takes the player's turn controls away."
+      code: "in_encounter",
+      message: "Borin is in the encounter. Releasing Borin takes the player's turn controls away."
     } as never);
     roster([pc({ id: "b", name: "Borin", ownerSessionId: "s1", firstClaimedAt: 1 })]);
     await user.click(screen.getByRole("button", { name: "Force release claim" }));
     await user.click(
       within(screen.getByRole("dialog", { name: "Release Borin?" })).getByRole("button", { name: "Release" })
     );
-    const again = await screen.findByRole("dialog", { name: "Release Borin mid-fight?" });
+    const again = await screen.findByRole("dialog", { name: "Release Borin mid-encounter?" });
     expect(again).toHaveTextContent("takes the player's turn controls away");
     await user.click(within(again).getByRole("button", { name: "Release anyway" }));
     await vi.waitFor(() =>

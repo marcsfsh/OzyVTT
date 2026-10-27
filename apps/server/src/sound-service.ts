@@ -112,15 +112,15 @@ export class SoundService {
 
   /** A scene went live: its sound starts, unless it has none or the GM turned that off. Best-effort: a sound
    *  failure must not undo the committed scene switch. */
-  sceneWentLive = async (sceneId: string, sourceRevision: number) => {
-    const preset = this.options.store.board.presets.find((candidate) => candidate.sceneId === sceneId);
+  sceneWentLive = async (encounterId: string, sourceRevision: number) => {
+    const preset = this.options.store.board.presets.find((candidate) => candidate.encounterId === encounterId);
     if (!preset?.autoplay) return;
     try {
-      await this.run(`scene-live:${sceneId}:${sourceRevision}`, (board, deps) => {
-        applyScenePreset(board, sceneId, deps);
+      await this.run(`scene-live:${encounterId}:${sourceRevision}`, (board, deps) => {
+        applyScenePreset(board, encounterId, deps);
       });
     } catch (error) {
-      console.error("The scene's sound could not start:", (error as Error).message);
+      console.error("The encounter's sound could not start:", (error as Error).message);
     }
   };
 

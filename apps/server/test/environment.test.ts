@@ -161,7 +161,7 @@ describe("frigid and deep water", () => {
     expect(hero(state).exposure?.frigidRounds ?? 0).toBe(0);
   });
 
-  it("counts frigid water a round at a time in a fight", () => {
+  it("counts frigid water a round at a time in an encounter", () => {
     const state = scene([], true);
     state.combat.terrain.water = [rect(0, 0, 5, 5)];
     setEnvironment(state, undefined, { frigidWater: true }, GM);

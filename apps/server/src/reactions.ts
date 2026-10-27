@@ -629,7 +629,7 @@ function answerPursuit(
     : undefined;
   if (!quarry || !state.combat.initiative.some((entry) => entry.actorId === quarry.id)) {
     clearPrompt(false);
-    throw new CommandRejectedError(`${pending.sourceName} is no longer in the fight.`);
+    throw new CommandRejectedError(`${pending.sourceName} is no longer in the encounter.`);
   }
   const sibling = available.find((candidate) => candidate.id === usesAction);
   if (!sibling?.teleport) {
@@ -718,8 +718,8 @@ function answerStrike(
     clearPrompt(false);
     throw new CommandRejectedError(
       pending.kind === "leaves-reach"
-        ? "The mover is no longer in the fight."
-        : `${pending.sourceName} is no longer in the fight.`
+        ? "The mover is no longer in the encounter."
+        : `${pending.sourceName} is no longer in the encounter.`
     );
   }
   const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;

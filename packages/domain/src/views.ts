@@ -102,7 +102,7 @@ export type CommandedOrders = Readonly<{
 
 export type PlayerActor = Pick<Actor, PlayerActorTableField> &
   Partial<Pick<Actor, PlayerActorPartyField>> & {
-    replaySceneId?: string;
+    replayEncounterId?: string;
     hp: PlayerHp;
     effects: PlayerEffect[];
     claimStatus: "available" | "mine" | "claimed";

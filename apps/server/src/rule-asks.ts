@@ -30,7 +30,7 @@ export function findRuleAsk(state: GameState, askId: string): PendingRuleAsk | n
  *  changed, already answered) is told so, and never believes it ran. */
 export function clearRuleAsk(state: GameState, askId: string): PendingRuleAsk {
   const ask = findRuleAsk(state, askId);
-  if (!ask) throw new CommandRejectedError("That question is no longer waiting. The fight moved on.");
+  if (!ask) throw new CommandRejectedError("That question is no longer waiting. The encounter moved on.");
   state.combat = {
     ...state.combat,
     pendingRuleAsks: state.combat.pendingRuleAsks.filter((entry) => entry.id !== askId)

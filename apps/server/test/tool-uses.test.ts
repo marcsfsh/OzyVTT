@@ -159,14 +159,14 @@ describe("a tool's printed Utilize uses", () => {
     );
   });
 
-  it("spends nothing outside a fight", () => {
+  it("spends nothing outside an encounter", () => {
     const { state, deps } = table({ inventory: [catalogRow("thieves-tools")] });
     rollItemUse(state, PLAYER, toolUse("thieves-tools", 0), deps);
     rollItemUse(state, PLAYER, toolUse("thieves-tools", 1), deps);
     expect(state.combat.turn.actionUsed).toBe(false);
   });
 
-  it("takes the Utilize action in a fight, and strict rules refuse a second", () => {
+  it("takes the Utilize action in an encounter, and strict rules refuse a second", () => {
     const { state, deps } = table({ inventory: [catalogRow("thieves-tools")], fight: true });
     rollItemUse(state, PLAYER, toolUse("thieves-tools", 0), deps);
     expect(state.combat.turn.actionUsed).toBe(true);

@@ -226,10 +226,10 @@ export function GearTab({
   const retrievalWords = (host: InventoryItem) => {
     const retrieval = holdsOf(host)?.retrieval;
     return retrieval === "utilize"
-      ? `Taking it out of ${host.name} takes the Utilize action in a fight.`
+      ? `Taking it out of ${host.name} takes the Utilize action in an encounter.`
       : retrieval === "utilize-or-bonus-action"
-        ? `Taking it out of ${host.name} takes a Bonus Action in a fight, or the Utilize action once that is spent.`
-        : `Taking it out of ${host.name} is your free object interaction in a fight.`;
+        ? `Taking it out of ${host.name} takes a Bonus Action in an encounter, or the Utilize action once that is spent.`
+        : `Taking it out of ${host.name} is your free object interaction in an encounter.`;
   };
   const nameOf = (item: InventoryItem) => {
     const base = item.baseId ? catalog.find((entry) => entry.id === item.baseId) : undefined;
@@ -503,7 +503,7 @@ export function GearTab({
                 <span className="cs-sub">
                   {open.equipped ? "" : `Hold it to change its form. `}
                   {summary?.variantChoice?.activation === "bonus-action"
-                    ? "Changing it takes a Bonus Action in a fight."
+                    ? "Changing it takes a Bonus Action in an encounter."
                     : ""}
                 </span>
               </div>

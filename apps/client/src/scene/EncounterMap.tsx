@@ -368,7 +368,7 @@ export function EncounterMap({
   const moverBudget = useMovementBudget(moverPlaced ? moverId : null, revision);
   const commands = useMapCommands({
     revision,
-    sceneId: moveSceneId,
+    encounterId: moveSceneId,
     size,
     canMove,
     moveModeFor: (actorId) => (actorId === moverId ? moveMode : undefined),

@@ -51,7 +51,7 @@ function blockedReason(offer: Offer, chosen: readonly Offer[], offers: CastShapi
       ? "One Metamagic option a spell."
       : "Two Metamagic options a spell while Innate Sorcery is active.";
   if (costOf([...chosen, offer], offers.free === true) > offers.points) return "Not enough Sorcery Points.";
-  if (!aimed && PROTECTS.has(offer.id)) return "Aim the spell on your turn in a fight to choose who it protects.";
+  if (!aimed && PROTECTS.has(offer.id)) return "Aim the spell on your turn in an encounter to choose who it protects.";
   return null;
 }
 

@@ -199,7 +199,7 @@ export function recoverAmmunition(
         next = { ...next, quantity: next.quantity + thrown };
         lines.push({
           actorId: actor.id,
-          text: `${actor.name} picks up the ${row.name} thrown in the fight (${thrown}).`
+          text: `${actor.name} picks up the ${row.name} thrown in the encounter (${thrown}).`
         });
       }
       const ammo = fired ? ammunitionOf(next, catalog) : null;

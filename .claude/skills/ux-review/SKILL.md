@@ -11,12 +11,12 @@ Review $ARGUMENTS as the people who use it. Report what you find; don't change c
 
 1. Read the Product principles and Page patterns in `docs/DESIGN.md`, and its section for this
    surface if it has one (the sheet, the Codex).
-2. Name the main job, such as "start a fight on a prepared scene", and who does it: the GM, a player
+2. Name the main job, such as "start a prepared encounter", and who does it: the GM, a player
    or the table screen.
 3. Screenshot each step at both sizes with `node .claude/skills/verify/screens.mjs` (`--as player` for
    a player's view) and read every picture. When a step needs a click or a drag to reach, drive it
    with a short Playwright script built on `e2e/smoke.ts`.
-4. Walk the job as a GM in the middle of a fight. Note every hunt for a control, every read before
+4. Walk the job as a GM in the middle of an encounter. Note every hunt for a control, every read before
    acting and every step a default could have saved. Beyond what `docs/DESIGN.md` asks, check that
    controls stay put as state changes, and that empty, loading, error and reconnecting states say
    what to do next.

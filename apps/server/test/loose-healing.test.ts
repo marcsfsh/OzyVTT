@@ -128,7 +128,7 @@ const use = (base: string, token: string, actionId: string, extra: Record<string
   post(base, GAME_PATHS.actionUse, token, { commandId: randomUUID(), actorId: HERO, actionId, ...extra });
 const hpOf = (state: GameState, id: string) => state.actors.find((candidate) => candidate.id === id)!.hp.current;
 
-describe("healing outside a fight", () => {
+describe("healing outside an encounter", () => {
   it("lands a potion on the party member it is given to, rolled once", async () => {
     const { base, server, heroSession } = await boot(idle());
     const drunk = await use(base, heroSession, "potion", { targetIds: [FRIEND] });

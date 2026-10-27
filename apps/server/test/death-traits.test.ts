@@ -120,7 +120,7 @@ describe("a hydra's Multiple Heads", () => {
 });
 
 describe("a troll's Loathsome Limbs", () => {
-  it("severs a limb from a Bloodied troll that took 15 Slashing this turn, which joins the fight after it", () => {
+  it("severs a limb from a Bloodied troll that took 15 Slashing this turn, which joins the encounter after it", () => {
     const { state, creature } = fight("troll");
     creature.hp = { ...creature.hp, current: 50 };
     hit(state, 18, "slashing");

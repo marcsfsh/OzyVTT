@@ -28,7 +28,7 @@ export const ScenesContext = createContext<ScenesContextValue | null>(null);
 
 export function useScenes(): ScenesContextValue {
   const value = useContext(ScenesContext);
-  if (!value) throw new Error("useScenes is used outside the Scenes tab.");
+  if (!value) throw new Error("useScenes is used outside Encounters.");
   return value;
 }
 
@@ -40,7 +40,7 @@ export function useSceneLinks(token: string) {
     let active = true;
     apiRequest<{ links: readonly CodexSceneLink[] }>(CODEX_PATHS.sceneLinks, { token })
       .then((data) => {
-        if (active) setLinks(new Map(data.links.map((link) => [link.sceneId, link])));
+        if (active) setLinks(new Map(data.links.map((link) => [link.encounterId, link])));
       })
       .catch(() => {
         if (active) setLinks(new Map());

@@ -103,7 +103,7 @@ const SESSION = {
   revealedToPlayers: false,
   status: "planned",
   tags: [],
-  sceneIds: [],
+  encounterIds: [],
   rev: 1,
   createdAt: AT,
   updatedAt: AT,

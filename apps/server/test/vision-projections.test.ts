@@ -102,7 +102,7 @@ describe("dynamic vision in the player projection", () => {
     expect(heroView.combat.tokens.some((token) => token.actorId === FRIEND)).toBe(false);
   });
 
-  it("behaves as before with the scene's vision off", () => {
+  it("behaves as before with the encounter's vision off", () => {
     const view = asPlayer(frozen(hiddenGoblin({ enabled: false })), SESSION_A);
     expect(view.combat.tokens.map((token) => token.actorId)).toContain(GOBLIN);
     expect(view.combat.vision).toEqual({ enabled: false });

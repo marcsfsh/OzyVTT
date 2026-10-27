@@ -28,14 +28,16 @@ export const clockMinutesOf = (state: GameState) => state.rest.clockHours * 60 +
  *  replay's copies. */
 function creaturesInTime(state: GameState): Set<string> {
   const frozen = new Set(
-    state.combat.scenes.flatMap((scene) =>
-      scene.id !== state.combat.activeSceneId && scene.combat.active
+    state.combat.encounters.flatMap((scene) =>
+      scene.id !== state.combat.activeEncounterId && scene.combat.active
         ? scene.combat.initiative.map((entry) => entry.actorId)
         : []
     )
   );
   return new Set(
-    state.actors.filter((actor) => !frozen.has(actor.id) && actor.replaySceneId === undefined).map((actor) => actor.id)
+    state.actors
+      .filter((actor) => !frozen.has(actor.id) && actor.replayEncounterId === undefined)
+      .map((actor) => actor.id)
   );
 }
 

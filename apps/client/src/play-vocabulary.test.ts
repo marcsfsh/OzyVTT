@@ -51,19 +51,23 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string; where?: Re
     pattern: /\b(strict|assisted|freeform)\b/i,
     use: '"Enforce" / "Advise" / "Off": the wire values keep their names, and the dial gets these'
   },
-  // The fight, and the place it happens
+  // The encounter, and the place it happens (ADR-0041)
   {
-    pattern: /\bencounters?\b/i,
-    use: '"fight" for the event ("Start the fight", "Add to this fight") and "Table" for the place; "encounter" is a wire name'
+    pattern: /\bscenes?\b/i,
+    use: '"encounter": the prepared map with its creatures is an Encounter ("New encounter", "Encounters")'
+  },
+  {
+    pattern: /\bfight(s|ing)?\b/i,
+    use: '"encounter" for the event ("Start the encounter", "Add to this encounter") and "Table" for the place'
   },
   { pattern: /\bbattlemaps?\b/i, use: `"battle map", two words: the Codex's spelling wins` },
   { pattern: /\bscene prep\b/i, use: '"Staging": one name for the GM-private setup state' },
-  // A finished fight's record
+  // A finished encounter's record
   { pattern: /\brecordings?\b/i, use: '"replay"' },
   {
     pattern: /\barchives?\b/i,
     where: /\/replay\//,
-    use: `"replay": "Archive" stays the reversible verb elsewhere, but a finished fight's record is a Replay`
+    use: `"replay": "Archive" stays the reversible verb elsewhere, but a finished encounter's record is a Replay`
   },
   // The verb triad
   { pattern: /remove from pickers/i, use: '"Archive": the act is reversible, so it is the Archive verb' },
@@ -91,12 +95,18 @@ const ALLOWED: ReadonlyArray<readonly [file: string, text: string, why: string]>
     "A class, a species, spellcaster, or creature-attuned-to-a- followed by an item's id. Any one is enough. It's shown on the sheet, and a player can't attune a character that meets none. You can still attune anyone.",
     "creature-attuned-to-a- is the id prefix an item prerequisite is written with in the content, which " +
       "the author types as it stands; the word is part of that id, not copy that talks about a creature."
+  ],
+  [
+    "apps/client/src/table/TonightTab.tsx",
+    "Scenes",
+    "The Tonight board lists the session prep's Scenes section: the Codex's own narrative scenes, a title, a place " +
+      "and notes each, which the Codex keeps calling scenes. The table's prepared encounters are the board's Encounters."
   ]
 ];
 
 /** Domain terms the lock must never eat, asserted present at their home. */
 const LEGITIMATE: ReadonlyArray<readonly [file: string, text: string, why: string]> = [
-  ["apps/client/src/scene/MapToolGroups.tsx", "Reveal the whole map", "fog: Reveal/Hide are in-fight verbs"],
+  ["apps/client/src/scene/MapToolGroups.tsx", "Reveal the whole map", "fog: Reveal/Hide are in-encounter verbs"],
   ["apps/client/src/scene/MapToolGroups.tsx", "Hide the whole map again", "fog: the Hide half"],
   [
     "apps/client/src/encounter/InitiativePrompt.tsx",
@@ -229,7 +239,7 @@ describe("The structured copy, pinned at its one definition", () => {
   });
 
   it("names the rules dial Enforce / Advise / Off, and the Settings sections", () => {
-    // The dial's labels are `settings/table-words.ts`'s DIAL_COPY, shared by Settings and the fight's options; the
+    // The dial's labels are `settings/table-words.ts`'s DIAL_COPY, shared by Settings and the encounter's options; the
     // wire values stay strict/assisted/freeform, which is why the RETIRED row above is about copy only.
     const source = readFileSync(`${process.cwd()}/src/settings/table-words.ts`, "utf8");
     expect(source).toMatch(/value: "strict", label: "Enforce"/);
@@ -237,7 +247,7 @@ describe("The structured copy, pinned at its one definition", () => {
     expect(source).toMatch(/value: "freeform", label: "Off"/);
     expect(SETTINGS_SECTIONS.map((section) => section.label)).toEqual([
       "Players",
-      "Fights",
+      "Encounters",
       "Characters",
       "Device",
       "Access",
@@ -245,15 +255,16 @@ describe("The structured copy, pinned at its one definition", () => {
     ]);
   });
 
-  it("calls the place the Table and never the Encounter", () => {
-    // "Encounter" is a fight and never a place. The GM's sections and Prep's pages are labelled in the router (their
-    // rows are `label: "…"`), and a player's Table tab in the app bar; the order is not pinned here.
+  it("calls the place the Table and the prepared record the Encounter", () => {
+    // An encounter is prepared in Prep's Encounters and run at the Table, which is never called an encounter. The GM's
+    // sections and Prep's pages are labelled in the router (their rows are `label: "…"`), and a player's Table tab in
+    // the app bar; the order is not pinned here.
     for (const label of [
       "Play",
       "Prep",
       "Codex",
       "Compendium",
-      "Scenes",
+      "Encounters",
       "Party",
       "Maps",
       "Tokens",
@@ -262,8 +273,9 @@ describe("The structured copy, pinned at its one definition", () => {
     ])
       expect(at("apps/client/src/router.ts", label), `the GM's sections no longer have "${label}"`).toBe(true);
     expect(at("apps/client/src/shell/AppBar.tsx", "Table"), "a player's sections no longer have the Table").toBe(true);
-    for (const file of ["apps/client/src/router.ts", "apps/client/src/shell/AppBar.tsx"])
-      expect(at(file, "Encounter"), `${file} labels a section "Encounter" again`).toBe(false);
+    expect(at("apps/client/src/shell/AppBar.tsx", "Encounter"), "a player's Table is labelled an encounter").toBe(
+      false
+    );
   });
 });
 

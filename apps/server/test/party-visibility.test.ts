@@ -134,7 +134,7 @@ describe("party visibility: the tier is enforced in projectPlayerView, on the se
 
   // `partyVisibility` does not govern `projectPlayerCombat`, so dropping an ally's actor entry would
   // leave them named in the turn order with no actor to resolve their token. The fight must stay coherent.
-  it("keeps the fight coherent at every tier: the turn order, the tokens and the actor list agree", () => {
+  it("keeps the encounter coherent at every tier: the turn order, the tokens and the actor list agree", () => {
     for (const tier of TIERS) {
       const state = tableAt(tier);
       state.combat = {

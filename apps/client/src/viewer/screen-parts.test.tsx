@@ -93,16 +93,16 @@ describe("the table screen's strip and column", () => {
     expect(screen.queryByRole("listitem", { name: /acting|next/ })).toBeNull();
   });
 
-  it("between fights reads STOP with the scene's name, and keeps the roll's place with its notice", () => {
+  it("between encounters reads STOP with the encounter's name, and keeps the roll's place with its notice", () => {
     render(
       <>
         <ScreenTop presentation={presentation({ visible: false })} />
         <ScreenColumn presentation={presentation({ visible: false })} />
       </>
     );
-    expect(screen.getByRole("img", { name: "No fight running" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "No encounter running" })).toBeTruthy();
     expect(screen.queryByRole("list", { name: /Turn order/ })).toBeNull();
-    expect(screen.getByRole("region", { name: "No fight running" }).textContent).toContain("Goblin warren");
+    expect(screen.getByRole("region", { name: "No encounter running" }).textContent).toContain("Goblin warren");
     expect(within(screen.getByRole("region", { name: "Latest roll" })).getByText("No roll to show yet.")).toBeTruthy();
   });
 

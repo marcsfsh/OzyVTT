@@ -50,7 +50,7 @@ export function projectViewerRoll(
 ): ViewerRollCard | null {
   const hidden = hiddenFrom(state, content);
   // A scene going live is a new thing on the screen too, even on the same map.
-  const liveAt = state.combat.scenes.find((scene) => scene.id === state.combat.activeSceneId)?.liveAt ?? 0;
+  const liveAt = state.combat.encounters.find((scene) => scene.id === state.combat.activeEncounterId)?.liveAt ?? 0;
   const floor = Math.max(since ?? 0, liveAt, now - ROLL_CARD_MS);
   for (let index = state.rolls.length - 1; index >= 0; index -= 1) {
     const roll = state.rolls[index];

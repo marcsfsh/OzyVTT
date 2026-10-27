@@ -126,7 +126,7 @@ const MARKER: CodexMarker = {
   revealedToPlayers: false,
   pageIds: [],
   subMapId: null,
-  sceneIds: [],
+  encounterIds: [],
   actorId: null,
   isParty: false,
   tags: [],

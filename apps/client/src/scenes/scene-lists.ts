@@ -201,7 +201,7 @@ export function dayRange(from: string | null, to: string | null): readonly [numb
 export function filterScenes(
   rows: readonly SceneFacts[],
   filters: SceneFilters,
-  context: Readonly<{ linked: (sceneId: string) => boolean; hasSound: (sceneId: string) => boolean }>
+  context: Readonly<{ linked: (encounterId: string) => boolean; hasSound: (encounterId: string) => boolean }>
 ): SceneFacts[] {
   const [start, end] = dayRange(filters.from, filters.to);
   return rows.filter((row) => {

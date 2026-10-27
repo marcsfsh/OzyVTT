@@ -87,7 +87,7 @@ export function spendHitDice(
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-    throw new CommandRejectedError("Hit Dice are spent on a rest. End the fight first.");
+    throw new CommandRejectedError("Hit Dice are spent on a rest. End the encounter first.");
   if (scope.role !== "gm" && !inShortRest(state, actorId))
     throw new CommandRejectedError(
       `Hit Point Dice are spent during a Short Rest. Start one for ${actor.name} first, and spend them before it ends.`
@@ -556,7 +556,7 @@ export function finishPartyShortRest(
     if (!actor) continue;
     if (restRefusal(state, actor, "short")) {
       const inFight = state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId);
-      const why = inFight ? "is in a fight" : isDead(actor) ? "is dead" : "has 0 Hit Points";
+      const why = inFight ? "is in an encounter" : isDead(actor) ? "is dead" : "has 0 Hit Points";
       events.push({ kind: "effect", text: `${actor.name} ${why}, so the Short Rest gives them nothing.`, actorId });
       continue;
     }

@@ -34,7 +34,7 @@ const ViewerPresentationDataSchema = named(
     presentation: z
       .record(z.string(), z.unknown())
       .describe(
-        "The player-safe presentation: the map, camera, measurement, pings, initiative and encounter scene, what the sound board plays, and `latestRoll`: the newest public roll by a creature the table can see, made since the screen last changed what it shows and within ten minutes (who, what, total, dice, modifier), or null. The event stream sends the same shape."
+        "The player-safe presentation: the map, camera, measurement, pings, initiative and the encounter's tokens, what the sound board plays, and `latestRoll`: the newest public roll by a creature the table can see, made since the screen last changed what it shows and within ten minutes (who, what, total, dice, modifier), or null. The event stream sends the same shape."
       )
   })
 );
@@ -204,7 +204,7 @@ export const getViewerPresentation = defineRoute({
   tag: "Table viewer",
   summary: "Read what the table screen shows",
   description:
-    "The player-safe presentation: the map, camera, measurement, pings, initiative and encounter scene, what the sound board plays, and the latest public roll. Nothing is shown while the GM has paused the screen.",
+    "The player-safe presentation: the map, camera, measurement, pings, initiative and the encounter's tokens, what the sound board plays, and the latest public roll. Nothing is shown while the GM has paused the screen.",
   access: { gm: true, viewer: true },
   responses: {
     200: ok(ViewerPresentationDataSchema, "The presentation."),
@@ -220,7 +220,7 @@ export const sendViewerPresentationCommand = defineRoute({
   tag: "Table viewer",
   summary: "Change what the table screen shows",
   description:
-    "One presentation command: switch the screen on or off, present a map, move the camera, set or clear a measurement, ping, or set the initiative and encounter scene. A repeated command id changes nothing, and a stale `expectedRevision` is a 409.",
+    "One presentation command: switch the screen on or off, present a map, move the camera, set or clear a measurement, ping, or set the initiative and the encounter's tokens. A repeated command id changes nothing, and a stale `expectedRevision` is a 409.",
   access: GM_SESSION,
   body: json(ViewerCommandRequestSchema),
   responses: {

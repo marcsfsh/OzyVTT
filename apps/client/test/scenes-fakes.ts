@@ -141,15 +141,18 @@ export const CAMP = scene(IDS.camp, "Camp at the ford", IDS.crypt, [], {
 });
 
 /** The GM's view of these scenes. A live scene's combat moves to the table, as the server keeps it. */
-export function gmView(scenes: readonly Scene[] = [AMBUSH, CHASE, CAMP], activeSceneId: string | null = null): GmView {
-  const live = scenes.find((candidate) => candidate.id === activeSceneId);
+export function gmView(
+  scenes: readonly Scene[] = [AMBUSH, CHASE, CAMP],
+  activeEncounterId: string | null = null
+): GmView {
+  const live = scenes.find((candidate) => candidate.id === activeEncounterId);
   const stored = scenes.map((candidate) =>
-    candidate.id === activeSceneId ? SceneSchema.parse({ ...candidate, combat: {} }) : candidate
+    candidate.id === activeEncounterId ? SceneSchema.parse({ ...candidate, combat: {} }) : candidate
   );
   const state = GameStateSchema.parse({
     schemaVersion: 1,
     revision: 7,
-    combat: { ...live?.combat, mapAssetId: live?.mapAssetId ?? null, scenes: stored, activeSceneId }
+    combat: { ...live?.combat, mapAssetId: live?.mapAssetId ?? null, encounters: stored, activeEncounterId }
   });
   return { ...state, actors: ACTORS } as unknown as GmView;
 }
@@ -157,7 +160,7 @@ export function gmView(scenes: readonly Scene[] = [AMBUSH, CHASE, CAMP], activeS
 /** The Codex's links: session 6 stages the ambush. */
 export const LINKS = [
   {
-    sceneId: IDS.ambush,
+    encounterId: IDS.ambush,
     sessions: [{ id: IDS.session, sessionNumber: 6, status: "planned", via: "session" }],
     pins: []
   }

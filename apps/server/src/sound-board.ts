@@ -266,7 +266,7 @@ export function stopAll(board: SoundBoard) {
 }
 
 /** Saves what the board holds now as a scene's sound: the playlist, and the ambient layers that are on. */
-export function saveScenePreset(board: SoundBoard, sceneId: string) {
+export function saveScenePreset(board: SoundBoard, encounterId: string) {
   const music = board.music.tracks.length
     ? { tracks: board.music.tracks.map((track) => ({ ...track })), shuffle: board.music.shuffle }
     : null;
@@ -274,33 +274,33 @@ export function saveScenePreset(board: SoundBoard, sceneId: string) {
     .filter((layer) => layer.playing)
     .map(({ assetId, volume, durationMs }) => ({ assetId, volume, durationMs }));
   if (!music && ambient.length === 0)
-    throw new CommandRejectedError("Add music or turn on an ambient layer first, then save it to the scene.");
-  const autoplay = board.presets.find((preset) => preset.sceneId === sceneId)?.autoplay ?? true;
+    throw new CommandRejectedError("Add music or turn on an ambient layer first, then save it to the encounter.");
+  const autoplay = board.presets.find((preset) => preset.encounterId === encounterId)?.autoplay ?? true;
   board.presets = [
-    ...board.presets.filter((preset) => preset.sceneId !== sceneId),
-    { sceneId, autoplay, music, ambient }
+    ...board.presets.filter((preset) => preset.encounterId !== encounterId),
+    { encounterId, autoplay, music, ambient }
   ];
 }
 
-export function setPresetAutoplay(board: SoundBoard, sceneId: string, autoplay: boolean) {
-  const preset = board.presets.find((candidate) => candidate.sceneId === sceneId);
-  if (!preset) throw new CommandRejectedError("That scene has no sound saved.");
+export function setPresetAutoplay(board: SoundBoard, encounterId: string, autoplay: boolean) {
+  const preset = board.presets.find((candidate) => candidate.encounterId === encounterId);
+  if (!preset) throw new CommandRejectedError("That encounter has no sound saved.");
   preset.autoplay = autoplay;
 }
 
-export function clearScenePreset(board: SoundBoard, sceneId: string) {
-  board.presets = board.presets.filter((preset) => preset.sceneId !== sceneId);
+export function clearScenePreset(board: SoundBoard, encounterId: string) {
+  board.presets = board.presets.filter((preset) => preset.encounterId !== encounterId);
 }
 
 /** Keeps only the presets of scenes that still exist. */
-export function prunePresets(board: SoundBoard, sceneIds: ReadonlySet<string>) {
-  board.presets = board.presets.filter((preset) => sceneIds.has(preset.sceneId));
+export function prunePresets(board: SoundBoard, encounterIds: ReadonlySet<string>) {
+  board.presets = board.presets.filter((preset) => encounterIds.has(preset.encounterId));
 }
 
 /** Plays a scene's sound: its playlist from the top (or shuffled) and its ambient layers, and nothing else of the
  *  music or ambience. Effect pads are left as they are. Returns false when the scene has no sound saved. */
-export function applyScenePreset(board: SoundBoard, sceneId: string, deps: SoundDeps) {
-  const preset = board.presets.find((candidate) => candidate.sceneId === sceneId);
+export function applyScenePreset(board: SoundBoard, encounterId: string, deps: SoundDeps) {
+  const preset = board.presets.find((candidate) => candidate.encounterId === encounterId);
   if (!preset) return false;
   resume(board, deps.now);
   if (preset.music && preset.music.tracks.length) {

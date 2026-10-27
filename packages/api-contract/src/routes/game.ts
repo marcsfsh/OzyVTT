@@ -98,8 +98,8 @@ export const getSoundBoard = defineRoute({
   tag: "Live game",
   summary: "Read the sound board",
   description:
-    "The playlist, ambient layers, effect pads and scene sounds, what is playing and since when on `serverTime`'s clock, and each connected table screen's sound state. GM-grade only: players are never sent any of it, and a table screen receives only what is playing, through its event stream.",
-  access: gmGrade("scene:read"),
+    "The playlist, ambient layers, effect pads and encounter sounds, what is playing and since when on `serverTime`'s clock, and each connected table screen's sound state. GM-grade only: players are never sent any of it, and a table screen receives only what is playing, through its event stream.",
+  access: gmGrade("encounter:read"),
   responses: {
     200: ok(SoundBoardDataSchema, "The sound board."),
     401: refused(),
@@ -152,7 +152,7 @@ export const getActorMovement = defineRoute({
   tag: "Live game",
   summary: "Read a combatant's movement left this turn",
   description:
-    "Whether a move is counted at all (a fight running, the combatant's turn, movement rules on), its budget after Exhaustion, Slow, Dash and the like, the feet already spent, and whether going over is refused or only warned. `token.move` charges the same budget, and a move costs its cheapest grid path, with difficult terrain and enemies' spaces counting double. A GM-grade caller may read any combatant, and a player session only its claimed character.",
+    "Whether a move is counted at all (an encounter running, the combatant's turn, movement rules on), its budget after Exhaustion, Slow, Dash and the like, the feet already spent, and whether going over is refused or only warned. `token.move` charges the same budget, and a move costs its cheapest grid path, with difficult terrain and enemies' spaces counting double. A GM-grade caller may read any combatant, and a player session only its claimed character.",
   access: anySession("combat:read"),
   params: ActorMovementSchema,
   responses: {
@@ -246,8 +246,8 @@ export const previewVision = defineRoute({
   tag: "Live game",
   summary: "See through a creature's eyes",
   description:
-    "What one creature sees on the live scene, or the whole party without an `actorId` (ADR-0023): the area as image-pixel polygons (`[x0, y0, x1, y1, ...]`) whose union is what it sees, and the creatures it perceives. It is the computation that decides what each player and the table screen receive. GM-grade only; empty while the scene's dynamic vision is off.",
-  access: gmGrade("scene:read"),
+    "What one creature sees on the live encounter, or the whole party without an `actorId` (ADR-0023): the area as image-pixel polygons (`[x0, y0, x1, y1, ...]`) whose union is what it sees, and the creatures it perceives. It is the computation that decides what each player and the table screen receive. GM-grade only; empty while the encounter's dynamic vision is off.",
+  access: gmGrade("encounter:read"),
   query: VisionPreviewSchema,
   responses: {
     200: ok(VisionPreviewReplySchema, "Where the creature or the party sees now."),
@@ -261,20 +261,20 @@ export const previewVision = defineRoute({
 export const previewScene = defineRoute({
   method: "get",
   path: GAME_PATHS.scenePreview,
-  operationId: "previewScene",
+  operationId: "previewEncounter",
   tag: "Live game",
-  summary: "See a scene as the table screen or a player would",
+  summary: "See an encounter as the table screen or a player would",
   description:
-    "What one audience would receive of a prepared or live scene if it were live now: with no `actorId` the table screen (`screen`: its encounter and turn order, as the presentation carries them), with a party character's `actorId` the player who holds that character (`player`: the combat of their projection and the creatures it names). The same projections build it over a copy of the state, so fog, dynamic vision and hidden creatures apply as they will, and nothing is changed. GM-grade only.",
-  access: gmGrade("scene:read"),
-  params: ScenePreviewSchema.pick({ sceneId: true }),
+    "What one audience would receive of a prepared or live encounter if it were live now: with no `actorId` the table screen (`screen`: its encounter and turn order, as the presentation carries them), with a party character's `actorId` the player who holds that character (`player`: the combat of their projection and the creatures it names). The same projections build it over a copy of the state, so fog, dynamic vision and hidden creatures apply as they will, and nothing is changed. GM-grade only.",
+  access: gmGrade("encounter:read"),
+  params: ScenePreviewSchema.pick({ encounterId: true }),
   query: ScenePreviewSchema.pick({ actorId: true }),
   responses: {
     200: ok(ScenePreviewReplySchema, "What that audience would receive."),
     400: refused(),
     401: refused(),
     403: refused(),
-    404: refused("No scene or party character has that id.")
+    404: refused("No encounter or party character has that id.")
   }
 });
 

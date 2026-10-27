@@ -274,7 +274,7 @@ describe("Corrosive Form eats the weapons and ammunition that hit it", () => {
     expect(actionNamed(table, IDS.fighter, "Flail")!.attack!.bonus).toBe(flail.attack!.bonus - 1);
   });
 
-  it("destroys an arrow that hits a gray ooze, while one that misses can be found after the fight", () => {
+  it("destroys an arrow that hits a gray ooze, while one that misses can be found after the encounter", () => {
     const { table } = fightWith("gray-ooze");
     write(table, IDS.fighter, catalogRow("longbow"), "gm");
     write(table, IDS.fighter, catalogRow("arrows-20", { equipped: false }), "gm");

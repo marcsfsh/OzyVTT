@@ -74,7 +74,7 @@ export function TonightTab({
   /** The table's prepared scenes, which the board's fights name. */
   scenes?: readonly Scene[];
   liveSceneId?: string | null;
-  onMakeLive?: (sceneId: string) => void;
+  onMakeLive?: (encounterId: string) => void;
 }>) {
   const feed = useCodexQuery(
     useCallback(() => liveApi.board(token), [token]),
@@ -146,7 +146,7 @@ function LiveBoard({
   party: readonly PartyCharacter[];
   scenes: readonly Scene[];
   liveSceneId: string | null;
-  onMakeLive?: (sceneId: string) => void;
+  onMakeLive?: (encounterId: string) => void;
   reload: () => Promise<void>;
 }>) {
   const [error, setError] = useState<string | null>(null);
@@ -271,8 +271,8 @@ function LiveBoard({
       )}
 
       {encounters.length > 0 && (
-        <section className="tonight-section" aria-label="Fights">
-          <h3 className="tonight-eyebrow">Fights</h3>
+        <section className="tonight-section" aria-label="Encounters">
+          <h3 className="tonight-eyebrow">Encounters</h3>
           <ul className="tonight-rows">
             {encounters.map((scene) => (
               <li key={scene.id} className="tonight-row">

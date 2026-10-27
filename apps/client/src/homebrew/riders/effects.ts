@@ -50,7 +50,7 @@ const effectModifiersField = (): FieldDef => ({
   label: "What it does",
   kind: "rows",
   wide: true,
-  help: "An effect with nothing here is a label the fight cannot feel.",
+  help: "An effect with nothing here is a label nothing in play can feel.",
   addLabel: "Add a modifier",
   emptyText: "Nothing yet. This effect changes no numbers.",
   maxRows: 8,

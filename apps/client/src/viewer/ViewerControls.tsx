@@ -220,8 +220,8 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
         >
           {!map && (
             <p className="viewer-no-map-notice" role="status">
-              Upload or pick a map in <strong>Scenes</strong> to present it here. Focus, ping and measure work on the
-              map the screen shows.
+              Upload or pick a map in <strong>Encounters</strong> to present it here. Focus, ping and measure work on
+              the map the screen shows.
             </p>
           )}
           {map && (

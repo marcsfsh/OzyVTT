@@ -429,13 +429,13 @@ export const gameReads = [
   },
 
   {
-    event: "scene:preview",
+    event: "encounter:preview",
     route: gameRoutes.previewScene,
-    gmOnly: "Only the GM can preview a scene.",
+    gmOnly: "Only the GM can preview an encounter.",
     schema: ScenePreviewSchema,
-    malformed: "The scene preview is malformed.",
+    malformed: "The encounter preview is malformed.",
     httpInput: ({ params, query }) => ({
-      sceneId: params.sceneId,
+      encounterId: params.encounterId,
       ...(typeof query.actorId === "string" ? { actorId: query.actorId } : {})
     }),
     // The GM's own look: the projections run over a copy where the scene is live, and nothing is committed.

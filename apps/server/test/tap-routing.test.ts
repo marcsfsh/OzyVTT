@@ -110,7 +110,7 @@ function fightState(): GameState {
 }
 
 describe("tap routing (the seam)", () => {
-  it("routes on turn, off turn, and outside a fight", () => {
+  it("routes on turn, off turn, and outside an encounter", () => {
     const fight = fightState();
     expect(routeForTap(fight.combat, HERO)).toBe("resolved");
     expect(routeForTap(fight.combat, OTHER)).toBe("blocked");
@@ -356,7 +356,7 @@ describe("action.use over the API", () => {
     expect(server.store.snapshot.rolls.some((roll) => roll.actorId === OTHER && roll.purpose === "attack")).toBe(true);
   });
 
-  it("rolls loose, attributed dice outside a fight, and moves no hit points", async () => {
+  it("rolls loose, attributed dice outside an encounter, and moves no hit points", async () => {
     const idle = GameStateSchema.parse({
       schemaVersion: 1,
       actors: [

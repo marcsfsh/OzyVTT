@@ -245,7 +245,7 @@ describe("who and what can be stabilized", () => {
   });
 });
 
-describe("in a fight the aid is the helper's action", () => {
+describe("in an encounter the aid is the helper's action", () => {
   it("spends the action on the helper's own turn, and a second aid that turn is refused", () => {
     const state = game({ fight: true });
     stabilizeCreature(state, aid("spare-the-dying"), { role: "gm" }, deps(state));

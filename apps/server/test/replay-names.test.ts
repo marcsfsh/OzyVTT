@@ -34,7 +34,7 @@ async function foughtOnce() {
   const imported = await server.mapAssets.import(png(900, 600), "cave.png");
   server.mapCatalog.register(imported.metadata.id, "Cave map", "battlemap");
   const scene = await post(GAME_PATHS.commands, gmToken, {
-    type: "scene.create",
+    type: "encounter.create",
     payload: { name: "Goblin cave", mapAssetId: imported.metadata.id, combatantIds: [HERO], activate: true }
   });
   expect(scene.status).toBe(200);
@@ -53,13 +53,13 @@ const list = async (base: string, token: string) =>
     await (
       await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: { authorization: `Bearer ${token}` } })
     ).json()
-  ).data.encounters;
+  ).data.replays;
 
 describe("a replay's name", () => {
-  it("starts as its scene's, and the GM may name it and take the name back", async () => {
+  it("starts as its encounter's, and the GM may name it and take the name back", async () => {
     const { base, gmToken, post } = await foughtOnce();
     const [archive] = await list(base, gmToken);
-    expect(archive).toMatchObject({ name: null, sceneName: "Goblin cave" });
+    expect(archive).toMatchObject({ name: null, encounterName: "Goblin cave" });
 
     const path = ENCOUNTER_ARCHIVE_PATHS.name.replace("{id}", String(archive.id));
     const renamed = await post(path, gmToken, { name: "  Ambush at the bridge  " });
@@ -68,7 +68,10 @@ describe("a replay's name", () => {
       id: archive.id,
       name: "Ambush at the bridge"
     });
-    expect((await list(base, gmToken))[0]).toMatchObject({ name: "Ambush at the bridge", sceneName: "Goblin cave" });
+    expect((await list(base, gmToken))[0]).toMatchObject({
+      name: "Ambush at the bridge",
+      encounterName: "Goblin cave"
+    });
 
     expect((await post(path, gmToken, { name: "x".repeat(81) })).status).toBe(400);
     expect((await post(ENCOUNTER_ARCHIVE_PATHS.name.replace("{id}", "999"), gmToken, { name: "Gone" })).status).toBe(
@@ -78,20 +81,20 @@ describe("a replay's name", () => {
     expect((await list(base, gmToken))[0].name).toBeNull();
   });
 
-  it("reaches a player on a shared replay without the scene's name, and only the GM may set it", async () => {
+  it("reaches a player on a shared replay without the encounter's name, and only the GM may set it", async () => {
     const { base, gmToken, post, server } = await foughtOnce();
     const player = server.auth.issuePlayerSession();
     const [archive] = await list(base, gmToken);
     const path = ENCOUNTER_ARCHIVE_PATHS.name.replace("{id}", String(archive.id));
     expect((await post(path, player, { name: "Mine now" })).status).toBe(403);
-    await post(path, gmToken, { name: "The cave fight" });
+    await post(path, gmToken, { name: "The cave encounter" });
     await post(ENCOUNTER_ARCHIVE_PATHS.visibility.replace("{id}", String(archive.id)), gmToken, {
       playerVisible: true
     });
 
     const [shared] = await list(base, player);
-    expect(shared.name).toBe("The cave fight");
-    expect("sceneName" in shared).toBe(false);
+    expect(shared.name).toBe("The cave encounter");
+    expect("encounterName" in shared).toBe(false);
     const raw = await (
       await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: { authorization: `Bearer ${player}` } })
     ).text();

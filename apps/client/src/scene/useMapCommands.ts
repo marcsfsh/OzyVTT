@@ -19,7 +19,7 @@ import type { AreaKindId, GroundOp } from "./mapTools";
 /**
  * Everything the map sends: token moves, annotations, fog, terrain and vision. Each family has its own busy flag, and
  * a refusal lands on the map's feedback line. Moves and fog target the privately staged scene while
- * the GM arranges one (`sceneId`), else the live table.
+ * the GM arranges one (`encounterId`), else the live table.
  */
 /** A token move a movement rule refused, kept so the GM can move it anyway or a player can ask the GM. */
 export type BlockedMove = Readonly<{
@@ -38,7 +38,7 @@ export type DoorWork = "pick" | "force" | "jam" | "pry" | "seal" | "release";
 
 export function useMapCommands({
   revision,
-  sceneId,
+  encounterId,
   size,
   canMove,
   moveModeFor = () => undefined,
@@ -48,7 +48,7 @@ export function useMapCommands({
   trapChoice = null
 }: Readonly<{
   revision: number;
-  sceneId?: string;
+  encounterId?: string;
   size: Readonly<{ width: number; height: number }> | null;
   canMove: (actorId: string) => boolean;
   /** How a creature's drag travels (the mode picked for the acting creature); walking when undefined. */
@@ -75,7 +75,7 @@ export function useMapCommands({
   const [terrainBusy, setTerrainBusy] = useState(false);
   const [visionBusy, setVisionBusy] = useState(false);
   const [blockedMove, setBlockedMove] = useState<BlockedMove | null>(null);
-  const scene = sceneId !== undefined ? { sceneId } : {};
+  const scene = encounterId !== undefined ? { encounterId } : {};
 
   const sendMove = async (
     actorId: string,

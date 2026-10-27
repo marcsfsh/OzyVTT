@@ -37,47 +37,53 @@ afterEach(() => {
   command.mockClear();
 });
 
-describe("the live scene picker", () => {
-  it("names the live scene and makes another live in one press when no fight is on", async () => {
+describe("the live encounter picker", () => {
+  it("names the live encounter and makes another live in one press when no combat is on", async () => {
     const user = userEvent.setup();
     header(gmView(undefined, IDS.ambush));
-    await user.click(screen.getByLabelText("Scenes · Crypt ambush is live"));
-    const menu = screen.getByRole("menuitem", { name: "All scenes" }).closest<HTMLElement>("[role=menu]")!;
+    await user.click(screen.getByLabelText("Encounters · Crypt ambush is live"));
+    const menu = screen.getByRole("menuitem", { name: "All encounters" }).closest<HTMLElement>("[role=menu]")!;
     expect(
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent)
-    ).toEqual(["Make Tunnel chase live", "Make Camp at the ford live", "Open Crypt ambush", "All scenes", "New scene"]);
+    ).toEqual([
+      "Make Tunnel chase live",
+      "Make Camp at the ford live",
+      "Open Crypt ambush",
+      "All encounters",
+      "New encounter"
+    ]);
     await user.click(within(menu).getByRole("menuitem", { name: "Make Tunnel chase live" }));
-    expect(command).toHaveBeenCalledWith("scene:activate", { sceneId: IDS.chase });
+    expect(command).toHaveBeenCalledWith("encounter:activate", { encounterId: IDS.chase });
   });
 
-  it("asks first while a fight is on, since the fight is parked", async () => {
+  it("asks first while combat is on, since combat is parked", async () => {
     const user = userEvent.setup();
     const live = gmView(undefined, IDS.ambush);
     header({ ...live, combat: { ...live.combat, active: true } });
-    await user.click(screen.getByLabelText("Scenes · Crypt ambush is live"));
+    await user.click(screen.getByLabelText("Encounters · Crypt ambush is live"));
     await user.click(screen.getByRole("menuitem", { name: "Make Tunnel chase live" }));
     expect(command).not.toHaveBeenCalled();
-    const dialog = screen.getByRole("dialog", { name: "Make scene live?" });
+    const dialog = screen.getByRole("dialog", { name: "Make encounter live?" });
     await user.click(within(dialog).getByRole("button", { name: "Make live" }));
-    expect(command).toHaveBeenCalledWith("scene:activate", { sceneId: IDS.chase });
+    expect(command).toHaveBeenCalledWith("encounter:activate", { encounterId: IDS.chase });
   });
 
-  it("opens the live scene's page in Prep", async () => {
+  it("opens the live encounter's page in Prep", async () => {
     const user = userEvent.setup();
     header(gmView(undefined, IDS.ambush));
-    await user.click(screen.getByLabelText("Scenes · Crypt ambush is live"));
+    await user.click(screen.getByLabelText("Encounters · Crypt ambush is live"));
     await user.click(screen.getByRole("menuitem", { name: "Open Crypt ambush" }));
-    expect(here()).toBe(`/scenes/${IDS.ambush}`);
+    expect(here()).toBe(`/encounters/${IDS.ambush}`);
   });
 
-  it("says when no scene is live, and offers a new one", async () => {
+  it("says when no encounter is live, and offers a new one", async () => {
     const user = userEvent.setup();
     header(gmView());
-    expect(screen.getByText("No scene live")).toBeInTheDocument();
-    await user.click(screen.getByLabelText("Scenes"));
-    await user.click(screen.getByRole("menuitem", { name: "New scene" }));
-    expect(here()).toBe("/scenes/new");
+    expect(screen.getByText("No encounter live")).toBeInTheDocument();
+    await user.click(screen.getByLabelText("Encounters"));
+    await user.click(screen.getByRole("menuitem", { name: "New encounter" }));
+    expect(here()).toBe("/encounters/new");
   });
 });

@@ -180,7 +180,7 @@ export function RollSettings({
         </label>
         {attackModeChoice && (
           <div className="cs-setting">
-            <span className="cs-eyebrow">Attacks from the sheet in a fight</span>
+            <span className="cs-eyebrow">Attacks from the sheet in an encounter</span>
             <SegmentedControl
               ariaLabel="Where attacks tapped on the sheet resolve"
               value={sheetAttackMode}

@@ -64,7 +64,7 @@ function game(positions: Readonly<Record<string, { x: number; y: number }>> = {}
           sizePx: 40,
           sizeCells: actor.id === OGRE ? 2 : 1
         })),
-      scenes: [{ id: SCENE, name: "Parked bridge", mapAssetId: MAP, combat: {} }]
+      encounters: [{ id: SCENE, name: "Parked bridge", mapAssetId: MAP, combat: {} }]
     }
   });
 }
@@ -86,17 +86,17 @@ describe("painting difficult terrain", () => {
     expect(state.combat.terrain.difficult).toEqual([]);
   });
 
-  it("needs a calibrated grid, and edits a parked scene's own terrain", () => {
+  it("needs a calibrated grid, and edits a parked encounter's own terrain", () => {
     const state = game();
     expect(() => paintTerrain(state, undefined, GRIDLESS, { op: "difficult", rect: cells(0, 0, 1, 1) })).toThrowError(
       CommandRejectedError
     );
     paintTerrain(state, SCENE, GRID, { op: "difficult", rect: cells(0, 0, 0, 0) });
-    expect(state.combat.scenes[0]!.combat.terrain.difficult).toEqual([cells(0, 0, 0, 0)]);
+    expect(state.combat.encounters[0]!.combat.terrain.difficult).toEqual([cells(0, 0, 0, 0)]);
     expect(state.combat.terrain.difficult).toEqual([]);
   });
 
-  it("is scene dressing: painting never dirties the combat timeline", () => {
+  it("is encounter dressing: painting never dirties the combat timeline", () => {
     const before = game();
     const after = structuredClone(before);
     paintTerrain(after, undefined, GRID, { op: "difficult", rect: cells(0, 0, 3, 3) });
@@ -266,7 +266,7 @@ describe("over HTTP", () => {
       webDist: join(directory, "dist"),
       useDevelopmentClient: true,
       developmentClientPort: 5173,
-      initialGameState: { ...game(), combat: { ...game().combat, mapAssetId: null, scenes: [] } }
+      initialGameState: { ...game(), combat: { ...game().combat, mapAssetId: null, encounters: [] } }
     });
     await server.initialize();
     await server.auth.bootstrap("a sufficiently long GM password");

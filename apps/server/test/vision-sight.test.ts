@@ -32,7 +32,7 @@ describe("dynamic vision: walls and doors", () => {
     expect(sceneSight(line("door", false)).perceives(HERO, GOBLIN)).toBe(false);
   });
 
-  it("does nothing while the scene's vision is off", () => {
+  it("does nothing while the encounter's vision is off", () => {
     const sight = sceneSight(visionGame({ enabled: false, walls: [DIVIDER()] }));
     expect(sight.enabled).toBe(false);
   });

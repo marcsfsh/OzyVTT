@@ -28,7 +28,7 @@ export function rebindRow(ctx: ResolveContext): void {
   if (!spec || input.commit === false) return;
   // A minute's work isn't done between turns.
   if (fighting(state, attacker))
-    throw new CommandRejectedError(`${action.name} takes 1 minute, so it can't be done in a fight.`);
+    throw new CommandRejectedError(`${action.name} takes 1 minute, so it can't be done in an encounter.`);
   const row = attacker.inventory.find((entry) => entry.id === input.itemId && entry.quantity > 0);
   if (!row) throw new CommandRejectedError(`Choose the weapon or the ammunition ${action.name} coats.`);
   const record = deps.catalog?.equipmentRecord(catalogIdOf(row));

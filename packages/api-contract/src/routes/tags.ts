@@ -31,8 +31,8 @@ export const API_TAGS = [
       "The SRD 5.2.1 catalogs and the GM's published homebrew merged into them, each with the CC BY 4.0 attribution line a screen showing it must carry."
   },
   {
-    name: "Fight replays",
-    description: "Permanent records of ended fights, which the GM may share with players and launch onto the table."
+    name: "Replays",
+    description: "Permanent records of ended encounters, which the GM may share with players and launch onto the table."
   },
   { name: "Map assets", description: "Battlemap, regional and world map images, their filing and their grids." },
   { name: "Token assets", description: "Token images. A player may upload their own character's token." },

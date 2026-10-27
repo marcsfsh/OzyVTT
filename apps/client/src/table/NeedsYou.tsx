@@ -30,7 +30,7 @@ function helpersFor(state: GmView, target: GmActor, distance: (a: string, b: str
 function dyingDetail(target: GmActor, helpers: ReturnType<typeof helpersFor>): string {
   const help = `Healing brings ${target.name} back, and Help with a DC 10 Medicine check stabilizes ${target.name}.`;
   const nearest = helpers[0];
-  if (!nearest) return `Nobody in the fight can help yet. ${help}`;
+  if (!nearest) return `Nobody in the encounter can help yet. ${help}`;
   return nearest.feet === null
     ? `${nearest.candidate.name} can help. ${help}`
     : `${nearest.candidate.name} is ${nearest.feet} ft away. ${help}`;

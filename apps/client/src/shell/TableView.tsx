@@ -39,7 +39,7 @@ export type GmTable = Readonly<{
   mapLibrary: readonly MapSelection[];
   onSelectMap: (map: MapSelection | null) => void;
   /** Makes a prepared scene live, asked first while a fight is on: Tonight's board names its fights' scenes. */
-  onMakeLive: (sceneId: string) => void;
+  onMakeLive: (encounterId: string) => void;
 }>;
 
 // Leave table is in Settings, confirmed, away from the fight's controls.
@@ -127,12 +127,12 @@ export function TableView(props: TableViewProps) {
       <strong>No map loaded yet</strong>
       <span>
         {role === "gm"
-          ? "Prepare a scene: pick a map and who is in it, then make it live."
-          : "The map appears here when the GM makes a scene live."}
+          ? "Prepare an encounter: pick a map and who is in it, then make it live."
+          : "The map appears here when the GM makes an encounter live."}
       </span>
       {gm && (
         <Button variant="secondary" className="empty-scene-prep" onClick={() => navigate(SCENES_PATHS.newScene)}>
-          <IconScene /> Prepare a scene
+          <IconScene /> Prepare an encounter
         </Button>
       )}
       {gm && <JoinAddress token={token} layout="hero" />}
@@ -177,8 +177,8 @@ export function TableView(props: TableViewProps) {
             <TonightTab
               token={token}
               party={party}
-              scenes={props.state.combat.scenes}
-              liveSceneId={props.state.combat.activeSceneId}
+              scenes={props.state.combat.encounters}
+              liveSceneId={props.state.combat.activeEncounterId}
               onMakeLive={props.gm.onMakeLive}
             />
           ),

@@ -20,7 +20,12 @@ export type SettingsSection = Readonly<{
 /** In the bar's order. Players leads because the join address is what a GM opens at every session. */
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: "players", label: "Players", hint: "Who is at the table, and what they see of each other.", audience: "gm" },
-  { id: "fights", label: "Fights", hint: "How the rules assistant and the turn order treat a fight.", audience: "gm" },
+  {
+    id: "fights",
+    label: "Encounters",
+    hint: "How the rules assistant and the turn order treat an encounter.",
+    audience: "gm"
+  },
   { id: "characters", label: "Characters", hint: "How players build and level their characters.", audience: "gm" },
   { id: "device", label: "Device", hint: "Choices for this device alone.", audience: "everyone" },
   {
@@ -82,7 +87,7 @@ export const SETTING = entries({
   rulesAssistant: {
     section: "fights",
     label: "Rules assistant",
-    hint: "Each fight starts with this, and you can change it mid-fight on the Table.",
+    hint: "Each encounter starts with this, and you can change it mid-encounter on the Table.",
     words: "enforce advise off dial rules checks movement action economy spell slots targeting"
   },
   playerHits: {
@@ -172,9 +177,9 @@ export const SETTING = entries({
   arrangeScenes: {
     section: "device",
     audience: "gm",
-    label: "Arrange new scenes",
-    hint: "A new scene opens on your table first, so you can place tokens before players see it.",
-    words: "staging preview scene arrange"
+    label: "Arrange new encounters",
+    hint: "A new encounter opens on your table first, so you can place tokens before players see it.",
+    words: "staging preview encounter arrange"
   },
   leaveTable: {
     section: "device",

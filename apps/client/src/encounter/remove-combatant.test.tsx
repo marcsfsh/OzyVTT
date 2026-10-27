@@ -51,25 +51,25 @@ function mount(
   return run;
 }
 
-describe("taking a combatant out of the fight from its row", () => {
+describe("taking a combatant out of the encounter from its row", () => {
   it("asks first, then sends the command and says who left", async () => {
     const user = userEvent.setup();
     const run = mount(fight([WORM, HERO]));
-    await user.click(screen.getByRole("button", { name: "Take out of fight" }));
+    await user.click(screen.getByRole("button", { name: "Take out of the encounter" }));
     expect(command).not.toHaveBeenCalled();
-    const confirm = screen.getByRole("alertdialog", { name: "Take Purple Worm out of the fight" });
+    const confirm = screen.getByRole("alertdialog", { name: "Take Purple Worm out of the encounter" });
     expect(confirm.textContent).toContain(
-      "Take Purple Worm out of the fight? Purple Worm's turn and token are removed, and anything Purple Worm is grappling or concentrating on ends."
+      "Take Purple Worm out of the encounter? Purple Worm's turn and token are removed, and anything Purple Worm is grappling or concentrating on ends."
     );
     await user.click(screen.getByRole("button", { name: "Take out" }));
     await waitFor(() =>
       expect(command).toHaveBeenCalledWith("encounter:remove-combatant", { actorId: WORM, expectedRevision: 7 })
     );
-    expect(run).toHaveBeenCalledWith(expect.any(Function), "Purple Worm left the fight.");
+    expect(run).toHaveBeenCalledWith(expect.any(Function), "Purple Worm left the encounter.");
   });
 
   it("isn't offered for the last combatant, who ends the encounter instead", () => {
     mount(fight([WORM]));
-    expect(screen.queryByRole("button", { name: "Take out of fight" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Take out of the encounter" })).toBeNull();
   });
 });

@@ -45,7 +45,7 @@ export const actorCommands = [
     description:
       "Instantiates a bundled SRD monster onto the roster (GM-grade only), with the stat block's average hit points or, with `hitPoints: \"roll\"`, its Hit Dice rolled. The response's `actorId` equals the commandId.",
     summary:
-      "Instantiate a bundled SRD monster onto the roster, optionally joining the running fight in the same command (GM).",
+      "Instantiate a bundled SRD monster onto the roster, optionally joining the running encounter in the same command (GM).",
     schema: ActorAddFromDefinitionSchema,
     malformed: "The add-combatant command is malformed.",
     gmOnly: "Only the GM can add combatants.",
@@ -117,7 +117,7 @@ export const actorCommands = [
     type: "actor.remove",
     operationId: "removeActor",
     description:
-      "Removes an actor from the roster (GM-grade only); rejected for claimed characters and, while rewound, for combatants in the fight.",
+      "Removes an actor from the roster (GM-grade only); rejected for claimed characters and, while rewound, for combatants in the encounter.",
     summary: "Remove an actor from the roster (GM).",
     schema: ActorRemoveSchema,
     malformed: "The remove-combatant command is malformed.",
@@ -131,8 +131,8 @@ export const actorCommands = [
     type: "actor.remove-samples",
     operationId: "removeSampleCharacters",
     description:
-      "Removes the sample characters a fresh table starts with (GM-grade only), in one command. Each goes unless the roster's rules keep it: a player holds it, or a running or paused fight uses it. The reply names the ones removed (`removed`) and each one kept with the reason (`kept`). Characters the GM made are untouched.",
-    summary: "Remove the sample characters no player holds and no fight uses (GM).",
+      "Removes the sample characters a fresh table starts with (GM-grade only), in one command. Each goes unless the roster's rules keep it: a player holds it, or a running or paused encounter uses it. The reply names the ones removed (`removed`) and each one kept with the reason (`kept`). Characters the GM made are untouched.",
+    summary: "Remove the sample characters no player holds and no encounter uses (GM).",
     schema: CommandIdentitySchema,
     malformed: "The remove-samples command is malformed.",
     gmOnly: "Only the GM can remove the sample characters.",
@@ -208,9 +208,9 @@ export const actorCommands = [
     type: "actor.set-archived",
     operationId: "setActorArchived",
     description:
-      "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a claimed character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
+      "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by encounter staging and encounter start/add; a character in the running encounter must be removed first. Archiving a claimed character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
     summary:
-      "Archive or restore a character (GM). An archived character is hidden from players, refused by claim and rejected by scene and encounter staging, and any claim is released on archive.",
+      "Archive or restore a character (GM). An archived character is hidden from players, refused by claim and rejected by encounter staging, and any claim is released on archive.",
     schema: SetActorArchivedSchema,
     malformed: "The archive command is malformed.",
     gmOnly: "Only the GM can archive characters.",

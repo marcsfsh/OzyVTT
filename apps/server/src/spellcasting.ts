@@ -114,7 +114,7 @@ export function setPreparedSpell(
   if (prepared === has) return;
   if (role === "player") {
     if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-      throw new CommandRejectedError("Prepared spells change after a Long Rest, outside a fight.");
+      throw new CommandRejectedError("Prepared spells change after a Long Rest, outside an encounter.");
     if (actor.preparation === null)
       throw new CommandRejectedError("You change your prepared spells when you finish a Long Rest.");
     if (prepared && actor.preparation.changesLeft === 0)

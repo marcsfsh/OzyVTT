@@ -21,7 +21,7 @@ export function VcrCounter({
     <div
       className={cx("nh-vcr", size === "lg" && "nh-vcr--lg", playing && "is-playing", className)}
       role="img"
-      aria-label={playing ? `Round ${round}` : "No fight running"}
+      aria-label={playing ? `Round ${round}` : "No encounter running"}
     >
       <span className="nh-vcr-state" aria-hidden="true">
         {playing ? "PLAY" : "STOP"}

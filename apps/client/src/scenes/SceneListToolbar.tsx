@@ -59,7 +59,7 @@ export function SceneListToolbar({
       />
       <span className="sc-grow" />
       <span className="sc-sub-count" role="status">
-        {shown === total ? `${total} ${total === 1 ? "scene" : "scenes"}` : `${shown} of ${total} scenes`}
+        {shown === total ? `${total} ${total === 1 ? "encounter" : "encounters"}` : `${shown} of ${total} encounters`}
       </span>
       <SortButton sort={sort} keys={SCENE_SORT_KEYS} labels={SCENE_SORT_LABEL} onSort={onSort} />
     </div>
@@ -89,7 +89,7 @@ export function SceneFiltersFlyout({
     label: maps.find((map) => map.id === id)?.name ?? "Not in the library"
   }));
   return (
-    <FilterFlyout id={SCENE_FILTERS_ID} open={open} title="Filter scenes" onClose={onClose}>
+    <FilterFlyout id={SCENE_FILTERS_ID} open={open} title="Filter encounters" onClose={onClose}>
       {mapOptions.length > 1 && (
         <>
           <Eyebrow>Map</Eyebrow>

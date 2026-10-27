@@ -11,7 +11,7 @@ export function GmAtlasSection() {
       gmToken={token}
       scenes={gm.scenes}
       actors={gm.actors}
-      activeSceneId={gm.activeSceneId}
+      activeEncounterId={gm.activeEncounterId}
       onActivateScene={gm.onActivateScene}
       onOpenReplay={gm.onOpenReplay}
       mapId={recordId}

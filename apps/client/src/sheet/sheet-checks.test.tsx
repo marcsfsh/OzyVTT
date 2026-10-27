@@ -247,7 +247,7 @@ describe("the sheet's checks", () => {
     expect(picker.closest("label")?.textContent).toContain("Who sees the roll");
   });
 
-  it("drops an initiative roll from the latest-roll line once its fight is over", async () => {
+  it("drops an initiative roll from the latest-roll line once its encounter is over", async () => {
     serve(derivedSheet());
     noteSheetRolls("i1", "c1");
     const initiative = { ...checkRoll("i1"), label: "Initiative", purpose: "manual", formula: "1d20 + 2", total: 14 };

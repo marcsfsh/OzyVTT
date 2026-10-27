@@ -92,7 +92,7 @@ function toolCheck(state: GameState) {
 
 const fighter = (state: GameState) => state.actors.find((actor) => actor.id === IDS.fighter)!;
 
-describe("Help with a Check outside a fight", () => {
+describe("Help with a Check outside an encounter", () => {
   it("gives the ally Advantage on its next check with the helper's tool, once", () => {
     const state = party();
     help(state, "thieves-tools");
@@ -104,7 +104,7 @@ describe("Help with a Check outside a fight", () => {
     expect(fighter(state).effects).toEqual([]);
   });
 
-  it("helps with a skill while no fight is running", () => {
+  it("helps with a skill while no encounter is running", () => {
     const state = party();
     help(state, "athletics");
     expect(fighter(state).effects).toMatchObject([{ name: "Helped by Rogue (Athletics)" }]);

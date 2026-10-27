@@ -31,7 +31,7 @@ const facts = [AMBUSH, CHASE, CAMP].map((scene) => factsOf(view, scene, MAPS));
 const [ambush, chase, camp] = facts as [(typeof facts)[0], (typeof facts)[0], (typeof facts)[0]];
 const none = { linked: () => false, hasSound: () => false };
 
-describe("a scene's facts", () => {
+describe("an encounter's facts", () => {
   it("counts who is in it, who waits in the tray and what is drawn", () => {
     expect(tokensLine(ambush)).toBe("4 tokens · 1 in the tray");
     expect(tokensLine(camp)).toBe("Nobody yet");
@@ -41,18 +41,18 @@ describe("a scene's facts", () => {
     expect(lightLine(chase)).toBe("Vision off");
   });
 
-  it("names what each scene still needs, with the step that answers it", () => {
+  it("names what each encounter still needs, with the step that answers it", () => {
     expect(needsOf(ambush).map((need) => [need.id, need.step])).toEqual([["waiting", "tokens"]]);
     expect(needsOf(chase).map((need) => need.text)).toEqual([
       "Old tunnels has no grid yet, so tokens won't snap to squares.",
       "2 tokens wait in the tray, off the map."
     ]);
-    expect(needsOf(camp).map((need) => need.text)).toEqual(["Nobody is in this scene yet."]);
+    expect(needsOf(camp).map((need) => need.text)).toEqual(["Nobody is in this encounter yet."]);
   });
 
-  it("reads the live scene from the table, since its own slot is empty", () => {
+  it("reads the live encounter from the table, since its own slot is empty", () => {
     const live = gmView(undefined, IDS.ambush);
-    const scene = live.combat.scenes.find((candidate) => candidate.id === IDS.ambush)!;
+    const scene = live.combat.encounters.find((candidate) => candidate.id === IDS.ambush)!;
     const liveFacts = factsOf(live, scene, MAPS);
     expect(liveFacts.state).toBe("live");
     expect(tokensLine(liveFacts)).toBe("4 tokens · 1 in the tray");
@@ -61,8 +61,8 @@ describe("a scene's facts", () => {
   });
 });
 
-describe("filtering and sorting scenes", () => {
-  it("keeps the states ticked, and the scenes the flyout's filters match", () => {
+describe("filtering and sorting encounters", () => {
+  it("keeps the states ticked, and the encounters the flyout's filters match", () => {
     expect(filterScenes(facts, { ...NO_SCENE_FILTERS, states: ["live"] }, none)).toEqual([]);
     expect(filterScenes(facts, { ...NO_SCENE_FILTERS, waiting: true }, none).map((row) => row.scene.name)).toEqual([
       "Crypt ambush",
@@ -71,12 +71,12 @@ describe("filtering and sorting scenes", () => {
     expect(filterScenes(facts, { ...NO_SCENE_FILTERS, vision: "on" }, none).map((row) => row.scene.name)).toEqual([
       "Crypt ambush"
     ]);
-    const linked = { ...none, linked: (sceneId: string) => sceneId === IDS.chase };
+    const linked = { ...none, linked: (encounterId: string) => encounterId === IDS.chase };
     expect(filterScenes(facts, { ...NO_SCENE_FILTERS, codex: "unlinked" }, linked)).toHaveLength(2);
     expect(filterScenes(facts, { ...NO_SCENE_FILTERS, mapIds: [IDS.crypt] }, none)).toHaveLength(2);
   });
 
-  it("keeps the scenes changed inside the Modified range", () => {
+  it("keeps the encounters changed inside the Modified range", () => {
     const filters = { ...NO_SCENE_FILTERS, from: "2026-10-17", to: "2026-10-17" };
     expect(filterScenes(facts, filters, none)).toHaveLength(3);
     expect(filterScenes(facts, { ...filters, from: "2026-10-18", to: null }, none)).toEqual([]);
@@ -140,7 +140,7 @@ describe("filtering and sorting scenes", () => {
 });
 
 describe("filtering and sorting maps", () => {
-  const usedIn = (mapId: string) => view.combat.scenes.filter((scene) => scene.mapAssetId === mapId).length;
+  const usedIn = (mapId: string) => view.combat.encounters.filter((scene) => scene.mapAssetId === mapId).length;
 
   it("keeps the types ticked, and the maps the flyout's filters match", () => {
     const names = (filters: typeof NO_MAP_FILTERS) => filterMaps(MAPS, filters, usedIn).map((map) => map.name);
@@ -186,22 +186,22 @@ describe("filtering and sorting maps", () => {
   });
 });
 
-describe("the Scenes tab's addresses", () => {
-  it("gives every scene, map and step its own link", () => {
-    expect(pathForScene(IDS.ambush)).toBe(`/scenes/${IDS.ambush}`);
-    expect(pathForScene(IDS.ambush, "light")).toBe(`/scenes/${IDS.ambush}?step=light`);
-    expect(pathForMap(IDS.crypt, "grid", "/table")).toBe(`/scenes/maps/${IDS.crypt}?step=grid&back=%2Ftable`);
+describe("the Encounters page's addresses", () => {
+  it("gives every encounter, map and step its own link", () => {
+    expect(pathForScene(IDS.ambush)).toBe(`/encounters/${IDS.ambush}`);
+    expect(pathForScene(IDS.ambush, "light")).toBe(`/encounters/${IDS.ambush}?step=light`);
+    expect(pathForMap(IDS.crypt, "grid", "/table")).toBe(`/encounters/maps/${IDS.crypt}?step=grid&back=%2Ftable`);
   });
 
-  it("goes back only into the app's own table or Scenes tab", () => {
+  it("goes back only into the app's own table or Encounters page", () => {
     expect(backPathOf(new URLSearchParams("back=/table"))).toBe("/table");
-    expect(backPathOf(new URLSearchParams(`back=/scenes/${IDS.ambush}`))).toBe(`/scenes/${IDS.ambush}`);
+    expect(backPathOf(new URLSearchParams(`back=/encounters/${IDS.ambush}`))).toBe(`/encounters/${IDS.ambush}`);
     expect(backPathOf(new URLSearchParams("back=https://example.com"))).toBeNull();
     expect(backPathOf(new URLSearchParams("back=/settings"))).toBeNull();
   });
 });
 
-describe("whether a scene is ready to go", () => {
+describe("whether an encounter is ready to go", () => {
   const placedAll = factsOf(
     view,
     {
@@ -222,7 +222,7 @@ describe("whether a scene is ready to go", () => {
     expect(readinessOf(chase, MAPS)).toBe("draft");
   });
 
-  it("says the map is loading, or gone, rather than calling the scene ready", () => {
+  it("says the map is loading, or gone, rather than calling the encounter ready", () => {
     expect(readinessOf(factsOf(view, AMBUSH, null), null)).toBe("loading-map");
     const gone = MAPS.filter((map) => map.id !== IDS.crypt);
     expect(readinessOf(factsOf(view, AMBUSH, gone), gone)).toBe("map-unavailable");

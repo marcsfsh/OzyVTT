@@ -200,7 +200,7 @@ describe("Banishment of a creature from another plane", () => {
     return state;
   };
 
-  it("doesn't return when the spell lasts its full minute, and leaves the fight", () => {
+  it("doesn't return when the spell lasts its full minute, and leaves the encounter", () => {
     const state = banishFiend();
     state.combat.round = 11;
     endEffect(state, OGRE, "banished");

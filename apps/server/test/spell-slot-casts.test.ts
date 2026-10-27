@@ -156,7 +156,7 @@ describe("a leveled spell cast with a slot", () => {
   });
 });
 
-describe("a leveled spell cast outside a fight", () => {
+describe("a leveled spell cast outside an encounter", () => {
   it("spends the slot and rolls its healing, labelled as healing", () => {
     const state = GameStateSchema.parse({ schemaVersion: 1 });
     importActorDefinition(state, definition, HERO, "public", catalog);

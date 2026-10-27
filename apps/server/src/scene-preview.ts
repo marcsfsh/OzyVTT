@@ -9,15 +9,15 @@ import { GameNotFoundError } from "./commands/failures.js";
 const PREVIEW_SESSION = "00000000-0000-4000-8000-00000000c0de";
 
 /**
- * The state as it would stand once `sceneId` went live, built on a copy: the same park and resume as `scene.activate`,
+ * The state as it would stand once `encounterId` went live, built on a copy: the same park and resume as `encounter.activate`,
  * then what the party sees remembered, as the store does after every command. Nothing here reaches the real state.
  */
-function asIfLive(state: GameState, sceneId: string, content: SightContent): GameState {
-  if (state.combat.activeSceneId === sceneId) return state;
+function asIfLive(state: GameState, encounterId: string, content: SightContent): GameState {
+  if (state.combat.activeEncounterId === encounterId) return state;
   const copy = structuredClone(state) as GameState;
   // A rewound timeline refuses a real switch; the preview only looks.
   copy.combat.historyCursor = null;
-  activateScene(copy, sceneId, "00000000-0000-4000-8000-000000000000");
+  activateScene(copy, encounterId, "00000000-0000-4000-8000-000000000000");
   rememberExplored(copy, content);
   return copy;
 }
@@ -29,17 +29,17 @@ function asIfLive(state: GameState, sceneId: string, content: SightContent): Gam
  */
 export function previewScene(
   state: GameState,
-  input: Readonly<{ sceneId: string; actorId?: string }>,
+  input: Readonly<{ encounterId: string; actorId?: string }>,
   deps: Readonly<{
     content: SightContent;
     playerView: (state: GameState, sessionId: string) => PlayerView;
     now?: number;
   }>
 ): ScenePreviewReply {
-  const scene = state.combat.scenes.find((candidate) => candidate.id === input.sceneId);
-  if (!scene) throw new GameNotFoundError("That scene no longer exists.");
-  const live = state.combat.activeSceneId === scene.id;
-  const reply = { sceneId: scene.id, live, mapAssetId: scene.mapAssetId, actorId: input.actorId ?? null };
+  const scene = state.combat.encounters.find((candidate) => candidate.id === input.encounterId);
+  if (!scene) throw new GameNotFoundError("That encounter no longer exists.");
+  const live = state.combat.activeEncounterId === scene.id;
+  const reply = { encounterId: scene.id, live, mapAssetId: scene.mapAssetId, actorId: input.actorId ?? null };
   if (input.actorId === undefined) {
     const { encounter, initiative } = projectViewerEncounter(
       asIfLive(state, scene.id, deps.content),

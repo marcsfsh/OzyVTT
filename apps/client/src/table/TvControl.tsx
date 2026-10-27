@@ -18,8 +18,8 @@ export function TvControl({ gmToken, state, compact }: Readonly<{ gmToken: strin
   const previewOpen = useViewerPreviewOpen();
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
-  const scenes = state.combat.scenes ?? [];
-  const live = scenes.find((scene) => scene.id === state.combat.activeSceneId) ?? null;
+  const scenes = state.combat.encounters ?? [];
+  const live = scenes.find((scene) => scene.id === state.combat.activeEncounterId) ?? null;
   const liveMap = state.combat.mapAssetId
     ? { assetId: state.combat.mapAssetId, name: live?.name ?? "Battle map" }
     : null;
@@ -83,11 +83,11 @@ export function TvControl({ gmToken, state, compact }: Readonly<{ gmToken: strin
                 altText: liveMap.name,
                 camera: { center: { x: (size?.width ?? 0) / 2, y: (size?.height ?? 0) / 2 }, zoom: 1 }
               },
-              "The table screen shows the live scene."
+              "The table screen shows the live encounter."
             )
           }
         >
-          Show the live scene
+          Show the live encounter
         </MenuItem>
       )}
       <MenuItem onClick={() => setViewerPreviewOpen(!previewOpen)}>

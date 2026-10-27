@@ -83,7 +83,7 @@ function liveScene(): GameState {
   });
 }
 
-describe("a live scene before its fight", () => {
+describe("a live encounter before its combat", () => {
   it("gives a player the map and the placed public tokens the fog doesn't cover", () => {
     const view = projectPlayerView(liveScene(), PLAYER, () => null);
     expect(view.combat.active).toBe(false);
@@ -140,7 +140,7 @@ describe("a live scene before its fight", () => {
   });
 });
 
-describe("a live scene with dynamic vision before its fight", () => {
+describe("a live encounter with dynamic vision before its combat", () => {
   it("keeps a creature no character sees off the players' map and the table screen", () => {
     const state = frozen(visionGame({ active: false, walls: [DIVIDER()], positions: { [ORC]: cell(3, 5) } }));
     const view = projectPlayerView(state, SESSION_A, () => null);
@@ -155,7 +155,7 @@ describe("a live scene with dynamic vision before its fight", () => {
   });
 });
 
-describe("placing tokens on a live scene before its fight", () => {
+describe("placing tokens on a live encounter before its combat", () => {
   const closers: Array<() => Promise<void>> = [];
   afterEach(async () => {
     for (const close of closers.splice(0)) await close();
@@ -200,7 +200,7 @@ describe("placing tokens on a live scene before its fight", () => {
     expect((await move(gmToken, LURKER, { x: 725, y: 75 })).status).toBe(200);
     const refused = await move(playerToken, HERO, { x: 125, y: 75 });
     expect(refused.status).toBe(409);
-    expect((await refused.json()).error.message).toBe("Your GM places the tokens before the fight starts.");
+    expect((await refused.json()).error.message).toBe("Your GM places the tokens before the encounter starts.");
     // Setting the scene narrates nothing to the table.
     const log = await (await fetch(base + GAME_PATHS.log, { headers: { authorization: `Bearer ${gmToken}` } })).json();
     expect(JSON.stringify(log)).not.toContain("entered the map");
@@ -248,13 +248,13 @@ describe("placing tokens on a live scene before its fight", () => {
   });
 });
 
-describe("the table screen and the live scene", () => {
+describe("the table screen and the live encounter", () => {
   const closers: Array<() => Promise<void>> = [];
   afterEach(async () => {
     for (const close of closers.splice(0)) await close();
   });
 
-  it("follows the scene that goes live unless the GM paused it", async () => {
+  it("follows the encounter that goes live unless the GM paused it", async () => {
     const { base, server, gmToken, post, close } = await bootServer(GameStateSchema.parse({ schemaVersion: 1 }));
     closers.push(close);
     const mapIds: string[] = [];

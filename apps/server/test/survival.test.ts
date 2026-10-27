@@ -193,7 +193,7 @@ describe("suffocation", () => {
     expect(hero.effects.map((effect) => effect.name)).toEqual(["Water Breathing"]);
   });
 
-  it("runs out as the minutes pass outside a fight", () => {
+  it("runs out as the minutes pass outside an encounter", () => {
     const { state, hero } = party();
     startHoldingBreath(state, hero, heroDefinition);
     passTime(state, 0, 2);

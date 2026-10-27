@@ -37,7 +37,7 @@ const STEP_ASK: Readonly<Record<MapStep, string>> = {
   upload: "Choose the image. Name it and file it now, or later.",
   grid: "Mark the printed grid, or a distance you know, so tokens snap and rulers measure.",
   check: "Check a far point against the grid, then save it.",
-  use: "Name the map and file it. A battle map can start a scene from here."
+  use: "Name the map and file it. A battle map can start an encounter from here."
 };
 
 /** The first step: the image and what to call it. Upload adds it to the library and opens its Grid step. */
@@ -273,7 +273,7 @@ function MapStepsEditor({ map, step }: Readonly<{ map: MapAsset; step: MapStep }
   const calibrating = current === "grid" || current === "check";
   const checkReady = current !== "check" || maxStep >= 3;
   const grid = gridStateOf(map);
-  const doneLabel = back === "/table" ? "Back to the table" : back ? "Back to the scene" : null;
+  const doneLabel = back === "/table" ? "Back to the table" : back ? "Back to the encounter" : null;
 
   const questions: ReactNode = calibrating ? (
     <div className="sc-q">
@@ -308,7 +308,7 @@ function MapStepsEditor({ map, step }: Readonly<{ map: MapAsset; step: MapStep }
         </Button>
       ) : map.kind === "battlemap" ? (
         <Button variant="primary" onClick={() => go(`${SCENES_PATHS.newScene}?map=${map.id}`)}>
-          New scene on this map
+          New encounter on this map
         </Button>
       ) : (
         <Button variant="primary" onClick={() => go(pathForMap(map.id))}>

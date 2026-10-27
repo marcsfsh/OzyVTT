@@ -288,7 +288,7 @@ describe("ask the GM", () => {
     expect(server.store.snapshot.combat.pendingRuleAsks).toEqual([]);
   });
 
-  it("keeps one question per character and clears the queue when the fight ends", async () => {
+  it("keeps one question per character and clears the queue when the encounter ends", async () => {
     const { base, server, heroSession, gmToken } = await fightWithExhaustedMovement();
     await post(base, GAME_PATHS.rulesAsk, heroSession, {
       commandId: randomUUID(),
@@ -342,7 +342,7 @@ describe("ask the GM", () => {
     expect(server.store.snapshot.combat.pendingRuleAsks.length).toBe(1);
   });
 
-  it("parks and resumes an unanswered question with its scene", () => {
+  it("parks and resumes an unanswered question with its encounter", () => {
     // `pendingRuleAsks` must be in both the snapshot list and the empty-scene literal, or a parked scene
     // resumes with an answered question or loses an unanswered one.
     const ask = {
@@ -369,22 +369,22 @@ describe("ask the GM", () => {
         mapAssetId: MAP,
         initiative: [{ actorId: HERO, score: 20 }],
         pendingRuleAsks: [ask],
-        scenes: [{ id: CORRIDOR, name: "The corridor", mapAssetId: MAP, combat: {} }],
-        activeSceneId: null
+        encounters: [{ id: CORRIDOR, name: "The corridor", mapAssetId: MAP, combat: {} }],
+        activeEncounterId: null
       }
     });
 
     // Switching away parks the live fight (question included) as an implicit scene...
     activateScene(game, CORRIDOR, IMPLICIT);
     expect(game.combat.pendingRuleAsks).toEqual([]);
-    expect(game.combat.scenes.find((scene) => scene.id === IMPLICIT)?.combat.pendingRuleAsks.length).toBe(1);
+    expect(game.combat.encounters.find((scene) => scene.id === IMPLICIT)?.combat.pendingRuleAsks.length).toBe(1);
 
     // ...and switching back resumes it exactly as the GM left it.
     activateScene(game, IMPLICIT, "90000000-0000-4000-8000-00000000000f");
     expect(game.combat.pendingRuleAsks.length).toBe(1);
     expect(game.combat.pendingRuleAsks[0].id).toBe(ask.id);
     // The scene the fight came from is emptied, as the active-scene invariant requires.
-    expect(game.combat.scenes.find((scene) => scene.id === CORRIDOR)?.combat.pendingRuleAsks).toEqual([]);
+    expect(game.combat.encounters.find((scene) => scene.id === CORRIDOR)?.combat.pendingRuleAsks).toEqual([]);
   });
 });
 

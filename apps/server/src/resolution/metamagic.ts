@@ -193,7 +193,7 @@ function unfitFor(id: CastShapingId, facts: CastFacts): string | null {
       if (!/^action\b/i.test(spell.castingTime.trim()) || action.id === ritualSpellActionId(spell.id))
         return `${name} changes a casting time of an action, and ${spell.name} isn't cast with one.`;
       if (!state.combat.active || state.combat.turnActorId !== attacker.id)
-        return `${name} is used on ${attacker.name}'s own turn in a fight.`;
+        return `${name} is used on ${attacker.name}'s own turn in an encounter.`;
       return state.combat.turn.metamagic?.leveledCast === true
         ? `${attacker.name} already cast a level 1+ spell this turn, so ${name} can't shape another.`
         : null;

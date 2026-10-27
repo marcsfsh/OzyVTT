@@ -107,8 +107,8 @@ function ActingNow({ presentation }: Readonly<{ presentation: Presentation }>) {
   const { initiative } = presentation;
   if (!initiative.visible)
     return (
-      <section className="screen-card screen-acting is-idle" aria-label="No fight running">
-        <p className="screen-card-label">No fight running</p>
+      <section className="screen-card screen-acting is-idle" aria-label="No encounter running">
+        <p className="screen-card-label">No encounter running</p>
         <p className="screen-acting-name chrome">{presentation.activeMap?.altText || "The table"}</p>
       </section>
     );

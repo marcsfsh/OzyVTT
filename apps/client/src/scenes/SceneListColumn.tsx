@@ -22,10 +22,10 @@ function ReadinessLine({ readiness }: Readonly<{ readiness: Readiness }>) {
 export function SceneListColumn({ currentId }: Readonly<{ currentId: string }>) {
   const { state, maps, go } = useScenes();
   return (
-    <nav className="sc-list-col scroll-y" aria-label="Scenes">
-      <h2 className="sc-list-col-title">Scenes</h2>
+    <nav className="sc-list-col scroll-y" aria-label="Encounters">
+      <h2 className="sc-list-col-title">Encounters</h2>
       <ul className="sc-list-col-rows">
-        {state.combat.scenes.map((scene) => {
+        {state.combat.encounters.map((scene) => {
           const facts = factsOf(state, scene, maps);
           const readiness = readinessOf(facts, maps);
           return (

@@ -42,7 +42,7 @@ export const tableSettingCommands = [
     description:
       "Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid structured actions with an overridable `error.details.blocked`, `assisted` allows them with logged warnings, `freeform` skips validation. Also settable at encounter start.",
     summary:
-      "Set the live fight's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).",
+      "Set the live encounter's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).",
     schema: SetRulesModeSchema,
     malformed: "The rules-mode command is malformed.",
     gmOnly: "Only the GM can change the rules mode.",
@@ -68,9 +68,9 @@ export const tableSettingCommands = [
     type: "rules.set-policy",
     operationId: "setRulesPolicy",
     description:
-      "Sets the table's standing rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy. The rules-mode command changes the fight in progress. Omitting `exceptions` keeps the stored ones. Every family follows the dial until the GM sets an exception for it.",
+      "Sets the table's standing rules policy (GM-grade only): the dial every new encounter starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy. The rules-mode command changes the encounter in progress. Omitting `exceptions` keeps the stored ones. Every family follows the dial until the GM sets an exception for it.",
     summary:
-      "Set the table's standing rules policy: the dial and per-family exceptions every new fight starts from (GM).",
+      "Set the table's standing rules policy: the dial and per-family exceptions every new encounter starts from (GM).",
     schema: RulesSetPolicySchema,
     malformed: "The rules-policy command is malformed.",
     gmOnly: "Only the GM can set the rules policy.",
@@ -236,8 +236,8 @@ export const tableSettingCommands = [
         kit,
         committed,
         underwater
-          ? "The fight is now underwater: melee has Disadvantage unless it deals piercing damage, ranged attacks miss beyond normal range, and everyone resists fire."
-          : "The fight is no longer underwater.",
+          ? "The encounter is now underwater: melee has Disadvantage unless it deals piercing damage, ranged attacks miss beyond normal range, and everyone resists fire."
+          : "The encounter is no longer underwater.",
         false
       );
       if (!committed.duplicate) kit.publishNarrations(events);

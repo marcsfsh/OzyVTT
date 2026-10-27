@@ -64,48 +64,48 @@ afterEach(() => {
   act(() => armPlacement(null));
 });
 
-describe("the Scenes tab's front page", () => {
-  it("leads with New map and New scene, then the Maps and Scenes views", async () => {
+describe("the Encounters front page", () => {
+  it("leads with New map and New encounter, then the Maps and Encounters views", async () => {
     const user = userEvent.setup();
-    renderTab("/scenes");
-    const views = await screen.findByRole("tablist", { name: "Maps and scenes" });
+    renderTab("/encounters");
+    const views = await screen.findByRole("tablist", { name: "Maps and encounters" });
     expect(
       within(views)
         .getAllByRole("tab")
         .map((tab) => tab.textContent)
-    ).toEqual(["Maps", "Scenes"]);
-    expect(within(views).getByRole("tab", { name: "Scenes" })).toHaveAttribute("aria-selected", "true");
+    ).toEqual(["Maps", "Encounters"]);
+    expect(within(views).getByRole("tab", { name: "Encounters" })).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByRole("table")).toBeInTheDocument();
     // Nothing of the old front page is left.
     expect(screen.queryByRole("region", { name: /^Needs you/ })).toBeNull();
     expect(screen.queryByRole("region", { name: "Recent changes" })).toBeNull();
     await user.click(within(views).getByRole("tab", { name: "Maps" }));
-    expect(here()).toBe("/scenes/maps");
+    expect(here()).toBe("/encounters/maps");
     await user.click(screen.getByRole("button", { name: "New map" }));
-    expect(here()).toBe("/scenes/maps/new");
+    expect(here()).toBe("/encounters/maps/new");
     cleanup();
-    renderTab("/scenes/list");
-    await user.click(screen.getAllByRole("button", { name: "New scene" })[0]!);
-    expect(here()).toBe("/scenes/new");
+    renderTab("/encounters/list");
+    await user.click(screen.getAllByRole("button", { name: "New encounter" })[0]!);
+    expect(here()).toBe("/encounters/new");
   });
 
-  it("sorts scenes by what needs attention, and by whether their fight has run", async () => {
+  it("sorts encounters by what needs attention, and by whether their combat has run", async () => {
     // A parked fight: running, with whose turn it is.
     const chaseRunning = {
       ...CHASE,
       combat: { ...CHASE.combat, active: true, round: 1, turnActorId: CHASE.combat.initiative[0]!.actorId }
     };
-    const campDone = { ...CAMP, fightEndedAt: Date.parse("2026-10-18T12:00:00.000Z") };
+    const campDone = { ...CAMP, endedAt: Date.parse("2026-10-18T12:00:00.000Z") };
     const names = async () =>
       within(await screen.findByRole("table"))
         .getAllByRole("row")
         .slice(1)
         .map((row) => row.querySelector("b")?.textContent);
-    const first = renderTab("/scenes?sort=attention:asc");
+    const first = renderTab("/encounters?sort=attention:asc");
     // The chase has no grid and two tokens in the tray: the most to do.
     expect((await names())[0]).toBe("Tunnel chase");
     first.unmount();
-    renderTab("/scenes?sort=progress:asc", gmView([AMBUSH, chaseRunning, campDone]));
+    renderTab("/encounters?sort=progress:asc", gmView([AMBUSH, chaseRunning, campDone]));
     expect(await names()).toEqual(["Crypt ambush", "Tunnel chase", "Camp at the ford"]);
     const table = await screen.findByRole("table");
     expect(within(table).getAllByText("Not started").length).toBeGreaterThan(0);
@@ -114,9 +114,9 @@ describe("the Scenes tab's front page", () => {
   });
 });
 
-describe("the scenes table", () => {
-  it("lists every scene with its state, map, tokens, light and Codex session", async () => {
-    renderTab("/scenes/list");
+describe("the encounters table", () => {
+  it("lists every encounter with its state, map, tokens, light and Codex session", async () => {
+    renderTab("/encounters/list");
     const table = await screen.findByRole("table");
     await waitFor(() => expect(within(table).getByText("Session 6")).toBeInTheDocument());
     const ambush = within(table).getByRole("button", { name: "Crypt ambush" }).closest("tr")!;
@@ -128,39 +128,39 @@ describe("the scenes table", () => {
 
   it("filters from the flyout and keeps the filters in the address", async () => {
     const user = userEvent.setup();
-    renderTab("/scenes/list");
+    renderTab("/encounters/list");
     await screen.findByText("Session 6");
     await user.click(screen.getByRole("button", { name: "Filters" }));
-    const flyout = screen.getByRole("complementary", { name: "Filter scenes" });
+    const flyout = screen.getByRole("complementary", { name: "Filter encounters" });
     await user.click(within(flyout).getByRole("button", { name: "Staged in the Codex" }));
-    expect(screen.getByText("1 of 3 scenes")).toBeInTheDocument();
+    expect(screen.getByText("1 of 3 encounters")).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get("codex")).toBe("linked");
     expect(screen.getByRole("button", { name: "Filters · 1" })).toBeInTheDocument();
 
     await user.click(within(flyout).getByRole("button", { name: "Staged in the Codex" }));
-    expect(screen.getByText("3 scenes")).toBeInTheDocument();
+    expect(screen.getByText("3 encounters")).toBeInTheDocument();
     expect(window.location.search).toBe("");
   });
 
   it("reads its filters back from a link", async () => {
-    renderTab("/scenes/list?tray=1");
-    expect(await screen.findByText("2 of 3 scenes")).toBeInTheDocument();
+    renderTab("/encounters/list?tray=1");
+    expect(await screen.findByText("2 of 3 encounters")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Camp at the ford" })).toBeNull();
   });
 
   it("shows only the states ticked in the State dropdown", async () => {
     const user = userEvent.setup();
-    renderTab("/scenes/list", gmView(undefined, IDS.ambush));
+    renderTab("/encounters/list", gmView(undefined, IDS.ambush));
     await user.click(await screen.findByRole("button", { name: "State: all 4" }));
     await user.click(screen.getByRole("checkbox", { name: "Prepared" }));
-    expect(screen.getByRole("button", { name: "State: Live, Fight parked, Replay" })).toBeInTheDocument();
-    expect(screen.getByText("1 of 3 scenes")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "State: Live, Encounter parked, Replay" })).toBeInTheDocument();
+    expect(screen.getByText("1 of 3 encounters")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Crypt ambush" })).toBeInTheDocument();
   });
 
   it("sorts by several columns from the Sort dialog", async () => {
     const user = userEvent.setup();
-    renderTab("/scenes/list");
+    renderTab("/encounters/list");
     await user.click(await screen.findByRole("button", { name: "Sort: Your order" }));
     const dialog = within(screen.getByRole("dialog", { name: "Sort" }));
     await user.selectOptions(dialog.getByLabelText("Sort by: column"), "name");
@@ -175,18 +175,18 @@ describe("the scenes table", () => {
     expect(names).toEqual(["Camp at the ford", "Crypt ambush", "Tunnel chase"]);
   });
 
-  it("opens a scene from its row", async () => {
+  it("opens an encounter from its row", async () => {
     const user = userEvent.setup();
-    renderTab("/scenes/list");
+    renderTab("/encounters/list");
     await user.click(await screen.findByRole("button", { name: "Tunnel chase" }));
-    expect(here()).toBe(`/scenes/${IDS.chase}`);
+    expect(here()).toBe(`/encounters/${IDS.chase}`);
   });
 });
 
-describe("a scene's page", () => {
+describe("an encounter's page", () => {
   it("is one document: its state, its map and grid, what it still needs, and Make live", async () => {
     const user = userEvent.setup();
-    renderTab(`/scenes/${IDS.ambush}`);
+    renderTab(`/encounters/${IDS.ambush}`);
     expect(await screen.findByRole("heading", { name: "Crypt ambush" })).toBeInTheDocument();
     // The Encounter tab leads: Ready to go lists what applies, the walls too since vision is on.
     const ready = within(screen.getByRole("region", { name: "Ready to go" }));
@@ -194,9 +194,9 @@ describe("a scene's page", () => {
     expect(ready.getByText("1 token waits in the tray, off the map.")).toBeInTheDocument();
     expect(ready.getByText("Vision is on with 2 walls and doors drawn.")).toBeInTheDocument();
     // The scene's list beside the page says which scenes are ready to go.
-    const list = within(screen.getByRole("navigation", { name: "Scenes" }));
+    const list = within(screen.getByRole("navigation", { name: "Encounters" }));
     expect(list.getAllByText("Draft").length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("tab", { name: "Scene" }));
+    await user.click(screen.getByRole("tab", { name: "Setup" }));
     expect(
       screen.getByText("Prepared. Players and the table screen see none of it until you make it live.")
     ).toBeInTheDocument();
@@ -205,13 +205,13 @@ describe("a scene's page", () => {
     expect(screen.getByRole("tab", { name: "Tokens · 4" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Make live" }));
-    expect(commands("scene:activate")).toEqual([{ sceneId: IDS.ambush }]);
+    expect(commands("encounter:activate")).toEqual([{ encounterId: IDS.ambush }]);
   });
 
   it("shows in place what the table screen would show, and goes back to the GM's view", async () => {
     const user = userEvent.setup();
     read.mockImplementation(async (type) =>
-      type === "scene:preview"
+      type === "encounter:preview"
         ? {
             ok: true,
             mapAssetId: IDS.crypt,
@@ -222,10 +222,10 @@ describe("a scene's page", () => {
           }
         : { ok: false }
     );
-    renderTab(`/scenes/${IDS.ambush}`);
+    renderTab(`/encounters/${IDS.ambush}`);
     await user.selectOptions(await screen.findByLabelText("See as"), "screen");
-    expect(screen.getByText("What the table screen shows once this scene is live.")).toBeInTheDocument();
-    expect(read).toHaveBeenCalledWith("scene:preview", { sceneId: IDS.ambush });
+    expect(screen.getByText("What the table screen shows once this encounter is live.")).toBeInTheDocument();
+    expect(read).toHaveBeenCalledWith("encounter:preview", { encounterId: IDS.ambush });
     await waitFor(() => expect(document.querySelector(".sc-preview-screen .viewer-stage")).not.toBeNull());
 
     await user.click(screen.getByRole("button", { name: "Back to your view" }));
@@ -235,31 +235,33 @@ describe("a scene's page", () => {
   it("asks the server what one character's player would see", async () => {
     const user = userEvent.setup();
     read.mockImplementation(() => new Promise(() => {}));
-    renderTab(`/scenes/${IDS.ambush}`);
+    renderTab(`/encounters/${IDS.ambush}`);
     await user.selectOptions(await screen.findByLabelText("See as"), IDS.lyra);
-    expect(read).toHaveBeenCalledWith("scene:preview", { sceneId: IDS.ambush, actorId: IDS.lyra });
-    expect(screen.getByText("What Lyra Emberwise's player sees once this scene is live.")).toBeInTheDocument();
+    expect(read).toHaveBeenCalledWith("encounter:preview", { encounterId: IDS.ambush, actorId: IDS.lyra });
+    expect(screen.getByText("What Lyra Emberwise's player sees once this encounter is live.")).toBeInTheDocument();
   });
 
   it("names the Codex session that stages it", async () => {
     const user = userEvent.setup();
-    renderTab(`/scenes/${IDS.ambush}`);
-    await user.click(await screen.findByRole("tab", { name: "Scene" }));
+    renderTab(`/encounters/${IDS.ambush}`);
+    await user.click(await screen.findByRole("tab", { name: "Setup" }));
     expect(await screen.findByText("Session 6")).toBeInTheDocument();
   });
 
-  it("says so when the scene is gone, with the way back to the list", async () => {
-    renderTab(`/scenes/${IDS.ambush}`, gmView([]));
-    expect(await screen.findByText("That scene no longer exists. It may have been deleted.")).toBeInTheDocument();
+  it("says so when the encounter is gone, with the way back to the list", async () => {
+    renderTab(`/encounters/${IDS.ambush}`, gmView([]));
+    expect(await screen.findByText("That encounter no longer exists. It may have been deleted.")).toBeInTheDocument();
   });
 });
 
-describe("making a scene as steps", () => {
-  it("makes the scene from its map, then opens its Tokens and monsters step", async () => {
+describe("making an encounter as steps", () => {
+  it("makes the encounter from its map, then opens its Tokens and monsters step", async () => {
     const user = userEvent.setup();
     const NEW = "30000000-0000-4000-8000-0000000000d1";
-    command.mockImplementation(async (type) => (type === "scene:create" ? { ok: true, sceneId: NEW } : { ok: true }));
-    renderTab("/scenes/new");
+    command.mockImplementation(async (type) =>
+      type === "encounter:create" ? { ok: true, encounterId: NEW } : { ok: true }
+    );
+    renderTab("/encounters/new");
     const steps = screen.getByRole("navigation", { name: "Steps" });
     expect(
       within(steps)
@@ -275,36 +277,36 @@ describe("making a scene as steps", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
 
     await user.click(await screen.findByRole("button", { name: /Sunken crypt/ }));
-    await user.type(screen.getByLabelText("Scene name"), "Bone pit");
+    await user.type(screen.getByLabelText("Encounter name"), "Bone pit");
     await user.click(screen.getByRole("button", { name: "Continue" }));
-    expect(commands("scene:create")).toEqual([
+    expect(commands("encounter:create")).toEqual([
       { name: "Bone pit", mapAssetId: IDS.crypt, combatantIds: [IDS.lyra, IDS.borin] }
     ]);
-    await waitFor(() => expect(here()).toBe(`/scenes/${NEW}?step=tokens`));
-    expect(screen.getByRole("status")).toHaveTextContent("Opening the scene…");
+    await waitFor(() => expect(here()).toBe(`/encounters/${NEW}?step=tokens`));
+    expect(screen.getByRole("status")).toHaveTextContent("Opening the encounter…");
   });
 
   it("uploads a map from its first step and tells the rest of the app the library changed", async () => {
     const user = userEvent.setup();
     const cave = mapAsset("20000000-0000-5000-8000-0000000000d2", "Cave");
     serveScenes({ uploaded: cave });
-    const { container } = renderTab("/scenes/new");
+    const { container } = renderTab("/encounters/new");
     await screen.findByRole("button", { name: /Sunken crypt/ });
     const input = container.querySelector<HTMLInputElement>("input.map-picker-file")!;
     await user.upload(input, new File(["png"], "cave.png", { type: "image/png" }));
     await waitFor(() => expect(onLibraryChanged).toHaveBeenCalled());
   });
 
-  it("walks a scene's steps, each with its question, and ends at Make live", async () => {
+  it("walks an encounter's steps, each with its question, and ends at Make live", async () => {
     const user = userEvent.setup();
-    renderTab(`/scenes/${IDS.ambush}?step=map`);
+    renderTab(`/encounters/${IDS.ambush}?step=map`);
     expect(await screen.findByRole("heading", { name: "Map" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Scene name")).toHaveValue("Crypt ambush");
+    expect(screen.getByLabelText("Encounter name")).toHaveValue("Crypt ambush");
 
     await user.click(screen.getByRole("button", { name: "Next: Tokens" }));
-    expect(here()).toBe(`/scenes/${IDS.ambush}?step=tokens`);
+    expect(here()).toBe(`/encounters/${IDS.ambush}?step=tokens`);
     expect(screen.getByRole("heading", { name: "Tokens and monsters" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "In this scene" })).toHaveTextContent("4 staged · 3 on the map");
+    expect(screen.getByRole("region", { name: "In this encounter" })).toHaveTextContent("4 staged · 3 on the map");
 
     await user.click(screen.getByRole("button", { name: "Next: Light" }));
     expect(screen.getByRole("heading", { name: "Walls and light" })).toBeInTheDocument();
@@ -317,61 +319,61 @@ describe("making a scene as steps", () => {
     expect(screen.getByRole("heading", { name: "Review and make live" })).toBeInTheDocument();
     expect(screen.getByText("Tokens", { selector: "dt" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Make live" }));
-    expect(commands("scene:activate")).toEqual([{ sceneId: IDS.ambush }]);
+    expect(commands("encounter:activate")).toEqual([{ encounterId: IDS.ambush }]);
   });
 
   it("goes back a step with Back, and leaves the review with Done for now", async () => {
     const user = userEvent.setup();
-    renderTab(`/scenes/${IDS.ambush}?step=review`);
+    renderTab(`/encounters/${IDS.ambush}?step=review`);
     await user.click(await screen.findByRole("button", { name: "Done for now" }));
-    expect(here()).toBe(`/scenes/${IDS.ambush}`);
+    expect(here()).toBe(`/encounters/${IDS.ambush}`);
   });
 
   it("places a token from its step: Place arms the map beside it", async () => {
     const user = userEvent.setup();
-    renderTab(`/scenes/${IDS.ambush}?step=tokens`);
+    renderTab(`/encounters/${IDS.ambush}?step=tokens`);
     await user.click(await screen.findByRole("button", { name: "Place Goblin Boss on the map" }));
     expect(await screen.findByText("Tap the map where Goblin Boss goes.")).toBeInTheDocument();
   });
 
-  it("turns vision on for this scene alone", async () => {
+  it("turns vision on for this encounter alone", async () => {
     const user = userEvent.setup();
-    renderTab(`/scenes/${IDS.chase}?step=light`);
+    renderTab(`/encounters/${IDS.chase}?step=light`);
     await user.click(await screen.findByRole("switch", { name: "Dynamic vision" }));
-    expect(commands("vision:set-enabled")).toEqual([{ enabled: true, sceneId: IDS.chase }]);
+    expect(commands("vision:set-enabled")).toEqual([{ enabled: true, encounterId: IDS.chase }]);
   });
 
-  it("renames the scene from its name field", async () => {
+  it("renames the encounter from its name field", async () => {
     const user = userEvent.setup();
-    renderTab(`/scenes/${AMBUSH.id}?step=review`);
-    const name = await screen.findByLabelText("Scene name");
+    renderTab(`/encounters/${AMBUSH.id}?step=review`);
+    const name = await screen.findByLabelText("Encounter name");
     await user.clear(name);
     await user.type(name, "Crypt brawl{Enter}");
-    expect(commands("scene:rename")).toEqual([{ sceneId: IDS.ambush, name: "Crypt brawl" }]);
+    expect(commands("encounter:rename")).toEqual([{ encounterId: IDS.ambush, name: "Crypt brawl" }]);
   });
 });
 
 describe("on a phone", () => {
-  it("lists Prep's pages as the strip under the header, with New map and New scene on the page", async () => {
+  it("lists Prep's pages as the strip under the header, with New map and New encounter on the page", async () => {
     setViewport(390);
-    renderTab("/scenes/list");
+    renderTab("/encounters/list");
     const pages = await screen.findByRole("tablist", { name: "Prep pages" });
     expect(
       within(pages)
         .getAllByRole("tab")
         .map((tab) => tab.textContent)
-    ).toEqual(["Scenes", "Party", "Maps", "Tokens", "Sound", "Replays"]);
-    expect(within(pages).getByRole("tab", { name: "Scenes" })).toHaveAttribute("aria-selected", "true");
-    const views = screen.getByRole("tablist", { name: "Maps and scenes" });
-    expect(within(views).getByRole("tab", { name: "Scenes" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("button", { name: "New scene" })).toBeInTheDocument();
+    ).toEqual(["Encounters", "Party", "Maps", "Tokens", "Sound", "Replays"]);
+    expect(within(pages).getByRole("tab", { name: "Encounters" })).toHaveAttribute("aria-selected", "true");
+    const views = screen.getByRole("tablist", { name: "Maps and encounters" });
+    expect(within(views).getByRole("tab", { name: "Encounters" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "New encounter" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New map" })).toBeInTheDocument();
   });
 
   it("runs the steps as a strip and keeps the map in a bar that opens it full screen", async () => {
     const user = userEvent.setup();
     setViewport(390);
-    renderTab(`/scenes/${IDS.ambush}?step=tokens`);
+    renderTab(`/encounters/${IDS.ambush}?step=tokens`);
     const strip = await screen.findByRole("tablist", { name: "Steps" });
     expect(
       within(strip)
@@ -385,20 +387,20 @@ describe("on a phone", () => {
   it("opens the map full screen when Place is pressed, armed for the next tap", async () => {
     const user = userEvent.setup();
     setViewport(390);
-    renderTab(`/scenes/${IDS.ambush}?step=tokens`);
+    renderTab(`/encounters/${IDS.ambush}?step=tokens`);
     await user.click(await screen.findByRole("button", { name: "Place Goblin Boss on the map" }));
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
     expect(await screen.findByText("Tap the map where Goblin Boss goes.")).toBeInTheDocument();
   });
 
-  it("keeps See as in the scene's menu", async () => {
+  it("keeps See as in the encounter's menu", async () => {
     const user = userEvent.setup();
     setViewport(390);
     read.mockImplementation(() => new Promise(() => {}));
-    renderTab(`/scenes/${IDS.ambush}`);
+    renderTab(`/encounters/${IDS.ambush}`);
     expect(screen.queryByLabelText("See as")).toBeNull();
     await user.click(await screen.findByLabelText("Crypt ambush actions"));
     await user.click(screen.getByRole("menuitem", { name: "See as Borin Stoneguard" }));
-    expect(screen.getByText("What Borin Stoneguard's player sees once this scene is live.")).toBeInTheDocument();
+    expect(screen.getByText("What Borin Stoneguard's player sees once this encounter is live.")).toBeInTheDocument();
   });
 });

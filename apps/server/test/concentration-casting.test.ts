@@ -228,7 +228,7 @@ describe("casting a Concentration spell starts Concentration", () => {
     expect(events.some((event) => /no longer concentrating/.test(event.text))).toBe(true);
   });
 
-  it("damage outside a fight still asks for the Constitution save, and it can be answered", () => {
+  it("damage outside an encounter still asks for the Constitution save, and it can be answered", () => {
     const state = game();
     cast(state, "hold-person", [IDS.captain]);
     answer(state, IDS.captain, 3);

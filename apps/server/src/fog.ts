@@ -9,31 +9,31 @@ export type FogRectInput = PaintRectInput;
 const MAX_FOG_SHAPES = 200;
 
 /** Manual fog of war: the GM paints reveal/hide rects over a per-scene mask that starts all hidden. The
- *  live table and a parked scene's private prep (`sceneId`) share this one implementation. */
+ *  live table and a parked scene's private prep (`encounterId`) share this one implementation. */
 
-const fogSlice = (state: GameState, sceneId: string | undefined) => {
-  const slice = layerSlice(state, sceneId, "fog", "That scene is live. Edit its fog on the table.");
+const fogSlice = (state: GameState, encounterId: string | undefined) => {
+  const slice = layerSlice(state, encounterId, "fog", "That encounter is live. Edit its fog on the table.");
   return { fog: slice.layer, write: slice.write };
 };
 
-export function setFogEnabled(state: GameState, sceneId: string | undefined, enabled: boolean) {
-  const slice = fogSlice(state, sceneId);
+export function setFogEnabled(state: GameState, encounterId: string | undefined, enabled: boolean) {
+  const slice = fogSlice(state, encounterId);
   slice.write({ ...slice.fog, enabled });
 }
 
 /** Everything hidden again ("Hide all": enabled fog with no reveals covers the whole map). */
-export function resetFog(state: GameState, sceneId: string | undefined) {
-  const slice = fogSlice(state, sceneId);
+export function resetFog(state: GameState, encounterId: string | undefined) {
+  const slice = fogSlice(state, encounterId);
   slice.write({ ...slice.fog, shapes: [] });
 }
 
 export function paintFog(
   state: GameState,
-  sceneId: string | undefined,
+  encounterId: string | undefined,
   geometry: FogMapGeometry,
   input: Readonly<{ id: string; op: "reveal" | "hide"; rect: FogRectInput }>
 ) {
-  const slice = fogSlice(state, sceneId);
+  const slice = fogSlice(state, encounterId);
   const rect = normalizedRect(geometry, input.rect, "Drag a larger area to paint fog.");
   // A stroke covering the whole map supersedes everything before it, so compact and never accumulate.
   const coversMap =

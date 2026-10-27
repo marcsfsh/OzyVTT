@@ -69,7 +69,7 @@ const PROSE: ContentActionSummary = { ...ROW, id: "item-deck-draw", name: "Draw 
 const emit = socket.emit as unknown as ReturnType<typeof vi.fn>;
 const sent = (event: string) => emit.mock.calls.filter((call) => call[0] === event).map((call) => call[1]);
 
-describe("a player's item actions in the fight", () => {
+describe("a player's item actions in the encounter", () => {
   it("offers a potion and a scroll, reads the scroll at a tap, and lets the potion's drinker be its holder", async () => {
     emit.mockImplementation((_event: string, _payload: unknown, ack?: (result: unknown) => void) =>
       ack?.({ ok: true })

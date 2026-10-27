@@ -42,7 +42,7 @@ const restartFight = (state: GameState, mapAssetId = MAP) =>
     GRID
   );
 
-describe("an area cast outside a fight", () => {
+describe("an area cast outside an encounter", () => {
   function zoneOfTruth() {
     const caster = fight(cleric, { combat: false });
     place(caster.state, { [HERO]: cell(0, 0), [FOE]: cell(10, 5), [FOE2]: cell(20, 20) });
@@ -110,14 +110,14 @@ describe("an area cast outside a fight", () => {
     expect(savesOf(state, FOE)).toHaveLength(2);
   });
 
-  it("is carried into a fight on the same map, with the shape it stands on", () => {
+  it("is carried into an encounter on the same map, with the shape it stands on", () => {
     const { state } = zoneOfTruth();
     restartFight(state);
     expect(state.combat.spellZones.map((zone) => zone.id)).toEqual([CAST]);
     expect(state.combat.annotations.map((annotation) => annotation.id)).toEqual([CAST]);
   });
 
-  it("stays behind when the fight starts on another map", () => {
+  it("stays behind when the encounter starts on another map", () => {
     const { state } = zoneOfTruth();
     restartFight(state, "20000000-0000-5000-8000-000000000009");
     expect(state.combat.spellZones).toEqual([]);
@@ -142,7 +142,7 @@ describe("an area cast outside a fight", () => {
   });
 });
 
-describe("an area cast in a fight, when the fight ends", () => {
+describe("an area cast in an encounter, when the encounter ends", () => {
   it("outlasts it while the duration that keeps it has more than a minute left", () => {
     const caster = fight(cleric);
     place(caster.state, { [HERO]: cell(0, 0), [FOE]: cell(10, 5), [FOE2]: cell(20, 20) });
@@ -153,7 +153,7 @@ describe("an area cast in a fight, when the fight ends", () => {
     expect(caster.state.combat.annotations.map((annotation) => annotation.id)).toContain(CAST);
   });
 
-  it("ends with a Concentration of a minute, which the fight's end ends", () => {
+  it("ends with a Concentration of a minute, which the encounter's end ends", () => {
     const caster = fight(druid);
     place(caster.state, { [HERO]: cell(0, 0), [FOE]: cell(10, 5), [FOE2]: cell(20, 20) });
     castArea(caster, "spell-moonbeam", [5, 5], 1);
@@ -165,7 +165,7 @@ describe("an area cast in a fight, when the fight ends", () => {
   });
 });
 
-describe("an area that acts as its spell ends, outside a fight", () => {
+describe("an area that acts as its spell ends, outside an encounter", () => {
   it("bursts when its caster's Concentration ends", () => {
     const caster = fight(druid, { combat: false });
     place(caster.state, { [HERO]: cell(0, 0), [FOE]: cell(5, 5), [FOE2]: cell(20, 20) });

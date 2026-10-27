@@ -61,12 +61,12 @@ export function FightSettings({ facts }: Readonly<{ facts: SceneFacts }>) {
   const save = async (next: Readonly<{ playersRollInitiative: boolean; groupMonsters: boolean }>) => {
     setBusy(true);
     try {
-      const result = await command("scene:set-initiative-defaults", {
-        sceneId: facts.scene.id,
+      const result = await command("encounter:set-initiative-defaults", {
+        encounterId: facts.scene.id,
         initiativeDefaults: next,
         expectedRevision: state.revision
       });
-      if (!result.ok) toast(result.message ?? "The fight settings weren't saved.", { tone: "error" });
+      if (!result.ok) toast(result.message ?? "The encounter settings weren't saved.", { tone: "error" });
     } finally {
       setBusy(false);
     }
@@ -74,7 +74,7 @@ export function FightSettings({ facts }: Readonly<{ facts: SceneFacts }>) {
   return (
     <section className="sc-encounter-section" aria-labelledby="sc-fight-settings-title">
       <h3 id="sc-fight-settings-title" className="sc-encounter-label">
-        Fight settings
+        Encounter settings
       </h3>
       <Switch
         label="Players roll their own initiative"
@@ -88,7 +88,7 @@ export function FightSettings({ facts }: Readonly<{ facts: SceneFacts }>) {
         disabled={busy}
         onChange={(on) => void save({ playersRollInitiative: playersRoll, groupMonsters: on })}
       />
-      <p className="sc-encounter-hint">Start the fight opens with these. Surprise is chosen when it starts.</p>
+      <p className="sc-encounter-hint">Start the encounter opens with these. Surprise is chosen when it starts.</p>
     </section>
   );
 }
@@ -101,7 +101,7 @@ export function SceneEncounterTab({ facts }: Readonly<{ facts: SceneFacts }>) {
     <div className="sc-encounter">
       <section className="sc-encounter-section" aria-labelledby="sc-encounter-title">
         <h3 id="sc-encounter-title" className="sc-encounter-label">
-          Who you fight
+          Who they face
         </h3>
         <EncounterMeter state={state} token={token} staged={facts.combat.initiative.map((entry) => entry.actorId)} />
       </section>

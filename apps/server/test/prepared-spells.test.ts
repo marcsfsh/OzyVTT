@@ -37,7 +37,7 @@ describe("the prepare step a Long Rest opens", () => {
     expect(hero.preparation).toEqual({ changesLeft: null });
   });
 
-  it("lets a player change the list only in the step, within the prepared cap, and not mid-fight", () => {
+  it("lets a player change the list only in the step, within the prepared cap, and not mid-encounter", () => {
     const { state, hero } = fight(wizard, { combat: false });
     expect(() => setPreparedSpell(state, HERO, "fireball", false, resolveDefinition, "player")).toThrowError(
       /when you finish a Long Rest/
@@ -64,11 +64,11 @@ describe("the prepare step a Long Rest opens", () => {
     );
   });
 
-  it("is refused mid-fight", () => {
+  it("is refused mid-encounter", () => {
     const { state, hero } = fight(wizard);
     openPreparation(hero, wizard);
     expect(() => setPreparedSpell(state, HERO, "fireball", false, resolveDefinition, "player")).toThrowError(
-      /outside a fight/
+      /outside an encounter/
     );
     endEncounter(state);
   });

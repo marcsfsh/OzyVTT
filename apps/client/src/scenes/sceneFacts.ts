@@ -11,7 +11,7 @@ export type SceneState = "live" | "prepared" | "parked" | "replay";
 export const STATE_LABEL: Readonly<Record<SceneState, string>> = {
   live: "Live",
   prepared: "Prepared",
-  parked: "Fight parked",
+  parked: "Encounter parked",
   replay: "Replay"
 };
 
@@ -58,8 +58,8 @@ export function gridStateOf(map: Measured | null): GridState {
 function liveCombat(view: GmView): SceneCombat {
   const {
     mapAssetId: _map,
-    scenes: _scenes,
-    activeSceneId: _active,
+    encounters: _scenes,
+    activeEncounterId: _active,
     historyCursor,
     historyDirty,
     ...combat
@@ -70,7 +70,7 @@ function liveCombat(view: GmView): SceneCombat {
 }
 
 export function factsOf(view: GmView, scene: Scene, maps: readonly MapAsset[] | null): SceneFacts {
-  const live = view.combat.activeSceneId === scene.id;
+  const live = view.combat.activeEncounterId === scene.id;
   const combat = live ? liveCombat(view) : scene.combat;
   const map = maps?.find((candidate) => candidate.id === scene.mapAssetId) ?? null;
   const byId = new Map(view.actors.map((actor) => [actor.id, actor]));
@@ -81,7 +81,7 @@ export function factsOf(view: GmView, scene: Scene, maps: readonly MapAsset[] | 
     scene,
     live,
     state: live ? "live" : scene.replayOf ? "replay" : combat.active ? "parked" : "prepared",
-    progress: combat.active ? "in-progress" : scene.fightEndedAt !== undefined ? "completed" : "not-started",
+    progress: combat.active ? "in-progress" : scene.endedAt !== undefined ? "completed" : "not-started",
     combat,
     map,
     grid: maps === null ? "unknown" : gridStateOf(map),
@@ -150,7 +150,7 @@ export function needsOf(facts: SceneFacts): SceneNeed[] {
   const mapName = facts.map?.name ?? "Its map";
   if (facts.grid === "none")
     needs.push({ id: "grid", text: `${mapName} has no grid yet, so tokens won't snap to squares.`, step: "map" });
-  if (facts.tokens === 0) needs.push({ id: "nobody", text: "Nobody is in this scene yet.", step: "tokens" });
+  if (facts.tokens === 0) needs.push({ id: "nobody", text: "Nobody is in this encounter yet.", step: "tokens" });
   else if (facts.waiting > 0 && !facts.live)
     needs.push({
       id: "waiting",

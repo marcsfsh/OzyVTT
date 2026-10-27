@@ -29,8 +29,8 @@ const withTroll = () => {
 
 afterEach(() => command.mockReset());
 
-describe("Add to a scene", () => {
-  it("makes the monster for the roster, then stages it in the prepared scene it was added to", async () => {
+describe("Add to an encounter", () => {
+  it("makes the monster for the roster, then stages it in the prepared encounter it was added to", async () => {
     const user = userEvent.setup();
     command.mockImplementation(async (type: unknown) =>
       type === "actor:add-from-definition" ? { ok: true, actorId: TROLL } : { ok: true }
@@ -40,8 +40,8 @@ describe("Add to a scene", () => {
         <AddToScene game={withTroll()} definitionId="troll" name="Troll" />
       </ToastProvider>
     );
-    await user.click(await screen.findByRole("button", { name: "Add to a scene" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Add Troll to a scene" }));
+    await user.click(await screen.findByRole("button", { name: "Add to an encounter" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Add Troll to an encounter" }));
     // The live scene adds from the table instead.
     expect(dialog.getByRole("button", { name: "Tunnel chase" })).toBeDisabled();
     await user.click(dialog.getByRole("button", { name: "Crypt ambush" }));
@@ -50,8 +50,8 @@ describe("Add to a scene", () => {
       visibility: "public",
       joinEncounter: false
     });
-    expect(command).toHaveBeenNthCalledWith(2, "scene:set-combatants", {
-      sceneId: IDS.ambush,
+    expect(command).toHaveBeenNthCalledWith(2, "encounter:set-combatants", {
+      encounterId: IDS.ambush,
       combatantIds: [IDS.lyra, IDS.borin, IDS.goblin, IDS.boss, TROLL],
       expectedRevision: 7
     });
@@ -70,14 +70,14 @@ describe("Add to a scene", () => {
         <AddToScene game={withTroll()} definitionId="troll" name="Troll" />
       </ToastProvider>
     );
-    await user.click(await screen.findByRole("button", { name: "Add to a scene" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Add Troll to a scene" }));
+    await user.click(await screen.findByRole("button", { name: "Add to an encounter" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Add Troll to an encounter" }));
     await user.click(dialog.getByRole("button", { name: "Crypt ambush" }));
     expect(await dialog.findByText(/Troll was added to the roster but isn.t staged here yet/)).toBeInTheDocument();
     await user.click(dialog.getByRole("button", { name: "Stage it in Crypt ambush again" }));
     const made = command.mock.calls.filter(([type]) => type === "actor:add-from-definition");
     expect(made).toHaveLength(1);
-    expect(command.mock.calls.filter(([type]) => type === "scene:set-combatants")).toHaveLength(2);
+    expect(command.mock.calls.filter(([type]) => type === "encounter:set-combatants")).toHaveLength(2);
   });
 
   it("offers nothing for a monster the catalog can't add", async () => {
@@ -87,6 +87,6 @@ describe("Add to a scene", () => {
       </ToastProvider>
     );
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(screen.queryByRole("button", { name: "Add to a scene" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add to an encounter" })).toBeNull();
   });
 });

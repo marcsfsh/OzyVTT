@@ -73,7 +73,7 @@ describe("improvised weapons", () => {
 });
 
 describe("a thrown weapon", () => {
-  it("leaves the hand: one Handaxe is thrown once, and is picked up after the fight", () => {
+  it("leaves the hand: one Handaxe is thrown once, and is picked up after the encounter", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     write(table, IDS.fighter, catalogRow("handaxe"));
     fight(table, IDS.fighter);
@@ -134,7 +134,7 @@ describe("Oil of Sharpness", () => {
     ).toThrow(/already magical/);
   });
 
-  it("takes a minute, so it can't be applied in a fight", () => {
+  it("takes a minute, so it can't be applied in an encounter", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     write(table, IDS.fighter, catalogRow("oil-of-sharpness", { equipped: false }));
     fight(table, IDS.fighter);

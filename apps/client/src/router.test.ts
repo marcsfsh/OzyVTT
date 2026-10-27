@@ -76,7 +76,7 @@ describe("The address table", () => {
     expect(litGmTab("/characters/a1")).toBe("roster");
     expect(litGmTab("/characters/a1/level")).toBe("roster");
     expect(litGmTab("/builder")).toBe("roster");
-    expect(litGmTab("/scenes/maps")).toBe("scenes");
+    expect(litGmTab("/encounters/maps")).toBe("scenes");
     expect(litGmTab("/replays/12")).toBe("replay");
     expect(litGmTab("/nonsense")).toBeNull();
     // A player's own sheet, its level page and the builder belong to My character.
@@ -94,16 +94,22 @@ describe("The address table", () => {
     expect(layerOf("/characters/a1/level")).toEqual({ kind: "level", actorId: "a1" });
     expect(layerOf("/builder")).toEqual({ kind: "builder" });
     expect(layerOf("/replays/12")).toEqual({ kind: "replay", archiveId: 12 });
-    expect(layerOf("/scenes/maps")).toEqual({ kind: "scenes", view: { view: "maps" } });
-    expect(layerOf("/scenes/list")).toEqual({ kind: "scenes", view: { view: "scenes" } });
-    expect(layerOf("/scenes/new")).toEqual({ kind: "scenes", view: { view: "scene", sceneId: null, step: "map" } });
-    expect(layerOf("/scenes/s1")).toEqual({ kind: "scenes", view: { view: "scene", sceneId: "s1", step: null } });
-    expect(layerOf("/scenes/s1", new URLSearchParams("step=light"))).toEqual({
+    expect(layerOf("/encounters/maps")).toEqual({ kind: "scenes", view: { view: "maps" } });
+    expect(layerOf("/encounters/list")).toEqual({ kind: "scenes", view: { view: "scenes" } });
+    expect(layerOf("/encounters/new")).toEqual({
       kind: "scenes",
-      view: { view: "scene", sceneId: "s1", step: "light" }
+      view: { view: "scene", encounterId: null, step: "map" }
     });
-    expect(layerOf("/scenes/maps/m1")).toEqual({ kind: "scenes", view: { view: "map", mapId: "m1", step: null } });
-    expect(layerOf("/scenes/maps/new")).toEqual({
+    expect(layerOf("/encounters/s1")).toEqual({
+      kind: "scenes",
+      view: { view: "scene", encounterId: "s1", step: null }
+    });
+    expect(layerOf("/encounters/s1", new URLSearchParams("step=light"))).toEqual({
+      kind: "scenes",
+      view: { view: "scene", encounterId: "s1", step: "light" }
+    });
+    expect(layerOf("/encounters/maps/m1")).toEqual({ kind: "scenes", view: { view: "map", mapId: "m1", step: null } });
+    expect(layerOf("/encounters/maps/new")).toEqual({
       kind: "scenes",
       view: { view: "map", mapId: null, step: "upload" }
     });
@@ -120,13 +126,20 @@ describe("The address table", () => {
     expect(redirectForRetiredPath("/encounter", new URLSearchParams())).toBe("/table");
     expect(redirectForRetiredPath("/setup", new URLSearchParams())).toBe("/settings");
     expect(redirectForRetiredPath("/homebrew", new URLSearchParams())).toBe("/compendium");
-    expect(redirectForRetiredPath("/scenes", new URLSearchParams("view=maps"))).toBe("/scenes/maps");
+    expect(redirectForRetiredPath("/encounters", new URLSearchParams("view=maps"))).toBe("/encounters/maps");
     // The map library's one-map address lands on that map's grid step, still knowing to go back to the table.
-    expect(redirectForRetiredPath("/scenes/maps", new URLSearchParams("map=m1&from=table"))).toBe(
-      "/scenes/maps/m1?step=grid&back=%2Ftable"
+    expect(redirectForRetiredPath("/encounters/maps", new URLSearchParams("map=m1&from=table"))).toBe(
+      "/encounters/maps/m1?step=grid&back=%2Ftable"
     );
-    expect(redirectForRetiredPath("/scenes/maps", new URLSearchParams())).toBeNull();
-    expect(redirectForRetiredPath("/scenes", new URLSearchParams())).toBeNull();
+    expect(redirectForRetiredPath("/encounters/maps", new URLSearchParams())).toBeNull();
+    expect(redirectForRetiredPath("/encounters", new URLSearchParams())).toBeNull();
+    // The old Scenes addresses land on Encounters, query and all.
+    expect(redirectForRetiredPath("/scenes", new URLSearchParams())).toBe("/encounters");
+    expect(redirectForRetiredPath("/scenes/abc", new URLSearchParams("step=tokens"))).toBe(
+      "/encounters/abc?step=tokens"
+    );
+    expect(redirectForRetiredPath("/scenes", new URLSearchParams("view=maps"))).toBe("/encounters/maps");
+    expect(redirectForRetiredPath("/encounters", new URLSearchParams("view=maps"))).toBe("/encounters/maps");
     expect(redirectForRetiredPath("/table", new URLSearchParams())).toBeNull();
     expect(redirectForRetiredPath("/codex/pages", new URLSearchParams())).toBeNull();
   });
@@ -259,8 +272,8 @@ describe("Which addresses a player may reach (viewer safety)", () => {
   });
 
   it("keeps the GM's own tabs GM-only", () => {
-    expect(isGmOnlyPath("/scenes")).toBe(true);
-    expect(isGmOnlyPath("/scenes/maps")).toBe(true);
+    expect(isGmOnlyPath("/encounters")).toBe(true);
+    expect(isGmOnlyPath("/encounters/maps")).toBe(true);
     expect(isGmOnlyPath("/roster")).toBe(true);
     expect(isGmOnlyPath("/compendium")).toBe(true);
     expect(isGmOnlyPath("/compendium/spells/hb-brine-burst-a1b2c3")).toBe(true);
@@ -325,15 +338,15 @@ describe("The addresses D29 added", () => {
     expect(isKnownPath("/builder")).toBe(true);
     expect(isKnownPath("/characters/a1")).toBe(true);
     expect(isKnownPath("/characters/a1/level")).toBe(true);
-    expect(isKnownPath("/scenes")).toBe(true);
-    expect(isKnownPath("/scenes/new")).toBe(true);
-    expect(isKnownPath("/scenes/maps")).toBe(true);
-    expect(isKnownPath("/scenes/s1")).toBe(true);
-    expect(isKnownPath("/scenes/list")).toBe(true);
-    expect(isKnownPath("/scenes/maps/new")).toBe(true);
-    expect(isKnownPath("/scenes/maps/m1")).toBe(true);
-    expect(isKnownPath("/scenes/s1/more")).toBe(false);
-    expect(isKnownPath("/scenes/maps/m1/more")).toBe(false);
+    expect(isKnownPath("/encounters")).toBe(true);
+    expect(isKnownPath("/encounters/new")).toBe(true);
+    expect(isKnownPath("/encounters/maps")).toBe(true);
+    expect(isKnownPath("/encounters/s1")).toBe(true);
+    expect(isKnownPath("/encounters/list")).toBe(true);
+    expect(isKnownPath("/encounters/maps/new")).toBe(true);
+    expect(isKnownPath("/encounters/maps/m1")).toBe(true);
+    expect(isKnownPath("/encounters/s1/more")).toBe(false);
+    expect(isKnownPath("/encounters/maps/m1/more")).toBe(false);
     expect(isKnownPath("/replays")).toBe(true);
     expect(isKnownPath("/replays/12")).toBe(true);
     expect(isKnownPath("/me")).toBe(true);
@@ -563,9 +576,9 @@ describe("Resume-last-location", () => {
 
     it("keeps the tabs apart: leaving one does not overwrite where you were in another", () => {
       rememberLocation("gm", "/codex/quests/q1");
-      rememberLocation("gm", "/scenes?view=maps");
+      rememberLocation("gm", "/encounters?view=maps");
       expect(lastLocationForTab("gm", "codex")).toBe("/codex/quests/q1");
-      expect(lastLocationForTab("gm", "scenes")).toBe("/scenes?view=maps");
+      expect(lastLocationForTab("gm", "encounters")).toBe("/encounters?view=maps");
     });
 
     it("has nothing to say about a tab never visited", () => {
@@ -596,9 +609,15 @@ describe("Resume-last-location", () => {
 describe("The sections the redesign groups addresses under", () => {
   it("lights Play for the table, Prep for each of its pages, and no section for the utilities", () => {
     expect(litGmSection("/table")).toBe("play");
-    for (const path of ["/scenes", "/scenes/list", "/scenes/new", "/roster", "/characters/a1", "/builder"])
+    for (const path of ["/encounters", "/encounters/list", "/encounters/new", "/roster", "/characters/a1", "/builder"])
       expect(litGmSection(path), path).toBe("prep");
-    for (const path of ["/scenes/maps", "/scenes/maps/m1", "/prep/tokens", "/viewer-controls/sound", "/replays/3"])
+    for (const path of [
+      "/encounters/maps",
+      "/encounters/maps/m1",
+      "/prep/tokens",
+      "/viewer-controls/sound",
+      "/replays/3"
+    ])
       expect(litGmSection(path), path).toBe("prep");
     expect(litGmSection("/codex/pages/abc")).toBe("codex");
     expect(litGmSection("/compendium/monsters")).toBe("compendium");
@@ -607,25 +626,25 @@ describe("The sections the redesign groups addresses under", () => {
   });
 
   it("names each Prep page for its address, keeping every existing address", () => {
-    expect(PREP_PAGES.map((page) => page.label)).toEqual(["Scenes", "Party", "Maps", "Tokens", "Sound", "Replays"]);
-    expect(prepPageFor("/scenes/s1?step=tokens")).toBe("scenes");
-    expect(prepPageFor("/scenes/maps/new")).toBe("maps");
+    expect(PREP_PAGES.map((page) => page.label)).toEqual(["Encounters", "Party", "Maps", "Tokens", "Sound", "Replays"]);
+    expect(prepPageFor("/encounters/s1?step=tokens")).toBe("scenes");
+    expect(prepPageFor("/encounters/maps/new")).toBe("maps");
     expect(prepPageFor("/characters/a1/level")).toBe("party");
     expect(prepPageFor("/viewer-controls")).toBeNull();
     expect(prepPageFor("/table")).toBeNull();
   });
 
-  it("adds /prep/tokens for the GM alone, and sends a bare /prep to Scenes", () => {
+  it("adds /prep/tokens for the GM alone, and sends a bare /prep to Encounters", () => {
     expect(isKnownPath("/prep/tokens")).toBe(true);
     expect(isKnownPath("/prep/other")).toBe(false);
     expect(gmTabForPath("/prep/tokens")).toBe("tokens");
     expect(isGmOnlyPath("/prep/tokens")).toBe(true);
     expect(isGmOnlyPath("/prep")).toBe(true);
-    expect(redirectForRetiredPath("/prep", new URLSearchParams())).toBe("/scenes");
+    expect(redirectForRetiredPath("/prep", new URLSearchParams())).toBe("/encounters");
   });
 
   it("keeps the old redirects", () => {
-    expect(redirectForRetiredPath("/scenes", new URLSearchParams("view=maps"))).toBe("/scenes/maps");
+    expect(redirectForRetiredPath("/encounters", new URLSearchParams("view=maps"))).toBe("/encounters/maps");
     expect(redirectForRetiredPath("/encounter", new URLSearchParams())).toBe("/table");
     expect(redirectForRetiredPath("/homebrew", new URLSearchParams())).toBe("/compendium");
   });
@@ -646,8 +665,8 @@ describe("The sections the redesign groups addresses under", () => {
   it("returns to where the GM was in a section, never to a page outside it", () => {
     localStorage.clear();
     expect(lastLocationForSection("prep")).toBeNull();
-    rememberLocation("gm", "/scenes/maps?map=m1");
-    expect(lastLocationForSection("prep")).toBe("/scenes/maps?map=m1");
+    rememberLocation("gm", "/encounters/maps?map=m1");
+    expect(lastLocationForSection("prep")).toBe("/encounters/maps?map=m1");
     rememberLocation("gm", "/prep/tokens");
     expect(lastLocationForSection("prep")).toBe("/prep/tokens");
     localStorage.setItem("vtt.gm-last-location.section.prep", "/codex");

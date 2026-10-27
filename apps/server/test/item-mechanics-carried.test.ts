@@ -412,7 +412,7 @@ describe("the Stone of Good Luck: both halves reach the roll", () => {
 });
 
 describe("what the carried items' buttons do outside an encounter", () => {
-  it("casts an item's spell or puts its effect on its user, and leaves a save with no fight to the loose route", () => {
+  it("casts an item's spell or puts its effect on its user, and leaves a save with no encounter to the loose route", () => {
     const definition = definitionOf();
     // A cast resolves outside a fight as a creature's own does, and spends its charge.
     for (const [id, name, actionId] of [

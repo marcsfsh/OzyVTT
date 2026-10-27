@@ -39,7 +39,7 @@ const hook = {
 };
 
 describe("the sheet's Utilize uses", () => {
-  it("rolls a carried gear's printed check, and as a Bonus Action for a Thief in a fight", async () => {
+  it("rolls a carried gear's printed check, and as a Bonus Action for a Thief in an encounter", async () => {
     const roller = rolls();
     render(<ToolUses actor={ARIA} derived={derived({ gearUses: [hook], fastHands: true })} rolls={roller} inFight />);
     const user = userEvent.setup();
@@ -71,7 +71,7 @@ describe("the sheet's Utilize uses", () => {
     expect(roller.rollCheck.mock.calls[0]?.[4]).toEqual({ bonusAction: true });
   });
 
-  it("offers no Bonus Action outside a fight", () => {
+  it("offers no Bonus Action outside an encounter", () => {
     render(
       <ToolUses actor={ARIA} derived={derived({ gearUses: [hook], fastHands: true })} rolls={rolls()} inFight={false} />
     );

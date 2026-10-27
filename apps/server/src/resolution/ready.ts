@@ -18,7 +18,7 @@ export function holdReadiedSpell(ctx: ResolveContext): void {
   const { state, action, attacker, input, plan, deps } = ctx;
   const spell = spellOf(ctx);
   if (!state.combat.active || state.combat.turnActorId !== attacker.id)
-    throw new CommandRejectedError("A spell is readied with the Ready action, on your own turn in a fight.");
+    throw new CommandRejectedError("A spell is readied with the Ready action, on your own turn in an encounter.");
   // "A casting time of an action": not a Bonus Action, a minute or more, or a Ritual's ten minutes longer.
   if (
     !spell ||

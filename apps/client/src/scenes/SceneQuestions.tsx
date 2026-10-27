@@ -20,7 +20,7 @@ import { MapThumb } from "./pieces";
  * copy is the table's.
  */
 
-const sceneTarget = (facts: SceneFacts) => (facts.live ? {} : { sceneId: facts.scene.id });
+const sceneTarget = (facts: SceneFacts) => (facts.live ? {} : { encounterId: facts.scene.id });
 
 /** Who is in the scene: the tray with each token's Place and reveal, the two Add buttons, Recent and the XP. */
 export function SceneTokens({
@@ -41,7 +41,7 @@ export function SceneTokens({
   if (facts.live)
     return (
       <div className="sc-q">
-        <p className="sc-hint">This scene is live. Who is in it changes from the fight on the table.</p>
+        <p className="sc-hint">This encounter is live. Who is in it changes at the table.</p>
         <ul className="sc-names">
           {staged.map((actorId) => {
             const actor = state.actors.find((candidate) => candidate.id === actorId);
@@ -57,7 +57,7 @@ export function SceneTokens({
     );
   const send = (ids: readonly string[], failure: string) => {
     setBusy(true);
-    void command("scene:set-combatants", { sceneId: facts.scene.id, combatantIds: [...ids] }).then((result) => {
+    void command("encounter:set-combatants", { encounterId: facts.scene.id, combatantIds: [...ids] }).then((result) => {
       setBusy(false);
       if (!result.ok) toast(result.message ?? failure, { tone: "error" });
     });
@@ -68,12 +68,12 @@ export function SceneTokens({
       staged={staged}
       placedIds={placedIds}
       onAdd={(actorId) => {
-        if (!staged.includes(actorId)) send([...staged, actorId], "The scene's list could not be updated.");
+        if (!staged.includes(actorId)) send([...staged, actorId], "The encounter's list could not be updated.");
       }}
       onRemove={(actorId) =>
         send(
           staged.filter((id) => id !== actorId),
-          "The scene's list could not be updated."
+          "The encounter's list could not be updated."
         )
       }
       mapName={facts.map?.name ?? null}
@@ -83,7 +83,7 @@ export function SceneTokens({
       stagingRevealed={(state.stagingDefaults?.visibility ?? "public") !== "gm-only"}
       combatActive={false}
       busy={busy}
-      emptyNote="Nobody is in this scene yet. Add the party or monsters below."
+      emptyNote="Nobody is in this encounter yet. Add the party or monsters below."
       onPlace={onPlace ?? ((actorId) => armPlacement(actorId))}
     />
   );
@@ -170,8 +170,8 @@ export function SceneSound({ facts }: Readonly<{ facts: SceneFacts }>) {
   return (
     <div className="sc-q">
       <p className="sc-hint">
-        Set up the music and ambience on the sound board, then save it here. It plays on the table screen when the scene
-        goes live.
+        Set up the music and ambience on the sound board, then save it here. It plays on the table screen when the
+        encounter goes live.
       </p>
       {board ? (
         <div className="sound-row sound-scene sc-sound-row">
@@ -239,19 +239,19 @@ export function SceneCodex({ facts }: Readonly<{ facts: SceneFacts }>) {
     };
   }, [token, links]);
   const sessionName = (number: number | null) => (number === null ? "A session with no number" : `Session ${number}`);
-  const setStaged = (session: CodexSession, sceneIds: readonly string[]) =>
+  const setStaged = (session: CodexSession, encounterIds: readonly string[]) =>
     apiRequest(CODEX_PATHS.sessionById.replace("{id}", session.id), {
       token,
       method: "PATCH",
-      body: { sceneIds, expectedRev: session.rev }
+      body: { encounterIds, expectedRev: session.rev }
     })
       .then(reloadLinks)
       .catch((error: Error) => toast(error.message, { tone: "error" }));
-  const free = (sessions ?? []).filter((session) => !session.sceneIds.includes(facts.scene.id));
+  const free = (sessions ?? []).filter((session) => !session.encounterIds.includes(facts.scene.id));
   return (
     <div className="sc-q">
       {!link || link.sessions.length + link.pins.length === 0 ? (
-        <p className="sc-hint">No session or pin names this scene yet.</p>
+        <p className="sc-hint">No session or pin names this encounter yet.</p>
       ) : (
         <ul className="sc-links">
           {link.sessions.map((entry) => {
@@ -270,7 +270,7 @@ export function SceneCodex({ facts }: Readonly<{ facts: SceneFacts }>) {
                     onClick={() =>
                       void setStaged(
                         session,
-                        session.sceneIds.filter((id) => id !== facts.scene.id)
+                        session.encounterIds.filter((id) => id !== facts.scene.id)
                       )
                     }
                   >
@@ -291,11 +291,11 @@ export function SceneCodex({ facts }: Readonly<{ facts: SceneFacts }>) {
       )}
       {free.length > 0 && (
         <Select
-          aria-label="Stage this scene for a session"
+          aria-label="Stage this encounter for a session"
           value=""
           onChange={(event) => {
             const session = free.find((candidate) => candidate.id === event.target.value);
-            if (session) void setStaged(session, [...session.sceneIds, facts.scene.id]);
+            if (session) void setStaged(session, [...session.encounterIds, facts.scene.id]);
           }}
         >
           <option value="">Stage it for a session…</option>

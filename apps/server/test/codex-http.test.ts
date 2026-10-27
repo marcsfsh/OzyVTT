@@ -335,7 +335,7 @@ describe("codex HTTP viewer-safety boundary", () => {
       iconId: "skull",
       iconColor: "#ff2e9a",
       pageIds: [secretPage.data.page.id],
-      sceneIds: [secretScene],
+      encounterIds: [secretScene],
       actorId: randomUUID(),
       revealedToPlayers: true
     });
@@ -346,14 +346,14 @@ describe("codex HTTP viewer-safety boundary", () => {
     const playerMarkers = (await body(await get(base, `/api/v1/codex/maps/${mapId}/markers`, PLAYER))).data
       .markers as Json[];
     expect(playerMarkers).toHaveLength(1);
-    expect(playerMarkers[0]).not.toHaveProperty("sceneIds");
+    expect(playerMarkers[0]).not.toHaveProperty("encounterIds");
     expect(playerMarkers[0]).not.toHaveProperty("actorId");
     expect(playerMarkers[0].pageIds).toEqual([]); // linked page not revealed, so link hidden
     expect(JSON.stringify(playerMarkers)).not.toContain(secretScene); // GM-only scene id never leaks
     expect(JSON.stringify(playerMarkers)).not.toContain(secretPage.data.page.id); // nor the unrevealed page id
-    expect((await body(await get(base, `/api/v1/codex/maps/${mapId}/markers`, GM))).data.markers[0].sceneIds).toEqual([
-      secretScene
-    ]);
+    expect(
+      (await body(await get(base, `/api/v1/codex/maps/${mapId}/markers`, GM))).data.markers[0].encounterIds
+    ).toEqual([secretScene]);
   });
 
   it("404s a player reading a hidden location's journal-by-attachment", async () => {
@@ -831,7 +831,7 @@ describe("codex HTTP viewer-safety boundary", () => {
         iconColor: "#ff2e9a",
         label: "Castle Ravenloft",
         pageIds: [pageId, otherSecretPage.data.page.id],
-        sceneIds: [secretScene],
+        encounterIds: [secretScene],
         actorId: secretActor,
         revealedToPlayers: true
       })
@@ -872,7 +872,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(payload).not.toContain(secretMap); // ...and not even that map's id
     expect(payload).not.toContain(secretScene); // GM-only linkage never travels
     expect(payload).not.toContain(secretActor);
-    expect(playerMarkers[0]).not.toHaveProperty("sceneIds");
+    expect(playerMarkers[0]).not.toHaveProperty("encounterIds");
     expect(playerMarkers[0]).not.toHaveProperty("actorId");
     expect(playerMarkers[0]).not.toHaveProperty("revealedToPlayers");
     expect(playerMarkers[0].pageIds).toEqual([pageId]); // the pin's other, secret page link is filtered out
@@ -897,7 +897,7 @@ describe("codex HTTP viewer-safety boundary", () => {
       iconColor: "#ff2e9a",
       label: "Burgomaster's house",
       pageIds: [pageId],
-      sceneIds: [randomUUID()],
+      encounterIds: [randomUUID()],
       revealedToPlayers: true
     });
 
@@ -2857,7 +2857,7 @@ describe("codex pin-by-id and party location, HTTP boundary", () => {
     expect(gm.pageIds).toHaveLength(2);
 
     const player = (await body(await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER))).data.marker as Json;
-    // The exact key set: `sceneIds`, `actorId`, `revealedToPlayers` and timestamps are absent, and
+    // The exact key set: `encounterIds`, `actorId`, `revealedToPlayers` and timestamps are absent, and
     // `pageIds` carries only the page the player can open.
     expect(Object.keys(player).sort()).toEqual([
       "iconColor",

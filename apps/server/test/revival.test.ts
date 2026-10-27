@@ -46,7 +46,7 @@ const kill = (state: GameState, actorId: string = ALLY) =>
 const pass = (state: GameState, minutes: number) => command(state, () => passGameTime(state, minutes));
 
 describe("the time of death", () => {
-  it("is stamped as a creature dies, counts the fight's rounds and moves onto the clock when the fight ends", () => {
+  it("is stamped as a creature dies, counts the encounter's rounds and moves onto the clock when the encounter ends", () => {
     const table = caster();
     table.state.combat.round = 3;
     kill(table.state);
@@ -100,7 +100,7 @@ describe("Revivify", () => {
     expect(table.hero.inventory.some((item) => item.id === "diamond-300")).toBe(true);
   });
 
-  it("brings back a creature that died in a fight just ended, cast with no fight running", () => {
+  it("brings back a creature that died in an encounter just ended, cast with no encounter running", () => {
     const table = caster();
     table.hero.inventory.push(diamond(300));
     table.state.combat.round = 2;

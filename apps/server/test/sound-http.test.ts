@@ -287,7 +287,7 @@ describe("the table screen's sound", () => {
     expect(now.startedAt).toBe(started.startedAt + 400);
   });
 
-  it("starts a scene's sound when the scene goes live, unless the GM turned that off", async () => {
+  it("starts an encounter's sound when the encounter goes live, unless the GM turned that off", async () => {
     const test = await boot();
     const map = await test.json(
       await fetch(`${test.base}/api/v1/map-assets?name=Cave&kind=battlemap`, {
@@ -298,22 +298,24 @@ describe("the table screen's sound", () => {
     );
     const scene = async (name: string) => {
       const created = await test.json(
-        await test.command("scenes", { name, mapAssetId: map.data.asset.id, combatantIds: [] })
+        await test.command("encounters", { name, mapAssetId: map.data.asset.id, combatantIds: [] })
       );
-      return created.data.sceneId as string;
+      return created.data.encounterId as string;
     };
     const cave = await scene("Cave");
     const camp = await scene("Camp");
     const drip = (await test.json(await test.upload(wav(2), "Drip.wav"))).data.sound;
     await test.command("sound/arrange", { ambient: [{ assetId: drip.id, volume: 0.5 }] });
     await test.command("sound/play", { target: "ambient", assetId: drip.id });
-    expect((await test.command(`scenes/${cave}/sound`, { preset: "save-current" })).status).toBe(200);
-    expect((await test.command(`scenes/${camp}/sound`, { preset: "save-current", autoplay: false })).status).toBe(200);
+    expect((await test.command(`encounters/${cave}/sound`, { preset: "save-current" })).status).toBe(200);
+    expect((await test.command(`encounters/${camp}/sound`, { preset: "save-current", autoplay: false })).status).toBe(
+      200
+    );
     await test.command("sound/stop", { target: "all" });
 
-    await test.command(`scenes/${camp}/activate`, {});
+    await test.command(`encounters/${camp}/activate`, {});
     expect(test.server.sound.view().board.ambient[0]!.playing).toBeNull();
-    await test.command(`scenes/${cave}/activate`, {});
+    await test.command(`encounters/${cave}/activate`, {});
     expect(test.server.sound.view().board.ambient[0]!.playing).not.toBeNull();
   });
 });

@@ -202,7 +202,7 @@ describe("crafting a nonmagical item", () => {
     expect(actor(BREN).inventory.find((row) => row.id === "rations")?.quantity).toBe(3);
   });
 
-  it("needs the tool's proficiency, the tool in the pack, the raw materials and no fight", () => {
+  it("needs the tool's proficiency, the tool in the pack, the raw materials and no encounter", () => {
     const { state, deps } = table();
     expect(() => startCraft(state, { actorId: BREN, itemId: "map" }, PLAYER, deps)).toThrow(
       "Crafting Map takes Cartographer's Tools, with proficiency and in the pack."
@@ -222,7 +222,7 @@ describe("crafting a nonmagical item", () => {
       initiative: [{ actorId: BREN, score: 10, tieBreaker: 0 }]
     };
     expect(() => startCraft(state, { actorId: BREN, itemId: "chain-mail" }, PLAYER, deps)).toThrow(
-      "Crafting is downtime. End the fight first."
+      "Crafting is downtime. End the encounter first."
     );
   });
 

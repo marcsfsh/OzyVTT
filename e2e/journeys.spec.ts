@@ -47,7 +47,7 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
   await expectPageFits(gm);
   await press(gm.getByRole("button", { name: "Make live" }));
   // With a fight running, making another scene live parks it, which the GM confirms.
-  const confirm = gm.getByRole("dialog", { name: "Make scene live?" });
+  const confirm = gm.getByRole("dialog", { name: "Make encounter live?" });
   const table = gm.getByRole("button", { name: "Go to the table" });
   await expect(confirm.or(table)).toBeVisible();
   if (await confirm.isVisible()) await press(confirm.getByRole("button", { name: "Make live" }));
@@ -56,10 +56,10 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
 
 /** A new scene on a freshly uploaded map, made from the Scenes tab's steps and made live; the GM ends at the table. */
 async function liveSceneOnNewMap(gm: Page, file: string, buffer: Buffer) {
-  await openGmSection(gm, "Scenes");
+  await openGmSection(gm, "Encounters");
   // The bar's New scene on a laptop, the tab bar's New on a phone.
-  await press(gm.getByRole("button", { name: /^New( scene)?$/ }).first());
-  await expect(gm.getByRole("heading", { name: "New scene" })).toBeVisible();
+  await press(gm.getByRole("button", { name: /^New( encounter)?$/ }).first());
+  await expect(gm.getByRole("heading", { name: "New encounter" })).toBeVisible();
   const chooser = gm.waitForEvent("filechooser");
   await press(gm.getByRole("button", { name: /Upload a map/ }));
   await (await chooser).setFiles({ name: file, mimeType: "image/png", buffer });
@@ -70,7 +70,7 @@ async function liveSceneOnNewMap(gm: Page, file: string, buffer: Buffer) {
   await makeLiveFromSteps(gm, ["Light", "Sound", "Review"]);
 }
 
-test("the first evening: the GM password, the join address, a player, the table screen and a live scene", async ({
+test("the first evening: the GM password, the join address, a player, the table screen and a live encounter", async ({
   open,
   hasTouch
 }) => {
@@ -159,8 +159,8 @@ test("the first evening: the GM password, the join address, a player, the table 
   // A scene on a new map, from the table's own start: its steps run on the Scenes tab. The map has no grid, which the
   // picker says, and the scene's Map step leads to it.
   await press(gmSection(gm, "Play"));
-  await press(gm.getByRole("button", { name: "Prepare a scene" }));
-  await expect(gm.getByRole("heading", { name: "New scene" })).toBeVisible();
+  await press(gm.getByRole("button", { name: "Prepare an encounter" }));
+  await expect(gm.getByRole("heading", { name: "New encounter" })).toBeVisible();
   const chooser = gm.waitForEvent("filechooser");
   await press(gm.getByRole("button", { name: /Upload a map/ }));
   await (await chooser).setFiles({ name: `${MAP_NAME}.png`, mimeType: "image/png", buffer: battleMap() });
@@ -188,11 +188,11 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expectPageFits(gm);
 
   // Back to the scene, now with a grid, through its steps to live: the table screen shows it.
-  await press(gm.getByRole("button", { name: "Back to the scene" }));
+  await press(gm.getByRole("button", { name: "Back to the encounter" }));
   await expect(gm.getByRole("heading", { name: "Map", exact: true })).toBeVisible();
   await expect(gm.getByRole("button", { name: "Set the grid" })).toBeHidden();
   await makeLiveFromSteps(gm, ["Tokens", "Light", "Sound", "Review"]);
-  await expect(gm.getByLabel(`Scenes · ${MAP_NAME} is live`)).toBeVisible();
+  await expect(gm.getByLabel(`Encounters · ${MAP_NAME} is live`)).toBeVisible();
   await expect(screen.getByRole("img", { name: MAP_NAME })).toBeVisible();
   await expectPageFits(gm);
   await expectPageFits(screen);
@@ -256,7 +256,7 @@ test("a stray pinch on a phone leaves the page at its size, and a finger still s
   await expect.poll(() => pageScale(gm)).toBeGreaterThan(1);
 });
 
-test("the GM runs a fight on a new scene and the player moves their token", async ({ open, hasTouch }) => {
+test("the GM runs an encounter on a new map and the player moves their token", async ({ open, hasTouch }) => {
   const hero = PARTY[1];
   const player = await open("/");
   await joinAndClaim(player, hero);
@@ -266,7 +266,7 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   // A scene with a freshly uploaded battle map, made live. A different image from the first evening's, which the
   // library would recognise and reuse with its grid.
   await liveSceneOnNewMap(gm, "Smoke crossing.png", battleMap(700, 504));
-  await expect(gm.getByRole("heading", { name: "Start a fight" })).toBeVisible();
+  await expect(gm.getByRole("heading", { name: "Start an encounter" })).toBeVisible();
 
   // The fight: the player's character and one monster.
   await stageFight(
@@ -274,14 +274,14 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
     PARTY.filter((name) => name !== hero),
     "Goblin Minion"
   );
-  await press(gm.getByRole("button", { name: "Start the fight" }));
-  await expect(gm.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
+  await press(gm.getByRole("button", { name: "Start the encounter" }));
+  await expect(gm.getByRole("tablist", { name: "The encounter · round 1" })).toBeVisible();
   await expectPageFits(gm);
   // The one primary sits in the panel's footer, inside the viewport and uncovered.
   await expectUncovered(gm.getByRole("button", { name: "End turn" }));
 
   // A move off the mover's turn goes to the GM, so if the goblin won initiative the GM ends its turn first.
-  await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
+  await expect(player.getByRole("tablist", { name: "The encounter · round 1" })).toBeVisible();
   const yourTurn = player.getByRole("heading", { name: "Your turn" });
   if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "End turn" }));
   await expect(yourTurn).toBeVisible();
@@ -367,7 +367,7 @@ test("a save on the player's own turn leaves the bar under the thumb on screen",
     !state.combat.active
   ) {
     if (state.combat.active) await gm("/api/v1/game/encounter/end", {});
-    let mapAssetId = state.combat.activeSceneId ? state.combat.mapAssetId : null;
+    let mapAssetId = state.combat.activeEncounterId ? state.combat.mapAssetId : null;
     if (!mapAssetId) {
       const upload = await player.request.post(`/api/v1/map-assets?name=Smoke%20yard&kind=battlemap`, {
         headers: { ...headers, "content-type": "image/png" },
@@ -431,14 +431,14 @@ test("a player takes a turn on a phone: a tile, its cast, a target and the roll"
   const gm = await open("/");
   await signInAsGm(gm);
   await liveSceneOnNewMap(gm, "Smoke ford.png", battleMap(700, 490));
-  await expect(gm.getByRole("heading", { name: "Start a fight" })).toBeVisible();
+  await expect(gm.getByRole("heading", { name: "Start an encounter" })).toBeVisible();
   await stageFight(
     gm,
     PARTY.filter((name) => name !== hero),
     "Goblin Minion"
   );
-  await press(gm.getByRole("button", { name: "Start the fight" }));
-  await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
+  await press(gm.getByRole("button", { name: "Start the encounter" }));
+  await expect(player.getByRole("tablist", { name: "The encounter · round 1" })).toBeVisible();
   const yourTurn = player.getByRole("heading", { name: "Your turn" });
   if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "End turn" }));
   await expect(yourTurn).toBeVisible();
@@ -565,8 +565,8 @@ test("the GM paints water on a gridded map, sets a hidden trap and turns the wea
   await signInAsGm(gm);
 
   // A scene on a new map with its grid set, so ground and traps snap to its squares.
-  await openGmSection(gm, "Scenes");
-  await press(gm.getByRole("button", { name: /^New( scene)?$/ }).first());
+  await openGmSection(gm, "Encounters");
+  await press(gm.getByRole("button", { name: /^New( encounter)?$/ }).first());
   const chooser = gm.waitForEvent("filechooser");
   await press(gm.getByRole("button", { name: /Upload a map/ }));
   await (await chooser).setFiles({ name: "Smoke grotto.png", mimeType: "image/png", buffer: battleMap(700, 546) });
@@ -580,7 +580,7 @@ test("the GM paints water on a gridded map, sets a hidden trap and turns the wea
   await press(gm.getByRole("button", { name: "Measure this area" }));
   await press(gm.getByRole("button", { name: "Looks right" }));
   await press(gm.getByRole("button", { name: "Confirm grid" }));
-  await press(gm.getByRole("button", { name: "Back to the scene" }));
+  await press(gm.getByRole("button", { name: "Back to the encounter" }));
   const continueStep = gm.getByRole("button", { name: "Continue" });
   if (await continueStep.isDisabled()) await press(gm.getByRole("button", { name: /^Smoke grotto/ }));
   await press(continueStep);

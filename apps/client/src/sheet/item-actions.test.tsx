@@ -87,7 +87,7 @@ describe("an item's own actions", () => {
     expect(screen.getByText("No charges left. Back on a Long Rest.")).toBeTruthy();
   });
 
-  it("wait for the character's turn in a fight, and say so", () => {
+  it("wait for the character's turn in an encounter, and say so", () => {
     const onUseAction = mount("It isn't your turn.");
     fireEvent.click(rowOf("Gem of Seeing"));
     const peer = screen.getByRole("button", { name: "Peer" }) as HTMLButtonElement;

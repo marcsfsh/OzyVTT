@@ -234,7 +234,8 @@ export function addAnnotation(
   geometryInput: AnnotationMapGeometry
 ): Annotation {
   // A live scene's map takes drawings before a fight as well; with no map there is nothing to draw on.
-  if (!state.combat.mapAssetId) throw new CommandRejectedError("Make a scene live before measuring or placing shapes.");
+  if (!state.combat.mapAssetId)
+    throw new CommandRejectedError("Make an encounter live before measuring or placing shapes.");
   if (input.kind === "shape" && !input.shape) throw new CommandRejectedError("Choose a shape before placing it.");
   const calibration = requireCalibration(geometryInput);
   withinMap(input.origin, geometryInput, "The starting point");
@@ -288,7 +289,7 @@ export function addPing(
   }>,
   geometryInput: AnnotationMapGeometry
 ): Annotation {
-  if (!state.combat.mapAssetId) throw new CommandRejectedError("Make a scene live before pinging the map.");
+  if (!state.combat.mapAssetId) throw new CommandRejectedError("Make an encounter live before pinging the map.");
   withinMap(input.point, geometryInput, "The ping");
   const pruned = state.combat.annotations.filter(
     (existing) => existing.expiresAt === null || existing.expiresAt > input.now

@@ -36,9 +36,9 @@ import "../table/table-header.css";
 function Section({
   title,
   step,
-  sceneId,
+  encounterId,
   children
-}: Readonly<{ title: string; step?: SceneStep; sceneId: string; children: React.ReactNode }>) {
+}: Readonly<{ title: string; step?: SceneStep; encounterId: string; children: React.ReactNode }>) {
   const { go } = useScenes();
   return (
     <section className="sc-meta-section" aria-label={title}>
@@ -48,7 +48,7 @@ function Section({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => go(pathForScene(sceneId, step))}
+            onClick={() => go(pathForScene(encounterId, step))}
             aria-label={`Edit ${title.toLowerCase()}`}
           >
             <IconPencil /> Edit
@@ -66,23 +66,23 @@ function Section({
  * Make live as its one primary. See as switches the map in place to what the table screen or one character's player
  * would receive.
  */
-export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
+export function SceneDocument({ encounterId }: Readonly<{ encounterId: string }>) {
   const { state, token, maps, go, narrow, phone } = useScenes();
-  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId) ?? null;
+  const scene = state.combat.encounters.find((candidate) => candidate.id === encounterId) ?? null;
   const [seeAs, setSeeAs] = useState<SeeAs>("gm");
   // On a narrow screen the map scrolls away above the panel.
   const column = useScrollPast(narrow);
-  const actions = useSceneActions(state.combat.scenes, {
+  const actions = useSceneActions(state.combat.encounters, {
     combatActive: state.combat.active,
     onDeleted: () => go(SCENES_PATHS.list),
     onDuplicated: (copyId) => go(pathForScene(copyId))
   });
-  const [tab, setTab] = useRememberedTab("vtt.scene-tab", ["encounter", "scene", "tokens"], "encounter", sceneId);
+  const [tab, setTab] = useRememberedTab("vtt.scene-tab", ["encounter", "scene", "tokens"], "encounter", encounterId);
   if (!scene)
     return (
       <div className="sc-missing">
-        <p role="status">That scene no longer exists. It may have been deleted.</p>
-        <Button onClick={() => go(SCENES_PATHS.list)}>All scenes</Button>
+        <p role="status">That encounter no longer exists. It may have been deleted.</p>
+        <Button onClick={() => go(SCENES_PATHS.list)}>All encounters</Button>
       </div>
     );
   const facts: SceneFacts = factsOf(state, scene, maps);
@@ -91,10 +91,10 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
   const seeAsValue = seeAs === "gm" || seeAs === "screen" ? seeAs : seeAs.actorId;
 
   const header = (
-    <header className={cx("table-header sc-scene-head", seeAs !== "gm" && "is-preview")} aria-label="The scene">
+    <header className={cx("table-header sc-scene-head", seeAs !== "gm" && "is-preview")} aria-label="The encounter">
       {/* A laptop lists the scenes beside the page; a narrow screen goes back to them. */}
       {narrow && (
-        <Button variant="ghost" size="sm" onClick={() => go(SCENES_PATHS.list)} aria-label="Back to the scenes">
+        <Button variant="ghost" size="sm" onClick={() => go(SCENES_PATHS.list)} aria-label="Back to the encounters">
           <IconChevronLeft />
         </Button>
       )}
@@ -163,7 +163,7 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
         </MenuItem>
         {!facts.live && (
           <MenuItem icon={<IconTrash />} tone="danger" onClick={() => void actions.remove(scene)}>
-            Delete scene
+            Delete encounter
           </MenuItem>
         )}
       </Menu>
@@ -197,8 +197,8 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
       <div className="map-seeing-as sc-preview-banner" role="status">
         <span>
           {seeAs === "screen"
-            ? `What the table screen shows${facts.live ? "" : " once this scene is live"}.`
-            : `What ${seeAs.name}'s player sees${facts.live ? "" : " once this scene is live"}.`}
+            ? `What the table screen shows${facts.live ? "" : " once this encounter is live"}.`
+            : `What ${seeAs.name}'s player sees${facts.live ? "" : " once this encounter is live"}.`}
         </span>
         <Button variant="secondary" size="sm" onClick={() => setSeeAs("gm")}>
           Back to your view
@@ -208,14 +208,14 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
 
   const sceneTab = (
     <div className="sc-meta">
-      <Section title="State" sceneId={scene.id}>
+      <Section title="State" encounterId={scene.id}>
         <p className="sc-hint">
           {facts.live
             ? state.combat.active
-              ? `Players and the table screen see it now. A fight is on, round ${state.combat.round}.`
+              ? `Players and the table screen see it now. Combat is on, round ${state.combat.round}.`
               : "Players and the table screen see it now."
             : facts.state === "parked"
-              ? `A fight is parked here at round ${facts.combat.round}. It resumes when the scene goes live.`
+              ? `Combat is parked here at round ${facts.combat.round}. It resumes when the encounter goes live.`
               : "Prepared. Players and the table screen see none of it until you make it live."}
         </p>
         {needs.length > 0 && (
@@ -231,10 +231,10 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
           </ul>
         )}
       </Section>
-      <Section title="Map" step="map" sceneId={scene.id}>
+      <Section title="Map" step="map" encounterId={scene.id}>
         <SceneMapFacts facts={facts} back={pathForScene(facts.scene.id)} />
       </Section>
-      <Section title="Walls and light" step="light" sceneId={scene.id}>
+      <Section title="Walls and light" step="light" encounterId={scene.id}>
         <SceneLight
           facts={facts}
           onOpenTools={(group) => {
@@ -243,20 +243,20 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
           }}
         />
       </Section>
-      <Section title="Sound" step="sound" sceneId={scene.id}>
+      <Section title="Sound" step="sound" encounterId={scene.id}>
         <SceneSound facts={facts} />
       </Section>
-      <Section title="In the Codex" sceneId={scene.id}>
+      <Section title="In the Codex" encounterId={scene.id}>
         <SceneCodex facts={facts} />
       </Section>
-      <Section title="History" sceneId={scene.id}>
+      <Section title="History" encounterId={scene.id}>
         <SceneHistory facts={facts} />
       </Section>
     </div>
   );
 
   // Making this scene live parks the one that is live now, which the line under Make live says.
-  const liveNow = state.combat.scenes.find((candidate) => candidate.id === state.combat.activeSceneId) ?? null;
+  const liveNow = state.combat.encounters.find((candidate) => candidate.id === state.combat.activeEncounterId) ?? null;
   const footer = facts.live ? (
     <Button variant="primary" onClick={() => go(pathForGmTab("table"))}>
       <IconPlay /> Go to the table
@@ -283,8 +283,8 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
           <TablePanel
             label={`About ${scene.name}`}
             tabs={[
-              { id: "encounter", label: "Fight", content: <SceneEncounterTab facts={facts} /> },
-              { id: "scene", label: "Scene", content: sceneTab },
+              { id: "encounter", label: "Combat", content: <SceneEncounterTab facts={facts} /> },
+              { id: "scene", label: "Setup", content: sceneTab },
               {
                 id: "tokens",
                 label: `Tokens · ${facts.tokens}`,

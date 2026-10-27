@@ -919,15 +919,15 @@ describe("public game API over /api/v1", () => {
     const list = EncounterArchiveListResponseSchema.parse(
       await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(reader.token) })).json()
     );
-    expect(list.data.encounters).toHaveLength(1);
-    const id = list.data.encounters[0].id;
+    expect(list.data.replays).toHaveLength(1);
+    const id = list.data.replays[0].id;
 
     // Hidden until shared. A player's list is empty and the record itself is 404, never 403, which would
     // confirm an unshared recording exists.
     const hiddenList = EncounterArchiveListResponseSchema.parse(
       await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(playerToken) })).json()
     );
-    expect(hiddenList.data.encounters).toEqual([]);
+    expect(hiddenList.data.replays).toEqual([]);
     expect(
       (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { headers: bearer(playerToken) }))
         .status
@@ -938,7 +938,7 @@ describe("public game API over /api/v1", () => {
     const sharedList = EncounterArchiveListResponseSchema.parse(
       await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(playerToken) })).json()
     );
-    expect(sharedList.data.encounters.map((entry) => entry.id)).toEqual([id]);
+    expect(sharedList.data.replays.map((entry) => entry.id)).toEqual([id]);
     const playerDocument = await (
       await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { headers: bearer(playerToken) })
     ).json();
@@ -1053,9 +1053,9 @@ describe("public game API over /api/v1", () => {
     expect((await post(base, GAME_PATHS.claims, seatB.data.token, { actorId: HERO_ID })).status).toBe(200);
   });
 
-  it("stages, edits, activates, and removes scenes over HTTP with the scene:write scope", async () => {
+  it("stages, edits, activates, and removes encounters over HTTP with the encounter:write scope", async () => {
     const { base, server, gmToken, mapAssetId } = await bootWithBattlemap();
-    const stager = await issueCredential(base, gmToken, "scene stager", ["game:read", "scene:write"]);
+    const stager = await issueCredential(base, gmToken, "encounter stager", ["game:read", "encounter:write"]);
     const noScope = await issueCredential(base, gmToken, "combat only", ["combat:write"]);
 
     // Wrong scope → 403; wrong map kind → 409 with the table's message.
@@ -1070,7 +1070,7 @@ describe("public game API over /api/v1", () => {
       combatantIds: []
     });
     expect(wrongKind.status).toBe(409);
-    expect((await wrongKind.json()).error.message).toBe("Prepare scenes on an uploaded battlemap.");
+    expect((await wrongKind.json()).error.message).toBe("Prepare encounters on an uploaded battlemap.");
 
     // Create → rename → set combatants → activate → the live table now runs this scene's map.
     const created = GameMutationAcceptedResponseSchema.parse(
@@ -1078,28 +1078,31 @@ describe("public game API over /api/v1", () => {
         await post(base, GAME_PATHS.scenes, stager.token, { name: "Ambush", mapAssetId, combatantIds: [HERO_ID] })
       ).json()
     );
-    const sceneId = created.data.sceneId as string;
+    const encounterId = created.data.encounterId as string;
     expect(
-      (await post(base, GAME_PATHS.sceneRename.replace("{sceneId}", sceneId), stager.token, { name: "Bridge Ambush" }))
-        .status
+      (
+        await post(base, GAME_PATHS.sceneRename.replace("{encounterId}", encounterId), stager.token, {
+          name: "Bridge Ambush"
+        })
+      ).status
     ).toBe(200);
     expect(
       (
-        await post(base, GAME_PATHS.sceneCombatants.replace("{sceneId}", sceneId), stager.token, {
+        await post(base, GAME_PATHS.sceneCombatants.replace("{encounterId}", encounterId), stager.token, {
           combatantIds: [HERO_ID, SECRET_ID]
         })
       ).status
     ).toBe(200);
-    expect((await post(base, GAME_PATHS.sceneActivate.replace("{sceneId}", sceneId), stager.token, {})).status).toBe(
-      200
-    );
-    expect(server.store.snapshot.combat.activeSceneId).toBe(sceneId);
+    expect(
+      (await post(base, GAME_PATHS.sceneActivate.replace("{encounterId}", encounterId), stager.token, {})).status
+    ).toBe(200);
+    expect(server.store.snapshot.combat.activeEncounterId).toBe(encounterId);
     expect(server.store.snapshot.combat.mapAssetId).toBe(mapAssetId);
     // Bridge: going live also presents the scene's map on the shared screen (enabled), in one action.
     expect(server.viewerPresentation.snapshot).toMatchObject({ enabled: true, activeMap: { assetId: mapAssetId } });
 
     // The active scene refuses removal; a second prepared scene deletes fine.
-    const removeActive = await fetch(base + GAME_PATHS.sceneById.replace("{sceneId}", sceneId), {
+    const removeActive = await fetch(base + GAME_PATHS.sceneById.replace("{encounterId}", encounterId), {
       method: "DELETE",
       headers: bearer(stager.token)
     });
@@ -1109,7 +1112,7 @@ describe("public game API over /api/v1", () => {
     );
     expect(
       (
-        await fetch(base + GAME_PATHS.sceneById.replace("{sceneId}", spare.data.sceneId as string), {
+        await fetch(base + GAME_PATHS.sceneById.replace("{encounterId}", spare.data.encounterId as string), {
           method: "DELETE",
           headers: bearer(stager.token)
         })
@@ -1199,7 +1202,7 @@ describe("public game API over /api/v1", () => {
       await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(gmToken) })).json()
     );
     const archived = await (
-      await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(archives.data.encounters[0].id)), {
+      await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(archives.data.replays[0].id)), {
         headers: bearer(gmToken)
       })
     ).json();

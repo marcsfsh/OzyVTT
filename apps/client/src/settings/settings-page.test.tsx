@@ -53,7 +53,7 @@ describe("the GM's Settings", () => {
     expect(within(bar).getByRole("button", { name: "Players" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("heading", { name: "Players", level: 2 })).toBeInTheDocument();
 
-    await user.click(within(bar).getByRole("button", { name: "Fights" }));
+    await user.click(within(bar).getByRole("button", { name: "Encounters" }));
     expect(window.location.pathname).toBe("/settings/fights");
     expect(screen.getByRole("heading", { name: "Rules assistant", level: 3 })).toBeInTheDocument();
   });
@@ -75,9 +75,11 @@ describe("the GM's Settings", () => {
 
   it("marks every GM section GM only, and the GM's own row in Device", async () => {
     renderAt("/settings/fights");
-    expect(screen.getByRole("heading", { name: /^Fights/, level: 2 }).parentElement).toHaveTextContent("GM only");
+    expect(screen.getByRole("heading", { name: /^Encounters/, level: 2 }).parentElement).toHaveTextContent("GM only");
     act(() => goTo("/settings/device"));
-    expect(await screen.findByRole("heading", { name: /^Arrange new scenes/, level: 3 })).toHaveTextContent("GM only");
+    expect(await screen.findByRole("heading", { name: /^Arrange new encounters/, level: 3 })).toHaveTextContent(
+      "GM only"
+    );
     expect(screen.getByRole("heading", { name: /^Device/, level: 2 }).parentElement).not.toHaveTextContent("GM only");
   });
 

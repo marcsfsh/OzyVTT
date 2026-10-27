@@ -37,8 +37,8 @@ const stateWith = (combat: Record<string, unknown>, revision: number): GmView =>
   }) as unknown as GmView;
 };
 
-describe("starting a second fight", () => {
-  it("rolls everyone again instead of reusing the last fight's order", async () => {
+describe("starting a second encounter", () => {
+  it("rolls everyone again instead of reusing the last encounter's order", async () => {
     const user = userEvent.setup();
     const fighting = stateWith(
       {
@@ -60,14 +60,14 @@ describe("starting a second fight", () => {
     const { rerender } = render(panel(fighting));
     rerender(panel(stateWith({ active: false }, 13)));
 
-    await user.click(screen.getByRole("button", { name: /Start the fight/ }));
+    await user.click(screen.getByRole("button", { name: /Start the encounter/ }));
     const calls = (socket.emit as unknown as { mock: { calls: [string, { entries?: unknown[] }][] } }).mock.calls;
     const start = calls.find(([event]) => event === "encounter:start");
     expect(start?.[1].entries).toEqual([{ actorId: ARIA }, { actorId: BORIN }]);
   });
 });
 
-describe("Start a fight's list", () => {
+describe("Start an encounter's list", () => {
   const GOBLIN = "10000000-0000-4000-8000-000000000003";
   const staged = (gmShaped: boolean) => {
     const state = stateWith(
@@ -83,7 +83,7 @@ describe("Start a fight's list", () => {
     return {
       ...state,
       actors: [...state.actors, goblin],
-      combat: { ...state.combat, scenes: gmShaped ? [] : undefined }
+      combat: { ...state.combat, encounters: gmShaped ? [] : undefined }
     } as unknown as GmView;
   };
 
@@ -93,9 +93,9 @@ describe("Start a fight's list", () => {
         <EncounterPanel role="gm" state={staged(true)} selectedMap={null} />
       </ToastProvider>
     );
-    expect(screen.getByRole("checkbox", { name: "Aria is in this fight" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Goblin is in this fight" })).toBeChecked();
-    expect(screen.queryByRole("checkbox", { name: "Borin is in this fight" })).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "Aria is in this encounter" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Goblin is in this encounter" })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Borin is in this encounter" })).toBeNull();
     expect(screen.getByText("Rolls initiative for all 2")).toBeInTheDocument();
   });
 });

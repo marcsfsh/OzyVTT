@@ -20,7 +20,7 @@ const choices = [
   { id: "thieves-tools", name: "Thieves' Tools" }
 ];
 
-describe("helping an ally's check outside a fight", () => {
+describe("helping an ally's check outside an encounter", () => {
   it("offers the party and the character's proficiencies, and helps with the tool picked", async () => {
     const said = vi.fn();
     render(<HelpAnAlly actor={actor} state={state} choices={choices} onFeedback={said} />);

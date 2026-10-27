@@ -198,7 +198,7 @@ describe("a door on a player's map", () => {
     tap(handle());
     const menu = screen.getByRole("menu", { name: "Door" });
     expect(within(menu).queryByRole("menuitem", { name: "Edit lock and strength" })).toBeNull();
-    expect(within(menu).getByText("Lyra does it. Each takes an action in a fight.")).toBeTruthy();
+    expect(within(menu).getByText("Lyra does it. Each takes an action in an encounter.")).toBeTruthy();
     await user.click(within(menu).getByRole("menuitem", { name: "Pick the lock" }));
     expect(sent("door:use")).toEqual([expect.objectContaining({ wallId: DOOR, actorId: LYRA, how: "pick" })]);
   });

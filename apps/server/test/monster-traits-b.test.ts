@@ -395,7 +395,7 @@ describe("a nightmare's Confer Fire Resistance", () => {
 });
 
 describe("an incubus's Succubus Form", () => {
-  it("is taken in the step a finished Long Rest opens, outside a fight, swapping the stat block", () => {
+  it("is taken in the step a finished Long Rest opens, outside an encounter, swapping the stat block", () => {
     const fought = fight("incubus", { combat: false });
     const offer = () =>
       conversionOffers(fought.state, actor(fought, IDS.foe), { resolveDefinition, catalog }).find(
@@ -418,14 +418,14 @@ describe("an incubus's Succubus Form", () => {
     expect(actor(fought, IDS.foe)).toMatchObject({ definitionId: "incubus", name: "Incubus" });
   });
 
-  it("isn't taken in a fight", () => {
+  it("isn't taken in an encounter", () => {
     const fought = fight("incubus");
     actor(fought, IDS.foe).restStep = { after: "long-rest" };
     expect(
       refusal(() =>
         convertResource(fought.state, IDS.foe, { conversionId: "form-at-rest" }, { resolveDefinition, catalog })
       )
-    ).toBe("This is chosen after a Long Rest, outside a fight.");
+    ).toBe("This is chosen after a Long Rest, outside an encounter.");
   });
 });
 

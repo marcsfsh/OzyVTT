@@ -117,7 +117,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
       </div>
     );
   const grid = gridStateOf(map);
-  const scenes = state.combat.scenes.filter((scene) => scene.mapAssetId === map.id);
+  const scenes = state.combat.encounters.filter((scene) => scene.mapAssetId === map.id);
   const folders = folderNamesOf(maps);
 
   const footer =
@@ -127,7 +127,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
       </Button>
     ) : map.kind === "battlemap" ? (
       <Button variant="primary" onClick={() => go(`${SCENES_PATHS.newScene}?map=${map.id}`)}>
-        <IconScene /> New scene on this map
+        <IconScene /> New encounter on this map
       </Button>
     ) : (
       <Button variant="primary" onClick={() => go(pathForMap(map.id, "grid"))}>
@@ -240,7 +240,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
                   <h3>Where it is used</h3>
                 </header>
                 {scenes.length === 0 && atlas.length === 0 ? (
-                  <p className="sc-hint">No scene and no atlas map uses it yet.</p>
+                  <p className="sc-hint">No encounter and no atlas map uses it yet.</p>
                 ) : (
                   <ul className="sc-links">
                     {scenes.map((scene) => (
@@ -249,7 +249,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
                           <IconScene />
                           <b>{scene.name}</b>
                         </button>
-                        {scene.id === state.combat.activeSceneId && <span className="sc-state is-live">Live</span>}
+                        {scene.id === state.combat.activeEncounterId && <span className="sc-state is-live">Live</span>}
                       </li>
                     ))}
                     {atlas.map((name) => (

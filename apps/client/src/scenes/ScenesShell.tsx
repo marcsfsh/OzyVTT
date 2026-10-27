@@ -19,7 +19,7 @@ import "./scenes.css";
 /** The front page's two views, in the order they are drawn. */
 const LIST_TABS: ReadonlyArray<{ id: ScenesSection; label: string; path: string }> = [
   { id: "maps", label: "Maps", path: SCENES_PATHS.maps },
-  { id: "scenes", label: "Scenes", path: SCENES_PATHS.list }
+  { id: "scenes", label: "Encounters", path: SCENES_PATHS.list }
 ];
 
 /**
@@ -34,11 +34,11 @@ function ListHead({ section }: Readonly<{ section: ScenesSection }>) {
           <IconMap /> New map
         </Button>
         <Button variant="primary" onClick={() => void navigate(SCENES_PATHS.newScene)}>
-          <IconScene /> New scene
+          <IconScene /> New encounter
         </Button>
       </div>
       <Tabs
-        ariaLabel="Maps and scenes"
+        ariaLabel="Maps and encounters"
         className="sc-front-tabs"
         activeId={section}
         onChange={(id) => void navigate(LIST_TABS.find((tab) => tab.id === id)!.path)}
@@ -66,11 +66,11 @@ function FindBox({ state, maps }: Readonly<{ state: GmView; maps: readonly MapAs
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   const options = [
-    ...state.combat.scenes.map((scene) => ({
+    ...state.combat.encounters.map((scene) => ({
       id: `scene:${scene.id}`,
       label: scene.name,
       icon: <IconScene />,
-      meta: scene.id === state.combat.activeSceneId ? "Scene · Live" : "Scene"
+      meta: scene.id === state.combat.activeEncounterId ? "Encounter · Live" : "Encounter"
     })),
     ...(maps ?? []).map((map) => ({ id: `map:${map.id}`, label: map.name, icon: <IconMap />, meta: "Map" }))
   ];
@@ -79,8 +79,8 @@ function FindBox({ state, maps }: Readonly<{ state: GmView; maps: readonly MapAs
       <Combobox
         options={options}
         value={null}
-        placeholder="Find a scene or a map"
-        ariaLabel="Find a scene or a map"
+        placeholder="Find an encounter or a map"
+        ariaLabel="Find an encounter or a map"
         onChange={(id) => {
           if (!id) return;
           const [kind, recordId] = id.split(":");
@@ -153,7 +153,7 @@ export function ScenesShell({
   const primary =
     section === "maps"
       ? { label: "New map", path: SCENES_PATHS.newMap }
-      : { label: "New scene", path: SCENES_PATHS.newScene };
+      : { label: "New encounter", path: SCENES_PATHS.newScene };
 
   const content = (() => {
     switch (view.view) {
@@ -165,10 +165,10 @@ export function ScenesShell({
           </>
         );
       case "scene":
-        return view.step === null && view.sceneId ? (
-          <SceneDocument key={view.sceneId} sceneId={view.sceneId} />
+        return view.step === null && view.encounterId ? (
+          <SceneDocument key={view.encounterId} encounterId={view.encounterId} />
         ) : (
-          <SceneEditor key={view.sceneId ?? "new"} sceneId={view.sceneId} step={view.step ?? "map"} />
+          <SceneEditor key={view.encounterId ?? "new"} encounterId={view.encounterId} step={view.step ?? "map"} />
         );
       case "maps":
         return (

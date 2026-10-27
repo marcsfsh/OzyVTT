@@ -20,7 +20,7 @@ const HOLD_PERSON_DC = wizard.actions.find((action) => action.id === "spell-hold
 const slotsOf = (actor: GameState["actors"][number], level: number) =>
   actor.spellSlots?.find((slot) => slot.level === level)?.remaining;
 
-describe("a spell cast outside a fight", () => {
+describe("a spell cast outside an encounter", () => {
   it("grants what it grants and spends its slot, with no action and no one-slot-a-turn limit", () => {
     const { state, hero, resolve } = fight(wizard, { combat: false });
     const before = slotsOf(hero, 1)!;
@@ -35,7 +35,7 @@ describe("a spell cast outside a fight", () => {
     expect(state.combat.turn.spellSlotCasters ?? []).toEqual([]);
   });
 
-  it("starts Concentration and asks for the save, as Hold Person does in a fight", () => {
+  it("starts Concentration and asks for the save, as Hold Person does in an encounter", () => {
     const { state, hero, resolve } = fight(wizard, { combat: false });
     resolve("spell-hold-person", { targetIds: [FOE] });
     expect(hero.effects.some((effect) => effect.concentration && effect.name.includes("Hold Person"))).toBe(true);
@@ -101,8 +101,8 @@ const post = (base: string, path: string, token: string, body: unknown) =>
     body: JSON.stringify(body)
   });
 
-describe("a sheet's cast outside a fight, over the API", () => {
-  it("resolves through the fight's path and lands a help spell on its caster when no one is named", async () => {
+describe("a sheet's cast outside an encounter, over the API", () => {
+  it("resolves through the encounter's path and lands a help spell on its caster when no one is named", async () => {
     const { base, server, gmToken } = await boot();
     const response = await post(base, GAME_PATHS.actionUse, gmToken, {
       commandId: randomUUID(),

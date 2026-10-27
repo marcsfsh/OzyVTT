@@ -49,23 +49,23 @@ afterEach(() => {
 });
 
 describe("the maps table", () => {
-  it("lists every map with its type, grid, size, folder and the scenes on it, newest first", async () => {
+  it("lists every map with its type, grid, size, folder and the encounters on it, newest first", async () => {
     serveScenes();
-    renderTab("/scenes/maps");
+    renderTab("/encounters/maps");
     await screen.findByRole("table");
     const names = within(screen.getByRole("table"))
       .getAllByRole("row")
       .slice(1)
       .map((row) => within(row).getAllByRole("button")[0]!.textContent);
     expect(names).toEqual(["Sunken crypt", "Old tunnels", "Saltmere"]);
-    expect(rowOf("Sunken crypt")).toHaveTextContent("Battle map50 px squares · 5 ft700 × 500Dungeons2 scenes");
-    expect(rowOf("Saltmere")).toHaveTextContent("Regional mapNo grid yet800 × 600NoneNo scene");
+    expect(rowOf("Sunken crypt")).toHaveTextContent("Battle map50 px squares · 5 ft700 × 500Dungeons2 encounters");
+    expect(rowOf("Saltmere")).toHaveTextContent("Regional mapNo grid yet800 × 600NoneNo encounter");
   });
 
   it("shows only the types ticked in the Type dropdown, and keeps them in the address", async () => {
     const user = userEvent.setup();
     serveScenes();
-    renderTab("/scenes/maps");
+    renderTab("/encounters/maps");
     await user.click(await screen.findByRole("button", { name: "Type: all 3" }));
     await user.click(screen.getByRole("checkbox", { name: "Regional map" }));
     expect(screen.getByText("2 of 3 maps")).toBeInTheDocument();
@@ -76,7 +76,7 @@ describe("the maps table", () => {
   it("filters by grid and folder from the flyout", async () => {
     const user = userEvent.setup();
     serveScenes();
-    renderTab("/scenes/maps");
+    renderTab("/encounters/maps");
     await user.click(await screen.findByRole("button", { name: "Filters" }));
     const flyout = screen.getByRole("complementary", { name: "Filter maps" });
     await user.click(within(flyout).getByRole("button", { name: "No grid yet" }));
@@ -91,16 +91,16 @@ describe("the maps table", () => {
   it("opens a map from its row", async () => {
     const user = userEvent.setup();
     serveScenes();
-    renderTab("/scenes/maps");
+    renderTab("/encounters/maps");
     await user.click(await screen.findByRole("button", { name: "Old tunnels" }));
-    expect(here()).toBe(`/scenes/maps/${IDS.tunnels}`);
+    expect(here()).toBe(`/encounters/maps/${IDS.tunnels}`);
   });
 });
 
 describe("a map's page", () => {
   it("is one document: its grid, its type and folder, and where it is used", async () => {
     serveScenes();
-    renderTab(`/scenes/maps/${IDS.crypt}`);
+    renderTab(`/encounters/maps/${IDS.crypt}`);
     expect(await screen.findByRole("heading", { name: "Sunken crypt" })).toBeInTheDocument();
     const grid = screen.getByRole("region", { name: "Grid" });
     expect(grid).toHaveTextContent("50 px squares · 5 ft");
@@ -112,14 +112,14 @@ describe("a map's page", () => {
 
   it("names the atlas map drawn from the image", async () => {
     serveScenes();
-    renderTab(`/scenes/maps/${IDS.town}`);
+    renderTab(`/encounters/maps/${IDS.town}`);
     expect(await screen.findByText(/The Saltmere coast/)).toBeInTheDocument();
   });
 
   it("changes the map's type in one write, then reads the library again", async () => {
     const user = userEvent.setup();
     const server = serveScenes();
-    renderTab(`/scenes/maps/${IDS.tunnels}`);
+    renderTab(`/encounters/maps/${IDS.tunnels}`);
     await user.selectOptions(await screen.findByLabelText("Type"), "world");
     await waitFor(() =>
       expect(server.calls).toContainEqual(
@@ -129,12 +129,12 @@ describe("a map's page", () => {
     await waitFor(() => expect(onLibraryChanged).toHaveBeenCalled());
   });
 
-  it("starts a new scene on a battle map with its one primary", async () => {
+  it("starts a new encounter on a battle map with its one primary", async () => {
     const user = userEvent.setup();
     serveScenes();
-    renderTab(`/scenes/maps/${IDS.crypt}`);
-    await user.click(await screen.findByRole("button", { name: "New scene on this map" }));
-    expect(here()).toBe(`/scenes/new?map=${IDS.crypt}`);
+    renderTab(`/encounters/maps/${IDS.crypt}`);
+    await user.click(await screen.findByRole("button", { name: "New encounter on this map" }));
+    expect(here()).toBe(`/encounters/new?map=${IDS.crypt}`);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /Sunken crypt/ })).toHaveAttribute("aria-pressed", "true")
     );
@@ -146,7 +146,7 @@ describe("adding a map as steps", () => {
     const user = userEvent.setup();
     const keep = mapAsset("20000000-0000-5000-8000-0000000000e1", "Ruined keep", { folder: "Dungeons" });
     const server = serveScenes({ uploaded: keep });
-    const { container } = renderTab("/scenes/maps/new");
+    const { container } = renderTab("/encounters/maps/new");
     const steps = screen.getByRole("navigation", { name: "Steps" });
     expect(
       within(steps)
@@ -172,7 +172,7 @@ describe("adding a map as steps", () => {
     await user.type(screen.getByRole("combobox", { name: "Folder" }), "Dungeons{Enter}");
     await user.click(screen.getByRole("button", { name: "Upload map" }));
 
-    await waitFor(() => expect(here()).toBe(`/scenes/maps/${keep.id}?step=grid`));
+    await waitFor(() => expect(here()).toBe(`/encounters/maps/${keep.id}?step=grid`));
     const upload = server.calls.find((call) => call.method === "POST")!;
     expect(Object.fromEntries(new URLSearchParams(upload.search))).toEqual(
       expect.objectContaining({ filename: "keep.png", name: "Ruined keep", kind: "battlemap", folder: "Dungeons" })
@@ -182,7 +182,7 @@ describe("adding a map as steps", () => {
 
   it("asks how the map measures distance at its Grid step", async () => {
     serveScenes();
-    renderTab(`/scenes/maps/${IDS.tunnels}?step=grid`);
+    renderTab(`/encounters/maps/${IDS.tunnels}?step=grid`);
     expect(await screen.findByRole("heading", { name: "Grid" })).toBeInTheDocument();
     expect(screen.getByText("Printed square grid")).toBeInTheDocument();
     expect(screen.getByText("Gridless battle map")).toBeInTheDocument();
@@ -191,27 +191,27 @@ describe("adding a map as steps", () => {
 
   it("says to mark the grid first when Check is opened before it", async () => {
     serveScenes();
-    renderTab(`/scenes/maps/${IDS.tunnels}?step=check`);
+    renderTab(`/encounters/maps/${IDS.tunnels}?step=check`);
     expect(await screen.findByText("Mark the grid first, then check it here.")).toBeInTheDocument();
   });
 
-  it("ends with the name and folder, and a new scene on it", async () => {
+  it("ends with the name and folder, and a new encounter on it", async () => {
     const user = userEvent.setup();
     const server = serveScenes();
-    renderTab(`/scenes/maps/${IDS.crypt}?step=use`);
+    renderTab(`/encounters/maps/${IDS.crypt}?step=use`);
     expect(await screen.findByRole("heading", { name: "Name and use" })).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Folder"), "");
     await waitFor(() =>
       expect(server.calls).toContainEqual(expect.objectContaining({ method: "PATCH", body: { folder: null } }))
     );
-    await user.click(screen.getByRole("button", { name: "New scene on this map" }));
-    expect(here()).toBe(`/scenes/new?map=${IDS.crypt}`);
+    await user.click(screen.getByRole("button", { name: "New encounter on this map" }));
+    expect(here()).toBe(`/encounters/new?map=${IDS.crypt}`);
   });
 
   it("goes back where it came from: the table, after setting the grid of its map", async () => {
     const user = userEvent.setup();
     serveScenes();
-    renderTab(`/scenes/maps/${IDS.crypt}?step=use&back=%2Ftable`);
+    renderTab(`/encounters/maps/${IDS.crypt}?step=use&back=%2Ftable`);
     await user.click(await screen.findByRole("button", { name: "Back to the table" }));
     expect(here()).toBe("/table");
   });
@@ -219,7 +219,7 @@ describe("adding a map as steps", () => {
   it("keeps the steps as a strip on a phone, with the image in a bar", async () => {
     setViewport(390);
     serveScenes();
-    renderTab("/scenes/maps/new");
+    renderTab("/encounters/maps/new");
     const strip = await screen.findByRole("tablist", { name: "Steps" });
     expect(
       within(strip)

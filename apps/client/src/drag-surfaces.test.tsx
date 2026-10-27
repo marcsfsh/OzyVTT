@@ -85,7 +85,7 @@ function CalibrationCanvas() {
 
 /** What the Scenes tab's views read, with these scenes in the GM's view. */
 const scenesContext = (scenes: ReturnType<typeof scene>[]): ScenesContextValue => ({
-  state: { combat: { scenes, activeSceneId: null, active: false }, actors: [] } as never,
+  state: { combat: { encounters: scenes, activeEncounterId: null, active: false }, actors: [] } as never,
   token: "gm",
   maps: [],
   reloadMaps: async () => [],

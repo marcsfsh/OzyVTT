@@ -75,24 +75,24 @@ export const BLANKET_ID = "blanket";
 /** The live scene's environment; calm when a state predates it. */
 export const environmentOf = (state: GameState): SceneEnvironment => state.combat.environment ?? CALM_ENVIRONMENT;
 
-/** The GM sets the live scene's climate and weather, or a prepared scene's with `sceneId`. */
+/** The GM sets the live scene's climate and weather, or a prepared scene's with `encounterId`. */
 export function setEnvironment(
   state: GameState,
-  sceneId: string | undefined,
+  encounterId: string | undefined,
   environment: Partial<SceneEnvironment>,
   scope: Initiator
 ): void {
   requireGm(scope, "Only the GM sets the weather.");
-  if (sceneId === undefined || sceneId === state.combat.activeSceneId) {
+  if (encounterId === undefined || encounterId === state.combat.activeEncounterId) {
     state.combat = { ...state.combat, environment: { ...environmentOf(state), ...environment } };
     return;
   }
-  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
-  if (!scene) throw new CommandRejectedError("That scene no longer exists.");
+  const scene = state.combat.encounters.find((candidate) => candidate.id === encounterId);
+  if (!scene) throw new CommandRejectedError("That encounter no longer exists.");
   state.combat = {
     ...state.combat,
-    scenes: state.combat.scenes.map((candidate) =>
-      candidate.id === sceneId
+    encounters: state.combat.encounters.map((candidate) =>
+      candidate.id === encounterId
         ? {
             ...candidate,
             combat: {

@@ -61,7 +61,8 @@ export const encounterCommands = [
     operationId: "startEncounter",
     description:
       "Starts an encounter on a calibrated battlemap with initial combatants (GM-grade only). Missing initiative scores are rolled server-side.",
-    summary: "Start an encounter on a battlemap; omit the combatants to start on the live scene's staged list (GM).",
+    summary:
+      "Start an encounter on a battlemap; omit the combatants to start on the live encounter's staged list (GM).",
     schema: EncounterStartSchema,
     malformed: "The encounter setup is malformed.",
     gmOnly: "Only the GM can start an encounter.",
@@ -79,8 +80,8 @@ export const encounterCommands = [
         // The active scene's own slot is empty by invariant (its live copy is the top-level combat), so the
         // staged list is the top-level initiative.
         const live =
-          state.combat.activeSceneId !== null &&
-          state.combat.scenes.some((candidate) => candidate.id === state.combat.activeSceneId);
+          state.combat.activeEncounterId !== null &&
+          state.combat.encounters.some((candidate) => candidate.id === state.combat.activeEncounterId);
         return live ? state.combat.initiative.map((entry) => ({ actorId: entry.actorId })) : [];
       };
       let regains: EffectNarration[] = [];
@@ -144,7 +145,7 @@ export const encounterCommands = [
     type: "encounter.end",
     operationId: "endEncounter",
     description:
-      "Ends the encounter (GM-grade only). The whole fight auto-archives permanently (see /encounters) in the same transaction.",
+      "Ends the encounter (GM-grade only). The whole encounter auto-archives permanently (see /replays) in the same transaction.",
     summary: "End the encounter and archive it permanently (GM).",
     schema: CommandIdentitySchema,
     malformed: "The encounter command is malformed.",
@@ -160,7 +161,7 @@ export const encounterCommands = [
       const { duplicate } = await executeTimeline((state, timeline) => {
         // The last live picture of the fight, captured before endEncounter clears the combat.
         const finalState = structuredClone(state);
-        endedSceneId = finalState.combat.activeSceneId;
+        endedSceneId = finalState.combat.activeEncounterId;
         endedMapAssetId = finalState.combat.mapAssetId;
         // The fight's effects end with it (onEnd fires), scoped to its combatants so parked scenes' effects survive.
         const combatantIds = state.combat.initiative.map((entry) => entry.actorId);
@@ -170,8 +171,8 @@ export const encounterCommands = [
         const endedAtMs = Date.now();
         state.combat = {
           ...state.combat,
-          scenes: state.combat.scenes.map((scene) =>
-            scene.id === endedSceneId ? { ...scene, fightEndedAt: endedAtMs } : scene
+          encounters: state.combat.encounters.map((scene) =>
+            scene.id === endedSceneId ? { ...scene, endedAt: endedAtMs } : scene
           )
         };
         // SRD Ammunition: after a fight, half the pieces each combatant fired are picked up again.
@@ -213,7 +214,7 @@ export const encounterCommands = [
             endedAt: document.endedAt,
             turnCount: document.turnCount,
             documentJson: JSON.stringify(document),
-            sceneName: finalState.combat.scenes.find((scene) => scene.id === endedSceneId)?.name ?? null
+            encounterName: finalState.combat.encounters.find((scene) => scene.id === endedSceneId)?.name ?? null
           });
           endedTurnCount = document.turnCount;
         }
@@ -232,7 +233,7 @@ export const encounterCommands = [
       kit.publishNarrations(effectEvents);
       kit.context.onEncounterArchived?.({
         mapAssetId: endedMapAssetId,
-        sceneId: endedSceneId,
+        encounterId: endedSceneId,
         turnCount: endedTurnCount
       });
     }
@@ -275,11 +276,11 @@ export const encounterCommands = [
     type: "encounter.remove-combatant",
     operationId: "removeEncounterCombatant",
     description:
-      "Takes a combatant out of the running fight (GM-grade only): its initiative entry, token and prompts go, the turn moves on first when it was its turn, and what it sustains ends: its grapples and Concentration, what lasts until its next turn, and a creature it swallowed, which climbs out of the corpse with the movement the stat block names and lands Prone. It stays on the roster.",
-    summary: "Take a combatant out of the running fight and end what it holds (GM).",
+      "Takes a combatant out of the running encounter (GM-grade only): its initiative entry, token and prompts go, the turn moves on first when it was its turn, and what it sustains ends: its grapples and Concentration, what lasts until its next turn, and a creature it swallowed, which climbs out of the corpse with the movement the stat block names and lands Prone. It stays on the roster.",
+    summary: "Take a combatant out of the running encounter and end what it holds (GM).",
     schema: RemoveCombatantSchema,
     malformed: "The remove-combatant command is malformed.",
-    gmOnly: "Only the GM can take a combatant out of the fight.",
+    gmOnly: "Only the GM can take a combatant out of the encounter.",
     async run({ request, executeTimeline }, kit) {
       const { actorId } = request;
       let outcome: TimelineOutcome | undefined;
@@ -290,7 +291,7 @@ export const encounterCommands = [
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
           throw new CommandRejectedError(
-            "Finish reviewing the combat history before taking a combatant out of the fight."
+            "Finish reviewing the combat history before taking a combatant out of the encounter."
           );
         // Hidden from the table as it leaves: it stays unknown to players, and so does its leaving.
         unseen = kit.hiddenFromTable(draft)(actorId);
@@ -314,7 +315,7 @@ export const encounterCommands = [
       kit.publishNarrations(effectEvents);
       kit.context.appendLog({
         kind: "encounter",
-        text: `${kit.actorName(actorId)} left the fight.`,
+        text: `${kit.actorName(actorId)} left the encounter.`,
         actorIds: [actorId],
         gmOnly: unseen || kit.actorHidden(actorId)
       });
@@ -367,7 +368,7 @@ export const encounterCommands = [
     type: "initiative.order-tie",
     operationId: "orderTiedCharacters",
     description:
-      "Puts a character directly ahead of another character tied with it on the same initiative score (SRD Initiative: the players decide the order among tied characters), before either has taken a turn in this fight. GM-grade for any character; a player session only for their own claimed character.",
+      "Puts a character directly ahead of another character tied with it on the same initiative score (SRD Initiative: the players decide the order among tied characters), before either has taken a turn in this encounter. GM-grade for any character; a player session only for their own claimed character.",
     summary: "Order your character before another character tied on initiative.",
     schema: InitiativeOrderTieSchema,
     malformed: "The tie order is malformed.",
@@ -439,8 +440,8 @@ export const encounterCommands = [
     type: "initiative.roll-remaining",
     operationId: "rollRemainingInitiative",
     description:
-      "Settles initiative for every combatant still pending a player roll with the provisional roll made at the start (GM-grade only). This begins a `wait`-mode fight.",
-    summary: "Use the start's rolls for every player still pending, and begin a wait-mode fight (GM).",
+      "Settles initiative for every combatant still pending a player roll with the provisional roll made at the start (GM-grade only). This begins a `wait`-mode encounter.",
+    summary: "Use the start's rolls for every player still pending, and begin a wait-mode encounter (GM).",
     schema: InitiativeRollRemainingSchema,
     malformed: "The initiative command is malformed.",
     gmOnly: "Only the GM can roll initiative for the rest of the table.",

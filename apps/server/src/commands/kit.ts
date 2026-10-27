@@ -171,7 +171,7 @@ export type CommandContext = Readonly<{
   newId: () => string;
   /** Best-effort hook after an encounter is archived, for the codex's combat history. Must swallow its own errors. */
   onEncounterArchived?: (
-    info: Readonly<{ mapAssetId: string | null; sceneId: string | null; turnCount: number }>
+    info: Readonly<{ mapAssetId: string | null; encounterId: string | null; turnCount: number }>
   ) => void;
   /** Best-effort hook after game time passed (a rest, or Pass time), so the Codex calendar's date moves with it.
    *  Must swallow its own errors. */
@@ -193,7 +193,7 @@ export type SoundPort = Readonly<{
   durationOf: (assetId: string) => number | null;
   view: () => SoundBoardView;
   /** Starts a scene's saved sound when it goes live, unless the GM turned that off. Best-effort. */
-  sceneWentLive: (sceneId: string, sourceRevision: number) => Promise<void>;
+  sceneWentLive: (encounterId: string, sourceRevision: number) => Promise<void>;
 }>;
 
 export type Kit = ReturnType<typeof createKit>;

@@ -110,7 +110,7 @@ describe("travel pace on the party's checks", () => {
     expect(lyra(state).effects).toEqual([]);
   });
 
-  it("leaves out a character in a running fight", () => {
+  it("leaves out a character in a running encounter", () => {
     const state = table();
     state.combat = {
       ...state.combat,

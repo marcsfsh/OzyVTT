@@ -56,7 +56,7 @@ describe("the GM's XP award", () => {
     await waitFor(() => expect(said).toHaveBeenCalledWith("Lyra gains 100 XP."));
   });
 
-  it("shares a fight's XP among its characters, from the monsters at 0 Hit Points", () => {
+  it("shares an encounter's XP among its characters, from the monsters at 0 Hit Points", () => {
     const actor = (id: string, kind: string, current: number) => ({ id, name: id, kind, hp: { current, maximum: 10 } });
     const state = {
       actors: [
@@ -80,8 +80,8 @@ describe("the GM's XP award", () => {
   });
 });
 
-describe("the fight menu's XP award", () => {
-  it("awards the fight's XP, at the lair XP when the GM says the fight was in their lair", async () => {
+describe("the encounter menu's XP award", () => {
+  it("awards the encounter's XP, at the lair XP when the GM says the encounter was in their lair", async () => {
     const award = vi.fn();
     const state = GameStateSchema.parse({ schemaVersion: 1 }) as unknown as GmView;
     render(
@@ -96,10 +96,10 @@ describe("the fight menu's XP award", () => {
       />
     );
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /Fight options/ }));
+    await user.click(screen.getByRole("button", { name: /Encounter options/ }));
     const xp = within(screen.getByRole("group", { name: "Experience Points" }));
     await user.click(xp.getByRole("switch", { name: "Fought in their lair" }));
-    await user.click(xp.getByRole("button", { name: "Award the fight's XP" }));
+    await user.click(xp.getByRole("button", { name: "Award the encounter's XP" }));
     expect(award).toHaveBeenCalledWith(true);
   });
 });

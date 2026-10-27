@@ -18,10 +18,10 @@ export function useForceRelease() {
     });
     if (!ok) return;
     let result = await command("character:force-release", { actorId: actor.id });
-    if (!result.ok && result.code === "in_fight") {
+    if (!result.ok && result.code === "in_encounter") {
       const again = await confirm({
-        title: `Release ${actor.name} mid-fight?`,
-        body: result.message ?? `${actor.name} is in the fight.`,
+        title: `Release ${actor.name} mid-encounter?`,
+        body: result.message ?? `${actor.name} is in the encounter.`,
         confirmLabel: "Release anyway",
         danger: true
       });

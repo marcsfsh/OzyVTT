@@ -66,20 +66,20 @@ export const soundCommands = [
     type: "sound.play",
     operationId: "playSound",
     description:
-      "Starts sound on the table screen (GM-grade only): the playlist (at `assetId`, or its first track, or a random one when shuffled), an ambient layer, a one-shot effect, or a scene's saved sound (`sceneId`). Playing anything lifts a pause. The server moves the playlist on by itself, with a short crossfade.",
-    summary: "Play the playlist, an ambient layer, an effect, or a scene's saved sound on the table screen (GM).",
+      "Starts sound on the table screen (GM-grade only): the playlist (at `assetId`, or its first track, or a random one when shuffled), an ambient layer, a one-shot effect, or an encounter's saved sound (`encounterId`). Playing anything lifts a pause. The server moves the playlist on by itself, with a short crossfade.",
+    summary: "Play the playlist, an ambient layer, an effect, or an encounter's saved sound on the table screen (GM).",
     schema: SoundPlaySchema,
     malformed: "The sound to play is malformed.",
     issueMessage: true,
     gmOnly: GM_ONLY,
     async run({ request }, kit) {
-      const { commandId, target, assetId, sceneId } = request;
+      const { commandId, target, assetId, encounterId } = request;
       const result = await soundOf(kit).run(commandId, (board, deps) => {
         if (target === "music") playMusic(board, assetId, deps);
         else if (target === "ambient") setLayerPlaying(board, assetId!, true, deps);
         else if (target === "effect") playEffect(board, assetId!, deps);
-        else if (!applyScenePreset(board, sceneId!, deps))
-          throw new CommandRejectedError("That scene has no sound saved.");
+        else if (!applyScenePreset(board, encounterId!, deps))
+          throw new CommandRejectedError("That encounter has no sound saved.");
       });
       return accepted(kit, result);
     }
@@ -136,24 +136,25 @@ export const soundCommands = [
   }),
 
   defineCommand({
-    type: "sound.set-scene-preset",
-    operationId: "setSceneSound",
+    type: "sound.set-encounter-preset",
+    operationId: "setEncounterSound",
     description:
-      "Gives a prepared scene a sound of its own (GM-grade only): `preset: save-current` saves the board's playlist and the ambient layers that are on, `clear` removes it, and `autoplay` says whether it starts when the scene goes live. Sounds of scenes that no longer exist are dropped.",
-    summary: "Save, clear, or switch on or off the sound a scene starts when it goes live (GM).",
+      "Gives a prepared encounter a sound of its own (GM-grade only): `preset: save-current` saves the board's playlist and the ambient layers that are on, `clear` removes it, and `autoplay` says whether it starts when the encounter goes live. Sounds of encounters that no longer exist are dropped.",
+    summary: "Save, clear, or switch on or off the sound an encounter starts when it goes live (GM).",
     schema: SoundScenePresetSchema,
-    malformed: "The scene sound command is malformed.",
+    malformed: "The encounter sound command is malformed.",
     issueMessage: true,
     gmOnly: GM_ONLY,
     async run({ request }, kit) {
-      const { commandId, sceneId, preset, autoplay } = request;
-      const sceneIds = new Set(kit.read().combat.scenes.map((scene) => scene.id));
-      if (preset !== "clear" && !sceneIds.has(sceneId)) throw new CommandRejectedError("That scene no longer exists.");
+      const { commandId, encounterId, preset, autoplay } = request;
+      const encounterIds = new Set(kit.read().combat.encounters.map((scene) => scene.id));
+      if (preset !== "clear" && !encounterIds.has(encounterId))
+        throw new CommandRejectedError("That encounter no longer exists.");
       const result = await soundOf(kit).run(commandId, (board) => {
-        prunePresets(board, sceneIds);
-        if (preset === "save-current") saveScenePreset(board, sceneId);
-        else if (preset === "clear") clearScenePreset(board, sceneId);
-        if (autoplay !== undefined) setPresetAutoplay(board, sceneId, autoplay);
+        prunePresets(board, encounterIds);
+        if (preset === "save-current") saveScenePreset(board, encounterId);
+        else if (preset === "clear") clearScenePreset(board, encounterId);
+        if (autoplay !== undefined) setPresetAutoplay(board, encounterId, autoplay);
       });
       return accepted(kit, result);
     }

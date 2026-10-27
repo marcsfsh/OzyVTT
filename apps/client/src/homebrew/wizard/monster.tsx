@@ -84,7 +84,7 @@ function ChallengeQuestion({ draft, onDraft, idPrefix }: StepProps) {
       <Field
         label="Challenge rating"
         htmlFor={`${idPrefix}-cr`}
-        help="The rating says how hard a fight it is for four characters of that level. It sets the Proficiency Bonus and the XP, as in every SRD stat block."
+        help="The rating says how hard an encounter it is for four characters of that level. It sets the Proficiency Bonus and the XP, as in every SRD stat block."
       >
         <Select
           id={`${idPrefix}-cr`}

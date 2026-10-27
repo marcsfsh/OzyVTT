@@ -20,7 +20,7 @@ const sceneWith = (initiativeDefaults?: Scene["initiativeDefaults"]) =>
     ...(initiativeDefaults ? { initiativeDefaults } : {})
   });
 const context = (scene: Scene): ScenesContextValue => ({
-  state: { revision: 7, combat: { scenes: [scene], activeSceneId: null, active: false }, actors: [] } as never,
+  state: { revision: 7, combat: { encounters: [scene], activeEncounterId: null, active: false }, actors: [] } as never,
   token: "gm",
   maps: [],
   reloadMaps: async () => [],
@@ -40,8 +40,8 @@ const show = (scene: Scene) =>
     </ToastProvider>
   );
 
-describe("a scene's Fight settings", () => {
-  it("reads as Start the fight would open when the scene has none", () => {
+describe("an encounter's Encounter settings", () => {
+  it("reads as Start the encounter would open when the encounter has none", () => {
     show(sceneWith());
     expect(screen.getByRole("switch", { name: "Players roll their own initiative" }).getAttribute("aria-checked")).toBe(
       "false"
@@ -51,11 +51,11 @@ describe("a scene's Fight settings", () => {
     ).toBe("true");
   });
 
-  it("saves both choices through the scene's command when one changes", async () => {
+  it("saves both choices through the encounter's command when one changes", async () => {
     show(sceneWith({ groupMonsters: false }));
     await userEvent.click(screen.getByRole("switch", { name: "Players roll their own initiative" }));
-    expect(command).toHaveBeenCalledWith("scene:set-initiative-defaults", {
-      sceneId: SCENE_ID,
+    expect(command).toHaveBeenCalledWith("encounter:set-initiative-defaults", {
+      encounterId: SCENE_ID,
       initiativeDefaults: { playersRollInitiative: true, groupMonsters: false },
       expectedRevision: 7
     });

@@ -1264,12 +1264,12 @@ export const SetEnvironmentSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Manual fog of war (GM-only). `sceneId` targets a parked scene's private prep; without it, the live table. */
+/** Manual fog of war (GM-only). `encounterId` targets a parked scene's private prep; without it, the live table. */
 export const FogSetEnabledSchema = z
   .object({
     commandId: z.uuid(),
     enabled: z.boolean(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1287,19 +1287,19 @@ export const FogPaintSchema = z
     commandId: z.uuid(),
     op: z.enum(["reveal", "hide"]),
     rect: PaintRectSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const FogResetSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 /** Traps (SRD 5.2.1 Gameplay Toolbox): the GM sets one of the toolbox's traps at a band of levels over a dragged area,
- *  hidden from the players. `sceneId` targets a parked scene. */
+ *  hidden from the players. `encounterId` targets a parked scene. */
 export const TrapPlaceSchema = z
   .object({
     commandId: z.uuid(),
@@ -1310,7 +1310,7 @@ export const TrapPlaceSchema = z
     /** The band of levels it is scaled for: 1 for levels 1-4, 2 for 5-10, 3 for 11-16, 4 for 17-20. */
     tier: z.number().int().min(1).max(4),
     rect: PaintRectSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1324,7 +1324,7 @@ export const TrapEditSchema = z
     blast: PaintRectSchema.nullable().optional(),
     found: z.boolean().optional(),
     state: z.enum(["armed", "disarmed"]).optional(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1332,7 +1332,7 @@ export const TrapRemoveSchema = z
   .object({
     commandId: z.uuid(),
     trapId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1366,31 +1366,31 @@ export const EnvironmentSetSchema = z
   .object({
     commandId: z.uuid(),
     environment: SceneEnvironmentSchema.partial(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 
 /** Painted ground (GM-only): mark a dragged area as difficult terrain, still or running water, or slippery ice, or clear
- *  every kind from it. `sceneId` targets a parked scene. */
+ *  every kind from it. `encounterId` targets a parked scene. */
 export const TerrainPaintSchema = z
   .object({
     commandId: z.uuid(),
     op: z.enum(["difficult", "water", "running-water", "ice", "clear"]),
     rect: PaintRectSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const TerrainResetSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 
-// Dynamic vision (ADR-0023). The GM's edits take `sceneId` to prep a parked scene, as fog and terrain do.
+// Dynamic vision (ADR-0023). The GM's edits take `encounterId` to prep a parked scene, as fog and terrain do.
 /** A map point in image pixels, before the server snaps and clamps it. */
 const VisionPointWireSchema = z
   .object({ x: z.number().min(-100000).max(1_000_000), y: z.number().min(-100000).max(1_000_000) })
@@ -1399,7 +1399,7 @@ export const VisionSetEnabledSchema = z
   .object({
     commandId: z.uuid(),
     enabled: z.boolean(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1409,7 +1409,7 @@ export const VisionSetAmbientSchema = z
     ambient: z.enum(["bright", "dim", "dark"]),
     /** The bright ambient light is sunlight (daylight outdoors). Left as it was when absent. */
     sunlight: z.boolean().optional(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1437,7 +1437,7 @@ export const VisionAreaAddSchema = z
       })
       .strict()
       .optional(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -1448,7 +1448,7 @@ export const VisionAreaRemoveSchema = z
   .object({
     commandId: z.uuid(),
     areaId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1493,7 +1493,7 @@ export const ItemSetFormSchema = z
 export const VisionResetExploredSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1503,7 +1503,7 @@ export const WallAddSchema = z
     commandId: z.uuid(),
     kind: z.enum(["wall", "door", "window"]),
     points: z.array(VisionPointWireSchema).min(2).max(64),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1513,7 +1513,7 @@ export const WallMoveSchema = z
     wallId: z.uuid(),
     a: VisionPointWireSchema,
     b: VisionPointWireSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1521,14 +1521,14 @@ export const WallRemoveSchema = z
   .object({
     commandId: z.uuid(),
     wallId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const WallClearSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1538,7 +1538,7 @@ export const DoorSetOpenSchema = z
     commandId: z.uuid(),
     wallId: z.uuid(),
     open: z.boolean(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1549,7 +1549,7 @@ export const DoorSetStateSchema = z
     commandId: z.uuid(),
     wallId: z.uuid(),
     door: DoorStateSchema.nullable(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1580,7 +1580,7 @@ export const ObjectSetSchema = z
     commandId: z.uuid(),
     wallId: z.uuid(),
     object: ObjectStatsSchema.nullable(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1616,7 +1616,7 @@ export const LightAddSchema = z
     actorId: z.uuid().optional(),
     brightFeet: z.number().min(0).max(240),
     dimFeet: z.number().min(0).max(240),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -1628,7 +1628,7 @@ export const LightMoveSchema = z
     commandId: z.uuid(),
     lightId: z.uuid(),
     position: VisionPointWireSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1636,7 +1636,7 @@ export const LightRemoveSchema = z
   .object({
     commandId: z.uuid(),
     lightId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1644,7 +1644,7 @@ export const LightRemoveSchema = z
 export const VisionPreviewSchema = z.object({ actorId: z.uuid().optional() }).strict();
 /** What a prepared or live scene shows one audience: the shared screen, or with `actorId` that party character's
  *  player. */
-export const ScenePreviewSchema = z.object({ sceneId: z.uuid(), actorId: z.uuid().optional() }).strict();
+export const ScenePreviewSchema = z.object({ encounterId: z.uuid(), actorId: z.uuid().optional() }).strict();
 export const ActorRestSchema = z
   .object({
     commandId: z.uuid(),
@@ -2300,7 +2300,7 @@ export const TokenMoveSchema = z
     /** Feet above the ground the move ends at; absent keeps the height it has. Rising or descending costs movement as
      *  distance does, and only flying, climbing, jumping, teleporting or a forced move changes it. */
     altitudeFeet: z.number().int().min(0).max(10000).optional(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -2405,7 +2405,7 @@ export const ActorSetArmorClassSchema = z
   })
   .strict();
 export const SceneNameSchema = z.string().trim().min(1).max(120);
-/** `activate: true` goes live on the new scene in the same command and parks whatever was live (as `scene.activate` does). */
+/** `activate: true` goes live on the new scene in the same command and parks whatever was live (as `encounter.activate` does). */
 export const SceneCreateSchema = z
   .object({
     commandId: z.uuid(),
@@ -2422,7 +2422,7 @@ export const SceneCreateSchema = z
 export const SceneSetInitiativeDefaultsSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid(),
+    encounterId: z.uuid(),
     initiativeDefaults: SceneInitiativeDefaultsSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -2430,7 +2430,7 @@ export const SceneSetInitiativeDefaultsSchema = z
 export const SceneRenameSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid(),
+    encounterId: z.uuid(),
     name: SceneNameSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -2438,7 +2438,7 @@ export const SceneRenameSchema = z
 export const SceneIdSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid(),
+    encounterId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -2454,7 +2454,7 @@ export const ReplayLaunchSchema = z
 export const SceneSetCombatantsSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid(),
+    encounterId: z.uuid(),
     combatantIds: z.array(z.uuid()).max(200),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -2580,16 +2580,16 @@ export const SoundArrangeSchema = z
 export const SoundPlaySchema = z
   .object({
     commandId: z.uuid(),
-    target: z.enum(["music", "ambient", "effect", "scene"]),
+    target: z.enum(["music", "ambient", "effect", "encounter"]),
     assetId: z.uuid().optional(),
-    sceneId: z.uuid().optional()
+    encounterId: z.uuid().optional()
   })
   .strict()
   .superRefine((value, context) => {
     if ((value.target === "ambient" || value.target === "effect") && !value.assetId)
       context.addIssue({ code: "custom", path: ["assetId"], message: "Name the sound to play." });
-    if (value.target === "scene" && !value.sceneId)
-      context.addIssue({ code: "custom", path: ["sceneId"], message: "Name the scene whose sound to play." });
+    if (value.target === "encounter" && !value.encounterId)
+      context.addIssue({ code: "custom", path: ["encounterId"], message: "Name the encounter whose sound to play." });
   });
 /** Stops the music, one ambient layer, or everything. */
 export const SoundStopSchema = z
@@ -2605,7 +2605,7 @@ export const SoundPauseSchema = z.object({ commandId: z.uuid(), paused: z.boolea
 export const SoundScenePresetSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid(),
+    encounterId: z.uuid(),
     preset: z.enum(["save-current", "clear"]).optional(),
     autoplay: z.boolean().optional()
   })

@@ -530,7 +530,7 @@ export const CodexMarkerSchema = z.strictObject({
   pageIds: z.array(z.uuid()).describe("Linked pages; for a player, filtered to the revealed subset."),
   subMapId: z.uuid().nullable().describe("Drill-down sub-map; nulled for a player when that map is not revealed."),
   /** Scenes staged from this pin: GM-only in every projection. */
-  sceneIds: z.array(z.uuid()).describe("Linked prepared scenes; GM-only, stripped from a player projection."),
+  encounterIds: z.array(z.uuid()).describe("Linked prepared scenes; GM-only, stripped from a player projection."),
   actorId: z.uuid().nullable(),
   createdAt: timestamp(),
   updatedAt: timestamp(),
@@ -558,7 +558,7 @@ export const PlayerCodexMarkerSchema = z
     isParty: z.boolean()
   })
   .describe(
-    "A pin as a player receives it: no `sceneIds`, no `actorId`, no `revealedToPlayers`, no timestamps, and page/sub-map links only when those targets are themselves revealed. `isParty` is here (the party pin is for the players), but it grants no visibility: a hidden party pin, or one on a hidden map, is exactly as hidden as any other."
+    "A pin as a player receives it: no `encounterIds`, no `actorId`, no `revealedToPlayers`, no timestamps, and page/sub-map links only when those targets are themselves revealed. `isParty` is here (the party pin is for the players), but it grants no visibility: a hidden party pin, or one on a hidden map, is exactly as hidden as any other."
   );
 export type PlayerCodexMarker = Wire<z.infer<typeof PlayerCodexMarkerSchema>>;
 
@@ -939,7 +939,7 @@ export const CodexSessionSchema = z
       "the codex-wide tag vocabulary, so sessions filter and cross-link like every other record. Single-layer (there is no GM-only tag) and player-facing on a revealed session."
     ),
     /** Scenes staged for this session. A dangling id is expected. */
-    sceneIds: z
+    encounterIds: z
       .array(z.uuid())
       .describe(
         "the prepared scenes staged for this session, so the GM can put any of them live in one tap at the table. GM-only, always: stricter than the session's own reveal, because a revealed session publishes its recap and tonight's planned fights are spoilers even then."
@@ -1630,7 +1630,7 @@ export type CodexRevealAudit = Wire<z.infer<typeof CodexRevealAuditSchema>>;
 /** One table scene and the Codex records that name it: sessions (staged for the session or in its prep's Encounters)
  *  and pins on the atlas. Scene ids are GM-only everywhere, so this read is too. */
 export const CodexSceneLinkSchema = z.strictObject({
-  sceneId: z.uuid(),
+  encounterId: z.uuid(),
   sessions: z.array(
     z.strictObject({
       id: z.uuid(),

@@ -213,7 +213,7 @@ export async function joinAndClaim(page: Page, name: string) {
 }
 
 /** Prep's pages, under Prep's section bar. */
-const PREP_PAGES = ["Scenes", "Party", "Maps", "Tokens", "Sound", "Replays"];
+const PREP_PAGES = ["Encounters", "Party", "Maps", "Tokens", "Sound", "Replays"];
 
 /** A GM section's tab: in the top bar on a laptop and the bottom tabs on a phone, under one name. */
 export const gmSection = (page: Page, name: "Play" | "Prep" | "Codex" | "Compendium") =>
@@ -255,14 +255,14 @@ export async function openGmSection(page: Page, name: string) {
  * sheet over the card.
  */
 export async function stageFight(page: Page, out: readonly string[], monster: string) {
-  const phone = !(await page.getByRole("region", { name: "In this fight" }).isVisible());
-  if (phone) await press(page.getByRole("button", { name: /^In this fight/ }));
+  const phone = !(await page.getByRole("region", { name: "In this encounter" }).isVisible());
+  if (phone) await press(page.getByRole("button", { name: /^In this encounter/ }));
   const list = phone
-    ? page.getByRole("dialog", { name: "In this fight" })
-    : page.getByRole("region", { name: "In this fight" });
+    ? page.getByRole("dialog", { name: "In this encounter" })
+    : page.getByRole("region", { name: "In this encounter" });
   for (const name of out) {
     await press(list.locator("label").filter({ hasText: name }));
-    await expect(list.getByRole("checkbox", { name: `${name} is in this fight` })).not.toBeChecked();
+    await expect(list.getByRole("checkbox", { name: `${name} is in this encounter` })).not.toBeChecked();
   }
   const adds = list.getByText("Add characters or monsters", { exact: true });
   if (await adds.isVisible()) await press(adds);
@@ -275,7 +275,7 @@ export async function stageFight(page: Page, out: readonly string[], monster: st
   await press(bestiary.getByRole("button", { name: "Close" }));
   // A monster already on the roster numbers the new one ("Goblin Minion 2").
   await expect(
-    list.getByRole("checkbox", { name: new RegExp(`^${monster}( \\d+)? is in this fight$`) }).last()
+    list.getByRole("checkbox", { name: new RegExp(`^${monster}( \\d+)? is in this encounter$`) }).last()
   ).toBeChecked();
   if (phone) await press(list.getByRole("button", { name: "Close" }).first());
 }

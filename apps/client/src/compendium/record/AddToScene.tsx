@@ -31,7 +31,9 @@ export function AddToScene({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   // A monster made for a scene whose staging was refused: kept, so a retry stages it rather than making another.
-  const [unstaged, setUnstaged] = useState<Readonly<{ actorId: string; sceneId: string; reason: string }> | null>(null);
+  const [unstaged, setUnstaged] = useState<Readonly<{ actorId: string; encounterId: string; reason: string }> | null>(
+    null
+  );
   const latest = useRef(game);
   latest.current = game;
   const { toast } = useToast();
@@ -51,21 +53,29 @@ export function AddToScene({
   }, [definitionId]);
   if (!inCatalog) return null;
 
-  const scenes = (game.combat.scenes ?? []).filter((scene) => !scene.replayOf);
-  const isLive = (sceneId: string) => game.combat.activeSceneId === sceneId;
+  const scenes = (game.combat.encounters ?? []).filter((scene) => !scene.replayOf);
+  const isLive = (encounterId: string) => game.combat.activeEncounterId === encounterId;
 
-  const stage = async (actorId: string, sceneId: string): Promise<boolean> => {
+  const stage = async (actorId: string, encounterId: string): Promise<boolean> => {
     const now = await settled(latest, actorId);
-    const scene = (now.combat.scenes ?? []).find((candidate) => candidate.id === sceneId);
-    if (!scene || now.combat.activeSceneId === sceneId || scene.combat.active) {
-      setUnstaged({ actorId, sceneId, reason: "That scene is live or holds a fight now. Add from the table instead." });
+    const scene = (now.combat.encounters ?? []).find((candidate) => candidate.id === encounterId);
+    if (!scene || now.combat.activeEncounterId === encounterId || scene.combat.active) {
+      setUnstaged({
+        actorId,
+        encounterId,
+        reason: "That encounter is live or its combat is parked. Add from the table instead."
+      });
       return false;
     }
     // The scene's own list from this snapshot, with the new monster added; the revision guards a staging made meanwhile.
     const combatantIds = [...new Set([...scene.combat.initiative.map((entry) => entry.actorId), actorId])];
-    const result = await command("scene:set-combatants", { sceneId, combatantIds, expectedRevision: now.revision });
+    const result = await command("encounter:set-combatants", {
+      encounterId,
+      combatantIds,
+      expectedRevision: now.revision
+    });
     if (!result.ok) {
-      setUnstaged({ actorId, sceneId, reason: result.message ?? "The scene could not take it." });
+      setUnstaged({ actorId, encounterId, reason: result.message ?? "The encounter could not take it." });
       return false;
     }
     setUnstaged(null);
@@ -73,11 +83,11 @@ export function AddToScene({
     return true;
   };
 
-  const add = async (sceneId: string) => {
+  const add = async (encounterId: string) => {
     setBusy(true);
     try {
-      if (unstaged && unstaged.sceneId === sceneId) {
-        if (await stage(unstaged.actorId, sceneId)) setOpen(false);
+      if (unstaged && unstaged.encounterId === encounterId) {
+        if (await stage(unstaged.actorId, encounterId)) setOpen(false);
         return;
       }
       const created = await command("actor:add-from-definition", {
@@ -89,7 +99,7 @@ export function AddToScene({
         toast(created.message ?? `${name} could not be added.`, { tone: "error" });
         return;
       }
-      if (await stage(created.actorId, sceneId)) setOpen(false);
+      if (await stage(created.actorId, encounterId)) setOpen(false);
     } finally {
       setBusy(false);
     }
@@ -98,14 +108,14 @@ export function AddToScene({
   return (
     <>
       <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
-        <IconPlus /> Add to a scene
+        <IconPlus /> Add to an encounter
       </Button>
-      <Modal open={open} onClose={() => setOpen(false)} title={`Add ${name} to a scene`} size="sm">
+      <Modal open={open} onClose={() => setOpen(false)} title={`Add ${name} to an encounter`} size="sm">
         {scenes.length === 0 ? (
           <div className="cp-add-scene-none">
-            <p className="cp-hint">No scene is prepared yet.</p>
+            <p className="cp-hint">No encounter is prepared yet.</p>
             <Button variant="secondary" onClick={() => navigate(SCENES_PATHS.newScene)}>
-              <IconPlus /> New scene
+              <IconPlus /> New encounter
             </Button>
           </div>
         ) : (
@@ -113,7 +123,7 @@ export function AddToScene({
             {scenes.map((scene) => {
               const live = isLive(scene.id);
               const parked = !live && scene.combat.active;
-              const retry = unstaged?.sceneId === scene.id;
+              const retry = unstaged?.encounterId === scene.id;
               return (
                 <li key={scene.id}>
                   <Button
@@ -127,8 +137,8 @@ export function AddToScene({
                   {(live || parked) && (
                     <p className="cp-hint">
                       {live
-                        ? "Live now: add from the table's Fight menu."
-                        : "A fight is parked here: add from the table once it is live."}
+                        ? "Live now: add from the table's Encounter menu."
+                        : "Combat is parked here: add from the table once it is live."}
                     </p>
                   )}
                   {retry && (

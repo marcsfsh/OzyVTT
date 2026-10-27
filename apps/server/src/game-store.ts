@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { GameStateSchema, type GameState, type RefusalCode, type TurnHistoryEntry } from "@vtt/domain";
 import { migrate, openDatabase, transaction, type Migration } from "./database.js";
+import { renameEncounterCommand, renameEncounterJson } from "./encounter-rename.js";
 import type { RuleId } from "./rules-families.js";
 
 /** An expected refusal. `code` is what a client branches on (see `RefusalCode`); the message is for people. */
@@ -110,7 +111,7 @@ export type EncounterArchiveInput = Readonly<{
   turnCount: number;
   documentJson: string;
   /** The live scene the fight was on, which names the replay until the GM gives it a name. */
-  sceneName?: string | null;
+  encounterName?: string | null;
 }>;
 export type EncounterArchiveSummary = Readonly<{
   id: number;
@@ -122,7 +123,7 @@ export type EncounterArchiveSummary = Readonly<{
   /** The GM's own name for the replay, or null. */
   name: string | null;
   /** The scene the fight was on; GM-only. */
-  sceneName: string | null;
+  encounterName: string | null;
 }>;
 
 type SqlWrite = Readonly<{ sql: string; params: readonly (string | number | null)[] }>;
@@ -213,6 +214,30 @@ const MIGRATIONS: readonly Migration[] = [
         ALTER TABLE encounter_archives ADD COLUMN name TEXT;
         ALTER TABLE encounter_archives ADD COLUMN scene_name TEXT;
       `)
+  },
+  {
+    // A scene is an encounter (ADR-0041): every saved document and command name moves to the new names. Columns
+    // keep theirs; they never leave the server.
+    version: 4,
+    up: (database) => {
+      const rewrite = (table: string, column: string, change: (value: string) => string) => {
+        const rows = database.prepare(`SELECT rowid AS row_id, ${column} AS value FROM ${table}`).all() as {
+          row_id: number;
+          value: string;
+        }[];
+        const update = database.prepare(`UPDATE ${table} SET ${column} = ? WHERE rowid = ?`);
+        for (const row of rows) {
+          const next = change(row.value);
+          if (next !== row.value) update.run(next, row.row_id);
+        }
+      };
+      rewrite("game_state", "state_json", renameEncounterJson);
+      rewrite("turn_snapshots", "state_json", renameEncounterJson);
+      rewrite("encounter_archives", "document_json", renameEncounterJson);
+      rewrite("encounter_journal", "payload_json", renameEncounterJson);
+      rewrite("encounter_journal", "command_type", renameEncounterCommand);
+      rewrite("command_receipts", "command_type", renameEncounterCommand);
+    }
   }
 ];
 
@@ -324,7 +349,7 @@ export class GameStore {
               row.endedAt,
               row.turnCount,
               row.documentJson,
-              row.sceneName ?? null
+              row.encounterName ?? null
             ]
           });
         },
@@ -398,7 +423,7 @@ export class GameStore {
       turnCount: row.turn_count,
       playerVisible: row.player_visible === 1,
       name: row.name,
-      sceneName: row.scene_name
+      encounterName: row.scene_name
     }));
   }
   /** The GM names a replay, or takes the name away with null; false if missing. */

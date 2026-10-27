@@ -1,3 +1,4 @@
+import { renameEncounterKeys } from "../encounter-rename.js";
 import type {
   CodexBlock,
   CodexCalendar,
@@ -260,7 +261,10 @@ const BUNDLE_KEYS: ReadonlySet<string> = new Set<string>([...BUNDLE_LIST_KEYS, .
 function normalizeBundle(raw: unknown): NormalizedBundle {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new CodexValidationError("That backup file is not a codex bundle.");
-  const bundle = raw as Record<string, unknown>;
+  // A backup from before ADR-0041 links encounters as `sceneIds`; it reads as the upgrade reads the Codex itself.
+  const bundle = { ...(raw as Record<string, unknown>) };
+  for (const key of ["markers", "sessions", "prepTemplates"])
+    if (key in bundle) bundle[key] = renameEncounterKeys(bundle[key]);
   const unrecognised = Object.keys(bundle).find((key) => !BUNDLE_KEYS.has(key));
   if (unrecognised !== undefined)
     throw new CodexValidationError(
@@ -413,7 +417,7 @@ function normalizeBundle(raw: unknown): NormalizedBundle {
     revealedToPlayers: flag(row.revealedToPlayers),
     pageIds: idArray(row.pageIds as string[] | undefined),
     subMapId: optionalId(nullableText(row.subMapId)),
-    sceneIds: idArray(row.sceneIds as string[] | undefined),
+    encounterIds: idArray(row.encounterIds as string[] | undefined),
     actorId: optionalId(nullableText(row.actorId)),
     tags: tags(stringList(row.tags)),
     isParty: flag(row.isParty),
@@ -445,7 +449,7 @@ function normalizeBundle(raw: unknown): NormalizedBundle {
       revealedToPlayers: flag(row.revealedToPlayers),
       status: sessionStatus(typeof row.status === "string" ? row.status : undefined),
       tags: tags(stringList(row.tags)),
-      sceneIds: sessionSceneIds(stringList(row.sceneIds)),
+      encounterIds: sessionSceneIds(stringList(row.encounterIds)),
       rev: Math.max(1, count(row.rev, 1)),
       createdAt: text(row.createdAt),
       updatedAt: text(row.updatedAt),

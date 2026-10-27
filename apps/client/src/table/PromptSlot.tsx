@@ -306,7 +306,7 @@ export function PromptSlot({
       case "initiative":
         card = (
           <PromptCard
-            eyebrow="The fight starts"
+            eyebrow="The encounter starts"
             title={`Roll initiative for ${first.actor.name}`}
             headingRef={headingRef}
           >

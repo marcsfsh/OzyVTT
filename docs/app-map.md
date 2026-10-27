@@ -38,7 +38,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `check`, `crafting`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `environment`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `trap`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `check`, `crafting`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `environment`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `trap`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -126,23 +126,31 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
 | `door.set-open` | `combat:write` |
-| `door.set-state` | `scene:write` |
+| `door.set-state` | `encounter:write` |
 | `door.use` | `combat:write` |
 | `effect.add` | `combat:write` |
 | `effect.end` | `combat:write` |
+| `encounter.activate` | `encounter:write` |
 | `encounter.add-combatant` | `combat:write` |
+| `encounter.create` | `encounter:write` |
+| `encounter.duplicate` | `encounter:write` |
 | `encounter.end` | `combat:write` |
+| `encounter.remove` | `encounter:write` |
 | `encounter.remove-combatant` | `combat:write` |
+| `encounter.rename` | `encounter:write` |
+| `encounter.reorder` | `encounter:write` |
+| `encounter.set-combatants` | `encounter:write` |
 | `encounter.set-environment` | `combat:write` |
 | `encounter.set-health-display` | `combat:write` |
+| `encounter.set-initiative-defaults` | `encounter:write` |
 | `encounter.set-player-damage-mode` | `combat:write` |
 | `encounter.set-player-initiative-mode` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.start` | `combat:write` |
-| `environment.set` | `scene:write` |
-| `fog.paint` | `scene:write` |
-| `fog.reset` | `scene:write` |
-| `fog.set-enabled` | `scene:write` |
+| `environment.set` | `encounter:write` |
+| `fog.paint` | `encounter:write` |
+| `fog.reset` | `encounter:write` |
+| `fog.set-enabled` | `encounter:write` |
 | `initiative.next` | `combat:write` |
 | `initiative.order-tie` | `combat:write` |
 | `initiative.previous` | `combat:write` |
@@ -152,12 +160,12 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `initiative.swap` | `combat:write` |
 | `item.set-form` | `combat:write` |
 | `item.set-light` | `combat:write` |
-| `light.add` | `scene:write` |
-| `light.move` | `scene:write` |
-| `light.remove` | `scene:write` |
+| `light.add` | `encounter:write` |
+| `light.move` | `encounter:write` |
+| `light.remove` | `encounter:write` |
 | `object.attack` | `combat:write` |
 | `object.damage` | `combat:write` |
-| `object.set` | `scene:write` |
+| `object.set` | `encounter:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
 | `replay.launch` | `combat:write` |
@@ -177,20 +185,12 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `save.answer` | `combat:write` |
 | `save.dismiss` | `combat:write` |
 | `save.roll` | `combat:write` |
-| `scene.activate` | `scene:write` |
-| `scene.create` | `scene:write` |
-| `scene.duplicate` | `scene:write` |
-| `scene.remove` | `scene:write` |
-| `scene.rename` | `scene:write` |
-| `scene.reorder` | `scene:write` |
-| `scene.set-combatants` | `scene:write` |
-| `scene.set-initiative-defaults` | `scene:write` |
-| `sound.arrange` | `scene:write` |
-| `sound.next-track` | `scene:write` |
-| `sound.pause` | `scene:write` |
-| `sound.play` | `scene:write` |
-| `sound.set-scene-preset` | `scene:write` |
-| `sound.stop` | `scene:write` |
+| `sound.arrange` | `encounter:write` |
+| `sound.next-track` | `encounter:write` |
+| `sound.pause` | `encounter:write` |
+| `sound.play` | `encounter:write` |
+| `sound.set-encounter-preset` | `encounter:write` |
+| `sound.stop` | `encounter:write` |
 | `spell-zone.end` | `combat:write` |
 | `spell-zone.place` | `combat:write` |
 | `summon.command` | `combat:write` |
@@ -200,31 +200,31 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `survival.set-tracking` | `combat:write` |
 | `table.set-party-visibility` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
-| `terrain.paint` | `scene:write` |
-| `terrain.reset` | `scene:write` |
+| `terrain.paint` | `encounter:write` |
+| `terrain.reset` | `encounter:write` |
 | `time.pass` | `combat:write` |
 | `time.set-dawn` | `combat:write` |
 | `token.move` | `combat:write` |
 | `token.set-altitude` | `combat:write` |
 | `trap.disarm` | `combat:write` |
-| `trap.edit` | `scene:write` |
-| `trap.place` | `scene:write` |
-| `trap.remove` | `scene:write` |
+| `trap.edit` | `encounter:write` |
+| `trap.place` | `encounter:write` |
+| `trap.remove` | `encounter:write` |
 | `trap.spring` | `combat:write` |
 | `turn.end` | `combat:write` |
 | `turn.order` | `combat:write` |
 | `turn.use` | `combat:write` |
 | `turn.use-legendary` | `combat:write` |
 | `turn.use-reaction` | `combat:write` |
-| `vision.add-area` | `scene:write` |
-| `vision.remove-area` | `scene:write` |
-| `vision.reset-explored` | `scene:write` |
-| `vision.set-ambient` | `scene:write` |
-| `vision.set-enabled` | `scene:write` |
-| `wall.add` | `scene:write` |
-| `wall.clear` | `scene:write` |
-| `wall.move` | `scene:write` |
-| `wall.remove` | `scene:write` |
+| `vision.add-area` | `encounter:write` |
+| `vision.remove-area` | `encounter:write` |
+| `vision.reset-explored` | `encounter:write` |
+| `vision.set-ambient` | `encounter:write` |
+| `vision.set-enabled` | `encounter:write` |
+| `wall.add` | `encounter:write` |
+| `wall.clear` | `encounter:write` |
+| `wall.move` | `encounter:write` |
+| `wall.remove` | `encounter:write` |
 
 ## HTTP surface
 
@@ -240,6 +240,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/codex/calendar/unpublish`
 - `GET /api/v1/codex/connections`
 - `DELETE PATCH /api/v1/codex/connections/{id}`
+- `GET /api/v1/codex/encounter-links`
 - `GET /api/v1/codex/export`
 - `GET POST /api/v1/codex/folders`
 - `POST /api/v1/codex/folders/delete`
@@ -290,7 +291,6 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `PUT /api/v1/codex/quests/{id}/objectives/{objectiveId}/audience`
 - `POST /api/v1/codex/quests/{id}/reveal`
 - `GET /api/v1/codex/reveal-audit`
-- `GET /api/v1/codex/scene-links`
 - `GET /api/v1/codex/search`
 - `GET POST /api/v1/codex/sessions`
 - `DELETE GET PATCH /api/v1/codex/sessions/{id}`
@@ -323,11 +323,6 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `GET /api/v1/content/species`
 - `GET /api/v1/content/spells`
 - `GET /api/v1/content/subclasses`
-- `GET /api/v1/encounters`
-- `DELETE GET /api/v1/encounters/{id}`
-- `POST /api/v1/encounters/{id}/launch`
-- `POST /api/v1/encounters/{id}/name`
-- `POST /api/v1/encounters/{id}/visibility`
 - `GET /api/v1/game`
 - `POST /api/v1/game/actions/resolve`
 - `POST /api/v1/game/actions/use`
@@ -438,6 +433,16 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/encounter/player-initiative-mode`
 - `POST /api/v1/game/encounter/rules-mode`
 - `POST /api/v1/game/encounter/start`
+- `POST /api/v1/game/encounters`
+- `DELETE /api/v1/game/encounters/{encounterId}`
+- `POST /api/v1/game/encounters/{encounterId}/activate`
+- `POST /api/v1/game/encounters/{encounterId}/combatants`
+- `POST /api/v1/game/encounters/{encounterId}/duplicate`
+- `POST /api/v1/game/encounters/{encounterId}/initiative-defaults`
+- `GET /api/v1/game/encounters/{encounterId}/preview`
+- `POST /api/v1/game/encounters/{encounterId}/rename`
+- `POST /api/v1/game/encounters/{encounterId}/sound`
+- `POST /api/v1/game/encounters/reorder`
 - `POST /api/v1/game/environment`
 - `POST /api/v1/game/experience/award`
 - `POST /api/v1/game/fog/enabled`
@@ -474,16 +479,6 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/saves/{saveId}/answer`
 - `POST /api/v1/game/saves/{saveId}/dismiss`
 - `POST /api/v1/game/saves/roll`
-- `POST /api/v1/game/scenes`
-- `DELETE /api/v1/game/scenes/{sceneId}`
-- `POST /api/v1/game/scenes/{sceneId}/activate`
-- `POST /api/v1/game/scenes/{sceneId}/combatants`
-- `POST /api/v1/game/scenes/{sceneId}/duplicate`
-- `POST /api/v1/game/scenes/{sceneId}/initiative-defaults`
-- `GET /api/v1/game/scenes/{sceneId}/preview`
-- `POST /api/v1/game/scenes/{sceneId}/rename`
-- `POST /api/v1/game/scenes/{sceneId}/sound`
-- `POST /api/v1/game/scenes/reorder`
 - `GET /api/v1/game/sound`
 - `POST /api/v1/game/sound/arrange`
 - `POST /api/v1/game/sound/next-track`
@@ -567,6 +562,11 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `PUT /api/v1/map-assets/{id}/scale`
 - `POST /api/v1/map-assets/folders/rename`
 - `GET /api/v1/openapi.json`
+- `GET /api/v1/replays`
+- `DELETE GET /api/v1/replays/{id}`
+- `POST /api/v1/replays/{id}/launch`
+- `POST /api/v1/replays/{id}/name`
+- `POST /api/v1/replays/{id}/visibility`
 - `POST /api/v1/sessions/player`
 - `GET POST /api/v1/sound-assets`
 - `DELETE PATCH /api/v1/sound-assets/{id}`

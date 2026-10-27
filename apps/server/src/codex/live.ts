@@ -122,7 +122,7 @@ export function boardFor(store: CodexStore, session: CodexSession): CodexLiveBoa
         ? [{ id: quest.id, title: quest.title, status: quest.status, revealedToPlayers: quest.revealedToPlayers }]
         : [];
     }),
-    encounterSceneIds: picked(session, (section) => (section.type === "encounters" ? section.sceneIds : [])),
+    encounterSceneIds: picked(session, (section) => (section.type === "encounters" ? section.encounterIds : [])),
     logged: filed.slice(-BOARD_LOGGED).map((entry) => ({
       id: entry.id,
       kind: entry.kind,

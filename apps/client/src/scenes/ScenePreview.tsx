@@ -12,7 +12,7 @@ export type SeeAs = "gm" | "screen" | Readonly<{ actorId: string; name: string }
 /**
  * What one audience receives of the scene if it went live now, drawn by the component that audience's device uses:
  * the table screen's map stage, or the map as that player's phone or laptop draws it. The server builds it from the
- * same projections as the real feeds (`scene:preview`), and it is read again whenever the game changes.
+ * same projections as the real feeds (`encounter:preview`), and it is read again whenever the game changes.
  */
 export function ScenePreview({
   facts,
@@ -21,12 +21,12 @@ export function ScenePreview({
   revision
 }: Readonly<{ facts: SceneFacts; seeAs: Exclude<SeeAs, "gm">; token: string; revision: number }>) {
   const actorId = seeAs === "screen" ? undefined : seeAs.actorId;
-  const sceneId = facts.scene.id;
+  const encounterId = facts.scene.id;
   const [reply, setReply] = useState<ScenePreviewReply | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    void read("scene:preview", { sceneId, ...(actorId ? { actorId } : {}) }).then((result) => {
+    void read("encounter:preview", { encounterId, ...(actorId ? { actorId } : {}) }).then((result) => {
       if (!active) return;
       if (result.ok && result.mapAssetId) {
         setReply(result as ScenePreviewReply);
@@ -36,7 +36,7 @@ export function ScenePreview({
     return () => {
       active = false;
     };
-  }, [sceneId, actorId, revision]);
+  }, [encounterId, actorId, revision]);
   const image = useAuthorizedMapImage(seeAs === "screen" ? facts.scene.mapAssetId : null, token);
 
   if (failure)

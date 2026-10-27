@@ -124,7 +124,7 @@ seconds before "offline".
 - **Player.** No password. Joining issues a signed 30-day token. A player claims one
   player-character at a time; the claim sets that character's `ownerSessionId`. A player may
   act only on the character they own: move it, roll for it, level it, set its token image. The
-  GM can force-release a claim (asked twice for a character in the running fight); the player is
+  GM can force-release a claim (asked twice for a character in the running encounter); the player is
   told on their own devices (`claim:released`).
 - **Integration credential.** A GM-minted, scoped bearer token for the HTTP API (ADR-0016).
 - **Table viewer.** The screen shows a six-digit code and the GM types it; the screen's own secret,
@@ -132,7 +132,7 @@ seconds before "offline".
   projection.
 
 Role comes from the signed token, never from network position. Archived characters cannot be
-claimed, staged or added to a fight.
+claimed, staged or added to an encounter.
 
 Every HTTP route and the socket handshake read the caller through one helper (`request-auth.ts`,
 ADR-0027): 401 for no credential or one that is malformed, expired or revoked, and 403 only for a
@@ -147,9 +147,9 @@ audience. There are five:
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
   get only `public` actors, a health band with no exact HP, and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
-  owner identity, GM notes and hidden turns are removed. A live scene's map reaches players before
-  its fight, with the public tokens the GM has placed; the turn order and the tray wait for the
-  fight. A player's reply to an area they aimed names only the creatures they may see. A player's
+  owner identity, GM notes and hidden turns are removed. A live encounter's map reaches players before
+  its combat, with the public tokens the GM has placed; the turn order and the tray wait for
+  combat. A player's reply to an area they aimed names only the creatures they may see. A player's
   reaction prompt names the attack total it answers only when the attack's own roll is in that
   player's dice log. An unclaimed character carries its species and class line for the claim
   picker, since any player could claim it and read its sheet. The options a player pins to the
@@ -166,10 +166,10 @@ audience. There are five:
   A trap the party hasn't found never reaches a player or the table screen; a found one carries its name, area and
   state, and for players the names of the ways to make it safe while it is armed, never its band of levels or a DC
   (`playerTraps`, `visibleTraps` in `traps.ts`). What Find Traps senses reaches the initiator's reply alone, by
-  nature (`sensed`), while where each trap lies is a GM-only line. The scene's weather (`combat.environment`) and
+  nature (`sensed`), while where each trap lies is a GM-only line. The encounter's weather (`combat.environment`) and
   a creature's exposure counters (`exposure`) are GM-only.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
-  room that may hold non-players. It follows the live scene, before and during its fight, unless
+  room that may hold non-players. It follows the live encounter, before and during its combat, unless
   the GM paused it. Only public actors with a position become tokens; annotations
   are public and unexpired; initiative appears only during combat; nothing is shown while
   paused. The fields that may cross are the `ViewerEncounterScene` and
@@ -178,7 +178,7 @@ audience. There are five:
   position, never a name, the playlist or the library. The screen may fetch a sound file only
   while it is in that projection. `latestRoll` (`viewer-roll.ts`, ADR-0040) is built on each send
   from an allow-list: the newest `public` roll that isn't the builder's, by no creature or one the
-  table can see (`hiddenFrom`), made since the presentation's `rollsSince`, the live scene's
+  table can see (`hiddenFrom`), made since the presentation's `rollsSince`, the live encounter's
   `liveAt` and the last ten minutes; it carries who, what, total, dice and modifier, and an id of
   its own.
 - **Codex** (`codex-projections.ts`): a player gets the parts of a revealed record that reach
@@ -194,7 +194,7 @@ audience. There are five:
   reader only once a write has stamped it for their audience, so an unstamped block fails closed.
   Reveal is a graph: a child never leaks an unrevealed parent or target, and `codex/visibility.ts`
   resolves a record's neighbours for the projection. Some fields are GM-only even when revealed:
-  staged scene ids on markers and sessions, and a page's folder path, which is the GM's private
+  staged encounter ids on markers and sessions, and a page's folder path, which is the GM's private
   filing (a player's `folder` filter on the page list is ignored). A page's `updatedAt` moves on
   every save, so it stays with the GM too; players get `playerUpdatedAt`, which moves only when
   something that reader can read changes. A record's `createdAt` would tell players when the GM
@@ -231,16 +231,16 @@ audience. There are five:
   switched off takes its records out of every catalog and picker while a character keeps its items
   and spells. The GM's See as reads one reader's catalog through GM-only routes. Players never get a
   pack name, an audience or a reveal date.
-- **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
+- **Replay** (`replay-projection.ts`): a shared encounter archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public. A player's
-  list of shared replays carries the GM's name for one, never the name of the scene it was fought on.
+  list of shared replays carries the GM's name for one, never the name of the encounter it was fought on.
 
 Sight is part of the boundary (ADR-0023). `vision/audience.ts` decides, per audience, which
 creatures it may know of. A player sees through their own placed characters; the table viewer, a
 spectator and a replay see through the whole party. A creature that isn't a player character is
 hidden from an audience, exactly like a `gm-only` one, when none of its characters perceive it
-(dynamic vision on), or when its whole space lies under the scene's manual fog (fog on). The same
-goes for one staged that way in a prepared scene, and, with the fog on, for one in the fight but not
+(dynamic vision on), or when its whole space lies under the encounter's manual fog (fog on). The same
+goes for one staged that way in a prepared encounter, and, with the fog on, for one in the encounter but not
 yet on the map. Every projection, the feed and toast gate, and a player's target check read that one
 answer (`AudienceSight`). Rules, narration and refusals ask it through `hiddenFrom`, the shared hidden
 check: GM-only, or hidden by sight or the fog, for the table or for one player. A line that would
@@ -268,15 +268,15 @@ of a hidden thing. When in doubt, leave it out.
   centre, even footprints on an intersection, gridless maps only clamp. Client snapping is a
   preview that mirrors the server.
 - Drawings, measurements and pings live in `annotations.ts`. Fog is an ordered list of
-  reveal/hide rectangles per scene (`fog.ts`). Scenes park and resume a fight (`scenes.ts`).
-- A prepared scene is edited through the same commands as the live table, each with the scene's
-  `sceneId`. Each scene carries when it was made, last changed and last live (`createdAt`,
-  `updatedAt`, `liveAt`), GM-only like the rest of `combat.scenes`; the server stamps a change
-  after each mutation (`stampSceneChanges`). `scene:preview` (GM only, `scene-preview.ts`)
-  answers what the table screen or one party character would get if a scene went live now: it
-  makes the scene live in a copy of the state and runs the real projections over it, and nothing
+  reveal/hide rectangles per encounter (`fog.ts`). Prepared encounters park and resume their combat (`scenes.ts`).
+- A prepared encounter is edited through the same commands as the live table, each with the encounter's
+  `encounterId`. Each encounter carries when it was made, last changed and last live (`createdAt`,
+  `updatedAt`, `liveAt`), GM-only like the rest of `combat.encounters`; the server stamps a change
+  after each mutation (`stampSceneChanges`). `encounter:preview` (GM only, `scene-preview.ts`)
+  answers what the table screen or one party character would get if an encounter went live now: it
+  makes the encounter live in a copy of the state and runs the real projections over it, and nothing
   is committed (ADR-0035).
-- Dynamic vision (ADR-0023) is per scene and off by default: walls, doors and windows as
+- Dynamic vision (ADR-0023) is per encounter and off by default: walls, doors and windows as
   image-pixel segments, placed and carried lights, an ambient light level (sunlight or not), and
   painted areas of Bright Light, Dim Light, Darkness, light or heavy obscurement and magical
   Darkness (`vision/edit.ts`, `vision/areas.ts`). The server builds each viewer's visibility
@@ -287,7 +287,7 @@ of a hidden thing. When in doubt, leave it out.
   `item-light.ts`, which burns a light down on the game clock). A cast or an action places its
   light, fog or magical Darkness and dispels what it overlaps; each ends with the Concentration,
   effect or rounds that keep it (`vision/cast-sight.ts`). After every command the server adds what
-  the party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
+  the party sees to the encounter's explored memory (`rememberExplored`). Players and the table screen
   get only polygons and rectangles to paint: what is in sight, the bright part of it, and what
   has been seen. While vision is on, walls, closed doors and windows also bar movement.
 - The rules read sight through `vision/rules.ts` (`sightRules`), which answers with the map while
@@ -303,7 +303,7 @@ of a hidden thing. When in doubt, leave it out.
   sees whom (`sees-other`, `seen-by-other`, `other-lacks-sense`), Blinded and Heavily Obscured
   checks, a save that needs its source seen (a gaze, a pattern), and the traits and features that
   ask for sunlight, Bright Light, or Dim Light and Darkness.
-- Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
+- Difficult terrain is a GM-painted set of cell-snapped rectangles per encounter (`terrain.ts`).
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
   dragging a grappled creature, add a foot per foot (`movementPath` and `spacePassage` in
@@ -364,7 +364,7 @@ of a hidden thing. When in doubt, leave it out.
   air (`settleFalls`, its own commit): a flier that is Prone, Incapacitated or at a Fly Speed of 0
   without hover, or left with nothing to fly with, falls; a levitation that ended, or a flight that
   ends safely (`descends-safely`), lowers it gently. The GM starts any other fall with `actor.fall`.
-  A fall in a fight first offers the reactions that answer it (a `falls` prompt: Feather Fall from a
+  A fall in an encounter first offers the reactions that answer it (a `falls` prompt: Feather Fall from a
   creature that sees the faller in range, the faller's own Slow Fall) and waits on them in
   `combat.pendingFalls`; then the server rolls 1d6 per 10 feet to 20d6 through the damage rules and
   leaves the creature Prone unless it took no damage.
@@ -405,7 +405,7 @@ of a hidden thing. When in doubt, leave it out.
   takes its creature off the map in the settle step, keeping its place in the initiative and the space it
   left in `combat.offPlane` (GM-only); it can't target or be targeted across the plane, and when the
   effect ends it returns to that space or the nearest unoccupied one, or beside the creature that holds
-  it (`besideActorId`). A creature sent to its home plane or one that stays gone leaves the fight.
+  it (`besideActorId`). A creature sent to its home plane or one that stays gone leaves the encounter.
   Blink's d6 is rolled by the server as the caster's turn ends.
 - The Border Ethereal (`ethereal.ts`): an effect tagged `ethereal` (Etherealness, a ghost's or
   nightmare's own, Blink's Ethereal turns, Plate Armor and Oil of Etherealness) keeps its token on the
@@ -438,7 +438,7 @@ of a hidden thing. When in doubt, leave it out.
   its key holders, stuck, barred, jammed with a spike, sealed by Stone Shape, an Arcane Lock), and
   `door.set-open` refuses a player one held shut against their character. `door.use` picks, forces, pries,
   jams or seals a door beside the acting creature, the server rolling the check and spending the Utilize action in a
-  fight (`doors.ts`, `utilize.ts`); `door.set-state`
+  encounter (`doors.ts`, `utilize.ts`); `door.set-state`
   is the GM's. A wall or door may be an object with AC and Hit Points (`VisionWall.object`), as is what holds a
   creature (`EffectInstance.heldBy`: a Net, a web, a rope). `object.attack` rolls an attack against one
   (`object-strikes.ts`), `object.damage` is the GM's, and at 0 Hit Points a wall or door is gone and a held
@@ -472,7 +472,7 @@ says: on an attack roll or a spell cast with a Verbal component (`resolution/rel
 the Hide total; a sound louder than a whisper is the GM's. Every condition
 write goes through `applyCondition` in `effects.ts`, which honours innate and item-granted
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
-Concentration and its grapples). In a fight, effects count down at turn start and turn end; the
+Concentration and its grapples). In an encounter, effects count down at turn start and turn end; the
 start of a turn deals any ongoing damage, and the end opens any repeat saves
 (`turn-boundaries.ts`). Two or more things that change Hit Points at the same moment (ongoing damage,
 Temporary Hit Points or Hit Points regained, a trait that burns or regenerates) wait in `combat.turnSteps`
@@ -491,8 +491,8 @@ wall of fire) opens a zone on the template the cast placed, or around its caster
 runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
 such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
 (`lasting-spells.ts`). A zone lasts while its caster's Concentration does, or the effect a spell with none
-leaves on its caster, so it opens outside a fight too (where it acts on the creatures the GM moves into
-it), counts down on the game clock, outlasts a fight and is carried into the next one on the same map.
+leaves on its caster, so it opens outside an encounter too (where it acts on the creatures the GM moves into
+it), counts down on the game clock, outlasts an encounter and is carried into the next one on the same map.
 A zone may act only on the creature types it names (Forbiddance), tell the GM who came in (Alarm), end
 its spell the first time it acts and burst over its area (Glyph of Warding, drawn for the GM and its
 caster alone), or raise a barrier at its edge (`zone-barriers.ts`): a step across it closes the path
@@ -569,12 +569,12 @@ Identify marks a carried row its player then reads in full (`resolution/identify
 stress (`resolution/wish.ts`); and Reincarnate rebuilds a character from its ledger as the rolled species after the
 cast lands (`reincarnation.ts`).
 
-Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
+Durations run on two clocks. In an encounter they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), finishing the party's
 Long Rest moves it to the rest's end and finishing the party's Short Rest moves it an hour, and `passGameTime`
-(`game-time.ts`) counts every creature's effects down by it, 10 rounds to the minute. A fight's rounds
-don't move the clock. When a fight ends, what has a minute (10 rounds) or less left ends with it, and
-anything longer carries on in game time; a parked fight's combatants and a replay's copies wait outside
+(`game-time.ts`) counts every creature's effects down by it, 10 rounds to the minute. An encounter's rounds
+don't move the clock. When an encounter ends, what has a minute (10 rounds) or less left ends with it, and
+anything longer carries on in game time; a parked encounter's combatants and a replay's copies wait outside
 the clock. A spell of 10 minutes or less is kept in rounds and a longer one in minutes, at the duration
 printed for the slot it was cast with (`spellDurationAt`), so Major Image from a level 4 slot lasts until
 dispelled with no Concentration. An effect can also last until its bearer's next Short or Long Rest
@@ -585,17 +585,17 @@ While the GM tracks food and water (`rest.survival`), each midnight it crosses e
 character, which eats and drinks what it carries (Rations, then a Bead of Nourishment) and meets the hunger and
 thirst rules (`survival.ts`).
 A creature out of air counts its held breath down on the clock as it does at its turns' ends (`breath.ts`).
-The scene's climate and weather (`combat.environment`, set with `environment.set`) wear on the creatures placed on
+The encounter's climate and weather (`combat.environment`, set with `environment.set`) wear on the creatures placed on
 its map (`environment.ts`): the clock asks extreme cold's and extreme heat's Constitution saves at each hour's end
 (a Bedroll passes the cold, a Blanket gives Advantage), and frigid and deep water count minutes in the painted
-water, frigid water by the round in a fight. The counts live on the creature (`exposure`, GM-only). Heavy rain,
+water, frigid water by the round in an encounter. The counts live on the creature (`exposure`, GM-only). Heavy rain,
 snow and strong wind are an effect each placed creature holds, settled after every command, that puts out its
 open flames; a strong wind brings down a flier that ends its turn aloft. Time passed at a travel pace counts
 Extended Travel's hours past 8, twice as fast at high altitude, until a Long Rest. A sahuagin's time out of water
 counts on the clock too (`water.ts`).
 
 Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
-creature died: the fight's round while its fight runs, then the game clock. A rule that kills also says what killed
+creature died: the encounter's round while its combat runs, then the game clock. A rule that kills also says what killed
 it and what is left of the body (Disintegrate's dust, a Vorpal Sword's lost head). A revival spell's conditions are
 data on the spell (`effect.revives`: its time limit, no Undead, a new body, the Hit Points it gives back). They are
 checked before anything is spent and applied as the cast resolves (`resolution/revival.ts`). Time under Gentle
@@ -641,7 +641,7 @@ Circle, Hallow), which also gives Advantage on a new save against such a creatur
 Good's Break Enchantment ends what those types charmed, frightened or possessed the creature with
 (`resolution/break-enchantment.ts`). A creature a lycanthrope's curse turns at 0 Hit Points is tagged
 `gm-controlled`: it fights against the party and only the GM commands it. The immunity a successful save earns
-(`immuneOnSuccess`) lasts its printed `immuneMinutes` on the game clock, or the fight when the text names no time
+(`immuneOnSuccess`) lasts its printed `immuneMinutes` on the game clock, or the encounter when the text names no time
 (`save-immunity.ts`).
 
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
@@ -728,7 +728,7 @@ left when the use ends early comes back. Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
 kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only
-the shot that draws it. A shot outside a fight spends a piece too, and `character.recover-ammunition` picks up
+the shot that draws it. A shot outside an encounter spends a piece too, and `character.recover-ammunition` picks up
 half of them. A potion, a flask or a Spell Scroll whose record is `consumedOnUse` acts from the pack and leaves
 the stack one smaller each time (`consumables.ts`). A Spell Scroll's row bears the one spell picked when it was
 added (`spellId`). Reading it casts that spell like an item's cast, at the spell's own level with the scroll
@@ -738,21 +738,21 @@ scroll with nothing cast (`scrolls.ts`). A thrown flask takes one attack of the 
 Alchemist's Fire sets its target burning and Oil covers it (`save.failureHazard`, `hazards.ts`): a burning
 creature takes 1d4 Fire at the start of each of its turns until it uses the Put Out the Fire action, which leaves
 it Prone, and Fire damage on an oiled creature within the minute deals 5 more. Antitoxin and a coat of Basic
-Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight
+Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in an encounter
 or out of one.
 
 Adventuring gear follows the same rows. An equipment pack is the things it holds (`contents`): the build and a
 write to the sheet unpack it into its stacks (`character-build.ts`, `setInventoryItem`). A record's own `uses`
 with `per: "never"` (a Healer's Kit's ten) are counted per carried row under `rowUsesKey`, and spending the last
 takes one copy from the stack (`stabilize.ts`). Bindings (Chain, Rope, Manacles) are actions that grant their
-target an effect with an `endAction` check, the escape at its printed DC. In a fight a player can't don or doff
+target an effect with an `endAction` check, the escape at its printed DC. In an encounter a player can't don or doff
 body armor, which takes minutes, and a Shield takes the Utilize action on their turn (`held-items.ts`). An
 Unconscious creature, or one a failed Fear save makes drop them, keeps its held rows carried but out of its hands
 (`dropHeldItems` in `effects.ts`), and what one gave its Armor Class (a Staff of Power's +2) goes with it. `carrying.ts`
 weighs what a character carries, coins included, against its Strength times its size's figure (a
 `carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that.
 
-The Utilize action is one module (`utilize.ts`): in a fight it spends the action on the user's own turn, or a Thief's
+The Utilize action is one module (`utilize.ts`): in an encounter it spends the action on the user's own turn, or a Thief's
 Bonus Action with Fast Hands, and outside one nothing. A Shield, a door, and each tool's and gear's Utilize uses take
 it. The sheet offers the uses (a tool's from `toolUses` in `ability-checks.ts`, gear's from its record's `utilize`,
 a Grappling Hook's DC 13 Acrobatics), and `check.roll` with `use`, or with a tool and a DC, rolls one through
@@ -777,10 +777,10 @@ names, sight, range, and for creatures of the caster's choice in an area, the ar
 (`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A Spell
 Scroll's cast is seen (a wand's needs no components and isn't), a spell readied with the Ready action is seen as it is
 cast and not when it is let go, and a long casting as it begins. A
-creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
+creature's own spell of a minute or more takes the action on each of its turns in an encounter and resolves on the last
 (`resolution/long-casting.ts`). A Cleric's Divine Intervention casts any Cleric spell of level 5 or lower (Wish with
 Greater Divine Intervention) as an action of its own, minted in the effective list (`divine-intervention.ts`) and
-picked under the feature's row on the sheet: cast at once, with no slot and no Material components. Outside a fight a
+picked under the feature's row on the sheet: cast at once, with no slot and no Material components. Outside an encounter a
 creature's own cast, an item's included, resolves through the same path with no turn to spend, and a long one moves
 the game clock by its whole hours. An item's cast takes the spell's own casting time (a Ring of Jumping's Jump is a
 Bonus Action, a reaction spell answers its trigger) unless the item prints another, and a printed bonus to hit stays
@@ -913,10 +913,10 @@ names no family is the GM's own ruling on the whole command.
   sends. The monster wizard compares its numbers with the SRD stat blocks of its CR, read from the bundle
   by `content:monster-benchmarks`. Its sections read Browse (the tables), Homebrew (the overview of what
   needs you), Sources and Sharing over the same addresses.
-- Add to a scene on a monster's card (`compendium/record/AddToScene.tsx`) is client orchestration over two
-  existing commands: `actor:add-from-definition` at the staging default, then `scene:set-combatants` with
-  the scene's ids merged from a fresh snapshot and `expectedRevision`. It offers only prepared scenes that
-  are neither live nor holding a parked fight, and a refused staging keeps the new monster and stages it
+- Add to an encounter on a monster's card (`compendium/record/AddToScene.tsx`) is client orchestration over two
+  existing commands: `actor:add-from-definition` at the staging default, then `encounter:set-combatants` with
+  the encounter's ids merged from a fresh snapshot and `expectedRevision`. It offers only prepared encounters that
+  are neither live nor holding a parked combat, and a refused staging keeps the new monster and stages it
   on retry, so no duplicate is made. The game reaches the Compendium through `CompendiumGameContext`.
 - A preview is the page: `CompendiumCard` draws a draft with the sheet's spell and item cards, the
   builder's detail and the bestiary's stat block (`encounter/StatBlock.tsx`), fed by
@@ -946,7 +946,7 @@ names no family is the GM's own ruling on the whole command.
 - A fresh table starts with a sample party (`sample-party.ts`): three level 7 characters made by the
   same builder from a fixed seed, so they level like any built character. Each is marked `sample`
   (GM-only), and one command (`actor.remove-samples`) removes every sample the roster rules let go and
-  names any a player holds or a fight uses.
+  names any a player holds or an encounter uses.
 
 ## Sound
 
@@ -956,8 +956,8 @@ table (`audio-assets.ts`, `sound-catalog.ts`, GM-only routes in `sound-http.ts`)
 from its bytes and walked far enough to read its length and refuse a truncated, video or non-sound
 file. The board (`sound-board.ts`, persisted by `sound-store.ts`, run by `sound-service.ts`) is apart
 from the game state so it never bumps the game revision: a playlist the server moves on by itself with
-a crossfade, looping ambient layers, one-shot effects, levels, pause, and a sound per scene that starts
-when the scene goes live. The `sound.*` commands sit in the game command table but write that store.
+a crossfade, looping ambient layers, one-shot effects, levels, pause, and a sound per encounter that starts
+when the encounter goes live. The `sound.*` commands sit in the game command table but write that store.
 The table screen's engine (`viewer/sound-engine.ts`) streams each file through a Web Audio gain, joins
 at the position the feed gives, shows "Tap to turn on sound" until its browser allows sound, and
 reports which of the two it is in for the GM's board.
@@ -984,7 +984,7 @@ calendar are separate dates; a date reaches players only when it is published. C
 `##` heading after the player text, and migration 5 turned a session's free-text prep into one
 Text section; a version 1 backup restores through the same conversions.
 
-Session prep is a list of typed sections (Text, Checklist, Linked pages, Scenes, Clocks, Quests in
+Session prep is a list of typed sections (Text, Checklist, Linked pages, Encounters, Clocks, Quests in
 play, Encounters; `codex/prep.ts`, shapes in `codex-prep-wire.ts`). A session copies its sections
 from a prep template when it is made, from the GM's library of templates or the built-in starting
 template, and owns the copy: editing a template never changes a session, and re-applying one keeps
@@ -996,7 +996,7 @@ write that moves the party pin to a point on any map, or makes one. Search filte
 GM's home counts, recent changes and reveal check, are built in `codex/find.ts`; a player's search
 and home are built in `player-reads.ts` from that player's own reads.
 
-The Scenes tab asks the Codex which records point at each table scene: `GET /api/v1/codex/scene-links` (GM only,
+The Encounters tab asks the Codex which records point at each table encounter: `GET /api/v1/codex/encounter-links` (GM only,
 `codex/scene-links.ts`) lists the sessions that stage it or name it in their prep's Encounters, and the pins on the
 atlas that name it.
 
@@ -1064,8 +1064,8 @@ Rules checks on the client are hints only; the server decides.
 The frame (ADR-0037, `shell/AppBar.tsx`) groups the addresses without moving them. The GM's top bar has Play, Prep,
 Codex and Compendium (`GM_SECTIONS` in `router.ts`), then the table screen lamp (`table/presentation.ts`, one poll
 for the page), the characters online, search and Settings; a phone moves the sections to bottom tabs. Prep's section
-bar (`PrepFrame`) holds Scenes, Party, Maps, Tokens, Sound and Replays (`PREP_PAGES`) over their existing addresses
-(`/scenes`, `/roster`, `/scenes/maps`, the new `/prep/tokens`, `/viewer-controls/sound`, `/replays`); a page puts its
+bar (`PrepFrame`) holds Encounters, Party, Maps, Tokens, Sound and Replays (`PREP_PAGES`) over their existing addresses
+(`/encounters`, `/roster`, `/encounters/maps`, the new `/prep/tokens`, `/viewer-controls/sound`, `/replays`); a page puts its
 search or primary at the bar's end through `PrepBarSlot`. `litGmSection` and `prepPageFor` say what lights, and
 `lastLocationForSection` returns a section to where the GM was. A player has Table, Sheet (`/me`) and Codex, and a
 phone adds Log, which is the table at `/table?panel=log`. The search (`shell/SearchLauncher.tsx`) is a launcher: Search
@@ -1075,17 +1075,17 @@ section with its own search keeps Ctrl K. While the connection is down, or until
 
 The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a strip over the map with the VCR counter and the
 status line (`table/TableStrip.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
-(`table/TablePanel.tsx`) whose tabs are Fight, Log, Party and Notes for the GM, and whose footer holds the view's one
-primary. The live scene picker (`table/LiveScenePicker.tsx`) sits in the GM's top bar on Play, and in the strip on a
-phone, where the strip is Play's header. In a fight the strip holds the turn order (`table/TurnTiles.tsx`, the real
-order for the GM and the projected one for a player) and, through `table/stripSlot.tsx`, the GM's Fight menu. The GM's
-Needs you leads the Fight tab, above the acting creature's card and lamps (`encounter/ActingConsole.tsx`) and the
-order with its row tools; Start a fight (`encounter/StartFight.tsx`) lists the staged characters and monsters to tick.
-A player's tabs are Turn, Sheet, Log and Party in a fight (Me, Log and Party between fights). The Turn tab leads with
+(`table/TablePanel.tsx`) whose tabs are Encounter, Log, Party and Notes for the GM, and whose footer holds the view's one
+primary. The live encounter picker (`table/LiveScenePicker.tsx`) sits in the GM's top bar on Play, and in the strip on a
+phone, where the strip is Play's header. In an encounter the strip holds the turn order (`table/TurnTiles.tsx`, the real
+order for the GM and the projected one for a player) and, through `table/stripSlot.tsx`, the GM's Encounter menu. The GM's
+Needs you leads the Encounter tab, above the acting creature's card and lamps (`encounter/ActingConsole.tsx`) and the
+order with its row tools; Start an encounter (`encounter/StartFight.tsx`) lists the staged characters and monsters to tick.
+A player's tabs are Turn, Sheet, Log and Party in an encounter (Me, Log and Party between encounters). The Turn tab leads with
 the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts, the round and the four lamps; End turn is the
 footer's one primary. On a phone the map and panel share one column (`table/scrollPast.ts`): the map keeps a fixed
 height and scrolls away, the panel is one screen tall, and its regions scroll only once the map has gone; choosing a
-target scrolls back to the map. Prep's scene and map pages do the same below 980px. On a phone the table and its log
+target scrolls back to the map. Prep's encounter and map pages do the same below 980px. On a phone the table and its log
 head with the character being played
 (`table/PlayerIdentity.tsx`) in place of the top bar. The Log tab is the persisted combat log, rolls drawn as cards,
 over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the field rolls the formula after
@@ -1101,24 +1101,29 @@ same page, so the two lay out alike. Nothing floats
 over the map but tokens and marks; notices land in the status line through `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
 
-Scenes and maps are prepared on Prep's Scenes and Maps pages (ADR-0035), in `scenes/` and `maps/`. `scenes/ScenesShell.tsx`
+An encounter is the one word outside the code (ADR-0041): screens, addresses, commands, events, API paths and
+fields, and saved data keys say encounter, and the stores' numbered migrations moved older saves
+(`encounter-rename.ts`). Files, types and variables inside still say scene, and the running fight inside is still
+"encounter" in places; issue #167 tracks renaming them.
+
+Encounters and maps are prepared on Prep's Encounters and Maps pages (ADR-0035), in `scenes/` and `maps/`. `scenes/ScenesShell.tsx`
 fills the end of Prep's section bar and renders the view the address names (`scenes/routes.ts`): the front page
-(New map and New scene side by side over the Maps and Scenes tabs, each its table with filters and a sort that
-includes Needs attention, from `needsOf`, and for scenes Progress: in progress while a fight runs or is parked,
-completed once one ended there, which the server stamps as the scene's `fightEndedAt`), a scene or a map as one
+(New map and New encounter side by side over the Maps and Encounters tabs, each its table with filters and a sort that
+includes Needs attention, from `needsOf`, and for encounters Progress: in progress while its combat runs or is parked,
+completed once one ended there, which the server stamps as the encounter's `endedAt`), an encounter or a map as one
 document, or the steps that make or edit one
-(`scenes/EditorFrame.tsx`). A scene's page and steps are built from the table's parts (`EncounterMap`, `MapRail`,
-`TablePanel`, the tray) and edit the parked scene with its `sceneId`, so the table itself always shows the live
-scene. Placing on any map is a button and then a press on it (`armPlacement` in `scene/tableGeometry.ts`), or the
+(`scenes/EditorFrame.tsx`). An encounter's page and steps are built from the table's parts (`EncounterMap`, `MapRail`,
+`TablePanel`, the tray) and edit the parked encounter with its `encounterId`, so the table itself always shows the live
+encounter. Placing on any map is a button and then a press on it (`armPlacement` in `scene/tableGeometry.ts`), or the
 spot menu a right-click or long press opens (`scene/MapSpotMenu.tsx`). The grid's calibration keeps its logic in
 `maps/useCalibration.tsx`, which returns its parts (note, body, actions, canvas) for the map's steps to place. On a
-laptop a scene's page lists the scenes down its left (`scenes/SceneListColumn.tsx`) with whether each is ready to go
-(`readinessOf` in `scenes/sceneFacts.ts`, worked out from the facts, never stored), and its panel leads with Fight
+laptop an encounter's page lists the encounters down its left (`scenes/SceneListColumn.tsx`) with whether each is ready to go
+(`readinessOf` in `scenes/sceneFacts.ts`, worked out from the facts, never stored), and its panel leads with Encounter
 (`scenes/SceneEncounterTab.tsx`): the monsters and the difficulty meter (`encounter/EncounterMeter.tsx`, the SRD budget
-for the staged party, with no reading when the catalog gives a monster no XP), Fight settings and Ready to go. Fight
-settings are the scene's `initiativeDefaults` (ADR-0039), set with `scene:set-initiative-defaults`: `encounter:start`
-takes the live scene's value for a choice its request leaves out, a duplicate copies them and a replay has none. The
-table's Start the fight seeds its two switches from them and sends what the switches show.
+for the staged party, with no reading when the catalog gives a monster no XP), Encounter settings and Ready to go. Encounter
+settings are the encounter's `initiativeDefaults` (ADR-0039), set with `encounter:set-initiative-defaults`: `encounter:start`
+takes the live encounter's value for a choice its request leaves out, a duplicate copies them and a replay has none. The
+table's Start the encounter seeds its two switches from them and sends what the switches show.
 
 The character sheet lives in `sheet/` (ADR-0030). `CharacterSheet.tsx` is one component for every place it sits: a
 page (My character, `/characters/<id>`, `sheet.html`), the GM's dialog, or the table panel's Me and Sheet tabs. It
@@ -1138,13 +1143,13 @@ the shell through context (`shell/context.ts`): the role and token, the address,
 the party and quick create. A player's views read only `playerCodexApi` and the player shapes of `api-records.ts`,
 which holds the record reads and writes (pages and quests with their blocks and audiences, search, home). The views
 live in their own folders (`home/`, `search/`, `page/`, `quests/`, `relationships/`) over the pieces in `shared/`. Who
-sees it, the filter flyout, the dropdown and the Sort dialog are shared with the Compendium, Scenes, Maps and Settings,
+sees it, the filter flyout, the dropdown and the Sort dialog are shared with the Compendium, Encounters, Maps and Settings,
 so they live in `@vtt/ui` (`packages/ui/src/records/`).
 A page's editor (`page/DocEditor.tsx`) writes the player text and the hidden blocks in one document;
 `page/document.ts` places blocks by `codexParagraphs` from `@vtt/domain`, the rule the server assembles bodies by.
 The table's Codex tab is `table/CodexTab.tsx`, over the same reads.
 
-Settings (ADR-0036) lives in `settings/`. `sections.ts` declares the sections (Players, Fights, Characters, Device,
+Settings (ADR-0036) lives in `settings/`. `sections.ts` declares the sections (Players, Encounters, Characters, Device,
 Access and API) with their audience and every setting's label and hint; the page, its search and the tests read it.
 `SettingsPage.tsx` draws the Codex shell's section bar or phone strip around the section the address names
 (`/settings/<section>`); a player's page is Device alone, so GM sections never mount for a player. Each section is

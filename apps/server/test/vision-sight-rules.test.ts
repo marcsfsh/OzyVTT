@@ -72,7 +72,7 @@ const fog = (x: number, y: number, width: number, height: number): VisionArea =>
 });
 
 describe("cover from the map", () => {
-  it("gives Total Cover behind a wall, and none with the scene's vision off", () => {
+  it("gives Total Cover behind a wall, and none with the encounter's vision off", () => {
     expect(mapCover(visionGame({ walls: [DIVIDER()] }), HERO, GOBLIN)).toBe("total");
     expect(mapCover(visionGame({ enabled: false, walls: [DIVIDER()] }), HERO, GOBLIN)).toBeNull();
     expect(mapCover(visionGame(), HERO, GOBLIN)).toBeNull();
@@ -109,7 +109,7 @@ describe("areas of effect and walls", () => {
     expect(caught).not.toContain(GOBLIN);
   });
 
-  it("reaches through an open door, and everywhere with the scene's vision off", () => {
+  it("reaches through an open door, and everywhere with the encounter's vision off", () => {
     const open = [
       wall({ x: 250, y: 0 }, { x: 250, y: 250 }),
       wall({ x: 250, y: 250 }, { x: 250, y: 300 }, "door", true),
@@ -292,7 +292,7 @@ describe("Frightened and line of sight", () => {
     ).toBe(true);
   });
 
-  it("stops behind a wall, and keeps on with the scene's vision off", () => {
+  it("stops behind a wall, and keeps on with the encounter's vision off", () => {
     const walled = visionGame({ walls: [DIVIDER()], actors: { [HERO]: frightenedBy(GOBLIN) } });
     const hero = walled.actors.find((actor) => actor.id === HERO)!;
     expect(frightenedApplies(hero, sightRules(walled, content))).toBe(false);
@@ -427,7 +427,7 @@ describe("the light a creature stands in", () => {
     expect(swing(torchlit, GOBLIN, "kobold-warrior").rollMode?.disadvantage ?? []).toEqual([]);
   });
 
-  it("reads a cloaker's Light Sensitivity in any Bright Light, and nothing with the scene's vision off", () => {
+  it("reads a cloaker's Light Sensitivity in any Bright Light, and nothing with the encounter's vision off", () => {
     const at = (state: GameState) =>
       lightSensitivities(
         state,
@@ -486,7 +486,7 @@ describe("a gaze that needs its bearer seen", () => {
   });
 });
 
-describe("special senses with the scene's vision off", () => {
+describe("special senses with the encounter's vision off", () => {
   it("lets Blindsight and Truesight see an Invisible creature within their range", () => {
     const invisible = { conditions: [{ id: "invisible" }] };
     // The goblin, 35 feet off, is Invisible; the hero sees it only with a sense that reaches.

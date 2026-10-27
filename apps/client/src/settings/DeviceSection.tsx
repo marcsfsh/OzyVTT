@@ -61,7 +61,7 @@ export function DeviceSection({
       </SettingRow>
       {role === "gm" && (
         <SettingRow setting={SETTING.arrangeScenes} gmOnly>
-          <Switch checked={autoArrange} onChange={setAutoArrange} label="Open new scenes for arranging" />
+          <Switch checked={autoArrange} onChange={setAutoArrange} label="Open new encounters for arranging" />
         </SettingRow>
       )}
       {role === "player" && onLeave && (

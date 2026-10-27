@@ -197,7 +197,7 @@ const AFTER_SHORT_REST = "This is chosen when a Short Rest finishes, in the step
 
 /** The refusals a short-rest recovery shares: out of a fight, in the step a finished Short Rest opened. */
 function afterShortRest(context: Context): string | null {
-  if (context.inFight) return "This is chosen after a Short Rest, outside a fight.";
+  if (context.inFight) return "This is chosen after a Short Rest, outside an encounter.";
   return context.actor.restStep?.after === "short-rest" ? null : AFTER_SHORT_REST;
 }
 
@@ -487,7 +487,7 @@ const CONVERSIONS: readonly Conversion[] = [
         : "A 1-minute rite regains spent Pact Magic slots, up to half your maximum (round up). Once per Long Rest.",
     check: (context) => {
       if (!useLeft(context, "magical-cunning")) return "Magical Cunning is used. It comes back on a Long Rest.";
-      if (context.inFight) return "The rite takes 1 minute, outside a fight.";
+      if (context.inFight) return "The rite takes 1 minute, outside an encounter.";
       return pactSpent(context) > 0 ? null : "No Pact Magic slots are spent.";
     },
     pick: () => ({ kind: "none" }),
@@ -712,7 +712,7 @@ function formAtRest(): Conversion {
     line: (context) =>
       `${traitIn(context)!.name}: when a Long Rest finishes, take the ${otherOf(context)?.name ?? traitIn(context)!.monsterId} stat block instead of this one.`,
     check: (context) => {
-      if (context.inFight) return "This is chosen after a Long Rest, outside a fight.";
+      if (context.inFight) return "This is chosen after a Long Rest, outside an encounter.";
       if (context.actor.restStep?.after !== "long-rest")
         return "This is chosen when a Long Rest finishes, in the step it opens.";
       return otherOf(context) ? null : "That stat block is no longer in the bestiary.";

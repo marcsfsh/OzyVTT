@@ -34,7 +34,7 @@ import { blocksMovement, wallPieces } from "./vision/sight.js";
  *  disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
 
 const MAX_TERRAIN_RECTS = 1000;
-const LIVE_REFUSAL = "That scene is live. Edit its terrain on the table.";
+const LIVE_REFUSAL = "That encounter is live. Edit its terrain on the table.";
 
 type Terrain = CombatState["terrain"];
 export type TerrainPaintOp = "difficult" | "water" | "running-water" | "ice" | "clear";
@@ -48,13 +48,13 @@ const SURFACE_OF: Readonly<Partial<Record<TerrainPaintOp, (typeof SURFACES)[numb
 
 export function paintTerrain(
   state: GameState,
-  sceneId: string | undefined,
+  encounterId: string | undefined,
   geometry: LayerMapGeometry,
   input: Readonly<{ op: TerrainPaintOp; rect: PaintRectInput }>
 ) {
   // Terrain lives in cells, so a map without a grid has nowhere to put it.
   if (!geometry.calibration) throw new CommandRejectedError("Calibrate the map's grid before marking terrain.");
-  const slice = layerSlice(state, sceneId, "terrain", LIVE_REFUSAL);
+  const slice = layerSlice(state, encounterId, "terrain", LIVE_REFUSAL);
   const rect = normalizedRect(geometry, input.rect, "Drag a larger area to mark terrain.");
   const layer = slice.layer;
   const surface = SURFACE_OF[input.op];
@@ -76,8 +76,8 @@ export function paintTerrain(
   slice.write(next);
 }
 
-export function resetTerrain(state: GameState, sceneId: string | undefined) {
-  const slice = layerSlice(state, sceneId, "terrain", LIVE_REFUSAL);
+export function resetTerrain(state: GameState, encounterId: string | undefined) {
+  const slice = layerSlice(state, encounterId, "terrain", LIVE_REFUSAL);
   slice.write({ difficult: [], water: [], runningWater: [], ice: [] });
 }
 

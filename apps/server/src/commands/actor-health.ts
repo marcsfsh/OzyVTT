@@ -335,7 +335,7 @@ export const actorHealthCommands = [
     type: "actor.set-condition",
     operationId: "setCondition",
     description:
-      "Applies or clears a bundled SRD condition. Exhaustion is cumulative: without `level` it gains one level, with one it is set to that level. The GM may name the charmer or the source of fear (`sourceActorId`) for Charmed or Frightened: the condition then rides an effect from that creature, so it can't be harmed by its charmed bearer or approached by its frightened one, and clearing the condition ends it. Player sessions may target only their claimed character: they may add any condition and clear one they added, while clearing one imposed by a save, an effect or the GM is a rules block (`condition.imposed`) they can ask the GM about; standing from Prone is allowed only on their own turn in a fight (`movement.stand-up-off-turn`) and costs half their Speed.",
+      "Applies or clears a bundled SRD condition. Exhaustion is cumulative: without `level` it gains one level, with one it is set to that level. The GM may name the charmer or the source of fear (`sourceActorId`) for Charmed or Frightened: the condition then rides an effect from that creature, so it can't be harmed by its charmed bearer or approached by its frightened one, and clearing the condition ends it. Player sessions may target only their claimed character: they may add any condition and clear one they added, while clearing one imposed by a save, an effect or the GM is a rules block (`condition.imposed`) they can ask the GM about; standing from Prone is allowed only on their own turn in an encounter (`movement.stand-up-off-turn`) and costs half their Speed.",
     summary: "Apply or clear an SRD condition, with exhaustion levels.",
     schema: SetConditionSchema,
     malformed: "The condition command is malformed.",
@@ -377,7 +377,7 @@ export const actorHealthCommands = [
     type: "actor.rechoose",
     operationId: "rechooseActorPick",
     description:
-      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). A pick the build itself reads (its options grant spells, or another pick depends on it, as the land's spells and Nature's Ward do) is written to the character's choices ledger and the sheet is rebuilt from it, keeping what has been spent, outside a fight. Any other pick is runtime state on the actor, kept until the character chooses again, so a re-choice needs no rebuild. A player session re-chooses only on their claimed character, outside a fight, in the step a finished rest opened (a Long Rest for a Long Rest pick, either rest for the others); the GM on anyone, any time. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
+      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). A pick the build itself reads (its options grant spells, or another pick depends on it, as the land's spells and Nature's Ward do) is written to the character's choices ledger and the sheet is rebuilt from it, keeping what has been spent, outside an encounter. Any other pick is runtime state on the actor, kept until the character chooses again, so a re-choice needs no rebuild. A player session re-chooses only on their claimed character, outside an encounter, in the step a finished rest opened (a Long Rest for a Long Rest pick, either rest for the others); the GM on anyone, any time. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
     summary:
       "Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type on a Long Rest, Fiendish Resilience's damage type on either). Your own character; the GM anyone.",
     schema: ActorRechooseSchema,
@@ -418,7 +418,7 @@ export const actorHealthCommands = [
         // opened, outside a fight; the GM any time.
         if (initiator.role !== "gm") {
           if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-            throw new CommandRejectedError(`${match.label} is chosen after a rest. End the fight first.`);
+            throw new CommandRejectedError(`${match.label} is chosen after a rest. End the encounter first.`);
           const afterLong = actor.restStep?.after === "long-rest" || actor.preparation !== null;
           const open = match.per === "long-rest" ? afterLong : afterLong || actor.restStep !== null;
           if (!open)
@@ -445,7 +445,7 @@ export const actorHealthCommands = [
         }
         // The build reads this answer (the land's spells and Nature's Ward), so it goes into the ledger.
         if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-          throw new CommandRejectedError(`${match.label} is chosen after a rest. End the fight first.`);
+          throw new CommandRejectedError(`${match.label} is chosen after a rest. End the encounter first.`);
         rechooseInLedger(
           state,
           actorId,
@@ -542,7 +542,7 @@ export const actorHealthCommands = [
     type: "actor.spend-uses",
     operationId: "spendUses",
     description:
-      "Spends several uses of one of the actor's limited-use pools at once, keyed as the counters are: Lay on Hands' points outside a fight, or Focus Points for a feature the engine doesn't run. The key is `uses.pool`, or `action.id` when there is no pool. A player session only on their claimed character, the GM anyone. Refused when the pool holds fewer, and for a pool that comes back every turn.",
+      "Spends several uses of one of the actor's limited-use pools at once, keyed as the counters are: Lay on Hands' points outside an encounter, or Focus Points for a feature the engine doesn't run. The key is `uses.pool`, or `action.id` when there is no pool. A player session only on their claimed character, the GM anyone. Refused when the pool holds fewer, and for a pool that comes back every turn.",
     summary: "Spend several uses of a limited-use pool at once (your own character; GM anyone).",
     schema: ActorSpendUsesSchema,
     malformed: "The spend is malformed.",
@@ -598,7 +598,7 @@ export const actorHealthCommands = [
     type: "actor.convert",
     operationId: "convertResource",
     description:
-      "Turns one of a character's resources into another, or recovers one, by a feature's rule; `actor:available-actions` lists the ones the character has (`conversions`), with why each can't be used now. Font of Magic: a spell slot for Sorcery Points equal to its level, up to the maximum, or as a Bonus Action Sorcery Points for a slot of level 5 or lower at the printed cost and Sorcerer level (a made slot can sit above the maximum and vanishes on a Long Rest). Font of Inspiration: a slot for a Bardic Inspiration. Wild Resurgence: a slot for a Wild Shape when none is left, once on each turn, and a Wild Shape for a level 1 slot once per Long Rest. Nature Magician: Wild Shape uses for one slot, 2 levels each, once per Long Rest. Arcane Recovery and Natural Recovery: spent slots adding up to half the class level (round up), none of level 6 or higher, in the step a finished Short Rest opens, once per Long Rest. Magical Cunning: Pact Magic slots up to half the maximum (all with Eldritch Master), outside a fight. Sorcerous Restoration: Sorcery Points up to half the Sorcerer level, after a Short Rest. Restoring a spent use: Intimidating Presence with a Rage, Holy Nimbus with a level 5 slot, Dragon Wings with 3 Sorcery Points, Hurl Through Hell with a Pact Magic slot, Innate Sorcery with 2 Sorcery Points (Sorcery Incarnate). Pearl of Power: a Magic action for a spent slot of level 3 or lower, once per dawn. Persistent Rage and Uncanny Metabolism (with its Martial Arts die and Monk level in Hit Points): from rolling Initiative to the end of the character's first turn, once per Long Rest. Succubus Form and Incubus Form: the other stat block, with its Hit Points, Armor Class and Speed, in the step a finished Long Rest opens and outside a fight. A player session only on their claimed character; the GM on anyone.",
+      "Turns one of a character's resources into another, or recovers one, by a feature's rule; `actor:available-actions` lists the ones the character has (`conversions`), with why each can't be used now. Font of Magic: a spell slot for Sorcery Points equal to its level, up to the maximum, or as a Bonus Action Sorcery Points for a slot of level 5 or lower at the printed cost and Sorcerer level (a made slot can sit above the maximum and vanishes on a Long Rest). Font of Inspiration: a slot for a Bardic Inspiration. Wild Resurgence: a slot for a Wild Shape when none is left, once on each turn, and a Wild Shape for a level 1 slot once per Long Rest. Nature Magician: Wild Shape uses for one slot, 2 levels each, once per Long Rest. Arcane Recovery and Natural Recovery: spent slots adding up to half the class level (round up), none of level 6 or higher, in the step a finished Short Rest opens, once per Long Rest. Magical Cunning: Pact Magic slots up to half the maximum (all with Eldritch Master), outside an encounter. Sorcerous Restoration: Sorcery Points up to half the Sorcerer level, after a Short Rest. Restoring a spent use: Intimidating Presence with a Rage, Holy Nimbus with a level 5 slot, Dragon Wings with 3 Sorcery Points, Hurl Through Hell with a Pact Magic slot, Innate Sorcery with 2 Sorcery Points (Sorcery Incarnate). Pearl of Power: a Magic action for a spent slot of level 3 or lower, once per dawn. Persistent Rage and Uncanny Metabolism (with its Martial Arts die and Monk level in Hit Points): from rolling Initiative to the end of the character's first turn, once per Long Rest. Succubus Form and Incubus Form: the other stat block, with its Hit Points, Armor Class and Speed, in the step a finished Long Rest opens and outside an encounter. A player session only on their claimed character; the GM on anyone.",
     summary: "Turn one resource into another, or recover one, by a feature's rule.",
     schema: ActorConvertSchema,
     malformed: "The conversion is malformed.",
@@ -634,7 +634,7 @@ export const actorHealthCommands = [
     type: "actor.spend-hit-dice",
     operationId: "spendHitDice",
     description:
-      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). A player session may target only their claimed character, and only while it is in the Short Rest under way (the party's, or one the player started with actor.rest), since a creature spends Hit Dice during a Short Rest; the GM any time outside a fight. The dice land in the shared roll history. `reroll` rerolls a die of the character's latest spend instead, while it is still the character's latest roll: a player spends Heroic Inspiration on the lowest die, the GM throws them all again, and the Hit Points are worked out afresh.",
+      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). A player session may target only their claimed character, and only while it is in the Short Rest under way (the party's, or one the player started with actor.rest), since a creature spends Hit Dice during a Short Rest; the GM any time outside an encounter. The dice land in the shared roll history. `reroll` rerolls a die of the character's latest spend instead, while it is still the character's latest roll: a player spends Heroic Inspiration on the lowest die, the GM throws them all again, and the Hit Points are worked out afresh.",
     summary: "Spend Hit Point Dice to heal on a Short Rest (roll + Con modifier each, minimum 1).",
     schema: ActorSpendHitDiceSchema,
     malformed: "The hit-dice command is malformed.",

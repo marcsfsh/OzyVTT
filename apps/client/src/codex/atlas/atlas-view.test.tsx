@@ -76,7 +76,7 @@ const PIN = (id: string, label: string, over: Partial<CodexMarker> = {}): CodexM
   iconColor: "#FF2E9A",
   tags: [],
   pageIds: [],
-  sceneIds: [],
+  encounterIds: [],
   subMapId: null,
   actorId: null,
   isParty: false,
@@ -129,7 +129,7 @@ function Harness({ autosave = true }: Readonly<{ autosave?: boolean }>) {
         gmToken="gm"
         scenes={[]}
         actors={[]}
-        activeSceneId={null}
+        activeEncounterId={null}
         onActivateScene={vi.fn()}
         mapId={path.split("/")[3] ?? null}
         pinId={query.get("pin")}
@@ -306,7 +306,7 @@ describe("The GM's atlas", () => {
           <AtlasView
             gmToken="gm"
             scenes={[]}
-            activeSceneId={null}
+            activeEncounterId={null}
             onActivateScene={vi.fn()}
             mapId={path.split("/")[3] ?? null}
             pinId={query.get("pin")}
@@ -333,7 +333,7 @@ describe("Selecting another pin passes the unsaved-changes guard", () => {
         <AtlasView
           gmToken="gm"
           scenes={[]}
-          activeSceneId={null}
+          activeEncounterId={null}
           onActivateScene={vi.fn()}
           mapId="m1"
           pinId={query.get("pin")}

@@ -188,7 +188,7 @@ describe("the Advantage an attack prints for itself", () => {
     expect(strike(built, "bite", [15, 3], { commit: false }).rollMode?.mode ?? "normal").toBe("advantage");
   });
 
-  it("gives a doppelganger's Slam Advantage in the first round of a fight", () => {
+  it("gives a doppelganger's Slam Advantage in the first round of an encounter", () => {
     const built = table("doppelganger");
     expect(strike(built, "slam", [15, 3], { commit: false }).rollMode?.mode ?? "normal").toBe("advantage");
     built.state.combat = { ...built.state.combat, round: 2 };

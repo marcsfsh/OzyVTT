@@ -1982,9 +1982,9 @@ export const SceneSchema = z
     updatedAt: z.number().int().nonnegative().optional(),
     liveAt: z.number().int().nonnegative().optional(),
     /** When a fight in this scene last ended, in epoch ms: Prep reads it as Completed. GM-only, as every scene is. */
-    fightEndedAt: z.number().int().nonnegative().optional(),
+    endedAt: z.number().int().nonnegative().optional(),
     /** Set when this scene is a launched replay. Such scenes are disposable: `scenes.ts` drops the scene and its
-     * cloned combatants (`Actor.replaySceneId`) when the table leaves it. GM-only. */
+     * cloned combatants (`Actor.replayEncounterId`) when the table leaves it. GM-only. */
     replayOf: z
       .object({
         archiveId: z.number().int().nonnegative(),
@@ -1997,11 +1997,11 @@ export const SceneSchema = z
 export type Scene = z.infer<typeof SceneSchema>;
 
 /** The campaign roster every management surface lists, shared so server and client agree. Excludes a launched
- * replay's clones (`Actor.replaySceneId`), which fight on the map but are never claimable. */
-export function rosterActors<T extends { readonly replaySceneId?: string | undefined }>(
+ * replay's clones (`Actor.replayEncounterId`), which fight on the map but are never claimable. */
+export function rosterActors<T extends { readonly replayEncounterId?: string | undefined }>(
   actors: readonly T[]
 ): readonly T[] {
-  return actors.filter((actor) => actor.replaySceneId === undefined);
+  return actors.filter((actor) => actor.replayEncounterId === undefined);
 }
 
 export const CombatStateSchema = z
@@ -2009,8 +2009,8 @@ export const CombatStateSchema = z
     ...sceneCombatShape,
     mapAssetId: z.uuid().nullable().default(null),
     /** Prepared scenes the GM parks and resumes. The active scene's own `combat` stays empty; its live copy is the top-level fields. */
-    scenes: z.array(SceneSchema).max(20).default([]),
-    activeSceneId: z.uuid().nullable().default(null),
+    encounters: z.array(SceneSchema).max(20).default([]),
+    activeEncounterId: z.uuid().nullable().default(null),
     /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
     pendingFalls: z.array(PendingFallSchema).max(20).default([]),
     /** A move stopped at the edge of the reach it leaves while the Opportunity Attacks it provoked are answered, or
@@ -2104,24 +2104,26 @@ export const CombatStateSchema = z
   })
   .superRefine((combat, context) => {
     refineCombatContext(combat, context);
-    const sceneIds = new Set<string>();
-    for (const [index, scene] of combat.scenes.entries()) {
-      if (sceneIds.has(scene.id))
+    const encounterIds = new Set<string>();
+    for (const [index, scene] of combat.encounters.entries()) {
+      if (encounterIds.has(scene.id))
         context.addIssue({
           code: "custom",
-          path: ["scenes", index, "id"],
-          message: "Scene IDs must be unique."
+          path: ["encounters", index, "id"],
+          message: "Encounter IDs must be unique."
         });
-      sceneIds.add(scene.id);
+      encounterIds.add(scene.id);
     }
-    if (combat.activeSceneId !== null && !sceneIds.has(combat.activeSceneId))
+    if (combat.activeEncounterId !== null && !encounterIds.has(combat.activeEncounterId))
       context.addIssue({
         code: "custom",
-        path: ["activeSceneId"],
-        message: "The active scene must be one of the prepared scenes."
+        path: ["activeEncounterId"],
+        message: "The active encounter must be one of the prepared encounters."
       });
     const active =
-      combat.activeSceneId === null ? undefined : combat.scenes.find((scene) => scene.id === combat.activeSceneId);
+      combat.activeEncounterId === null
+        ? undefined
+        : combat.encounters.find((scene) => scene.id === combat.activeEncounterId);
     if (
       active &&
       (active.combat.active ||
@@ -2151,8 +2153,8 @@ export const CombatStateSchema = z
     ) {
       context.addIssue({
         code: "custom",
-        path: ["scenes"],
-        message: "The active scene's stored combat must be empty, because its live copy is the top-level combat."
+        path: ["encounters"],
+        message: "The active encounter's stored combat must be empty, because its live copy is the top-level combat."
       });
     }
   });

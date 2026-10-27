@@ -8,22 +8,22 @@ import type { CodexStore } from "../codex-store.js";
  */
 export function sceneLinks(store: CodexStore): CodexSceneLink[] {
   const links = new Map<string, CodexSceneLink>();
-  const linkOf = (sceneId: string) => {
-    let link = links.get(sceneId);
+  const linkOf = (encounterId: string) => {
+    let link = links.get(encounterId);
     if (!link) {
-      link = { sceneId, sessions: [], pins: [] };
-      links.set(sceneId, link);
+      link = { encounterId, sessions: [], pins: [] };
+      links.set(encounterId, link);
     }
     return link;
   };
   for (const session of store.listSessions()) {
     const named = new Map<string, "session" | "prep">();
-    for (const sceneId of session.sceneIds) named.set(sceneId, "session");
+    for (const encounterId of session.encounterIds) named.set(encounterId, "session");
     for (const section of session.prep)
       if (section.type === "encounters")
-        for (const sceneId of section.sceneIds) if (!named.has(sceneId)) named.set(sceneId, "prep");
-    for (const [sceneId, via] of named)
-      (linkOf(sceneId).sessions as CodexSceneLink["sessions"][number][]).push({
+        for (const encounterId of section.encounterIds) if (!named.has(encounterId)) named.set(encounterId, "prep");
+    for (const [encounterId, via] of named)
+      (linkOf(encounterId).sessions as CodexSceneLink["sessions"][number][]).push({
         id: session.id,
         sessionNumber: session.sessionNumber,
         status: session.status,
@@ -32,8 +32,8 @@ export function sceneLinks(store: CodexStore): CodexSceneLink[] {
   }
   for (const map of store.listMaps())
     for (const marker of store.listMarkers(map.id))
-      for (const sceneId of marker.sceneIds)
-        (linkOf(sceneId).pins as CodexSceneLink["pins"][number][]).push({
+      for (const encounterId of marker.encounterIds)
+        (linkOf(encounterId).pins as CodexSceneLink["pins"][number][]).push({
           id: marker.id,
           label: marker.label,
           mapId: map.id,

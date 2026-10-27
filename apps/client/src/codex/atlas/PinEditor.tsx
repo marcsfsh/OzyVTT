@@ -36,7 +36,7 @@ export function PinEditor({
   maps,
   scenes,
   actors,
-  activeSceneId,
+  activeEncounterId,
   autosave,
   onUpdated,
   onDeleted,
@@ -55,7 +55,7 @@ export function PinEditor({
   maps: readonly CodexMap[];
   scenes: readonly EditorScene[];
   actors: readonly EditorActor[];
-  activeSceneId: string | null;
+  activeEncounterId: string | null;
   autosave: CodexAutosaveSettings;
   onUpdated: (marker: CodexMarker) => void;
   onDeleted: (markerId: string) => void;
@@ -67,7 +67,7 @@ export function PinEditor({
   onRevealPage: (pageId: string) => void;
   /** Shows the map this pin sits on to players. */
   onRevealMap?: () => void;
-  onActivateScene: (sceneId: string) => void;
+  onActivateScene: (encounterId: string) => void;
   onDone: () => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -147,11 +147,11 @@ export function PinEditor({
     .map((id) => pages.find((page) => page.id === id))
     .filter((page): page is CodexPageSummary => Boolean(page));
   const unlinkedPages = pages.filter((page) => !marker.pageIds.includes(page.id));
-  const linkedScenes = marker.sceneIds
+  const linkedScenes = marker.encounterIds
     .map((id) => scenes.find((scene) => scene.id === id))
     .filter((scene): scene is EditorScene => Boolean(scene));
-  const availableScenes = scenes.filter((scene) => !marker.sceneIds.includes(scene.id));
-  const danglingScenes = marker.sceneIds.filter((id) => !scenes.some((scene) => scene.id === id)).length;
+  const availableScenes = scenes.filter((scene) => !marker.encounterIds.includes(scene.id));
+  const danglingScenes = marker.encounterIds.filter((id) => !scenes.some((scene) => scene.id === id)).length;
   const hiddenLinkedPages = linkedPages.filter((page) => marker.revealedToPlayers && !page.revealedToPlayers);
   const danglingActor = marker.actorId !== null && !actors.some((actor) => actor.id === marker.actorId);
 
@@ -300,11 +300,11 @@ export function PinEditor({
       )}
 
       {scenes.length > 0 && (
-        <Field label="Scenes staged here" help="Link the encounters prepared here, then make any of them live.">
+        <Field label="Encounters staged here" help="Link the encounters prepared here, then make any of them live.">
           <div className="atlas-links">
             {linkedScenes.map((scene) => (
               <div key={scene.id} className="atlas-link">
-                {activeSceneId === scene.id ? (
+                {activeEncounterId === scene.id ? (
                   <Badge tone="success">Live</Badge>
                 ) : (
                   <Button variant="secondary" size="sm" onClick={() => onActivateScene(scene.id)}>
@@ -315,7 +315,7 @@ export function PinEditor({
                 <IconButton
                   label={`Unlink ${scene.name}`}
                   size="sm"
-                  onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => id !== scene.id) })}
+                  onClick={() => patch({ encounterIds: marker.encounterIds.filter((id) => id !== scene.id) })}
                 >
                   <IconX />
                 </IconButton>
@@ -323,14 +323,14 @@ export function PinEditor({
             ))}
             {availableScenes.length > 0 && (
               <Select
-                aria-label="Link a scene"
+                aria-label="Link an encounter"
                 value=""
                 disabled={busy}
                 onChange={(event) =>
-                  event.target.value && patch({ sceneIds: [...marker.sceneIds, event.target.value] })
+                  event.target.value && patch({ encounterIds: [...marker.encounterIds, event.target.value] })
                 }
               >
-                <option value="">Link a scene</option>
+                <option value="">Link an encounter</option>
                 {availableScenes.map((scene) => (
                   <option key={scene.id} value={scene.id}>
                     {scene.name}
@@ -347,7 +347,9 @@ export function PinEditor({
           <button
             type="button"
             className="atlas-linkbutton"
-            onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => scenes.some((scene) => scene.id === id)) })}
+            onClick={() =>
+              patch({ encounterIds: marker.encounterIds.filter((id) => scenes.some((scene) => scene.id === id)) })
+            }
           >
             Clear them
           </button>

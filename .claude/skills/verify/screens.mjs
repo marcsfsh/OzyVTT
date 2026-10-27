@@ -7,7 +7,7 @@
 // Each page is captured in each theme asked for (both by default), after the self-hosted fonts load. `--scenario table`
 // makes a scene live on a drawn battle map with the party and four goblins on it, one hidden from players;
 // `--scenario fight` also starts the fight. Both add a Codex page with a hidden field and a hidden block. A path's
-// `{scene}` is that scene's id, as in `/scenes/{scene}`, and `{page}` that page's, as in `/codex/pages/{page}`.
+// `{scene}` is that scene's id, as in `/encounters/{scene}`, and `{page}` that page's, as in `/codex/pages/{page}`.
 // `--tab log` opens the table's panel on that tab (the device's saved tab), and `--scroll-end <selector>` scrolls that
 // element to its end before the capture. `--tv` pairs each browser as a table screen instead of signing in, presents the scenario's map, and captures
 // /viewer.html at 1920x1080, a 1280x720 screen and a portrait tablet.
@@ -161,7 +161,7 @@ async function drawnMap(browser) {
 }
 
 /** The scenario's live scene and Codex page, for a path that names `{scene}` or `{page}`. */
-let sceneId = null;
+let encounterId = null;
 let pageId = null;
 let mapAssetId = null;
 
@@ -207,7 +207,12 @@ async function seed(browser) {
   const { game } = await json(await fetch(`${base}/api/v1/game`, { headers }));
   mapAssetId = asset.id;
   const ids = game.actors.filter((actor) => !actor.archived).map((actor) => actor.id);
-  await post("/api/v1/game/scenes", { name: "Goblin warren", mapAssetId: asset.id, combatantIds: ids, activate: true });
+  await post("/api/v1/game/encounters", {
+    name: "Goblin warren",
+    mapAssetId: asset.id,
+    combatantIds: ids,
+    activate: true
+  });
   const spots = [
     [275, 525],
     [525, 525],
@@ -221,7 +226,7 @@ async function seed(browser) {
     const [x, y] = spots[index % spots.length];
     await post(`/api/v1/game/tokens/${actorId}/move`, { actorId, position: { x, y } });
   }
-  sceneId = (await json(await fetch(`${base}/api/v1/game`, { headers }))).game.combat.activeSceneId;
+  encounterId = (await json(await fetch(`${base}/api/v1/game`, { headers }))).game.combat.activeEncounterId;
   // A Codex page with a link, a hidden field and a hidden block, so the page has each part to show.
   await post("/api/v1/codex/pages", {
     title: "Thornwood",
@@ -279,7 +284,7 @@ try {
         { theme, reduce, tab, key: `vtt.table-tab.${role}.${size.name === "phone" ? "phone" : "laptop"}` }
       );
       for (const path of paths) {
-        await page.goto(path.replace("{scene}", sceneId ?? "").replace("{page}", pageId ?? ""));
+        await page.goto(path.replace("{scene}", encounterId ?? "").replace("{page}", pageId ?? ""));
         // A player rejoins with the stored token after a load; the address they asked for wins. The title screen can
         // take a moment to offer the rejoin, so wait for it or for the shell, whichever comes first.
         if (tv) {

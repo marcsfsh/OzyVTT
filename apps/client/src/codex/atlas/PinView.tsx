@@ -28,7 +28,7 @@ type ViewedPin = Readonly<{
   subMapId: string | null;
   isParty: boolean;
   revealedToPlayers?: boolean;
-  sceneIds?: readonly string[];
+  encounterIds?: readonly string[];
 }>;
 type ViewedPage = Readonly<{
   id: string;
@@ -54,7 +54,7 @@ export function PinView({
   pages,
   mapName,
   scenes = [],
-  activeSceneId = null,
+  activeEncounterId = null,
   onOpenPage,
   onOpenMap,
   onEdit,
@@ -69,12 +69,12 @@ export function PinView({
   pages: readonly ViewedPage[];
   mapName: (mapId: string) => string | null;
   scenes?: readonly ViewedScene[];
-  activeSceneId?: string | null;
+  activeEncounterId?: string | null;
   onOpenPage: (pageId: string) => void;
   onOpenMap: (mapId: string) => void;
   onEdit?: () => void;
   onSetParty?: () => void;
-  onActivateScene?: (sceneId: string) => void;
+  onActivateScene?: (encounterId: string) => void;
   onOpenReplay?: (archiveId: number) => void;
   onClose: () => void;
 }>) {
@@ -83,7 +83,7 @@ export function PinView({
     .map((id) => pages.find((page) => page.id === id))
     .filter((page): page is ViewedPage => page !== undefined);
   const subMapName = pin.subMapId ? mapName(pin.subMapId) : null;
-  const staged = (pin.sceneIds ?? [])
+  const staged = (pin.encounterIds ?? [])
     .map((id) => scenes.find((scene) => scene.id === id))
     .filter((scene): scene is ViewedScene => scene !== undefined);
   const label = pin.label?.trim() || "Unlabelled pin";
@@ -126,11 +126,11 @@ export function PinView({
 
       {gm && staged.length > 0 && (
         <div className="atlas-pinview-scenes">
-          <h4 className="atlas-eyebrow">Scenes staged here</h4>
+          <h4 className="atlas-eyebrow">Encounters staged here</h4>
           {staged.map((scene) => (
             <div key={scene.id} className="atlas-scenerow">
               <span className="atlas-ellipsis">{scene.name}</span>
-              {activeSceneId === scene.id ? (
+              {activeEncounterId === scene.id ? (
                 <Badge tone="success">Live</Badge>
               ) : (
                 <Button variant="secondary" size="sm" onClick={() => onActivateScene?.(scene.id)}>

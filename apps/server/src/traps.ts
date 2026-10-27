@@ -71,7 +71,7 @@ export type SpringDeps = Readonly<{
 /** The GM sets a trap on the live map or a prepared scene: armed, hidden, over the dragged area. */
 export function placeTrap(
   state: GameState,
-  sceneId: string | undefined,
+  encounterId: string | undefined,
   geometry: LayerMapGeometry,
   input: Readonly<{ id: string; trapId: string; tier: number; rect: PaintRectInput }>,
   scope: Initiator
@@ -80,8 +80,8 @@ export function placeTrap(
   if (!geometry.calibration) throw new CommandRejectedError("Calibrate the map's grid before setting a trap.");
   const record = trapRecord(input.trapId);
   if (!record) throw new CommandRejectedError("That trap isn't in the Gameplay Toolbox.");
-  const slice = layerSlice(state, sceneId, "traps", "That scene is live. Set its traps on the table.");
-  if (slice.layer.length >= MAX_TRAPS) throw new CommandRejectedError(`A scene holds up to ${MAX_TRAPS} traps.`);
+  const slice = layerSlice(state, encounterId, "traps", "That encounter is live. Set its traps on the table.");
+  if (slice.layer.length >= MAX_TRAPS) throw new CommandRejectedError(`An encounter holds up to ${MAX_TRAPS} traps.`);
   const trap: MapTrap = {
     id: input.id,
     trapId: record.id,
@@ -99,7 +99,7 @@ export function placeTrap(
 /** The GM changes a trap: its blast area, its band, whether the party has found it, or arms or disarms it. */
 export function editTrap(
   state: GameState,
-  sceneId: string | undefined,
+  encounterId: string | undefined,
   geometry: LayerMapGeometry,
   input: Readonly<{
     id: string;
@@ -111,7 +111,7 @@ export function editTrap(
   scope: Initiator
 ): MapTrap {
   requireGm(scope, "Only the GM changes traps.");
-  const slice = layerSlice(state, sceneId, "traps", "That scene is live. Change its traps on the table.");
+  const slice = layerSlice(state, encounterId, "traps", "That encounter is live. Change its traps on the table.");
   const trap = slice.layer.find((candidate) => candidate.id === input.id);
   if (!trap) throw new CommandRejectedError("That trap is no longer on the map.");
   const record = trapRecord(trap.trapId);
@@ -137,9 +137,9 @@ export function editTrap(
 }
 
 /** The GM takes a trap off the map. */
-export function removeTrap(state: GameState, sceneId: string | undefined, id: string, scope: Initiator): void {
+export function removeTrap(state: GameState, encounterId: string | undefined, id: string, scope: Initiator): void {
   requireGm(scope, "Only the GM removes traps.");
-  const slice = layerSlice(state, sceneId, "traps", "That scene is live. Remove its traps on the table.");
+  const slice = layerSlice(state, encounterId, "traps", "That encounter is live. Remove its traps on the table.");
   if (!slice.layer.some((trap) => trap.id === id)) throw new CommandRejectedError("That trap is no longer on the map.");
   slice.write(slice.layer.filter((trap) => trap.id !== id));
 }

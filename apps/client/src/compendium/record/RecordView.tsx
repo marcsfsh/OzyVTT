@@ -53,7 +53,7 @@ const WHERE_IT_APPEARS: Readonly<Record<Kind, string>> = {
   spell: "Casters whose spell lists include it can learn it.",
   "spell-list": "Classes that name it draw their spells from it.",
   equipment: "It is in the gear picker for every character's inventory.",
-  monster: "It is in the bestiary, and you can add it to a fight from there."
+  monster: "It is in the bestiary, and you can add it to an encounter from there."
 };
 
 export type RecordLayout = "dock" | "full" | "phone";

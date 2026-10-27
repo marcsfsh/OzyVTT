@@ -89,7 +89,7 @@ function StartFightPanel(props: StartFightProps) {
   return (
     <div className="start-fight" aria-labelledby="gm-encounter-title">
       <h2 id="gm-encounter-title" className="start-fight-title">
-        Start a fight
+        Start an encounter
       </h2>
       <p className="start-fight-lede">Everyone on the map is in. Untick anyone who isn&apos;t.</p>
       {props.spellAreas}
@@ -120,15 +120,15 @@ function StartFightCard(props: StartFightProps) {
     <div className="start-fight is-card" aria-labelledby="gm-encounter-title">
       <div className="start-fight-card-head">
         <h2 id="gm-encounter-title" className="start-fight-title">
-          Start a fight
+          Start an encounter
         </h2>
-        <span className="start-fight-card-state">No fight running</span>
+        <span className="start-fight-card-state">No encounter running</span>
       </div>
       {staged.length > 0 && (
         <div
           className="start-fight-faces"
           role="img"
-          aria-label={`In this fight: ${namesOf(staged.map((a) => a.name))}`}
+          aria-label={`In this encounter: ${namesOf(staged.map((a) => a.name))}`}
         >
           {staged.map((actor) => (
             <ActorPortrait
@@ -144,7 +144,7 @@ function StartFightCard(props: StartFightProps) {
       )}
       {props.spellAreas}
       <ul className="start-fight-rows">
-        <CardRow title="In this fight" value={sidesOf(staged)} onOpen={() => setSheet("fight")} />
+        <CardRow title="In this encounter" value={sidesOf(staged)} onOpen={() => setSheet("fight")} />
         <CardRow title="Initiative" value={initiativeWords} onOpen={() => setSheet("initiative")} />
         <CardRow title="Surprised" value={namesOf(surprisedNames)} onOpen={() => setSheet("surprised")} />
       </ul>
@@ -153,7 +153,7 @@ function StartFightCard(props: StartFightProps) {
           {props.blocked}
         </p>
       )}
-      <Modal open={sheet === "fight"} onClose={close} title="In this fight" align="bottom">
+      <Modal open={sheet === "fight"} onClose={close} title="In this encounter" align="bottom">
         <InThisFight {...props} />
       </Modal>
       <Modal open={sheet === "initiative"} onClose={close} title="Initiative" align="bottom">
@@ -183,8 +183,8 @@ function CardRow({ title, value, onOpen }: Readonly<{ title: string; value: stri
 function InThisFight(props: StartFightProps) {
   const { candidates, ticked, onTick, busy, state, token } = props;
   return (
-    <section className="start-fight-section" aria-label="In this fight">
-      {!props.phone && <h3 className="start-fight-label">In this fight</h3>}
+    <section className="start-fight-section" aria-label="In this encounter">
+      {!props.phone && <h3 className="start-fight-label">In this encounter</h3>}
       {candidates.length === 0 ? (
         <p className="start-fight-empty">No one staged yet. Add characters or monsters below.</p>
       ) : (
@@ -208,7 +208,7 @@ function InThisFight(props: StartFightProps) {
                     type="checkbox"
                     checked={ticked.has(actor.id)}
                     disabled={busy}
-                    aria-label={`${actor.name} is in this fight`}
+                    aria-label={`${actor.name} is in this encounter`}
                     onChange={(event) => onTick(actor.id, event.target.checked)}
                   />
                 </span>

@@ -46,7 +46,7 @@ export const returnsWords = (per: string, afterHours?: string) =>
     : per === "short-rest"
       ? "Back on a Short Rest"
       : per === "encounter"
-        ? "Back when the fight ends"
+        ? "Back when the encounter ends"
         : per === "own-turn"
           ? "Back each round"
           : per === "recharge"

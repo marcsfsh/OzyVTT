@@ -221,14 +221,18 @@ describe("what the table screen receives", () => {
   });
 });
 
-describe("a scene's sound", () => {
+describe("an encounter's sound", () => {
   it("saves the playlist and the layers that are on, and plays them when asked", () => {
     const fresh = board();
     expect(() => saveScenePreset(createSoundBoard(), SCENE)).toThrow("Add music or turn on an ambient layer");
     setLayerPlaying(fresh, FIRE, true, deps(0));
     saveScenePreset(fresh, SCENE);
     expect(fresh.presets).toEqual([
-      expect.objectContaining({ sceneId: SCENE, autoplay: true, ambient: [expect.objectContaining({ assetId: FIRE })] })
+      expect.objectContaining({
+        encounterId: SCENE,
+        autoplay: true,
+        ambient: [expect.objectContaining({ assetId: FIRE })]
+      })
     ]);
     setPresetAutoplay(fresh, SCENE, false);
     expect(fresh.presets[0]!.autoplay).toBe(false);

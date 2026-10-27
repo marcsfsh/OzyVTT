@@ -25,16 +25,21 @@ export const objectCommands = [
     type: "door.set-state",
     operationId: "setDoorState",
     description:
-      "Sets what keeps a door shut (GM-grade only): its `fastenings` (a `lock` with the Thieves' Tools DC to pick it, a `forceDc` to break it and the creatures that hold its key; `stuck`, `barred` or `jammed` with the Strength (Athletics) DC that forces it, 15 when none is given; `sealed`, which no check opens), an `arcaneLock` with its caster and the creatures it lets through, and `hidden` for a secret door players see as wall. Null clears them. Players never receive any of it; they learn a door is locked by trying it. `sceneId` targets a prepared scene.",
+      "Sets what keeps a door shut (GM-grade only): its `fastenings` (a `lock` with the Thieves' Tools DC to pick it, a `forceDc` to break it and the creatures that hold its key; `stuck`, `barred` or `jammed` with the Strength (Athletics) DC that forces it, 15 when none is given; `sealed`, which no check opens), an `arcaneLock` with its caster and the creatures it lets through, and `hidden` for a secret door players see as wall. Null clears them. Players never receive any of it; they learn a door is locked by trying it. `encounterId` targets a prepared encounter.",
     summary: "Lock, bar or hide a door (GM).",
     schema: DoorSetStateSchema,
     malformed: "The door's state is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }) {
-      const { wallId, door, sceneId } = request;
+      const { wallId, door, encounterId } = request;
       await execute((state) => {
-        if (sceneId !== undefined) {
-          const target = layerSlice(state, sceneId, "vision", "That scene is live. Edit its doors on the table.");
+        if (encounterId !== undefined) {
+          const target = layerSlice(
+            state,
+            encounterId,
+            "vision",
+            "That encounter is live. Edit its doors on the table."
+          );
           const scratch = { ...state, combat: { ...state.combat, vision: target.layer } };
           setDoorState(scratch, wallId, door);
           target.write(scratch.combat.vision);
@@ -49,7 +54,7 @@ export const objectCommands = [
     type: "door.use",
     operationId: "useDoor",
     description:
-      "A creature within 5 feet of a closed door works on it (SRD 5.2.1 Thieves' Tools, Ram Portable, Spikes Iron): `pick` its lock with Thieves' Tools (a Dexterity (Sleight of Hand) check against the lock's DC, 15 for the SRD Lock; an Arcane Lock can't be picked), `force` it open (a Strength (Athletics) check against the highest DC holding it, +4 with a Portable Ram and Advantage when `helperId` names another character beside the door to help with it), `jam` it shut with an Iron Spike (DC 15 to force), `pry` it open with Carpenter's or Smith's Tools (a Strength check with the tool against DC 20; a sealed door and an Arcane Lock hold), or `seal` it with Carpenter's Tools (the same check; DC 20 to force). Each takes the Utilize action in a fight on the creature's turn, or with `bonusAction` a Thief's Bonus Action (Fast Hands). The server rolls the check. GM-grade for any creature; a player session for their own character.",
+      "A creature within 5 feet of a closed door works on it (SRD 5.2.1 Thieves' Tools, Ram Portable, Spikes Iron): `pick` its lock with Thieves' Tools (a Dexterity (Sleight of Hand) check against the lock's DC, 15 for the SRD Lock; an Arcane Lock can't be picked), `force` it open (a Strength (Athletics) check against the highest DC holding it, +4 with a Portable Ram and Advantage when `helperId` names another character beside the door to help with it), `jam` it shut with an Iron Spike (DC 15 to force), `pry` it open with Carpenter's or Smith's Tools (a Strength check with the tool against DC 20; a sealed door and an Arcane Lock hold), or `seal` it with Carpenter's Tools (the same check; DC 20 to force). Each takes the Utilize action in an encounter on the creature's turn, or with `bonusAction` a Thief's Bonus Action (Fast Hands). The server rolls the check. GM-grade for any creature; a player session for their own character.",
     summary: "Pick, force, pry, jam or seal a door beside your character.",
     schema: DoorUseSchema,
     malformed: "The door command is malformed.",
@@ -97,17 +102,22 @@ export const objectCommands = [
     type: "object.set",
     operationId: "setWallObject",
     description:
-      "Gives a wall or door statistics as an object (GM-grade only), SRD 5.2.1 Breaking Objects: its Armor Class, its Hit Points (current and maximum), an optional damage threshold, and the damage types it resists, ignores or takes double from. Every object also has Immunity to Poison and Psychic damage. Attacks and damage then break it, and at 0 Hit Points it is gone from the map, opening the way. Null clears them. `sceneId` targets a prepared scene.",
+      "Gives a wall or door statistics as an object (GM-grade only), SRD 5.2.1 Breaking Objects: its Armor Class, its Hit Points (current and maximum), an optional damage threshold, and the damage types it resists, ignores or takes double from. Every object also has Immunity to Poison and Psychic damage. Attacks and damage then break it, and at 0 Hit Points it is gone from the map, opening the way. Null clears them. `encounterId` targets a prepared encounter.",
     summary: "Give a wall or door Armor Class and Hit Points (GM).",
     schema: ObjectSetSchema,
     malformed: "The object is malformed.",
     issueMessage: true,
     gmOnly: GM_ONLY,
     async run({ request, execute }) {
-      const { wallId, object, sceneId } = request;
+      const { wallId, object, encounterId } = request;
       await execute((state) => {
-        if (sceneId !== undefined) {
-          const target = layerSlice(state, sceneId, "vision", "That scene is live. Edit its walls on the table.");
+        if (encounterId !== undefined) {
+          const target = layerSlice(
+            state,
+            encounterId,
+            "vision",
+            "That encounter is live. Edit its walls on the table."
+          );
           const scratch = { ...state, combat: { ...state.combat, vision: target.layer } };
           setWallObject(scratch, wallId, object);
           target.write(scratch.combat.vision);
@@ -149,7 +159,7 @@ export const objectCommands = [
     type: "object.attack",
     operationId: "attackObject",
     description:
-      "A creature attacks an object with one of its own attacks (SRD 5.2.1 Breaking Objects): a door or wall with object statistics, or what holds a creature (`actorId` and `effectId`: a Net, a giant spider's web). The server rolls the attack against the object's Armor Class (a natural 20 is a Critical Hit, a natural 1 a miss), checks the attack's reach or range, spends the attack as one against a creature would in a fight, and deals its damage through the object's defences and damage threshold. A Siege Monster deals double damage, and a Sword of Sharpness its dice's maximum. At 0 Hit Points the object is destroyed: a door or wall is gone from the map, and a creature held by it is free. A player is told whether it hit and whether the object broke, never its Armor Class or the Hit Points it has left. GM-grade for any creature; a player session for their own character.",
+      "A creature attacks an object with one of its own attacks (SRD 5.2.1 Breaking Objects): a door or wall with object statistics, or what holds a creature (`actorId` and `effectId`: a Net, a giant spider's web). The server rolls the attack against the object's Armor Class (a natural 20 is a Critical Hit, a natural 1 a miss), checks the attack's reach or range, spends the attack as one against a creature would in an encounter, and deals its damage through the object's defences and damage threshold. A Siege Monster deals double damage, and a Sword of Sharpness its dice's maximum. At 0 Hit Points the object is destroyed: a door or wall is gone from the map, and a creature held by it is free. A player is told whether it hit and whether the object broke, never its Armor Class or the Hit Points it has left. GM-grade for any creature; a player session for their own character.",
     summary: "Attack a door, a wall or a net with one of your attacks.",
     schema: ObjectAttackSchema,
     malformed: "The attack is malformed.",

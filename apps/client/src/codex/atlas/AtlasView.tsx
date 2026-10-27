@@ -62,8 +62,8 @@ export type AtlasViewProps = Readonly<{
   gmToken: string;
   scenes: readonly AtlasScene[];
   actors?: readonly AtlasActor[];
-  activeSceneId: string | null;
-  onActivateScene: (sceneId: string) => void;
+  activeEncounterId: string | null;
+  onActivateScene: (encounterId: string) => void;
   onOpenReplay?: (archiveId: number) => void;
   /** From `/codex/atlas/:mapId`. Null opens the first top-level map. */
   mapId: string | null;
@@ -87,7 +87,7 @@ export function AtlasView({
   gmToken,
   scenes,
   actors = [],
-  activeSceneId,
+  activeEncounterId,
   onActivateScene,
   onOpenReplay,
   mapId,
@@ -442,7 +442,7 @@ export function AtlasView({
         maps={maps}
         scenes={scenes}
         actors={actors}
-        activeSceneId={activeSceneId}
+        activeEncounterId={activeEncounterId}
         autosave={autosave}
         onUpdated={onMarkerUpdated}
         onDeleted={(markerId) => {
@@ -470,7 +470,7 @@ export function AtlasView({
         pages={pages}
         mapName={mapName}
         scenes={scenes}
-        activeSceneId={activeSceneId}
+        activeEncounterId={activeEncounterId}
         onOpenPage={(id) => onNavigate(pagePath(id))}
         onOpenMap={enterMap}
         onEdit={() => setEditing(true)}

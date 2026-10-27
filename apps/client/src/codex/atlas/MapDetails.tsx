@@ -199,7 +199,9 @@ export function MapPicker({
         />
       </div>
       {assets.length === 0 ? (
-        <p className="atlas-empty">No map images yet. Upload one to start your atlas. Scenes uses the same images.</p>
+        <p className="atlas-empty">
+          No map images yet. Upload one to start your atlas. Encounters use the same images.
+        </p>
       ) : (
         <div className="atlas-assetgrid">
           {assets.map((asset) => (

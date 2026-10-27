@@ -398,7 +398,7 @@ describe("a save only some creature types make", () => {
 });
 
 describe("saves a stat block repeats or ends another way", () => {
-  it("makes a creature that saved against a cloaker's Moan immune to it for the fight", () => {
+  it("makes a creature that saved against a cloaker's Moan immune to it for the encounter", () => {
     const built = table("cloaker");
     use(built, "moan");
     answer(built, 20);

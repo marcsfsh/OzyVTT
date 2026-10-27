@@ -20,8 +20,8 @@ export function tableStatus(view: View): string {
     const down = "kind" in acting.hp ? acting.hp.kind === "exact" && acting.hp.current === 0 : acting.hp.current === 0;
     return `Round ${combat.round} · ${acting.name} ${dying && down ? "is dying" : "is acting"}`;
   }
-  if (combat.mapAssetId) return view.role === "gm" ? "Scene is live · no fight yet" : "Exploring · no fight";
-  return "No fight running yet";
+  if (combat.mapAssetId) return view.role === "gm" ? "Encounter is live · not started" : "Exploring · no encounter";
+  return "No encounter running yet";
 }
 
 /**
@@ -30,11 +30,11 @@ export function tableStatus(view: View): string {
  */
 export function idleStatus(view: View): Readonly<{ lead: string; detail: string }> {
   const { combat } = view.state;
-  const lead = "No fight running.";
+  const lead = "No encounter running.";
   if (!combat.mapAssetId)
     return {
       lead,
-      detail: view.role === "gm" ? "No scene is live." : "The map appears when the GM makes a scene live."
+      detail: view.role === "gm" ? "No encounter is live." : "The map appears when the GM makes an encounter live."
     };
   const onMap = new Set(combat.tokens.filter((token) => token.position !== null).map((token) => token.actorId));
   const here = view.state.actors.filter((actor) => onMap.has(actor.id));

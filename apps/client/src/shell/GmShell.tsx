@@ -75,8 +75,8 @@ export function GmShell({
    * Read defensively: the first `state:updated` a signing-in GM receives can still be the player-shaped
    * projection, which has no scenes. The scene surfaces wait for the GM's.
    */
-  const scenesLoaded = Array.isArray(state.combat.scenes);
-  const scenes = useMemo(() => state.combat.scenes ?? [], [state.combat.scenes]);
+  const scenesLoaded = Array.isArray(state.combat.encounters);
+  const scenes = useMemo(() => state.combat.encounters ?? [], [state.combat.encounters]);
   /** The party's player characters, for the Compendium's Who sees it. */
   const party = useMemo(
     () =>
@@ -87,8 +87,8 @@ export function GmShell({
   );
   const sceneActions = useSceneActions(scenes, { combatActive: state.combat.active });
   // One way to make a scene live from anywhere: asked first while a fight is on, since that fight is parked.
-  const makeSceneLive = async (sceneId: string): Promise<boolean> => {
-    const scene = scenes.find((candidate) => candidate.id === sceneId);
+  const makeSceneLive = async (encounterId: string): Promise<boolean> => {
+    const scene = scenes.find((candidate) => candidate.id === encounterId);
     return scene ? sceneActions.makeLive(scene) : false;
   };
 
@@ -170,7 +170,7 @@ export function GmShell({
             selectedMap,
             mapLibrary,
             onSelectMap: setSelectedMap,
-            onMakeLive: (sceneId) => void makeSceneLive(sceneId)
+            onMakeLive: (encounterId) => void makeSceneLive(encounterId)
           }}
         />
       )}
@@ -185,7 +185,7 @@ export function GmShell({
         <SoundBoard
           gmToken={token}
           scenes={scenes.map((scene) => ({ id: scene.id, name: scene.name }))}
-          activeSceneId={state.combat.activeSceneId ?? null}
+          activeEncounterId={state.combat.activeEncounterId ?? null}
         />
       )}
       {tab("viewer") && route.segments[1] !== "sound" && (
@@ -226,11 +226,11 @@ export function GmShell({
             archived: actor.archived,
             kind: actor.kind
           }))}
-          activeSceneId={state.combat.activeSceneId ?? null}
+          activeEncounterId={state.combat.activeEncounterId ?? null}
           gameHours={state.rest?.clockHours ?? null}
           gameMinutes={state.rest?.clockMinutes ?? 0}
-          onActivateScene={(sceneId: string) =>
-            void makeSceneLive(sceneId).then((live) => {
+          onActivateScene={(encounterId: string) =>
+            void makeSceneLive(encounterId).then((live) => {
               if (live) navigate(pathForGmTab("table"));
             })
           }

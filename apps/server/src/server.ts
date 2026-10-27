@@ -304,7 +304,7 @@ export function createServer(options: CreateServerOptions) {
     return new Set(
       committedState
         .read()
-        .actors.filter((actor) => actor.kind === "player-character" && actor.replaySceneId === undefined)
+        .actors.filter((actor) => actor.kind === "player-character" && actor.replayEncounterId === undefined)
         .map((actor) => actor.id)
     );
   }
@@ -699,7 +699,7 @@ export function createServer(options: CreateServerOptions) {
         if (auth.verify(socket.handshake.auth?.token))
           socket.emit(
             "system:error",
-            "The scene is live, but the shared screen could not switch to its map. Present it from the Viewer tab."
+            "The encounter is live, but the shared screen could not switch to its map. Present it from the Viewer tab."
           );
     }
   }
@@ -776,12 +776,12 @@ export function createServer(options: CreateServerOptions) {
         if (auth.verifyPlayer(socket.handshake.auth?.token)?.sessionId === sessionId)
           socket.emit("claim:released", event);
     },
-    onEncounterArchived: ({ sceneId, turnCount }) => {
+    onEncounterArchived: ({ encounterId, turnCount }) => {
       // Log the fight to the codex timeline, pinned to the location marker that links this scene, if any.
       try {
         const latest = store.listEncounterArchives()[0];
         if (!latest) return;
-        const marker = sceneId ? codexStore.markerForScene(sceneId) : null;
+        const marker = encounterId ? codexStore.markerForScene(encounterId) : null;
         const turns = turnCount > 0 ? ` (${turnCount} ${turnCount === 1 ? "turn" : "turns"})` : "";
         codexStore.appendCombatEntry({
           sourceEncounterId: latest.id,

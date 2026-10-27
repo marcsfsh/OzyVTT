@@ -302,7 +302,7 @@ function severLimb(
     kind: "effect",
     text: limb
       ? `One of ${troll.name}'s limbs is severed and becomes ${limb}, which acts right after ${troll.name} (${limbs.name}).`
-      : `One of ${troll.name}'s limbs is severed and becomes a ${limbs.limbMonsterId.replace(/-/g, " ")} (${limbs.name}). Add it to the fight.`,
+      : `One of ${troll.name}'s limbs is severed and becomes a ${limbs.limbMonsterId.replace(/-/g, " ")} (${limbs.name}). Add it to the encounter.`,
     actorId: troll.id
   });
 }

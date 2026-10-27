@@ -60,7 +60,7 @@ export function donInFight(
     const [don, doff] = DONNING[weightOf(incoming.armor)];
     const minutes = now ? don : doff;
     throw new CommandRejectedError(
-      `${now ? "Donning" : "Doffing"} ${incoming.name} takes ${minutes} ${minutes === 1 ? "minute" : "minutes"}, so it can't be done in a fight.`
+      `${now ? "Donning" : "Doffing"} ${incoming.name} takes ${minutes} ${minutes === 1 ? "minute" : "minutes"}, so it can't be done in an encounter.`
     );
   }
   if (kind === "shield") spendUtilize(state, actor, { role: "player" }, `${now ? "Don" : "Doff"} ${incoming.name}`);

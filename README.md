@@ -6,7 +6,7 @@ no accounts and no cloud service.
 
 It has two parts:
 
-- **The table.** Upload a battlemap, calibrate its grid, stage scenes, and run initiative with
+- **The table.** Upload a battlemap, calibrate its grid, stage encounters, and run initiative with
   server-enforced 5e rules: attacks, typed damage, saves, conditions, reactions, spell slots,
   rests and death saves. The [SRD coverage manifest](docs/srd-coverage.md) says, for every SRD
   5.2.1 record, what the server applies and what it leaves to the table. Players use a tabbed
@@ -156,14 +156,14 @@ The smoke suite (`e2e/`) starts its own servers on ports 3201 and 3202 (set `SMO
 them), each against a fresh temporary data directory, and runs the first-evening journeys at a
 390x844 touch phone and a 1280x800 laptop: the first evening (GM setup, the join address, a player
 claiming a character, pairing the table screen, uploading a map, setting its grid and making the
-scene live), a player claiming a character, a fight on a new scene, presenting a map on the table
+encounter live), a player claiming a character, an encounter on a new map, presenting a map on the table
 screen, and playing music on it. It needs Chromium once: `npx playwright install chromium`.
 
-## Running a fight
+## Running an encounter
 
-1. As GM, open **Scenes** and press **New scene**. Pick its battle map or upload one, then work
+1. As GM, open **Encounters** and press **New encounter**. Pick its battle map or upload one, then work
    through the steps: tokens and monsters, walls and light, sound, and **Make live**. The
-   Scenes front page lists what still needs you, and **See as** shows a scene the way the table
+   Encounters front page lists what still needs you, and **See as** shows an encounter the way the table
    screen or one player would get it.
 2. A map with no grid says so: press **Set the grid** (or open the map under **Maps**). For a
    printed grid, drag diagonally across a 3x3 block of squares to set the scale. For a gridless
@@ -175,14 +175,14 @@ screen, and playing music on it. It needs Chromium once: `npx playwright install
    GM-only combatants never appear on player screens or the table viewer.
 6. For sound, open **Shared screen**, then **Sound**: upload files you have the right to play,
    put them in the playlist, the ambience or the effects, and press play. Sound comes from the
-   table screen only; tap it once if it asks. A scene can start its own sound when it goes live.
+   table screen only; tap it once if it asks. An encounter can start its own sound when it goes live.
 
 ## Using the Codex
 
 1. Open the **Codex** tab and make a page with **New**. Write what players may read, and add a
    **Hidden block** for anything only you should see; each field has its own Who sees it switch.
    Link pages with `[[links]]` and add relationships beside the text.
-2. Upload maps to the **Atlas** and place pins that link pages, sub-maps or scenes.
+2. Upload maps to the **Atlas** and place pins that link pages, sub-maps or encounters.
 3. Set the calendar in **Story** and add dated entries to the chronicle.
 4. Make a session from a prep template, fill in its prep, and run it from the table's
    **Tonight** tab: tick clues, log what happens, and write the recap after play.

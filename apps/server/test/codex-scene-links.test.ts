@@ -13,10 +13,10 @@ const path = CODEX_PATHS.sceneLinks.replace("/api/v1/codex", "");
 describe("the scenes the Codex names", () => {
   it("lists each scene with the sessions that stage it, by the session or its prep, and the pins that link it", async () => {
     const { store, get } = await fixture();
-    store.createSession({ sessionNumber: 3, sceneIds: [SCENE_A] });
+    store.createSession({ sessionNumber: 3, encounterIds: [SCENE_A] });
     store.createSession({
       sessionNumber: 4,
-      prep: [{ type: "encounters", title: "Fights", sceneIds: [SCENE_A, SCENE_B] }]
+      prep: [{ type: "encounters", title: "Fights", encounterIds: [SCENE_A, SCENE_B] }]
     });
     const map = store.createMap({
       assetId: "20000000-0000-5000-8000-000000000001",
@@ -29,17 +29,17 @@ describe("the scenes the Codex names", () => {
       iconId: "pin",
       iconColor: "#ff2e9a",
       label: "Bridge",
-      sceneIds: [SCENE_B]
+      encounterIds: [SCENE_B]
     });
 
     const answer = await get(path);
     expect(answer.status).toBe(200);
     const links = answer.body.data!.links as Array<{
-      sceneId: string;
+      encounterId: string;
       sessions: Array<{ sessionNumber: number; via: string }>;
       pins: Array<{ label: string; mapName: string }>;
     }>;
-    const byScene = new Map(links.map((link) => [link.sceneId, link]));
+    const byScene = new Map(links.map((link) => [link.encounterId, link]));
     expect(byScene.get(SCENE_A)!.sessions.map((session) => [session.sessionNumber, session.via])).toEqual([
       [3, "session"],
       [4, "prep"]

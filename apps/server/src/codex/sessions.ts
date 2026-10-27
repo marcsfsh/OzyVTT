@@ -50,7 +50,7 @@ export type CodexSessionCreateInput = Readonly<{
   revealedToPlayers?: boolean;
   status?: CodexSessionStatus;
   tags?: readonly string[];
-  sceneIds?: readonly string[];
+  encounterIds?: readonly string[];
 }>;
 /** No `revealedToPlayers`: reveal has its own route, so an edit cannot publish a recap as a side effect. */
 export type CodexSessionUpdateInput = Readonly<{
@@ -61,7 +61,7 @@ export type CodexSessionUpdateInput = Readonly<{
   recapBody?: string;
   status?: CodexSessionStatus;
   tags?: readonly string[];
-  sceneIds?: readonly string[];
+  encounterIds?: readonly string[];
 }>;
 
 type SessionRowRaw = {
@@ -99,7 +99,7 @@ function toSession(row: SessionRowRaw): CodexSession {
     // Unrecognised statuses read as `planned`.
     status: row.status === "played" ? "played" : "planned",
     tags: parseStringArray(row.tags_json),
-    sceneIds: parseStringArray(row.scene_ids_json),
+    encounterIds: parseStringArray(row.scene_ids_json),
     rev: row.rev,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -123,7 +123,7 @@ export function insertSession(db: CodexDb, session: CodexSession): void {
       session.revealedToPlayers ? 1 : 0,
       session.status,
       JSON.stringify(session.tags),
-      JSON.stringify(session.sceneIds),
+      JSON.stringify(session.encounterIds),
       session.rev,
       session.createdAt,
       session.updatedAt,
@@ -170,7 +170,7 @@ export function createSession(db: CodexDb, input: CodexSessionCreateInput): Code
     revealedToPlayers: input.revealedToPlayers === true,
     status: sessionStatus(input.status),
     tags: tags(input.tags),
-    sceneIds: sessionSceneIds(input.sceneIds),
+    encounterIds: sessionSceneIds(input.encounterIds),
     rev: 1,
     createdAt: now,
     updatedAt: now,
@@ -204,7 +204,7 @@ export function updateSession(
     recapBody: input.recapBody === undefined ? existing.recapBody : body(input.recapBody),
     status: input.status === undefined ? existing.status : sessionStatus(input.status),
     tags: input.tags === undefined ? existing.tags : tags(input.tags),
-    sceneIds: input.sceneIds === undefined ? existing.sceneIds : sessionSceneIds(input.sceneIds),
+    encounterIds: input.encounterIds === undefined ? existing.encounterIds : sessionSceneIds(input.encounterIds),
     // `rev` and `updatedAt` move together on an edit; a reveal moves neither.
     rev: existing.rev + 1,
     updatedAt: now
@@ -229,7 +229,7 @@ function rewriteSession(db: CodexDb, next: CodexSession): void {
       next.recapBody,
       next.status,
       JSON.stringify(next.tags),
-      JSON.stringify(next.sceneIds),
+      JSON.stringify(next.encounterIds),
       next.rev,
       next.updatedAt,
       next.id

@@ -107,7 +107,7 @@ describe("the table screen's latest roll", () => {
     expect(card).toMatchObject({ who: "GM", what: "Damage" });
   });
 
-  it("shows nothing older than the screen's last change, the live scene going live, or ten minutes", () => {
+  it("shows nothing older than the screen's last change, the live encounter going live, or ten minutes", () => {
     const state = withRolls(table(), [roll({ createdAt: at(5_000) })]);
     expect(projectViewerRoll(state, NOW - 10_000, NOW)).not.toBeNull();
     expect(projectViewerRoll(state, NOW - 1_000, NOW)).toBeNull();
@@ -118,13 +118,13 @@ describe("the table screen's latest roll", () => {
       ...state,
       combat: {
         ...state.combat,
-        activeSceneId: "40000000-0000-4000-8000-00000000000a",
-        scenes: [
+        activeEncounterId: "40000000-0000-4000-8000-00000000000a",
+        encounters: [
           {
             id: "40000000-0000-4000-8000-00000000000a",
             name: "Warren",
             mapAssetId: state.combat.mapAssetId ?? "20000000-0000-5000-8000-000000000001",
-            combat: state.combat.scenes[0]?.combat ?? ({} as never),
+            combat: state.combat.encounters[0]?.combat ?? ({} as never),
             liveAt: NOW - 2_000
           }
         ]
@@ -144,7 +144,7 @@ describe("the screen's marker for what it shows", () => {
   const encounter = { mapAssetId: null, tokens: [], annotations: [] };
   const idle = { visible: false, round: 0, hiddenTurn: false, entries: [] };
 
-  it("moves when a map is presented or changed, and when a fight starts or ends, and not otherwise", () => {
+  it("moves when a map is presented or changed, and when an encounter starts or ends, and not otherwise", () => {
     let state = createViewerPresentationState();
     state = applyViewerCommand(
       state,

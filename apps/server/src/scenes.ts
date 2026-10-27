@@ -20,8 +20,8 @@ const MAX_SCENES = 20;
 // Go-live refusals, exported because `replay-launch.ts` pre-checks the room refusal. The Replays tab
 // routes both by their codes.
 export const SCENE_ROOM_REFUSAL =
-  "Remove a prepared scene first. Launching needs room to park the table and stage the replay.";
-export const HISTORY_REVIEW_REFUSAL = "Finish reviewing the combat history before switching scenes.";
+  "Remove a prepared encounter first. Launching needs room to park the table and stage the replay.";
+export const HISTORY_REVIEW_REFUSAL = "Finish reviewing the combat history before switching encounters.";
 
 /** A parked scene's combat is the live top-level combat minus the map and scene bookkeeping. */
 function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
@@ -98,10 +98,10 @@ function emptySceneCombat(): SceneCombat {
 
 /** A prepared combat from a combatant list: initiative at score 0, tokens unplaced. */
 function buildSceneCombat(state: GameState, combatantIds: readonly string[], geometry: TokenMapGeometry): SceneCombat {
-  if (combatantIds.length > 200) throw new CommandRejectedError("A scene can hold up to 200 combatants.");
+  if (combatantIds.length > 200) throw new CommandRejectedError("An encounter can hold up to 200 combatants.");
   const seen = new Set<string>();
   const initiative = combatantIds.map((actorId) => {
-    if (seen.has(actorId)) throw new CommandRejectedError("Each combatant can appear in a scene only once.");
+    if (seen.has(actorId)) throw new CommandRejectedError("Each combatant can appear in an encounter only once.");
     seen.add(actorId);
     const actor = state.actors.find((candidate) => candidate.id === actorId);
     if (!actor) throw new CommandRejectedError("One of the chosen combatants no longer exists.");
@@ -139,7 +139,7 @@ function stampStagingRecency(state: GameState, combatantIds: readonly string[], 
 export function createScene(
   state: GameState,
   input: Readonly<{
-    sceneId: string;
+    encounterId: string;
     name: string;
     mapAssetId: string;
     combatantIds: readonly string[];
@@ -148,12 +148,12 @@ export function createScene(
   geometry: TokenMapGeometry,
   now: number = Date.now()
 ): Scene {
-  if (state.combat.scenes.length >= MAX_SCENES)
-    throw new CommandRejectedError(`You can prepare up to ${MAX_SCENES} scenes.`);
-  if (state.combat.scenes.some((scene) => scene.id === input.sceneId))
-    throw new CommandRejectedError("That scene already exists.");
+  if (state.combat.encounters.length >= MAX_SCENES)
+    throw new CommandRejectedError(`You can prepare up to ${MAX_SCENES} encounters.`);
+  if (state.combat.encounters.some((scene) => scene.id === input.encounterId))
+    throw new CommandRejectedError("That encounter already exists.");
   const scene: Scene = {
-    id: input.sceneId,
+    id: input.encounterId,
     name: input.name,
     mapAssetId: input.mapAssetId,
     combat: buildSceneCombat(state, input.combatantIds, geometry),
@@ -162,23 +162,23 @@ export function createScene(
     updatedAt: now
   };
   stampStagingRecency(state, input.combatantIds, now);
-  state.combat = { ...state.combat, scenes: [...state.combat.scenes, scene] };
+  state.combat = { ...state.combat, encounters: [...state.combat.encounters, scene] };
   return scene;
 }
 
 /** Replaces a scene's starting choices for its fight. Allowed on the live scene: it changes no running fight. */
-export function setSceneInitiativeDefaults(state: GameState, sceneId: string, defaults: SceneInitiativeDefaults) {
-  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
-  if (!scene) throw new CommandRejectedError("That scene no longer exists.");
-  if (scene.replayOf) throw new CommandRejectedError("A replay starts the way its recorded fight did.");
+export function setSceneInitiativeDefaults(state: GameState, encounterId: string, defaults: SceneInitiativeDefaults) {
+  const scene = state.combat.encounters.find((candidate) => candidate.id === encounterId);
+  if (!scene) throw new CommandRejectedError("That encounter no longer exists.");
+  if (scene.replayOf) throw new CommandRejectedError("A replay starts the way its recorded encounter did.");
   const kept: SceneInitiativeDefaults = {
     ...(defaults.playersRollInitiative !== undefined ? { playersRollInitiative: defaults.playersRollInitiative } : {}),
     ...(defaults.groupMonsters !== undefined ? { groupMonsters: defaults.groupMonsters } : {})
   };
   state.combat = {
     ...state.combat,
-    scenes: state.combat.scenes.map((candidate) => {
-      if (candidate.id !== sceneId) return candidate;
+    encounters: state.combat.encounters.map((candidate) => {
+      if (candidate.id !== encounterId) return candidate;
       const { initiativeDefaults: _dropped, ...rest } = candidate;
       return Object.keys(kept).length > 0 ? { ...rest, initiativeDefaults: kept } : rest;
     })
@@ -190,50 +190,53 @@ export function setSceneInitiativeDefaults(state: GameState, sceneId: string, de
  * request's own value always wins; with neither, the fight starts as it always has.
  */
 export function liveInitiativeDefaults(state: GameState): SceneInitiativeDefaults {
-  const live = state.combat.scenes.find((scene) => scene.id === state.combat.activeSceneId);
+  const live = state.combat.encounters.find((scene) => scene.id === state.combat.activeEncounterId);
   return live && !live.replayOf ? (live.initiativeDefaults ?? {}) : {};
 }
 
-export function renameScene(state: GameState, sceneId: string, name: string) {
-  if (!state.combat.scenes.some((scene) => scene.id === sceneId))
-    throw new CommandRejectedError("That scene no longer exists.");
+export function renameScene(state: GameState, encounterId: string, name: string) {
+  if (!state.combat.encounters.some((scene) => scene.id === encounterId))
+    throw new CommandRejectedError("That encounter no longer exists.");
   state.combat = {
     ...state.combat,
-    scenes: state.combat.scenes.map((scene) => (scene.id === sceneId ? { ...scene, name } : scene))
+    encounters: state.combat.encounters.map((scene) => (scene.id === encounterId ? { ...scene, name } : scene))
   };
 }
 
 /** Drops a launched replay's scene and its cloned combatants. Call after the state swap; no-op for an
  *  ordinary scene. */
-function dropReplayScene(state: GameState, sceneId: string) {
-  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
+function dropReplayScene(state: GameState, encounterId: string) {
+  const scene = state.combat.encounters.find((candidate) => candidate.id === encounterId);
   if (!scene?.replayOf) return;
   // Keyed on the actors' own back-reference; the scene's id list is only a hint.
-  state.actors = state.actors.filter((actor) => actor.replaySceneId !== sceneId);
-  state.combat = { ...state.combat, scenes: state.combat.scenes.filter((candidate) => candidate.id !== sceneId) };
+  state.actors = state.actors.filter((actor) => actor.replayEncounterId !== encounterId);
+  state.combat = {
+    ...state.combat,
+    encounters: state.combat.encounters.filter((candidate) => candidate.id !== encounterId)
+  };
 }
 
-export function removeScene(state: GameState, sceneId: string) {
-  if (!state.combat.scenes.some((scene) => scene.id === sceneId))
-    throw new CommandRejectedError("That scene no longer exists.");
-  if (state.combat.activeSceneId === sceneId)
-    throw new CommandRejectedError("Switch to another scene before removing the live one.");
+export function removeScene(state: GameState, encounterId: string) {
+  if (!state.combat.encounters.some((scene) => scene.id === encounterId))
+    throw new CommandRejectedError("That encounter no longer exists.");
+  if (state.combat.activeEncounterId === encounterId)
+    throw new CommandRejectedError("Switch to another encounter before removing the live one.");
   // Removing a parked replay takes its clones with it; an ordinary scene's combatants stay on the roster.
-  dropReplayScene(state, sceneId);
-  state.combat = { ...state.combat, scenes: state.combat.scenes.filter((scene) => scene.id !== sceneId) };
+  dropReplayScene(state, encounterId);
+  state.combat = { ...state.combat, encounters: state.combat.encounters.filter((scene) => scene.id !== encounterId) };
 }
 
 export function setSceneCombatants(
   state: GameState,
-  sceneId: string,
+  encounterId: string,
   combatantIds: readonly string[],
   geometry: TokenMapGeometry,
   now: number = Date.now()
 ) {
-  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
-  if (!scene) throw new CommandRejectedError("That scene no longer exists.");
-  if (state.combat.activeSceneId === sceneId)
-    throw new CommandRejectedError("This scene is live. Change who is in it from the fight.");
+  const scene = state.combat.encounters.find((candidate) => candidate.id === encounterId);
+  if (!scene) throw new CommandRejectedError("That encounter no longer exists.");
+  if (state.combat.activeEncounterId === encounterId)
+    throw new CommandRejectedError("This encounter is live. Change who is in it at the table.");
   // Preserve where already-staged combatants stand so adding/removing one doesn't reset the layout.
   const placed = new Map(scene.combat.tokens.map((token) => [token.actorId, token.position]));
   const combat = buildSceneCombat(state, combatantIds, geometry);
@@ -244,8 +247,8 @@ export function setSceneCombatants(
   stampStagingRecency(state, combatantIds, now);
   state.combat = {
     ...state.combat,
-    scenes: state.combat.scenes.map((candidate) =>
-      candidate.id === sceneId ? { ...candidate, combat: combatKeepingPositions } : candidate
+    encounters: state.combat.encounters.map((candidate) =>
+      candidate.id === encounterId ? { ...candidate, combat: combatKeepingPositions } : candidate
     )
   };
 }
@@ -257,15 +260,17 @@ export function duplicateScene(
   newSceneId: string,
   now: number = Date.now()
 ): Scene {
-  if (state.combat.scenes.length >= MAX_SCENES)
-    throw new CommandRejectedError(`You can prepare up to ${MAX_SCENES} scenes.`);
-  const sourceIndex = state.combat.scenes.findIndex((scene) => scene.id === sourceSceneId);
-  if (sourceIndex === -1) throw new CommandRejectedError("That scene no longer exists.");
-  if (state.combat.scenes.some((scene) => scene.id === newSceneId))
-    throw new CommandRejectedError("That scene already exists.");
-  const source = state.combat.scenes[sourceIndex];
+  if (state.combat.encounters.length >= MAX_SCENES)
+    throw new CommandRejectedError(`You can prepare up to ${MAX_SCENES} encounters.`);
+  const sourceIndex = state.combat.encounters.findIndex((scene) => scene.id === sourceSceneId);
+  if (sourceIndex === -1) throw new CommandRejectedError("That encounter no longer exists.");
+  if (state.combat.encounters.some((scene) => scene.id === newSceneId))
+    throw new CommandRejectedError("That encounter already exists.");
+  const source = state.combat.encounters[sourceIndex];
   const combat =
-    state.combat.activeSceneId === sourceSceneId ? snapshotSceneCombat(state.combat) : structuredClone(source.combat);
+    state.combat.activeEncounterId === sourceSceneId
+      ? snapshotSceneCombat(state.combat)
+      : structuredClone(source.combat);
   const suffix = " (copy)";
   const name = `${source.name.length + suffix.length > 120 ? source.name.slice(0, 120 - suffix.length) : source.name}${suffix}`;
   const copy: Scene = {
@@ -277,43 +282,48 @@ export function duplicateScene(
     createdAt: now,
     updatedAt: now
   };
-  const scenes = [...state.combat.scenes];
+  const scenes = [...state.combat.encounters];
   scenes.splice(sourceIndex + 1, 0, copy);
-  state.combat = { ...state.combat, scenes };
+  state.combat = { ...state.combat, encounters: scenes };
   return copy;
 }
 
 /** Reorders scenes to a permutation of the current ids; the live scene is an id, so it never changes. */
 export function reorderScenes(state: GameState, order: readonly string[]) {
-  const current = state.combat.scenes;
+  const current = state.combat.encounters;
   const ids = new Set(current.map((scene) => scene.id));
   if (order.length !== current.length || new Set(order).size !== order.length || order.some((id) => !ids.has(id))) {
-    throw new CommandRejectedError("The new order must list every prepared scene exactly once.");
+    throw new CommandRejectedError("The new order must list every prepared encounter exactly once.");
   }
   const byId = new Map(current.map((scene) => [scene.id, scene]));
-  state.combat = { ...state.combat, scenes: order.map((id) => byId.get(id)!) };
+  state.combat = { ...state.combat, encounters: order.map((id) => byId.get(id)!) };
 }
 
 /** Park-and-resume: parks the live combat into its slot (or an implicit scene), then resumes the target
  *  and empties its slot. */
-export function activateScene(state: GameState, sceneId: string, implicitSceneId: string, now: number = Date.now()) {
-  const target = state.combat.scenes.find((scene) => scene.id === sceneId);
-  if (!target) throw new CommandRejectedError("That scene no longer exists.");
-  if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("That scene is already live.");
+export function activateScene(
+  state: GameState,
+  encounterId: string,
+  implicitSceneId: string,
+  now: number = Date.now()
+) {
+  const target = state.combat.encounters.find((scene) => scene.id === encounterId);
+  if (!target) throw new CommandRejectedError("That encounter no longer exists.");
+  if (state.combat.activeEncounterId === encounterId) throw new CommandRejectedError("That encounter is already live.");
   // The handler wipes timeline snapshots on a swap, so refuse while the GM is mid-review.
   if (state.combat.historyCursor !== null) throw new CommandRejectedError(HISTORY_REVIEW_REFUSAL, "history_review");
 
-  const departingId = state.combat.activeSceneId;
-  let scenes = state.combat.scenes;
-  if (state.combat.activeSceneId !== null) {
-    const parkedId = state.combat.activeSceneId;
+  const departingId = state.combat.activeEncounterId;
+  let scenes = state.combat.encounters;
+  if (state.combat.activeEncounterId !== null) {
+    const parkedId = state.combat.activeEncounterId;
     scenes = scenes.map((scene) =>
       scene.id === parkedId ? { ...scene, combat: snapshotSceneCombat(state.combat) } : scene
     );
   } else if (state.combat.mapAssetId !== null && (state.combat.active || state.combat.initiative.length > 0)) {
     // A pre-scenes encounter is live and unbound; preserve it as an implicit scene so switching back resumes it.
     if (scenes.length >= MAX_SCENES)
-      throw new CommandRejectedError("Remove a prepared scene before switching away from the current encounter.");
+      throw new CommandRejectedError("Remove a prepared encounter before switching away from the current encounter.");
     scenes = [
       ...scenes,
       {
@@ -329,14 +339,14 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
   // Read the target's stored combat before blanking its slot.
   const resumed = target.combat;
   scenes = scenes.map((scene) =>
-    scene.id === sceneId ? { ...scene, combat: emptySceneCombat(), liveAt: now } : scene
+    scene.id === encounterId ? { ...scene, combat: emptySceneCombat(), liveAt: now } : scene
   );
   // SceneCombat has no timeline fields; set them so the resumed combat starts live.
   state.combat = {
     ...resumed,
     mapAssetId: target.mapAssetId,
-    scenes,
-    activeSceneId: sceneId,
+    encounters: scenes,
+    activeEncounterId: encounterId,
     historyCursor: null,
     historyDirty: false,
     // A held fall belongs to the table it began on.
@@ -358,21 +368,21 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
 /** Scene slots a park-and-go-live needs (one more if an unbound encounter must be preserved). */
 export function sceneSlotsNeededToGoLive(state: GameState): number {
   const parksImplicitly =
-    state.combat.activeSceneId === null &&
+    state.combat.activeEncounterId === null &&
     state.combat.mapAssetId !== null &&
     (state.combat.active || state.combat.initiative.length > 0);
   return 1 + (parksImplicitly ? 1 : 0);
 }
 
 export function sceneHeadroom(state: GameState): number {
-  return MAX_SCENES - state.combat.scenes.length;
+  return MAX_SCENES - state.combat.encounters.length;
 }
 
 /** `activateScene` for a target it creates fresh; used for replay launch. */
 export function activateNewScene(
   state: GameState,
   input: Readonly<{
-    sceneId: string;
+    encounterId: string;
     name: string;
     mapAssetId: string | null;
     combat: SceneCombat;
@@ -382,16 +392,16 @@ export function activateNewScene(
   now: number = Date.now()
 ): Scene {
   if (state.combat.historyCursor !== null) throw new CommandRejectedError(HISTORY_REVIEW_REFUSAL, "history_review");
-  if (state.combat.scenes.some((scene) => scene.id === input.sceneId))
-    throw new CommandRejectedError("That scene already exists.");
+  if (state.combat.encounters.some((scene) => scene.id === input.encounterId))
+    throw new CommandRejectedError("That encounter already exists.");
   if (sceneHeadroom(state) < sceneSlotsNeededToGoLive(state)) {
-    throw new CommandRejectedError(SCENE_ROOM_REFUSAL, "scene_room_full");
+    throw new CommandRejectedError(SCENE_ROOM_REFUSAL, "encounter_room_full");
   }
 
-  const departingId = state.combat.activeSceneId;
-  let scenes = state.combat.scenes;
-  if (state.combat.activeSceneId !== null) {
-    const parkedId = state.combat.activeSceneId;
+  const departingId = state.combat.activeEncounterId;
+  let scenes = state.combat.encounters;
+  if (state.combat.activeEncounterId !== null) {
+    const parkedId = state.combat.activeEncounterId;
     scenes = scenes.map((scene) =>
       scene.id === parkedId ? { ...scene, combat: snapshotSceneCombat(state.combat) } : scene
     );
@@ -410,7 +420,7 @@ export function activateNewScene(
   }
   // The live scene's own slot stays empty by invariant.
   const scene: Scene = {
-    id: input.sceneId,
+    id: input.encounterId,
     name: input.name,
     mapAssetId: input.mapAssetId ?? state.combat.mapAssetId ?? "",
     combat: emptySceneCombat(),
@@ -422,8 +432,8 @@ export function activateNewScene(
   state.combat = {
     ...input.combat,
     mapAssetId: scene.mapAssetId,
-    scenes: [...scenes, scene],
-    activeSceneId: scene.id,
+    encounters: [...scenes, scene],
+    activeEncounterId: scene.id,
     historyCursor: null,
     historyDirty: false,
     pendingFalls: [],
@@ -454,14 +464,15 @@ function sceneContent(scene: Scene): string {
  * only had its slot emptied, which its `liveAt` already records.
  */
 export function stampSceneChanges(state: GameState, before: GameState, now: number = Date.now()) {
-  const previous = new Map(before.combat.scenes.map((scene) => [scene.id, scene]));
-  const wentLive = state.combat.activeSceneId !== before.combat.activeSceneId ? state.combat.activeSceneId : null;
+  const previous = new Map(before.combat.encounters.map((scene) => [scene.id, scene]));
+  const wentLive =
+    state.combat.activeEncounterId !== before.combat.activeEncounterId ? state.combat.activeEncounterId : null;
   let changed = false;
-  const scenes = state.combat.scenes.map((scene) => {
+  const scenes = state.combat.encounters.map((scene) => {
     const earlier = previous.get(scene.id);
     if (!earlier || scene.id === wentLive || sceneContent(scene) === sceneContent(earlier)) return scene;
     changed = true;
     return { ...scene, updatedAt: now };
   });
-  if (changed) state.combat = { ...state.combat, scenes };
+  if (changed) state.combat = { ...state.combat, encounters: scenes };
 }

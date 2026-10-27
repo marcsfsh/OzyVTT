@@ -307,8 +307,8 @@ export class CodexStore {
   markersForPage(pageId: string) {
     return atlas.markersForPage(this.#db, pageId);
   }
-  markerForScene(sceneId: string) {
-    return atlas.markerForScene(this.#db, sceneId);
+  markerForScene(encounterId: string) {
+    return atlas.markerForScene(this.#db, encounterId);
   }
   setPartyMarker(markerId: string | null) {
     return atlas.setPartyMarker(this.#db, markerId);
@@ -464,8 +464,8 @@ export class CodexStore {
   tickPrepItem(sessionId: string, itemId: string, done: boolean) {
     return sessions.tickPrepItem(this.#db, sessionId, itemId, done);
   }
-  setCurrentScene(sessionId: string, sceneId: string | null) {
-    return sessions.setCurrentScene(this.#db, sessionId, sceneId);
+  setCurrentScene(sessionId: string, encounterId: string | null) {
+    return sessions.setCurrentScene(this.#db, sessionId, encounterId);
   }
   /** A line logged at the table, filed under the session and dated at the GM's clock. */
   logSessionLine(sessionId: string, input: Readonly<{ text: string; revealedToPlayers?: boolean }>) {

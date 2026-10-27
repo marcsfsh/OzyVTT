@@ -165,13 +165,13 @@ export function FightMenu({
         className={`encounter-menu-toggle${labelled ? " is-labelled" : ""}`}
         aria-expanded={menuOpen}
         aria-haspopup="menu"
-        aria-label="Fight options"
-        title="Fight options · rules assistant, environment, roster, end"
+        aria-label="Encounter options"
+        title="Encounter options · rules assistant, environment, roster, end"
         onClick={() => setMenuOpen((current) => !current)}
       >
         {labelled ? (
           <>
-            Fight <IconChevron />
+            Encounter <IconChevron />
           </>
         ) : (
           "⋯"
@@ -185,7 +185,7 @@ export function FightMenu({
               ref={menuRef}
               className="encounter-menu anim-dialog"
               role="menu"
-              aria-label="Fight options"
+              aria-label="Encounter options"
               style={
                 menuPos
                   ? {
@@ -318,7 +318,7 @@ export function FightMenu({
                 {state.combat.healthDisplay.style === "band" && <p className="menu-note">{BADGE_AUDIENCE_REASON}</p>}
                 <Switch
                   className="environment-control"
-                  label="Underwater fight"
+                  label="Underwater"
                   checked={state.combat.underwater}
                   disabled={busy}
                   onChange={(underwater) =>
@@ -326,15 +326,15 @@ export function FightMenu({
                       onFeedback(
                         result.ok
                           ? underwater
-                            ? "The fight is now underwater."
-                            : "The fight is no longer underwater."
+                            ? "The encounter is now underwater."
+                            : "The encounter is no longer underwater."
                           : (result.message ?? "The environment could not be changed.")
                       )
                     )
                   }
                 />
-                <div className="menu-section" role="group" aria-label="Add to the fight">
-                  <p className="menu-section-title">Add to the fight</p>
+                <div className="menu-section" role="group" aria-label="Add to the encounter">
+                  <p className="menu-section-title">Add to the encounter</p>
                   {(() => {
                     // Archived characters are out of play and the server refuses them; `rosterActors` also drops a
                     // launched replay's clones.
@@ -365,7 +365,7 @@ export function FightMenu({
                                   actorId: actor.id,
                                   expectedRevision: state.revision
                                 }),
-                              `${actor.name} joined the fight. The token is in the staging tray.`
+                              `${actor.name} joined the encounter. The token is in the staging tray.`
                             )
                           }
                         >
@@ -378,7 +378,7 @@ export function FightMenu({
                         {addable.length > 0 && <div className="menu-add-list">{addable.map(row)}</div>}
                         {/* Only when the roster is truly exhausted; `Recent` may still offer monsters. */}
                         {available.length === 0 && (
-                          <p className="menu-empty-note">Everyone on the roster is already in this fight.</p>
+                          <p className="menu-empty-note">Everyone on the roster is already in this encounter.</p>
                         )}
                         {/* No `.scroll-y` here: `RECENT_COUNT` bounds the list, and a nested scroller inside the
                       body's scroll region is hard to use. */}
@@ -424,7 +424,7 @@ export function FightMenu({
                         onAwardExperience(inLair);
                       }}
                     >
-                      Award the fight's XP
+                      Award the encounter's XP
                     </button>
                   </div>
                 )}
@@ -437,7 +437,7 @@ export function FightMenu({
                     onEnd();
                   }}
                 >
-                  End the fight
+                  End the encounter
                 </button>
               </div>
             </div>

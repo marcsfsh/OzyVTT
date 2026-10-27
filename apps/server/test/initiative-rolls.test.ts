@@ -118,7 +118,7 @@ describe("player-rolled initiative", () => {
     expect(() => nextInitiativeTurn(game)).not.toThrow();
   });
 
-  it("lets the GM settle the rest with the start's rolls to begin a wait-mode fight", () => {
+  it("lets the GM settle the rest with the start's rolls to begin a wait-mode encounter", () => {
     const game = started("wait", [10, 10, 15]); // Alpha 12, Beta 10, Goblin 15
     rollRemainingInitiative(game);
     expect(game.combat.pendingInitiative).toEqual([]);
@@ -208,7 +208,7 @@ describe("what the rules give an initiative roll", () => {
     expect(rollSelfInitiative(game, PC, {}, queue([15, 3]))).toBe(5); // Disadvantage: min(15, 3) + 2
   });
 
-  it("rolls a mid-fight joiner under the same rules, fresh", () => {
+  it("rolls a mid-encounter joiner under the same rules, fresh", () => {
     const game = fresh("immediate");
     startEncounter(game, { mapAssetId: MAP, entries: [{ actorId: PC2 }] }, queue([10]), GEOMETRY);
     game.actors[0].conditions = [{ id: "invisible" }];
@@ -301,7 +301,7 @@ describe("Alert's Initiative Swap from a player", () => {
   });
 });
 
-describe("a wait-mode fight before everyone has rolled", () => {
+describe("a wait-mode encounter before everyone has rolled", () => {
   it("refuses actions, since the turn economy resets when turns begin", () => {
     const game = started("wait", [10, 10, 15]); // Goblin 15 is the provisional top
     const goblin = game.actors.find((actor) => actor.id === MON)!;
@@ -359,7 +359,7 @@ describe("Heroic Inspiration on an initiative roll", () => {
     );
   });
 
-  it("is refused once the fight has come to the character's first turn", () => {
+  it("is refused once the encounter has come to the character's first turn", () => {
     const game = started("immediate", [10, 10, 1]);
     rollSelfInitiative(game, PC, {}, queue([10]));
     rollSelfInitiative(game, PC2, {}, queue([1]));

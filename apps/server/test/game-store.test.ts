@@ -62,7 +62,8 @@ describe("SQLite GameStore", () => {
       expect(database.prepare("SELECT store, version FROM migrations").all()).toEqual([
         { store: "game", version: 1 },
         { store: "game", version: 2 },
-        { store: "game", version: 3 }
+        { store: "game", version: 3 },
+        { store: "game", version: 4 }
       ]);
       database.close();
     } finally {
@@ -112,7 +113,67 @@ describe("SQLite GameStore", () => {
     }
   });
 
-  it("journals commands only while a fight is live, capturing payload, principal, and revision", async () => {
+  it("reads a campaign saved before scenes became encounters under the new names", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-game-store-"));
+    const databasePath = join(directory, "vtt.sqlite");
+    try {
+      const store = new GameStore(databasePath);
+      await store.initialize();
+      store.close();
+      // Back to how an older build left it: migration 4 not applied, and every encounter saved under its scene name.
+      const sceneId = "30000000-0000-4000-8000-000000000001";
+      const old = GameStateSchema.parse({ schemaVersion: 1 });
+      const saved = {
+        ...old,
+        combat: {
+          ...old.combat,
+          scenes: [
+            { id: sceneId, name: "Warren", mapAssetId: "20000000-0000-5000-8000-000000000001", fightEndedAt: 5 }
+          ],
+          activeSceneId: sceneId
+        }
+      };
+      const database = new DatabaseSync(databasePath);
+      database.prepare("DELETE FROM migrations WHERE store = 'game' AND version = 4").run();
+      database.prepare("UPDATE game_state SET state_json = ? WHERE id = 1").run(JSON.stringify(saved));
+      database
+        .prepare(
+          "INSERT INTO turn_snapshots (idx, kind, label, revision, state_json, created_at) VALUES (0, 'turn', 'Round 1', 0, ?, ?)"
+        )
+        .run(JSON.stringify(saved), new Date().toISOString());
+      database
+        .prepare(
+          "INSERT INTO encounter_journal (command_id, command_type, actor_id, principal, payload_json, revision, at) VALUES ('j1', 'scene.activate', NULL, 'gm', ?, 1, ?)"
+        )
+        .run(JSON.stringify({ sceneId }), new Date().toISOString());
+      database
+        .prepare(
+          "INSERT INTO command_receipts (command_id, revision, command_type, accepted_at) VALUES ('r1', 1, 'scene.rename', ?)"
+        )
+        .run(new Date().toISOString());
+      database.close();
+
+      const reopened = new GameStore(databasePath);
+      await reopened.initialize();
+      expect(reopened.snapshot.combat.activeEncounterId).toBe(sceneId);
+      expect(reopened.snapshot.combat.encounters).toMatchObject([{ id: sceneId, name: "Warren", endedAt: 5 }]);
+      expect(reopened.listJournal()).toMatchObject([{ type: "encounter.activate", payload: { encounterId: sceneId } }]);
+      reopened.close();
+      const check = new DatabaseSync(databasePath, { readOnly: true });
+      const snapshot = check.prepare("SELECT state_json FROM turn_snapshots WHERE idx = 0").get() as {
+        state_json: string;
+      };
+      expect(JSON.parse(snapshot.state_json).combat.encounters[0].id).toBe(sceneId);
+      expect(check.prepare("SELECT command_type FROM command_receipts WHERE command_id = 'r1'").get()).toEqual({
+        command_type: "encounter.rename"
+      });
+      check.close();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("journals commands only while an encounter is live, capturing payload, principal, and revision", async () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-journal-"));
     let store: GameStore | undefined;
     try {

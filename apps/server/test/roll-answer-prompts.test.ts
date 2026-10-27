@@ -330,7 +330,7 @@ describe("Countercharm on a failed save against Frightened", () => {
 });
 
 describe("Improve Fate on another creature's roll", () => {
-  it("takes 2d4 off the goblin's attack roll, and is spent until the next fight", () => {
+  it("takes 2d4 off the goblin's attack roll, and is spent until the next encounter", () => {
     const game = table([IMPROVE_FATE]);
     goblinSwings(game, IDS.ally, [11]);
     expect(game.combat.pendingReactions[0]).toMatchObject({ actionName: "Improve Fate", answerEither: true });

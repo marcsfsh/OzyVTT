@@ -516,7 +516,7 @@ export const deleteSoundAsset = defineRoute({
   tag: "Sound assets",
   summary: "Delete a sound",
   description:
-    "Deletes a sound from the library. It is first taken off the sound board and every scene's sound, and stops if it is playing.",
+    "Deletes a sound from the library. It is first taken off the sound board and every encounter's sound, and stops if it is playing.",
   access: GM_SESSION,
   params: assetId("sound"),
   responses: {
