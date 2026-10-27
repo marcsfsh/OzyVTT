@@ -1,5 +1,7 @@
-import { Button, IconCheck, IconWarning } from "@vtt/ui";
+import { useState } from "react";
+import { Button, IconCheck, IconWarning, Switch, useToast } from "@vtt/ui";
 import { EncounterMeter } from "../encounter/EncounterMeter";
+import { command } from "../lib/command";
 import { useScenes } from "./context";
 import { pathForScene } from "./routes";
 import { count, needsOf, readinessOf, READINESS_LABEL, type SceneFacts } from "./sceneFacts";
@@ -45,7 +47,53 @@ export function readyChecks(facts: SceneFacts, maps: Parameters<typeof readiness
   return checks;
 }
 
-/** The scene panel's Fight tab: the monsters and the difficulty meter, then Ready to go. */
+/**
+ * Fight settings: how this scene's fight starts. Start the fight opens with these and can still change them for one
+ * fight (ADR-0039). Shown as Start the fight would open, so a scene with none reads the table's usual choices.
+ */
+export function FightSettings({ facts }: Readonly<{ facts: SceneFacts }>) {
+  const { state } = useScenes();
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const defaults = facts.scene.initiativeDefaults;
+  const playersRoll = defaults?.playersRollInitiative ?? false;
+  const groupMonsters = defaults?.groupMonsters ?? true;
+  const save = async (next: Readonly<{ playersRollInitiative: boolean; groupMonsters: boolean }>) => {
+    setBusy(true);
+    try {
+      const result = await command("scene:set-initiative-defaults", {
+        sceneId: facts.scene.id,
+        initiativeDefaults: next,
+        expectedRevision: state.revision
+      });
+      if (!result.ok) toast(result.message ?? "The fight settings weren't saved.", { tone: "error" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="sc-encounter-section" aria-labelledby="sc-fight-settings-title">
+      <h3 id="sc-fight-settings-title" className="sc-encounter-label">
+        Fight settings
+      </h3>
+      <Switch
+        label="Players roll their own initiative"
+        checked={playersRoll}
+        disabled={busy}
+        onChange={(on) => void save({ playersRollInitiative: on, groupMonsters })}
+      />
+      <Switch
+        label="One roll for each group of identical monsters"
+        checked={groupMonsters}
+        disabled={busy}
+        onChange={(on) => void save({ playersRollInitiative: playersRoll, groupMonsters: on })}
+      />
+      <p className="sc-encounter-hint">Start the fight opens with these. Surprise is chosen when it starts.</p>
+    </section>
+  );
+}
+
+/** The scene panel's Fight tab: the monsters and the difficulty meter, the fight's settings, then Ready to go. */
 export function SceneEncounterTab({ facts }: Readonly<{ facts: SceneFacts }>) {
   const { state, token, maps, go } = useScenes();
   const checks = readyChecks(facts, maps);
@@ -57,6 +105,7 @@ export function SceneEncounterTab({ facts }: Readonly<{ facts: SceneFacts }>) {
         </h3>
         <EncounterMeter state={state} token={token} staged={facts.combat.initiative.map((entry) => entry.actorId)} />
       </section>
+      {!facts.scene.replayOf && <FightSettings facts={facts} />}
       <section className="sc-encounter-section" aria-labelledby="sc-ready-title">
         <h3 id="sc-ready-title" className="sc-encounter-label">
           Ready to go

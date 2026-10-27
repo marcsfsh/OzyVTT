@@ -14,6 +14,7 @@ import {
   RuleFamilySchema,
   RuleModeSchema,
   SceneEnvironmentSchema,
+  SceneInitiativeDefaultsSchema,
   TableRollPurposeSchema
 } from "./state.js";
 import {
@@ -2393,6 +2394,17 @@ export const SceneCreateSchema = z
     mapAssetId: z.uuid(),
     combatantIds: z.array(z.uuid()).max(200),
     activate: z.boolean().optional(),
+    /** The fight's starting choices for Start the fight to read (ADR-0039). */
+    initiativeDefaults: SceneInitiativeDefaultsSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Replaces a scene's starting choices for its fight; an empty object clears them (ADR-0039). */
+export const SceneSetInitiativeDefaultsSchema = z
+  .object({
+    commandId: z.uuid(),
+    sceneId: z.uuid(),
+    initiativeDefaults: SceneInitiativeDefaultsSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

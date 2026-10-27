@@ -168,6 +168,7 @@ import type {
   SceneCreateSchema,
   SceneIdSchema,
   SceneRenameSchema,
+  SceneSetInitiativeDefaultsSchema,
   SceneReorderSchema,
   SceneSetCombatantsSchema,
   SetActorArchivedSchema,
@@ -949,6 +950,11 @@ export interface ClientToServerEvents {
   ) => void;
   "scene:rename": (
     payload: CommandPayload<typeof SceneRenameSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM sets how a scene's fight starts when Start the fight leaves a choice out (ADR-0039). */
+  "scene:set-initiative-defaults": (
+    payload: CommandPayload<typeof SceneSetInitiativeDefaultsSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "scene:remove": (

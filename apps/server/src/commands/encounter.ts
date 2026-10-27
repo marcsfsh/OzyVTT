@@ -43,6 +43,7 @@ import { defineCommand } from "./pipeline.js";
 import { refreshVisionMeasure } from "../vision/edit.js";
 import { hiddenCombatants, keepUnseenHidden } from "../vision/audience.js";
 import { recoverAmmunition } from "../ammunition.js";
+import { liveInitiativeDefaults } from "../scenes.js";
 
 // The encounter lifecycle, initiative and the turn economy.
 
@@ -87,7 +88,9 @@ export const encounterCommands = [
         const entries = request.entries ?? stagedEntries(draft);
         // Hidden from the table before the new fight: one this start leaves off the map stays unknown.
         const unseenBefore = hiddenCombatants(draft, kit.sightContent());
-        // A fresh fight starts from the table's standing rules policy unless this command names its own.
+        // A fresh fight starts from the table's standing rules policy unless this command names its own, and from
+        // the live scene's fight settings where the request leaves a choice out (ADR-0039).
+        const sceneDefaults = liveInitiativeDefaults(draft);
         regains = startEncounter(
           draft,
           {
@@ -95,8 +98,8 @@ export const encounterCommands = [
             entries,
             rulesMode: rulesMode ?? draft.rulesPolicy.dial,
             ruleExceptions: ruleExceptions ?? { ...draft.rulesPolicy.exceptions },
-            playersRollInitiative,
-            groupMonsters
+            playersRollInitiative: playersRollInitiative ?? sceneDefaults.playersRollInitiative,
+            groupMonsters: groupMonsters ?? sceneDefaults.groupMonsters
           },
           () => kit.context.random(20),
           tokenGeometry,

@@ -4,7 +4,8 @@ import {
   EMPTY_SCENE_VISION,
   type GameState,
   type Scene,
-  type SceneCombat
+  type SceneCombat,
+  type SceneInitiativeDefaults
 } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { assertNotArchived } from "./actor-roster.js";
@@ -137,7 +138,13 @@ function stampStagingRecency(state: GameState, combatantIds: readonly string[], 
 
 export function createScene(
   state: GameState,
-  input: Readonly<{ sceneId: string; name: string; mapAssetId: string; combatantIds: readonly string[] }>,
+  input: Readonly<{
+    sceneId: string;
+    name: string;
+    mapAssetId: string;
+    combatantIds: readonly string[];
+    initiativeDefaults?: SceneInitiativeDefaults;
+  }>,
   geometry: TokenMapGeometry,
   now: number = Date.now()
 ): Scene {
@@ -150,12 +157,41 @@ export function createScene(
     name: input.name,
     mapAssetId: input.mapAssetId,
     combat: buildSceneCombat(state, input.combatantIds, geometry),
+    ...(input.initiativeDefaults ? { initiativeDefaults: input.initiativeDefaults } : {}),
     createdAt: now,
     updatedAt: now
   };
   stampStagingRecency(state, input.combatantIds, now);
   state.combat = { ...state.combat, scenes: [...state.combat.scenes, scene] };
   return scene;
+}
+
+/** Replaces a scene's starting choices for its fight. Allowed on the live scene: it changes no running fight. */
+export function setSceneInitiativeDefaults(state: GameState, sceneId: string, defaults: SceneInitiativeDefaults) {
+  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
+  if (!scene) throw new CommandRejectedError("That scene no longer exists.");
+  if (scene.replayOf) throw new CommandRejectedError("A replay starts the way its recorded fight did.");
+  const kept: SceneInitiativeDefaults = {
+    ...(defaults.playersRollInitiative !== undefined ? { playersRollInitiative: defaults.playersRollInitiative } : {}),
+    ...(defaults.groupMonsters !== undefined ? { groupMonsters: defaults.groupMonsters } : {})
+  };
+  state.combat = {
+    ...state.combat,
+    scenes: state.combat.scenes.map((candidate) => {
+      if (candidate.id !== sceneId) return candidate;
+      const { initiativeDefaults: _dropped, ...rest } = candidate;
+      return Object.keys(kept).length > 0 ? { ...rest, initiativeDefaults: kept } : rest;
+    })
+  };
+}
+
+/**
+ * The live scene's starting choices, for `encounter:start` to use where its request leaves one out (ADR-0039). A
+ * request's own value always wins; with neither, the fight starts as it always has.
+ */
+export function liveInitiativeDefaults(state: GameState): SceneInitiativeDefaults {
+  const live = state.combat.scenes.find((scene) => scene.id === state.combat.activeSceneId);
+  return live && !live.replayOf ? (live.initiativeDefaults ?? {}) : {};
 }
 
 export function renameScene(state: GameState, sceneId: string, name: string) {
@@ -232,7 +268,15 @@ export function duplicateScene(
     state.combat.activeSceneId === sourceSceneId ? snapshotSceneCombat(state.combat) : structuredClone(source.combat);
   const suffix = " (copy)";
   const name = `${source.name.length + suffix.length > 120 ? source.name.slice(0, 120 - suffix.length) : source.name}${suffix}`;
-  const copy: Scene = { id: newSceneId, name, mapAssetId: source.mapAssetId, combat, createdAt: now, updatedAt: now };
+  const copy: Scene = {
+    id: newSceneId,
+    name,
+    mapAssetId: source.mapAssetId,
+    combat,
+    ...(source.initiativeDefaults && !source.replayOf ? { initiativeDefaults: { ...source.initiativeDefaults } } : {}),
+    createdAt: now,
+    updatedAt: now
+  };
   const scenes = [...state.combat.scenes];
   scenes.splice(sourceIndex + 1, 0, copy);
   state.combat = { ...state.combat, scenes };

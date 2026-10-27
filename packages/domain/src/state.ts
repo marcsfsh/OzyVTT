@@ -1961,12 +1961,21 @@ export const SceneCombatSchema = z.object(sceneCombatShape).superRefine(refineCo
 export type SceneCombat = z.infer<typeof SceneCombatSchema>;
 
 /** A prepared encounter the GM can switch to: its map plus a frozen combat context that resumes exactly when activated. */
+/** A scene's own starting choices for its fight: whether claimed characters roll their initiative and whether
+ *  identical monsters share one roll. An omitted field has no default. */
+export const SceneInitiativeDefaultsSchema = z
+  .object({ playersRollInitiative: z.boolean().optional(), groupMonsters: z.boolean().optional() })
+  .strict();
+export type SceneInitiativeDefaults = z.infer<typeof SceneInitiativeDefaultsSchema>;
 export const SceneSchema = z
   .object({
     id: z.uuid(),
     name: z.string().min(1).max(120),
     mapAssetId: z.uuid(),
     combat: SceneCombatSchema.prefault({}),
+    /** How this scene's fight starts when Start the fight leaves a choice out (ADR-0039). GM-only, as every scene is;
+     * a launched replay carries none. */
+    initiativeDefaults: SceneInitiativeDefaultsSchema.optional(),
     /** When the GM prepared it, last changed its record and last made it live, in epoch ms. GM-only, as every scene
      * is; a scene saved before these existed has none. */
     createdAt: z.number().int().nonnegative().optional(),

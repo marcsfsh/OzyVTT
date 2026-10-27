@@ -100,11 +100,20 @@ export function GmEncounterPanel({
   // until shortly after the last turn command settled; otherwise one double tap skips a combatant.
   const turnSettlesAt = useRef(0);
   const [message, setMessage] = useState("");
-  // Encounter-setup opt-in: claimed players roll their own initiative (per encounter, never persisted).
+  // Encounter-setup opt-in: claimed players roll their own initiative, for this fight.
   const [playersRollInitiative, setPlayersRollInitiative] = useState(false);
   // SRD Surprise and group rolls, per fight: who rolls initiative at Disadvantage, and one roll per stat block.
   const [surprised, setSurprised] = useState<ReadonlySet<string>>(() => new Set());
   const [groupMonsters, setGroupMonsters] = useState(true);
+  // The live scene's fight settings seed both switches, and a change to them or to the live scene seeds them again;
+  // the start sends what the switches show (ADR-0039).
+  const liveDefaults = state.combat.scenes.find((scene) => scene.id === state.combat.activeSceneId)?.initiativeDefaults;
+  const defaultPlayersRoll = liveDefaults?.playersRollInitiative ?? false;
+  const defaultGroup = liveDefaults?.groupMonsters ?? true;
+  useEffect(() => {
+    setPlayersRollInitiative(defaultPlayersRoll);
+    setGroupMonsters(defaultGroup);
+  }, [state.combat.activeSceneId, defaultPlayersRoll, defaultGroup]);
   // A pending history rewrite/discard the GM must confirm (see the Previous/Next flow).
   const [confirm, setConfirm] = useState<{
     message: string;

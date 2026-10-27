@@ -1095,7 +1095,10 @@ spot menu a right-click or long press opens (`scene/MapSpotMenu.tsx`). The grid'
 laptop a scene's page lists the scenes down its left (`scenes/SceneListColumn.tsx`) with whether each is ready to go
 (`readinessOf` in `scenes/sceneFacts.ts`, worked out from the facts, never stored), and its panel leads with Fight
 (`scenes/SceneEncounterTab.tsx`): the monsters and the difficulty meter (`encounter/EncounterMeter.tsx`, the SRD budget
-for the staged party, with no reading when the catalog gives a monster no XP) and Ready to go.
+for the staged party, with no reading when the catalog gives a monster no XP), Fight settings and Ready to go. Fight
+settings are the scene's `initiativeDefaults` (ADR-0039), set with `scene:set-initiative-defaults`: `encounter:start`
+takes the live scene's value for a choice its request leaves out, a duplicate copies them and a replay has none. The
+table's Start the fight seeds its two switches from them and sends what the switches show.
 
 The character sheet lives in `sheet/` (ADR-0030). `CharacterSheet.tsx` is one component for every place it sits: a
 page (My character, `/characters/<id>`, `sheet.html`), the GM's dialog, or the table panel's Me and Sheet tabs. It

@@ -14,6 +14,11 @@
   color: var(--text-muted);
   font: 600 12px / 1.3 var(--font-label);
 }
+.sc-encounter-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 .sc-ready {
   display: flex;
   flex-direction: column;

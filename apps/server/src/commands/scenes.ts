@@ -11,6 +11,7 @@ import {
   SceneRenameSchema,
   SceneReorderSchema,
   SceneSetCombatantsSchema,
+  SceneSetInitiativeDefaultsSchema,
   TerrainPaintSchema,
   TerrainResetSchema
 } from "@vtt/domain/commands";
@@ -25,7 +26,8 @@ import {
   removeScene,
   renameScene,
   reorderScenes,
-  setSceneCombatants
+  setSceneCombatants,
+  setSceneInitiativeDefaults
 } from "../scenes.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -46,13 +48,13 @@ export const sceneCommands = [
       const sceneMap = kit.context.mapCatalog.get(request.mapAssetId);
       if (!sceneMap || sceneMap.kind !== "battlemap")
         throw new CommandRejectedError("Prepare scenes on an uploaded battlemap.");
-      const { commandId, name, mapAssetId, combatantIds, activate } = request;
+      const { commandId, name, mapAssetId, combatantIds, activate, initiativeDefaults } = request;
       const geometry = await kit.context.tokenGeometryFor(mapAssetId);
       const implicitSceneId = kit.context.newId();
       // `activate` runs the same park/resume swap as `scene.activate` (and inherits its refusals), hence
       // executeTimeline and truncation.
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
-        createScene(draft, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry);
+        createScene(draft, { sceneId: commandId, name, mapAssetId, combatantIds, initiativeDefaults }, geometry);
         if (activate === true) {
           // The implicit-scene id must not be the commandId: the new scene already owns it.
           activateScene(draft, commandId, implicitSceneId);
@@ -77,6 +79,20 @@ export const sceneCommands = [
     gmOnly: "Only the GM can rename scenes.",
     async run({ request, execute }) {
       await execute((state) => renameScene(state, request.sceneId, request.name));
+    }
+  }),
+
+  defineCommand({
+    type: "scene.set-initiative-defaults",
+    operationId: "setSceneInitiativeDefaults",
+    description:
+      "Replaces how a scene's fight starts when `encounter.start` leaves a choice out: whether claimed characters roll their own initiative and whether identical monsters share one roll (GM-grade only, ADR-0039). An empty object clears them. Allowed on the live scene; a launched replay is refused.",
+    summary: "Set how a scene's fight starts when Start the fight leaves a choice out (GM).",
+    schema: SceneSetInitiativeDefaultsSchema,
+    malformed: "The scene's fight settings are malformed.",
+    gmOnly: "Only the GM can change a scene's fight settings.",
+    async run({ request, execute }) {
+      await execute((state) => setSceneInitiativeDefaults(state, request.sceneId, request.initiativeDefaults));
     }
   }),
 

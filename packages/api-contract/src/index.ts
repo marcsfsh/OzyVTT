@@ -370,6 +370,7 @@ export const GAME_PATHS = {
   scenes: `${API_NAMESPACE}/game/scenes`,
   sceneById: `${API_NAMESPACE}/game/scenes/{sceneId}`,
   sceneRename: `${API_NAMESPACE}/game/scenes/{sceneId}/rename`,
+  sceneInitiativeDefaults: `${API_NAMESPACE}/game/scenes/{sceneId}/initiative-defaults`,
   sceneActivate: `${API_NAMESPACE}/game/scenes/{sceneId}/activate`,
   sceneCombatants: `${API_NAMESPACE}/game/scenes/{sceneId}/combatants`,
   sceneDuplicate: `${API_NAMESPACE}/game/scenes/{sceneId}/duplicate`,
@@ -819,6 +820,11 @@ export const GAME_COMMANDS = {
   "actor.set-armor-class": { scope: "actor:write", method: "post", path: GAME_PATHS.actorArmorClass },
   "scene.create": { scope: "scene:write", method: "post", path: GAME_PATHS.scenes },
   "scene.rename": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneRename },
+  "scene.set-initiative-defaults": {
+    scope: "scene:write",
+    method: "post",
+    path: GAME_PATHS.sceneInitiativeDefaults
+  },
   "scene.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.sceneById },
   "scene.activate": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneActivate },
   "scene.set-combatants": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneCombatants },
