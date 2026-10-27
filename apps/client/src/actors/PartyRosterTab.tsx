@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { rosterActors, type ActorDefinition, type GmActor, type GmView, type PendingImport } from "@vtt/domain";
-import { Avatar, Badge, Button, Eyebrow, Modal, RevealSwitch, useToast } from "@vtt/ui";
+import { Badge, Button, Eyebrow, Modal, RevealSwitch, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { JoinAddress } from "../components/JoinAddress";
 import { navigate } from "../router";
@@ -12,6 +12,7 @@ import { CLAIM_WORD, claimStateOf, classLine, presenceDot } from "./actor-displa
 import { command } from "../lib/command";
 import { useForceRelease } from "./useForceRelease";
 import "./party-roster.css";
+import { ActorAvatar } from "./ActorAvatar";
 
 /** Never claimed and never in a fight: a character the GM made and can take back without archiving it first. */
 export const neverPlayed = (actor: GmActor) =>
@@ -178,7 +179,14 @@ export function PartyRosterTab({
     return (
       <li key={actor.id} className={`nh-card party-card${isArchived ? " is-archived" : ""}`}>
         <div className="nh-card-thumb party-card-thumb">
-          <Avatar name={actor.name} size="lg" presence={actor.presence ? presenceDot(actor.presence) : undefined} />
+          <ActorAvatar
+            actor={actor}
+            token={token}
+            definitions={definitions}
+            name={actor.name}
+            size="lg"
+            presence={actor.presence ? presenceDot(actor.presence) : undefined}
+          />
         </div>
         {(isArchived || actor.sample) && (
           <span className="nh-card-status">

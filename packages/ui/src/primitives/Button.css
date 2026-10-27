@@ -23,7 +23,7 @@
   border: 1px solid transparent;
   border-radius: 0;
   background: transparent;
-  font: 600 var(--fs-body) / 1 var(--font-label);
+  font: 600 14px / 1 var(--font-label);
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
@@ -79,32 +79,51 @@
   width: 100%;
 }
 
-/* Primary: the sun frame. A 3px sunset edge around a dark warm-tinted fill, with the label in Bungee. The label is
-   white on dark (deep ink on pale in Day and Dawn), never dark ink on the sun itself. */
+/* Primary: the arcade button, the one primary action in a view. A magenta face with dark Bungee ink over a 5px
+   pressed edge, and a soft pink glow in Dusk. The edge is a shadow, so the margin under the button keeps it clear of
+   what follows. Pressing sinks the face onto its edge. */
 .nh-btn--primary {
-  font: 400 var(--fs-body) / 1 var(--font-display);
-  letter-spacing: 0.02em;
+  min-height: 52px;
+  margin-bottom: 5px;
+  padding: 0 var(--space-8);
+  font: 400 16px / 1 var(--font-display);
+  letter-spacing: 0.04em;
   color: var(--primary-ink);
   text-shadow: var(--primary-ink-shadow);
   --nh-ink: var(--primary-ink);
+  --nh-edge: 5px;
+  transition: transform var(--dur-press) ease-out;
 }
 .nh-btn--primary::before {
-  border: 3px solid transparent;
-  background:
-    var(--primary-tint) padding-box,
-    linear-gradient(var(--primary-base), var(--primary-base)) padding-box,
-    var(--grad-sun-x) border-box;
-  box-shadow: var(--glow-sun);
+  border: 0;
+  background: var(--primary-tint), linear-gradient(var(--primary-base), var(--primary-base));
+  box-shadow:
+    0 var(--nh-edge) 0 var(--primary-edge),
+    var(--glow-primary);
 }
+/* In a section bar: a 42px face over a 4px edge, with `.tap-target` for the 44px hit area. */
 .nh-btn--primary.nh-btn--sm {
-  font-size: var(--fs-sm);
+  min-height: 42px;
+  margin-bottom: 4px;
+  padding: 0 18px;
+  font-size: 14px;
+  --nh-edge: 4px;
+}
+.nh-btn--primary:active:not(:disabled) {
+  transform: translateY(3px);
+  --nh-edge: 2px;
 }
 
-/* Secondary: the resting default, a raised control. */
+/* Secondary: the resting default, a flat control with a 1px edge. */
 .nh-btn--secondary {
-  --nh-fill: var(--raised);
+  --nh-fill: var(--surface-2);
   --nh-rim: var(--line-raised);
-  --nh-sheen: var(--raised-sheen);
+}
+
+/* Link: cyan words with no box, at the 44px height. */
+.nh-btn--link {
+  padding-inline: var(--space-1);
+  color: var(--cyan-hi);
 }
 
 /* Ghost: text only; a quiet fill is its interaction. */
@@ -122,16 +141,18 @@
 
 /* ---- Interaction, on :active as well as :hover ---- */
 .nh-btn--primary:hover:not(:disabled),
-.nh-btn--primary:active:not(:disabled),
-.nh-btn--primary:focus-visible {
+.nh-btn--primary:active:not(:disabled) {
   --primary-tint: var(--primary-tint-hover);
-  --nh-glow: var(--glow-drop-magenta);
 }
 .nh-btn--secondary:hover:not(:disabled),
-.nh-btn--secondary:active:not(:disabled),
-.nh-btn--secondary:focus-visible {
-  --nh-fill: var(--raised-hover);
-  --nh-rim: var(--rim-color-hi);
+.nh-btn--secondary:active:not(:disabled) {
+  --nh-fill: var(--surface-3);
+  --nh-rim: var(--line-raised-hover);
+}
+.nh-btn--link:hover:not(:disabled),
+.nh-btn--link:active:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .nh-btn--ghost:hover:not(:disabled),
 .nh-btn--ghost:active:not(:disabled),
@@ -166,18 +187,22 @@
   background: var(--surface-2);
   box-shadow: none;
 }
+.nh-btn--link:disabled {
+  --nh-fill: transparent;
+}
 
-/* Icon-only square control: compact paint, with `.tap-target` (added by the component) for the 44px hit area.
-   Fill and edge live on `--nh-fill` / `--nh-rim`, so setting `background` or `border-color` on `.nh-iconbtn`
-   has no visible effect. Pressed is a cyan fill, because cyan is selection. */
+/* Icon-only square control: 44 by 44 with no box at rest, a hover fill, and a cyan fill when pressed (cyan is
+   selection). `--sm` paints smaller and keeps `.tap-target` for the 44px hit area. Fill and edge live on `--nh-fill` /
+   `--nh-rim`, so setting `background` or `border-color` on `.nh-iconbtn` has no visible effect. */
 .nh-iconbtn {
   position: relative;
   isolation: isolate;
   display: inline-grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--tap-min);
+  height: var(--tap-min);
   padding: 0;
+  font-size: 20px;
   /* line-height:1 so a glyph child (✕) centres and doesn't ride a ~1.5 line box. */
   line-height: 1;
   border: 1px solid transparent;
@@ -185,9 +210,9 @@
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  --nh-fill: var(--raised);
-  --nh-rim: var(--line-raised);
-  --nh-sheen: var(--raised-sheen);
+  --nh-fill: transparent;
+  --nh-rim: transparent;
+  --nh-sheen: none;
 }
 .nh-iconbtn::before {
   content: "";
@@ -210,13 +235,12 @@
 .nh-iconbtn:hover:not(:disabled),
 .nh-iconbtn:active:not(:disabled) {
   color: var(--text);
-  --nh-fill: var(--raised-hover);
-  --nh-rim: var(--rim-color-hi);
+  --nh-fill: var(--surface-3);
 }
 .nh-iconbtn[aria-pressed="true"] {
   color: var(--text-on-neon);
-  --nh-fill: var(--cyan);
-  --nh-rim: var(--cyan);
+  --nh-fill: var(--state-on);
+  --nh-rim: var(--state-on-edge);
   --nh-sheen: none;
 }
 .nh-iconbtn:disabled {

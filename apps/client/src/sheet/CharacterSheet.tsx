@@ -9,7 +9,6 @@ import {
 } from "react";
 import type { GmActor, GmView, PlayerActor } from "@vtt/domain";
 import {
-  Avatar,
   Button,
   Chip,
   GmOnlyTag,
@@ -72,6 +71,7 @@ import { useSheetRolls } from "./useSheetRolls";
 import { poolsOf } from "./Uses";
 import { useRememberedTab } from "../table/TablePanel";
 import "./sheet.css";
+import { ActorAvatar } from "../actors/ActorAvatar";
 
 /** Where the sheet sits: a page of its own (My character, `/characters/<id>`, `sheet.html`), a dialog over the page
  *  it was opened from, or the table's panel. */
@@ -570,7 +570,13 @@ export function CharacterSheet({
     frame = (
       <section className={`cs cs--wide${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
         <header className="cs-band">
-          <Avatar name={actor.name} size="lg" />
+          <ActorAvatar
+            actor={actor}
+            token={token}
+            definitions={role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined}
+            name={actor.name}
+            size="lg"
+          />
           {name}
           <div className="cs-band-stats">
             <StatTile
@@ -685,7 +691,13 @@ export function CharacterSheet({
       <section className={`cs cs--narrow${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
         <header className="cs-head">
           <div className="cs-id">
-            <Avatar name={actor.name} size="md" />
+            <ActorAvatar
+              actor={actor}
+              token={token}
+              definitions={role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined}
+              name={actor.name}
+              size="md"
+            />
             {name}
             {levelBox}
             {menu}

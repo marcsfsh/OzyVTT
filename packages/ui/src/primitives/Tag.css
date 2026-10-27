@@ -1,0 +1,62 @@
+/* A tag is a short VT323 word on a fill or inside an edge. The fill tones put dark ink on a pale fill in both themes;
+   the outline tones print their word in the hue's text ink. */
+.nh-tag {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  font: 400 16px / 1.2 var(--font-numeric);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text);
+}
+.nh-tag--sm {
+  font-size: 15px;
+  padding: 0 4px;
+}
+.nh-tag--lg {
+  font-size: 18px;
+}
+.nh-tag--next {
+  background: var(--tag-next-bg);
+  color: var(--tag-next-ink);
+}
+.nh-tag--wait {
+  background: var(--tag-wait-bg);
+  color: var(--tag-wait-ink);
+}
+.nh-tag--hit {
+  background: var(--tag-hit-bg);
+  color: var(--tag-hit-ink);
+}
+.nh-tag--miss {
+  background: var(--tag-miss-bg);
+  color: var(--tag-miss-ink);
+}
+.nh-tag--status {
+  border-color: var(--line-raised);
+  color: var(--text-dim);
+}
+.nh-tag--ready,
+.nh-tag--done {
+  border-color: var(--state-on-edge);
+  color: var(--cyan-hi);
+}
+.nh-tag--error {
+  border-color: var(--hostile);
+  color: var(--danger-text);
+}
+.nh-tag--srd {
+  border-color: var(--line-raised);
+  color: var(--text-dim);
+}
+.nh-tag--homebrew {
+  border-color: var(--hp);
+  color: var(--hp-text);
+}
+.nh-tag--hidden {
+  border: 1px dashed var(--violet);
+  color: var(--violet-hi);
+}

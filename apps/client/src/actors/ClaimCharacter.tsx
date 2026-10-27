@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { rosterActors, type PlayerActor, type PlayerView } from "@vtt/domain";
-import { Alert, Avatar, Badge, Button, useToast } from "@vtt/ui";
+import { Alert, Badge, Button, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { PdfImportModal } from "./PdfImportModal";
 import { CLAIM_WORD, claimStateOf } from "./actor-display";
@@ -8,6 +8,7 @@ import { command } from "../lib/command";
 import { noteClaimReleased, useClaimReleased } from "../lib/claim-notice";
 import { navigate } from "../router";
 import "./claim-character.css";
+import { ActorAvatar } from "./ActorAvatar";
 
 /**
  * "Dwarf Fighter 7 · HP 74": who a character is, from what the projection gives an unclaimed character (its species
@@ -80,7 +81,7 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
             const line = pickLine(actor);
             return (
               <li key={actor.id} className={`claim-card${taken ? " is-taken" : ""}`}>
-                <Avatar name={actor.name} size="lg" />
+                <ActorAvatar actor={actor} name={actor.name} size="lg" />
                 <div className="claim-card-text">
                   <h3 className="claim-card-name">{actor.name}</h3>
                   {line && <span className="claim-card-line">{line}</span>}

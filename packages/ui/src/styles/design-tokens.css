@@ -38,6 +38,8 @@
   --line: rgba(255, 255, 255, 0.07);
   --line-strong: rgba(255, 255, 255, 0.12);
   --line-raised: rgba(255, 255, 255, 0.2);
+  /* A control's edge under the pointer: a step lighter, with no hue (cyan means selected). */
+  --line-raised-hover: rgba(255, 255, 255, 0.32);
   --line-hover: color-mix(in srgb, var(--cyan) 55%, transparent); /* adapts per theme via --cyan */
 
   /* One meaning per hue (DESIGN.md, Colour and themes). Each hue has an ink for words where the hue itself, meant
@@ -168,6 +170,19 @@
   --primary-ink-shadow: none;
   --primary-tint: linear-gradient(transparent, transparent);
   --primary-tint-hover: linear-gradient(rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.14));
+
+  /* Cabinet lamps: available, or on. A lit lamp glows in its colour; an unlit one is --surface-3 with a 1px edge. */
+  --lamp-action: var(--magenta);
+  --lamp-reaction: var(--cyan);
+  --lamp-on: var(--cyan);
+  --lamp-move: var(--text);
+  --lamp-bevel: inset 0 -3px 0 rgba(0, 0, 0, 0.3);
+  --glow-lamp-action: 0 0 10px rgba(255, 47, 146, 0.85);
+  --glow-lamp-bonus: 0 0 10px rgba(255, 210, 63, 0.8);
+  --glow-lamp-reaction: 0 0 10px rgba(43, 228, 255, 0.8);
+
+  /* The VCR counter's phosphor. */
+  --vcr-glow: 0 0 6px rgba(255, 255, 255, 0.45);
 
   /* Tags: VT323 words on a fill. */
   --tag-next-bg: #eef0f8;
@@ -415,15 +430,15 @@
      keep their visual weight and grow the area with `.tap-target`. */
   --tap-min: 44px;
 
-  /* Motion (between snappy and glidey) */
+  /* Motion: quick and one-shot, 120 to 200 ms, ease-out. Nothing loops, pulses or waits on an animation, and under
+     prefers-reduced-motion every one of these is instant. */
   --ease-settle: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-drawer: cubic-bezier(0.4, 0, 0.2, 1);
-  --dur-press: 100ms; /* transform on press               */
+  --dur-press: 120ms; /* transform on press                   */
   --dur-hover: 140ms; /* color/bg/border/shadow, glow on-off */
-  --dur-base: 200ms; /* panels, tabs, popovers, combat tint */
-  --dur-enter: 260ms; /* full view entrances               */
-  --dur-reveal: 560ms; /* one-time data reveals             */
-  --dur-theme: 400ms; /* the theme-switch sky moment       */
+  --dur-base: 200ms; /* popovers, the sun frame's slide      */
+  --dur-enter: 120ms; /* tabs and panels fading in           */
+  --dur-count: 300ms; /* the table screen's roll count-up    */
 
   /* Focus ring: the --focus-ring colour, under the name its callers use. */
   --focus-ring-color: var(--focus-ring);
@@ -454,6 +469,7 @@
   --line: #e0dbe6;
   --line-strong: #d3ccdc;
   --line-raised: #b9b0c8;
+  --line-raised-hover: #9c92ae;
 
   --magenta: #f0559b;
   --magenta-hi: #f27aae;
@@ -524,6 +540,11 @@
 
   --scanline-opacity: 0;
 
+  --glow-lamp-action: 0 0 #0000;
+  --glow-lamp-bonus: 0 0 #0000;
+  --glow-lamp-reaction: 0 0 #0000;
+  --vcr-glow: 0 0 #0000;
+
   --track-edge: var(--line-raised);
   --tab-on: linear-gradient(#fbfafc, #fbfafc);
 
@@ -586,6 +607,10 @@
   --glow-horizon: 0 0 #0000;
   --turn-glow: 0 0 #0000;
   --script-glow: 0 0 #0000;
+  --glow-lamp-action: 0 0 #0000;
+  --glow-lamp-bonus: 0 0 #0000;
+  --glow-lamp-reaction: 0 0 #0000;
+  --vcr-glow: 0 0 #0000;
 }
 
 /* A browser that can't blur what is behind a panel gets the solid surfaces too. */
@@ -655,14 +680,12 @@ body::after {
   border: 0;
 }
 
-/* Visible keyboard focus in the theme accent. `summary` is included because disclosures (Menu, FeatureList)
-   are <summary> elements. `:where()` adds no specificity, so primitives' own focus styles win. */
+/* Visible keyboard focus: a 2px --focus-ring outline 2px out, on every control. `summary` is included because
+   disclosures (Menu, FeatureList) are <summary> elements. An outline adds no layout and survives a control's own
+   box-shadow. `:where()` adds no specificity; a field keeps its own focus edge. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--bg),
-    0 0 0 4px var(--focus-ring-color);
-  border-radius: var(--radius-sm);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* ---- Interaction defaults ---- */
@@ -952,11 +975,9 @@ a:focus-visible .nav-arrow {
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(7px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 @keyframes popover-in {

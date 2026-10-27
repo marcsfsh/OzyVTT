@@ -1,90 +1,72 @@
+/* Bottom right on a laptop; on a phone, just above the bottom tabs (the shell sets --bottom-tabs-h). */
 .nh-toast-viewport {
   position: fixed;
   z-index: 80;
+  right: var(--space-5);
   bottom: var(--space-5);
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: var(--space-2);
-  width: min(100vw - 2rem, 24rem);
+  width: min(100vw - 2rem, 26rem);
   pointer-events: none;
 }
-/* On a phone the stack sits at the top edge, under the tab bar, away from the controls a thumb is reaching for. It
-   shows the newest message alone: a second one would hang over the page's own controls. */
+/* A phone shows the newest message alone: a second one would hang over the page's own controls. */
 @media (max-width: 760px) {
   .nh-toast-viewport {
-    top: calc(env(safe-area-inset-top) + 3.75rem);
-    bottom: auto;
+    left: 50%;
+    right: auto;
+    bottom: calc(var(--bottom-tabs-h, 0px) + env(safe-area-inset-bottom) + var(--space-3));
+    transform: translateX(-50%);
+    align-items: stretch;
   }
   .nh-toast-viewport > .nh-toast:not(:last-child) {
     display: none;
   }
 }
-/* Severity on a 2px leading rule, never the fill. Material on a backing layer because the toast has its own ✕. */
+/* A plate in --surface-2 with a 1px edge: the VT323 tag names its kind, one line says what happened. */
 .nh-toast {
-  position: relative;
-  isolation: isolate;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  box-sizing: border-box;
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
   color: var(--text);
   pointer-events: auto;
-  --nh-rule: var(--line-strong);
-}
-.nh-toast::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  box-sizing: border-box;
-  pointer-events: none;
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--nh-rule);
-  background: var(--surface-2);
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--void) 55%, transparent);
-}
-.nh-toast--success {
-  --nh-rule: var(--success);
-}
-.nh-toast--error {
-  --nh-rule: var(--danger);
-}
-.nh-toast--info {
-  --nh-rule: var(--info);
-}
-.nh-toast-icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  font-size: 1.05rem;
-  line-height: 1;
-}
-.nh-toast--success .nh-toast-icon {
-  color: var(--success);
-}
-.nh-toast--error .nh-toast-icon {
-  color: var(--danger-text);
-}
-.nh-toast--info .nh-toast-icon {
-  color: var(--info);
 }
 .nh-toast-message {
   flex: 1;
+  min-width: 0;
   font-size: var(--fs-sm);
   line-height: 1.3;
 }
-/* A quiet ✕; `.tap-target` lifts the hit area to 44px without growing the toast. */
+.nh-toast-undo {
+  flex: none;
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--cyan-hi);
+  font: 600 14px / 1 var(--font-label);
+  cursor: pointer;
+}
+.nh-toast-undo:hover,
+.nh-toast-undo:active {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* A quiet x; `.tap-target` lifts the hit area to 44px without growing the toast. */
 .nh-toast-close {
   flex: none;
   display: grid;
   place-items: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
   padding: 0;
   border: 0;
   background: transparent;
@@ -113,13 +95,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text);
-}
-.nh-toast-outlet--success .nh-toast-icon {
-  color: var(--success);
-}
-.nh-toast-outlet--error .nh-toast-icon {
-  color: var(--danger-text);
-}
-.nh-toast-outlet--info .nh-toast-icon {
-  color: var(--info);
 }

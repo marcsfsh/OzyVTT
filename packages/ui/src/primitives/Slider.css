@@ -33,7 +33,7 @@
   box-shadow: none;
 }
 .nh-slider-input:focus-visible {
-  outline: 2px solid var(--cyan);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 .nh-slider-input::-webkit-slider-runnable-track {

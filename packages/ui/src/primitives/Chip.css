@@ -1,29 +1,28 @@
-/* A chip is a tinted strip with a 3px bar on its leading edge, both in the chip's tone. Painted on the element:
-   a pressable chip carries `.tap-target`, whose `::after` is the hit area, and nothing here needs a second layer.
-   The tone's text token keeps the label at 4.5:1. */
+/* A chip is a flat face with a 1px edge in its tone and a faint tint of it. Painted on the element: a pressable chip
+   carries `.tap-target`, whose `::after` is the hit area, and nothing here needs a second layer. The tone's text
+   token keeps the label at 4.5:1. */
 .nh-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 2px var(--space-2) 2px calc(3px + var(--space-2));
-  border: 0;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--nh-chip-tone);
   border-radius: 0;
-  background-color: color-mix(in srgb, var(--nh-chip-tone) var(--nh-chip-mix), transparent);
-  box-shadow: inset 3px 0 0 var(--nh-chip-tone);
+  background-color: color-mix(in srgb, var(--nh-chip-tone) var(--nh-chip-mix), var(--surface-2));
   color: var(--nh-chip-ink);
-  font: 600 var(--fs-xs) / 1.4 var(--font-label);
+  font: 600 12px / 1.4 var(--font-label);
   white-space: nowrap;
   transition:
     background-color var(--dur-hover),
     box-shadow var(--dur-hover);
   --nh-chip-tone: var(--line-raised);
   --nh-chip-ink: var(--text);
-  --nh-chip-mix: 22%;
+  --nh-chip-mix: 0%;
 }
 .nh-chip--harmful {
   --nh-chip-tone: var(--danger);
   --nh-chip-ink: var(--danger-text);
-  --nh-chip-mix: 15%;
+  --nh-chip-mix: 10%;
 }
 .nh-chip--beneficial {
   --nh-chip-tone: var(--cyan);
@@ -41,9 +40,14 @@
   --nh-chip-mix: 18%;
 }
 .nh-chip--at-risk {
-  box-shadow:
-    inset 3px 0 0 var(--nh-chip-tone),
-    var(--glow-violet);
+  box-shadow: var(--glow-violet);
+}
+/* A removable filter chip: a cyan edge and its x, at the 36px face. */
+.nh-chip:has(> .nh-chip-remove) {
+  min-height: 36px;
+  padding-inline: var(--space-3) var(--space-1);
+  border-color: var(--state-on-edge);
+  font-size: 13px;
 }
 
 .nh-chip-icon {
@@ -81,26 +85,35 @@
   border-radius: 50%;
 }
 
-/* Pressable chip (filter and condition toggles): 2rem of paint plus `.tap-target` for the 44px floor. The 6px
-   overhang means a wrapping chip row needs at least --space-3 between chips. Every pressable chip keeps a lane
-   for the pressed tick, so pressing never shifts the row. */
+/* Pressable chip (filter and condition toggles): a 36px face plus `.tap-target` for the 44px floor, and 44px of paint
+   on a touch screen. The 4px overhang means a wrapping chip row needs at least --space-2 between chips. Every
+   pressable chip keeps a lane for the pressed tick, so pressing never shifts the row. */
 .nh-chip--pressable {
-  min-height: 2rem;
-  padding-left: calc(3px + var(--space-2) + 0.55rem);
+  min-height: 36px;
+  padding-inline: calc(var(--space-3) + 0.55rem) var(--space-3);
+  font-size: 13px;
   cursor: pointer;
+}
+@media (any-pointer: coarse) {
+  .nh-chip--pressable,
+  .nh-chip:has(> .nh-chip-remove) {
+    min-height: var(--tap-min);
+  }
 }
 /* `:active` says what `:hover` says. */
 .nh-chip--pressable:hover:not(:disabled),
 .nh-chip--pressable:active:not(:disabled) {
-  --nh-chip-mix: 32%;
+  background-color: color-mix(in srgb, var(--nh-chip-tone) var(--nh-chip-mix), var(--surface-3));
 }
-/* Pressed = a deeper tint plus the leading tick, the same "on" mark the cue draws elsewhere. */
+/* Pressed = selected: the cyan edge and tint, plus the leading tick, the same "on" mark the cue draws elsewhere. */
 .nh-chip--pressable[aria-pressed="true"] {
-  --nh-chip-mix: 40%;
+  --nh-chip-tone: var(--state-on-edge);
+  --nh-chip-mix: 14%;
+  color: var(--text);
   background-image: var(--cue-mark);
   background-repeat: no-repeat;
   background-size: 0.3rem 0.6rem;
-  background-position: calc(3px + 0.3rem) center;
+  background-position: var(--space-2) center;
 }
 .nh-chip--pressable:disabled {
   opacity: 0.6;

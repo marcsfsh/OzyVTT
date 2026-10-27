@@ -36,6 +36,24 @@ export { Drawer } from "./primitives/Drawer";
 export { ToastProvider, ToastOutlet, useToast, useToastMute, type ToastTone } from "./primitives/Toast";
 export { Badge, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarPresence } from "./primitives/Avatar";
+/* The 80s elements, each with one job: tags, lamps, the life bar, the VCR counter and framed pictures. */
+export { Tag, type TagTone } from "./primitives/Tag";
+export { Lamp, MoveLamp, StatusLamp, type LampKind } from "./primitives/Lamp";
+export { LifeBar, type ExactHp, type HpBand } from "./primitives/LifeBar";
+export { VcrCounter } from "./primitives/VcrCounter";
+export { Picture, Portrait, type PictureSource, type PortraitFrame } from "./primitives/Portrait";
+export {
+  avatarHash,
+  avatarUrl,
+  classAvatarFor,
+  defaultAvatarFor,
+  generalAvatarFor,
+  CLASS_AVATARS,
+  GENERAL_AVATARS,
+  type AvatarId,
+  type ClassAvatar,
+  type GeneralAvatar
+} from "./avatars";
 export { Meter, type MeterTone } from "./primitives/Meter";
 export { Alert } from "./primitives/Alert";
 export { Switch } from "./primitives/Switch";

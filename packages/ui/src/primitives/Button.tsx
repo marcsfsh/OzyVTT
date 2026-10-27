@@ -13,7 +13,7 @@ declare module "react" {
   }
 }
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "link" | "destructive";
 type ButtonSize = "sm" | "md";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -28,9 +28,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   ref?: Ref<HTMLButtonElement>;
 }
 
-/** The one button. Variants map to the semantic roles in the design language:
-    primary = magenta action, secondary = bordered, ghost = text, destructive =
-    danger. One primary action per view. Labels use sentence case, body face. */
+/** The one button. Variants map to the semantic roles in the design language: primary = the arcade button (one per
+    view, its label names its result), secondary = a flat control with an edge, ghost = quiet text, link = cyan words,
+    destructive = danger. Labels use sentence case, except the primary's Bungee. */
 export function Button({
   variant = "secondary",
   size = "md",
