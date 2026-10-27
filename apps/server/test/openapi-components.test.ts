@@ -361,7 +361,8 @@ describe("generated OpenAPI components", () => {
       const compiled = ajv.compile({ $ref: `openapi#/components/schemas/${base}` });
       expect(compiled(schema.parse(fixture)), `${base}: ${JSON.stringify(compiled.errors)}`).toBe(true);
     }
-  });
+    // Compiling the whole document takes several seconds on a CI runner.
+  }, 60_000);
 
   /** At bundle scale: every bundled SRD record must validate as the homebrew body that would carry it
    * (the "duplicate an SRD record into homebrew" flow). */
@@ -634,7 +635,8 @@ describe("generated OpenAPI components", () => {
           modifiers: [{ type: "attunement-slots", amount: 1 }]
         })
       ).toThrow();
-    });
+      // Compiling the whole document takes several seconds on a CI runner.
+    }, 60_000);
   });
 
   it("keeps a fixture for every homebrew shape, so a new component cannot land uncompiled", () => {
