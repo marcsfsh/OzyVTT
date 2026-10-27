@@ -1,0 +1,222 @@
+/* The table screen's strip and column, read across a room: the drawn sizes at 1920 wide, scaled with the screen's
+   width below that. Paint only, like viewer.css: nothing here makes a field render. */
+.screen-top {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 2vw, 2.5rem);
+  min-width: 0;
+  padding: clamp(0.5rem, 0.9vw, 1.1rem) clamp(1rem, 1.7vw, 2rem);
+  background:
+    var(--grad-horizon) bottom / 100% 2px no-repeat,
+    var(--surface-1);
+}
+.screen-mark {
+  flex: none;
+}
+/* The mark at the drawn TV size: the app bar's 22px and 30px, scaled to the room. */
+.screen-mark .nh-wordmark-ozy {
+  font-size: clamp(22px, 1.9vw, 36px);
+}
+.screen-mark .nh-wordmark-vtt {
+  font-size: clamp(30px, 2.6vw, 50px);
+}
+.screen-vcr {
+  flex: none;
+  padding-left: clamp(1rem, 1.6vw, 2rem);
+  border-left: 1px solid var(--line-strong);
+}
+.screen-tiles {
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 auto;
+  gap: clamp(0.25rem, 0.5vw, 0.75rem);
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 0 clamp(1rem, 1.6vw, 2rem);
+  border-left: 1px solid var(--line-strong);
+  list-style: none;
+  overflow-x: hidden;
+}
+.screen-tile {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: clamp(5rem, 6.5vw, 8rem);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-dim);
+}
+.screen-tile.is-acting {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.screen-tile-face {
+  position: relative;
+  display: inline-flex;
+}
+.screen-tile-next {
+  position: absolute;
+  left: calc(100% + 6px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 5px;
+  background: var(--text);
+  color: var(--bg);
+  font: 400 clamp(14px, 1vw, 20px) / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
+}
+.screen-tile-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 11rem;
+  font-size: clamp(15px, 1.05vw, 21px);
+  white-space: nowrap;
+}
+.screen-tile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.screen-tile.is-acting .screen-tile-name {
+  font-weight: 700;
+}
+.screen-tile-score {
+  font: 400 clamp(18px, 1.3vw, 26px) / 1 var(--font-numeric);
+}
+.screen-tile.is-acting .screen-tile-score {
+  color: var(--hp-text);
+}
+.screen-tile.is-gm-turn {
+  min-width: clamp(6rem, 7vw, 9rem);
+}
+.screen-tile-gm {
+  color: var(--violet-hi);
+  font: 400 clamp(20px, 1.4vw, 28px) / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The column: at 1920 the drawn 540px, narrower on a smaller screen, under the map on a portrait one. */
+.screen-column {
+  grid-area: 2 / 2;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.screen-column-scroll {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1vw, 1.25rem);
+  min-height: 0;
+  padding: clamp(1rem, 1.5vw, 1.75rem);
+}
+.screen-column-resize {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  bottom: 0;
+  left: -7px;
+  width: 14px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.screen-column-resize::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition:
+    background var(--dur-hover),
+    width var(--dur-hover);
+}
+.screen-column-resize:hover::before,
+.screen-column-resize:active::before {
+  width: 4px;
+  background: var(--cyan);
+}
+.screen-card {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: clamp(1rem, 1.25vw, 1.5rem);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+}
+.screen-card-label {
+  margin: 0;
+  color: var(--text-dim);
+  font: 400 clamp(16px, 1.15vw, 23px) / 1 var(--font-numeric);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.screen-acting-head {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 1.25vw, 1.5rem);
+  min-width: 0;
+}
+.screen-acting-who {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.screen-acting-name {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font: 400 clamp(1.5rem, 1.9vw, 2.4rem) / 1.05 var(--font-display);
+  text-transform: uppercase;
+}
+.screen-acting-next {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: clamp(16px, 1.05vw, 21px);
+}
+.screen-acting.is-gm-turn .screen-acting-name {
+  color: var(--violet-hi);
+}
+.screen-roll-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: clamp(16px, 1.05vw, 21px);
+}
+
+@media (max-aspect-ratio: 4/3) {
+  .screen-column {
+    grid-area: 3 / 1;
+    border-top: 1px solid var(--line-strong);
+    border-left: 0;
+  }
+  .screen-column-resize {
+    display: none;
+  }
+  .screen-column-scroll {
+    flex-direction: row;
+    max-height: 32vh;
+  }
+  .screen-column-scroll > .screen-card {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .screen-top {
+    flex-wrap: wrap;
+  }
+  .screen-tiles {
+    flex-basis: 100%;
+    padding-left: 0;
+    border-left: 0;
+  }
+}

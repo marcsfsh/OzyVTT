@@ -30,7 +30,8 @@ import { ScenesContext, type ScenesContextValue } from "./scenes/context";
 import { SceneList } from "./scenes/SceneList";
 import { FloatingSheet } from "./sheet/CharacterSheet";
 import { PaneDivider } from "./table/PaneDivider";
-import { Initiative, MapStage, type Presentation } from "./viewer/ViewerApp";
+import { ScreenColumn } from "./viewer/ScreenParts";
+import { MapStage, type Presentation } from "./viewer/ViewerApp";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
 
 // Every element with `touch-action: none` is a drag surface, and each one cancels its own touchmove: a drag that lifts
@@ -149,8 +150,8 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
   },
   { selector: ".viewer-stage", ui: () => <MapStage presentation={presentation} /> },
   {
-    selector: ".viewer-initiative-resize",
-    ui: () => <Initiative presentation={presentation} onResize={() => {}} />
+    selector: ".screen-column-resize",
+    ui: () => <ScreenColumn presentation={presentation} onResize={() => {}} />
   },
   { selector: ".viewer-preview-titlebar", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },
   { selector: ".viewer-preview-resize", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },

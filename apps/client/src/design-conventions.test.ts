@@ -288,7 +288,7 @@ const VIEWPORT_ALLOW: ReadonlyArray<readonly [file: string, values: readonly str
   ["apps/client/src/encounter/monster-browser.css", ["92vh"], "the cap on the monster browser modal"],
   ["apps/client/src/sheet/sheet.css", ["92dvh"], "the cap on the sheet's dialog"],
   ["apps/client/src/shell/landing.css", ["4vh", "3.5vh", "4.5vh"], "clamp() middle terms for the landing's spacing"],
-  ["apps/client/src/viewer/viewer.css", ["32vh"], "the shared screen's portrait initiative band"]
+  ["apps/client/src/viewer/screen-parts.css", ["32vh"], "the shared screen's portrait band under the map"]
 ];
 
 describe("(g) no viewport-fraction caps on in-flow content", () => {

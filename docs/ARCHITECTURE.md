@@ -1076,7 +1076,11 @@ footer's one primary. On a phone the table and its log head with the character b
 over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the field sends a typed formula, both
 through `dice:roll` at the visibility the dice options chose (`dice/roll-visibility.ts`), and Dice options opens the
 full `DicePanel`, the GM's calls for a roll included. The table screen lamp
-(`table/TvControl.tsx`) pauses or resumes the screen and opens its preview (`viewer/preview-open.ts`). Nothing floats
+(`table/TvControl.tsx`) pauses or resumes the screen and opens its preview (`viewer/preview-open.ts`). The screen
+itself (`viewer/ViewerApp.tsx`, with `viewer/ScreenParts.tsx`) draws a strip of the turn order with the VCR counter,
+the map fitted whole unless the screen chose Follow GM view or zoomed, and a column with who acts now and the place
+the latest roll will take; its pictures read only the feed's placed tokens and the actor id. The GM's preview loads the
+same page, so the two lay out alike. Nothing floats
 over the map but tokens and marks; notices land in the status line through `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
 
