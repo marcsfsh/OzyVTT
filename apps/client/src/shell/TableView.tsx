@@ -215,6 +215,13 @@ export function TableView(props: TableViewProps) {
     );
   }
 
+  // With no map live the picker is the whole table, beside the title screen's sunset.
+  if (claimingOnly && props.role === "player")
+    return (
+      <div className="table-claim anim-view">
+        <ClaimCharacter state={props.state} art />
+      </div>
+    );
   return (
     <div className={`table-bench anim-view ${role}${claimingOnly ? " is-claiming" : ""}`}>
       {header}

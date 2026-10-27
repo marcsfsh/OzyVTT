@@ -130,3 +130,9 @@
 .table-sheet-foot:empty {
   display: none;
 }
+
+/* A player with nobody claimed and no map live: the picker and its art take the whole pane. */
+.table-claim {
+  height: 100%;
+  min-height: 0;
+}

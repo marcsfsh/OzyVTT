@@ -130,12 +130,14 @@ test("the first evening: the GM password, the join address, a player, the table 
   // A player opens that address, sees who each character is, claims one and lands on My character.
   const player = await open(address!);
   await press(player.getByRole("button", { name: "Join as Player" }));
-  await expect(player.getByRole("heading", { name: "Choose your character" })).toBeVisible();
+  await expect(player.getByRole("heading", { name: "Pick your character" })).toBeVisible();
   // The later journeys play the other two.
   const card = player.getByRole("listitem").filter({ hasText: PARTY[2] });
   await expect(card.getByText(/^Elf Wizard 7 · HP \d+$/)).toBeVisible();
   await expectPageFits(player);
-  await press(card.getByRole("button", { name: "Claim" }));
+  // Choose the character, then Play as claims it after the claim is confirmed.
+  await press(card.getByRole("radio"));
+  await press(player.getByRole("button", { name: `Play as ${PARTY[2].split(" ")[0]}` }));
   await press(player.getByRole("dialog", { name: `Claim ${PARTY[2]}?` }).getByRole("button", { name: "Claim" }));
   await expect(playerSection(player, "Sheet")).toHaveAttribute("aria-selected", "true");
   await expectPageFits(player);
@@ -200,11 +202,13 @@ test("a player joins and claims a character", async ({ open }) => {
   const player = await open("/");
   await ensureGmPassword(player.request);
   await press(player.getByRole("button", { name: "Join as Player" }));
-  await expect(player.getByRole("heading", { name: "Choose your character" })).toBeVisible();
+  await expect(player.getByRole("heading", { name: "Pick your character" })).toBeVisible();
   await expectPageFits(player);
 
   const card = player.getByRole("listitem").filter({ hasText: PARTY[0] });
-  await press(card.getByRole("button", { name: "Claim" }));
+  // Choose the character, then Play as claims it after the claim is confirmed.
+  await press(card.getByRole("radio"));
+  await press(player.getByRole("button", { name: `Play as ${PARTY[0].split(" ")[0]}` }));
   await press(player.getByRole("dialog", { name: `Claim ${PARTY[0]}?` }).getByRole("button", { name: "Claim" }));
   await expect(player.getByText(`You're playing ${PARTY[0]}.`)).toBeVisible();
   await expectPageFits(player);

@@ -200,7 +200,8 @@ export const playerSection = (page: Page, name: "Table" | "Sheet" | "Codex" | "L
 export async function joinAndClaim(page: Page, name: string) {
   await ensureGmPassword(page.request);
   await press(page.getByRole("button", { name: "Join as Player" }));
-  await press(page.getByRole("listitem").filter({ hasText: name }).getByRole("button", { name: "Claim" }));
+  await press(page.getByRole("radio", { name: new RegExp(`^${name}`) }));
+  await press(page.getByRole("button", { name: `Play as ${name.split(" ")[0]}` }));
   await press(page.getByRole("dialog").getByRole("button", { name: "Claim" }));
   await expect(page.getByText(`You're playing ${name}.`)).toBeVisible();
   await expect(playerSection(page, "Sheet")).toHaveAttribute("aria-selected", "true");

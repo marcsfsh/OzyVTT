@@ -6,7 +6,7 @@
 //
 // Each page is captured in each theme asked for (both by default), after the self-hosted fonts load. `--scenario table`
 // makes a scene live on a drawn battle map with the party and four goblins on it, one hidden from players;
-// `--scenario fight` also starts the fight.
+// `--scenario fight` also starts the fight. A path's `{scene}` is that scene's id, as in `/scenes/{scene}`.
 // Build the client first (`npm run build`). Pictures land in e2e/test-results/screens/.
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -70,7 +70,8 @@ async function signIn(page) {
     await page.getByRole("tablist", { name: "GM sections" }).waitFor();
   } else {
     await page.getByRole("button", { name: "Join as Player" }).click();
-    await page.getByRole("listitem").getByRole("button", { name: "Claim" }).first().click();
+    await page.getByRole("radio").first().click();
+    await page.getByRole("button", { name: /^Play as / }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Claim" }).click();
     await page.getByText(/^You're playing /).waitFor();
   }
@@ -89,6 +90,9 @@ async function drawnMap(browser) {
   await page.close();
   return png;
 }
+
+/** The scenario's live scene, for a path that names `{scene}`. */
+let sceneId = null;
 
 /** Makes the scenario's scene live through the API, as the GM would from Prep. */
 async function seed(browser) {
@@ -145,6 +149,7 @@ async function seed(browser) {
     const [x, y] = spots[index % spots.length];
     await post(`/api/v1/game/tokens/${actorId}/move`, { actorId, position: { x, y } });
   }
+  sceneId = (await json(await fetch(`${base}/api/v1/game`, { headers }))).game.combat.activeSceneId;
   if (scenario === "fight") {
     await post("/api/v1/game/encounter/start", { mapAssetId: asset.id, entries: ids.map((actorId) => ({ actorId })) });
     // A few rolls shown to players, so the log has cards to show.
@@ -179,7 +184,7 @@ try {
         { theme, reduce }
       );
       for (const path of paths) {
-        await page.goto(path);
+        await page.goto(path.replace("{scene}", sceneId ?? ""));
         // A player rejoins with the stored token after a load; the address they asked for wins. The title screen can
         // take a moment to offer the rejoin, so wait for it or for the shell, whichever comes first.
         const rejoin = page.getByRole("button", { name: "Join as Player" });

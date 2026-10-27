@@ -51,6 +51,24 @@ export function useEntryAnimation() {
  * The landing page: one centred column with the wordmark and the two ways in. The GM password card
  * replaces the buttons in place. While the entry drives, it stays mounted as the curtain.
  */
+/** The title screen's art, layer by layer: star field, the slatted sun behind the horizon, the mountains on it, the
+ *  receding grid and grain. Colours are --landing-* tokens, re-skinned per theme. The picker reuses it. */
+export function LandingScene() {
+  return (
+    <div className="landing-scene" aria-hidden="true">
+      <span className="landing-stars-far" />
+      <span className="landing-stars" />
+      <span className="landing-skyband">
+        <span className="landing-sun" />
+      </span>
+      <span className="landing-mountains" />
+      <span className="landing-horizon" />
+      <span className="landing-grid" />
+      <span className="landing-noise" />
+    </div>
+  );
+}
+
 export function Landing({
   driving,
   bootstrapped,
@@ -96,26 +114,14 @@ export function Landing({
   };
   return (
     <div className={driving ? "landing landing--drive" : "landing"}>
-      {/* The title screen, layer by layer: star field, the slatted sun behind the horizon, the mountains on
-        it, the receding grid, grain, and the vignette from `.landing::before`. Colours are --landing-*
-        tokens, re-skinned per theme. */}
-      <div className="landing-scene" aria-hidden="true">
-        <span className="landing-stars-far" />
-        <span className="landing-stars" />
-        <span className="landing-skyband">
-          <span className="landing-sun" />
-        </span>
-        <span className="landing-mountains" />
-        <span className="landing-horizon" />
-        <span className="landing-grid" />
-        <span className="landing-noise" />
-      </div>
+      {/* The title screen's art, with the vignette from `.landing::before` over it. */}
+      <LandingScene />
       {/* A sibling of the scene, outside it: it must paint over the vignette and the content, and the
         scene is its own stacking context. */}
       <span className="landing-flare" aria-hidden="true" />
       <header className="home-hero anim-view">
         <h1 className="home-hero-title">
-          <Wordmark>OZYVTT</Wordmark>
+          <Wordmark variant="cabinet" className="home-hero-mark" />
         </h1>
       </header>
       {door === "choose" ? (
