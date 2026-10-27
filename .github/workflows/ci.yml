@@ -18,7 +18,8 @@ jobs:
   validate:
     name: Test, type-check, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The full suite runs about 11 minutes on a hosted runner; the rest takes 4.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
