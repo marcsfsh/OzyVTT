@@ -287,13 +287,16 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   await expect(yourTurn).toBeVisible();
   await expectUncovered(player.getByRole("button", { name: "End turn" }));
   if (hasTouch) {
-    // On a phone a divider splits the map pane from the panel; the keys move it as well as a finger.
-    const divider = player.getByRole("separator", { name: "Map and panel split" });
-    const before = Number(await divider.getAttribute("aria-valuenow"));
-    await divider.focus();
-    await player.keyboard.press("ArrowUp");
-    await expect(divider).toHaveAttribute("aria-valuenow", String(before - 5));
-    await player.keyboard.press("ArrowDown");
+    // On a phone the map scrolls away above the panel: scrolled to the end, the panel's tabs sit right under the turn
+    // order, and scrolled back the map is whole again.
+    const column = player.locator(".table-bench-split");
+    await column.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+    const [stripBottom, tabsTop] = await player.evaluate(() => [
+      document.querySelector(".table-strip")!.getBoundingClientRect().bottom,
+      document.querySelector(".table-bench-panel [role=tablist]")!.getBoundingClientRect().top
+    ]);
+    expect(Math.abs(tabsTop - stripBottom), "the panel's tabs sit under the turn order").toBeLessThan(80);
+    await column.evaluate((element) => element.scrollTo({ top: 0 }));
     await expectPageFits(player);
   }
 

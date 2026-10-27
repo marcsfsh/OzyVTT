@@ -138,6 +138,8 @@ export async function expectPageFits(page: Page) {
  */
 export async function expectUncovered(control: Locator) {
   await expect(control).toBeVisible();
+  // On a phone the panel sits under a map that scrolls away, so the control is checked once it is scrolled to.
+  await control.scrollIntoViewIfNeeded();
   const measure = () =>
     control.evaluate((element: HTMLElement) => {
       const box = element.getBoundingClientRect();
@@ -165,6 +167,8 @@ export async function expectTokenUncovered(page: Page, tokenId: string) {
   const token = page.locator(`g.encounter-token[data-token-id="${tokenId}"]`);
   await expect(token).toBeVisible();
   const found = await token.evaluate((element: SVGGElement) => {
+    // On a phone the map scrolls away above the panel; a person scrolls back to it to see the token.
+    element.closest(".table-bench-split")?.scrollTo({ top: 0 });
     const box = element.getBoundingClientRect();
     const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
     return {

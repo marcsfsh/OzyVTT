@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { rosterActors } from "@vtt/domain";
 import {
   Button,
@@ -17,7 +17,7 @@ import {
 } from "@vtt/ui";
 import { EncounterMap } from "../scene/EncounterMap";
 import { armPlacement, openMapToolGroup } from "../scene/tableGeometry";
-import { PaneDivider, useMomentShare } from "../table/PaneDivider";
+import { useScrollPast } from "../table/scrollPast";
 import { TablePanel, useRememberedTab } from "../table/TablePanel";
 import { pathForGmTab } from "../router";
 import { useScenes } from "./context";
@@ -70,8 +70,8 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
   const { state, token, maps, go, narrow, phone } = useScenes();
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId) ?? null;
   const [seeAs, setSeeAs] = useState<SeeAs>("gm");
-  const splitRef = useRef<HTMLDivElement | null>(null);
-  const [mapShare, moveSplit] = useMomentShare(null);
+  // On a narrow screen the map scrolls away above the panel.
+  const column = useScrollPast(narrow);
   const actions = useSceneActions(state.combat.scenes, {
     combatActive: state.combat.active,
     onDeleted: () => go(SCENES_PATHS.list),
@@ -274,16 +274,11 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
     <div className={cx("table-bench gm sc-scene-bench", !facts.live && "is-staging", !narrow && "has-list")}>
       {!narrow && <SceneListColumn currentId={scene.id} />}
       {header}
-      <div
-        className="table-bench-split"
-        ref={splitRef}
-        style={narrow ? ({ "--map-share": `${mapShare}%` } as React.CSSProperties) : undefined}
-      >
+      <div className={cx("table-bench-split", column.className)} ref={column.columnRef}>
         <div className="table-bench-map">
           {previewBanner}
           {map}
         </div>
-        {narrow && <PaneDivider value={mapShare} onChange={moveSplit} container={() => splitRef.current} />}
         <div className="table-bench-panel">
           <TablePanel
             label={`About ${scene.name}`}

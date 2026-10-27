@@ -165,7 +165,9 @@ The shells:
   for its pages, with the section's search or its primary at the right end.
 - GM, phone. The same four sections as a bottom tab bar. The top bar belongs to the page on screen. In a fight, Play
   stacks the VCR counter and scene picker, the turn order, the map, and the acting creature's card (portrait and
-  chrome name, life bar, pending card, lamps, an Actions row that opens the full list) above End turn.
+  chrome name, life bar, pending card, lamps, an Actions row that opens the full list) above End turn. Under the strips
+  the map (its tools above it) has a fixed height and scrolls away; the panel below is one screen tall, so scrolled to
+  the end its tabs sit under the turn order. Its content scrolls only once the map has gone. No handle resizes the map.
 - Player, laptop. The wordmark; Table, Sheet and Codex; the claimed character on the right; settings.
 - Player, phone. Bottom tabs Table, Sheet, Codex and Log on every screen. In a fight, Table holds the turn card and a
   small map with Open map.

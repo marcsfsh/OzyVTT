@@ -1083,7 +1083,10 @@ Needs you leads the Fight tab, above the acting creature's card and lamps (`enco
 order with its row tools; Start a fight (`encounter/StartFight.tsx`) lists the staged characters and monsters to tick.
 A player's tabs are Turn, Sheet, Log and Party in a fight (Me, Log and Party between fights). The Turn tab leads with
 the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts, the round and the four lamps; End turn is the
-footer's one primary. On a phone the table and its log head with the character being played
+footer's one primary. On a phone the map and panel share one column (`table/scrollPast.ts`): the map keeps a fixed
+height and scrolls away, the panel is one screen tall, and its regions scroll only once the map has gone; choosing a
+target scrolls back to the map. Prep's scene and map pages do the same below 980px. On a phone the table and its log
+head with the character being played
 (`table/PlayerIdentity.tsx`) in place of the top bar. The Log tab is the persisted combat log, rolls drawn as cards,
 over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the field rolls the formula after
 `/roll` (or `/r`), both through `dice:roll` at the visibility the dice options chose (`dice/roll-visibility.ts`);

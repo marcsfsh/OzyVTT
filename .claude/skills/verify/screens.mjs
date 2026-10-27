@@ -2,13 +2,14 @@
 // temporary data directory, so a UI change can be looked at without touching the GM's campaign.
 //
 //   node .claude/skills/verify/screens.mjs [--as gm|player] [--theme dusk|dawn|both] [--reduce-transparency]
-//     [--scenario table|fight] [--tab <id>] [--tv] <path>...
+//     [--scenario table|fight] [--tab <id>] [--scroll-end <selector>] [--tv] <path>...
 //
 // Each page is captured in each theme asked for (both by default), after the self-hosted fonts load. `--scenario table`
 // makes a scene live on a drawn battle map with the party and four goblins on it, one hidden from players;
 // `--scenario fight` also starts the fight. Both add a Codex page with a hidden field and a hidden block. A path's
 // `{scene}` is that scene's id, as in `/scenes/{scene}`, and `{page}` that page's, as in `/codex/pages/{page}`.
-// `--tab log` opens the table's panel on that tab (the device's saved tab). `--tv` pairs each browser as a table screen instead of signing in, presents the scenario's map, and captures
+// `--tab log` opens the table's panel on that tab (the device's saved tab), and `--scroll-end <selector>` scrolls that
+// element to its end before the capture. `--tv` pairs each browser as a table screen instead of signing in, presents the scenario's map, and captures
 // /viewer.html at 1920x1080, a 1280x720 screen and a portrait tablet.
 // Build the client first (`npm run build`). Pictures land in e2e/test-results/screens/.
 import { spawn } from "node:child_process";
@@ -30,6 +31,8 @@ const scenarioAt = args.indexOf("--scenario");
 const scenario = scenarioAt === -1 ? null : args.splice(scenarioAt, 2)[1];
 if (scenario !== null && scenario !== "table" && scenario !== "fight")
   throw new Error(`--scenario takes table or fight, not ${scenario}`);
+const scrollAt = args.indexOf("--scroll-end");
+const scrollEnd = scrollAt === -1 ? null : args.splice(scrollAt, 2)[1];
 const tabAt = args.indexOf("--tab");
 const tab = tabAt === -1 ? null : args.splice(tabAt, 2)[1];
 const tvAt = args.indexOf("--tv");
@@ -302,9 +305,14 @@ try {
           .catch(() => {});
         await page.waitForLoadState("networkidle").catch(() => {});
         await page.evaluate(() => document.fonts.ready);
+        if (scrollEnd)
+          await page.evaluate((selector) => {
+            const element = document.querySelector(selector);
+            element?.scrollTo({ top: element.scrollHeight, behavior: "auto" });
+          }, scrollEnd);
         await page.waitForTimeout(500);
         const slug = path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "home";
-        const variant = `${theme}${reduce ? "-solid" : ""}`;
+        const variant = `${theme}${reduce ? "-solid" : ""}${scrollEnd ? "-scrolled" : ""}`;
         const file = join(out, `${role}-${slug}-${size.name}-${variant}.png`);
         await page.screenshot({ path: file });
         console.log(file);

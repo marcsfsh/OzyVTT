@@ -29,7 +29,6 @@ import { MapTokenTray } from "./scene/MapTokenTray";
 import { ScenesContext, type ScenesContextValue } from "./scenes/context";
 import { SceneList } from "./scenes/SceneList";
 import { FloatingSheet } from "./sheet/CharacterSheet";
-import { PaneDivider } from "./table/PaneDivider";
 import { ScreenColumn } from "./viewer/ScreenParts";
 import { MapStage, type Presentation } from "./viewer/ViewerApp";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
@@ -155,10 +154,6 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
   },
   { selector: ".viewer-preview-titlebar", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },
   { selector: ".viewer-preview-resize", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },
-  {
-    selector: ".pane-divider",
-    ui: () => <PaneDivider value={50} onChange={() => {}} container={() => null} />
-  },
   { selector: ".cs-float-grip", ui: () => <FloatingSheet name="Lyra">Sheet</FloatingSheet> },
   { selector: ".cs-float-resize", ui: () => <FloatingSheet name="Lyra">Sheet</FloatingSheet> },
   {

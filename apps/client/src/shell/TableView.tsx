@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { Button, IconScene } from "@vtt/ui";
+import { Button, IconScene, cx } from "@vtt/ui";
 import { ClaimCharacter } from "../actors/ClaimCharacter";
 import { JoinAddress } from "../components/JoinAddress";
 import { partyVisibilityOf } from "../actors/MyCharacter";
@@ -20,7 +20,7 @@ import { PartyRest } from "../rest/PartyRest";
 import { RestPrompt } from "../rest/RestPrompt";
 import { needsItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
-import { PaneDivider, useMomentShare } from "../table/PaneDivider";
+import { useScrollPast } from "../table/scrollPast";
 import { hasPlayerPrompt, PromptSlot } from "../table/PromptSlot";
 import { StripEndContext } from "../table/stripSlot";
 import { TableStrip } from "../table/TableStrip";
@@ -74,9 +74,8 @@ export function TableView(props: TableViewProps) {
   // A player who has claimed nobody while no map is live sees the picker across the whole table, never under an empty
   // map box.
   const claimingOnly = props.role === "player" && !playerHasClaimed && !state.combat.mapAssetId;
-  // The phone's split between the map pane and the panel. Choosing a target lowers the divider so the map takes
-  // most of the height, and the player's sheet raises it so the sheet does; the person's own split comes back after.
-  const splitRef = useRef<HTMLDivElement | null>(null);
+  // On a phone the map scrolls away above the panel. Choosing a target scrolls back to the map, and the player's sheet
+  // or a prompt they owe scrolls past it to the panel.
   const targeting = useTargeting();
   const myId =
     props.role === "player" ? (props.state.actors.find((actor) => actor.claimStatus === "mine")?.id ?? null) : null;
@@ -85,7 +84,7 @@ export function TableView(props: TableViewProps) {
   // A prompt the player owes takes the panel's room too, so its answer and End turn stay on screen.
   const promptWaits = props.role === "player" && hasPlayerPrompt(props.state);
   const moment = choosing ? "choosing" : phone && (sheetShown || promptWaits) && playerHasClaimed ? "sheet" : null;
-  const [mapShare, moveSplit] = useMomentShare(moment);
+  const column = useScrollPast(phone && !claimingOnly, moment);
   const liveMapName = gm?.selectedMap?.id === state.combat.mapAssetId ? (gm?.selectedMap?.name ?? null) : null;
   // A player hears, in the status line, when the Codex gives them something new.
   useCodexNotice(role === "player" ? token : null);
@@ -238,13 +237,8 @@ export function TableView(props: TableViewProps) {
   return (
     <div className={`table-bench anim-view ${role}${claimingOnly ? " is-claiming" : ""}`}>
       {header}
-      <div
-        className="table-bench-split"
-        ref={splitRef}
-        style={phone ? ({ "--map-share": `${mapShare}%` } as React.CSSProperties) : undefined}
-      >
+      <div className={cx("table-bench-split", column.className)} ref={column.columnRef}>
         {map && <div className="table-bench-map">{map}</div>}
-        {phone && map && <PaneDivider value={mapShare} onChange={moveSplit} container={() => splitRef.current} />}
         <div className="table-bench-panel">
           <StripEndContext.Provider value={stripEnd}>{panel}</StripEndContext.Provider>
         </div>

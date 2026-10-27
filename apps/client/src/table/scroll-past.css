@@ -1,0 +1,22 @@
+/* A phone's map-then-panel column (`useScrollPast`): the map block keeps a fixed height and the panel is one screen
+   tall, so the column scrolls exactly the map's height and stops with the panel's tabs at its top. The map's own tools
+   sit in the map block and scroll with it. While the map shows, the panel's regions don't scroll, so a drag anywhere
+   moves the column. */
+.table-bench-split.is-scroll-past {
+  display: block;
+  flex: 1 1 0;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: auto;
+}
+.table-bench-split.is-scroll-past > .table-bench-map {
+  height: 24rem;
+  min-height: 0;
+}
+.table-bench-split.is-scroll-past > .table-bench-panel {
+  height: 100%;
+  min-height: 0;
+}
+.table-bench-split.is-scroll-past:not(.is-at-panel) > .table-bench-panel .scroll-y {
+  overflow-y: hidden;
+}
