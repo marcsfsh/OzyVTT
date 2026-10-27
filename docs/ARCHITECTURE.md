@@ -1066,7 +1066,10 @@ order with its row tools; Start a fight (`encounter/StartFight.tsx`) lists the s
 A player's tabs are Turn, Sheet, Log and Party in a fight (Me, Log and Party between fights). The Turn tab leads with
 the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts, the round and the four lamps; End turn is the
 footer's one primary. On a phone the table and its log head with the character being played
-(`table/PlayerIdentity.tsx`) in place of the top bar. The table screen lamp
+(`table/PlayerIdentity.tsx`) in place of the top bar. The Log tab is the persisted combat log, rolls drawn as cards,
+over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the field sends a typed formula, both
+through `dice:roll` at the visibility the dice options chose (`dice/roll-visibility.ts`), and Dice options opens the
+full `DicePanel`, the GM's calls for a roll included. The table screen lamp
 (`table/TvControl.tsx`) pauses or resumes the screen and opens its preview (`viewer/preview-open.ts`). Nothing floats
 over the map but tokens and marks; notices land in the status line through `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).

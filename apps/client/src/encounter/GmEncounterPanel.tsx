@@ -16,6 +16,7 @@ import { SpellAreas } from "./SpellAreas";
 import { useTargeting, useTargetingResult } from "./targeting";
 import { holdsTheTurn } from "../table/NeedsYou";
 import { isDefeatedMonster } from "../table/needs";
+import { LogComposer } from "../table/LogComposer";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
 import { revealInRegion } from "../lib/reveal";
 import { InStripEnd } from "../table/stripSlot";
@@ -598,7 +599,7 @@ export function GmEncounterPanel({
   const logBody = (
     <div className="table-log-tab">
       {slots?.log}
-      {slots?.dice && <div className="table-log-tab-dice scroll-y">{slots.dice}</div>}
+      <LogComposer options={slots?.dice} />
     </div>
   );
   const partyBody = (

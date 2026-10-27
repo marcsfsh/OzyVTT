@@ -1,6 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { CombatLogEntry } from "@vtt/domain";
-import { Eyebrow } from "@vtt/ui";
 import { read } from "../lib/command";
 import { socket } from "../socket";
 import "./combat-log.css";
@@ -65,23 +64,53 @@ function CombatLogList() {
   if (log.length === 0) return <p className="combat-log-empty">No combat events yet.</p>;
   return (
     <ol className="combat-log-list scroll-y" ref={listRef} aria-live="polite">
-      {log.map((entry) => (
-        <li key={entry.id} className={`combat-log-entry log-${entry.kind}`}>
-          <span className="combat-log-text">{entry.text}</span>
-        </li>
-      ))}
+      {log.map((entry) =>
+        entry.kind === "roll" && entry.roll ? (
+          <li key={entry.id} className="combat-log-entry log-roll is-card">
+            <RollCard text={entry.text} roll={entry.roll} />
+          </li>
+        ) : (
+          <li key={entry.id} className={`combat-log-entry log-${entry.kind}`}>
+            <span className="combat-log-text">{entry.text}</span>
+          </li>
+        )
+      )}
     </ol>
   );
 }
 
-/** The Log tab: its own heading over the list. */
+/**
+ * A roll in the log: who rolled what, the total large in VT323, and the dice with the formula beside it. The line's
+ * text stays for screen readers; the card shows the same roll.
+ */
+function RollCard({ text, roll }: Readonly<{ text: string; roll: NonNullable<CombatLogEntry["roll"]> }>) {
+  return (
+    <article className="log-roll-card" aria-label={text}>
+      <p className="log-roll-who" aria-hidden="true">
+        <b>{roll.initiatorLabel ?? "Someone"}</b> {roll.label ?? "rolled"}
+      </p>
+      <p className="log-roll-readout" aria-hidden="true">
+        <span className="log-roll-total">{roll.total}</span>
+        <span className="log-roll-dice">
+          {roll.dice.map((die, index) => (
+            <span key={index} className={die.kept ? undefined : "is-dropped"}>
+              {die.face}
+            </span>
+          ))}
+          <span className="log-roll-formula">{roll.formula}</span>
+        </span>
+      </p>
+    </article>
+  );
+}
+
+/** The Log tab: the feed, under a heading the tab's name already shows. */
 export function CombatLogPanel() {
   return (
     <section className="combat-log" aria-labelledby="combat-log-heading">
-      <div className="combat-log-heading">
-        <Eyebrow>LOG</Eyebrow>
-        <h2 id="combat-log-heading">Combat log</h2>
-      </div>
+      <h2 id="combat-log-heading" className="nh-sr-only">
+        Combat log
+      </h2>
       <CombatLogList />
     </section>
   );

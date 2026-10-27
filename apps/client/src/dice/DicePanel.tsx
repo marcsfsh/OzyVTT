@@ -3,6 +3,7 @@ import type { GmView, PlayerView, RollPurpose, RollVisibility, TableRollPurpose 
 import { Button, Input, SegmentedControl, Select, Stepper, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "./roll-preference";
+import { setRollVisibility, useRollVisibility } from "./roll-visibility";
 import { RollCallPanel } from "./RollCallPanel";
 import "./dice-panel.css";
 
@@ -69,7 +70,9 @@ export function DicePanel({
 }) {
   const [formula, setFormula] = useState("1d20");
   const [purpose, setPurpose] = useState<TableRollPurpose>("manual");
-  const [visibility, setVisibility] = useState<RollVisibility>("public");
+  // Shared with the log's composer, so a quick die there goes to the audience chosen here.
+  const visibility = useRollVisibility();
+  const setVisibility = setRollVisibility;
   const [rollFilter, setRollFilter] = useState<"all" | "mine">("all");
   const [modifier, setModifier] = useState(0);
   const [advantage, setAdvantage] = useState(false);

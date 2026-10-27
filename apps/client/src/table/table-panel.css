@@ -178,7 +178,7 @@
   font: 400 16px / 1 var(--font-numeric);
 }
 
-/* Log: the log fills the tab and the dice sit under it in their own scrolling region. */
+/* Log: the log fills the tab and the composer sits under it. */
 .table-log-tab {
   display: flex;
   flex-direction: column;
@@ -188,11 +188,6 @@
 .table-log-tab > :first-child {
   flex: 1 1 0;
   min-height: 0;
-}
-.table-log-tab-dice {
-  flex: 0 1 auto;
-  max-height: 50%;
-  border-top: 1px solid var(--line-strong);
 }
 .table-party-rest {
   display: flex;
@@ -218,4 +213,18 @@
   flex-direction: column;
   flex: 1 1 0;
   min-height: 0;
+}
+/* The feed fills what the composer leaves and scrolls itself, pinned to its newest line. */
+.table-log-tab > .combat-log {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: var(--space-3);
+  overflow: hidden;
+}
+.table-log-tab .combat-log-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
 }

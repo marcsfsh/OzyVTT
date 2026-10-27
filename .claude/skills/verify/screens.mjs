@@ -145,8 +145,12 @@ async function seed(browser) {
     const [x, y] = spots[index % spots.length];
     await post(`/api/v1/game/tokens/${actorId}/move`, { actorId, position: { x, y } });
   }
-  if (scenario === "fight")
+  if (scenario === "fight") {
     await post("/api/v1/game/encounter/start", { mapAssetId: asset.id, entries: ids.map((actorId) => ({ actorId })) });
+    // A few rolls shown to players, so the log has cards to show.
+    for (const formula of ["1d20+5", "2d6+3", "1d8"])
+      await post("/api/v1/game/rolls", { formula, purpose: "manual", visibility: "public" });
+  }
 }
 
 const browser = await chromium.launch();

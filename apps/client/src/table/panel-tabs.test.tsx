@@ -134,9 +134,13 @@ describe("the GM's panel", () => {
     expect(within(fight).getByText("Turn order and tools")).toBeTruthy();
     expect(screen.getByRole("button", { name: "End turn" })).toBeTruthy();
     expect(screen.getByText("Next: Borin")).toBeTruthy();
-    // Log holds the log and the dice. A tab shows its own panel and is remembered on this device.
+    // A tab shows its own panel and is remembered on this device.
     await user.click(within(list).getByRole("tab", { name: "Log" }));
-    expect(screen.getByRole("tabpanel", { name: "Log" }).textContent).toBe("The logThe dice");
+    // Log holds the feed and the composer under it; the dice tools open from its Dice options.
+    const log = screen.getByRole("tabpanel", { name: "Log" });
+    expect(within(log).getByText("The log")).toBeTruthy();
+    expect(within(log).getByRole("group", { name: "Quick rolls" })).toBeTruthy();
+    expect(within(log).getByRole("button", { name: "Dice options" })).toBeTruthy();
     expect(screen.queryByText("Needs you · 2")).toBeNull();
     expect(localStorage.getItem("vtt.table-tab.gm.laptop")).toBe("log");
     // End turn stays in the footer while another tab is shown.

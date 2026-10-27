@@ -16,6 +16,7 @@ import { CommandedCreatures, commandedOf } from "./CommandedCreatures";
 import { UnconsciousNote } from "../sheet/PlayFight";
 import { isDying, owesDeathSave } from "../table/playerPrompts";
 import { hasPlayerPrompt } from "../table/PromptSlot";
+import { LogComposer } from "../table/LogComposer";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
 import { usePlayerTargetRows } from "../table/targetRows";
 import { useTargeting } from "./targeting";
@@ -321,10 +322,12 @@ export function PlayerEncounterPanel({
     [logAddressed, setRememberedTab]
   );
   const sheetShown = myActor !== null && tab === (fighting ? "sheet" : "me");
+  // The phone's Log section is this panel too, and like the sheet it takes the height from the map.
+  const wantsRoom = sheetShown || (phone && logAddressed);
   useEffect(() => {
-    onSheetShown?.(sheetShown);
+    onSheetShown?.(wantsRoom);
     return () => onSheetShown?.(false);
-  }, [onSheetShown, sheetShown]);
+  }, [onSheetShown, wantsRoom]);
   // "Jump" sheet-attack mode: an attack tapped on the sheet comes to the Turn tab to pick and confirm, then
   // returns to the sheet once it commits.
   const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
@@ -624,7 +627,7 @@ export function PlayerEncounterPanel({
   const logBody = (
     <div className="table-log-tab">
       {slots?.log}
-      {slots?.dice && <div className="table-log-tab-dice scroll-y">{slots.dice}</div>}
+      <LogComposer options={slots?.dice} />
     </div>
   );
   const party = slots?.party ?? <p className="table-panel-empty">The party is hidden.</p>;
