@@ -148,7 +148,7 @@ export const SETTING = entries({
   theme: {
     section: "device",
     label: "Theme",
-    hint: "It applies to this device, and every page's app bar has the same switch.",
+    hint: "It applies to this device alone.",
     words: "dusk dawn dark light night day colours appearance"
   },
   reduceTransparency: {

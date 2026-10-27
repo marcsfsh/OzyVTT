@@ -5,14 +5,26 @@ import "./Wordmark.css";
 interface WordmarkProps extends HTMLAttributes<HTMLSpanElement> {
   /** Brand text. Defaults to the working name; swap freely (see --brand-name). */
   children?: ReactNode;
-  /** `chrome` is the title screen's metal; `solid` is plain ink with the heading shadow, for the app bar. */
-  variant?: "chrome" | "solid";
+  /** `cabinet` is the app's mark: OZY in chrome lettering and vtt in neon script. `chrome` is the title screen's
+      metal; `solid` is plain ink. */
+  variant?: "cabinet" | "chrome" | "solid";
   /** Put the sun glyph before the name, as the app bar does. */
   sun?: boolean;
 }
 
-/** The app wordmark in Bungee. Chrome on the title screen only; everywhere else it is solid. */
+/** The app wordmark. The cabinet mark leads every top bar; the chrome name belongs to the title screen. */
 export function Wordmark({ children = "OZYVTT", variant = "chrome", sun = false, className, ...rest }: WordmarkProps) {
+  if (variant === "cabinet")
+    return (
+      <span className={cx("nh-wordmark-cabinet", className)} role="img" aria-label="OzyVTT" {...rest}>
+        <span className="nh-wordmark-ozy chrome" aria-hidden="true">
+          OZY
+        </span>
+        <span className="nh-wordmark-vtt" aria-hidden="true">
+          vtt
+        </span>
+      </span>
+    );
   const finish = variant === "chrome" ? "wordmark-name" : "wordmark-solid";
   if (!sun) {
     return (

@@ -15,11 +15,13 @@ import {
   expect,
   expectPageFits,
   fillIn,
+  gmSection,
   joinAndClaim,
   openGmSection,
   pageScale,
   pinch,
   pinchDuringDrag,
+  playerSection,
   positionOf,
   press,
   signInAsGm,
@@ -103,10 +105,10 @@ test("the first evening: the GM password, the join address, a player, the table 
   await press(reset.getByRole("button", { name: "Close" }));
   await fillIn(gm.getByPlaceholder("GM password"), GM_PASSWORD);
   await press(gm.getByRole("button", { name: "Enter table" }));
-  await expect(gm.getByRole("tab", { name: "Table", selected: true })).toBeVisible();
+  await expect(gmSection(gm, "Play")).toHaveAttribute("aria-selected", "true");
   // A reload keeps the GM signed in.
   await gm.reload();
-  await expect(gm.getByRole("tab", { name: "Table", selected: true })).toBeVisible();
+  await expect(gmSection(gm, "Play")).toHaveAttribute("aria-selected", "true");
   await expectPageFits(gm);
 
   // The address players open, from the Table's empty state, with Copy and a QR code drawn here.
@@ -134,7 +136,7 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expectPageFits(player);
   await press(card.getByRole("button", { name: "Claim" }));
   await press(player.getByRole("dialog", { name: `Claim ${PARTY[2]}?` }).getByRole("button", { name: "Claim" }));
-  await expect(player.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
+  await expect(playerSection(player, "Sheet")).toHaveAttribute("aria-selected", "true");
   await expectPageFits(player);
 
   // The table screen shows a code, and the GM types it: nothing is typed with a remote.
@@ -142,7 +144,7 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expect(screen.getByRole("heading", { name: "Pair this screen" })).toBeVisible();
   const code = (await screen.locator(".viewer-screen-code").textContent())!.replace(/\D/g, "");
   expect(code).toMatch(/^\d{6}$/);
-  await openGmSection(gm, "Shared screen");
+  await openGmSection(gm, "Table screen");
   await fillIn(gm.getByLabel("Code on the screen"), code);
   await fillIn(gm.getByLabel("Screen name"), "Living room TV");
   await press(gm.getByRole("button", { name: "Pair screen" }));
@@ -153,7 +155,7 @@ test("the first evening: the GM password, the join address, a player, the table 
 
   // A scene on a new map, from the table's own start: its steps run on the Scenes tab. The map has no grid, which the
   // picker says, and the scene's Map step leads to it.
-  await press(gm.getByRole("tab", { name: "Table" }));
+  await press(gmSection(gm, "Play"));
   await press(gm.getByRole("button", { name: "Prepare a scene" }));
   await expect(gm.getByRole("heading", { name: "New scene" })).toBeVisible();
   const chooser = gm.waitForEvent("filechooser");
@@ -207,7 +209,7 @@ test("a player joins and claims a character", async ({ open }) => {
   await expectPageFits(player);
 
   // My character is the character's sheet; Release is in its menu.
-  await press(player.getByRole("tab", { name: "My character" }));
+  await press(playerSection(player, "Sheet"));
   await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
   await press(player.getByLabel(`Sheet menu for ${PARTY[0]}`));
   await expect(player.getByRole("menuitem", { name: `Release ${PARTY[0]}` })).toBeVisible();
@@ -217,7 +219,7 @@ test("a player joins and claims a character", async ({ open }) => {
   // After a reload, joining again resumes the same session: their character, on the page they left.
   await player.reload();
   await press(player.getByRole("button", { name: "Join as Player" }));
-  await expect(player.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
+  await expect(playerSection(player, "Sheet")).toHaveAttribute("aria-selected", "true");
   await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
 });
 
@@ -230,7 +232,7 @@ test("a stray pinch on a phone leaves the page at its size, and a finger still s
   await ensureGmPassword(request);
   const gm = await open("/");
   await signInAsGm(gm);
-  await openGmSection(gm, "Roster");
+  await openGmSection(gm, "Party");
   const roster = gm.locator(".party-roster-body");
   await expect(roster.getByRole("heading", { name: PARTY[0] })).toBeVisible();
 
@@ -688,7 +690,7 @@ test("the GM presents a map on a paired table screen", async ({ open, request })
 
   const gm = await open("/");
   await signInAsGm(gm);
-  await openGmSection(gm, "Shared screen");
+  await openGmSection(gm, "Table screen");
   await expect(gm.getByRole("heading", { name: "Shared screen", level: 2 })).toBeVisible();
   await expect(gm.getByText("Den TV", { exact: false }).first()).toBeVisible();
 
@@ -722,7 +724,7 @@ test("the GM plays music on the table screen and sees that the room hears it", a
 
   const gm = await open("/");
   await signInAsGm(gm);
-  await openGmSection(gm, "Shared screen");
+  await openGmSection(gm, "Table screen");
   await press(gm.getByRole("button", { name: "Sound" }));
   await expect(gm.getByRole("heading", { name: "Sound", level: 2 })).toBeVisible();
   await expectPageFits(gm);
@@ -751,7 +753,7 @@ test("the GM plays music on the table screen and sees that the room hears it", a
   await expect(gm.locator("audio")).toHaveCount(0);
 
   // Mid-fight, the Table tab's control pauses it.
-  await press(gm.getByRole("tab", { name: "Table" }));
+  await press(gmSection(gm, "Play"));
   const control = gm.getByRole("region", { name: "Sound" });
   await expect(control.getByText("Smoke Tone")).toBeVisible();
   await expectPageFits(gm);
@@ -760,8 +762,8 @@ test("the GM plays music on the table screen and sees that the room hears it", a
   await press(control.getByRole("button", { name: "Resume sound" }));
   await expect.poll(() => music.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
 
-  // Leave the board silent for whatever runs next.
-  await openGmSection(gm, "Shared screen");
+  // Leave the board silent for whatever runs next. The board is also Prep's Sound page.
+  await openGmSection(gm, "Sound");
   await press(gm.getByRole("button", { name: "Stop all" }));
   await expect(music).toHaveCount(0);
 });
@@ -786,7 +788,7 @@ test("a player turns on the situation their Crowbar names and rolls a Strength c
   expect((await gm(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item: crowbar })).ok()).toBe(true);
   await joinAndClaim(player, hero);
 
-  await press(player.getByRole("tab", { name: "My character" }));
+  await press(playerSection(player, "Sheet"));
   const sheet = player.getByRole("region", { name: `${hero} character sheet` });
   // On a phone the checks are a tab of their own; on a laptop they are the sheet's left column.
   const checksTab = sheet.getByRole("tab", { name: "Checks" });
@@ -827,7 +829,7 @@ test("a player rolls a tool's Utilize use and starts crafting from the sheet, an
   expect((await api(`/api/v1/game/actors/${actorId}/currency`, { actorId, currency })).ok()).toBe(true);
   await joinAndClaim(player, hero);
 
-  await press(player.getByRole("tab", { name: "My character" }));
+  await press(playerSection(player, "Sheet"));
   const sheet = player.getByRole("region", { name: `${hero} character sheet` });
   const checksTab = sheet.getByRole("tab", { name: "Checks" });
   if (await checksTab.isVisible()) await press(checksTab);
@@ -859,7 +861,7 @@ test("a player rolls a tool's Utilize use and starts crafting from the sheet, an
 
   const gm = await open("/");
   await signInAsGm(gm);
-  await openGmSection(gm, "Table");
+  await openGmSection(gm, "Play");
   await press(gm.getByRole("button", { name: /^Rest/ }));
   const panel = gm.getByRole("dialog", { name: "Rest" }).getByRole("region", { name: "Crafting" });
   await expect(panel.getByText("Ink (1-ounce bottle) · 5 GP paid")).toBeVisible();
@@ -902,7 +904,7 @@ test("a player packs a thing into a container from the Gear tab and sees what it
     expect((await api(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item })).ok()).toBe(true);
   await joinAndClaim(player, hero);
 
-  await press(player.getByRole("tab", { name: "My character" }));
+  await press(playerSection(player, "Sheet"));
   const sheet = player.getByRole("region", { name: `${hero} character sheet` });
   await press(sheet.getByRole("tab", { name: "Gear" }));
   await press(sheet.getByRole("button", { name: /^Spare Rope/ }).first());

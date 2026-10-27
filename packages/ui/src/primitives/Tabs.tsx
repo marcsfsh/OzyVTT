@@ -131,6 +131,8 @@ export function Tabs({
     >
       {tabs.map((tab, index) => {
         const active = tab.id === activeId;
+        // With no tab chosen (a page that belongs to none), the first is the bar's one stop, so the keyboard can enter.
+        const stop = active || (index === 0 && !tabs.some((other) => other.id === activeId));
         return (
           <button
             key={tab.id}
@@ -141,7 +143,7 @@ export function Tabs({
             type="button"
             {...(idBase ? { id: `${idBase}-tab-${tab.id}`, "aria-controls": `${idBase}-panel-${tab.id}` } : {})}
             aria-selected={active}
-            tabIndex={active ? 0 : -1}
+            tabIndex={stop ? 0 : -1}
             disabled={tab.disabled}
             className={cx("nh-tab", "interactive", active && "nh-tab--active")}
             onClick={() => onChange(tab.id)}

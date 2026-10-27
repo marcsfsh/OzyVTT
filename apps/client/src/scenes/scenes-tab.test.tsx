@@ -34,6 +34,7 @@ import { AMBUSH, IDS, gmView, mapAsset, serveScenes } from "../../test/scenes-fa
 import { setViewport } from "../../test/viewport";
 import { armPlacement } from "../scene/tableGeometry";
 import { ScenesShell } from "./ScenesShell";
+import { PrepFrame } from "../shell/AppBar";
 
 const onLibraryChanged = vi.fn();
 
@@ -41,7 +42,9 @@ function renderTab(path: string, view: GmView = gmView()) {
   goTo(path);
   return render(
     <ToastProvider>
-      <ScenesShell state={view} token="gm" onLibraryChanged={onLibraryChanged} onOpenMap={vi.fn()} />
+      <PrepFrame>
+        <ScenesShell state={view} token="gm" onLibraryChanged={onLibraryChanged} onOpenMap={vi.fn()} />
+      </PrepFrame>
     </ToastProvider>
   );
 }
@@ -293,7 +296,7 @@ describe("making a scene as steps", () => {
 
     await user.click(screen.getByRole("button", { name: "Next: Review" }));
     expect(screen.getByRole("heading", { name: "Review and make live" })).toBeInTheDocument();
-    expect(screen.getByText("Tokens")).toBeInTheDocument();
+    expect(screen.getByText("Tokens", { selector: "dt" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Make live" }));
     expect(commands("scene:activate")).toEqual([{ sceneId: IDS.ambush }]);
   });
@@ -330,15 +333,19 @@ describe("making a scene as steps", () => {
 });
 
 describe("on a phone", () => {
-  it("puts the sections in a tab bar under the thumb", async () => {
+  it("lists Prep's pages as the strip under the header, with the Scenes views and New beside them", async () => {
     setViewport(390);
     renderTab("/scenes/list");
-    const bar = await screen.findByRole("navigation", { name: "Scenes sections" });
+    const pages = await screen.findByRole("tablist", { name: "Prep pages" });
     expect(
-      within(bar)
-        .getAllByRole("button")
-        .map((button) => button.textContent)
-    ).toEqual(["Overview", "Scenes", "New", "Maps"]);
+      within(pages)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent)
+    ).toEqual(["Scenes", "Party", "Maps", "Tokens", "Sound", "Replays"]);
+    expect(within(pages).getByRole("tab", { name: "Scenes" })).toHaveAttribute("aria-selected", "true");
+    const views = screen.getByRole("group", { name: "Scenes views" });
+    expect(within(views).getByRole("button", { name: "All scenes" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "New scene" })).toBeInTheDocument();
   });
 
   it("runs the steps as a strip and keeps the map in a bar that opens it full screen", async () => {

@@ -28,7 +28,7 @@
   min-width: 0;
   min-height: 0;
 }
-/* The panel is part of the shell: no shadow, its seam against the map in the role hue. The fill is 88% opaque so the
+/* The panel is part of the shell: no shadow, and a plain seam against the map. The fill is 88% opaque so the
    horizon shows through; reduced transparency makes it solid. */
 .table-bench-panel {
   grid-area: panel;
@@ -36,7 +36,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border-left: var(--rim-w) solid var(--role-hue);
+  border-left: var(--rim-w) solid var(--line-strong);
   background:
     var(--material-lip),
     linear-gradient(

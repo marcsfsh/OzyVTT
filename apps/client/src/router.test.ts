@@ -7,8 +7,14 @@ import {
   isKnownPath,
   isPlayerOnlyPath,
   lastLocation,
+  lastLocationForSection,
   lastLocationForTab,
   layerOf,
+  litGmSection,
+  litPlayerSection,
+  PLAYER_LOG_PATH,
+  PREP_PAGES,
+  prepPageFor,
   litGmTab,
   litPlayerTab,
   navigate,
@@ -584,5 +590,67 @@ describe("Resume-last-location", () => {
       expect(lastLocationForTab("gm", "codex")).toBe("/codex/settings");
       expect(lastLocationForTab("player", "codex")).toBe("/codex/quests/q9");
     });
+  });
+});
+
+describe("The sections the redesign groups addresses under", () => {
+  it("lights Play for the table, Prep for each of its pages, and no section for the utilities", () => {
+    expect(litGmSection("/table")).toBe("play");
+    for (const path of ["/scenes", "/scenes/list", "/scenes/new", "/roster", "/characters/a1", "/builder"])
+      expect(litGmSection(path), path).toBe("prep");
+    for (const path of ["/scenes/maps", "/scenes/maps/m1", "/prep/tokens", "/viewer-controls/sound", "/replays/3"])
+      expect(litGmSection(path), path).toBe("prep");
+    expect(litGmSection("/codex/pages/abc")).toBe("codex");
+    expect(litGmSection("/compendium/monsters")).toBe("compendium");
+    expect(litGmSection("/viewer-controls")).toBeNull();
+    expect(litGmSection("/settings/device")).toBeNull();
+  });
+
+  it("names each Prep page for its address, keeping every existing address", () => {
+    expect(PREP_PAGES.map((page) => page.label)).toEqual(["Scenes", "Party", "Maps", "Tokens", "Sound", "Replays"]);
+    expect(prepPageFor("/scenes/s1?step=tokens")).toBe("scenes");
+    expect(prepPageFor("/scenes/maps/new")).toBe("maps");
+    expect(prepPageFor("/characters/a1/level")).toBe("party");
+    expect(prepPageFor("/viewer-controls")).toBeNull();
+    expect(prepPageFor("/table")).toBeNull();
+  });
+
+  it("adds /prep/tokens for the GM alone, and sends a bare /prep to Scenes", () => {
+    expect(isKnownPath("/prep/tokens")).toBe(true);
+    expect(isKnownPath("/prep/other")).toBe(false);
+    expect(gmTabForPath("/prep/tokens")).toBe("tokens");
+    expect(isGmOnlyPath("/prep/tokens")).toBe(true);
+    expect(isGmOnlyPath("/prep")).toBe(true);
+    expect(redirectForRetiredPath("/prep", new URLSearchParams())).toBe("/scenes");
+  });
+
+  it("keeps the old redirects", () => {
+    expect(redirectForRetiredPath("/scenes", new URLSearchParams("view=maps"))).toBe("/scenes/maps");
+    expect(redirectForRetiredPath("/encounter", new URLSearchParams())).toBe("/table");
+    expect(redirectForRetiredPath("/homebrew", new URLSearchParams())).toBe("/compendium");
+  });
+
+  it("lights a player's Log for the table's log address, and the Table otherwise", () => {
+    const at = (href: string) => {
+      const [path, search] = href.split("?");
+      return { path: path!, query: new URLSearchParams(search ?? "") };
+    };
+    expect(PLAYER_LOG_PATH).toBe("/table?panel=log");
+    expect(litPlayerSection(at(PLAYER_LOG_PATH))).toBe("log");
+    expect(litPlayerSection(at("/table"))).toBe("table");
+    expect(litPlayerSection(at("/me"))).toBe("sheet");
+    expect(litPlayerSection(at("/replays"))).toBe("table");
+    expect(litPlayerSection(at("/settings"))).toBeNull();
+  });
+
+  it("returns to where the GM was in a section, never to a page outside it", () => {
+    localStorage.clear();
+    expect(lastLocationForSection("prep")).toBeNull();
+    rememberLocation("gm", "/scenes/maps?map=m1");
+    expect(lastLocationForSection("prep")).toBe("/scenes/maps?map=m1");
+    rememberLocation("gm", "/prep/tokens");
+    expect(lastLocationForSection("prep")).toBe("/prep/tokens");
+    localStorage.setItem("vtt.gm-last-location.section.prep", "/codex");
+    expect(lastLocationForSection("prep")).toBeNull();
   });
 });

@@ -215,11 +215,6 @@ export function SettingsPage({
             <span ref={setSlot} className="settings-primary-slot" />
           </div>
         )}
-        {/* The reference is a frame of its own, with its results as the one scroller, so its filter flyout spans
-          what is on screen. Every other section scrolls as one page. */}
-        <div className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"} key={section}>
-          {body}
-        </div>
         {phone && (
           <nav className="cx-tabbar settings-tabbar" aria-label="Settings sections">
             {sections.map((item) => (
@@ -236,6 +231,11 @@ export function SettingsPage({
             ))}
           </nav>
         )}
+        {/* The reference is a frame of its own, with its results as the one scroller, so its filter flyout spans
+          what is on screen. Every other section scrolls as one page. */}
+        <div className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"} key={section}>
+          {body}
+        </div>
         {dialog}
       </div>
     </PrimarySlot.Provider>

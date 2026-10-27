@@ -1,0 +1,68 @@
+/* Prep's Tokens page: a table of creatures, 48px rows under a sticky header; rows with two facts on a phone. */
+.tokens-page-body {
+  padding: var(--space-4) var(--pane-gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
+}
+.tokens-page-empty {
+  margin: var(--space-6) 0;
+  color: var(--text-dim);
+}
+.tokens-page-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.tokens-page-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--text-muted);
+  font: 600 12px / 1.2 var(--font-label);
+  text-align: left;
+  white-space: nowrap;
+}
+.tokens-page-table td {
+  height: 48px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.tokens-page-table tr:hover td {
+  background: var(--surface-3);
+}
+.tokens-page-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.tokens-page-actions {
+  text-align: right;
+}
+.tokens-page-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tokens-page-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-1);
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.tokens-page-row-text {
+  display: grid;
+  gap: 2px;
+}
+.tokens-page-row-text span {
+  font-size: 13px;
+  color: var(--text-dim);
+}

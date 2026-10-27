@@ -3,6 +3,7 @@ import { Button, IconEye, IconHome, IconList, IconPlus, Kbd, cx, type PartyChara
 import { CodexIcon } from "../codex/icons";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";
+import { RulesButton } from "../reference/RulesReference";
 import { navigate, replaceQuery, useRoute } from "../router";
 import {
   CompendiumContext,
@@ -66,6 +67,13 @@ export function CompendiumShell({ token, party }: Readonly<{ token: string; part
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // The top bar's search launcher sends `openSearch=1` once: open the search and clear that one key.
+  useEffect(() => {
+    if (route.query.get("openSearch") !== "1") return;
+    setSearchOpen(true);
+    replaceQuery((query) => query.delete("openSearch"));
+  }, [route.query]);
 
   // A row picked in the folded table opens its record and puts the table away.
   const recordKey = view.view === "record" ? `${view.kind}:${view.id}` : null;
@@ -156,13 +164,13 @@ export function CompendiumShell({ token, party }: Readonly<{ token: string; part
               <span className="cx-searchbox-label">Search the SRD and homebrew</span>
               {shortcut && <Kbd>{shortcut}</Kbd>}
             </button>
+            <RulesButton />
             <span className="cx-grow" />
             <Button variant="primary" onClick={() => openNew({ kind: kindInView })}>
               <IconPlus /> New homebrew
             </Button>
           </div>
         )}
-        <div className="cx-content cp-content">{body}</div>
         {phone && (
           <nav className="cx-tabbar" aria-label="Compendium sections">
             {[
@@ -192,6 +200,7 @@ export function CompendiumShell({ token, party }: Readonly<{ token: string; part
             })}
           </nav>
         )}
+        <div className="cx-content cp-content">{body}</div>
         {newOptions && <NewRecordDialog options={newOptions} onClose={() => setNewOptions(null)} />}
         {searchOpen && <SearchDialog onClose={() => setSearchOpen(false)} />}
       </div>

@@ -1,18 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { IconTv, Menu, MenuItem, useToast } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import { newId } from "../lib/ids";
 import { navigate, pathForGmTab } from "../router";
 import { useTableMapSize } from "../scene/tableGeometry";
 
-type Presentation = Readonly<{
-  revision: number;
-  enabled: boolean;
-  pausedByGm?: boolean;
-  activeMap: Readonly<{ assetId: string }> | null;
-}>;
-
-const PRESENTATION = "/api/v1/viewer/presentation";
+import { PRESENTATION, usePresentation } from "./presentation";
 
 /**
  * The GM's TV control in the header bar: whether the table screen shows the live scene, and one tap to pause it or put
@@ -30,19 +23,10 @@ export function TvControl({
   /** The floating preview of what the table screen shows. */
   preview: Readonly<{ on: boolean; onToggle: () => void }>;
 }>) {
-  const [presentation, setPresentation] = useState<Presentation | null>(null);
+  const { presentation, refresh } = usePresentation(gmToken);
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
   const size = useTableMapSize(liveMap?.assetId ?? null);
-  const refresh = useCallback(async () => {
-    const data = await apiRequest<{ presentation: Presentation }>(PRESENTATION, { token: gmToken });
-    setPresentation(data.presentation);
-  }, [gmToken]);
-  useEffect(() => {
-    void refresh().catch(() => {});
-    const interval = window.setInterval(() => void refresh().catch(() => {}), 5_000);
-    return () => window.clearInterval(interval);
-  }, [refresh]);
 
   const send = async (payload: Record<string, unknown>, done: string) => {
     if (!presentation) return;
@@ -56,7 +40,7 @@ export function TvControl({
     } catch (error) {
       toast((error as Error).message, { tone: "error" });
     } finally {
-      await refresh().catch(() => {});
+      await refresh();
       setBusy(false);
     }
   };
@@ -109,7 +93,7 @@ export function TvControl({
         </MenuItem>
       )}
       <MenuItem onClick={preview.onToggle}>{preview.on ? "Hide the preview" : "Preview the TV here"}</MenuItem>
-      <MenuItem onClick={() => navigate(pathForGmTab("viewer"))}>Shared screen settings</MenuItem>
+      <MenuItem onClick={() => navigate(pathForGmTab("viewer"))}>Table screen settings</MenuItem>
     </Menu>
   );
 }

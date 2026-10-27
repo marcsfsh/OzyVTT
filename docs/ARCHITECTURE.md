@@ -1043,6 +1043,18 @@ Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib
 calls through `lib/api.ts`. The table viewer is a separate bundle that never loads the game client.
 Rules checks on the client are hints only; the server decides.
 
+The frame (ADR-0037, `shell/AppBar.tsx`) groups the addresses without moving them. The GM's top bar has Play, Prep,
+Codex and Compendium (`GM_SECTIONS` in `router.ts`), then the table screen lamp (`table/presentation.ts`, one poll
+for the page), the characters online, search and Settings; a phone moves the sections to bottom tabs. Prep's section
+bar (`PrepFrame`) holds Scenes, Party, Maps, Tokens, Sound and Replays (`PREP_PAGES`) over their existing addresses
+(`/scenes`, `/roster`, `/scenes/maps`, the new `/prep/tokens`, `/viewer-controls/sound`, `/replays`); a page puts its
+search or primary at the bar's end through `PrepBarSlot`. `litGmSection` and `prepPageFor` say what lights, and
+`lastLocationForSection` returns a section to where the GM was. A player has Table, Sheet (`/me`) and Codex, and a
+phone adds Log, which is the table at `/table?panel=log`. The search (`shell/SearchLauncher.tsx`) is a launcher: Search
+the Codex and Search the Compendium go to that section with a one-shot `openSearch=1` that opens its own dialog, and a
+section with its own search keeps Ctrl K. While the connection is down, or until a snapshot arrives after it returns,
+`shell/ReconnectBar.tsx` says to wait and `useTableCurrent()` is false for the controls that read it.
+
 The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a header bar over the map with the scene and
 the status line (`table/TableHeader.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
 (`table/TablePanel.tsx`) with Needs you or the player's prompt slot above its tabs and the view's one primary in
@@ -1050,8 +1062,8 @@ its footer. Nothing floats over the map but tokens and marks; notices land in th
 `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
 
-Scenes and maps are prepared on the Scenes tab (ADR-0035), in `scenes/` and `maps/`. `scenes/ScenesShell.tsx` draws
-the section bar (or a phone's tab bar) and renders the view the address names (`scenes/routes.ts`): the front page,
+Scenes and maps are prepared on Prep's Scenes and Maps pages (ADR-0035), in `scenes/` and `maps/`. `scenes/ScenesShell.tsx`
+fills the end of Prep's section bar and renders the view the address names (`scenes/routes.ts`): the front page,
 the scene and map tables, a scene or a map as one document, or the steps that make or edit one
 (`scenes/EditorFrame.tsx`). A scene's page and steps are built from the table's parts (`EncounterMap`, `MapRail`,
 `TablePanel`, the tray) and edit the parked scene with its `sceneId`, so the table itself always shows the live
@@ -1071,7 +1083,7 @@ column. The sheet notes the ids of the rolls it starts (`sheet-roll-ids.ts`), an
 those.
 
 The Codex client (ADR-0031) lives in `codex/`. `CodexShell.tsx` (the GM) and `PlayerCodex.tsx` (a player, and the
-GM's preview, which runs on a local route) both draw `shell/CodexFrame.tsx`, the section bar or the phone's tab bar,
+GM's preview, which runs on a local route) both draw `shell/CodexFrame.tsx`, the section bar or the phone's strip of views,
 and render the section the address names from `shell/sections.tsx`, each entry a GM view and a player view. Views read
 the shell through context (`shell/context.ts`): the role and token, the address, and for the GM the shared feeds,
 the party and quick create. A player's views read only `playerCodexApi` and the player shapes of `api-records.ts`,
@@ -1085,7 +1097,7 @@ The table's Codex tab is `table/CodexTab.tsx`, over the same reads.
 
 Settings (ADR-0036) lives in `settings/`. `sections.ts` declares the sections (Players, Fights, Characters, Device,
 Access and API) with their audience and every setting's label and hint; the page, its search and the tests read it.
-`SettingsPage.tsx` draws the Codex shell's section bar or phone tab bar around the section the address names
+`SettingsPage.tsx` draws the Codex shell's section bar or phone strip around the section the address names
 (`/settings/<section>`); a player's page is Device alone, so GM sections never mount for a player. Each section is
 its own component and writes through the same commands as before (`table-writes.ts`). The integration credentials
 (`integrations/CredentialsTable.tsx`) read and write their GM routes. The API reference
@@ -1098,8 +1110,8 @@ The themes are Dusk and Dawn (`dusk` and `dawn` on `<html data-theme>`, ADR-0037
 `packages/ui/src/styles/design-tokens.css` with Dusk in `:root`. Each HTML entry decides the theme before first paint
 with the rules of `resolveTheme` (`packages/ui/src/theme/theme.ts`): a saved `dusk` or `dawn` wins, a retired `dark` or
 `light` becomes Dusk or Dawn and is rewritten, and anything else follows `prefers-color-scheme`.
-`apps/client/src/shell/theme-startup.test.ts` runs each entry's script against it. `ThemeSwitch` in every app bar and
-`ThemeToggle` in Settings share `useTheme`, which hears every change on the page. Reduce transparency
+`apps/client/src/shell/theme-startup.test.ts` runs each entry's script against it. `ThemeToggle` in Settings > Device and
+the standalone sheet's `ThemeSwitch` share `useTheme`, which hears every change on the page. Reduce transparency
 (`theme/transparency.ts`, Settings > Device) is the device setting `vtt.reduce-transparency` or the system's request;
 while it is on, `<html data-transparency="reduced">` turns the glass tokens solid and drops the scanlines and glows. The
 same script sets it before first paint, and each entry calls `initTransparency` to follow the system after that.

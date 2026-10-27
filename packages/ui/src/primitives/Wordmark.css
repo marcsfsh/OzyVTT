@@ -49,3 +49,21 @@
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+/* The cabinet mark: OZY in chrome lettering, then vtt in the neon script, tilted up into the name. */
+.nh-wordmark-cabinet {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  white-space: nowrap;
+}
+.nh-wordmark-ozy {
+  font: 400 22px / 1 var(--font-wordmark);
+}
+.nh-wordmark-vtt {
+  font: 400 30px / 1 var(--font-script);
+  color: var(--script-ink);
+  text-shadow: var(--script-glow);
+  transform: rotate(-8deg) translateY(4px);
+}

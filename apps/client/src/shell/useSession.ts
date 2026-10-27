@@ -44,6 +44,9 @@ export function useSession(enter: (commit: () => void) => void) {
   const [signedIn, setSignedIn] = useState<Session | null>(null);
   const [state, setState] = useState<PlayerView | GmView | null>(null);
   const [connection, setConnection] = useState<Connection>("online");
+  // Whether the table has sent a snapshot since the connection last came back: until it has, what is on screen may be
+  // stale, so game controls wait for it.
+  const [fresh, setFresh] = useState(true);
   const [bootstrapped, setBootstrapped] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   /** True while a stored or shared GM session is tried, so the landing doesn't offer a second way in. */
@@ -85,10 +88,19 @@ export function useSession(enter: (commit: () => void) => void) {
       .then((status) => setBootstrapped(status.bootstrapped))
       .catch((error: Error) => setNotice({ tone: "error", text: error.message }));
     const onConnect = () => setConnection("online");
-    const onDisconnect = () => setConnection("reconnecting");
-    const onGaveUp = () => setConnection("offline");
+    const onDisconnect = () => {
+      setConnection("reconnecting");
+      setFresh(false);
+    };
+    const onGaveUp = () => {
+      setConnection("offline");
+      setFresh(false);
+    };
     // Creatures of one kind are numbered by name in every list, as on their tokens.
-    const onState = (next: PlayerView | GmView) => setState(withNumberedNames(next));
+    const onState = (next: PlayerView | GmView) => {
+      setState(withNumberedNames(next));
+      setFresh(true);
+    };
     socket.on("state:updated", onState);
     socket.on("session:ended", sessionEnded);
     socket.on("connect", onConnect);
@@ -286,6 +298,8 @@ export function useSession(enter: (commit: () => void) => void) {
     signedIn,
     state,
     connection,
+    /** Online, with a snapshot received since the connection last came back. */
+    current: connection === "online" && fresh,
     bootstrapped,
     busy,
     resuming,

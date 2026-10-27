@@ -11,37 +11,26 @@ body {
   height: 100dvh;
   overflow: hidden;
 }
-/* The frame: a viewport-high grid, rows [connection strip][tab bar][content pane]. Rows 1-2 size to
-   content and collapse when absent; the pane is `minmax(0, 1fr)` so it can shrink below its content.
-   Children have explicit grid rows so a stray in-flow child cannot reshape the frame.
+/* The frame: a viewport-high grid, rows [top bar][reconnecting bar][content pane][bottom tabs]. Rows 1, 2 and 4
+   size to content and collapse when absent; the pane is `minmax(0, 1fr)` so it can shrink below its content.
+   Children have explicit grid rows so a stray in-flow child cannot reshape the frame. The bottom tabs exist on a
+   phone alone, and `--bottom-tabs-h` tells a toast how high to sit above them.
    --pane-gutter centres a 1720px column as inline padding. */
 main {
   --pane-gutter: max(1rem, calc((100% - 1720px) / 2));
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr);
-  /* The role hue on the whole chrome, so a GM window and a player window side by side cannot be
-     confused. It is read from the tab bar's `.rim-*` class via `:has()` (the frame has no role class of
-     its own) and inherited by the chrome. A role hue is not a security boundary (projection is), and
-     every rimmed site still names its role in words. viewer.html never loads this file, so the public
-     screen gets no role hue. Falls back to the neutral --rim-color before auth. */
-  --role-hue: var(--rim-color);
-  /* The chrome rows sit on the night, a shade below the panels, faintly tinted by the role. */
-  --chrome-plate: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--role-hue) 9%, var(--void)) 0%,
-    color-mix(in srgb, var(--role-hue) 5%, var(--bg)) 100%
-  );
 }
-main:has(> .frame-tabbar.rim-gm) {
-  --role-hue: var(--rim-gm);
+main > .app-bar {
+  grid-row: 1;
 }
-main:has(> .frame-tabbar.rim-player) {
-  --role-hue: var(--rim-player);
+main > .app-bottom-tabs {
+  grid-row: 4;
 }
-:root {
-  --connection-banner-h: 2.5rem;
+main:has(> .app-bottom-tabs) {
+  --bottom-tabs-h: 65px;
 }
 /* Row 3, the content pane: always rendered; its one in-flow child fills it. Fixed and top-layer
    children (viewer preview, dialogs) take no box here. */
@@ -346,105 +335,24 @@ textarea:focus {
   padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
-/* The connection strip: an in-flow frame row that height-animates in (fixed height, since height is
-   animated) and vanishes instantly on reconnect. It shares the tab bar's plate but is status, not
-   navigation: an inverted plate, no hover/focus/press, non-focusable `<p role="status">`. The 3px
-   caution bar (an inset shadow) outranks the role hue. */
-.connection-banner {
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--connection-banner-h);
-  overflow: hidden;
-  margin: 0;
-  padding: 0 var(--space-4);
-  border: 0;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--caution) 9%, var(--surface-3)) 0%,
-    color-mix(in srgb, var(--role-hue) 7%, var(--surface-2)) 100%
-  );
-  box-shadow: inset 3px 0 0 0 var(--caution);
-  color: var(--text-dim);
-  font-size: 0.9rem;
-  text-align: center;
-  animation: connection-in var(--dur-base) var(--ease-settle);
-}
-/* With no tab bar after it (a full-page layer before the shell mounts), this row carries the chrome's
-   bottom edge itself. */
-.connection-banner:not(:has(~ .frame-tabbar)) {
-  border-bottom: var(--rim-w) solid var(--role-hue);
-}
-@keyframes connection-in {
-  from {
-    height: 0;
-    opacity: 0;
-  }
-  to {
-    height: var(--connection-banner-h);
-    opacity: 1;
-  }
-}
-
-/* Frame row 2, the app bar: the logo, then the tab track. The track scrolls and fades its own edges, so the
-   plate, the role edge (`.rim-gm` / `.rim-player`, a 3px inset bar) and the horizon rule along the bottom live
-   on this wrapper. Each bar's aria-label also names its role. */
-.frame-tabbar {
+/* The reconnecting bar, under the top bar while the connection is down or the table has not sent a fresh snapshot
+   since it came back. Reading the last snapshot still works; the bar says to wait before making changes. */
+.reconnect-bar {
   grid-row: 2;
-  position: relative;
-  min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-2) var(--pane-gutter) calc(var(--space-2) + 1px);
-  background-image: var(--chrome-plate);
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  margin: 0;
+  padding: var(--space-1) var(--space-5);
+  border-bottom: 1px solid var(--caution);
+  background: color-mix(in srgb, var(--caution) 10%, var(--surface-1));
+  color: var(--text);
+  font-size: var(--fs-sm);
 }
-.frame-tabbar::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background-image: var(--rule-beam);
-  box-shadow: var(--rule-beam-glow);
-  pointer-events: none;
-}
-.frame-tabbar .nh-tabs {
-  min-width: 0;
-}
-.app-logo {
-  flex: none;
-}
-/* The tabs, More and Rules sit in the bar's own row; their wrapper only measures them. */
-.app-tabs {
-  display: contents;
-}
-/* The theme switch closes the bar at its far end, on every page and for both roles. */
-.frame-tabbar .app-theme-switch {
-  margin-left: auto;
-}
-/* A phone spends the bar's width on the tabs: no logo, and the tabs share the track. */
-@media (max-width: 760px) {
-  .app-logo {
-    display: none;
-  }
-  /* Tighter steps, so three tabs, More and the theme switch share a 390px bar with nothing clipped. */
-  .frame-tabbar {
-    gap: var(--space-2);
-    padding-inline: var(--space-2);
-  }
-  .frame-tabbar .nh-tabs {
-    flex: 1;
-  }
-  .frame-tabbar .nh-tab,
-  .frame-tabbar .app-more .nh-menu-trigger {
-    padding-inline: var(--space-3);
-  }
-  .frame-tabbar .nh-tab {
-    flex: 1 0 auto;
-  }
+.reconnect-bar.is-back {
+  border-bottom-color: var(--state-on-edge);
+  background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1));
 }
 
 .home-hero {

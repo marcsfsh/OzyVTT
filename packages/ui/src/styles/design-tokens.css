@@ -181,6 +181,9 @@
   --glow-lamp-bonus: 0 0 10px rgba(255, 210, 63, 0.8);
   --glow-lamp-reaction: 0 0 10px rgba(43, 228, 255, 0.8);
 
+  /* The lit section's words glow faintly in Dusk. */
+  --glow-tab-text: 0 0 10px rgba(43, 228, 255, 0.7);
+
   /* The VCR counter's phosphor. */
   --vcr-glow: 0 0 6px rgba(255, 255, 255, 0.45);
 
@@ -544,6 +547,7 @@
   --glow-lamp-bonus: 0 0 #0000;
   --glow-lamp-reaction: 0 0 #0000;
   --vcr-glow: 0 0 #0000;
+  --glow-tab-text: 0 0 #0000;
 
   --track-edge: var(--line-raised);
   --tab-on: linear-gradient(#fbfafc, #fbfafc);
@@ -611,6 +615,7 @@
   --glow-lamp-bonus: 0 0 #0000;
   --glow-lamp-reaction: 0 0 #0000;
   --vcr-glow: 0 0 #0000;
+  --glow-tab-text: 0 0 #0000;
 }
 
 /* A browser that can't blur what is behind a panel gets the solid surfaces too. */

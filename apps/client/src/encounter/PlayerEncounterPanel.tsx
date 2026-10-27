@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { type MutationResult, type PlayerView } from "@vtt/domain";
 import { Button, SunMark } from "@vtt/ui";
 import { command } from "../lib/command";
@@ -20,7 +20,7 @@ import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel
 import { usePlayerTargetRows } from "../table/targetRows";
 import { useTargeting } from "./targeting";
 import { revealInRegion } from "../lib/reveal";
-import { navigate } from "../router";
+import { navigate, replaceQuery, useRoute } from "../router";
 
 /**
  * A player's own prompts keep their outcome line beside them: answering one unmounts it, and the
@@ -304,11 +304,23 @@ export function PlayerEncounterPanel({
   const tabIds = fighting
     ? ["turn", "order", "sheet", ...codexIds, "dice", "log"]
     : ["me", "party", ...codexIds, "dice", "log"];
-  const [tab, setTab] = useRememberedTab(
+  const [rememberedTab, setRememberedTab] = useRememberedTab(
     `vtt.table-tab.player.${phone ? "phone" : "laptop"}`,
     tabIds,
     fighting ? "turn" : "me",
     `${fighting}|${phone}`
+  );
+  // The Log section is this panel at `/table?panel=log`: the address opens the Log tab, and choosing another tab
+  // takes the key away again. Same panel, same subscriptions, so a typed formula survives the switch.
+  const route = useRoute();
+  const logAddressed = route.query.get("panel") === "log";
+  const tab = logAddressed ? "log" : rememberedTab;
+  const setTab = useCallback(
+    (next: string) => {
+      if (logAddressed && next !== "log") replaceQuery((query) => query.delete("panel"));
+      setRememberedTab(next);
+    },
+    [logAddressed, setRememberedTab]
   );
   const sheetShown = myActor !== null && tab === (fighting ? "sheet" : "me");
   useEffect(() => {

@@ -246,16 +246,24 @@ describe("The structured copy, pinned at its one definition", () => {
   });
 
   it("calls the place the Table and never the Encounter", () => {
-    // "Encounter" is a fight and never a place. The GM tab table is checked through the scan (its rows are
-    // `label: "…"`); the order is not pinned here.
-    for (const label of ["Table", "Scenes", "Roster", "Codex", "Compendium", "Settings"]) {
-      expect(at("apps/client/src/shell/GmShell.tsx", label), `the GM tab bar no longer has a "${label}" tab`).toBe(
-        true
-      );
-    }
-    expect(at("apps/client/src/shell/GmShell.tsx", "Encounter"), 'the table tab is labelled "Encounter" again').toBe(
-      false
-    );
+    // "Encounter" is a fight and never a place. The GM's sections and Prep's pages are labelled in the router (their
+    // rows are `label: "…"`), and a player's Table tab in the app bar; the order is not pinned here.
+    for (const label of [
+      "Play",
+      "Prep",
+      "Codex",
+      "Compendium",
+      "Scenes",
+      "Party",
+      "Maps",
+      "Tokens",
+      "Sound",
+      "Replays"
+    ])
+      expect(at("apps/client/src/router.ts", label), `the GM's sections no longer have "${label}"`).toBe(true);
+    expect(at("apps/client/src/shell/AppBar.tsx", "Table"), "a player's sections no longer have the Table").toBe(true);
+    for (const file of ["apps/client/src/router.ts", "apps/client/src/shell/AppBar.tsx"])
+      expect(at(file, "Encounter"), `${file} labels a section "Encounter" again`).toBe(false);
   });
 });
 

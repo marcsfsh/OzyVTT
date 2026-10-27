@@ -192,29 +192,48 @@ export async function signInAsGm(page: Page) {
   await expect(page.getByRole("tablist", { name: "GM sections" })).toBeVisible();
 }
 
-/** Joins, claims `name`, and goes from My character (where a claim lands) to the Table. */
+/** A player's section tab: in the top bar on a laptop and the bottom tabs on a phone, under one name. */
+export const playerSection = (page: Page, name: "Table" | "Sheet" | "Codex" | "Log") =>
+  page.getByRole("tablist", { name: "Player sections" }).getByRole("tab", { name, exact: true });
+
+/** Joins, claims `name`, and goes from the Sheet (where a claim lands) to the Table. */
 export async function joinAndClaim(page: Page, name: string) {
   await ensureGmPassword(page.request);
   await press(page.getByRole("button", { name: "Join as Player" }));
   await press(page.getByRole("listitem").filter({ hasText: name }).getByRole("button", { name: "Claim" }));
   await press(page.getByRole("dialog").getByRole("button", { name: "Claim" }));
   await expect(page.getByText(`You're playing ${name}.`)).toBeVisible();
-  await expect(page.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
-  await press(page.getByRole("tab", { name: "Table" }));
+  await expect(playerSection(page, "Sheet")).toHaveAttribute("aria-selected", "true");
+  await press(playerSection(page, "Table"));
 }
 
+/** Prep's pages, under Prep's section bar. */
+const PREP_PAGES = ["Scenes", "Party", "Maps", "Tokens", "Sound", "Replays"];
+
+/** A GM section's tab: in the top bar on a laptop and the bottom tabs on a phone, under one name. */
+export const gmSection = (page: Page, name: "Play" | "Prep" | "Codex" | "Compendium") =>
+  page.getByRole("tablist", { name: "GM sections" }).getByRole("tab", { name, exact: true });
+
 /**
- * Opens a section of the GM's app: its tab, or on a narrow screen the More menu's item for it (the tab bar
- * keeps every section one tap away without scrolling sideways).
+ * Opens a place in the GM's app: a section (Play, Prep, Codex, Compendium), one of Prep's pages, or a utility (the
+ * Table screen controls, Settings).
  */
 export async function openGmSection(page: Page, name: string) {
-  const tab = page.getByRole("tab", { name, exact: true });
-  if (await tab.isVisible()) {
-    await press(tab);
+  if (name === "Table screen") {
+    await press(page.getByRole("button", { name: /^Table screen/ }));
     return;
   }
-  await press(page.getByLabel(/more sections$/i));
-  await press(page.getByRole("menuitem", { name, exact: true }));
+  if (name === "Settings") {
+    await press(page.getByRole("button", { name: "Settings", exact: true }));
+    return;
+  }
+  if (PREP_PAGES.includes(name)) {
+    const pages = page.getByRole("tablist", { name: "Prep pages" });
+    if (!(await pages.isVisible())) await press(gmSection(page, "Prep"));
+    await press(pages.getByRole("tab", { name, exact: true }));
+    return;
+  }
+  await press(gmSection(page, name as "Play" | "Prep" | "Codex" | "Compendium"));
 }
 
 type Point = { x: number; y: number };
