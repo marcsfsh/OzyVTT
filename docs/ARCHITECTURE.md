@@ -134,6 +134,13 @@ seconds before "offline".
 Role comes from the signed token, never from network position. Archived characters cannot be
 claimed, staged or added to an encounter.
 
+A party character can be played at the table (ADR-0042, `played-at-table.ts`): its player keeps a printed sheet
+and tells the GM what they do. The GM-only `playedAtTable` mark refuses its claim, so it stays unclaimed and every
+prompt for it goes to the GM, by the same ownership rule as any unclaimed character's. `encounter.start` takes
+`atTable`, each party character's choice for that encounter, and keeps it on the combat (`combat.atTable`, GM-only)
+while the encounter runs or is parked; a claimed character stays on its device until the claim is released. The
+mark changes nothing for a running encounter.
+
 Every HTTP route and the socket handshake read the caller through one helper (`request-auth.ts`,
 ADR-0027): 401 for no credential or one that is malformed, expired or revoked, and 403 only for a
 valid credential without the role or scope. `credential-walk.test.ts` walks every mounted route with

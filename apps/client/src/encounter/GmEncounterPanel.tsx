@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
+import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/map-catalog";
 import { Button, IconChevronLeft } from "@vtt/ui";
 import { command } from "../lib/command";
@@ -105,6 +105,10 @@ export function GmEncounterPanel({
   // SRD Surprise and group rolls, per fight: who rolls initiative at Disadvantage, and one roll per stat block.
   const [surprised, setSurprised] = useState<ReadonlySet<string>>(() => new Set());
   const [groupMonsters, setGroupMonsters] = useState(true);
+  // Who plays each party character this encounter, where the GM changed it from the saved mark (ADR-0042).
+  const [atTableChoice, setAtTableChoice] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  const atTable = (actor: GmActor) =>
+    actor.ownerSessionId === null && (atTableChoice.get(actor.id) ?? actor.playedAtTable === true);
   // The live scene's fight settings seed both switches, and a change to them or to the live scene seeds them again;
   // the start sends what the switches show (ADR-0039).
   const liveDefaults = state.combat.encounters.find(
@@ -194,11 +198,15 @@ export function GmEncounterPanel({
         .filter((actor) => selectedActors.has(actor.id))
         .map((actor) => (surprised.has(actor.id) ? { actorId: actor.id, surprised: true } : { actorId: actor.id }));
       if (entries.length === 0) throw new Error("Stage at least one character or monster.");
+      const party = rosterActors(state.actors).filter(
+        (actor) => selectedActors.has(actor.id) && actor.kind === "player-character"
+      );
       return command("encounter:start", {
         mapAssetId: startMapId,
         entries,
         playersRollInitiative,
         groupMonsters,
+        atTable: Object.fromEntries(party.map((actor) => [actor.id, atTable(actor)])),
         expectedRevision: state.revision
       });
     }, "The encounter has started, and initiative was rolled.");
@@ -416,6 +424,8 @@ export function GmEncounterPanel({
       onPlayersRoll={setPlayersRollInitiative}
       groupMonsters={groupMonsters}
       onGroupMonsters={setGroupMonsters}
+      atTable={atTable}
+      onAtTable={(actorId, on) => setAtTableChoice((current) => new Map(current).set(actorId, on))}
       busy={busy}
       // Spell areas outlast a fight and can be cast outside one (Glyph of Warding, Alarm), so they are listed here too.
       spellAreas={<SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />}

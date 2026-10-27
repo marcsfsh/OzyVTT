@@ -1953,7 +1953,10 @@ const sceneCombatShape = {
   /** Combatants that rolled Initiative this fight and haven't ended their first turn: a feature that acts "when you
    *  roll Initiative" and is the creature's to choose (Persistent Rage) may be used until then. Engine bookkeeping,
    *  never projected. */
-  initiativeWindow: z.array(z.uuid()).max(200).default([])
+  initiativeWindow: z.array(z.uuid()).max(200).default([]),
+  /** Whether each party character the encounter started with is played at the table (true) or on its player's
+   *  device (false), chosen at the start (ADR-0042). Kept while the encounter runs or is parked; GM-only. */
+  atTable: z.record(z.uuid(), z.boolean()).optional()
 };
 
 /** A parked scene's frozen combat: same fields and invariants as the live combat, minus the map (the Scene owns that). */

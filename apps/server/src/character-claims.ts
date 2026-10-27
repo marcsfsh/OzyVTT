@@ -1,5 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
+import { playedAtTable } from "./played-at-table.js";
 
 export function claimCharacter(state: GameState, actorId: string, sessionId: string, now = Date.now()) {
   const actor = state.actors.find((item) => item.id === actorId && item.kind === "player-character");
@@ -11,6 +12,7 @@ export function claimCharacter(state: GameState, actorId: string, sessionId: str
   if (actor.replayEncounterId !== undefined) throw new CommandRejectedError("Character is unavailable.");
   if (actor.ownerSessionId && actor.ownerSessionId !== sessionId)
     throw new CommandRejectedError("That character is already claimed.");
+  if (playedAtTable(state, actor)) throw new CommandRejectedError(`${actor.name} is played at the table.`);
   if (state.actors.some((item) => item.ownerSessionId === sessionId && item.id !== actorId))
     throw new CommandRejectedError("Release your current character before claiming another one.");
   actor.ownerSessionId = sessionId;

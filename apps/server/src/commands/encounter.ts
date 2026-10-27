@@ -70,7 +70,8 @@ export const encounterCommands = [
       const encounterMap = kit.context.mapCatalog.get(request.mapAssetId);
       if (!encounterMap || encounterMap.kind !== "battlemap")
         throw new CommandRejectedError("Select an uploaded battlemap before starting the encounter.");
-      const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative, groupMonsters } = request;
+      const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative, groupMonsters, atTable } =
+        request;
       const tokenGeometry = await kit.context.tokenGeometryFor(mapAssetId);
       // Where the staged creatures stand, for an aura that reaches Initiative (a Weapon of Warning).
       const distance = await mappedDistance(kit);
@@ -100,7 +101,8 @@ export const encounterCommands = [
             rulesMode: rulesMode ?? draft.rulesPolicy.dial,
             ruleExceptions: ruleExceptions ?? { ...draft.rulesPolicy.exceptions },
             playersRollInitiative: playersRollInitiative ?? sceneDefaults.playersRollInitiative,
-            groupMonsters: groupMonsters ?? sceneDefaults.groupMonsters
+            groupMonsters: groupMonsters ?? sceneDefaults.groupMonsters,
+            ...(atTable ? { atTable } : {})
           },
           () => kit.context.random(20),
           tokenGeometry,

@@ -49,6 +49,24 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("the Roster", () => {
+  it("marks a character played at the table, and keeps a claimed one on its player's device", async () => {
+    const user = userEvent.setup();
+    command.mockClear();
+    roster([
+      pc({ id: "a", name: "Lyra" }),
+      pc({ id: "b", name: "Borin", ownerSessionId: "s1" }),
+      pc({ id: "c", name: "Mirena", playedAtTable: true })
+    ]);
+    await user.click(within(card("Lyra")).getByRole("switch", { name: "Played at the table" }));
+    expect(command).toHaveBeenCalledWith("actor:set-played-at-table", { actorId: "a", playedAtTable: true });
+    expect(within(card("Borin")).getByRole("switch", { name: "Played at the table" })).toBeDisabled();
+    expect(within(card("Mirena")).getByRole("switch", { name: "Played at the table" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    expect(card("Mirena")).toHaveTextContent("At the table · HP");
+  });
+
   it("tells a character nobody has played from one that has been", () => {
     expect(neverPlayed(pc({ id: "a", name: "New" }))).toBe(true);
     expect(neverPlayed(pc({ id: "b", name: "Claimed once", firstClaimedAt: 1 }))).toBe(false);

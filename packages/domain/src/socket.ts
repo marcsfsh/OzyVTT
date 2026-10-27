@@ -178,6 +178,7 @@ import type {
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
   SetActorLairSchema,
+  SetActorPlayedAtTableSchema,
   SetActorPickSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
@@ -501,6 +502,11 @@ export interface ClientToServerEvents {
   /** GM shares (or un-shares) an archived character's sheet with players as a read-only keepsake. Default hidden. */
   "actor:set-sheet-preview": (
     payload: CommandPayload<typeof SetActorSheetPreviewSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM marks a party character played at the table, or takes the mark off (ADR-0042). */
+  "actor:set-played-at-table": (
+    payload: CommandPayload<typeof SetActorPlayedAtTableSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM marks a legendary creature as fighting in its lair, with the lair's counts, or out of it. */

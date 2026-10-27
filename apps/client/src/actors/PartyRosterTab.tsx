@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { rosterActors, type ActorDefinition, type GmActor, type GmView, type PendingImport } from "@vtt/domain";
-import { Badge, Button, Eyebrow, Modal, RevealSwitch, useToast } from "@vtt/ui";
+import { Badge, Button, Eyebrow, Modal, RevealSwitch, Switch, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { JoinAddress } from "../components/JoinAddress";
 import { navigate } from "../router";
@@ -11,6 +11,7 @@ import { identityOf, ledgerOf } from "../builder/level-ledger";
 import { CLAIM_WORD, claimStateOf, classLine, presenceDot } from "./actor-display";
 import { command } from "../lib/command";
 import { useForceRelease } from "./useForceRelease";
+import { atTableBlocked, setPlayedAtTable } from "./playedAtTable";
 import "./party-roster.css";
 import { ActorAvatar } from "./ActorAvatar";
 
@@ -72,6 +73,12 @@ export function PartyRosterTab({
         : `${actor.name} is back on the table.`,
       { tone: "success" }
     );
+  };
+
+  /** Its player keeps a printed sheet and tells the GM what they do, so nobody claims it and the GM answers for it. */
+  const markAtTable = async (actor: GmActor, on: boolean) => {
+    const refused = await setPlayedAtTable(actor.id, on);
+    if (refused) toast(refused, { tone: "error" });
   };
 
   const setSheetPreview = async (actor: GmActor, enabled: boolean) => {
@@ -175,6 +182,7 @@ export function PartyRosterTab({
 
   const card = (actor: GmActor, isArchived: boolean) => {
     const claim = claimStateOf(actor);
+    const playedWord = actor.playedAtTable ? "At the table" : CLAIM_WORD[claim];
     const line = classLine(definitionOf(actor));
     return (
       <li key={actor.id} className={`nh-card party-card${isArchived ? " is-archived" : ""}`}>
@@ -197,9 +205,19 @@ export function PartyRosterTab({
           <h3 className="nh-card-title">{actor.name}</h3>
           {line && <span className="nh-card-meta">{line}</span>}
           <span className="nh-card-meta">
-            {CLAIM_WORD[claim]} · HP {actor.hp.current}/{actor.hp.maximum} · AC {actor.armorClass ?? "None"}
+            {playedWord} · HP {actor.hp.current}/{actor.hp.maximum} · AC {actor.armorClass ?? "None"}
           </span>
         </div>
+        {!isArchived && (
+          <div className="party-card-preview">
+            <Switch
+              label="Played at the table"
+              checked={actor.playedAtTable === true}
+              disabled={busy || atTableBlocked(actor) !== null}
+              onChange={(next) => void markAtTable(actor, next)}
+            />
+          </div>
+        )}
         {isArchived && (
           <div className="party-card-preview">
             <span className="party-card-preview-label">Sheet:</span>

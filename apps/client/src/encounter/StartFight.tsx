@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { GmActor, GmView } from "@vtt/domain";
-import { Chip, IconChevronRight, Modal, Switch, cx } from "@vtt/ui";
+import { Chip, IconChevronRight, Modal, SegmentedControl, Switch, cx } from "@vtt/ui";
 import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
 import "./start-fight.css";
 
@@ -67,6 +67,9 @@ export type StartFightProps = Readonly<{
   onPlayersRoll: (on: boolean) => void;
   groupMonsters: boolean;
   onGroupMonsters: (on: boolean) => void;
+  /** Whether each party character is played at the table for this encounter (ADR-0042). */
+  atTable: (actor: GmActor) => boolean;
+  onAtTable: (actorId: string, on: boolean) => void;
   busy: boolean;
   /** The spell areas on the map, which outlast a fight. */
   spellAreas: ReactNode;
@@ -77,9 +80,16 @@ export type StartFightProps = Readonly<{
   phone: boolean;
 }>;
 
+/** "Lyra at the table", "Lyra and Borin at the table", or "All on their devices": the phone's Who plays row. */
+export function playsOf(party: readonly GmActor[], atTable: (actor: GmActor) => boolean): string {
+  const here = party.filter(atTable).map((actor) => actor.name);
+  return here.length === 0 ? "All on their devices" : `${namesOf(here)} at the table`;
+}
+
 /**
- * Start a fight: In this fight lists the staged characters and monsters, ticked, with hidden ones marked; the two
- * initiative switches; Surprised as one chip each, with the rule. On a phone the three are rows that open a sheet.
+ * Start an encounter: In this encounter lists the staged characters and monsters, ticked, with hidden ones marked;
+ * who plays each party character; the two initiative switches; Surprised as one chip each, with the rule. On a phone
+ * each is a row that opens a sheet.
  */
 export function StartFight(props: StartFightProps) {
   return props.phone ? <StartFightCard {...props} /> : <StartFightPanel {...props} />;
@@ -94,6 +104,7 @@ function StartFightPanel(props: StartFightProps) {
       <p className="start-fight-lede">Everyone on the map is in. Untick anyone who isn&apos;t.</p>
       {props.spellAreas}
       <InThisFight {...props} />
+      <WhoPlays {...props} />
       <Initiative {...props} />
       <Surprised {...props} />
       {props.blocked && (
@@ -105,12 +116,13 @@ function StartFightPanel(props: StartFightProps) {
   );
 }
 
-type Sheet = "fight" | "initiative" | "surprised";
+type Sheet = "fight" | "plays" | "initiative" | "surprised";
 
 function StartFightCard(props: StartFightProps) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const staged = props.candidates.filter((actor) => props.ticked.has(actor.id));
   const surprisedNames = staged.filter((actor) => props.surprised.has(actor.id)).map((actor) => actor.name);
+  const party = staged.filter((actor) => actor.kind === "player-character");
   const initiativeWords = [
     props.playersRoll ? "Players roll their own." : "Rolled here for everyone.",
     props.groupMonsters ? "Groups share a roll." : "Each monster rolls."
@@ -145,6 +157,9 @@ function StartFightCard(props: StartFightProps) {
       {props.spellAreas}
       <ul className="start-fight-rows">
         <CardRow title="In this encounter" value={sidesOf(staged)} onOpen={() => setSheet("fight")} />
+        {party.length > 0 && (
+          <CardRow title="Who plays" value={playsOf(party, props.atTable)} onOpen={() => setSheet("plays")} />
+        )}
         <CardRow title="Initiative" value={initiativeWords} onOpen={() => setSheet("initiative")} />
         <CardRow title="Surprised" value={namesOf(surprisedNames)} onOpen={() => setSheet("surprised")} />
       </ul>
@@ -155,6 +170,9 @@ function StartFightCard(props: StartFightProps) {
       )}
       <Modal open={sheet === "fight"} onClose={close} title="In this encounter" align="bottom">
         <InThisFight {...props} />
+      </Modal>
+      <Modal open={sheet === "plays"} onClose={close} title="Who plays" align="bottom">
+        <WhoPlays {...props} />
       </Modal>
       <Modal open={sheet === "initiative"} onClose={close} title="Initiative" align="bottom">
         <Initiative {...props} />
@@ -218,6 +236,40 @@ function InThisFight(props: StartFightProps) {
         </ul>
       )}
       {props.staging}
+    </section>
+  );
+}
+
+/** Each party character in the encounter is played at the table, by the GM, or on its player's device. A claimed one
+ *  stays on its device: the server refuses the table until the claim is released. */
+function WhoPlays(props: StartFightProps) {
+  const party = props.candidates.filter((actor) => props.ticked.has(actor.id) && actor.kind === "player-character");
+  if (party.length === 0) return null;
+  return (
+    <section className="start-fight-section" aria-label="Who plays">
+      {!props.phone && <h3 className="start-fight-label">Who plays</h3>}
+      <ul className="start-fight-plays">
+        {party.map((actor) => (
+          <li key={actor.id}>
+            <span className="start-fight-plays-name">
+              <b>{actor.name}</b>
+              {actor.ownerSessionId !== null && <span>Claimed on a player&apos;s device</span>}
+            </span>
+            <SegmentedControl
+              size="sm"
+              ariaLabel={`Where ${actor.name} is played`}
+              value={props.atTable(actor) ? "table" : "device"}
+              disabled={props.busy || actor.ownerSessionId !== null}
+              onChange={(value) => props.onAtTable(actor.id, value === "table")}
+              options={[
+                { value: "table", label: "At the table" },
+                { value: "device", label: "On their device" }
+              ]}
+            />
+          </li>
+        ))}
+      </ul>
+      <p className="start-fight-rule">At the table, you answer every prompt for the character and roll its dice.</p>
     </section>
   );
 }

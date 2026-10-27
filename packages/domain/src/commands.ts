@@ -93,6 +93,9 @@ export const EncounterStartSchema = z
     playersRollInitiative: z.boolean().optional(),
     /** SRD: one initiative roll for each group of identical monsters, so they act together. */
     groupMonsters: z.boolean().optional(),
+    /** Party characters played at the table for this encounter (true) or on their players' devices (false), by id
+     *  (ADR-0042). One left out takes its saved mark; a claimed character can't be played at the table. */
+    atTable: z.record(z.uuid(), z.boolean()).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -264,6 +267,15 @@ export const SetActorSheetPreviewSchema = z
   })
   .strict();
 /** GM switch: a legendary creature fights in its lair, with the lair's legendary counts (SRD 5.2.1). */
+/** The GM marks a party character played at the table, or takes the mark off (ADR-0042). */
+export const SetActorPlayedAtTableSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    playedAtTable: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const SetActorLairSchema = z
   .object({
     commandId: z.uuid(),

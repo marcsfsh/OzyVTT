@@ -73,6 +73,7 @@ import { poolsOf } from "./Uses";
 import { useRememberedTab } from "../table/TablePanel";
 import "./sheet.css";
 import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
+import { atTableBlocked, setPlayedAtTable } from "../actors/playedAtTable";
 
 /** Where the sheet sits: a page of its own (My character, `/characters/<id>`, `sheet.html`), a dialog over the page
  *  it was opened from, or the table's panel. */
@@ -245,6 +246,18 @@ export function CharacterSheet({
     ...(canLevel && !phoneViews && level! > 1 ? { levelDown: { to: level! - 1, onSelect: onLevel! } } : {}),
     ...(actor.kind === "player-character" && definition ? { editNames: () => setEditingNames(true) } : {}),
     ...(token ? { tokenImage: () => setPickingToken(true) } : {}),
+    ...(role === "gm" && actor.kind === "player-character" && "ownerSessionId" in actor && !actor.archived
+      ? {
+          playedAtTable: {
+            on: actor.playedAtTable === true,
+            blocked: atTableBlocked(actor),
+            onToggle: () =>
+              void setPlayedAtTable(actor.id, actor.playedAtTable !== true).then(
+                (refused) => refused && toast(refused, { tone: "error" })
+              )
+          }
+        }
+      : {}),
     ...(layout === "wide" && state ? { dockDice: { docked, onToggle: () => setDocked((current) => !current) } } : {}),
     ...(presentation === "dialog" && wideScreen
       ? { popOut: { floating, onToggle: () => setFloating((current) => !current) } }

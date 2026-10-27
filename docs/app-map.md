@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 17 GameState fields · 183 commands · 360 HTTP paths
+- 17 GameState fields · 184 commands · 361 HTTP paths
 
 ## GameState shape
 
@@ -70,6 +70,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `actor.set-hp` | `actor:write` |
 | `actor.set-lair` | `actor:write` |
 | `actor.set-pick` | `actor:write` |
+| `actor.set-played-at-table` | `actor:write` |
 | `actor.set-sheet-preview` | `actor:write` |
 | `actor.set-size` | `actor:write` |
 | `actor.set-speed` | `actor:write` |
@@ -369,6 +370,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `GET /api/v1/game/actors/{actorId}/next-level`
 - `POST /api/v1/game/actors/{actorId}/nourish`
 - `POST /api/v1/game/actors/{actorId}/pick`
+- `POST /api/v1/game/actors/{actorId}/played-at-table`
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
 - `POST /api/v1/game/actors/{actorId}/proficiencies`
 - `POST /api/v1/game/actors/{actorId}/rebuild`

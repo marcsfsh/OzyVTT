@@ -52,7 +52,8 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     pendingDamage: combat.pendingDamage,
     pendingRuleAsks: combat.pendingRuleAsks,
     pendingInitiative: combat.pendingInitiative,
-    initiativeWindow: combat.initiativeWindow
+    initiativeWindow: combat.initiativeWindow,
+    ...(combat.atTable ? { atTable: combat.atTable } : {})
   };
 }
 

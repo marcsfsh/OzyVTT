@@ -58,7 +58,24 @@ character, 44px at 390px.
 
 Additive; every saved character starts unmarked, so nothing changes until the GM marks one.
 
+## As built
+
+- The mark is `playedAtTable` on the actor and the encounter's choice is `combat.atTable`, set by
+  `actor.set-played-at-table` (`POST /game/actors/{actorId}/played-at-table`) and `encounter.start`'s `atTable`.
+  `played-at-table.ts` holds the rules.
+- Routing needed no new code: a character played at the table can't be claimed, and every prompt for an unclaimed
+  character already goes to the GM. A claimed character stays on its device for an encounter, so the choice never
+  takes a character from a player holding it. Start the encounter shows it held there with a note.
+- The Party roster has a Played at the table switch on each card, and the character sheet's menu the same choice
+  for the GM.
+- The dice line waits for ADR-0043: until it lands, the GM rolls or types a d20 for the character as for any
+  unclaimed one.
+
 ## Validation evidence
 
-To be added with the code: the claim refusal, each prompt routed to the GM, initiative skipping the character, the
-per-encounter override, both transports, and the projection tests.
+- `played-at-table.test.ts`: the mark and its refusals, the claim refusal, the start's choice (from the mark, a
+  claimed character on its device, a refused choice rolling nothing), a mid-encounter change doing nothing, the choice
+  parked and resumed with its encounter, initiative "players roll their own" leaving the character to the server,
+  both transports, and the player game read and the table screen's presentation carrying neither field.
+- `start-fight.test.tsx`: Who plays starts from the mark, holds a claimed character, and sends the GM's choice.
+- `party-roster.test.tsx`: the roster's switch, held for a claimed character.

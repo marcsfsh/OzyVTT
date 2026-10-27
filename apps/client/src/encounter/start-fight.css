@@ -196,3 +196,34 @@
   font-size: var(--fs-sm);
   text-align: center;
 }
+/* Who plays: one row per party character, its name and where it is played. Wraps under the name at 390px. */
+.start-fight-plays {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.start-fight-plays li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+.start-fight-plays-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.start-fight-plays-name b {
+  color: var(--text);
+  font-weight: 600;
+}
+.start-fight-plays-name span {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}

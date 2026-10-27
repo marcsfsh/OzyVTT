@@ -22,6 +22,7 @@ import {
   SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorLairSchema,
+  SetActorPlayedAtTableSchema,
   SetActorPickSchema,
   SetActorSheetPreviewSchema,
   SetActorSizeSchema,
@@ -35,6 +36,7 @@ import { setActorSize, setActorVisibility } from "../token-placement.js";
 import { importedDefinition } from "./characters.js";
 import { initiatorOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+import { setPlayedAtTable } from "../played-at-table.js";
 
 // The roster and each combatant's presentation on the table.
 
@@ -261,6 +263,28 @@ export const actorCommands = [
         kit.context.appendLog({
           kind: "encounter",
           text: `${kit.actorName(actorId)}'s archived sheet is now ${enabled ? "shared with players" : "hidden from players"}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.set-played-at-table",
+    operationId: "setActorPlayedAtTable",
+    description:
+      "Marks a party character played at the table, or takes the mark off (GM-grade only, ADR-0042). A character played at the table is one whose player keeps a printed sheet and tells the GM what they do: it can't be claimed, and every prompt for it (its initiative, a saving throw, a reaction, a death save) goes to the GM. Refused for a claimed character; release the claim first. An encounter keeps the choice it started with, so a change applies from the next start. GM-only: players and the table screen never see the mark.",
+    summary: "Mark a party character played at the table, or on its player's device (GM).",
+    schema: SetActorPlayedAtTableSchema,
+    malformed: "The played-at-the-table command is malformed.",
+    gmOnly: "Only the GM decides who is played at the table.",
+    async run({ request, execute }, kit) {
+      const { actorId, playedAtTable } = request;
+      const { duplicate } = await execute((state) => setPlayedAtTable(state, actorId, playedAtTable));
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `${kit.actorName(actorId)} is ${playedAtTable ? "played at the table" : "played on a player's device"}.`,
           actorIds: [actorId],
           gmOnly: true
         });

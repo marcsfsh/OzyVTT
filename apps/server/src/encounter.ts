@@ -63,6 +63,7 @@ import { summonTurnEnd, summonTurnStart, takesNoTurns } from "./summon-turns.js"
 import { checkSightFor } from "./vision/rules.js";
 import { rowRecord } from "./item-records.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import { startingAtTable } from "./played-at-table.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -75,6 +76,8 @@ type StartEncounterInput = Readonly<{
   playersRollInitiative?: boolean;
   /** SRD: one roll for each group of identical monsters (same stat block), so the group acts together. */
   groupMonsters?: boolean;
+  /** Which party characters are played at the table for this encounter (ADR-0042); one left out takes its mark. */
+  atTable?: Readonly<Record<string, boolean>>;
 }>;
 
 const EMPTY_TURN = {
@@ -435,6 +438,12 @@ export function startEncounter(
         "This encounter uses a different map. Start on the encounter's map, or switch encounters first."
       );
   }
+  // Before any die is rolled, so a refused choice rolls nothing.
+  const atTable = startingAtTable(
+    state,
+    input.entries.map((entry) => entry.actorId),
+    input.atTable
+  );
   // Preserve any positions already placed during scene prep (or a prior setup); new combatants start unplaced.
   const placedPositions = new Map(state.combat.tokens.map((token) => [token.actorId, token.position]));
   const actorIds = new Set<string>();
@@ -512,6 +521,7 @@ export function startEncounter(
     pendingRuleAsks: [],
     pendingInitiative,
     initiativeWindow: [],
+    atTable,
     secondTurn: null,
     secondTurnsTaken: [],
     initiativeSwapOffers: [],
@@ -689,6 +699,8 @@ export function endEncounter(state: GameState) {
     historyCursor: null,
     historyDirty: false
   };
+  // Who played at the table was this encounter's choice; the next start chooses again.
+  delete state.combat.atTable;
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number, tieBreaker?: number) {

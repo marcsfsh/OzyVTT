@@ -199,12 +199,13 @@ Before an encounter, the same frame changes in three places:
   enemies are on the map, and the join address with a Copy button.
 - The map shows every token with its plain ring; nobody wears the sun frame.
 - Encounter shows Start an encounter: In this encounter lists the staged combatants, ticked, with hidden creatures marked; the two
-  initiative switches; Surprised as one chip per combatant, with the rule underneath; and START THE FIGHT pinned at the
+  initiative switches; Who plays, each party character At the table or On their device (ADR-0042), a claimed one held
+  on its device; Surprised as one chip per combatant, with the rule underneath; and START THE ENCOUNTER pinned at the
   bottom over a live count and an accurate description of who rolls. With players rolling, say that the players roll
   for their claimed characters; do not promise an automatic roll for everyone. The list is the staged combatants,
   including tokens still in the tray, with Add combatants available. The switches start from the
   encounter's Encounter settings (ADR-0039). On a phone, Start an encounter is a card under the map with the combatants' faces and
-  three rows (In this encounter, Initiative, Surprised), each opening a sheet, above the primary; the header holds the
+  rows (In this encounter, Who plays when the party is in it, Initiative, Surprised), each opening a sheet, above the primary; the header holds the
   STOP counter, the encounter picker and a Join button.
 
 The table screen (the shared TV) is for reading across a room. Gameplay has no controls; pairing, fullscreen and

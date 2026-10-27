@@ -871,6 +871,7 @@ const PLAYER_ACTOR_FIELDS = {
   firstClaimedAt: "never",
   sample: "never",
   archived: "never",
+  playedAtTable: "never",
   sheetPreview: "never",
   // Who summoned a creature and what keeps it is the GM's; its commander's player is told only that it commands it.
   summon: "never",
@@ -947,7 +948,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | favouriteOptionIds, optionUseCounts     |  Y   |  -  |       -        |     -      |          -          |
  * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, firstClaimedAt, sample, archived,          |
- * | sheetPreview, lastLongRestAt: never, at any tier.                                                              |
+ * | playedAtTable, sheetPreview, lastLongRestAt: never, at any tier.                                               |
  *
  * `off` keeps the base entry: initiative and tokens still reference the ally, and the map renders
  * nothing for a token whose actor is missing. Rules for new fields: never gate `mine` on the tier;

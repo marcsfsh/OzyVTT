@@ -34,6 +34,8 @@ export type SheetMenuItems = Readonly<{
   dockDice?: Readonly<{ docked: boolean; onToggle: () => void }>;
   popOut?: Readonly<{ floating: boolean; onToggle: () => void }>;
   newTab?: () => void;
+  /** The GM plays a party character at the table, or on its player's device (ADR-0042); `blocked` says why not. */
+  playedAtTable?: Readonly<{ on: boolean; blocked: string | null; onToggle: () => void }>;
   /** A player gives the character back: the menu's last item. */
   release?: Readonly<{ name: string; onSelect: () => void }>;
 }>;
@@ -44,8 +46,19 @@ export function SheetMenu({
   items,
   onRollSettings
 }: Readonly<{ name: string; items: SheetMenuItems; onRollSettings: () => void }>) {
-  const { levelUp, levelDown, editNames, tokenImage, party, createCharacter, dockDice, popOut, newTab, release } =
-    items;
+  const {
+    levelUp,
+    levelDown,
+    editNames,
+    tokenImage,
+    playedAtTable,
+    party,
+    createCharacter,
+    dockDice,
+    popOut,
+    newTab,
+    release
+  } = items;
   const entries: ReactNode[] = [];
   if (levelUp)
     entries.push(
@@ -92,6 +105,12 @@ export function SheetMenu({
     entries.push(
       <MenuItem key="tab" onClick={newTab}>
         Open in a new tab
+      </MenuItem>
+    );
+  if (playedAtTable)
+    entries.push(
+      <MenuItem key="at-table" disabled={playedAtTable.blocked !== null} onClick={playedAtTable.onToggle}>
+        {playedAtTable.on ? "Play on a player's device" : "Play at the table"}
       </MenuItem>
     );
   if (party)

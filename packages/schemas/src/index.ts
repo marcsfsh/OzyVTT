@@ -3045,6 +3045,9 @@ export const ActorSchema = z.object({
   currency: CurrencySchema.prefault({}),
   /** GM-archived: hidden from players and excluded from the encounter builder and party. Never projected to players or the viewer. */
   archived: z.boolean().default(false),
+  /** Played at the table (ADR-0042): its player never opens the app, so it can't be claimed and the GM answers for
+   *  it. Set by the GM on a party character; GM-only, never projected to players or the viewer. */
+  playedAtTable: z.boolean().optional(),
   /** Set on a launched replay's cloned combatant: the replay scene's id. `rosterActors` hides these from management
    * surfaces; they are deleted with the replay scene. */
   replayEncounterId: z.uuid().optional(),
