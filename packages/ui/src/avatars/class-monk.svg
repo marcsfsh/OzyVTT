@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Monk avatar"><title>Monk avatar</title><defs><radialGradient id="oz-class-monk-b" cx="0.5" cy="0.5" r="0.7"><stop offset="0" stop-color="#0a3a3a"></stop><stop offset="1" stop-color="#03080c"></stop></radialGradient>
+<radialGradient id="oz-class-monk-k" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#2be4ff" stop-opacity="0.55"></stop><stop offset="1" stop-color="#2be4ff" stop-opacity="0"></stop></radialGradient>
+<linearGradient id="oz-class-monk-f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb35c"></stop><stop offset="1" stop-color="#ff7a1a"></stop></linearGradient></defs>
+<rect width="64" height="64" fill="url(#oz-class-monk-b)"></rect><circle cx="32" cy="32" r="28" fill="url(#oz-class-monk-k)"></circle><path d="M4 24h9" stroke="#2be4ff" stroke-width="1.4" opacity="0.8"></path><path d="M2 31h11" stroke="#2be4ff" stroke-width="1.4" opacity="0.8"></path><path d="M5 38h8" stroke="#2be4ff" stroke-width="1.4" opacity="0.8"></path><path d="M51 24h9" stroke="#2be4ff" stroke-width="1.4" opacity="0.8"></path><path d="M51 31h11" stroke="#2be4ff" stroke-width="1.4" opacity="0.8"></path><path d="M51 38h8" stroke="#2be4ff" stroke-width="1.4" opacity="0.8"></path>
+<g fill="url(#oz-class-monk-f)" stroke="#7a2e05" stroke-width="1"><rect x="18" y="17" width="7.5" height="16" rx="3.6"></rect><rect x="25" y="14.5" width="7.5" height="18" rx="3.6"></rect><rect x="32" y="14.5" width="7.5" height="18" rx="3.6"></rect><rect x="39" y="17" width="7.5" height="16" rx="3.6"></rect>
+<rect x="18" y="27" width="28.5" height="19" rx="4"></rect></g>
+<path d="M17 33C22 31 32 32.5 36.5 34.5C38 36.5 37 39.5 34.5 39.5C28 39.5 22 40.5 17.5 40.5Z" fill="#ffb35c" stroke="#7a2e05" stroke-width="1"></path>
+<path d="M25.2 19v9M32.2 17v10M39.2 19v9" stroke="#7a2e05" stroke-width="1"></path>
+<rect x="21" y="45" width="22" height="13" fill="#f4e6d0" stroke="#7a2e05" stroke-width="1"></rect>
+<path d="M21 49.5h22M21 54h22" stroke="#c8b49a" stroke-width="1.2"></path></svg>

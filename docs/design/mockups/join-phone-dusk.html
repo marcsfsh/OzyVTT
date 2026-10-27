@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Join the table, Dusk</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&amp;family=Bungee&amp;family=Mr+Dafoe&amp;family=VT323&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:rgba(10, 12, 22, 0.55)}
+.oz{font-family:'Bai Jamjuree',system-ui,sans-serif;color:#eef0f8}
+.oz *{box-sizing:border-box}
+.oz p,.oz h1,.oz h2,.oz h3,.oz ul,.oz ol{margin:0;padding:0}
+.oz ul,.oz ol{list-style:none}
+.oz button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+.oz input{font:inherit;color:inherit}
+.oz button:focus-visible,.oz input:focus-visible{outline:2px solid #4fe3ff;outline-offset:2px}
+.oz .vt{font-family:'VT323',ui-monospace,monospace;letter-spacing:.04em}
+.oz .lbl{font-size:12px;font-weight:600;color:#b0b4ca;letter-spacing:.02em}
+.oz .dim{color:#c3c7d9}
+.oz .mute{color:#b0b4ca}
+.oz .h1{font-family:'Bungee',system-ui,sans-serif;font-weight:400;font-size:24px;line-height:1.1}
+.oz .chrome{background:linear-gradient(180deg,#eaf8ff 0%,#9fdcff 42%,#ffffff 49%,#3b2163 51%,#ff5fae 75%,#ffd6ea 100%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:-1.5px 0 rgba(43, 228, 255, .55),1.5px 0 rgba(255, 47, 146, .55)}
+.oz .scan{position:absolute;inset:0;pointer-events:none;z-index:40;opacity:.5;background:repeating-linear-gradient(180deg,rgba(0, 0, 0, .2) 0 1px,transparent 1px 3px)}
+.oz .navbtn{height:56px;padding:0 14px;font-size:15px;font-weight:600;color:#c3c7d9}
+.oz .navbtn[aria-current="page"]{color:#6fe8ff;text-shadow:0 0 10px rgba(43, 228, 255, .7);box-shadow:inset 0 -2px 0 #4fe3ff}
+.oz .subbtn{height:52px;padding:0 14px;font-size:14px;font-weight:600;color:#c3c7d9;display:flex;align-items:center;gap:8px}
+.oz .subbtn[aria-current="page"]{color:#eef0f8;box-shadow:inset 0 -2px 0 #4fe3ff}
+.oz .btn{min-height:44px;padding:0 16px;border:1px solid rgba(255, 255, 255, 0.2);background:rgba(44, 48, 72, 0.5);font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.oz .btn:hover{border-color:rgba(255, 255, 255, 0.32)}
+.oz .btn-primary{height:52px;padding:0 24px;background:#ff2f92;color:#12020a;font-family:'Bungee',system-ui,sans-serif;font-size:16px;letter-spacing:.04em;box-shadow:0 5px 0 #8a0f4d,0 0 24px rgba(255, 47, 146, .45);margin-bottom:5px;display:inline-flex;align-items:center;justify-content:center;gap:10px;white-space:nowrap}
+.oz .btn-primary.sm{height:42px;font-size:14px;padding:0 18px;box-shadow:0 4px 0 #8a0f4d,0 0 18px rgba(255, 47, 146, .4);margin-bottom:4px}
+.oz .linkbtn{min-height:44px;font-size:14px;font-weight:600;color:#6fe8ff;display:inline-flex;align-items:center;gap:6px}
+.oz .iconbtn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#c3c7d9;flex:none}
+.oz .port{display:flex;align-items:center;justify-content:center;font-weight:700;background:rgba(26, 29, 46, 0.85);border:2px solid #7aa2ff;flex:none}
+.oz .panel{background:rgba(26, 29, 46, 0.62);border:1px solid rgba(255, 255, 255, 0.12)}
+.oz .tag{font-family:'VT323',ui-monospace,monospace;font-size:16px;line-height:1.25;padding:0 6px;letter-spacing:.04em;white-space:nowrap}
+.oz .chip{min-height:36px;padding:0 10px;border:1px solid rgba(255, 255, 255, 0.2);background:rgba(44, 48, 72, 0.5);font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.oz .field{height:44px;border:1px solid rgba(255, 255, 255, 0.2);background:rgba(10, 12, 22, 0.55);display:flex;align-items:center;gap:8px;padding:0 12px;color:#b0b4ca;font-size:14px}
+.oz .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;align-items:center;width:100%;padding:8px 12px;min-height:52px;border-top:1px solid rgba(255, 255, 255, 0.07)}
+.oz .row:hover{background:rgba(60, 66, 96, 0.45)}
+.oz .navtab{flex:1;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:#c3c7d9}
+.oz .navtab[aria-current="page"]{color:#6fe8ff;text-shadow:0 0 10px rgba(43, 228, 255, .7);box-shadow:inset 0 2px 0 #4fe3ff}
+.oz .seg{display:flex;border:1px solid rgba(255, 255, 255, 0.2);background:rgba(10, 12, 22, 0.55);padding:2px;gap:2px}
+.oz .seg button{flex:1;min-height:40px;padding:0 12px;font-size:14px;font-weight:600;color:#c3c7d9;white-space:nowrap}
+.oz .seg button[aria-pressed="true"]{background:rgba(70, 76, 108, 0.6);color:#eef0f8;box-shadow:inset 0 -2px 0 #4fe3ff}
+.oz .switch{width:46px;height:26px;border:1px solid rgba(255, 255, 255, 0.2);background:rgba(10, 12, 22, 0.55);padding:3px;display:flex;flex:none}
+.oz .switch span{width:18px;height:18px;background:rgba(255, 255, 255, 0.2)}
+.oz .switch[aria-checked="true"]{border-color:#4fe3ff;justify-content:flex-end}
+.oz .switch[aria-checked="true"] span{background:#4fe3ff;box-shadow:0 0 8px rgba(43, 228, 255, .8)}
+.oz .lamp{width:10px;height:10px;flex:none}
+.oz .tbl{width:100%;border-collapse:collapse;font-size:14px}
+.oz .tbl th{position:sticky;top:0;background:rgba(18, 20, 34, 0.7);text-align:left;font-size:12px;font-weight:600;color:#b0b4ca;padding:10px 12px;border-bottom:1px solid rgba(255, 255, 255, 0.12);white-space:nowrap}
+.oz .tbl td{padding:0 12px;height:48px;border-bottom:1px solid rgba(255, 255, 255, 0.07);white-space:nowrap}
+.oz .tbl tr:hover td{background:rgba(60, 66, 96, 0.45)}
+.oz .card{border:1px solid rgba(255, 255, 255, 0.12);background:rgba(26, 29, 46, 0.62);padding:12px}
+.oz.ph .chip{min-height:44px}
+.oz.ph .seg button{min-height:44px}
+.oz.ph .btn{min-height:44px}
+@media (max-width: 900px){
+.oz .lay{height:auto !important;min-height:0 !important}
+.oz .cols{display:flex !important;flex-direction:column}
+.oz .oz-nav{display:none !important}
+}
+
+.oz .scan{opacity:.25 !important}
+.oz header,.oz aside,.oz nav,.oz main,.oz section:not(.oz-map):not([aria-label="Battle map"]){-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15)}
+body{background:#151a2d}</style>
+</head>
+<body>
+<div class="oz ph" style="position: relative; width: 390px; height: 844px; display: flex; flex-direction: column; background: radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%), linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%); overflow: hidden">
+<section aria-label="OzyVTT" style="position: relative; height: 250px; flex: none; overflow: hidden">
+<svg viewBox="0 0 390 250" preserveAspectRatio="xMidYMid slice" width="100%" height="100%" aria-hidden="true" style="position: absolute; inset: 0; display: block">
+<defs><linearGradient id="jpSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05010c"></stop><stop offset="0.55" stop-color="#1e0840"></stop><stop offset="0.85" stop-color="#7a1268"></stop><stop offset="1" stop-color="#ff3d8b"></stop></linearGradient>
+<linearGradient id="jpSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe14d"></stop><stop offset="0.55" stop-color="#ff8a1f"></stop><stop offset="1" stop-color="#ff2f92"></stop></linearGradient>
+<linearGradient id="jpFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050208" stop-opacity="0"></stop><stop offset="1" stop-color="#050208" stop-opacity="0.9"></stop></linearGradient>
+<filter id="jpGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="11.0"></feGaussianBlur></filter>
+<mask id="jpCut"><rect width="390" height="170" fill="#fff"></rect><rect x="0" y="119.4" width="390" height="2.0" fill="#000"></rect><rect x="0" y="128.4" width="390" height="3.6" fill="#000"></rect><rect x="0" y="139.6" width="390" height="5.2" fill="#000"></rect><rect x="0" y="153.0" width="390" height="6.8" fill="#000"></rect><rect x="0" y="168.6" width="390" height="8.4" fill="#000"></rect></mask></defs>
+<rect width="390" height="170" fill="url(#jpSky)"></rect><circle cx="91" cy="43" r="1.0" fill="#fff" opacity="0.55"></circle><circle cx="182" cy="86" r="1.3" fill="#fff" opacity="0.70"></circle><circle cx="273" cy="11" r="0.7" fill="#fff" opacity="0.85"></circle><circle cx="364" cy="54" r="1.0" fill="#fff" opacity="0.40"></circle><circle cx="65" cy="97" r="1.3" fill="#fff" opacity="0.55"></circle><circle cx="156" cy="22" r="0.7" fill="#fff" opacity="0.70"></circle><circle cx="247" cy="65" r="1.0" fill="#fff" opacity="0.85"></circle><circle cx="338" cy="108" r="1.3" fill="#fff" opacity="0.40"></circle><circle cx="39" cy="33" r="0.7" fill="#fff" opacity="0.55"></circle><circle cx="130" cy="76" r="1.0" fill="#fff" opacity="0.70"></circle><circle cx="221" cy="1" r="1.3" fill="#fff" opacity="0.85"></circle><circle cx="312" cy="44" r="0.7" fill="#fff" opacity="0.40"></circle><circle cx="13" cy="87" r="1.0" fill="#fff" opacity="0.55"></circle><circle cx="104" cy="12" r="1.3" fill="#fff" opacity="0.70"></circle><circle cx="195" cy="55" r="0.7" fill="#fff" opacity="0.85"></circle><circle cx="286" cy="98" r="1.0" fill="#fff" opacity="0.40"></circle><circle cx="377" cy="23" r="1.3" fill="#fff" opacity="0.55"></circle><circle cx="78" cy="66" r="0.7" fill="#fff" opacity="0.70"></circle><circle cx="169" cy="109" r="1.0" fill="#fff" opacity="0.85"></circle><circle cx="260" cy="34" r="1.3" fill="#fff" opacity="0.40"></circle><circle cx="351" cy="77" r="0.7" fill="#fff" opacity="0.55"></circle><circle cx="52" cy="2" r="1.0" fill="#fff" opacity="0.70"></circle><circle cx="143" cy="45" r="1.3" fill="#fff" opacity="0.85"></circle><circle cx="234" cy="88" r="0.7" fill="#fff" opacity="0.40"></circle><circle cx="325" cy="13" r="1.0" fill="#fff" opacity="0.55"></circle><circle cx="26" cy="56" r="1.3" fill="#fff" opacity="0.70"></circle><circle cx="117" cy="99" r="0.7" fill="#fff" opacity="0.85"></circle><circle cx="208" cy="24" r="1.0" fill="#fff" opacity="0.40"></circle><circle cx="299" cy="67" r="1.3" fill="#fff" opacity="0.55"></circle><circle cx="0" cy="110" r="0.7" fill="#fff" opacity="0.70"></circle><circle cx="91" cy="35" r="1.0" fill="#fff" opacity="0.85"></circle><circle cx="182" cy="78" r="1.3" fill="#fff" opacity="0.40"></circle><circle cx="273" cy="3" r="0.7" fill="#fff" opacity="0.55"></circle><circle cx="364" cy="46" r="1.0" fill="#fff" opacity="0.70"></circle><circle cx="65" cy="89" r="1.3" fill="#fff" opacity="0.85"></circle><circle cx="156" cy="14" r="0.7" fill="#fff" opacity="0.40"></circle><circle cx="247" cy="57" r="1.0" fill="#fff" opacity="0.55"></circle><circle cx="338" cy="100" r="1.3" fill="#fff" opacity="0.70"></circle><circle cx="39" cy="25" r="0.7" fill="#fff" opacity="0.85"></circle>
+<circle cx="195" cy="170" r="92" fill="#ff5a6e" opacity="0.45" filter="url(#jpGlow)"></circle>
+<circle cx="195" cy="170" r="92" fill="url(#jpSun)" mask="url(#jpCut)"></circle>
+<path d="M0 170L31 150 62 162 105 140 148 165 172 170Z" fill="#10031f" stroke="#2be4ff" stroke-opacity="0.7" stroke-width="1.2"></path><path d="M226 170L257 155 289 165 328 142 363 160 390 152V170Z" fill="#10031f" stroke="#2be4ff" stroke-opacity="0.7" stroke-width="1.2"></path>
+<rect y="170" width="390" height="80" fill="#07020f"></rect>
+<path d="M0 170.8H390M0 173.8H390M0 179.2H390M0 187.4H390M0 198.4H390M0 212.5H390M0 229.6H390M0 250.0H390M195 170L-362 250M195 170L-306 250M195 170L-251 250M195 170L-195 250M195 170L-139 250M195 170L-84 250M195 170L-28 250M195 170L28 250M195 170L84 250M195 170L139 250M195 170L195 250M195 170L251 250M195 170L306 250M195 170L362 250M195 170L418 250M195 170L474 250M195 170L529 250M195 170L585 250M195 170L641 250M195 170L696 250M195 170L752 250" stroke="#ff2f92" stroke-width="1.2" opacity="0.85" fill="none"></path>
+<rect y="170" width="390" height="80" fill="url(#jpFade)"></rect>
+</svg>
+<div style="position: absolute; left: 0; right: 0; top: 58px; display: flex; justify-content: center"><div role="img" aria-label="OzyVTT" style="display: flex; align-items: center; gap: 4px"><span class="chrome" style="font-family: 'Bungee', system-ui, sans-serif; font-size: 42px; line-height: 1">OZY</span><span style="font-family: 'Mr Dafoe', cursive; font-size: 57px; line-height: 1; color: #ff4fa3; transform: rotate(-8deg) translateY(8px); text-shadow: 0 0 8px rgba(255, 47, 146, 0.9), 0 0 18px rgba(255, 47, 146, 0.5)">vtt</span></div></div>
+</section>
+<div style="flex: 1; min-height: 0; padding: 18px 16px 0; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 8px"><h1 class="h1" style="font-size: 22px">PICK YOUR CHARACTER</h1><p style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #c3c7d9"><span class="lamp" style="background: #4fe3ff; box-shadow: 0 0 8px rgba(43, 228, 255, 0.85)"></span>Goblin warren is live. 2 of 3 players are here.</p></div>
+<ul style="display: flex; flex-direction: column; gap: 8px"><li><button disabled="disabled" aria-disabled="true" style="width: 100%; display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(26, 29, 46, 0.62); opacity: 0.55; cursor: default"><span class="port" style="width: 48px; height: 48px; border: 2px solid rgba(255, 255, 255, 0.32); overflow: hidden; padding: 0"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true" style="display: block"><defs><radialGradient id="a1xb" cx="0.5" cy="0.5" r="0.75"><stop offset="0" stop-color="#14205a"></stop><stop offset="1" stop-color="#05040f"></stop></radialGradient>
+<linearGradient id="a1xh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5c8dff"></stop><stop offset="1" stop-color="#2a0a52"></stop></linearGradient>
+<mask id="a1xm"><rect width="64" height="64" fill="#fff"></rect><circle cx="33.5" cy="20" r="3.4" fill="#000"></circle></mask></defs>
+<rect width="64" height="64" fill="url(#a1xb)"></rect>
+<circle cx="10" cy="14" r="0.8" fill="#fff"></circle><circle cx="54" cy="20" r="0.7" fill="#fff"></circle><circle cx="50" cy="8" r="0.6" fill="#fff" opacity="0.7"></circle><circle cx="12" cy="36" r="0.6" fill="#fff" opacity="0.7"></circle>
+<path d="M38 6C34 10 29 22 21 45H45C41 32 39 18 38 6Z" fill="url(#a1xh)" stroke="#2be4ff" stroke-width="1.5" stroke-linejoin="round"></path>
+<circle cx="32" cy="21" r="3.6" fill="#ffe14d" mask="url(#a1xm)"></circle>
+<path d="M28 29.8l0.90 2.30 2.30 0.90-2.30 0.90L28 36.2l-0.90-2.30-2.30-0.90 2.30-0.90z" fill="#ffe14d"></path><path d="M37 25.8l0.62 1.58 1.58 0.62-1.58 0.62L37 30.2l-0.62-1.58-1.58-0.62 1.58-0.62z" fill="#ffe14d"></path><path d="M35 36.2l0.50 1.30 1.30 0.50-1.30 0.50L35 39.8l-0.50-1.30-1.30-0.50 1.30-0.50z" fill="#ffe14d"></path>
+<path d="M22 41.5H44.5" stroke="#ff2f92" stroke-width="3"></path>
+<ellipse cx="33" cy="46" rx="24" ry="5.5" fill="#1a0638" stroke="#2be4ff" stroke-width="1.5"></ellipse>
+<ellipse cx="33" cy="45" rx="12" ry="1.8" fill="#0b0414"></ellipse></svg></span><span style="flex: 1; min-width: 0; text-align: left"><span style="display: block; font-size: 17px; font-weight: 700">Lyra Emberwise</span><span style="display: block; font-size: 13px; color: #c3c7d9">Elf wizard 7</span></span><span class="tag" style="background: rgba(255, 255, 255, 0.12); color: #c3c7d9">TAKEN</span></button></li><li><button aria-pressed="true" style="width: 100%; display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 2px solid #4fe3ff; background: rgba(43, 228, 255, 0.06); box-shadow: 0 0 18px rgba(43, 228, 255, 0.25)"><span class="port" style="width: 48px; height: 48px; border: 2px solid #7aa2ff; overflow: hidden; padding: 0"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true" style="display: block"><defs><radialGradient id="a2xb" cx="0.5" cy="0.45" r="0.75"><stop offset="0" stop-color="#1e2436"></stop><stop offset="1" stop-color="#05060a"></stop></radialGradient>
+<linearGradient id="a2xc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a3a52"></stop><stop offset="0.35" stop-color="#f4f4fa"></stop><stop offset="0.55" stop-color="#b8b8cc"></stop><stop offset="1" stop-color="#3a3a52"></stop></linearGradient>
+<filter id="a2xg" x="-30%" y="-200%" width="160%" height="500%"><feGaussianBlur stdDeviation="1.6"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#a2xb)"></rect>
+<path d="M17 55V27C17 14.5 23.5 8.5 32 8.5C40.5 8.5 47 14.5 47 27V55Z" fill="none" stroke="#ff2f92" stroke-width="3" opacity="0.5" filter="url(#a2xg)"></path>
+<path d="M17 55V27C17 14.5 23.5 8.5 32 8.5C40.5 8.5 47 14.5 47 27V55Z" fill="url(#a2xc)" stroke="#ff2f92" stroke-width="1.4"></path>
+<path d="M32 9V27" stroke="#ffffff" stroke-width="1" opacity="0.6"></path>
+<rect x="19.5" y="27" width="25" height="4" fill="#07060f"></rect>
+<rect x="21" y="28.3" width="22" height="1.4" fill="#2be4ff" filter="url(#a2xg)"></rect><rect x="21" y="28.6" width="22" height="0.8" fill="#a6f3ff"></rect>
+<rect x="30.5" y="31" width="3" height="13" fill="#07060f"></rect>
+<g fill="#07060f"><circle cx="39" cy="36" r="0.9"></circle><circle cx="42" cy="36" r="0.9"></circle><circle cx="39" cy="39" r="0.9"></circle><circle cx="42" cy="39" r="0.9"></circle><circle cx="39" cy="42" r="0.9"></circle><circle cx="42" cy="42" r="0.9"></circle></g>
+<g fill="#ffd23f"><circle cx="20" cy="51" r="1"></circle><circle cx="26" cy="52" r="1"></circle><circle cx="38" cy="52" r="1"></circle><circle cx="44" cy="51" r="1"></circle></g></svg></span><span style="flex: 1; min-width: 0; text-align: left"><span style="display: block; font-size: 17px; font-weight: 700">Borin Stoneguard</span><span style="display: block; font-size: 13px; color: #c3c7d9">Dwarf fighter 7</span></span><span style="width: 26px; height: 26px; background: #4fe3ff; color: #050508; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M4 10.5l4 4 8-9"></path></svg></span></button></li><li><button disabled="disabled" aria-disabled="true" style="width: 100%; display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(26, 29, 46, 0.62); opacity: 0.55; cursor: default"><span class="port" style="width: 48px; height: 48px; border: 2px solid rgba(255, 255, 255, 0.32); overflow: hidden; padding: 0"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true" style="display: block"><defs><radialGradient id="a3xb" cx="0.5" cy="0.55" r="0.75"><stop offset="0" stop-color="#14205a"></stop><stop offset="1" stop-color="#04040e"></stop></radialGradient>
+<radialGradient id="a3xm" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#fff7c2"></stop><stop offset="0.5" stop-color="#ffd23f"></stop><stop offset="1" stop-color="#ff8a1f"></stop></radialGradient>
+<filter id="a3xg" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#a3xb)"></rect>
+<g fill="#ffd23f" opacity="0.35"><path d="M32 36L61.7 32.1L61.7 39.9Z"></path><path d="M32 36L59.7 47.5L55.8 54.2Z"></path><path d="M32 36L50.2 59.8L43.5 63.7Z"></path><path d="M32 36L35.9 65.7L28.1 65.7Z"></path><path d="M32 36L20.5 63.7L13.8 59.8Z"></path><path d="M32 36L8.2 54.2L4.3 47.5Z"></path><path d="M32 36L2.3 39.9L2.3 32.1Z"></path><path d="M32 36L4.3 24.5L8.2 17.8Z"></path><path d="M32 36L13.8 12.2L20.5 8.3Z"></path><path d="M32 36L28.1 6.3L35.9 6.3Z"></path><path d="M32 36L43.5 8.3L50.2 12.2Z"></path><path d="M32 36L55.8 17.8L59.7 24.5Z"></path></g>
+<path d="M14 3Q22 18 29 23M50 3Q42 18 35 23" stroke="#ffd23f" stroke-width="1.6" stroke-dasharray="1.6 1.4" fill="none"></path>
+<circle cx="32" cy="36" r="14" fill="#ffd23f" filter="url(#a3xg)" opacity="0.6"></circle>
+<circle cx="32" cy="36" r="13" fill="url(#a3xm)" stroke="#fff7c2" stroke-width="1.2"></circle>
+<circle cx="32" cy="36" r="10" fill="none" stroke="#ff8a1f" stroke-width="0.8"></circle>
+<path d="M32 25L34 33.5 42.5 36 34 38.5 32 47 30 38.5 21.5 36 30 33.5Z" fill="#ffffff"></path><circle cx="32" cy="36" r="2.4" fill="#2be4ff"></circle>
+<circle cx="32" cy="22" r="2" fill="none" stroke="#ffd23f" stroke-width="1.4"></circle></svg></span><span style="flex: 1; min-width: 0; text-align: left"><span style="display: block; font-size: 17px; font-weight: 700">Mirena Dawnbright</span><span style="display: block; font-size: 13px; color: #c3c7d9">Human cleric 7</span></span><span class="tag" style="background: rgba(255, 255, 255, 0.12); color: #c3c7d9">TAKEN</span></button></li></ul>
+<button class="btn" style="align-self: flex-start"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><circle cx="8" cy="7" r="3.5"></circle><path d="M2 17c0-3.3 2.7-5 6-5s6 1.7 6 5M15.5 5v5M13 7.5h5"></path></svg>Make a new character</button>
+</div>
+<div style="padding: 10px 16px 6px; flex: none; display: flex; flex-direction: column; gap: 4px">
+<button class="btn-primary" style="width: 100%">PLAY AS BORIN</button>
+<p style="font-size: 13px; color: #c3c7d9; display: flex; align-items: center; justify-content: center; gap: 4px">Running this game?<button class="linkbtn">Sign in as the GM</button></p>
+</div>
+<div class="scan"></div>
+</div>
+</body>
+</html>

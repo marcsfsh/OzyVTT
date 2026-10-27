@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Bard avatar"><title>Bard avatar</title><defs><radialGradient id="oz-class-bard-b" cx="0.5" cy="0.5" r="0.75"><stop offset="0" stop-color="#3b0a5e"></stop><stop offset="1" stop-color="#0a0418"></stop></radialGradient>
+<linearGradient id="oz-class-bard-w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8cc0"></stop><stop offset="1" stop-color="#c0157a"></stop></linearGradient></defs>
+<rect width="64" height="64" fill="url(#oz-class-bard-b)"></rect>
+<g transform="translate(13 20)" fill="#2be4ff"><ellipse cx="0" cy="0" rx="2.4" ry="1.8" transform="rotate(-20)"></ellipse><rect x="1.6" y="-9" width="1" height="9"></rect><path d="M2.6 -9c2 1 3 2.5 2.5 4.5-.6-1.4-1.4-2.2-2.5-2.5z"></path></g><g transform="translate(19 13)" fill="#2be4ff"><ellipse cx="0" cy="0" rx="2.4" ry="1.8" transform="rotate(-20)"></ellipse><rect x="1.6" y="-9" width="1" height="9"></rect><path d="M2.6 -9c2 1 3 2.5 2.5 4.5-.6-1.4-1.4-2.2-2.5-2.5z"></path></g>
+<g transform="translate(34 36) rotate(35)">
+<rect x="-2.6" y="-30" width="5.2" height="24" fill="#3b1170"></rect>
+<path d="M-3 -30L-1.5 -37H3.5L3 -30Z" fill="#5c2a8a"></path>
+<path d="M0 -8C-9 -8 -14 -1 -14 7C-14 15 -8 20 0 20C8 20 14 15 14 7C14 -1 9 -8 0 -8Z" fill="url(#oz-class-bard-w)" stroke="#ffe14d" stroke-width="1.2"></path>
+<circle cx="0" cy="4" r="4" fill="#1a0638" stroke="#ffe14d" stroke-width="0.8"></circle>
+<rect x="-5" y="13" width="10" height="2" fill="#3b1170"></rect>
+<path d="M-1.6 -36V14M0 -36V14M1.6 -36V14" stroke="#a6f3ff" stroke-width="0.5"></path>
+</g></svg>

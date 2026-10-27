@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Paladin avatar"><title>Paladin avatar</title><defs><radialGradient id="oz-class-paladin-b" cx="0.5" cy="0.5" r="0.75"><stop offset="0" stop-color="#0a1440"></stop><stop offset="1" stop-color="#03040c"></stop></radialGradient>
+<linearGradient id="oz-class-paladin-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7aa2ff"></stop><stop offset="1" stop-color="#23307a"></stop></linearGradient>
+<linearGradient id="oz-class-paladin-c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9fdcff"></stop><stop offset="0.5" stop-color="#ffffff"></stop><stop offset="1" stop-color="#8e8ea6"></stop></linearGradient>
+<filter id="oz-class-paladin-g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#oz-class-paladin-b)"></rect>
+<path d="M32 3L35 8V14H29V8Z" fill="url(#oz-class-paladin-c)"></path>
+<rect x="22" y="53" width="20" height="3" fill="#ffd23f"></rect><rect x="30.5" y="56" width="3" height="5" fill="#3b1170"></rect><circle cx="32" cy="62" r="1.8" fill="#ffd23f"></circle>
+<path d="M16 14H48V30C48 42 40.5 50 32 54C23.5 50 16 42 16 30Z" fill="url(#oz-class-paladin-s)" stroke="url(#oz-class-paladin-c)" stroke-width="2.2"></path>
+<path d="M19 17H45V30C45 40 39 47 32 50.5" fill="none" stroke="#ffffff" stroke-width="0.8" opacity="0.35"></path>
+<path d="M32 20L34.2 28 42 30.5 34.2 33 32 41 29.8 33 22 30.5 29.8 28Z" fill="#ffd23f" filter="url(#oz-class-paladin-g)" opacity="0.8"></path><path d="M32 20L34.2 28 42 30.5 34.2 33 32 41 29.8 33 22 30.5 29.8 28Z" fill="#fff2a8" stroke="#ff8a1f" stroke-width="0.8"></path></svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Horns avatar"><title>Horns avatar</title><defs><radialGradient id="oz-horns-b" cx="0.5" cy="0.6" r="0.75"><stop offset="0" stop-color="#2e0b0b"></stop><stop offset="1" stop-color="#07030a"></stop></radialGradient>
+<linearGradient id="oz-horns-h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe14d"></stop><stop offset="0.35" stop-color="#ff8a1f"></stop><stop offset="1" stop-color="#ff4b3e"></stop></linearGradient>
+<filter id="oz-horns-g" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#oz-horns-b)"></rect><path d="M0 52.7H64M0 53.9H64M0 55.8H64M0 58.7H64M0 64.0H64M32 52L-64 64M32 52L-48 64M32 52L-32 64M32 52L-16 64M32 52L0 64M32 52L16 64M32 52L32 64M32 52L48 64M32 52L64 64M32 52L80 64M32 52L96 64M32 52L112 64M32 52L128 64" stroke="#ff4b3e" stroke-width="0.7" opacity="0.45" fill="none"></path>
+<path d="M27.5 42C18 40 9.5 30 12 11C15.5 23 21.5 29.5 30.5 33.5ZM36.5 42C46 40 54.5 30 52 11C48.5 23 42.5 29.5 33.5 33.5Z" fill="#ff4b3e" filter="url(#oz-horns-g)" opacity="0.6"></path>
+<path d="M27.5 42C18 40 9.5 30 12 11C15.5 23 21.5 29.5 30.5 33.5ZM36.5 42C46 40 54.5 30 52 11C48.5 23 42.5 29.5 33.5 33.5Z" fill="url(#oz-horns-h)" stroke="#2a0606" stroke-width="1"></path>
+<path d="M14 18c3 1 5 0 6-1M15.5 25c3 0 5-1 6-3M50 18c-3 1-5 0-6-1M48.5 25c-3 0-5-1-6-3" stroke="#5a1020" stroke-width="1.2" fill="none"></path>
+<path d="M24 46l6 2-6 1zM40 46l-6 2 6 1z" fill="#ffd23f"></path></svg>

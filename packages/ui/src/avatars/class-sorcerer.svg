@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Sorcerer avatar"><title>Sorcerer avatar</title><defs><radialGradient id="oz-class-sorcerer-gl" cx="0.5" cy="0.45" r="0.55"><stop offset="0" stop-color="#5a1a8a"></stop><stop offset="1" stop-color="#0d0420"></stop></radialGradient>
+<filter id="oz-class-sorcerer-g" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6"></feGaussianBlur></filter>
+<linearGradient id="oz-class-sorcerer-c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a3a52"></stop><stop offset="0.5" stop-color="#b8b8cc"></stop><stop offset="1" stop-color="#26263a"></stop></linearGradient></defs>
+<rect width="64" height="64" fill="#05020c"></rect>
+<circle cx="32" cy="28" r="22" fill="#b07cff" opacity="0.18" filter="url(#oz-class-sorcerer-g)"></circle>
+<circle cx="32" cy="28" r="20" fill="url(#oz-class-sorcerer-gl)" stroke="#d4b8ff" stroke-width="1.2"></circle>
+<g fill="none" stroke="#ff2f92" stroke-width="2.6" filter="url(#oz-class-sorcerer-g)" opacity="0.9"><path d="M32 28L26 22 27 17 21 12"></path><path d="M32 28L39 23 37 17 43 11"></path><path d="M32 28L22 29 18 25 13 28"></path><path d="M32 28L42 31 46 27 51 30"></path><path d="M32 28L28 36 23 38 19 44"></path><path d="M32 28L37 36 41 38 44 44"></path></g>
+<g fill="none" stroke="#ffd6ea" stroke-width="1" stroke-linejoin="round"><path d="M32 28L26 22 27 17 21 12"></path><path d="M32 28L39 23 37 17 43 11"></path><path d="M32 28L22 29 18 25 13 28"></path><path d="M32 28L42 31 46 27 51 30"></path><path d="M32 28L28 36 23 38 19 44"></path><path d="M32 28L37 36 41 38 44 44"></path></g>
+<g fill="#ff8cc0"><circle cx="21" cy="12" r="1.6"></circle><circle cx="43" cy="11" r="1.6"></circle><circle cx="13" cy="28" r="1.6"></circle><circle cx="51" cy="30" r="1.6"></circle><circle cx="19" cy="44" r="1.4"></circle><circle cx="44" cy="44" r="1.4"></circle></g>
+<circle cx="32" cy="28" r="4" fill="#ffd6ea"></circle>
+<path d="M18 16A18 18 0 0 1 28 10" stroke="#ffffff" stroke-width="1.4" fill="none" opacity="0.6"></path>
+<path d="M22 47H42L46 57H18Z" fill="url(#oz-class-sorcerer-c)"></path><rect x="16" y="56" width="32" height="3" fill="#2be4ff"></rect></svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Orbit avatar"><title>Orbit avatar</title><defs><linearGradient id="oz-orbit-pl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b07cff"></stop><stop offset="1" stop-color="#ff2f92"></stop></linearGradient>
+<clipPath id="oz-orbit-k"><circle cx="32" cy="33" r="14"></circle></clipPath></defs>
+<rect width="64" height="64" fill="#06040f"></rect>
+<circle cx="10" cy="10" r="0.8" fill="#fff"></circle><circle cx="52" cy="9" r="0.7" fill="#fff"></circle><circle cx="56" cy="50" r="0.8" fill="#fff" opacity="0.8"></circle><circle cx="8" cy="52" r="0.6" fill="#fff" opacity="0.7"></circle><circle cx="20" cy="18" r="0.5" fill="#fff" opacity="0.6"></circle>
+<ellipse cx="32" cy="33" rx="25" ry="7" transform="rotate(-18 32 33)" fill="none" stroke="#2be4ff" stroke-width="2.2" opacity="0.6"></ellipse>
+<circle cx="32" cy="33" r="14" fill="url(#oz-orbit-pl)"></circle>
+<g clip-path="url(#oz-orbit-k)" fill="#3b1170" opacity="0.55"><rect x="16" y="28" width="32" height="2"></rect><rect x="16" y="33" width="32" height="3"></rect><rect x="16" y="39" width="32" height="2"></rect></g>
+<path d="M8.2 41.6A25 7 -18 0 0 55.8 24.4" transform="rotate(0)" fill="none" stroke="#2be4ff" stroke-width="2.2"></path></svg>

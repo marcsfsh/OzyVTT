@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Cleric avatar"><title>Cleric avatar</title><defs><radialGradient id="oz-class-cleric-b" cx="0.5" cy="0.55" r="0.75"><stop offset="0" stop-color="#14205a"></stop><stop offset="1" stop-color="#04040e"></stop></radialGradient>
+<radialGradient id="oz-class-cleric-m" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#fff7c2"></stop><stop offset="0.5" stop-color="#ffd23f"></stop><stop offset="1" stop-color="#ff8a1f"></stop></radialGradient>
+<filter id="oz-class-cleric-g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#oz-class-cleric-b)"></rect>
+<g fill="#ffd23f" opacity="0.35"><path d="M32 36L61.7 32.1L61.7 39.9Z"></path><path d="M32 36L59.7 47.5L55.8 54.2Z"></path><path d="M32 36L50.2 59.8L43.5 63.7Z"></path><path d="M32 36L35.9 65.7L28.1 65.7Z"></path><path d="M32 36L20.5 63.7L13.8 59.8Z"></path><path d="M32 36L8.2 54.2L4.3 47.5Z"></path><path d="M32 36L2.3 39.9L2.3 32.1Z"></path><path d="M32 36L4.3 24.5L8.2 17.8Z"></path><path d="M32 36L13.8 12.2L20.5 8.3Z"></path><path d="M32 36L28.1 6.3L35.9 6.3Z"></path><path d="M32 36L43.5 8.3L50.2 12.2Z"></path><path d="M32 36L55.8 17.8L59.7 24.5Z"></path></g>
+<path d="M14 3Q22 18 29 23M50 3Q42 18 35 23" stroke="#ffd23f" stroke-width="1.6" stroke-dasharray="1.6 1.4" fill="none"></path>
+<circle cx="32" cy="36" r="14" fill="#ffd23f" filter="url(#oz-class-cleric-g)" opacity="0.6"></circle>
+<circle cx="32" cy="36" r="13" fill="url(#oz-class-cleric-m)" stroke="#fff7c2" stroke-width="1.2"></circle>
+<circle cx="32" cy="36" r="10" fill="none" stroke="#ff8a1f" stroke-width="0.8"></circle>
+<path d="M32 25L34 33.5 42.5 36 34 38.5 32 47 30 38.5 21.5 36 30 33.5Z" fill="#ffffff"></path><circle cx="32" cy="36" r="2.4" fill="#2be4ff"></circle>
+<circle cx="32" cy="22" r="2" fill="none" stroke="#ffd23f" stroke-width="1.4"></circle></svg>

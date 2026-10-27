@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Player, a reaction to decide, Dusk</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&amp;family=Bungee&amp;family=VT323&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:rgba(10, 12, 22, 0.55)}
+.oz{font-family:'Bai Jamjuree',system-ui,sans-serif;color:#eef0f8}
+.oz button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.oz button:focus-visible{outline:2px solid #4fe3ff;outline-offset:2px}
+.oz .vt{font-family:'VT323',ui-monospace,monospace;letter-spacing:.04em}
+.oz .lbl{margin:0;font-size:12px;font-weight:600;color:#b0b4ca;letter-spacing:.02em}
+.oz .lamp{display:flex;align-items:center;gap:5px;padding:6px 5px;background:rgba(44, 48, 72, 0.5);border:1px solid rgba(255, 255, 255, 0.12);white-space:nowrap}
+.oz .off{width:14px;height:14px;flex:none;background:rgba(255, 255, 255, 0.07);box-shadow:inset 0 0 0 1px rgba(255, 255, 255, 0.2)}
+.oz .readout{display:flex;flex-direction:column;align-items:center;padding:6px 4px;background:rgba(10, 12, 22, 0.55);border:1px solid rgba(255, 255, 255, 0.2)}
+.oz .navtab{flex:1;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:#c3c7d9}
+.oz .navtab[aria-current="page"]{color:#6fe8ff;text-shadow:0 0 10px rgba(43, 228, 255, .7);box-shadow:inset 0 2px 0 #4fe3ff}
+.oz .scan{position:absolute;inset:0;pointer-events:none;z-index:40;background:repeating-linear-gradient(180deg,rgba(0, 0, 0, .2) 0 1px,transparent 1px 3px)}
+
+.oz .scan{opacity:.25 !important}
+.oz header,.oz aside,.oz nav,.oz main,.oz section:not(.oz-map):not([aria-label="Battle map"]){-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15)}
+body{background:#151a2d}</style>
+</head>
+<body>
+<div class="oz" style="position: relative; width: 390px; height: 844px; display: flex; flex-direction: column; background: radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%), linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%); overflow: hidden">
+
+<header style="position: relative; padding: 12px 16px 12px; background: rgba(18, 20, 34, 0.7)">
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="width: 44px; height: 44px; box-sizing: border-box; border: 2px solid #7aa2ff; background: rgba(26, 29, 46, 0.85); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex: none; overflow: hidden; padding: 0"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true" style="display: block"><defs><radialGradient id="a27xb" cx="0.5" cy="0.5" r="0.75"><stop offset="0" stop-color="#14205a"></stop><stop offset="1" stop-color="#05040f"></stop></radialGradient>
+<linearGradient id="a27xh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5c8dff"></stop><stop offset="1" stop-color="#2a0a52"></stop></linearGradient>
+<mask id="a27xm"><rect width="64" height="64" fill="#fff"></rect><circle cx="33.5" cy="20" r="3.4" fill="#000"></circle></mask></defs>
+<rect width="64" height="64" fill="url(#a27xb)"></rect>
+<circle cx="10" cy="14" r="0.8" fill="#fff"></circle><circle cx="54" cy="20" r="0.7" fill="#fff"></circle><circle cx="50" cy="8" r="0.6" fill="#fff" opacity="0.7"></circle><circle cx="12" cy="36" r="0.6" fill="#fff" opacity="0.7"></circle>
+<path d="M38 6C34 10 29 22 21 45H45C41 32 39 18 38 6Z" fill="url(#a27xh)" stroke="#2be4ff" stroke-width="1.5" stroke-linejoin="round"></path>
+<circle cx="32" cy="21" r="3.6" fill="#ffe14d" mask="url(#a27xm)"></circle>
+<path d="M28 29.8l0.90 2.30 2.30 0.90-2.30 0.90L28 36.2l-0.90-2.30-2.30-0.90 2.30-0.90z" fill="#ffe14d"></path><path d="M37 25.8l0.62 1.58 1.58 0.62-1.58 0.62L37 30.2l-0.62-1.58-1.58-0.62 1.58-0.62z" fill="#ffe14d"></path><path d="M35 36.2l0.50 1.30 1.30 0.50-1.30 0.50L35 39.8l-0.50-1.30-1.30-0.50 1.30-0.50z" fill="#ffe14d"></path>
+<path d="M22 41.5H44.5" stroke="#ff2f92" stroke-width="3"></path>
+<ellipse cx="33" cy="46" rx="24" ry="5.5" fill="#1a0638" stroke="#2be4ff" stroke-width="1.5"></ellipse>
+<ellipse cx="33" cy="45" rx="12" ry="1.8" fill="#0b0414"></ellipse></svg></span>
+<div style="flex: 1; min-width: 0">
+<div style="font-size: 17px; font-weight: 700; line-height: 1.2">Lyra Emberwise</div>
+<div style="font-size: 13px; color: #c3c7d9">Elf wizard 7</div>
+</div>
+<div style="width: 48px; height: 48px; border: 1px solid rgba(255, 255, 255, 0.2); display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none"><span class="vt" style="font-size: 26px; line-height: 0.9">15</span><span style="font-size: 10px; font-weight: 600; color: #c3c7d9">AC</span></div>
+<button aria-label="Hit points 38 of 44. Change hit points" style="width: 80px; height: 48px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(44, 48, 72, 0.5); display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none"><span class="vt" style="font-size: 26px; line-height: 0.9">38<span style="color: #b0b4ca">/44</span></span><span style="font-size: 10px; font-weight: 600; color: #c3c7d9">HP</span></button>
+</div>
+<div role="img" aria-label="38 of 44 hit points" style="margin-top: 10px; display: grid; grid-template-columns: repeat(22, minmax(0, 1fr)); gap: 2px; height: 12px; padding: 2px; background: rgba(10, 12, 22, 0.55); border: 1px solid rgba(255, 255, 255, 0.2)">
+<span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: rgba(120, 30, 50, 0.6)"></span><span style="background: rgba(120, 30, 50, 0.6)"></span><span style="background: rgba(120, 30, 50, 0.6)"></span>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, #4fe3ff 0%, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d 100%); box-shadow: 0 0 12px rgba(255, 47, 146, 0.6)"></div></header>
+
+<section aria-label="Whose turn it is" style="padding: 10px 16px; background: rgba(26, 29, 46, 0.62); border-bottom: 1px solid rgba(255, 255, 255, 0.12); display: flex; align-items: center; gap: 10px">
+<span style="width: 36px; height: 36px; padding: 3px; box-sizing: border-box; background: linear-gradient(180deg, #ffe14d 0%, #ff8a1f 50%, #ff2f92 100%); box-shadow: 0 0 14px rgba(255, 110, 60, 0.55); flex: none"><svg viewBox="0 0 64 64" width="30" height="30" aria-hidden="true" style="display: block"><defs><linearGradient id="a28xs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a0638"></stop><stop offset="1" stop-color="#c01a7c"></stop></linearGradient>
+<linearGradient id="a28xu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe14d"></stop><stop offset="0.55" stop-color="#ff8a1f"></stop><stop offset="1" stop-color="#ff2f92"></stop></linearGradient>
+<mask id="a28xm"><rect width="64" height="40" fill="#fff"></rect><rect y="28" width="64" height="1.6" fill="#000"></rect><rect y="32" width="64" height="2.2" fill="#000"></rect><rect y="36" width="64" height="2.8" fill="#000"></rect></mask></defs>
+<rect width="64" height="40" fill="url(#a28xs)"></rect><circle cx="32" cy="40" r="19" fill="url(#a28xu)" mask="url(#a28xm)"></circle>
+<rect y="40" width="64" height="24" fill="#07020f"></rect><path d="M0 41.4H64M0 43.8H64M0 47.7H64M0 53.4H64M0 64.0H64M32 40L-64 64M32 40L-48 64M32 40L-32 64M32 40L-16 64M32 40L0 64M32 40L16 64M32 40L32 64M32 40L48 64M32 40L64 64M32 40L80 64M32 40L96 64M32 40L112 64M32 40L128 64" stroke="#ff2f92" stroke-width="0.7" opacity="0.85" fill="none"></path></svg></span>
+<div style="flex: 1; min-width: 0">
+<div style="font-size: 16px; font-weight: 600">Goblin Boss is acting</div>
+<div style="font-size: 13px; color: #c3c7d9">Your next turn is in round 4</div>
+</div>
+<div class="vt" style="line-height: 0.95; text-align: right; text-shadow: 0 0 6px rgba(255, 255, 255, 0.45)">
+<div style="font-size: 15px; display: flex; align-items: center; justify-content: flex-end; gap: 5px">PLAY<svg width="8" height="9" viewBox="0 0 12 14" aria-hidden="true"><path d="M1 1l10 6-10 6z" fill="#eef0f8"></path></svg></div>
+<div style="font-size: 24px">RND 03</div>
+</div>
+</section>
+
+<div style="padding: 10px 16px 0">
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+<div class="lamp"><span class="off"></span><span style="display: flex; flex-direction: column"><span style="font-size: 10px; font-weight: 600; color: #b0b4ca">Action</span><span class="vt" style="font-size: 17px; line-height: 1; color: #b0b4ca">--</span></span></div>
+<div class="lamp"><span class="off"></span><span style="display: flex; flex-direction: column"><span style="font-size: 10px; font-weight: 600; color: #b0b4ca">Bonus</span><span class="vt" style="font-size: 17px; line-height: 1; color: #b0b4ca">--</span></span></div>
+<div class="lamp" style="border-color: #4fe3ff"><span style="width: 14px; height: 14px; flex: none; background: #4fe3ff; box-shadow: 0 0 9px rgba(43, 228, 255, 0.85)"></span><span style="display: flex; flex-direction: column"><span style="font-size: 10px; font-weight: 600; color: #c3c7d9">Reaction</span><span class="vt" style="font-size: 17px; line-height: 1">READY</span></span></div>
+<div class="lamp"><span class="off"></span><span style="display: flex; flex-direction: column"><span style="font-size: 10px; font-weight: 600; color: #b0b4ca">Move</span><span class="vt" style="font-size: 17px; line-height: 1; color: #b0b4ca">--</span></span></div>
+</div>
+</div>
+
+<div style="flex: 1; min-height: 0; overflow: hidden; padding: 12px 16px 0; display: flex; flex-direction: column; gap: 16px">
+<section aria-label="Decide your reaction" style="padding: 14px; background: rgba(26, 29, 46, 0.62); border: 2px solid #4fe3ff; box-shadow: 0 0 22px rgba(43, 228, 255, 0.25), inset 0 0 18px rgba(43, 228, 255, 0.08); display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h1 style="margin: 0; font-family: 'Bungee', system-ui, sans-serif; font-weight: 400; font-size: 24px; line-height: 1.1; text-shadow: -1.5px 0 rgba(43, 228, 255, 0.7), 1.5px 0 rgba(255, 47, 146, 0.7)">YOU'RE HIT</h1>
+<span class="vt" style="font-size: 17px; color: #050508; background: #4fe3ff; padding: 0 6px; line-height: 1.3">REACTION</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+<div class="readout"><span class="vt" style="font-size: 34px; line-height: 0.9; color: #ff9d94">18</span><span style="font-size: 11px; font-weight: 600; color: #c3c7d9">Their roll</span></div>
+<div class="readout"><span class="vt" style="font-size: 34px; line-height: 0.9">15</span><span style="font-size: 11px; font-weight: 600; color: #c3c7d9">Your AC</span></div>
+<div class="readout" style="border-color: #4fe3ff"><span class="vt" style="font-size: 34px; line-height: 0.9; color: #6fe8ff">20</span><span style="font-size: 11px; font-weight: 600; color: #c3c7d9">With Shield</span></div>
+</div>
+<p style="margin: 0; font-size: 14px; line-height: 1.45; color: #dfe2ee">Cast Shield and the Goblin Boss's Shortbow misses. Your AC stays 20 until the start of your next turn.</p>
+<p style="margin: 0; font-size: 13px; color: #b0b4ca">Uses your reaction and a level 1 slot. You have 4.</p>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 2px; padding-bottom: 5px">
+<button style="height: 52px; background: #ff2f92; color: #12020a; font-family: 'Bungee', system-ui, sans-serif; font-size: 15px; letter-spacing: 0.04em; box-shadow: 0 5px 0 #8a0f4d, 0 0 22px rgba(255, 47, 146, 0.45)">CAST SHIELD</button>
+<button style="height: 52px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(44, 48, 72, 0.5); font-size: 15px; font-weight: 600">Take the hit</button>
+</div>
+</section>
+
+<section aria-label="Map">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h2 class="lbl">Map</h2>
+<button style="min-height: 44px; font-size: 14px; font-weight: 600; color: #6fe8ff">Open map</button>
+</div>
+<svg viewBox="150 330 560 300" width="358" height="192" role="img" aria-label="The Goblin Boss shooting at Lyra from 35 feet, with Borin between them." style="display: block; border: 1px solid #262636; background: #141312">
+<defs>
+<pattern id="wGrid" width="56" height="56" patternUnits="userSpaceOnUse"><path d="M56 0H0V56" fill="none" stroke="rgba(43,228,255,0.24)" stroke-width="1"></path></pattern>
+<pattern id="wStone" width="28" height="28" patternUnits="userSpaceOnUse"><rect width="28" height="28" fill="#4b463e"></rect><path d="M0 14h28M14 0v14M7 14v14M21 14v14" stroke="#423d36" stroke-width="1"></path></pattern>
+<linearGradient id="wSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe14d"></stop><stop offset="0.5" stop-color="#ff8a1f"></stop><stop offset="1" stop-color="#ff2f92"></stop></linearGradient>
+</defs>
+<rect x="150" y="330" width="560" height="300" fill="#141312"></rect>
+<rect x="56" y="168" width="392" height="504" fill="url(#wStone)"></rect>
+<rect x="448" y="392" width="168" height="112" fill="url(#wStone)"></rect>
+<rect x="616" y="112" width="336" height="560" fill="url(#wStone)"></rect>
+<rect x="56" y="168" width="392" height="504" fill="url(#wGrid)"></rect>
+<rect x="448" y="392" width="168" height="112" fill="url(#wGrid)"></rect>
+<rect x="616" y="112" width="336" height="560" fill="url(#wGrid)"></rect>
+<path d="M448 392V168H56V672H448V504M448 392H616M448 504H616M616 392V112H952V672H616V504" fill="none" stroke="#1c1a17" stroke-width="12"></path>
+<path d="M448 392V168H56V672H448V504M448 392H616M448 504H616M616 392V112H952V672H616V504" fill="none" stroke="#6e675c" stroke-width="2"></path>
+<line x1="644" y1="420" x2="252" y2="476" stroke="#2be4ff" stroke-width="2.5" stroke-dasharray="10 6"></line>
+<g transform="translate(252 476)" stroke="#2be4ff" stroke-width="3" fill="none"><circle r="33"></circle><path d="M0 -42V-28M0 28V42M-42 0H-28M28 0H42"></path></g>
+<g transform="translate(252 476)"><clipPath id="tk29"><circle r="23"></circle></clipPath><g clip-path="url(#tk29)"><svg x="-23" y="-23" width="46" height="46" viewBox="0 0 64 64"><defs><radialGradient id="a30xb" cx="0.5" cy="0.5" r="0.75"><stop offset="0" stop-color="#14205a"></stop><stop offset="1" stop-color="#05040f"></stop></radialGradient>
+<linearGradient id="a30xh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5c8dff"></stop><stop offset="1" stop-color="#2a0a52"></stop></linearGradient>
+<mask id="a30xm"><rect width="64" height="64" fill="#fff"></rect><circle cx="33.5" cy="20" r="3.4" fill="#000"></circle></mask></defs>
+<rect width="64" height="64" fill="url(#a30xb)"></rect>
+<circle cx="10" cy="14" r="0.8" fill="#fff"></circle><circle cx="54" cy="20" r="0.7" fill="#fff"></circle><circle cx="50" cy="8" r="0.6" fill="#fff" opacity="0.7"></circle><circle cx="12" cy="36" r="0.6" fill="#fff" opacity="0.7"></circle>
+<path d="M38 6C34 10 29 22 21 45H45C41 32 39 18 38 6Z" fill="url(#a30xh)" stroke="#2be4ff" stroke-width="1.5" stroke-linejoin="round"></path>
+<circle cx="32" cy="21" r="3.6" fill="#ffe14d" mask="url(#a30xm)"></circle>
+<path d="M28 29.8l0.90 2.30 2.30 0.90-2.30 0.90L28 36.2l-0.90-2.30-2.30-0.90 2.30-0.90z" fill="#ffe14d"></path><path d="M37 25.8l0.62 1.58 1.58 0.62-1.58 0.62L37 30.2l-0.62-1.58-1.58-0.62 1.58-0.62z" fill="#ffe14d"></path><path d="M35 36.2l0.50 1.30 1.30 0.50-1.30 0.50L35 39.8l-0.50-1.30-1.30-0.50 1.30-0.50z" fill="#ffe14d"></path>
+<path d="M22 41.5H44.5" stroke="#ff2f92" stroke-width="3"></path>
+<ellipse cx="33" cy="46" rx="24" ry="5.5" fill="#1a0638" stroke="#2be4ff" stroke-width="1.5"></ellipse>
+<ellipse cx="33" cy="45" rx="12" ry="1.8" fill="#0b0414"></ellipse></svg></g><circle r="23" fill="none" stroke="#5c8dff" stroke-width="3"></circle></g>
+<g transform="translate(532 476)"><clipPath id="tk31"><circle r="23"></circle></clipPath><g clip-path="url(#tk31)"><svg x="-23" y="-23" width="46" height="46" viewBox="0 0 64 64"><defs><radialGradient id="a32xb" cx="0.5" cy="0.45" r="0.75"><stop offset="0" stop-color="#1e2436"></stop><stop offset="1" stop-color="#05060a"></stop></radialGradient>
+<linearGradient id="a32xc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a3a52"></stop><stop offset="0.35" stop-color="#f4f4fa"></stop><stop offset="0.55" stop-color="#b8b8cc"></stop><stop offset="1" stop-color="#3a3a52"></stop></linearGradient>
+<filter id="a32xg" x="-30%" y="-200%" width="160%" height="500%"><feGaussianBlur stdDeviation="1.6"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#a32xb)"></rect>
+<path d="M17 55V27C17 14.5 23.5 8.5 32 8.5C40.5 8.5 47 14.5 47 27V55Z" fill="none" stroke="#ff2f92" stroke-width="3" opacity="0.5" filter="url(#a32xg)"></path>
+<path d="M17 55V27C17 14.5 23.5 8.5 32 8.5C40.5 8.5 47 14.5 47 27V55Z" fill="url(#a32xc)" stroke="#ff2f92" stroke-width="1.4"></path>
+<path d="M32 9V27" stroke="#ffffff" stroke-width="1" opacity="0.6"></path>
+<rect x="19.5" y="27" width="25" height="4" fill="#07060f"></rect>
+<rect x="21" y="28.3" width="22" height="1.4" fill="#2be4ff" filter="url(#a32xg)"></rect><rect x="21" y="28.6" width="22" height="0.8" fill="#a6f3ff"></rect>
+<rect x="30.5" y="31" width="3" height="13" fill="#07060f"></rect>
+<g fill="#07060f"><circle cx="39" cy="36" r="0.9"></circle><circle cx="42" cy="36" r="0.9"></circle><circle cx="39" cy="39" r="0.9"></circle><circle cx="42" cy="39" r="0.9"></circle><circle cx="39" cy="42" r="0.9"></circle><circle cx="42" cy="42" r="0.9"></circle></g>
+<g fill="#ffd23f"><circle cx="20" cy="51" r="1"></circle><circle cx="26" cy="52" r="1"></circle><circle cx="38" cy="52" r="1"></circle><circle cx="44" cy="51" r="1"></circle></g></svg></g><circle r="23" fill="none" stroke="#5c8dff" stroke-width="3"></circle></g>
+<g transform="translate(196 588)"><clipPath id="tk33"><circle r="23"></circle></clipPath><g clip-path="url(#tk33)"><svg x="-23" y="-23" width="46" height="46" viewBox="0 0 64 64"><defs><radialGradient id="a34xb" cx="0.5" cy="0.55" r="0.75"><stop offset="0" stop-color="#14205a"></stop><stop offset="1" stop-color="#04040e"></stop></radialGradient>
+<radialGradient id="a34xm" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#fff7c2"></stop><stop offset="0.5" stop-color="#ffd23f"></stop><stop offset="1" stop-color="#ff8a1f"></stop></radialGradient>
+<filter id="a34xg" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#a34xb)"></rect>
+<g fill="#ffd23f" opacity="0.35"><path d="M32 36L61.7 32.1L61.7 39.9Z"></path><path d="M32 36L59.7 47.5L55.8 54.2Z"></path><path d="M32 36L50.2 59.8L43.5 63.7Z"></path><path d="M32 36L35.9 65.7L28.1 65.7Z"></path><path d="M32 36L20.5 63.7L13.8 59.8Z"></path><path d="M32 36L8.2 54.2L4.3 47.5Z"></path><path d="M32 36L2.3 39.9L2.3 32.1Z"></path><path d="M32 36L4.3 24.5L8.2 17.8Z"></path><path d="M32 36L13.8 12.2L20.5 8.3Z"></path><path d="M32 36L28.1 6.3L35.9 6.3Z"></path><path d="M32 36L43.5 8.3L50.2 12.2Z"></path><path d="M32 36L55.8 17.8L59.7 24.5Z"></path></g>
+<path d="M14 3Q22 18 29 23M50 3Q42 18 35 23" stroke="#ffd23f" stroke-width="1.6" stroke-dasharray="1.6 1.4" fill="none"></path>
+<circle cx="32" cy="36" r="14" fill="#ffd23f" filter="url(#a34xg)" opacity="0.6"></circle>
+<circle cx="32" cy="36" r="13" fill="url(#a34xm)" stroke="#fff7c2" stroke-width="1.2"></circle>
+<circle cx="32" cy="36" r="10" fill="none" stroke="#ff8a1f" stroke-width="0.8"></circle>
+<path d="M32 25L34 33.5 42.5 36 34 38.5 32 47 30 38.5 21.5 36 30 33.5Z" fill="#ffffff"></path><circle cx="32" cy="36" r="2.4" fill="#2be4ff"></circle>
+<circle cx="32" cy="22" r="2" fill="none" stroke="#ffd23f" stroke-width="1.4"></circle></svg></g><circle r="23" fill="none" stroke="#5c8dff" stroke-width="3"></circle></g>
+<g transform="translate(644 420)"><clipPath id="tk35"><circle r="23"></circle></clipPath><g clip-path="url(#tk35)"><svg x="-23" y="-23" width="46" height="46" viewBox="0 0 64 64"><defs><linearGradient id="a36xs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a0638"></stop><stop offset="1" stop-color="#c01a7c"></stop></linearGradient>
+<linearGradient id="a36xu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe14d"></stop><stop offset="0.55" stop-color="#ff8a1f"></stop><stop offset="1" stop-color="#ff2f92"></stop></linearGradient>
+<mask id="a36xm"><rect width="64" height="40" fill="#fff"></rect><rect y="28" width="64" height="1.6" fill="#000"></rect><rect y="32" width="64" height="2.2" fill="#000"></rect><rect y="36" width="64" height="2.8" fill="#000"></rect></mask></defs>
+<rect width="64" height="40" fill="url(#a36xs)"></rect><circle cx="32" cy="40" r="19" fill="url(#a36xu)" mask="url(#a36xm)"></circle>
+<rect y="40" width="64" height="24" fill="#07020f"></rect><path d="M0 41.4H64M0 43.8H64M0 47.7H64M0 53.4H64M0 64.0H64M32 40L-64 64M32 40L-48 64M32 40L-32 64M32 40L-16 64M32 40L0 64M32 40L16 64M32 40L32 64M32 40L48 64M32 40L64 64M32 40L80 64M32 40L96 64M32 40L112 64M32 40L128 64" stroke="#ff2f92" stroke-width="0.7" opacity="0.85" fill="none"></path></svg></g><circle r="23" fill="none" stroke="url(#wSun)" stroke-width="4"></circle></g>
+</svg>
+</section>
+</div>
+
+<nav aria-label="Player views" style="display: flex; flex: none; background: rgba(18, 20, 34, 0.7); border-top: 1px solid rgba(255, 255, 255, 0.12)"><button class="navtab" aria-current="page"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M2.5 5l5-2 5 2 5-2v12l-5 2-5-2-5 2z"></path><path d="M7.5 3v12M12.5 5v12"></path></svg>Table</button><button class="navtab"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><rect x="4" y="2.5" width="12" height="15"></rect><path d="M7 7h6M7 10.5h6M7 14h3.5"></path></svg>Sheet</button><button class="navtab"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M3 4.5h5a2 2 0 0 1 2 2V17a2 2 0 0 0-2-2H3zM17 4.5h-5a2 2 0 0 0-2 2V17a2 2 0 0 1 2-2h5z"></path></svg>Codex</button><button class="navtab"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M3 5h14M3 10h14M3 15h9"></path></svg>Log</button></nav>
+<div class="scan" style="opacity: 0.5"></div>
+</div>
+</body>
+</html>
