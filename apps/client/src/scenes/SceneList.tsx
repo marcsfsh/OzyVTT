@@ -18,7 +18,16 @@ import { useSoundBoard } from "../sound/sound-data";
 import { useScenes } from "./context";
 import { pathForScene, SCENES_PATHS } from "./routes";
 import { useSceneActions } from "./sceneActions";
-import { tokensLine, factsOf, lightLine, modifiedAt, STATE_LABEL, whenLabel, type SceneFacts } from "./sceneFacts";
+import {
+  tokensLine,
+  factsOf,
+  lightLine,
+  modifiedAt,
+  PROGRESS_LABEL,
+  STATE_LABEL,
+  whenLabel,
+  type SceneFacts
+} from "./sceneFacts";
 import {
   DEFAULT_SCENE_SORT,
   filterScenes,
@@ -221,7 +230,8 @@ export function SceneList() {
                     <span className="sc-row-main">
                       <strong>{row.scene.name}</strong>
                       <small>
-                        {STATE_LABEL[row.state]} · {row.map?.name ?? "Map not in the library"}
+                        {STATE_LABEL[row.state]} · {PROGRESS_LABEL[row.progress]} ·{" "}
+                        {row.map?.name ?? "Map not in the library"}
                       </small>
                     </span>
                   </button>
@@ -236,6 +246,7 @@ export function SceneList() {
                 <tr>
                   <th scope="col">Name</th>
                   <th scope="col">State</th>
+                  <th scope="col">Progress</th>
                   <th scope="col">Map</th>
                   <th scope="col">Tokens</th>
                   <th scope="col">Light</th>
@@ -265,6 +276,7 @@ export function SceneList() {
                     <td>
                       <StateChip facts={row} />
                     </td>
+                    <td>{PROGRESS_LABEL[row.progress]}</td>
                     <td>{row.map?.name ?? "Not in the library"}</td>
                     <td>{tokensLine(row)}</td>
                     <td>{lightLine(row)}</td>

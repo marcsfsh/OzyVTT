@@ -173,7 +173,8 @@ The shells:
 - Player, phone. Bottom tabs Table, Sheet, Codex and Log on every screen. In a fight, Table holds the turn card and a
   small map with Open map.
 
-Prep holds Scenes, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. The table screen's controls open from the
+Prep holds Scenes, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. Its front
+page pins New map and New scene side by side at the top, then the Maps and Scenes tabs, each a sortable table. The table screen's controls open from the
 table screen button in the top bar. The rules reference opens from search and from the Compendium. Settings is the gear.
 
 The table (Play), as a docked workbench (ADR-0025):

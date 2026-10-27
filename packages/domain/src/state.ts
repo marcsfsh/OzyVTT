@@ -1981,6 +1981,8 @@ export const SceneSchema = z
     createdAt: z.number().int().nonnegative().optional(),
     updatedAt: z.number().int().nonnegative().optional(),
     liveAt: z.number().int().nonnegative().optional(),
+    /** When a fight in this scene last ended, in epoch ms: Prep reads it as Completed. GM-only, as every scene is. */
+    fightEndedAt: z.number().int().nonnegative().optional(),
     /** Set when this scene is a launched replay. Such scenes are disposable: `scenes.ts` drops the scene and its
      * cloned combatants (`Actor.replaySceneId`) when the table leaves it. GM-only. */
     replayOf: z

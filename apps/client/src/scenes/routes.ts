@@ -2,12 +2,12 @@
  * The Scenes tab's addresses. Every scene and every map has one, and so does each step of making or editing one, so a
  * reload or a link lands where the GM was.
  *
- *   /scenes                     the front page
- *   /scenes/list                every scene, as a table
+ *   /scenes                     the front page: New map and New scene, then the Scenes tab
+ *   /scenes/list                the same page, on its Scenes tab
  *   /scenes/new                 a new scene, from its first step
  *   /scenes/<id>                a scene, as one document
  *   /scenes/<id>?step=<step>    a scene's steps, as its editor
- *   /scenes/maps                every map, as a table
+ *   /scenes/maps                the front page on its Maps tab
  *   /scenes/maps/new            a new map, from its first step
  *   /scenes/maps/<id>           a map, as one document
  *   /scenes/maps/<id>?step=...  a map's steps
@@ -20,10 +20,9 @@ export type SceneStep = (typeof SCENE_STEPS)[number];
 export const MAP_STEPS = ["upload", "grid", "check", "use"] as const;
 export type MapStep = (typeof MAP_STEPS)[number];
 
-export type ScenesSection = "overview" | "scenes" | "maps";
+export type ScenesSection = "scenes" | "maps";
 
 export type ScenesView =
-  | Readonly<{ view: "overview" }>
   | Readonly<{ view: "scenes" }>
   /** `sceneId` null is a new scene; `step` null is the scene's document. */
   | Readonly<{ view: "scene"; sceneId: string | null; step: SceneStep | null }>
@@ -37,7 +36,7 @@ const isMapStep = (value: string | null): value is MapStep => MAP_STEPS.includes
 export function scenesViewOf(segments: readonly string[], query: URLSearchParams): ScenesView | null {
   if (segments[0] !== "scenes") return null;
   const [, second, third] = segments;
-  if (segments.length === 1) return { view: "overview" };
+  if (segments.length === 1) return { view: "scenes" };
   if (segments.length > 3 || !second) return null;
   if (second === "maps") {
     if (segments.length === 2) return { view: "maps" };
@@ -55,7 +54,6 @@ export function scenesViewOf(segments: readonly string[], query: URLSearchParams
 
 /** Which section of the bar lights for a view: a scene lights Scenes, a map lights Maps. */
 export function sectionOf(view: ScenesView): ScenesSection {
-  if (view.view === "overview") return "overview";
   if (view.view === "maps" || view.view === "map") return "maps";
   return "scenes";
 }

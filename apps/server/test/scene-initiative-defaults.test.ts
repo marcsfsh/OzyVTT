@@ -151,6 +151,11 @@ describe("encounter.start with a scene's fight settings", () => {
     expect(server.store.snapshot.combat.pendingInitiative).toEqual([]);
     expect((await post("/game/encounter/end", gmToken, {})).status).toBe(200);
 
+    // A fight that ended marks its scene, so Prep reads it as Completed.
+    expect(server.store.snapshot.combat.scenes.find((scene) => scene.id === sceneId)?.fightEndedAt).toEqual(
+      expect.any(Number)
+    );
+
     // Cleared over HTTP: with neither, the fight starts as it always has.
     expect(
       (await post(`/game/scenes/${sceneId}/initiative-defaults`, gmToken, { initiativeDefaults: {} })).status

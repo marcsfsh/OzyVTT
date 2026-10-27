@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { GmView } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
@@ -30,7 +30,7 @@ vi.mock("../scene/gridPreview", async (original) => ({
 }));
 
 import { goTo } from "../../test/route";
-import { AMBUSH, IDS, gmView, mapAsset, serveScenes } from "../../test/scenes-fakes";
+import { AMBUSH, CAMP, CHASE, IDS, gmView, mapAsset, serveScenes } from "../../test/scenes-fakes";
 import { setViewport } from "../../test/viewport";
 import { armPlacement } from "../scene/tableGeometry";
 import { ScenesShell } from "./ScenesShell";
@@ -65,44 +65,52 @@ afterEach(() => {
 });
 
 describe("the Scenes tab's front page", () => {
-  it("starts with what needs the GM, each with the action that answers it", async () => {
+  it("leads with New map and New scene, then the Maps and Scenes views", async () => {
     const user = userEvent.setup();
     renderTab("/scenes");
-    const needs = await screen.findByRole("region", { name: "Needs you · 5" });
-    const rows = within(needs).getAllByRole("listitem");
-    expect(rows.map((row) => row.textContent)).toEqual([
-      expect.stringContaining("Crypt ambush · 1 token waits in the tray, off the map."),
-      expect.stringContaining("Tunnel chase · Old tunnels has no grid yet"),
-      expect.stringContaining("Tunnel chase · 2 tokens wait in the tray, off the map."),
-      expect.stringContaining("Camp at the ford · Nobody is in this scene yet."),
-      expect.stringContaining("Saltmere has no grid yet.")
-    ]);
-    await user.click(within(rows[1]!).getByRole("button", { name: "Set the grid" }));
-    // The grid's steps come back to the scene that needed it.
-    expect(here()).toBe(`/scenes/maps/${IDS.tunnels}?step=grid&back=${encodeURIComponent(`/scenes/${IDS.chase}`)}`);
+    const views = await screen.findByRole("tablist", { name: "Maps and scenes" });
+    expect(
+      within(views)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent)
+    ).toEqual(["Maps", "Scenes"]);
+    expect(within(views).getByRole("tab", { name: "Scenes" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    // Nothing of the old front page is left.
+    expect(screen.queryByRole("region", { name: /^Needs you/ })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Recent changes" })).toBeNull();
+    await user.click(within(views).getByRole("tab", { name: "Maps" }));
+    expect(here()).toBe("/scenes/maps");
+    await user.click(screen.getByRole("button", { name: "New map" }));
+    expect(here()).toBe("/scenes/maps/new");
+    cleanup();
+    renderTab("/scenes/list");
+    await user.click(screen.getAllByRole("button", { name: "New scene" })[0]!);
+    expect(here()).toBe("/scenes/new");
   });
 
-  it("goes from a waiting token to the step that places it", async () => {
-    const user = userEvent.setup();
-    renderTab("/scenes");
-    const needs = await screen.findByRole("region", { name: /^Needs you/ });
-    await user.click(within(within(needs).getAllByRole("listitem")[0]!).getByRole("button", { name: "Go to it" }));
-    expect(here()).toBe(`/scenes/${IDS.ambush}?step=tokens`);
-  });
-
-  it("lists recent changes newest first, each saying who sees it", async () => {
-    renderTab("/scenes");
-    const recent = await screen.findByRole("region", { name: "Recent changes" });
-    const rows = within(recent).getAllByRole("row").slice(1);
-    expect(rows[0]).toHaveTextContent("Camp at the ford");
-    expect(within(rows[0]!).getByText("Hidden from players")).toBeInTheDocument();
-  });
-
-  it("names the live scene first, with the way to its table", async () => {
-    renderTab("/scenes", gmView(undefined, IDS.ambush));
-    const needs = await screen.findByRole("region", { name: /^Needs you/ });
-    expect(within(needs).getAllByRole("listitem")[0]).toHaveTextContent("Crypt ambush is live.");
-    expect(within(needs).getByRole("button", { name: "Go to the table" })).toBeInTheDocument();
+  it("sorts scenes by what needs attention, and by whether their fight has run", async () => {
+    // A parked fight: running, with whose turn it is.
+    const chaseRunning = {
+      ...CHASE,
+      combat: { ...CHASE.combat, active: true, round: 1, turnActorId: CHASE.combat.initiative[0]!.actorId }
+    };
+    const campDone = { ...CAMP, fightEndedAt: Date.parse("2026-10-18T12:00:00.000Z") };
+    const names = async () =>
+      within(await screen.findByRole("table"))
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => row.querySelector("b")?.textContent);
+    const first = renderTab("/scenes?sort=attention:asc");
+    // The chase has no grid and two tokens in the tray: the most to do.
+    expect((await names())[0]).toBe("Tunnel chase");
+    first.unmount();
+    renderTab("/scenes?sort=progress:asc", gmView([AMBUSH, chaseRunning, campDone]));
+    expect(await names()).toEqual(["Crypt ambush", "Tunnel chase", "Camp at the ford"]);
+    const table = await screen.findByRole("table");
+    expect(within(table).getAllByText("Not started").length).toBeGreaterThan(0);
+    expect(within(table).getByText("In progress")).toBeInTheDocument();
+    expect(within(table).getByText("Completed")).toBeInTheDocument();
   });
 });
 
@@ -344,7 +352,7 @@ describe("making a scene as steps", () => {
 });
 
 describe("on a phone", () => {
-  it("lists Prep's pages as the strip under the header, with the Scenes views and New beside them", async () => {
+  it("lists Prep's pages as the strip under the header, with New map and New scene on the page", async () => {
     setViewport(390);
     renderTab("/scenes/list");
     const pages = await screen.findByRole("tablist", { name: "Prep pages" });
@@ -354,9 +362,10 @@ describe("on a phone", () => {
         .map((tab) => tab.textContent)
     ).toEqual(["Scenes", "Party", "Maps", "Tokens", "Sound", "Replays"]);
     expect(within(pages).getByRole("tab", { name: "Scenes" })).toHaveAttribute("aria-selected", "true");
-    const views = screen.getByRole("group", { name: "Scenes views" });
-    expect(within(views).getByRole("button", { name: "All scenes" })).toHaveAttribute("aria-pressed", "true");
+    const views = screen.getByRole("tablist", { name: "Maps and scenes" });
+    expect(within(views).getByRole("tab", { name: "Scenes" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("button", { name: "New scene" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New map" })).toBeInTheDocument();
   });
 
   it("runs the steps as a strip and keeps the map in a bar that opens it full screen", async () => {

@@ -1102,8 +1102,11 @@ over the map but tokens and marks; notices land in the status line through `Toas
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
 
 Scenes and maps are prepared on Prep's Scenes and Maps pages (ADR-0035), in `scenes/` and `maps/`. `scenes/ScenesShell.tsx`
-fills the end of Prep's section bar and renders the view the address names (`scenes/routes.ts`): the front page,
-the scene and map tables, a scene or a map as one document, or the steps that make or edit one
+fills the end of Prep's section bar and renders the view the address names (`scenes/routes.ts`): the front page
+(New map and New scene side by side over the Maps and Scenes tabs, each its table with filters and a sort that
+includes Needs attention, from `needsOf`, and for scenes Progress: in progress while a fight runs or is parked,
+completed once one ended there, which the server stamps as the scene's `fightEndedAt`), a scene or a map as one
+document, or the steps that make or edit one
 (`scenes/EditorFrame.tsx`). A scene's page and steps are built from the table's parts (`EncounterMap`, `MapRail`,
 `TablePanel`, the tray) and edit the parked scene with its `sceneId`, so the table itself always shows the live
 scene. Placing on any map is a button and then a press on it (`armPlacement` in `scene/tableGeometry.ts`), or the

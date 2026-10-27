@@ -1,6 +1,6 @@
 import { type SortDirection, type SortLevelOf } from "@vtt/ui";
-import type { SceneFacts, SceneState } from "./sceneFacts";
-import { modifiedAt } from "./sceneFacts";
+import type { SceneFacts, SceneProgress, SceneState } from "./sceneFacts";
+import { modifiedAt, needsOf } from "./sceneFacts";
 
 /**
  * What the Scenes table filters and sorts on. Pure, so the table and its tests agree: the State dropdown, the
@@ -37,14 +37,25 @@ export const NO_SCENE_FILTERS: SceneFilters = {
   to: null
 };
 
-export type SceneSortKey = "order" | "name" | "state" | "map" | "tokens" | "modified";
+export type SceneSortKey = "order" | "name" | "state" | "progress" | "attention" | "map" | "tokens" | "modified";
 export type SortLevel<Key extends string> = SortLevelOf<Key>;
-export const SCENE_SORT_KEYS: readonly SceneSortKey[] = ["order", "name", "state", "map", "tokens", "modified"];
+export const SCENE_SORT_KEYS: readonly SceneSortKey[] = [
+  "order",
+  "name",
+  "state",
+  "progress",
+  "attention",
+  "map",
+  "tokens",
+  "modified"
+];
 
 export const SCENE_SORT_LABEL: Readonly<Record<SceneSortKey, string>> = {
   order: "Your order",
   name: "Name",
   state: "State",
+  progress: "Progress",
+  attention: "Needs attention",
   map: "Map",
   tokens: "Tokens",
   modified: "Modified"
@@ -60,6 +71,8 @@ export function sortDirectionLabel(key: string, direction: SortDirection): strin
   if (key === "tokens" || key === "used") return direction === "asc" ? "Fewest first" : "Most first";
   if (key === "state") return direction === "asc" ? "Live first" : "Live last";
   if (key === "grid") return direction === "asc" ? "No grid first" : "Grid set first";
+  if (key === "attention") return direction === "asc" ? "Most to do first" : "Most to do last";
+  if (key === "progress") return direction === "asc" ? "Not started first" : "Completed first";
   return direction === "asc" ? "A to Z" : "Z to A";
 }
 
@@ -208,6 +221,7 @@ export function filterScenes(
 }
 
 const STATE_RANK: Readonly<Record<SceneState, number>> = { live: 0, parked: 1, prepared: 2, replay: 3 };
+const PROGRESS_RANK: Readonly<Record<SceneProgress, number>> = { "not-started": 0, "in-progress": 1, completed: 2 };
 
 /** Sorts by the first level, then by each level under it; the GM's order breaks any tie that is left. */
 export function sortScenes(
@@ -224,6 +238,11 @@ export function sortScenes(
         return left.scene.name.localeCompare(right.scene.name);
       case "state":
         return STATE_RANK[left.state] - STATE_RANK[right.state];
+      case "progress":
+        return PROGRESS_RANK[left.progress] - PROGRESS_RANK[right.progress];
+      // Most first in its natural direction: what needs the GM most comes to the top.
+      case "attention":
+        return needsOf(right).length - needsOf(left).length;
       case "map":
         return (left.map?.name ?? "").localeCompare(right.map?.name ?? "");
       case "tokens":

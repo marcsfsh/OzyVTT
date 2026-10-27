@@ -166,6 +166,14 @@ export const encounterCommands = [
         const combatantIds = state.combat.initiative.map((entry) => entry.actorId);
         effectEvents = endEncounterEffects(state, combatantIds);
         endEncounter(state); // rejects while rewound
+        // The scene remembers that its fight was run, so Prep can tell a finished scene from one not yet played.
+        const endedAtMs = Date.now();
+        state.combat = {
+          ...state.combat,
+          scenes: state.combat.scenes.map((scene) =>
+            scene.id === endedSceneId ? { ...scene, fightEndedAt: endedAtMs } : scene
+          )
+        };
         // SRD Ammunition: after a fight, half the pieces each combatant fired are picked up again.
         recovered = recoverAmmunition(state, combatantIds, kit.equipmentCatalog());
         // Archive the fight in the same transaction, before wiping live buffers, so it can never be lost.

@@ -17,10 +17,19 @@ export const STATE_LABEL: Readonly<Record<SceneState, string>> = {
 
 export type GridState = "grid" | "scale" | "none" | "unknown";
 
+/** Whether a scene's fight has been run: one running or parked is in progress, one that ended is completed. */
+export type SceneProgress = "not-started" | "in-progress" | "completed";
+export const PROGRESS_LABEL: Readonly<Record<SceneProgress, string>> = {
+  "not-started": "Not started",
+  "in-progress": "In progress",
+  completed: "Completed"
+};
+
 export type SceneFacts = Readonly<{
   scene: Scene;
   live: boolean;
   state: SceneState;
+  progress: SceneProgress;
   /** The scene's own combat, or the live table's for the live scene (whose slot is empty by design). */
   combat: SceneCombat;
   map: MapAsset | null;
@@ -72,6 +81,7 @@ export function factsOf(view: GmView, scene: Scene, maps: readonly MapAsset[] | 
     scene,
     live,
     state: live ? "live" : scene.replayOf ? "replay" : combat.active ? "parked" : "prepared",
+    progress: combat.active ? "in-progress" : scene.fightEndedAt !== undefined ? "completed" : "not-started",
     combat,
     map,
     grid: maps === null ? "unknown" : gridStateOf(map),

@@ -1,17 +1,6 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { GmView } from "@vtt/domain";
-import {
-  Button,
-  Combobox,
-  IconButton,
-  IconHome,
-  IconMap,
-  IconPlus,
-  IconScene,
-  Kbd,
-  SegmentedControl,
-  cx
-} from "@vtt/ui";
+import { Button, Combobox, IconButton, IconMap, IconPlus, IconScene, Kbd, Tabs, cx } from "@vtt/ui";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { useMapLibrary, type MapAsset } from "../maps/map-catalog";
@@ -19,7 +8,6 @@ import { navigate, useRoute } from "../router";
 import { PrepBarSlot } from "../shell/AppBar";
 import { ScenesContext, useSceneLinks, type ScenesContextValue } from "./context";
 import { SCENES_PATHS, pathForMap, pathForScene, scenesViewOf, sectionOf, type ScenesSection } from "./routes";
-import { ScenesOverview } from "./ScenesOverview";
 import { SceneList } from "./SceneList";
 import { SceneDocument } from "./SceneDocument";
 import { SceneEditor } from "./SceneEditor";
@@ -28,11 +16,37 @@ import { MapDocument } from "../maps/MapDocument";
 import { MapEditor } from "../maps/MapEditor";
 import "./scenes.css";
 
-const SECTIONS: ReadonlyArray<{ id: ScenesSection; label: string; path: string; icon: ReactNode }> = [
-  { id: "overview", label: "Overview", path: SCENES_PATHS.overview, icon: <IconHome /> },
-  { id: "scenes", label: "Scenes", path: SCENES_PATHS.list, icon: <IconScene /> },
-  { id: "maps", label: "Maps", path: SCENES_PATHS.maps, icon: <IconMap /> }
+/** The front page's two views, in the order they are drawn. */
+const LIST_TABS: ReadonlyArray<{ id: ScenesSection; label: string; path: string }> = [
+  { id: "maps", label: "Maps", path: SCENES_PATHS.maps },
+  { id: "scenes", label: "Scenes", path: SCENES_PATHS.list }
 ];
+
+/**
+ * Prep's front page above its lists: New map and New scene side by side, then the Maps and Scenes views. The lists
+ * under it keep their own filters and sort.
+ */
+function ListHead({ section }: Readonly<{ section: ScenesSection }>) {
+  return (
+    <div className="sc-front-head">
+      <div className="sc-front-new">
+        <Button variant="secondary" onClick={() => void navigate(SCENES_PATHS.newMap)}>
+          <IconMap /> New map
+        </Button>
+        <Button variant="primary" onClick={() => void navigate(SCENES_PATHS.newScene)}>
+          <IconScene /> New scene
+        </Button>
+      </div>
+      <Tabs
+        ariaLabel="Maps and scenes"
+        className="sc-front-tabs"
+        activeId={section}
+        onChange={(id) => void navigate(LIST_TABS.find((tab) => tab.id === id)!.path)}
+        tabs={LIST_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+      />
+    </div>
+  );
+}
 
 const PHONE_QUERY = "(max-width: 760px)";
 const NARROW_QUERY = "(max-width: 979px)";
@@ -80,7 +94,7 @@ function FindBox({ state, maps }: Readonly<{ state: GmView; maps: readonly MapAs
 
 /**
  * Prep's Scenes and Maps pages: the view the address names under Prep's section bar, whose right end holds the
- * Overview and All scenes switch, the find box and the page's one primary. A scene or map that is open takes the pane
+ * find box (and a secondary New while a record is open). The lists open under New map, New scene and their tabs. A scene or map that is open takes the pane
  * as one document; on a phone its workbench fills the pane and Back returns to the list.
  */
 export function ScenesShell({
@@ -96,7 +110,7 @@ export function ScenesShell({
   onOpenMap: (map: MapAsset) => void;
 }>) {
   const route = useRoute();
-  const view = scenesViewOf(route.segments, route.query) ?? { view: "overview" as const };
+  const view = scenesViewOf(route.segments, route.query) ?? { view: "scenes" as const };
   const section = sectionOf(view);
   const phone = useMediaQuery(PHONE_QUERY);
   const narrow = useMediaQuery(NARROW_QUERY);
@@ -134,19 +148,22 @@ export function ScenesShell({
     ]
   );
 
+  // The front page has its own New map and New scene; an open record keeps a secondary New in the bar.
+  const listing = view.view === "scenes" || view.view === "maps";
   const primary =
     section === "maps"
-      ? { label: "Add a map", path: SCENES_PATHS.newMap }
+      ? { label: "New map", path: SCENES_PATHS.newMap }
       : { label: "New scene", path: SCENES_PATHS.newScene };
-  // A record's own primary is in its footer, so the bar's New steps down to a secondary while one is open.
-  const barPrimary = view.view === "overview" || view.view === "scenes" || view.view === "maps";
 
   const content = (() => {
     switch (view.view) {
-      case "overview":
-        return <ScenesOverview />;
       case "scenes":
-        return <SceneList />;
+        return (
+          <>
+            <ListHead section="scenes" />
+            <SceneList />
+          </>
+        );
       case "scene":
         return view.step === null && view.sceneId ? (
           <SceneDocument key={view.sceneId} sceneId={view.sceneId} />
@@ -154,7 +171,12 @@ export function ScenesShell({
           <SceneEditor key={view.sceneId ?? "new"} sceneId={view.sceneId} step={view.step ?? "map"} />
         );
       case "maps":
-        return <MapList />;
+        return (
+          <>
+            <ListHead section="maps" />
+            <MapList />
+          </>
+        );
       case "map":
         return view.step === null && view.mapId ? (
           <MapDocument key={view.mapId} mapId={view.mapId} />
@@ -169,32 +191,17 @@ export function ScenesShell({
       <div className={cx("sc-shell anim-view", phone ? "is-phone" : "is-laptop")}>
         {/* Prep's section bar names the page; its right end holds this page's views, the find box and the primary. */}
         <PrepBarSlot>
-          {section !== "maps" && (
-            <SegmentedControl
-              ariaLabel="Scenes views"
-              size="sm"
-              value={section}
-              onChange={(value) => void navigate(value === "overview" ? SCENES_PATHS.overview : SCENES_PATHS.list)}
-              options={SECTIONS.filter((item) => item.id !== "maps").map((item) => ({
-                value: item.id,
-                label: item.id === "scenes" ? "All scenes" : item.label
-              }))}
-            />
-          )}
           {!phone && <FindBox state={state} maps={library.maps} />}
-          {phone ? (
-            <IconButton label={primary.label} onClick={() => void navigate(primary.path)}>
-              <IconPlus />
-            </IconButton>
-          ) : (
-            <Button
-              variant={barPrimary ? "primary" : "secondary"}
-              size="sm"
-              onClick={() => void navigate(primary.path)}
-            >
-              <IconPlus /> {primary.label}
-            </Button>
-          )}
+          {!listing &&
+            (phone ? (
+              <IconButton label={primary.label} onClick={() => void navigate(primary.path)}>
+                <IconPlus />
+              </IconButton>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={() => void navigate(primary.path)}>
+                <IconPlus /> {primary.label}
+              </Button>
+            ))}
         </PrepBarSlot>
         <div className="sc-content">{content}</div>
       </div>
