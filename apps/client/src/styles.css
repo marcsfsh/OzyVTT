@@ -23,7 +23,8 @@ main {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr);
 }
-main > .app-bar {
+main > .app-bar,
+main > .player-identity {
   grid-row: 1;
 }
 main > .app-bottom-tabs {

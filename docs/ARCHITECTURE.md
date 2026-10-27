@@ -1062,7 +1062,11 @@ primary. The live scene picker (`table/LiveScenePicker.tsx`) sits in the GM's to
 phone, where the strip is Play's header. In a fight the strip holds the turn order (`table/TurnTiles.tsx`, the real
 order for the GM and the projected one for a player) and, through `table/stripSlot.tsx`, the GM's Fight menu. The GM's
 Needs you leads the Fight tab, above the acting creature's card and lamps (`encounter/ActingConsole.tsx`) and the
-order with its row tools; Start a fight (`encounter/StartFight.tsx`) lists the staged characters and monsters to tick. The table screen lamp
+order with its row tools; Start a fight (`encounter/StartFight.tsx`) lists the staged characters and monsters to tick.
+A player's tabs are Turn, Sheet, Log and Party in a fight (Me, Log and Party between fights). The Turn tab leads with
+the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts, the round and the four lamps; End turn is the
+footer's one primary. On a phone the table and its log head with the character being played
+(`table/PlayerIdentity.tsx`) in place of the top bar. The table screen lamp
 (`table/TvControl.tsx`) pauses or resumes the screen and opens its preview (`viewer/preview-open.ts`). Nothing floats
 over the map but tokens and marks; notices land in the status line through `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GmView, PlayerView } from "@vtt/domain";
+import { nextTurnWords } from "../encounter/PlayerTurnCard";
 import { turnTiles } from "./TurnTiles";
 
 // The strip's turn order: the GM's real order, a player's projected one, and NEXT as the next entry that audience has.
@@ -49,5 +50,22 @@ describe("the turn order in the strip", () => {
   it("gives a player the next entry they can see, and marks nothing during a hidden turn", () => {
     expect(marks(turnTiles({ role: "player", state: player("a", false) }))).toEqual(["Lyra acting", "Borin next"]);
     expect(marks(turnTiles({ role: "player", state: player(null, true) }))).toEqual(["Lyra", "Borin"]);
+  });
+});
+
+describe("when a player's character acts next", () => {
+  const combat = (activeId: string, hiddenTurn = false) =>
+    ({
+      round: 3,
+      hiddenTurn,
+      initiative: ["a", "b", "c", "d"].map((actorId) => ({ actorId, active: actorId === activeId }))
+    }) as unknown as PlayerView["combat"];
+
+  it("says next, later this round, or the next round, and nothing during a hidden turn", () => {
+    expect(nextTurnWords(combat("b"), "c")).toBe("Your turn is next");
+    expect(nextTurnWords(combat("a"), "d")).toBe("Your turn comes later this round");
+    expect(nextTurnWords(combat("c"), "a")).toBe("Your next turn is in round 4");
+    expect(nextTurnWords(combat("d"), "a")).toBe("Your turn is next");
+    expect(nextTurnWords(combat("b", true), "c")).toBeNull();
   });
 });

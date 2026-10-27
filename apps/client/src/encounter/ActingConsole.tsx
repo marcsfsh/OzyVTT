@@ -1,33 +1,12 @@
-import { IconStar, Lamp, MoveLamp, type LampKind } from "@vtt/ui";
+import { IconStar, MoveLamp } from "@vtt/ui";
 import { useEffect, useState } from "react";
 import type { GmActor, GmView, MutationResult } from "@vtt/domain";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
 import { ActingCard } from "./ActingCard";
+import { LampToggle } from "./LampToggle";
 import { ActionRunner } from "./ActionRunner";
 import "./acting-console.css";
-
-/** One lamp as a toggle: lit while the resource is there, a press marks it spent or gives it back. */
-function LampToggle({
-  kind,
-  label,
-  used,
-  busy,
-  onToggle
-}: Readonly<{ kind: LampKind; label: string; used: boolean; busy: boolean; onToggle: () => void }>) {
-  return (
-    <button
-      type="button"
-      className="lamp-toggle"
-      aria-label={label}
-      aria-pressed={used}
-      disabled={busy}
-      onClick={onToggle}
-    >
-      <Lamp kind={kind} lit={!used} label={label} unavailableReason="Used this turn" className="lamp-toggle-lamp" />
-    </button>
-  );
-}
 
 /**
  * The acting creature's console: its card, its turn's lamps and its action runner. An off-turn legendary actor takes
@@ -194,7 +173,7 @@ export function ActingConsole({
                 kind="action"
                 label="Action"
                 used={state.combat.turn.actionUsed}
-                busy={busy}
+                disabled={busy}
                 onToggle={() =>
                   void run(
                     () =>
@@ -211,7 +190,7 @@ export function ActingConsole({
                 kind="bonus"
                 label="Bonus"
                 used={state.combat.turn.bonusActionUsed}
-                busy={busy}
+                disabled={busy}
                 onToggle={() =>
                   void run(
                     () =>
@@ -229,7 +208,7 @@ export function ActingConsole({
                 kind="reaction"
                 label="Reaction"
                 used={state.combat.reactionsUsed.includes(actor.id)}
-                busy={busy}
+                disabled={busy}
                 onToggle={() =>
                   void run(
                     () =>

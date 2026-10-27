@@ -179,48 +179,62 @@ describe("the GM's panel", () => {
 });
 
 describe("a player's panel", () => {
-  it("in a fight: Turn, Order, Sheet, Dice and Log, with End turn in the footer on their turn", () => {
+  it("in a fight: Turn, Sheet, Log and Party, with End turn in the footer on their turn", () => {
     render(
       <ToastProvider>
         <EncounterPanel role="player" state={playerView(true)} slots={slots} />
       </ToastProvider>
     );
     const list = screen.getByRole("tablist", { name: "The fight · round 2" });
-    expect(tabNames(list)).toEqual(["Turn", "Order", "Sheet", "Dice", "Log"]);
+    expect(tabNames(list)).toEqual(["Turn", "Sheet", "Log", "Party"]);
     const turn = screen.getByRole("tabpanel", { name: "Turn" });
     expect(within(turn).getByRole("heading", { name: "Your turn" })).toBeTruthy();
+    expect(within(turn).getByRole("img", { name: "Round 2" })).toBeTruthy();
+    // The order folds under the turn, with what a player can do from it.
+    expect(within(turn).getByText("Turn order")).toBeTruthy();
     expect(screen.getByRole("button", { name: "End turn" })).toBeTruthy();
     // Each tab names the panel it controls.
     for (const tab of within(list).getAllByRole("tab"))
       expect(document.getElementById(tab.getAttribute("aria-controls")!)?.getAttribute("role")).toBe("tabpanel");
   });
 
-  it("on their turn: the slots and End turn in one row, with the HP after them", () => {
+  it("on their turn: the four lamps on the turn card, and End turn alone under the thumb", () => {
     render(
       <ToastProvider>
         <EncounterPanel role="player" state={playerView(true)} phone slots={slots} />
       </ToastProvider>
     );
-    const bar = screen.getByRole("group", { name: "Your turn resources" });
-    const order = [...bar.querySelectorAll("button, .economy-status")].map((element) => element.textContent);
-    // The readouts come last, so End turn wraps with the buttons and the bar keeps two rows on a phone.
-    expect(order).toEqual(["Action", "Bonus", "Reaction", "End turn", "HP 37/44"]);
+    const lamps = screen.getByRole("group", { name: "Your turn resources" });
+    expect(
+      within(lamps)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label"))
+    ).toEqual(["Action", "Bonus", "Reaction"]);
+    expect(within(lamps).getByRole("group", { name: /^Move/ })).toBeTruthy();
+    const foot = screen.getByRole("button", { name: "End turn" }).closest(".table-panel-foot")!;
+    expect(
+      within(foot as HTMLElement)
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+    ).toEqual(["End turn"]);
   });
 
-  it("while someone else acts: their HP and Reaction in the bar, who acts left to the header, and no End turn", () => {
+  it("while someone else acts: who acts and when this player is next, only the Reaction ready, and no End turn", () => {
     render(
       <ToastProvider>
         <EncounterPanel role="player" state={playerView(true, false)} slots={slots} />
       </ToastProvider>
     );
-    expect(screen.queryByText(/Goblin 1 is acting/)).toBeNull();
-    expect(screen.getByText("HP 37/44")).toBeTruthy();
-    expect(screen.getByText("Your Reaction stays ready. The rest waits for your turn.")).toBeTruthy();
+    expect(screen.getByText("Goblin 1 is acting")).toBeTruthy();
+    // Two in the order: after the goblin, the round wraps to Lyra.
+    expect(screen.getByText("Your turn is next")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "End turn" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Reaction" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Action" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reaction" })).toBeEnabled();
+    expect(screen.getByRole("group", { name: "Reaction: ready" })).toBeTruthy();
   });
 
-  it("between fights: Me, Party, Dice and Log", async () => {
+  it("between fights: Me, Log and Party", async () => {
     const user = userEvent.setup();
     render(
       <ToastProvider>
@@ -228,7 +242,7 @@ describe("a player's panel", () => {
       </ToastProvider>
     );
     const list = screen.getByRole("tablist", { name: "The table" });
-    expect(tabNames(list)).toEqual(["Me", "Party", "Dice", "Log"]);
+    expect(tabNames(list)).toEqual(["Me", "Log", "Party"]);
     await user.click(within(list).getByRole("tab", { name: "Party" }));
     expect(screen.getByRole("tabpanel", { name: "Party" }).textContent).toBe("The party");
   });

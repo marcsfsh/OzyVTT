@@ -24,8 +24,13 @@ function slotCost(actor: PlayerActor, actionId: string): string | null {
     : `It costs a level ${spell.level} spell slot, and you have ${left} left.`;
 }
 
+type PromptNumber = Readonly<{ label: string; value: number; tone?: "hostile" | "on" }>;
+
 /** The headline and the one-line why of a reaction, from the side of the character who may take it. */
-function reactionWords(reaction: PlayerPendingReaction, actor: PlayerActor) {
+function reactionWords(
+  reaction: PlayerPendingReaction,
+  actor: PlayerActor
+): Readonly<{ title: string; detail: string; numbers?: readonly PromptNumber[] }> {
   switch (reaction.kind) {
     case "attack-would-hit": {
       const ac = actor.armorClass;
@@ -37,9 +42,29 @@ function reactionWords(reaction: PlayerPendingReaction, actor: PlayerActor) {
             ? `The attack hits your AC ${ac}. `
             : "";
       const lasts = reaction.lastsUntilNextTurn ? " until the start of your next turn" : " against it";
+      // The numbers the choice turns on, in VT323: the roll only where the player saw it, and the AC with the bonus.
+      const numbers: PromptNumber[] =
+        ac === undefined
+          ? []
+          : [
+              ...(reaction.attackRoll !== undefined
+                ? [{ label: "Their roll", value: reaction.attackRoll, tone: "hostile" as const }]
+                : []),
+              { label: "Your AC", value: ac },
+              ...(typeof reaction.acBonus === "number"
+                ? [
+                    {
+                      label: `With ${plainActionName(reaction.actionName)}`,
+                      value: ac + reaction.acBonus,
+                      tone: "on" as const
+                    }
+                  ]
+                : [])
+            ];
       return {
         title: `${reaction.sourceName}'s attack would hit you`,
-        detail: `${roll}${plainActionName(reaction.actionName)} gives you +${reaction.acBonus} AC${lasts}, so this hit becomes a miss.`
+        detail: `${roll}${plainActionName(reaction.actionName)} gives you +${reaction.acBonus} AC${lasts}, so this hit becomes a miss.`,
+        numbers
       };
     }
     case "leaves-reach":
@@ -91,6 +116,7 @@ function PromptCard({
   title,
   meta,
   detail,
+  numbers,
   tone = "alert",
   headingRef,
   children
@@ -99,6 +125,7 @@ function PromptCard({
   title: string;
   meta?: ReactNode;
   detail?: ReactNode;
+  numbers?: readonly PromptNumber[];
   tone?: "alert" | "danger";
   headingRef: (element: HTMLElement | null) => void;
   children: ReactNode;
@@ -110,6 +137,16 @@ function PromptCard({
         <span>{title}</span>
         {meta && <span className="prompt-card-meta">{meta}</span>}
       </h3>
+      {numbers && numbers.length > 0 && (
+        <dl className="prompt-card-numbers">
+          {numbers.map((number) => (
+            <div key={number.label} className={number.tone ? `is-${number.tone}` : undefined}>
+              <dd>{number.value}</dd>
+              <dt>{number.label}</dt>
+            </div>
+          ))}
+        </dl>
+      )}
       {detail && <p className="prompt-card-detail">{detail}</p>}
       <div className="prompt-card-body">{children}</div>
     </article>
@@ -198,6 +235,7 @@ export function PromptSlot({
             eyebrow="Reaction · answer now"
             title={words.title}
             detail={cost ? `${words.detail} ${cost}` : words.detail}
+            {...(words.numbers ? { numbers: words.numbers } : {})}
             headingRef={headingRef}
           >
             <ReactionPrompt

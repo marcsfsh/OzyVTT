@@ -21,7 +21,7 @@ import { RestPrompt } from "../rest/RestPrompt";
 import { needsItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
 import { PaneDivider, useMomentShare } from "../table/PaneDivider";
-import { PromptSlot } from "../table/PromptSlot";
+import { hasPlayerPrompt, PromptSlot } from "../table/PromptSlot";
 import { StripEndContext } from "../table/stripSlot";
 import { TableStrip } from "../table/TableStrip";
 import { usePhoneShell } from "./AppBar";
@@ -82,7 +82,9 @@ export function TableView(props: TableViewProps) {
     props.role === "player" ? (props.state.actors.find((actor) => actor.claimStatus === "mine")?.id ?? null) : null;
   const choosing = phone && targeting !== null && (role === "gm" || targeting.attackerId === myId);
   const [sheetShown, setSheetShown] = useState(false);
-  const moment = choosing ? "choosing" : phone && sheetShown && playerHasClaimed ? "sheet" : null;
+  // A prompt the player owes takes the panel's room too, so its answer and End turn stay on screen.
+  const promptWaits = props.role === "player" && hasPlayerPrompt(props.state);
+  const moment = choosing ? "choosing" : phone && (sheetShown || promptWaits) && playerHasClaimed ? "sheet" : null;
   const [mapShare, moveSplit] = useMomentShare(moment);
   const liveMapName = gm?.selectedMap?.id === state.combat.mapAssetId ? (gm?.selectedMap?.name ?? null) : null;
   // A player hears, in the status line, when the Codex gives them something new.
@@ -196,7 +198,6 @@ export function TableView(props: TableViewProps) {
           ),
           dice,
           log,
-          codex: <CodexTab role="player" token={token} />,
           // The party is a party surface, so the `off` tier removes it for players.
           ...(partyVisibilityOf(props.state) !== "off"
             ? { party: <PartyStrip role="player" state={props.state} /> }

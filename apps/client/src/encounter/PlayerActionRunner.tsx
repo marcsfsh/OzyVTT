@@ -172,6 +172,9 @@ function useServerActionFacts(actorId: string, definition: ActorDefinition, effe
   return facts;
 }
 
+/** On the table the turn card's heading sits above the runner, in the turn's section: that top comes into view. */
+const turnTop = (root: HTMLElement | null) => root?.closest<HTMLElement>(".player-turn") ?? root;
+
 /**
  * A player's action console on their own turn, the counterpart of the GM's ActionRunner for their claimed
  * character: pick an action and targets, roll the d20 (or type the face a physical die shows), see why
@@ -201,7 +204,8 @@ export function PlayerActionRunner({
   round = null,
   acting = null,
   turnTitle,
-  pinnable = true
+  pinnable = true,
+  cardHead = true
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -240,6 +244,8 @@ export function PlayerActionRunner({
   turnTitle?: string;
   /** Whether the player may pin favourites on this card: only on their own character. */
   pinnable?: boolean;
+  /** Whether the turn card names whose turn it is; the table's own turn card already does. */
+  cardHead?: boolean;
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
@@ -351,7 +357,8 @@ export function PlayerActionRunner({
   useEffect(() => {
     if (castSeen.current === castingId) return;
     castSeen.current = castingId;
-    if (castPlace.kind === "inline") revealInRegion(rootRef.current, "nearest");
+    // Opening the cast brings its top (Back) into view; Back brings the whole turn card's top back.
+    if (castPlace.kind === "inline") revealInRegion(castingId ? rootRef.current : turnTop(rootRef.current), "nearest");
   }, [castingId, castPlace.kind]);
 
   if (actions.length === 0 && facts.common.length === 0) return null;
@@ -469,6 +476,7 @@ export function PlayerActionRunner({
               round={round}
               acting={acting}
               {...(turnTitle ? { title: turnTitle } : {})}
+              head={cardHead}
               busy={busy}
               {...(unavailable ? { unavailable } : {})}
               header={header}

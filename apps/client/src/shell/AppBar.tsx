@@ -33,6 +33,7 @@ import {
   type PlayerSection
 } from "../router";
 import { LiveScenePicker } from "../table/LiveScenePicker";
+import { PlayerIdentity } from "../table/PlayerIdentity";
 import { TvControl } from "../table/TvControl";
 import { SearchLauncher } from "./SearchLauncher";
 import "./app-bar.css";
@@ -233,12 +234,17 @@ function Playing({ state }: Readonly<{ state: PlayerView }>) {
  */
 export function PlayerTopBar({
   state,
+  token,
   codexUnread,
   onCodexSeen
-}: Readonly<{ state: PlayerView; codexUnread: number; onCodexSeen: () => void }>) {
+}: Readonly<{ state: PlayerView; token?: string; codexUnread: number; onCodexSeen: () => void }>) {
   const route = useRoute();
   const phone = usePhoneShell();
   const section = litPlayerSection(route);
+  // On a phone the table and its log head with the character being played, as the top bar belongs to the page.
+  const claimed = state.actors.some((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
+  if (phone && token && claimed && (section === "table" || section === "log"))
+    return <PlayerIdentity state={state} token={token} />;
   return (
     <TopBar className="app-bar--player">
       {!phone && (

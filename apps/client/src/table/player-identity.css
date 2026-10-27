@@ -1,0 +1,52 @@
+/* The character a player plays, as a phone's header on the table: the portrait, name and class, AC and HP in VT323
+   boxes, the life bar under them, and the horizon line closing it like every top bar. */
+.player-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  background:
+    var(--grad-horizon) bottom / 100% 2px no-repeat,
+    var(--surface-1);
+}
+.player-identity-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.player-identity-name {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-identity-line {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.player-identity-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+}
+.player-identity-box b {
+  font: 400 22px / 1 var(--font-numeric);
+  color: var(--text);
+}
+.player-identity-box span {
+  color: var(--text-muted);
+  font: 600 10px / 1.2 var(--font-label);
+}
+.player-identity-life {
+  grid-column: 1 / -1;
+}
