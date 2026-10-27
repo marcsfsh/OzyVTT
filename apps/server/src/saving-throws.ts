@@ -925,6 +925,9 @@ export function answerSave(
   if (damageOverride !== undefined && !playerMayType(state, scope, "damage"))
     throw new CommandRejectedError("At this table the server rolls the damage. Ask the GM to change it.");
   const heldKey = `save:${saveId}`;
+  // Its damage waits for the caster's player to type their roll (ADR-0043); a look at the die is fine meanwhile.
+  if (commit && pending.damageRollId !== undefined)
+    throw new CommandRejectedError(`${pending.sourceName ?? "The caster"}'s damage roll isn't in yet.`);
   // A confirmed save waiting on another creature's answer moves only through that answer.
   if (pending.confirmed && options.settling !== true && options.answer?.by === undefined)
     throw new CommandRejectedError(`${target.name}'s save waits on an answer to the roll. The GM can close it.`);

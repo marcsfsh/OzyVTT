@@ -179,6 +179,10 @@ export function SavePrompt({
       );
     });
   };
+  // Its damage waits for the caster's player to type their roll (ADR-0043): it can be rolled, not confirmed.
+  const damageWaits =
+    ("awaitingDamage" in save && save.awaitingDamage === true) ||
+    ("damageRollId" in save && save.damageRollId !== undefined);
   // A confirm parked on another creature's answer outlives this prompt's own state (a reload, another screen).
   const parked =
     ("confirmed" in save && save.confirmed !== undefined) || ("awaitingAnswer" in save && save.awaitingAnswer === true);
@@ -296,7 +300,13 @@ export function SavePrompt({
         answers={rolled?.answers}
         answered={rolled?.answered}
         onAnswer={(answer) => send({ commit: false, answer })}
-        waiting={parked || rolled?.awaiting ? "Waiting on an answer to the roll." : undefined}
+        waiting={
+          parked || rolled?.awaiting
+            ? "Waiting on an answer to the roll."
+            : damageWaits && rolled !== null
+              ? "Waiting for the damage roll."
+              : undefined
+        }
         summary={
           rolled ? (
             <>

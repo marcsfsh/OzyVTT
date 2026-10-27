@@ -35,10 +35,16 @@ export const PLAYER_INITIATIVE = {
 
 /** How players' dice are entered (ADR-0043), in Settings and in an encounter's own settings. */
 export const DICE_MODE_OPTIONS = [
-  { value: "total", label: "Type the total" },
-  { value: "die", label: "Type each die" },
-  { value: "app", label: "The app rolls" }
+  { value: "total", label: "Total" },
+  { value: "die", label: "Each die" },
+  { value: "app", label: "App rolls" }
 ] as const;
+/** The same, as a sentence's end ("Players' d20 rolls: they type each die."). */
+export const DICE_MODE_PHRASE = {
+  total: "they type the total",
+  die: "they type each die",
+  app: "the app rolls"
+} as const;
 /** What each dice mode means, under the choice. */
 export const DICE_MODE_HELP = {
   total: "Players type the final number, bonus included. The app checks it can be rolled.",

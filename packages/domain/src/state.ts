@@ -340,6 +340,9 @@ export const PendingSaveSchema = z
       .optional(),
     /** Effect applied on a failed save, e.g. Grappled with its escape DC from an Unarmed Strike grapple. */
     onFailEffect: PendingSaveEffectSchema.optional(),
+    /** The caster's damage roll the save's damage waits for (`DamageRoll`, ADR-0043); it can't be confirmed until the
+     *  number is in. GM bookkeeping; a player is told only that it waits (`awaitingDamage`). */
+    damageRollId: z.uuid().optional(),
     /** What a success leaves instead (Heat Metal: holding on to the red-hot object brings Disadvantage). The same shape
      *  as `onFailEffect`. GM bookkeeping, never projected. */
     onSuccessEffect: PendingSaveEffectSchema.optional(),
@@ -1060,6 +1063,33 @@ export type PendingFall = z.infer<typeof PendingFallSchema>;
 
 /** A player's hit awaiting the GM's Apply (proposal mode, the default), so players never change HP on a creature
  * they don't own. GM-only: never projected to players or the viewer. */
+/**
+ * A player's damage waiting for the number their dice came to (ADR-0043): the damage dice of a hit, or of an action
+ * whose targets save, while the table's damage mode asks players to type it. What waits on it applies once it is in.
+ */
+export const DamageRollSchema = z
+  .object({
+    id: z.uuid(),
+    sourceActorId: z.uuid(),
+    sourceName: z.string().min(1).max(120),
+    actionName: z.string().min(1).max(120),
+    /** The dice to roll, as they read ("2d6 + 3"). */
+    formula: z.string().min(1).max(200),
+    dice: z
+      .array(z.object({ count: z.number().int().min(1).max(100), sides: z.number().int().min(2).max(100) }).strict())
+      .min(1)
+      .max(20),
+    /** What the server adds to the dice: the formula's numbers and any flat damage effects add. */
+    fixed: z.number().int().min(-1000).max(1000),
+    mode: z.enum(["total", "die"]),
+    /** What waits on it: one damage proposal, or the saves the action opened. */
+    proposalId: z.uuid().optional(),
+    saveIds: z.array(z.uuid()).max(50).optional(),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type DamageRoll = z.infer<typeof DamageRollSchema>;
+
 export const PendingDamageSchema = z
   .object({
     id: z.uuid(),
@@ -1081,6 +1111,10 @@ export const PendingDamageSchema = z
     damageSource: DamageSourceSchema.optional(),
     /** The attacker knocks the target out: a drop to 0 leaves it at 1 Hit Point and Unconscious (SRD). */
     nonlethal: z.literal(true).optional(),
+    /** The player's damage roll it waits for (`DamageRoll`); the GM may still apply it. */
+    awaitingRoll: z.uuid().optional(),
+    /** Applied as soon as the roll is in, at a table where players' hits apply directly. */
+    direct: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -1956,7 +1990,9 @@ const sceneCombatShape = {
   initiativeWindow: z.array(z.uuid()).max(200).default([]),
   /** Whether each party character the encounter started with is played at the table (true) or on its player's
    *  device (false), chosen at the start (ADR-0042). Kept while the encounter runs or is parked; GM-only. */
-  atTable: z.record(z.uuid(), z.boolean()).optional()
+  atTable: z.record(z.uuid(), z.boolean()).optional(),
+  /** Players' damage waiting for their typed number (ADR-0043). A player sees their own characters'. */
+  damageRolls: z.array(DamageRollSchema).max(50).default([])
 };
 
 /** A parked scene's frozen combat: same fields and invariants as the live combat, minus the map (the Scene owns that). */

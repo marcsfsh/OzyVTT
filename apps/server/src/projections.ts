@@ -278,7 +278,9 @@ const PENDING_SAVE_FIELDS = {
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
   spell: "never",
   // Who was asked to answer it would name them; the player is told only that it waits (`awaitingAnswer`).
-  confirmed: "derived"
+  confirmed: "derived",
+  // The roll it waits on is the caster's; the player is told only that it waits (`awaitingDamage`).
+  damageRollId: "derived"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -509,6 +511,18 @@ export function projectPlayerCombat(
     playerDamageMode: state.combat.playerDamageMode,
     // Filtered to public actors; a player checks for their own id to show the "Roll initiative" prompt.
     pendingInitiative: state.combat.pendingInitiative.filter((actorId) => publicActorIds.has(actorId)),
+    // The player's own characters' damage rolls: what to roll, never the proposal or the saves waiting on it.
+    damageRolls: state.combat.damageRolls
+      .filter((roll) => ownedBy(state, roll.sourceActorId, playerSessionId))
+      .map((roll) => ({
+        id: roll.id,
+        sourceActorId: roll.sourceActorId,
+        actionName: roll.actionName,
+        formula: roll.formula,
+        dice: roll.dice.map((die) => ({ ...die })),
+        fixed: roll.fixed,
+        mode: roll.mode
+      })),
     // An Initiative Swap offer names only the two characters in it, and reaches only their players.
     ...swapOffersFor(state, playerSessionId),
     playerInitiativeMode: state.combat.playerInitiativeMode,
@@ -551,6 +565,7 @@ export function projectPlayerCombat(
           actionName: hiddenSource ? withoutSourceName(entry.actionName, entry.sourceName) : entry.actionName,
           sourceName: hiddenSource ? HIDDEN_SOURCE : entry.sourceName,
           ...(entry.confirmed ? { awaitingAnswer: true as const } : {}),
+          ...(entry.damageRollId ? { awaitingDamage: true as const } : {}),
           ...(onFail
             ? {
                 onFailEffect: {

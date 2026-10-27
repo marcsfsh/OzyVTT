@@ -703,6 +703,7 @@ export function endEncounter(state: GameState) {
     pendingRuleAsks: [],
     pendingInitiative: [],
     initiativeWindow: [],
+    damageRolls: [],
     turnSteps: null,
     historyCursor: null,
     historyDirty: false

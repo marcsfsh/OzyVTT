@@ -96,8 +96,8 @@ export function ActionRunner({
     setDamageEdit(null);
   }, [result]);
   // Confirming a hit applies its damage in the same step when no reaction can change it. With hand-rolled dice the
-  // GM types the damage first, so Apply stays.
-  const { rollMode } = useRollPreference();
+  // GM types the damage first, so Apply stays; so it does for a character played at the table, whose player reports it.
+  const { rollMode } = useRollPreference(actor.id);
   const previewedTarget = useRef<string | null>(null);
   const applyRef = useRef<(targetId: string, targetName: string, key: string) => void>(() => {});
   useEffect(() => {

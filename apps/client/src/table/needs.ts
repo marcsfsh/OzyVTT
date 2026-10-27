@@ -1,4 +1,5 @@
 import type {
+  DamageRoll,
   GmActor,
   GmView,
   PendingDamage,
@@ -18,7 +19,8 @@ export type NeedsItem =
   | Readonly<{ kind: "order"; key: string; steps: TurnSteps; actor: GmActor; waiting: boolean }>
   | Readonly<{ kind: "reaction"; key: string; reaction: PendingReaction; actor: GmActor; waiting: boolean }>
   | Readonly<{ kind: "save"; key: string; save: PendingSave; actor: GmActor; waiting: boolean }>
-  | Readonly<{ kind: "damage"; key: string; proposal: PendingDamage }>
+  | Readonly<{ kind: "damage"; key: string; proposal: PendingDamage; roll?: DamageRoll }>
+  | Readonly<{ kind: "damage-roll"; key: string; roll: DamageRoll }>
   | Readonly<{ kind: "dying"; key: string; actor: GmActor; ownTurn: boolean }>
   | Readonly<{ kind: "ask"; key: string; ask: PendingRuleAsk; actor: GmActor | undefined }>
   | Readonly<{ kind: "initiative"; key: string; actors: readonly GmActor[] }>
@@ -57,7 +59,14 @@ export function needsItems(state: GmView): NeedsItem[] {
     if (actor && save.callId === undefined)
       items.push({ kind: "save", key: save.id, save, actor, waiting: answeredByPlayer(actor) });
   }
-  for (const proposal of state.combat.pendingDamage ?? []) items.push({ kind: "damage", key: proposal.id, proposal });
+  // A player's damage waiting for their typed roll (ADR-0043): a hit's on its proposal, a spell's saves on its own.
+  const rolls = new Map((state.combat.damageRolls ?? []).map((roll) => [roll.id, roll]));
+  for (const proposal of state.combat.pendingDamage ?? []) {
+    const roll = proposal.awaitingRoll ? rolls.get(proposal.awaitingRoll) : undefined;
+    items.push({ kind: "damage", key: proposal.id, proposal, ...(roll ? { roll } : {}) });
+  }
+  for (const roll of rolls.values())
+    if (roll.proposalId === undefined) items.push({ kind: "damage-roll", key: roll.id, roll });
   if (state.combat.active)
     for (const actor of state.actors)
       if (inFight.has(actor.id) && isDying(actor))
@@ -106,7 +115,11 @@ export function needsTitle(item: NeedsItem, state: GmView): string {
       return item.waiting ? `Waiting on ${item.actor.name} · ${what}` : `${item.actor.name} makes a ${what}`;
     }
     case "damage":
-      return `${item.proposal.sourceName}'s ${item.proposal.actionName} hit ${item.proposal.targetName}`;
+      return item.roll
+        ? `Waiting on ${item.proposal.sourceName} · damage for ${item.proposal.actionName}`
+        : `${item.proposal.sourceName}'s ${item.proposal.actionName} hit ${item.proposal.targetName}`;
+    case "damage-roll":
+      return `Waiting on ${item.roll.sourceName} · damage for ${item.roll.actionName}`;
     case "dying": {
       const saves = item.actor.deathSaves!;
       return `${item.actor.name} is dying · ${saves.successes} ${saves.successes === 1 ? "success" : "successes"} · ${saves.failures} ${saves.failures === 1 ? "failure" : "failures"}`;

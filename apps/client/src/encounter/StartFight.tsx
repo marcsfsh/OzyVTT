@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
-import type { GmActor, GmView } from "@vtt/domain";
+import { effectivePlayerDice, type GmActor, type GmView } from "@vtt/domain";
 import { Chip, IconChevronRight, Modal, SegmentedControl, Switch, cx } from "@vtt/ui";
 import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
+import { DICE_MODE_PHRASE } from "../settings/table-words";
 import "./start-fight.css";
 
 const SIDE_WORD: Readonly<Record<GmActor["kind"], string>> = {
@@ -79,6 +80,12 @@ export type StartFightProps = Readonly<{
   blocked: string | null;
   phone: boolean;
 }>;
+
+/** What players' dice do in this encounter, from its own modes or the table's (ADR-0043). */
+export function diceLine(state: GmView): string {
+  const dice = effectivePlayerDice(state);
+  return `Players' d20 rolls: ${DICE_MODE_PHRASE[dice.d20]}. Their damage: ${DICE_MODE_PHRASE[dice.damage]}.`;
+}
 
 /** "Lyra at the table", "Lyra and Borin at the table", or "All on their devices": the phone's Who plays row. */
 export function playsOf(party: readonly GmActor[], atTable: (actor: GmActor) => boolean): string {
@@ -290,6 +297,7 @@ function Initiative(props: StartFightProps) {
         disabled={props.busy}
         onChange={props.onGroupMonsters}
       />
+      <p className="start-fight-rule">{diceLine(props.state)}</p>
     </section>
   );
 }

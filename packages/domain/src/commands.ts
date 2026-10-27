@@ -1273,6 +1273,19 @@ export const DamageResolveSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** A player reports what their damage dice came to (ADR-0043): the total, or each die's face in the roll's order. */
+export const DamageReportSchema = z
+  .object({
+    commandId: z.uuid(),
+    rollId: z.uuid(),
+    total: z.number().int().min(0).max(2000).optional(),
+    faces: z.array(z.number().int().min(1).max(100)).min(1).max(100).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((payload) => (payload.total === undefined) !== (payload.faces === undefined), {
+    error: "Send the damage total or each die's face, and only one of the two."
+  });
 /** Table-wide default for how token health shows on the map (GM). */
 export const SetHealthDisplaySchema = z
   .object({

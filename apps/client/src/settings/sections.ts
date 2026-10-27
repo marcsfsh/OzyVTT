@@ -111,7 +111,7 @@ export const SETTING = entries({
   damageDice: {
     section: "fights",
     label: "Players' damage",
-    hint: "Damage and healing dice, unless an encounter chooses its own.",
+    hint: "Damage dice, unless an encounter chooses its own.",
     words: "physical dice type manual roll total face damage healing"
   },
   healthDisplay: {

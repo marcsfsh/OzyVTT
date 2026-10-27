@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Actor, ActorDefinition, EffectInstance } from "@vtt/schemas";
 import type {
+  DamageRoll,
   Annotation,
   BuilderPolicy,
   PlayerDice,
@@ -203,6 +204,7 @@ export type PlayerPendingSave = Omit<
   | "disadvantageTypes"
   | "spell"
   | "confirmed"
+  | "damageRollId"
   | "spendsOnKill"
   | "damageSource"
 > & {
@@ -212,6 +214,8 @@ export type PlayerPendingSave = Omit<
   >;
   /** Confirmed, and waiting on another creature's answer to the roll; who may answer stays unnamed. */
   awaitingAnswer?: true;
+  /** Its damage waits for the caster's player to type their roll (ADR-0043); it can't be confirmed until then. */
+  awaitingDamage?: true;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. `attackRoll` is the held attack's total, present only when that roll
@@ -256,6 +260,12 @@ export type PlayerVision =
       /** Only in a player's own projection, never the table's. */
       sensed?: readonly PlayerSensedCreature[];
     }>;
+/** A damage roll as its own player receives it: what to roll and how to enter it, and nothing of what waits on it. */
+export type PlayerDamageRoll = Pick<
+  DamageRoll,
+  "id" | "sourceActorId" | "actionName" | "formula" | "dice" | "fixed" | "mode"
+>;
+
 export type PlayerCombatView = Readonly<{
   active: boolean;
   round: number;
@@ -282,6 +292,7 @@ export type PlayerCombatView = Readonly<{
   /** Lets the player runner label a hit "handed to the GM" or "applied"; the proposals themselves stay GM-only. */ playerDamageMode:
     "proposal" | "direct";
   /** Claimed-PC actorIds still owing an initiative roll; a player looks for their own id. */ pendingInitiative: readonly string[];
+  /** This player's own characters' damage waiting for the number their dice came to (ADR-0043). */ damageRolls?: readonly PlayerDamageRoll[];
   /** Whether the table waits for all players' initiative rolls before turns begin (see CombatState.playerInitiativeMode). */ playerInitiativeMode:
     "immediate" | "wait";
   underwater: boolean;

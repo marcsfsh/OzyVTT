@@ -1,4 +1,9 @@
-import { DamageResolveSchema, ReactionAnswerSchema, ReactionDismissSchema } from "@vtt/domain/commands";
+import {
+  DamageReportSchema,
+  DamageResolveSchema,
+  ReactionAnswerSchema,
+  ReactionDismissSchema
+} from "@vtt/domain/commands";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
@@ -10,6 +15,7 @@ import { withoutSourceName } from "../hidden-source.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { countOptionUse } from "../option-uses.js";
 import { defineCommand } from "./pipeline.js";
+import { reportDamageRoll } from "../damage-rolls.js";
 
 // Answers to what a hit leaves open: reaction prompts (ADR-0020) and the GM's damage proposals.
 
@@ -344,6 +350,54 @@ export const reactionCommands = [
           }) ?? undefined;
       });
       if (duplicate || !applied) return;
+      const { outcome, targetId, sourceActorId, label } = applied;
+      const detail = damageAdjustmentDetail(outcome.application);
+      const text = `${label} hit ${kit.actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`;
+      kit.context.broadcastTableEvent({ kind: "damage", text, actorIds: [targetId, sourceActorId] });
+      kit.context.appendLog({ kind: "damage", text, actorIds: [targetId, sourceActorId] });
+      kit.publishNarrations(outcome.events);
+    }
+  }),
+
+  defineCommand({
+    type: "damage.report",
+    operationId: "reportDamageRoll",
+    description:
+      "Reports what a player's damage dice came to (ADR-0043), while the table's damage mode has players type it: `total` (bonus included) where the mode is `total`, or `faces`, each die's face in the roll's order, where it is `die`. The server checks the number against the dice and adds what it adds to them. What waits on the roll takes the new total in its own damage types: a hit's proposal stays for the GM to apply, or applies now at a table where players' hits apply directly; the saves an action opened can be confirmed. A player may report only their own character's roll; the GM may report any, as either. The rolls waiting are in `combat.damageRolls`.",
+    summary: "Report what a player's damage dice came to (player or GM).",
+    schema: DamageReportSchema,
+    malformed: "The damage report is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      const distance = await kit.creatureDistance();
+      let reported: ReturnType<typeof reportDamageRoll> | undefined;
+      const { duplicate } = await execute((state) => {
+        reported = reportDamageRoll(
+          state,
+          initiatorOf(principal),
+          request.rollId,
+          {
+            ...(request.total !== undefined ? { total: request.total } : {}),
+            ...(request.faces ? { faces: request.faces } : {})
+          },
+          {
+            resolveDefinition: kit.resolveDefinition,
+            newId: kit.context.newId,
+            now: () => Date.now(),
+            catalog: kit.equipmentCatalog(),
+            distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB),
+            rollDie: (sides) => kit.context.random(sides)
+          }
+        );
+      });
+      if (duplicate || !reported) return;
+      const { roll, total, applied } = reported;
+      kit.context.appendLog({
+        kind: "damage",
+        text: `${roll.sourceName} rolled ${total} damage for ${roll.actionName}.`,
+        actorIds: [roll.sourceActorId]
+      });
+      if (!applied) return;
       const { outcome, targetId, sourceActorId, label } = applied;
       const detail = damageAdjustmentDetail(outcome.application);
       const text = `${label} hit ${kit.actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`;

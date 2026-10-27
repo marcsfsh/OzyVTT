@@ -67,14 +67,29 @@ The numbered migration maps the old setting exactly, so a table's behavior is un
   is still known. "The bonus" is every fixed modifier; dice an effect adds (Bless's d4, a Bardic Inspiration die) the
   server still throws in both typed modes, and the box says the bonus is included. A Heroic Inspiration reroll of a
   typed die takes the rerolled face.
-- **The player's box.** A player has no device choice: `app` rolls, `die` asks for the face (with a Roll button still
-  there), `total` asks for the total. The GM keeps the device choice, except for a character played at the table, whose
-  prompts ask the GM for the total.
+- **The player's box.** Where the table takes typed d20s (`die` or `total`), a player keeps the device's choice to
+  roll or type, as before; the mode says whether a typed number is the face or the total. `app` always rolls. The GM
+  keeps the device choice too, except for a character played at the table, whose prompts ask the GM for the total.
+- **Damage.** With `damage` at `total` or `die`, a player's confirmed hit, the damage of an action with no attack or
+  save, and the damage of the saves their action opens wait on a `DamageRoll` (`combat.damageRolls`,
+  `damage-rolls.ts`): the dice the server read off the damage formulas, and what it adds (the formulas' numbers and
+  flat damage effects). The player's prompt slot asks for the total or each die's face (`damage.report`); the server
+  checks it ("1d8 + 3 comes to 4 to 11"), and what waits takes the new total in its own damage types. A hit's proposal
+  then waits for the GM, or applies at once at a table where players' hits apply directly; a save can be rolled but
+  not confirmed until its roll is in. The GM may type the roll instead from Needs you, or settle a hit without it.
+  A character played at the table is resolved by the GM, whose result card keeps Apply until the GM types the damage.
+- **Not built yet.** Healing dice still roll on the server, and damage split among targets (Magic Missile's darts)
+  keeps the server's roll.
 - **Builder.** Typed rolled scores and hit points follow `d20`: allowed unless it is `app`.
 - **Where it is set.** Settings > Encounters has both modes; an encounter's Encounter settings can use the table's or
   pick its own (`encounter.set-player-dice`); Start the encounter says what applies.
 
 ## Validation evidence
 
-To be added with the code: each mode for each kind of roll on both transports, the range check, a save-for-damage
-effect waiting for the player's number, the encounter override, the at-the-table rule, and the migration test.
+- `dice-authority.test.ts`: totals for attacks, death saves (Bless's d4 still thrown) and initiative, the range and
+  mode refusals, the encounter's own mode and what players read; a player's damage total and faces, the range check,
+  a direct table applying once the roll is in, and a save that takes no confirm until its roll is in.
+- `check-rolls.test.ts`: a check's face, total and refusals in each mode. `damage-rolls.test.ts`: the dice read off a
+  resolve and the saves it holds. `game-store.test.ts`: the migration from `typedRolls`.
+- Client: `dice-modes.test.ts` (who types what, and the at-the-table rule), `damage-roll-prompt.test.tsx`, and the
+  existing prompt and settings tests under the new modes.

@@ -878,7 +878,10 @@ How a player's dice are entered is the table's dice modes (ADR-0043, `GameState.
 `die` or `app` (`player-dice.ts`). In `die` a player types the d20's face; in `total` they send `rolledTotal`
 (`attackRolledTotal` for an attack), which the server turns back into the face by taking off the bonus it works out
 (`faceFromTotal`), refusing a total the bonus can't reach; dice an effect adds (Bless) it still throws. The GM may
-always type or roll, and types the total for a character played at the table. On the client every roll prompt
+always type or roll, and types the total for a character played at the table. With `damage` at `total` or `die`, a
+player's damage waits on a `DamageRoll` (`damage-rolls.ts`, `combat.damageRolls`) until `damage.report` brings their
+number; a hit's proposal (`awaitingRoll`) and the saves the action opened (`damageRollId`, which can't be confirmed
+meanwhile) then take it. On the client every roll prompt
 shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`). A call
 for a check can name the creature it is about (`aboutActorId`, never projected), whose traits weigh on the roll (a

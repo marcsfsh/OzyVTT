@@ -52,6 +52,8 @@ describe("recipient-safe encounter projections", () => {
     expect(combat).toEqual({
       active: true,
       round: 3,
+      // A player's own damage rolls (ADR-0043); none here.
+      damageRolls: [],
       turnActorId: null,
       mapAssetId: MAP,
       hiddenTurn: true,

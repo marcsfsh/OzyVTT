@@ -32,6 +32,8 @@ import { damageAdjustmentDetail } from "../hit-points.js";
 import { activeMoveGrant } from "../granted-moves.js";
 import { DISTANCE_TOLERANCE_FEET, mapDistance, tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
+import { holdForDamageRolls } from "../damage-rolls.js";
+import { diceMode } from "../player-dice.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
 import { looseRollPlan, routeForTap, slotsModeFor, spendLooseUses } from "../tap-routing.js";
@@ -172,6 +174,11 @@ export const actionCommands = [
         // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
         // else's get one answer, so a player can't probe which ids exist.
         requireActorAccess(initiator, draft, actorId, "attack");
+        // What already waited before this resolve, so a player's damage roll holds only what it opens (ADR-0043).
+        const waitingBefore = {
+          proposalIds: new Set(draft.combat.pendingDamage.map((proposal) => proposal.id)),
+          saveIds: new Set(draft.combat.pendingSaves.map((save) => save.id))
+        };
         const attacker = draft.actors.find((item) => item.id === actorId);
         if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
         // What its turn's start does at once comes first, in the order its player gives.
@@ -732,13 +739,16 @@ export const actionCommands = [
           );
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
+        // With players typing their damage, it waits for their number as a proposal, and applies directly once it is
+        // in where hits apply directly (ADR-0043).
+        const damageMode = isPlayer ? diceMode(draft, "damage") : "app";
         if (isPlayer)
           playerDamageApplied = settlePlayerDamage(
             draft,
             resolution,
             attacker.name,
             actorId,
-            draft.combat.playerDamageMode,
+            damageMode === "app" ? draft.combat.playerDamageMode : "proposal",
             {
               resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
               newId: kit.context.newId,
@@ -748,6 +758,16 @@ export const actionCommands = [
               rollDie: (sides) => kit.context.random(sides)
             },
             action.drain
+          );
+        if (damageMode !== "app")
+          holdForDamageRolls(
+            draft,
+            resolution,
+            { actorId, name: attacker.name },
+            damageMode,
+            waitingBefore,
+            draft.combat.playerDamageMode === "direct",
+            { newId: kit.context.newId, now: () => Date.now() }
           );
         // Record the blast as a shape; id=commandId keeps re-delivery idempotent. A cone or line starts at its caster,
         // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.

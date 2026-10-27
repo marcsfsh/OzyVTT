@@ -1,3 +1,4 @@
+import { DamageRollPrompt, damageRollLine } from "../encounter/DamageRollPrompt";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { PlayerActor, PlayerPendingReaction, PlayerView } from "@vtt/domain";
 import { useRollPreference } from "../dice/roll-preference";
@@ -197,6 +198,8 @@ export function PromptSlot({
         return turnOrderTitle(entry.actor.name, entry.waiting.boundary);
       case "roll-call":
         return "The GM calls for a roll";
+      case "damage-roll":
+        return `Roll damage for ${entry.roll.actionName}`;
     }
   };
 
@@ -284,9 +287,11 @@ export function PromptSlot({
             eyebrow="Saving throw · answer now"
             title={`DC ${save.dc} ${abilityName(save.ability)} saving throw`}
             detail={`${save.sourceName ? `${save.sourceName}'s ` : ""}${save.actionName}${
-              save.proposedDamage > 0
-                ? `: ${save.proposedDamage} damage on a failure${save.halfOnSuccess ? ", half on a success" : ""}.`
-                : "."
+              save.awaitingDamage
+                ? ": damage on a failure, once its roll is in."
+                : save.proposedDamage > 0
+                  ? `: ${save.proposedDamage} damage on a failure${save.halfOnSuccess ? ", half on a success" : ""}.`
+                  : "."
             }`}
             headingRef={headingRef}
           >
@@ -303,6 +308,18 @@ export function PromptSlot({
         );
         break;
       }
+      case "damage-roll":
+        card = (
+          <PromptCard
+            eyebrow="Damage · roll now"
+            title={`Roll damage for ${first.roll.actionName}`}
+            detail={damageRollLine(first.roll)}
+            headingRef={headingRef}
+          >
+            <DamageRollPrompt key={first.roll.id} roll={first.roll} onFeedback={setOutcome} />
+          </PromptCard>
+        );
+        break;
       case "initiative":
         card = (
           <PromptCard

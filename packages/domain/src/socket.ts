@@ -122,6 +122,7 @@ import type {
   CheckRollSchema,
   CommandIdentitySchema,
   DamageResolveSchema,
+  DamageReportSchema,
   DeathSaveRollSchema,
   DiceRollSchema,
   EffectAddSchema,
@@ -818,6 +819,11 @@ export interface ClientToServerEvents {
   ) => void;
   "damage:resolve": (
     payload: CommandPayload<typeof DamageResolveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A player (or the GM) reports what a damage roll came to (ADR-0043). */
+  "damage:report": (
+    payload: CommandPayload<typeof DamageReportSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:available-actions": (

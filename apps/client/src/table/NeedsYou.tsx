@@ -1,3 +1,4 @@
+import { DamageRollPrompt } from "../encounter/DamageRollPrompt";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmActor, GmView } from "@vtt/domain";
 import { Button, IconBell, useToast } from "@vtt/ui";
@@ -148,10 +149,28 @@ function NeedsCard({
       break;
     }
     case "damage": {
-      const { proposal } = item;
+      const { proposal, roll } = item;
       tone = "caution";
+      if (roll) {
+        // The player rolls it; the GM may type it instead, or settle the hit as it stands.
+        detail = `${proposal.targetName} was hit. ${roll.sourceName}'s player rolls ${roll.formula}.`;
+        body = (
+          <>
+            <DamageRollPrompt roll={roll} onFeedback={onFeedback} />
+            <PendingDamagePrompt proposal={proposal} onFeedback={onFeedback} />
+          </>
+        );
+        break;
+      }
       detail = `${damageWords(proposal.proposedDamageParts, proposal.proposedTotal)}${proposal.critical ? " · critical hit" : ""}.`;
       body = <PendingDamagePrompt proposal={proposal} onFeedback={onFeedback} />;
+      break;
+    }
+    case "damage-roll": {
+      const { roll } = item;
+      tone = "caution";
+      detail = `The saves wait for it. ${roll.sourceName}'s player rolls ${roll.formula}.`;
+      body = <DamageRollPrompt roll={roll} onFeedback={onFeedback} />;
       break;
     }
     case "dying": {

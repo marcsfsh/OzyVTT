@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 18 GameState fields · 186 commands · 363 HTTP paths
+- 18 GameState fields · 187 commands · 364 HTTP paths
 
 ## GameState shape
 
@@ -124,6 +124,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `crafting.help` | `actor:write` |
 | `crafting.start` | `actor:write` |
 | `crafting.work` | `actor:write` |
+| `damage.report` | `combat:write` |
 | `damage.resolve` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
@@ -424,6 +425,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/crafting/{projectId}/cancel`
 - `POST /api/v1/game/crafting/{projectId}/helpers`
 - `POST /api/v1/game/crafting/{projectId}/work`
+- `POST /api/v1/game/damage/report`
 - `POST /api/v1/game/damage/resolve`
 - `POST /api/v1/game/definitions/import`
 - `POST /api/v1/game/doors/{wallId}/open`
