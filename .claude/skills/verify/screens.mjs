@@ -2,13 +2,13 @@
 // temporary data directory, so a UI change can be looked at without touching the GM's campaign.
 //
 //   node .claude/skills/verify/screens.mjs [--as gm|player] [--theme dusk|dawn|both] [--reduce-transparency]
-//     [--scenario table|fight] [--tv] <path>...
+//     [--scenario table|fight] [--tab <id>] [--tv] <path>...
 //
 // Each page is captured in each theme asked for (both by default), after the self-hosted fonts load. `--scenario table`
 // makes a scene live on a drawn battle map with the party and four goblins on it, one hidden from players;
 // `--scenario fight` also starts the fight. Both add a Codex page with a hidden field and a hidden block. A path's
 // `{scene}` is that scene's id, as in `/scenes/{scene}`, and `{page}` that page's, as in `/codex/pages/{page}`.
-// `--tv` pairs each browser as a table screen instead of signing in, presents the scenario's map, and captures
+// `--tab log` opens the table's panel on that tab (the device's saved tab). `--tv` pairs each browser as a table screen instead of signing in, presents the scenario's map, and captures
 // /viewer.html at 1920x1080, a 1280x720 screen and a portrait tablet.
 // Build the client first (`npm run build`). Pictures land in e2e/test-results/screens/.
 import { spawn } from "node:child_process";
@@ -30,6 +30,8 @@ const scenarioAt = args.indexOf("--scenario");
 const scenario = scenarioAt === -1 ? null : args.splice(scenarioAt, 2)[1];
 if (scenario !== null && scenario !== "table" && scenario !== "fight")
   throw new Error(`--scenario takes table or fight, not ${scenario}`);
+const tabAt = args.indexOf("--tab");
+const tab = tabAt === -1 ? null : args.splice(tabAt, 2)[1];
 const tvAt = args.indexOf("--tv");
 const tv = tvAt !== -1;
 if (tv) args.splice(tvAt, 1);
@@ -133,7 +135,8 @@ async function signIn(page) {
     await page.getByRole("tablist", { name: "GM sections" }).waitFor();
   } else {
     await page.getByRole("button", { name: "Join as Player" }).click();
-    await page.getByRole("radio").first().click();
+    // Each size is its own player, so it takes the first character no earlier size claimed.
+    await page.getByRole("radio", { disabled: false }).first().click();
     await page.getByRole("button", { name: /^Play as / }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Claim" }).click();
     await page.getByText(/^You're playing /).waitFor();
@@ -239,6 +242,10 @@ async function seed(browser) {
     // A few rolls shown to players, so the log has cards to show.
     for (const formula of ["1d20+5", "2d6+3", "1d8"])
       await post("/api/v1/game/rolls", { formula, purpose: "manual", visibility: "public" });
+    // A line for everyone and a whisper to the first character, so the log has chat to show.
+    const first = game.actors.find((actor) => actor.kind === "player-character");
+    await post("/api/v1/game/chat", { text: "Watch the shadows by the east door." });
+    if (first) await post("/api/v1/game/chat", { text: "You hear something only you notice.", whisperTo: first.id });
   }
 }
 
@@ -261,11 +268,12 @@ try {
     // next load reads before it paints.
     for (const theme of themes) {
       await page.evaluate(
-        ({ theme, reduce }) => {
+        ({ theme, reduce, tab, key }) => {
           localStorage.setItem("vtt.theme", theme);
           localStorage.setItem("vtt.reduce-transparency", reduce ? "on" : "off");
+          if (tab) localStorage.setItem(key, tab);
         },
-        { theme, reduce }
+        { theme, reduce, tab, key: `vtt.table-tab.${role}.${size.name === "phone" ? "phone" : "laptop"}` }
       );
       for (const path of paths) {
         await page.goto(path.replace("{scene}", sceneId ?? "").replace("{page}", pageId ?? ""));

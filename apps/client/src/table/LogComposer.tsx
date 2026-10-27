@@ -104,11 +104,24 @@ export function LogComposer({ options, talk }: Readonly<{ options?: ReactNode; t
         ))}
       </div>
       <form className="log-composer-row" onSubmit={submit}>
+        <Select
+          className="log-composer-hears"
+          aria-label="Who hears it"
+          value={hears}
+          onChange={(event) => setHears(event.target.value)}
+        >
+          <option value="">Everyone</option>
+          {whisperOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
         <span className="log-composer-field">
           <Input
             value={text}
             onChange={(event) => setText(event.target.value)}
-            placeholder="Say something, or /roll 2d6+3"
+            placeholder="Say, or /roll 1d20"
             aria-label="Say something or roll"
             autoComplete="off"
             maxLength={600}
@@ -118,29 +131,14 @@ export function LogComposer({ options, talk }: Readonly<{ options?: ReactNode; t
           <IconArrow />
         </IconButton>
       </form>
-      <div className="log-composer-foot">
-        <Select
-          className="log-composer-hears"
-          aria-label="Who hears it"
-          value={hears}
-          onChange={(event) => setHears(event.target.value)}
-        >
-          <option value="">Everyone hears it</option>
-          {whisperOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
-        {options && (
-          <>
-            <span className="log-composer-audience">{ROLL_VISIBILITY_WORD[visibility]}</span>
-            <Button variant="link" size="sm" onClick={() => setOptionsOpen(true)}>
-              Dice options
-            </Button>
-          </>
-        )}
-      </div>
+      {options && (
+        <div className="log-composer-foot">
+          <span className="log-composer-audience">{ROLL_VISIBILITY_WORD[visibility]}</span>
+          <Button variant="link" size="sm" onClick={() => setOptionsOpen(true)}>
+            Dice options
+          </Button>
+        </div>
+      )}
       {options && (
         <Modal open={optionsOpen} onClose={() => setOptionsOpen(false)} title="Dice options" size="lg">
           {options}
