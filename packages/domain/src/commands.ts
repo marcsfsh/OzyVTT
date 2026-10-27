@@ -2266,6 +2266,25 @@ export const DiceRollSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Longest chat line, in code points after the server's clean-up (ADR-0038). */
+export const CHAT_MAX_LENGTH = 500;
+/** A chat line (ADR-0038). `actorId` names which claimed character speaks, needed when a player plays several.
+ *  `whisperTo` makes it a whisper: a party character's id from the GM, or "gm" from a player. */
+export const ChatSendSchema = z
+  .object({
+    commandId: z.uuid(),
+    text: z.string().min(1).max(2000),
+    actorId: z.uuid().optional(),
+    whisperTo: z.union([z.uuid(), z.literal("gm")]).optional()
+  })
+  .strict();
+/** Removes a chat line: its author's own, or any for the GM. `entryId` is the line's id as the reader holds it. */
+export const ChatDeleteSchema = z
+  .object({
+    commandId: z.uuid(),
+    entryId: z.number().int().nonnegative()
+  })
+  .strict();
 /** How a token move travels (SRD Movement): on foot or by one of the special speeds, which spend movement; by
  *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
 export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "jump", "teleport", "forced"]);

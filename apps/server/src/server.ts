@@ -24,7 +24,8 @@ import { reconcileMagicMarkers } from "./inventory.js";
 import { refreshBuiltSheets, refreshIsDue, type SheetRefresh } from "./sheet-refresh.js";
 import { AuthService } from "./auth.js";
 import { developmentClientUrl } from "./client-hosting.js";
-import { CombatLogStore, projectFeedRow } from "./combat-log.js";
+import { ChatLimiter } from "./chat.js";
+import { CombatLogStore, projectFeedRow, type StoredFeedRow } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
 import {
@@ -158,6 +159,7 @@ export function createServer(options: CreateServerOptions) {
   // Every read of the game state outside a command's own transaction goes through here.
   const committedState = createStateReader(store);
   const combatLog = new CombatLogStore(options.databasePath);
+  const chatLimiter = new ChatLimiter();
   const credentials = new IntegrationCredentialStore(options.integrationCredentialsPath);
   const mapAssets = new MapAssetStore(options.mapAssetsPath ?? join(dirname(options.databasePath), "map-assets"));
   const mapCatalog = new MapCatalogStore(options.databasePath);
@@ -573,18 +575,38 @@ export function createServer(options: CreateServerOptions) {
       actorId: entry.actorId ?? null,
       roll: entry.roll ?? null
     });
-    // Per-recipient delivery: a `self-only` roll belongs to one player, unlocked by their session id.
-    // `projectFeedRow` decides and strips the roller's session id. The public viewer has no game socket.
+    sendFeedRow(row);
+  }
+  /** The party characters a player's session plays now: what unlocks a whisper to one of them (ADR-0038). */
+  function charactersOf(state: GameState, sessionId: string): ReadonlySet<string> {
+    return new Set(
+      state.actors
+        .filter((actor) => actor.kind === "player-character" && actor.ownerSessionId === sessionId)
+        .map((actor) => actor.id)
+    );
+  }
+  /** Per-recipient delivery: a `self-only` roll belongs to one player, unlocked by their session id, and a whisper to
+   *  whoever plays its character. `projectFeedRow` decides and strips the sender's session id. The public viewer has
+   *  no game socket. With `removed`, each reader that held the row is told its id is gone. */
+  function sendFeedRow(row: StoredFeedRow, removed = false) {
+    const current = committedState.read();
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
       if (auth.verify(token)) {
-        socket.emit("log:entry", row.entry);
+        if (removed) socket.emit("log:removed", { id: row.entry.id });
+        else socket.emit("log:entry", row.entry);
         continue;
       }
       const player = auth.verifyPlayer(token);
       if (!player) continue;
-      const projected = projectFeedRow(row, { gm: false, sessionId: player.sessionId });
-      if (projected) socket.emit("log:entry", projected);
+      const projected = projectFeedRow(row, {
+        gm: false,
+        sessionId: player.sessionId,
+        characterIds: charactersOf(current, player.sessionId)
+      });
+      if (!projected) continue;
+      if (removed) socket.emit("log:removed", { id: projected.id });
+      else socket.emit("log:entry", projected);
     }
   }
   /** "Round 3 · Borin's turn.", then what Borin carries into it (`turnReminder`). A hidden combatant's turn stays
@@ -726,6 +748,27 @@ export function createServer(options: CreateServerOptions) {
       } catch (error) {
         // Best-effort (the rest already committed), but logged.
         console.error("moving the codex date failed:", error instanceof Error ? error.message : error);
+      }
+    },
+    chat: {
+      byCommand: (commandId) => combatLog.chatByCommand(commandId),
+      allow: (sessionId, gm) => chatLimiter.allow(sessionId, gm),
+      post: (line) => {
+        const row = combatLog.append({
+          kind: "chat",
+          text: line.text,
+          gmOnly: false,
+          revision: committedState.read().revision,
+          chat: line
+        });
+        sendFeedRow(row);
+        return row;
+      },
+      find: (entryId, gm) => combatLog.findForReader(entryId, gm),
+      remove: (row) => {
+        // Told before the row goes, while each reader's right to it can still be worked out.
+        sendFeedRow(row, true);
+        combatLog.remove(row.entry.id);
       }
     },
     claimReleased: (sessionId, event) => {

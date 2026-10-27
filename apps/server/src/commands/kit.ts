@@ -1,6 +1,7 @@
 import type {
   ActionResolution,
   ActionTableNarration,
+  ChatAuthor,
   ClaimReleasedEvent,
   CombatLogEntry,
   GameState,
@@ -17,7 +18,7 @@ import { withMonsterSpells } from "../monster-spells.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import type { CharacterDraftStore } from "../character-drafts.js";
 import type { Initiator } from "../authorization.js";
-import type { CombatLogStore } from "../combat-log.js";
+import type { CombatLogStore, StoredFeedRow } from "../combat-log.js";
 import type { TimelineOutcome } from "../combat-history.js";
 import type { ContentAudience, ContentLibrary } from "../content-library.js";
 import type { EffectNarration } from "../effects.js";
@@ -103,6 +104,23 @@ export type CommandContext = Readonly<{
   /** The committed state for reads: frozen, and cloned once per revision, however many reads there are. */
   readState: () => GameState;
   combatLog: Pick<CombatLogStore, "list" | "exportSince">;
+  /** Table chat (ADR-0038): lines go into the feed and out to each reader as the feed's rows do. */
+  chat: Readonly<{
+    byCommand: (commandId: string) => StoredFeedRow | null;
+    /** Whether this session may send another line now, under the chat's rate limit. */
+    allow: (sessionId: string, gm: boolean) => boolean;
+    post: (
+      line: Readonly<{
+        commandId: string;
+        text: string;
+        author: ChatAuthor;
+        whisper?: Readonly<{ characterId: string; name: string }>;
+        sessionId: string;
+      }>
+    ) => StoredFeedRow;
+    find: (entryId: number, gm: boolean) => StoredFeedRow | null;
+    remove: (row: StoredFeedRow) => void;
+  }>;
   contentLibrary: ContentLibrary;
   mapCatalog: Readonly<{
     get: (

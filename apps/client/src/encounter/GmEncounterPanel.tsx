@@ -608,7 +608,15 @@ export function GmEncounterPanel({
   const logBody = (
     <div className="table-log-tab">
       {slots?.log}
-      <LogComposer options={slots?.dice} />
+      <LogComposer
+        options={slots?.dice}
+        talk={{
+          role: "gm",
+          characters: rosterActors(state.actors)
+            .filter((actor) => actor.kind === "player-character" && !actor.archived)
+            .map((actor) => ({ id: actor.id, name: actor.name }))
+        }}
+      />
     </div>
   );
   const partyBody = (

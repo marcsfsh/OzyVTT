@@ -627,7 +627,16 @@ export function PlayerEncounterPanel({
   const logBody = (
     <div className="table-log-tab">
       {slots?.log}
-      <LogComposer options={slots?.dice} />
+      <LogComposer
+        options={slots?.dice}
+        talk={{
+          role: "player",
+          speaker:
+            state.actors
+              .filter((actor) => actor.claimStatus === "mine")
+              .map((actor) => ({ id: actor.id, name: actor.name }))[0] ?? null
+        }}
+      />
     </div>
   );
   const party = slots?.party ?? <p className="table-panel-empty">The party is hidden.</p>;

@@ -43,7 +43,7 @@ import { castOptionsOf } from "../spell-zones.js";
 import { craftingOffers } from "../crafting.js";
 import { craftingDeps } from "./crafting.js";
 import { GameNotFoundError } from "./failures.js";
-import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
+import { claimedCharacterIds, initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";
 import { rowAsSeen } from "../disguised-items.js";
 
@@ -457,7 +457,9 @@ export const gameReads = [
       entries: kit.context.combatLog.list(
         isGmGrade(principal),
         (input as z.output<typeof LogReadSchema>).limit,
-        principal.kind === "player" ? principal.sessionId : undefined
+        principal.kind === "player" ? principal.sessionId : undefined,
+        // The characters this player plays now unlock the whispers to them (ADR-0038).
+        principal.kind === "player" ? new Set(claimedCharacterIds(kit.read(), principal.sessionId)) : undefined
       )
     })
   },

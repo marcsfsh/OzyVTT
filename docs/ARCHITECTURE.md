@@ -80,8 +80,16 @@ so a held attack finishes without the reaction.
 Socket.IO over the same origin as HTTP. Server-to-client events come in two kinds:
 
 - **Projected channels** carry content and are computed per recipient: `state:updated`,
-  `table:event` and `log:entry`. `log:entry` is computed per socket because a self-only roll
-  belongs to exactly one player; `projectFeedRow` in `combat-log.ts` makes that decision.
+  `table:event`, `log:entry` and `log:removed`. `log:entry` is computed per socket because a
+  self-only roll belongs to exactly one player and a whisper to the players of one character;
+  `projectFeedRow` in `combat-log.ts` makes that decision, from the reader's session and the
+  characters it plays now. `log:removed` tells each reader that held a deleted chat line its id.
+- **Table chat** (ADR-0038, `commands/chat.ts`, `chat.ts`): `chat:send` writes a `kind: "chat"`
+  feed row whose author comes from the token (a player speaks as a claimed character, the GM as
+  the GM), cleaned to plain text of at most 500 characters, refused when it starts with `/`, and
+  limited per session. A whisper is stored with visibility `whisper` and reaches the GM and the
+  players of its character only. `chat:delete` removes a line (its author's, or any for the GM)
+  and nothing of it is kept. A resent command finds its row by `commandId` and writes nothing.
 - **Ping channels** carry only a revision: `codex:changed` and `homebrew:changed`. Naming what
   changed would tell players which part of the world the GM is editing, so clients refetch
   their own projected view instead. The GM's devices get `codex:changed` with the Codex store's
@@ -1077,9 +1085,11 @@ A player's tabs are Turn, Sheet, Log and Party in a fight (Me, Log and Party bet
 the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts, the round and the four lamps; End turn is the
 footer's one primary. On a phone the table and its log head with the character being played
 (`table/PlayerIdentity.tsx`) in place of the top bar. The Log tab is the persisted combat log, rolls drawn as cards,
-over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the field sends a typed formula, both
-through `dice:roll` at the visibility the dice options chose (`dice/roll-visibility.ts`), and Dice options opens the
-full `DicePanel`, the GM's calls for a roll included. The table screen lamp
+over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the field rolls the formula after
+`/roll` (or `/r`), both through `dice:roll` at the visibility the dice options chose (`dice/roll-visibility.ts`);
+any other text is a chat line through `chat:send`, to everyone or whispered as Who hears it says, and an unknown
+`/` word is refused before anything is sent. Dice options opens the full `DicePanel`, the GM's calls for a roll
+included. The table screen lamp
 (`table/TvControl.tsx`) pauses or resumes the screen and opens its preview (`viewer/preview-open.ts`). The screen
 itself (`viewer/ViewerApp.tsx`, with `viewer/ScreenParts.tsx`) draws a strip of the turn order with the VCR counter,
 the map fitted whole unless the screen chose Follow GM view or zoomed, and a column with who acts now and the

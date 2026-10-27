@@ -141,7 +141,20 @@ export function TableView(props: TableViewProps) {
   );
 
   const dice = <DicePanel role={role} state={state} />;
-  const log = <CombatLogPanel />;
+  // The GM may remove any chat line; a player, what their own characters said.
+  const myCharacters = new Set(
+    role === "gm"
+      ? []
+      : state.actors.filter((actor) => "claimStatus" in actor && actor.claimStatus === "mine").map((a) => a.id)
+  );
+  const log = (
+    <CombatLogPanel
+      canRemove={(entry) =>
+        entry.kind === "chat" &&
+        (role === "gm" || (entry.author?.role === "player" && myCharacters.has(entry.author.actorId ?? "")))
+      }
+    />
+  );
   let panel;
   if (props.role === "gm") {
     panel = (

@@ -1,4 +1,4 @@
-/* The composer under the log: six quick dice, then the formula field and its Roll, then who sees the roll beside
+/* The composer under the log: six quick dice, then the field and Send, then who hears a line, who sees a roll and
    Dice options. */
 .log-composer {
   flex: none;
@@ -44,26 +44,22 @@
   align-items: center;
   min-width: 0;
 }
-.log-composer-field > svg {
-  position: absolute;
-  left: 12px;
-  width: 18px;
-  height: 18px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
 .log-composer-field .nh-input {
   width: 100%;
-  padding-left: 40px;
 }
 .log-composer-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-2);
   min-height: var(--tap-min);
 }
 .log-composer-audience {
   color: var(--text-muted);
   font-size: var(--fs-sm);
+}
+.log-composer-hears {
+  flex: 1 1 12rem;
+  min-width: 0;
+  min-height: var(--tap-min);
 }

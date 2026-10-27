@@ -169,6 +169,8 @@ import type {
   SceneIdSchema,
   SceneRenameSchema,
   SceneSetInitiativeDefaultsSchema,
+  ChatSendSchema,
+  ChatDeleteSchema,
   SceneReorderSchema,
   SceneSetCombatantsSchema,
   SetActorArchivedSchema,
@@ -260,6 +262,8 @@ export interface ServerToClientEvents {
   "system:error": (message: string) => void;
   "table:event": (event: TableEvent) => void;
   "log:entry": (entry: CombatLogEntry) => void;
+  /** A feed line was removed (a deleted chat line), by the id this reader holds it under. */
+  "log:removed": (event: Readonly<{ id: number }>) => void;
   "codex:changed": (event: CodexChangedEvent) => void;
   "homebrew:changed": (event: HomebrewChangedEvent) => void;
   /** The sound board changed, or a table screen's sound did. Sent to GM sessions only: players learn nothing of it. */
@@ -851,6 +855,15 @@ export interface ClientToServerEvents {
   /** The creature's controller orders what happens at once as its turn starts or ends. */
   "turn:order": (
     payload: CommandPayload<typeof TurnOrderSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A chat line, or a whisper between the GM and one character (ADR-0038). */
+  "chat:send": (
+    payload: CommandPayload<typeof ChatSendSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "chat:delete": (
+    payload: CommandPayload<typeof ChatDeleteSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "dice:roll": (

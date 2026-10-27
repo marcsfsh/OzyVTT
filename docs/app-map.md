@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 17 GameState fields · 181 commands · 358 HTTP paths
+- 17 GameState fields · 183 commands · 360 HTTP paths
 
 ## GameState shape
 
@@ -38,7 +38,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `crafting`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `environment`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `trap`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `check`, `crafting`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `environment`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `trap`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -113,6 +113,8 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `c
 | `character.study-item` | `actor:write` |
 | `character.submit-import` | `actor:write` |
 | `character.swap-spell` | `actor:write` |
+| `chat.delete` | `roll:create` |
+| `chat.send` | `roll:create` |
 | `check.answer` | `combat:write` |
 | `check.reroll` | `combat:write` |
 | `check.roll` | `combat:write` |
@@ -413,6 +415,8 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/characters/draft/discard`
 - `POST /api/v1/game/characters/draft/save`
 - `POST /api/v1/game/characters/random`
+- `POST /api/v1/game/chat`
+- `POST /api/v1/game/chat/delete`
 - `POST /api/v1/game/claims`
 - `POST /api/v1/game/claims/{actorId}/force-release`
 - `POST /api/v1/game/claims/release`

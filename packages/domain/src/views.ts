@@ -408,7 +408,8 @@ export type CombatLogEntry = Readonly<{
     | "movement"
     | "effect"
     | "death-save"
-    | "override";
+    | "override"
+    | "chat";
   text: string;
   gmOnly: boolean;
   revision: number;
@@ -418,4 +419,10 @@ export type CombatLogEntry = Readonly<{
   roll?: PlayerRollRecord;
   /** True only on a `self-only` roll the recipient rolled. Computed per recipient; never stored. */
   private?: boolean;
+  /** Who said a `kind: "chat"` line: the GM, or a player as the character named (ADR-0038). */
+  author?: ChatAuthor;
+  /** A chat line whispered between the GM and this party character. It reaches only the GM and that character's
+   *  player. */
+  whisper?: Readonly<{ characterId: string; name: string }>;
 }>;
+export type ChatAuthor = Readonly<{ name: string; role: "gm" | "player"; actorId?: string }>;
