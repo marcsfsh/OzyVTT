@@ -22,7 +22,8 @@ import { needsItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
 import { PaneDivider, useMomentShare } from "../table/PaneDivider";
 import { PromptSlot } from "../table/PromptSlot";
-import { TableHeader } from "../table/TableHeader";
+import { TableStrip } from "../table/TableStrip";
+import { usePhoneShell } from "./AppBar";
 import { TokenTab } from "../table/TokenTab";
 import { useCodexNotice } from "../table/useCodexNotice";
 import "./table-view.css";
@@ -38,7 +39,6 @@ export type GmTable = Readonly<{
   onSelectMap: (map: MapSelection | null) => void;
   /** Makes a prepared scene live, asked first while a fight is on: Tonight's board names its fights' scenes. */
   onMakeLive: (sceneId: string) => void;
-  viewerPreview: Readonly<{ on: boolean; onToggle: () => void }>;
 }>;
 
 // Leave table is in Settings, confirmed, away from the fight's controls.
@@ -59,6 +59,8 @@ export function TableView(props: TableViewProps) {
   const { role, state, token } = props;
   const gm = props.role === "gm" ? props.gm : null;
   const phone = useMediaQuery(PHONE_TABLE_QUERY);
+  // The narrower phone shell, where Play's strip stands in for the top bar.
+  const phoneShell = usePhoneShell();
   /**
    * Whether this player has claimed anyone, which decides between the pre-claim picker and their own
    * character. Read from the projection's `claimStatus`.
@@ -88,9 +90,9 @@ export function TableView(props: TableViewProps) {
 
   const header =
     props.role === "gm" ? (
-      <TableHeader role="gm" state={props.state} gm={{ token, liveMapName, viewerPreview: props.gm.viewerPreview }} />
+      <TableStrip role="gm" state={props.state} token={token} phone={phoneShell} />
     ) : (
-      <TableHeader role="player" state={props.state} />
+      <TableStrip role="player" state={props.state} token={token} phone={phoneShell} />
     );
 
   const map = state.combat.mapAssetId ? (
@@ -145,6 +147,7 @@ export function TableView(props: TableViewProps) {
         mapLibrary={props.gm.mapLibrary}
         onSelectMap={props.gm.onSelectMap}
         phone={phone}
+        token={token}
         slots={{
           needs: <NeedsYou state={props.state} token={token} />,
           needsCount: needsItems(props.state).length,

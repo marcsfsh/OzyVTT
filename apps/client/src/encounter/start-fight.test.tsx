@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { GameStateSchema, type GmView } from "@vtt/domain";
+import { GameStateSchema, type GmActor, type GmView } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
 
 vi.mock("../socket", () => {
@@ -15,6 +15,7 @@ vi.mock("../socket", () => {
 
 import { socket } from "../socket";
 import { EncounterPanel } from "./EncounterPanel";
+import { rollsLine, sidesOf } from "./StartFight";
 
 const ARIA = "10000000-0000-4000-8000-000000000001";
 const BORIN = "10000000-0000-4000-8000-000000000002";
@@ -63,5 +64,54 @@ describe("starting a second fight", () => {
     const calls = (socket.emit as unknown as { mock: { calls: [string, { entries?: unknown[] }][] } }).mock.calls;
     const start = calls.find(([event]) => event === "encounter:start");
     expect(start?.[1].entries).toEqual([{ actorId: ARIA }, { actorId: BORIN }]);
+  });
+});
+
+describe("Start a fight's list", () => {
+  const GOBLIN = "10000000-0000-4000-8000-000000000003";
+  const staged = (gmShaped: boolean) => {
+    const state = stateWith(
+      {
+        initiative: [
+          { actorId: ARIA, score: 0 },
+          { actorId: GOBLIN, score: 0 }
+        ]
+      },
+      4
+    );
+    const goblin = { ...state.actors[0], id: GOBLIN, name: "Goblin", kind: "monster" };
+    return {
+      ...state,
+      actors: [...state.actors, goblin],
+      combat: { ...state.combat, scenes: gmShaped ? [] : undefined }
+    } as unknown as GmView;
+  };
+
+  it("lists the staged characters and monsters, ticked, and leaves out the rest of the roster", () => {
+    render(
+      <ToastProvider>
+        <EncounterPanel role="gm" state={staged(true)} selectedMap={null} />
+      </ToastProvider>
+    );
+    expect(screen.getByRole("checkbox", { name: "Aria is in this fight" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Goblin is in this fight" })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Borin is in this fight" })).toBeNull();
+    expect(screen.getByText("Rolls initiative for all 2")).toBeInTheDocument();
+  });
+});
+
+describe("who rolls initiative", () => {
+  const pc = (id: string, claimed: boolean) =>
+    ({ id, name: id, kind: "player-character", ownerSessionId: claimed ? "s" : null }) as unknown as GmActor;
+  const monster = { id: "g", name: "g", kind: "monster", ownerSessionId: null } as unknown as GmActor;
+
+  it("says the players roll for their claimed characters only when they do", () => {
+    expect(rollsLine([pc("a", true), pc("b", false), monster], false)).toBe("Rolls initiative for all 3");
+    expect(rollsLine([pc("a", true), pc("b", false), monster], true)).toBe(
+      "Rolls initiative for 2. Players roll for their 1 claimed character."
+    );
+    expect(rollsLine([pc("a", true)], true)).toBe("Players roll for their 1 claimed character.");
+    expect(rollsLine([], false)).toBe("Tick at least one character or monster.");
+    expect(sidesOf([pc("a", true), monster])).toBe("1 of the party, 1 monster");
   });
 });

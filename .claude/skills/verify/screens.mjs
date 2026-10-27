@@ -1,9 +1,12 @@
 // Screenshots app pages at the smoke suite's phone and laptop sizes, from a throwaway server on a
 // temporary data directory, so a UI change can be looked at without touching the GM's campaign.
 //
-//   node .claude/skills/verify/screens.mjs [--as gm|player] [--theme dusk|dawn|both] [--reduce-transparency] <path>...
+//   node .claude/skills/verify/screens.mjs [--as gm|player] [--theme dusk|dawn|both] [--reduce-transparency]
+//     [--scenario table|fight] <path>...
 //
-// Each page is captured in each theme asked for (both by default), after the self-hosted fonts load.
+// Each page is captured in each theme asked for (both by default), after the self-hosted fonts load. `--scenario table`
+// makes a scene live on a drawn battle map with the party and four goblins on it, one hidden from players;
+// `--scenario fight` also starts the fight.
 // Build the client first (`npm run build`). Pictures land in e2e/test-results/screens/.
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -20,6 +23,10 @@ const themes = themeArg === "both" ? ["dusk", "dawn"] : [themeArg];
 const reduceAt = args.indexOf("--reduce-transparency");
 const reduce = reduceAt !== -1;
 if (reduce) args.splice(reduceAt, 1);
+const scenarioAt = args.indexOf("--scenario");
+const scenario = scenarioAt === -1 ? null : args.splice(scenarioAt, 2)[1];
+if (scenario !== null && scenario !== "table" && scenario !== "fight")
+  throw new Error(`--scenario takes table or fight, not ${scenario}`);
 const paths = args.length > 0 ? args : ["/"];
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const out = join(root, "e2e", "test-results", "screens");
@@ -69,6 +76,79 @@ async function signIn(page) {
   }
 }
 
+/** A drawn battle map: two stone rooms joined by a corridor, on a 50px grid, as a PNG. */
+async function drawnMap(browser) {
+  const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  await page.setContent(`<body style="margin:0;background:#141210">
+    <div style="position:absolute;left:100px;top:250px;width:450px;height:550px;background:#5b5346"></div>
+    <div style="position:absolute;left:550px;top:450px;width:250px;height:150px;background:#5b5346"></div>
+    <div style="position:absolute;left:800px;top:150px;width:500px;height:650px;background:#5b5346"></div>
+    <div style="position:absolute;inset:0;background-image:linear-gradient(#0003 1px,transparent 1px),
+      linear-gradient(90deg,#0003 1px,transparent 1px);background-size:50px 50px"></div></body>`);
+  const png = await page.screenshot();
+  await page.close();
+  return png;
+}
+
+/** Makes the scenario's scene live through the API, as the GM would from Prep. */
+async function seed(browser) {
+  const json = async (response) => {
+    const body = await response.json();
+    if (!response.ok) throw new Error(`${response.url}: ${JSON.stringify(body)}`);
+    return body.data;
+  };
+  const { token } = await json(
+    await fetch(`${base}/api/v1/host/gm/sign-in`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password })
+    })
+  );
+  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  const post = async (path, data) =>
+    json(
+      await fetch(`${base}${path}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ commandId: crypto.randomUUID(), ...data })
+      })
+    );
+  const { asset } = await json(
+    await fetch(`${base}/api/v1/map-assets?name=Goblin%20warren&kind=battlemap`, {
+      method: "POST",
+      headers: { ...headers, "content-type": "image/png" },
+      body: await drawnMap(browser)
+    })
+  );
+  const monsters = (await json(await fetch(`${base}/api/v1/content/monsters`, { headers }))).monsters;
+  const find = (name) => monsters.find((monster) => monster.name === name)?.id;
+  for (const [name, visibility] of [
+    ["Goblin Boss", "public"],
+    ["Goblin Warrior", "public"],
+    ["Goblin Warrior", "public"],
+    ["Goblin Warrior", "gm-only"]
+  ])
+    await post("/api/v1/game/actors", { definitionId: find(name), visibility });
+  const { game } = await json(await fetch(`${base}/api/v1/game`, { headers }));
+  const ids = game.actors.filter((actor) => !actor.archived).map((actor) => actor.id);
+  await post("/api/v1/game/scenes", { name: "Goblin warren", mapAssetId: asset.id, combatantIds: ids, activate: true });
+  const spots = [
+    [275, 525],
+    [525, 525],
+    [225, 625],
+    [625, 475],
+    [725, 325],
+    [775, 575],
+    [825, 275]
+  ];
+  for (const [index, actorId] of ids.entries()) {
+    const [x, y] = spots[index % spots.length];
+    await post(`/api/v1/game/tokens/${actorId}/move`, { actorId, position: { x, y } });
+  }
+  if (scenario === "fight")
+    await post("/api/v1/game/encounter/start", { mapAssetId: asset.id, entries: ids.map((actorId) => ({ actorId })) });
+}
+
 const browser = await chromium.launch();
 try {
   await serverReady();
@@ -77,6 +157,7 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ password })
   });
+  if (scenario) await seed(browser);
   mkdirSync(out, { recursive: true });
   for (const size of sizes) {
     const context = await browser.newContext({ baseURL: base, viewport: size.viewport, hasTouch: size.hasTouch });

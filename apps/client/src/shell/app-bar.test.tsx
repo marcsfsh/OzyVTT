@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render as renderBare, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const apiRequest = vi.fn();
@@ -8,7 +8,9 @@ vi.mock("../lib/api", () => ({
   apiBlob: vi.fn(async () => new Blob())
 }));
 
+import type { ReactElement } from "react";
 import { GameStateSchema, type GmView, type PlayerView } from "@vtt/domain";
+import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { GmBottomTabs, GmTopBar, PlayerBottomTabs, PlayerTopBar } from "./AppBar";
 import { ReconnectBar } from "./ReconnectBar";
@@ -31,6 +33,8 @@ const playerView = (mine = true): PlayerView =>
     ...(GameStateSchema.parse({ schemaVersion: 1 }) as unknown as PlayerView),
     actors: [{ id: "lyra", name: "Lyra Emberwise", kind: "player-character", claimStatus: mine ? "mine" : "available" }]
   }) as unknown as PlayerView;
+
+const render = (ui: ReactElement) => renderBare(<ToastProvider>{ui}</ToastProvider>);
 
 /** Answers min- and max-width queries from a viewport width. */
 function setViewport(width: number) {
@@ -70,7 +74,7 @@ describe("the GM's top bar", () => {
     render(<GmTopBar state={gmView()} token="gm" />);
     expect(sectionNames("GM sections")).toEqual(["Play", "Prep", "Codex", "Compendium"]);
     expect(screen.getByRole("tab", { name: "Prep" })).toHaveAttribute("aria-selected", "true");
-    expect(await screen.findByRole("button", { name: "Table screen, on" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("Table screen, on")).toBeInTheDocument();
     // Who is connected is the claimed characters whose players are online, as the projection says.
     expect(screen.getByRole("img", { name: "1 character online" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Search, Ctrl K" })).toBeInTheDocument();
@@ -98,9 +102,27 @@ describe("the GM's top bar", () => {
     expect(window.location.pathname).toBe("/scenes");
   });
 
-  it("moves the sections to the bottom tabs on a phone and keeps the utilities in the top bar", () => {
+  it("puts the live scene picker in the bar on Play, and opens the table screen's settings from its lamp", async () => {
+    const user = userEvent.setup();
+    setViewport(1280);
+    goTo("/table");
+    render(<GmTopBar state={gmView()} token="gm" />);
+    expect(screen.getByLabelText("Scenes")).toHaveTextContent("No scene live");
+    await user.click(await screen.findByLabelText("Table screen, on"));
+    await user.click(screen.getByRole("menuitem", { name: "Table screen settings" }));
+    expect(window.location.pathname).toBe("/viewer-controls");
+  });
+
+  it("gives Play's strip the top of a phone, where Play is its own header", () => {
     setViewport(390);
     goTo("/table");
+    const { container } = render(<GmTopBar state={gmView()} token="gm" />);
+    expect(container.querySelector(".app-bar")).toBeNull();
+  });
+
+  it("moves the sections to the bottom tabs on a phone and keeps the utilities in the top bar", () => {
+    setViewport(390);
+    goTo("/codex");
     render(
       <>
         <GmTopBar state={gmView()} token="gm" />

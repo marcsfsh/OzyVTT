@@ -27,6 +27,7 @@ import { SceneListFlyout, StateChip } from "./pieces";
 import { ScenePreview, type SeeAs } from "./ScenePreview";
 import { SceneCodex, SceneTokens, SceneHistory, SceneLight, SceneMapFacts, SceneSound } from "./SceneQuestions";
 import "./scene-page.css";
+import "../table/table-header.css";
 
 /** A section of the metadata panel: a heading, and Edit when a step answers it. */
 function Section({

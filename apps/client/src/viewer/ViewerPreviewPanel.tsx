@@ -23,7 +23,7 @@ function topLimit(): number {
  * wider than the window allows.
  */
 function openingPlace(): Place {
-  const header = document.querySelector(".table-header")?.getBoundingClientRect().bottom ?? 0;
+  const header = document.querySelector(".table-strip, .table-header")?.getBoundingClientRect().bottom ?? 0;
   const width = Math.min(480, window.innerWidth - GUTTER * 2);
   return {
     x: Math.max(GUTTER, window.innerWidth - width - GUTTER),

@@ -15,18 +15,14 @@ vi.mock("../socket", () => ({
 
 import { goTo } from "../../test/route";
 import { IDS, gmView, serveScenes } from "../../test/scenes-fakes";
-import { TableHeader } from "./TableHeader";
+import { LiveScenePicker } from "./LiveScenePicker";
 
-// Scenes are prepared on the Scenes tab; the table's header switches between them and opens that tab.
+// Scenes are prepared in Prep; the live scene picker on Play switches between them and opens Prep's Scenes page.
 
 function header(view: GmView) {
   return render(
     <ToastProvider>
-      <TableHeader
-        role="gm"
-        state={view}
-        gm={{ token: "gm", liveMapName: "Sunken crypt", viewerPreview: { on: false, onToggle: vi.fn() } }}
-      />
+      <LiveScenePicker state={view} />
     </ToastProvider>
   );
 }
@@ -41,7 +37,7 @@ afterEach(() => {
   command.mockClear();
 });
 
-describe("the table's scene menu", () => {
+describe("the live scene picker", () => {
   it("names the live scene and makes another live in one press when no fight is on", async () => {
     const user = userEvent.setup();
     header(gmView(undefined, IDS.ambush));
@@ -68,7 +64,7 @@ describe("the table's scene menu", () => {
     expect(command).toHaveBeenCalledWith("scene:activate", { sceneId: IDS.chase });
   });
 
-  it("opens the live scene's page on the Scenes tab", async () => {
+  it("opens the live scene's page in Prep", async () => {
     const user = userEvent.setup();
     header(gmView(undefined, IDS.ambush));
     await user.click(screen.getByLabelText("Scenes · Crypt ambush is live"));

@@ -9,10 +9,8 @@ import {
   IconLog,
   IconPage,
   IconScene,
-  IconTv,
   IconUser,
   Portrait,
-  StatusLamp,
   Tabs,
   Wordmark,
   cx
@@ -34,7 +32,8 @@ import {
   type GmSection,
   type PlayerSection
 } from "../router";
-import { tableScreenOn, usePresentation } from "../table/presentation";
+import { LiveScenePicker } from "../table/LiveScenePicker";
+import { TvControl } from "../table/TvControl";
 import { SearchLauncher } from "./SearchLauncher";
 import "./app-bar.css";
 
@@ -107,28 +106,6 @@ function TopBar({ children, className }: Readonly<{ children: ReactNode; classNa
   );
 }
 
-/** The table screen's status lamp: on while the screen shows a map, and the door to its controls. */
-function TableScreenButton({ gmToken, phone }: Readonly<{ gmToken: string; phone: boolean }>) {
-  const { presentation } = usePresentation(gmToken);
-  const on = tableScreenOn(presentation);
-  const word = presentation === null ? "--" : on ? "ON" : "OFF";
-  return (
-    <button
-      type="button"
-      className={cx("app-bar-screen", "interactive", phone && "is-compact")}
-      aria-label={`Table screen, ${presentation === null ? "status unknown" : on ? "on" : "off"}`}
-      onClick={() => void navigate(pathForGmTab("viewer"))}
-    >
-      <IconTv />
-      {!phone && <span className="app-bar-screen-label">Table screen</span>}
-      <StatusLamp lit={on} />
-      <span className="app-bar-screen-word" aria-hidden="true">
-        {word}
-      </span>
-    </button>
-  );
-}
-
 /** Who is connected, as the projection says it: the claimed characters whose players are online. */
 function Connected({ state }: Readonly<{ state: GmView }>) {
   const online = state.actors.filter(
@@ -163,6 +140,8 @@ export function GmTopBar({ state, token }: Readonly<{ state: GmView; token: stri
   const route = useRoute();
   const phone = usePhoneShell();
   const section = litGmSection(route.path);
+  // On a phone the top bar belongs to the page on screen, and Play's strip is its own header.
+  if (phone && section === "play") return null;
   return (
     <TopBar className="app-bar--gm">
       {!phone && (
@@ -174,8 +153,14 @@ export function GmTopBar({ state, token }: Readonly<{ state: GmView; token: stri
           bottom={false}
         />
       )}
+      {!phone && section === "play" && (
+        <>
+          <span className="app-bar-divider" aria-hidden="true" />
+          <LiveScenePicker state={state} />
+        </>
+      )}
       <span className="app-bar-grow" />
-      <TableScreenButton gmToken={token} phone={phone} />
+      <TvControl gmToken={token} state={state} compact={phone} />
       {!phone && <Connected state={state} />}
       <SearchLauncher
         role="gm"

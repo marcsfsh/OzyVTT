@@ -1,0 +1,76 @@
+/* The strip above the map, 64px: the VCR counter, a seam, the status, and at the right end the join address and the
+   sound. The status gives way first when the row runs short. */
+.table-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 64px;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.table-strip-divider {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: var(--space-1) 0;
+  background: var(--line-strong);
+}
+.table-strip .table-status {
+  display: flex;
+  align-items: center;
+  flex: 1 1 8rem;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+}
+.table-strip .table-status b {
+  color: var(--text);
+  font-weight: 700;
+}
+.table-strip .join-address--strip {
+  flex: 0 1 auto;
+}
+.table-strip-me {
+  flex: none;
+}
+
+/* A GM's phone: the strip is Play's header, with the counter, the live scene picker centred, and Join. The horizon
+   line closes it the way it closes every top bar. */
+.table-strip.is-header {
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  border-bottom: 0;
+  background:
+    var(--grad-horizon) bottom / 100% 2px no-repeat,
+    var(--surface-1);
+}
+.table-strip.is-header .live-scene {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+}
+.table-strip.is-header .now-playing.is-compact {
+  max-width: 7rem;
+  padding: 0;
+}
+
+@media (max-width: 979px) {
+  .table-strip:not(.is-header) {
+    gap: var(--space-2);
+    min-height: 52px;
+    padding: var(--space-1) var(--space-2);
+  }
+  .table-strip:not(.is-header) .join-address--strip .join-address-label {
+    display: none;
+  }
+  .table-strip:not(.is-header) .now-playing.is-compact {
+    max-width: 8.5rem;
+    padding: 0;
+  }
+}

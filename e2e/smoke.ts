@@ -219,12 +219,21 @@ export const gmSection = (page: Page, name: "Play" | "Prep" | "Codex" | "Compend
  * Table screen controls, Settings).
  */
 export async function openGmSection(page: Page, name: string) {
+  // On a phone Play's strip stands in for the top bar, so the utilities are a section away.
+  const utility =
+    name === "Table screen"
+      ? page.getByLabel(/^Table screen,/)
+      : page.getByRole("button", { name: "Settings", exact: true });
+  if (name === "Table screen" || name === "Settings") {
+    if (!(await utility.isVisible())) await press(gmSection(page, "Prep"));
+  }
   if (name === "Table screen") {
-    await press(page.getByRole("button", { name: /^Table screen/ }));
+    await press(utility);
+    await press(page.getByRole("menuitem", { name: "Table screen settings" }));
     return;
   }
   if (name === "Settings") {
-    await press(page.getByRole("button", { name: "Settings", exact: true }));
+    await press(utility);
     return;
   }
   if (PREP_PAGES.includes(name)) {
@@ -234,6 +243,36 @@ export async function openGmSection(page: Page, name: string) {
     return;
   }
   await press(gmSection(page, name as "Play" | "Prep" | "Codex" | "Compendium"));
+}
+
+/**
+ * Before a fight: unticks `out` from In this fight and adds `monster` from the bestiary. On a phone In this fight is a
+ * sheet over the card.
+ */
+export async function stageFight(page: Page, out: readonly string[], monster: string) {
+  const phone = !(await page.getByRole("region", { name: "In this fight" }).isVisible());
+  if (phone) await press(page.getByRole("button", { name: /^In this fight/ }));
+  const list = phone
+    ? page.getByRole("dialog", { name: "In this fight" })
+    : page.getByRole("region", { name: "In this fight" });
+  for (const name of out) {
+    await press(list.locator("label").filter({ hasText: name }));
+    await expect(list.getByRole("checkbox", { name: `${name} is in this fight` })).not.toBeChecked();
+  }
+  const adds = list.getByText("Add characters or monsters", { exact: true });
+  if (await adds.isVisible()) await press(adds);
+  await press(list.getByRole("button", { name: "Add monsters" }));
+  const bestiary = page.getByRole("dialog", { name: "Add monsters from the bestiary" });
+  await fillIn(bestiary.getByRole("searchbox", { name: "Search monsters" }), monster);
+  await press(bestiary.getByRole("listitem").filter({ hasText: monster }).getByRole("button", { name: "Add" }));
+  await expect(bestiary.getByText(`${monster} is in the staging tray.`)).toBeVisible();
+  await expectPageFits(page);
+  await press(bestiary.getByRole("button", { name: "Close" }));
+  // A monster already on the roster numbers the new one ("Goblin Minion 2").
+  await expect(
+    list.getByRole("checkbox", { name: new RegExp(`^${monster}( \\d+)? is in this fight$`) }).last()
+  ).toBeChecked();
+  if (phone) await press(list.getByRole("button", { name: "Close" }).first());
 }
 
 type Point = { x: number; y: number };

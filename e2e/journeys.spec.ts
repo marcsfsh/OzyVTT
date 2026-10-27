@@ -25,6 +25,7 @@ import {
   positionOf,
   press,
   signInAsGm,
+  stageFight,
   test,
   toneWav
 } from "./smoke";
@@ -264,18 +265,11 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   await expect(gm.getByRole("heading", { name: "Start a fight" })).toBeVisible();
 
   // The fight: the player's character and one monster.
-  for (const other of PARTY.filter((name) => name !== hero)) {
-    const remove = gm.getByRole("button", { name: `Remove ${other} from this list` });
-    await press(remove);
-    await expect(remove).toBeHidden();
-  }
-  await press(gm.getByRole("button", { name: "Add monsters" }));
-  const bestiary = gm.getByRole("dialog", { name: "Add monsters from the bestiary" });
-  await fillIn(bestiary.getByRole("searchbox", { name: "Search monsters" }), "Goblin Minion");
-  await press(bestiary.getByRole("listitem").filter({ hasText: "Goblin Minion" }).getByRole("button", { name: "Add" }));
-  await expect(bestiary.getByText("Goblin Minion is in the staging tray.")).toBeVisible();
-  await expectPageFits(gm);
-  await press(bestiary.getByRole("button", { name: "Close" }));
+  await stageFight(
+    gm,
+    PARTY.filter((name) => name !== hero),
+    "Goblin Minion"
+  );
   await press(gm.getByRole("button", { name: "Start the fight" }));
   await expect(gm.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
   await expectPageFits(gm);
@@ -431,17 +425,11 @@ test("a player takes a turn on a phone: a tile, its cast, a target and the roll"
   await signInAsGm(gm);
   await liveSceneOnNewMap(gm, "Smoke ford.png", battleMap(700, 490));
   await expect(gm.getByRole("heading", { name: "Start a fight" })).toBeVisible();
-  for (const other of PARTY.filter((name) => name !== hero)) {
-    const remove = gm.getByRole("button", { name: `Remove ${other} from this list` });
-    await press(remove);
-    await expect(remove).toBeHidden();
-  }
-  await press(gm.getByRole("button", { name: "Add monsters" }));
-  const bestiary = gm.getByRole("dialog", { name: "Add monsters from the bestiary" });
-  await fillIn(bestiary.getByRole("searchbox", { name: "Search monsters" }), "Goblin Minion");
-  await press(bestiary.getByRole("listitem").filter({ hasText: "Goblin Minion" }).getByRole("button", { name: "Add" }));
-  await expect(bestiary.getByText("Goblin Minion is in the staging tray.")).toBeVisible();
-  await press(bestiary.getByRole("button", { name: "Close" }));
+  await stageFight(
+    gm,
+    PARTY.filter((name) => name !== hero),
+    "Goblin Minion"
+  );
   await press(gm.getByRole("button", { name: "Start the fight" }));
   await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
   const yourTurn = player.getByRole("heading", { name: "Your turn" });
@@ -748,7 +736,8 @@ test("the GM plays music on the table screen and sees that the room hears it", a
   await expect
     .poll(() => music.evaluate((element: HTMLAudioElement) => !element.paused && element.currentTime > 0.2))
     .toBe(true);
-  await expect(gm.getByText("Smoke TV · Sound on")).toBeVisible();
+  // The phone and laptop runs share one server, so an earlier run's Smoke TV can still be paired.
+  await expect(gm.getByText("Smoke TV · Sound on").first()).toBeVisible();
   // Only the table screen makes sound: the GM's page has no audio at all.
   await expect(gm.locator("audio")).toHaveCount(0);
 
@@ -862,6 +851,8 @@ test("a player rolls a tool's Utilize use and starts crafting from the sheet, an
   const gm = await open("/");
   await signInAsGm(gm);
   await openGmSection(gm, "Play");
+  // The party's rest is on the table's Party tab.
+  await press(gm.getByRole("tab", { name: "Party" }));
   await press(gm.getByRole("button", { name: /^Rest/ }));
   const panel = gm.getByRole("dialog", { name: "Rest" }).getByRole("region", { name: "Crafting" });
   await expect(panel.getByText("Ink (1-ounce bottle) · 5 GP paid")).toBeVisible();

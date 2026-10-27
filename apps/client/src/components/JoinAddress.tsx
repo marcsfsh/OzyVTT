@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { HOST_PATHS } from "@vtt/api-contract";
-import { Button, QrCode, Select, useToast } from "@vtt/ui";
+import { Button, IconButton, IconCopy, QrCode, Select, useToast } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import "./join-address.css";
@@ -43,9 +43,10 @@ async function copyText(text: string): Promise<boolean> {
 
 /**
  * "Players join at http://...": the address players open, with Copy and a QR code drawn on this device. The `hero`
- * layout shows the code at once on a laptop, for the Table before anyone has joined; `row` keeps it behind a button.
+ * layout shows the code at once on a laptop, for the Table before anyone has joined; `row` keeps it behind a button;
+ * `strip` is one line for the strip above the map, with Copy as an icon.
  */
-export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string; layout?: "hero" | "row" }>) {
+export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string; layout?: "hero" | "row" | "strip" }>) {
   const [urls, setUrls] = useState<readonly string[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
@@ -85,21 +86,33 @@ export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string;
       tone: copied ? "success" : "error"
     });
   };
+  const choice =
+    urls.length > 1 ? (
+      <Select aria-label="Join address" value={url} onChange={(event) => setChosen(event.target.value)}>
+        {urls.map((candidate) => (
+          <option key={candidate} value={candidate}>
+            {candidate}
+          </option>
+        ))}
+      </Select>
+    ) : (
+      <code className="join-address-url">{url}</code>
+    );
+  if (layout === "strip")
+    return (
+      <section className="join-address join-address--strip" aria-label="Join address">
+        <span className="join-address-label">Players join at</span>
+        {choice}
+        <IconButton label="Copy the join address" size="sm" onClick={() => void copy()}>
+          <IconCopy />
+        </IconButton>
+      </section>
+    );
   return (
     <section className={`join-address join-address--${layout}`} aria-label="Join address">
       <div className="join-address-text">
         <span className="join-address-label">Players join at</span>
-        {urls.length > 1 ? (
-          <Select aria-label="Join address" value={url} onChange={(event) => setChosen(event.target.value)}>
-            {urls.map((candidate) => (
-              <option key={candidate} value={candidate}>
-                {candidate}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <code className="join-address-url">{url}</code>
-        )}
+        {choice}
         <div className="join-address-actions">
           <Button variant="secondary" onClick={() => void copy()}>
             Copy

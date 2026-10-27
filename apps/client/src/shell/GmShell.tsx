@@ -18,6 +18,7 @@ import {
 } from "../router";
 import { useSceneActions } from "../scenes/sceneActions";
 import { PrepFrame } from "./AppBar";
+import { setViewerPreviewOpen, useViewerPreviewOpen } from "../viewer/preview-open";
 import { isFullPageLayer, LayerView } from "./LayerView";
 import { TableView } from "./TableView";
 import type { Connection } from "./useSession";
@@ -68,7 +69,7 @@ export function GmShell({
   const addressUnknown = (!isKnownPath(route.path) || isPlayerOnlyPath(route.path)) && route.segments[0] !== "codex";
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
   const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
-  const [showViewerPreview, setShowViewerPreview] = useState(false);
+  const showViewerPreview = useViewerPreviewOpen();
   const { confirm, dialog } = useConfirm();
   /**
    * Read defensively: the first `state:updated` a signing-in GM receives can still be the player-shaped
@@ -159,7 +160,8 @@ export function GmShell({
       {/* An unknown address and a player-only address both land here, indistinguishably. */}
       {addressUnknown && <NotFoundPage role="gm" />}
 
-      {tab("table") && route.segments[0] !== "codex" && (
+      {/* The table waits for the GM's own view too: the acting console reads fields the player shape lacks. */}
+      {tab("table") && scenesLoaded && route.segments[0] !== "codex" && (
         <TableView
           role="gm"
           state={state}
@@ -168,8 +170,7 @@ export function GmShell({
             selectedMap,
             mapLibrary,
             onSelectMap: setSelectedMap,
-            onMakeLive: (sceneId) => void makeSceneLive(sceneId),
-            viewerPreview: { on: showViewerPreview, onToggle: () => setShowViewerPreview((current) => !current) }
+            onMakeLive: (sceneId) => void makeSceneLive(sceneId)
           }}
         />
       )}
@@ -190,7 +191,7 @@ export function GmShell({
       {tab("viewer") && route.segments[1] !== "sound" && (
         <ViewerControls
           gmToken={token}
-          onPreview={() => setShowViewerPreview(true)}
+          onPreview={() => setViewerPreviewOpen(true)}
           {...(selectedMap
             ? {
                 map: {
@@ -240,7 +241,7 @@ export function GmShell({
       {/* The Compendium owns its frame: a section bar over its tables, and a record at its own address. */}
       {tab("compendium") && <CompendiumShell token={token} party={party} />}
 
-      {showViewerPreview && <ViewerPreviewPanel gmToken={token} onClose={() => setShowViewerPreview(false)} />}
+      {showViewerPreview && <ViewerPreviewPanel gmToken={token} onClose={() => setViewerPreviewOpen(false)} />}
 
       {/* Settings owns its addresses: a section at `/settings/<section>` and an operation of the API reference at
         `/settings/api/<operation id>`. Opening the reference in a new tab asks for the GM password once, since the GM
@@ -251,7 +252,7 @@ export function GmShell({
           state={state}
           gmToken={token}
           busy={busy}
-          onPreviewPlayers={() => setShowViewerPreview(true)}
+          onPreviewPlayers={() => setViewerPreviewOpen(true)}
           onSignOut={onSignOut}
           onRevokeAll={() => void revokeAll()}
           onChangePassword={onChangePassword}

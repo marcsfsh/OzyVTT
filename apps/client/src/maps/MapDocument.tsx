@@ -25,6 +25,7 @@ import { folderNamesOf, useMapActions } from "./mapActions";
 import { MAP_KIND_LABEL, MAP_KINDS } from "./map-lists";
 import type { MapKind } from "./map-catalog";
 import "../scenes/scene-page.css";
+import "../table/table-header.css";
 
 /** The library the map came from, folded into a flyout; a row opens that map. */
 function MapListFlyout({

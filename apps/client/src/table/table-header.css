@@ -1,4 +1,4 @@
-/* The header bar above the map: the scene, the status line, and the GM's fog, vision, TV and sound. One row; the
+/* The header bar over a scene's or a map's page in Prep: its name, its status line and its actions. One row; the
    status gives way first when the row runs short. */
 .table-header {
   display: flex;
@@ -83,18 +83,6 @@
   color: var(--violet-hi);
   font-size: var(--fs-sm);
 }
-.tv-control-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  white-space: nowrap;
-}
-.tv-control-trigger.is-live .tv-control-label {
-  color: var(--cyan-hi);
-}
-.table-header-me {
-  flex: none;
-}
 
 /* Below 980px the header keeps one row: the scenes as an icon, the status, the TV as an icon and the sound with a
    short title. The fog and vision chips fold away and the player's Me moves to the tool row. */
@@ -105,8 +93,6 @@
     gap: var(--space-1);
   }
   .table-header-chips,
-  .table-header-me,
-  .tv-control-label,
   .table-header-scene-name,
   .table-header-live {
     display: none;

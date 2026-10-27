@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/map-catalog";
-import { Button, Chip, Switch, IconArrow, IconChevronLeft, Eyebrow } from "@vtt/ui";
+import { Button, IconArrow, IconChevronLeft } from "@vtt/ui";
 import { command } from "../lib/command";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { MonsterBrowser } from "./MonsterBrowser";
@@ -18,6 +18,9 @@ import { holdsTheTurn } from "../table/NeedsYou";
 import { isDefeatedMonster } from "../table/needs";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
 import { revealInRegion } from "../lib/reveal";
+import { useSelectedToken } from "../scene/selectedToken";
+import { NotesTab } from "../table/NotesTab";
+import { rollsLine, StartFight } from "./StartFight";
 
 /** A monster defeated in the last fight on this scene stays out of the next one unless the GM adds it back. */
 function stillStanding(actors: GmView["actors"], actorId: string) {
@@ -51,7 +54,7 @@ export type GmPanelSlots = Readonly<{
   log?: ReactNode;
   token?: ReactNode;
   party?: ReactNode;
-  /** The rest button, beside Start the fight. */
+  /** The party's rest, on the Party tab. */
   rest?: ReactNode;
   /** The active session's live board. */
   tonight?: ReactNode;
@@ -65,7 +68,8 @@ export function GmEncounterPanel({
   mapLibrary,
   onSelectMap,
   phone = false,
-  slots
+  slots,
+  token = null
 }: Readonly<{
   state: GmView;
   selectedMap: MapSelection | null;
@@ -74,7 +78,10 @@ export function GmEncounterPanel({
   /** Below 980px: the fight splits into Act and Order tabs, and Needs you becomes a tab. */
   phone?: boolean;
   slots?: GmPanelSlots;
+  /** The GM's bearer, for the portraits' token art. */
+  token?: string | null;
 }>) {
+  const selectedTokenId = useSelectedToken();
   const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() =>
     state.combat.initiative.length > 0
       ? new Set(state.combat.initiative.map((entry) => entry.actorId).filter((id) => stillStanding(state.actors, id)))
@@ -336,85 +343,78 @@ export function GmEncounterPanel({
   const placed = state.combat.tokens.filter((token) => token.position !== null).length;
   const total = state.combat.initiative.length;
 
+  // In this fight offers everyone staged on the map or in the tray, and anyone ticked, so an untick keeps its row.
+  const onMapOrTray = new Set(state.combat.tokens.map((entry) => entry.actorId));
+  const candidates = rosterActors(state.actors)
+    .filter((actor) => !actor.archived && (selectedActors.has(actor.id) || onMapOrTray.has(actor.id)))
+    .sort((left, right) => Number(right.kind === "player-character") - Number(left.kind === "player-character"));
+  const stagedActors = candidates.filter((actor) => selectedActors.has(actor.id));
+  const tick = (actorId: string, ticked: boolean) =>
+    setSelectedActors((current) => {
+      const next = new Set(current);
+      if (ticked) next.add(actorId);
+      else next.delete(actorId);
+      return next;
+    });
+  const prep = (
+    <ScenePrepPanel
+      actors={state.actors}
+      staged={stagedIds}
+      placedIds={new Set(state.combat.tokens.filter((token) => token.position !== null).map((token) => token.actorId))}
+      onAdd={(actorId) => tick(actorId, true)}
+      onRemove={(actorId) => tick(actorId, false)}
+      mapName={panelMapName}
+      mapNote={sceneLive ? "A scene is live. Choosing another map makes a new scene live on it." : undefined}
+      selectedMapId={quickStartMapId}
+      onSelectMap={chooseQuickStartMap}
+      mapFallback={mapLibrary}
+      stagingRevealed={stagingVisibility !== "gm-only"}
+      combatActive={false}
+      busy={busy}
+      emptyNote="No one staged yet. The party lands here automatically; add monsters below."
+    />
+  );
+  // A live scene owns its map, so its staging folds away under the list; a quick start needs the map choice open.
+  const staging = sceneLive ? (
+    <details className="start-fight-staging">
+      <summary>Add characters or monsters</summary>
+      {prep}
+    </details>
+  ) : (
+    prep
+  );
   const setupBody = (
-    <div className="encounter-panel setup" aria-labelledby="gm-encounter-title">
-      <div className="encounter-heading">
-        <div>
-          <Eyebrow>FIGHT</Eyebrow>
-          <h2 id="gm-encounter-title">Start a fight</h2>
-        </div>
-      </div>
-      {/* Spell areas outlast a fight and can be cast outside one (Glyph of Warding, Alarm), so they are listed here too. */}
-      <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
-      <ScenePrepPanel
-        actors={state.actors}
-        staged={stagedIds}
-        placedIds={
-          new Set(state.combat.tokens.filter((token) => token.position !== null).map((token) => token.actorId))
-        }
-        onAdd={(actorId) => setSelectedActors((current) => new Set(current).add(actorId))}
-        onRemove={(actorId) =>
-          setSelectedActors((current) => {
-            const next = new Set(current);
-            next.delete(actorId);
-            return next;
-          })
-        }
-        mapName={panelMapName}
-        mapNote={sceneLive ? "A scene is live. Choosing another map makes a new scene live on it." : undefined}
-        selectedMapId={quickStartMapId}
-        onSelectMap={chooseQuickStartMap}
-        mapFallback={mapLibrary}
-        stagingRevealed={stagingVisibility !== "gm-only"}
-        combatActive={false}
-        busy={busy}
-        emptyNote="No one staged yet. The party lands here automatically; add monsters below."
-        footer={
-          <>
-            <Switch
-              label="Players roll their own initiative"
-              checked={playersRollInitiative}
-              disabled={busy}
-              onChange={setPlayersRollInitiative}
-            />
-            <Switch
-              label="One roll for each group of identical monsters"
-              checked={groupMonsters}
-              disabled={busy}
-              onChange={setGroupMonsters}
-            />
-            {stagedIds.length > 0 && (
-              <fieldset className="encounter-surprise">
-                <legend>Pick who is Surprised. They roll initiative at Disadvantage.</legend>
-                <div className="encounter-surprise-chips">
-                  {stagedIds.map((actorId) => (
-                    <Chip
-                      key={actorId}
-                      pressed={surprised.has(actorId)}
-                      disabled={busy}
-                      onClick={() =>
-                        setSurprised((current) => {
-                          const next = new Set(current);
-                          if (!next.delete(actorId)) next.add(actorId);
-                          return next;
-                        })
-                      }
-                    >
-                      {state.actors.find((actor) => actor.id === actorId)?.name ?? "Unknown"}
-                    </Chip>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-            {!readyToStart && (
-              <p className="encounter-start-blocked" role="status">
-                {stagedIds.length === 0 ? "Stage at least one character or monster." : "Pick a battle map first."}
-              </p>
-            )}
-          </>
-        }
-      />
-    </div>
+    <StartFight
+      state={state}
+      token={token}
+      candidates={candidates}
+      ticked={selectedActors}
+      onTick={tick}
+      surprised={surprised}
+      onSurprised={(actorId) =>
+        setSurprised((current) => {
+          const next = new Set(current);
+          if (!next.delete(actorId)) next.add(actorId);
+          return next;
+        })
+      }
+      playersRoll={playersRollInitiative}
+      onPlayersRoll={setPlayersRollInitiative}
+      groupMonsters={groupMonsters}
+      onGroupMonsters={setGroupMonsters}
+      busy={busy}
+      // Spell areas outlast a fight and can be cast outside one (Glyph of Warding, Alarm), so they are listed here too.
+      spellAreas={<SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />}
+      staging={staging}
+      blocked={
+        readyToStart
+          ? null
+          : stagedIds.length === 0
+            ? "Stage at least one character or monster."
+            : "Pick a battle map first."
+      }
+      phone={phone}
+    />
   );
 
   const orderBody = (
@@ -553,71 +553,79 @@ export function GmEncounterPanel({
     </div>
   );
   const startControls = (
-    <div className="table-panel-foot-row">
-      {slots?.rest}
-      <Button variant="primary" arrow className="table-panel-primary" disabled={busy || !readyToStart} onClick={start}>
+    <div className="table-panel-foot-start">
+      <Button variant="primary" className="table-panel-primary" disabled={busy || !readyToStart} onClick={start}>
         Start the fight
       </Button>
+      <p className="start-fight-count">{rollsLine(stagedActors, playersRollInitiative)}</p>
     </div>
   );
 
   const fighting = state.combat.active;
   const needsCount = slots?.needsCount ?? 0;
-  // Tonight and the Codex sit beside the fight's own tabs, so a lookup or a logged line never leaves the map.
-  const campaignTabs: PanelTab[] = [
-    ...(slots?.tonight ? [{ id: "tonight", label: "Tonight", content: slots.tonight, scrolls: false }] : []),
-    ...(slots?.codex ? [{ id: "codex", label: "Codex", content: slots.codex, scrolls: false }] : [])
-  ];
-  const tabs: PanelTab[] = phone
-    ? fighting
+  // What waits on the GM leads the Fight tab, and the tab's count follows the GM to the other tabs.
+  const fightLabel = (
+    <>
+      Fight
+      {needsCount > 0 && (
+        <span className="table-tab-count">
+          <span aria-hidden="true">{needsCount}</span>
+          <span className="nh-sr-only">, {needsCount} waiting on you</span>
+        </span>
+      )}
+    </>
+  );
+  const fightBody = fighting ? (
+    phone ? (
+      <>
+        {slots?.needs}
+        {actBody}
+      </>
+    ) : (
+      <div className="encounter-fight">
+        {slots?.needs}
+        {orderBody}
+        {actBody}
+      </div>
+    )
+  ) : (
+    <>
+      {slots?.needs}
+      {setupBody}
+    </>
+  );
+  const logBody = (
+    <div className="table-log-tab">
+      {slots?.log}
+      {slots?.dice && <div className="table-log-tab-dice scroll-y">{slots.dice}</div>}
+    </div>
+  );
+  const partyBody = (
+    <>
+      {slots?.rest && <div className="table-party-rest">{slots.rest}</div>}
+      {slots?.party}
+    </>
+  );
+  const tabs: PanelTab[] = [
+    { id: "fight", label: fightLabel, content: fightBody, scrolls: !fighting || phone },
+    // A phone has no room beside the acting card, so the order is its own tab there.
+    ...(phone && fighting ? [{ id: "order", label: "Order", content: orderBody, scrolls: false }] : []),
+    { id: "log", label: "Log", content: logBody, scrolls: false },
+    { id: "party", label: "Party", content: partyBody },
+    ...(slots?.tonight || slots?.codex
       ? [
-          { id: "act", label: "Act", content: actBody },
-          { id: "order", label: "Order", content: orderBody, scrolls: false },
           {
-            id: "needs",
-            label: needsCount > 0 ? `Needs ${needsCount}` : "Needs",
-            content: slots?.needs ?? <p className="table-panel-empty">Nothing waits on you.</p>
-          },
-          ...campaignTabs,
-          { id: "dice", label: "Dice", content: slots?.dice },
-          { id: "log", label: "Log", content: slots?.log, scrolls: false }
+            id: "notes",
+            label: "Notes",
+            content: <NotesTab tonight={slots?.tonight} codex={slots?.codex} />,
+            scrolls: false
+          }
         ]
-      : [
-          {
-            id: "scene",
-            label: "Scene",
-            content: (
-              <>
-                {slots?.needs}
-                {setupBody}
-              </>
-            )
-          },
-          ...campaignTabs,
-          { id: "party", label: "Party", content: slots?.party },
-          { id: "dice", label: "Dice", content: slots?.dice },
-          { id: "log", label: "Log", content: slots?.log, scrolls: false }
-        ]
-    : [
-        {
-          id: "fight",
-          label: "Fight",
-          content: fighting ? (
-            <div className="encounter-fight">
-              {orderBody}
-              {actBody}
-            </div>
-          ) : (
-            setupBody
-          ),
-          scrolls: !fighting
-        },
-        ...campaignTabs,
-        { id: "dice", label: "Dice", content: slots?.dice },
-        { id: "log", label: "Log", content: slots?.log, scrolls: false },
-        { id: "token", label: "Token", content: slots?.token }
-      ];
-  const fallback = phone ? (fighting ? "act" : "scene") : "fight";
+      : []),
+    // The token last pressed on the map, with the same controls as its menu there.
+    ...(selectedTokenId && slots?.token ? [{ id: "token", label: "Token", content: slots.token }] : [])
+  ];
+  const fallback = "fight";
   const [tab, setTab] = useRememberedTab(
     `vtt.table-tab.gm.${phone ? "phone" : "laptop"}`,
     tabs.map((entry) => entry.id),
@@ -629,7 +637,6 @@ export function GmEncounterPanel({
     <>
       <TablePanel
         label={fighting ? `The fight · round ${state.combat.round}` : "The table"}
-        {...(!phone && slots?.needs ? { top: slots.needs } : {})}
         tabs={tabs}
         active={tab}
         onActive={setTab}

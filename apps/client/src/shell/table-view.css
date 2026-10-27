@@ -14,7 +14,7 @@
   overscroll-behavior: contain;
   background: var(--void);
 }
-.table-bench > .table-header {
+.table-bench > .table-strip {
   grid-area: head;
 }
 /* On a laptop the split is no box of its own: the map and the panel are cells of the bench's grid. */

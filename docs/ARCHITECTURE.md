@@ -1055,11 +1055,14 @@ the Codex and Search the Compendium go to that section with a one-shot `openSear
 section with its own search keeps Ctrl K. While the connection is down, or until a snapshot arrives after it returns,
 `shell/ReconnectBar.tsx` says to wait and `useTableCurrent()` is false for the controls that read it.
 
-The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a header bar over the map with the scene and
-the status line (`table/TableHeader.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
-(`table/TablePanel.tsx`) with Needs you or the player's prompt slot above its tabs and the view's one primary in
-its footer. Nothing floats over the map but tokens and marks; notices land in the status line through
-`ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
+The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a strip over the map with the VCR counter and the
+status line (`table/TableStrip.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
+(`table/TablePanel.tsx`) whose tabs are Fight, Log, Party and Notes for the GM, and whose footer holds the view's one
+primary. The live scene picker (`table/LiveScenePicker.tsx`) sits in the GM's top bar on Play, and in the strip on a
+phone, where the strip is Play's header. The GM's Needs you leads the Fight tab, and Start a fight
+(`encounter/StartFight.tsx`) lists the staged characters and monsters to tick. The table screen lamp
+(`table/TvControl.tsx`) pauses or resumes the screen and opens its preview (`viewer/preview-open.ts`). Nothing floats
+over the map but tokens and marks; notices land in the status line through `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
 
 Scenes and maps are prepared on Prep's Scenes and Maps pages (ADR-0035), in `scenes/` and `maps/`. `scenes/ScenesShell.tsx`
