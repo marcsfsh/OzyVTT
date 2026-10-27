@@ -106,6 +106,18 @@ async function pairScreen(context) {
     altText: "Goblin warren",
     camera: { center: { x: 700, y: 500 }, zoom: 1 }
   });
+  // Presenting the map clears the screen's roll card, so the fight rolls once more for the card to show.
+  if (scenario === "fight")
+    await fetch(`${base}/api/v1/game/rolls`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        commandId: crypto.randomUUID(),
+        formula: "1d20+7",
+        purpose: "attack",
+        visibility: "public"
+      })
+    });
 }
 
 async function signIn(page) {
