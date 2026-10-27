@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { Combobox } from "./Combobox";
 import { Drawer } from "./Drawer";
+import { Tabs } from "./Tabs";
 import { MarkdownEditor, applyMarkdownFormat, wikiLinkContext } from "./MarkdownEditor";
 import { Modal } from "./Modal";
 import { TagInput } from "./TagInput";
@@ -599,5 +600,23 @@ describe("ToastProvider", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("Tabs", () => {
+  it("puts a tab's own class on that tab alone", () => {
+    render(
+      <Tabs
+        ariaLabel="Sheet"
+        activeId="notes"
+        onChange={() => {}}
+        tabs={[
+          { id: "notes", label: "Notes" },
+          { id: "gm", label: "GM", className: "is-gm" }
+        ]}
+      />
+    );
+    expect(screen.getByRole("tab", { name: "GM" })).toHaveClass("is-gm");
+    expect(screen.getByRole("tab", { name: "Notes" })).not.toHaveClass("is-gm");
   });
 });

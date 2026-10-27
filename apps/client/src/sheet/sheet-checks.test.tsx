@@ -519,7 +519,10 @@ describe("the sheet's Speed", () => {
   it("shows the Speed in force, with the base beside it when they differ", async () => {
     serve(derivedSheet({ speedFeet: 15 }));
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
-    await openTab(userEvent.setup(), "Checks");
+    const user = userEvent.setup();
+    await openTab(user, "Checks");
+    // The compact header keeps AC and HP; its HP box opens the other vitals, Speed among them.
+    await user.click(screen.getByRole("button", { name: /^Hit Points .*see the other vitals$/ }));
     const lowered = await screen.findByText("of 30 ft");
     expect(lowered.closest(".cs-stat")?.textContent).toContain("15");
     expect(lowered.closest(".cs-stat")?.classList.contains("is-caution")).toBe(true);

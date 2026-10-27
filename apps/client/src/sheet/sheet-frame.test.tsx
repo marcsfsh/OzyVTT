@@ -228,9 +228,13 @@ describe("the phone's header", () => {
     });
     // The Play tab's Vitals hold the numbers, so another tab shows the header's tiles.
     await user.click(screen.getByRole("tab", { name: "Notes" }));
-    await user.click(screen.getByRole("button", { name: "Hit Points 30 of 44. Change Hit Points" }));
+    await user.click(
+      screen.getByRole("button", { name: "Hit Points 30 of 44. Change Hit Points and see the other vitals" })
+    );
     const drawer = within(screen.getByRole("dialog", { name: "Hit Points" }));
     for (const name of ["Damage", "Heal", "Temp"]) expect(drawer.getByRole("button", { name })).toBeTruthy();
+    // The vitals the compact header leaves out are here too.
+    for (const label of ["Speed", "Init"]) expect(drawer.getByText(label)).toBeTruthy();
     expect(drawer.queryByText("GM only")).toBeNull();
   });
 
@@ -239,7 +243,9 @@ describe("the phone's header", () => {
     render(<CharacterSheet actor={hero() as unknown as GmActor} role="gm" onClose={() => {}} />, {
       wrapper: ToastProvider
     });
-    await user.click(screen.getByRole("button", { name: "Hit Points 30 of 44. Change Hit Points" }));
+    await user.click(
+      screen.getByRole("button", { name: "Hit Points 30 of 44. Change Hit Points and see the other vitals" })
+    );
     const set = within(
       within(screen.getByRole("dialog", { name: "Hit Points" })).getByRole("group", { name: "Set Hit Points" })
     );

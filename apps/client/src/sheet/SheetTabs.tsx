@@ -110,7 +110,7 @@ export function SheetTabStrip({
       idBase={idBase}
       activeId={active}
       onChange={(id) => onChange(id as SheetTabId)}
-      tabs={tabs.map((id) => ({ id, label: TAB_META[id].label }))}
+      tabs={tabs.map((id) => ({ id, label: TAB_META[id].label, ...(id === "gm" ? { className: "is-gm" } : {}) }))}
     />
   );
 }

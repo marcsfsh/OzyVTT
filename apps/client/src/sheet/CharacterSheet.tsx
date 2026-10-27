@@ -13,9 +13,10 @@ import {
   Chip,
   GmOnlyTag,
   IconButton,
+  IconPencil,
   IconSkull,
   IconX,
-  Meter,
+  LifeBar,
   Modal,
   ToastOutlet,
   useDragSurface,
@@ -60,7 +61,7 @@ import {
 } from "./sheet-model";
 import { type DetailPlace } from "./SheetDetail";
 import { RollSettings, SheetMenu, type SheetMenuItems } from "./SheetMenu";
-import { SheetTabBar, SheetTabStrip, sheetTabs, tabIds, type SheetTabId } from "./SheetTabs";
+import { SheetTabStrip, sheetTabs, tabIds, type SheetTabId } from "./SheetTabs";
 import { SpellsTab } from "./SpellsTab";
 import { StatusStrip } from "./StatusStrip";
 import { useSheetController, type SheetCombat } from "./useSheetController";
@@ -71,7 +72,7 @@ import { useSheetRolls } from "./useSheetRolls";
 import { poolsOf } from "./Uses";
 import { useRememberedTab } from "../table/TablePanel";
 import "./sheet.css";
-import { ActorAvatar } from "../actors/ActorAvatar";
+import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
 
 /** Where the sheet sits: a page of its own (My character, `/characters/<id>`, `sheet.html`), a dialog over the page
  *  it was opened from, or the table's panel. */
@@ -570,11 +571,11 @@ export function CharacterSheet({
     frame = (
       <section className={`cs cs--wide${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
         <header className="cs-band">
-          <ActorAvatar
+          <ActorPortrait
             actor={actor}
             token={token}
             definitions={role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined}
-            name={actor.name}
+            frame={frameOf(actor, role)}
             size="lg"
           />
           {name}
@@ -599,6 +600,14 @@ export function CharacterSheet({
             )}
             {inspired !== undefined && <StatTile label="Heroic Inspiration" value={inspired ? "Held" : "None"} />}
           </div>
+          {hp && (
+            <div className="cs-band-life">
+              <LifeBar hp={hp} />
+              <Button variant="secondary" size="sm" onClick={() => setHpOpen(true)}>
+                <IconPencil /> Change HP
+              </Button>
+            </div>
+          )}
           <span className="cs-grow" />
           {role === "gm" && <GmOnlyTag />}
           {/* A rest is taken between fights, so the band's Rest leaves while one runs. */}
@@ -691,64 +700,50 @@ export function CharacterSheet({
       <section className={`cs cs--narrow${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
         <header className="cs-head">
           <div className="cs-id">
-            <ActorAvatar
+            <ActorPortrait
               actor={actor}
               token={token}
               definitions={role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined}
-              name={actor.name}
-              size="md"
+              frame={frameOf(actor, role)}
+              size="sm"
             />
             {name}
-            {levelBox}
-            {menu}
-            {close}
-            {headerEnd}
-          </div>
-          {!vitalsShow && (
-            <div className="cs-tiles">
-              <button
-                type="button"
-                className={`cs-tile-hp${down ? " is-down" : ""}`}
-                aria-label={
-                  hp
-                    ? `Hit Points ${hp.current} of ${hp.maximum}${down ? ", dying" : ""}. Change Hit Points`
-                    : "Hit Points"
-                }
-                onClick={() => setHpOpen(true)}
-              >
-                <span className="cs-stat-k">{down ? "Hit Points · Dying" : "Hit Points"}</span>
-                <span className="cs-tile-hp-row">
-                  <strong className="cs-stat-v">{hp ? hp.current : "None"}</strong>
-                  {hp && (
-                    <span className="cs-stat-n">
-                      of {hp.maximum}
-                      {hp.temporary > 0 ? ` · ${hp.temporary} temp` : ""}
-                    </span>
-                  )}
-                </span>
-                {hp && <Meter tone="health" value={hp.current} max={hp.maximum} />}
-              </button>
+            {!vitalsShow && (
               <StatTile
                 label="AC"
                 value={armorClassOf(actor) ?? "None"}
                 note={actor.armorClassOverride !== undefined ? "Set by GM" : null}
               />
-              <StatTile
-                label="Speed"
-                value={speed.now ?? "None"}
-                note={speed.lowered ? `of ${speed.base} ft` : null}
-                caution={speed.lowered}
-              />
-              <StatTile label="Init" value={actor.initiative !== undefined ? signed(actor.initiative) : "None"} />
-            </div>
-          )}
+            )}
+            {/* The compact header keeps AC and HP; the HP box opens the hit points with the other vitals. */}
+            {!vitalsShow && (
+              <button
+                type="button"
+                className={`cs-stat cs-tile-hp${down ? " is-down" : ""}`}
+                aria-label={
+                  hp
+                    ? `Hit Points ${hp.current} of ${hp.maximum}${down ? ", dying" : ""}. Change Hit Points and see the other vitals`
+                    : "Hit Points and the other vitals"
+                }
+                onClick={() => setHpOpen(true)}
+              >
+                <strong className="cs-stat-v">{hp ? `${hp.current}/${hp.maximum}` : "None"}</strong>
+                <span className="cs-stat-k">{down ? "Dying" : "HP"}</span>
+              </button>
+            )}
+            {levelBox}
+            {menu}
+            {close}
+            {headerEnd}
+          </div>
+          {!vitalsShow && hp && <LifeBar hp={hp} showNumbers={false} className="cs-head-life" />}
         </header>
+        <SheetTabStrip tabs={tabs} active={tab} onChange={setTab} idBase={idBase} strip />
         {!vitalsShow && status}
         {toastRow}
         {lastRoll}
         {top}
         {body}
-        <SheetTabBar tabs={tabs} active={tab} onChange={setTab} idBase={idBase} />
       </section>
     );
   }
@@ -759,6 +754,23 @@ export function CharacterSheet({
       {controller.healDialog}
       {hpOpen && (
         <Modal open onClose={() => setHpOpen(false)} align="bottom" title="Hit Points">
+          {layout === "narrow" && (
+            <div className="cs-vitals-strip">
+              <StatTile
+                label="Speed"
+                value={speed.now ?? "None"}
+                note={speed.lowered ? `of ${speed.base} ft` : null}
+                caution={speed.lowered}
+              />
+              <StatTile label="Init" value={actor.initiative !== undefined ? signed(actor.initiative) : "None"} />
+              {definition && (
+                <StatTile
+                  label="Proficiency"
+                  value={signed(derived?.proficiencyBonus ?? definition.proficiencyBonus)}
+                />
+              )}
+            </div>
+          )}
           <HpCard actor={actor} role={role} withSet onFeedback={say} />
         </Modal>
       )}

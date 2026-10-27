@@ -7,6 +7,8 @@ interface TabItem {
   id: string;
   label: ReactNode;
   disabled?: boolean;
+  /** A class for this tab alone (a GM-only tab's violet). */
+  className?: string;
 }
 
 interface TabsProps {
@@ -145,7 +147,7 @@ export function Tabs({
             aria-selected={active}
             tabIndex={stop ? 0 : -1}
             disabled={tab.disabled}
-            className={cx("nh-tab", "interactive", active && "nh-tab--active")}
+            className={cx("nh-tab", "interactive", active && "nh-tab--active", tab.className)}
             onClick={() => onChange(tab.id)}
             onKeyDown={(event) => onKeyDown(event, index)}
           >
