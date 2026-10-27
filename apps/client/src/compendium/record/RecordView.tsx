@@ -21,12 +21,13 @@ import { closingSave } from "../../homebrew/closingSaves";
 import { WIZARDS } from "../../homebrew/wizard";
 import { REVIEW_STEP } from "../../homebrew/wizard/steps";
 import { CompendiumCard, cardName, cardOfBody } from "../CompendiumCard";
-import { useCompendium } from "../context";
+import { useCompendium, useCompendiumGame } from "../context";
 import { useHomebrewList, useTable } from "../data";
 import { KindIcon, kindLabel, phoneFacts, type Kind } from "../kinds";
 import { PhoneHead, StateChip } from "../pieces";
 import { RECORD_TABS, recordPath, tablePath, withTableQuery, type RecordTab } from "../routes";
 import { useNames } from "../TablesView";
+import { AddToScene } from "./AddToScene";
 import { CardTab } from "./CardTab";
 import { HistoryTab } from "./HistoryTab";
 import { MergePanel } from "./Merge";
@@ -215,6 +216,7 @@ function SrdRecord({
     };
   }, [token, id]);
   const line = useRecordLine(kind, id, `SRD 5.2.1 ${kindLabel(kind)}`);
+  const game = useCompendiumGame();
   const close = () => go(withTableQuery(tablePath(kind), query));
   if (error) return <RecordProblem text={error} onClose={close} />;
   if (!record) return <p className="cp-hint cp-pad">Opening the record.</p>;
@@ -231,6 +233,7 @@ function SrdRecord({
       Make a homebrew copy
     </Button>
   );
+  const addToScene = kind === "monster" && game ? <AddToScene game={game} definitionId={id} name={name} /> : null;
   return (
     <article className={cx("cp-record", `is-${layout}`)} aria-label={name}>
       <RecordHeader
@@ -238,7 +241,14 @@ function SrdRecord({
         name={name}
         line={line}
         chips={<Badge tone="info">SRD 5.2.1</Badge>}
-        primary={layout === "phone" ? null : copyButton}
+        primary={
+          layout === "phone" ? null : (
+            <>
+              {addToScene}
+              {copyButton}
+            </>
+          )
+        }
         layout={layout}
         onOpenTable={onOpenTable}
         onClose={close}
@@ -277,7 +287,12 @@ function SrdRecord({
             </ul>
           </section>
         )}
-        {layout === "phone" && copyButton}
+        {layout === "phone" && (
+          <div className="cp-rec-actions">
+            {addToScene}
+            {copyButton}
+          </div>
+        )}
       </div>
     </article>
   );
@@ -382,6 +397,7 @@ function HomebrewRecord({
   const { doc, draft } = record;
   const kind = doc.type;
   const names = useNames(token);
+  const game = useCompendiumGame();
   const def = WIZARDS[kind];
   const { steps, placed } = useStudioPlan(def, draft, record.checklist);
   // A record opened to edit has been through every step; one just made walks them first.
@@ -416,7 +432,11 @@ function HomebrewRecord({
   const publishLabel = record.archived ? null : !record.published ? "Publish" : record.pending ? "Update" : null;
   const blocked = record.checklist.length > 0;
 
-  const primary = publishLabel ? (
+  const addToScene =
+    kind === "monster" && game && record.published && !record.archived ? (
+      <AddToScene game={game} definitionId={doc.id} name={name} />
+    ) : null;
+  const publish = publishLabel ? (
     <Button
       variant="primary"
       size="sm"
@@ -427,6 +447,13 @@ function HomebrewRecord({
       {publishLabel}
     </Button>
   ) : null;
+  const primary =
+    addToScene || publish ? (
+      <>
+        {addToScene}
+        {publish}
+      </>
+    ) : null;
 
   const menu = (
     <Menu trigger={<IconMore />} label={`More actions for ${name}`} icon align="end" hideCaret>
@@ -595,7 +622,7 @@ function HomebrewRecord({
         chips={chips}
         lead={tab === "edit" && !record.archived ? <ReadinessRing done={done} total={steps.length - 1} /> : undefined}
         who={layout === "phone" ? null : who}
-        primary={layout === "phone" ? null : primary}
+        primary={layout === "phone" ? addToScene : primary}
         menu={menu}
         extra={extra}
         layout={layout}

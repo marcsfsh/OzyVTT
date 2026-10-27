@@ -50,8 +50,8 @@
   display: grid;
   justify-items: center;
   gap: 2px;
-  padding: var(--space-1) 2px;
-  border: 1px solid var(--line);
+  padding: var(--space-2) 2px;
+  border: 1px solid var(--line-raised);
   background: var(--surface-2);
 }
 .sb-ability dt {
@@ -64,12 +64,14 @@
   justify-items: center;
   margin: 0;
 }
+/* VT323 has one weight: a bold one would be smeared by the browser, so size carries the score. */
 .sb-score {
-  font: 700 var(--fs-body) / 1.1 var(--font-numeric);
+  color: var(--text);
+  font: 400 24px / 1 var(--font-numeric);
 }
 .sb-mods {
   color: var(--text-dim);
-  font: 500 var(--fs-2xs) / 1.2 var(--font-numeric);
+  font: 400 14px / 1.1 var(--font-numeric);
   text-align: center;
 }
 .sb-section {

@@ -239,7 +239,7 @@ export function GmShell({
       )}
 
       {/* The Compendium owns its frame: a section bar over its tables, and a record at its own address. */}
-      {tab("compendium") && <CompendiumShell token={token} party={party} />}
+      {tab("compendium") && <CompendiumShell token={token} party={party} game={state} />}
 
       {showViewerPreview && <ViewerPreviewPanel gmToken={token} onClose={() => setViewerPreviewOpen(false)} />}
 

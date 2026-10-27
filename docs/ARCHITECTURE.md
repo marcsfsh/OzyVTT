@@ -899,7 +899,13 @@ names no family is the GM's own ruling on the whole command.
   every tab, and the review step places the publish checklist on the step that answers each item. The
   checklist's sentences come from `homebrew-issues.ts` in the content package, the same words the gate
   sends. The monster wizard compares its numbers with the SRD stat blocks of its CR, read from the bundle
-  by `content:monster-benchmarks`.
+  by `content:monster-benchmarks`. Its sections read Browse (the tables), Homebrew (the overview of what
+  needs you), Sources and Sharing over the same addresses.
+- Add to a scene on a monster's card (`compendium/record/AddToScene.tsx`) is client orchestration over two
+  existing commands: `actor:add-from-definition` at the staging default, then `scene:set-combatants` with
+  the scene's ids merged from a fresh snapshot and `expectedRevision`. It offers only prepared scenes that
+  are neither live nor holding a parked fight, and a refused staging keeps the new monster and stages it
+  on retry, so no duplicate is made. The game reaches the Compendium through `CompendiumGameContext`.
 - A preview is the page: `CompendiumCard` draws a draft with the sheet's spell and item cards, the
   builder's detail and the bestiary's stat block (`encounter/StatBlock.tsx`), fed by
   `homebrew/summaries.ts`, which a mirror test holds equal to the server's catalog summaries. See as reads

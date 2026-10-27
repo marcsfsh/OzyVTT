@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { Button } from "@vtt/ui";
 import type { HomebrewPackInfo, HomebrewTableRow } from "../homebrew/api";
 import { CompendiumTable } from "./CompendiumTable";
 import { useCompendium } from "./context";
@@ -50,7 +49,7 @@ export function TablesView({
   selectedId = null,
   inFlyout = false
 }: Readonly<{ kind: Kind | null; compact?: boolean; selectedId?: string | null; inFlyout?: boolean }>) {
-  const { token, party, phone, query, go, setQuery, openNew } = useCompendium();
+  const { token, party, phone, query, go, setQuery } = useCompendium();
   const table = useTable(token, kind);
   const packs = usePacks(token).data?.packs ?? [];
   const names = useNames(token);
@@ -77,18 +76,7 @@ export function TablesView({
       onOpen={(row) => go(withTableQuery(recordPath(row.kind, row.id), query))}
       mark={(row) => <SourceMark row={row} packs={packs} />}
       sourceWord={(row) => sourceWord(row, packs)}
-      head={
-        phone && !inFlyout ? (
-          <PhoneHead
-            title="Compendium"
-            actions={
-              <Button size="sm" variant="ghost" onClick={() => openNew({ kind })}>
-                New
-              </Button>
-            }
-          />
-        ) : undefined
-      }
+      head={phone && !inFlyout ? <PhoneHead title="Compendium" /> : undefined}
     />
   );
 }

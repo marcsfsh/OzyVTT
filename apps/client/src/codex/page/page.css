@@ -61,15 +61,16 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+/* The page's name at the size the drawn page gives it: the one Bungee line on the screen. */
 .cx-page-title {
   margin: 0;
-  font: 400 var(--fs-h2) / 1.15 var(--font-display);
+  font: 400 34px / 1.1 var(--font-display);
   letter-spacing: var(--tracking-display);
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
 }
 .cx-page-title.is-phone {
-  font-size: var(--fs-h3);
+  font-size: var(--fs-h1);
 }
 .cx-kind {
   display: inline-flex;
