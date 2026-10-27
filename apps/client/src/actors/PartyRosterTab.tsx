@@ -239,8 +239,7 @@ export function PartyRosterTab({
 
   /* Heading and actions stay fixed; the queue, gallery and archived drawer share one region below. */
   return (
-    <section className="party-roster pane-frame pane-scene scanlines frame-col anim-view">
-      <div className="pane-sky" aria-hidden="true" />
+    <section className="party-roster pane-frame pane-scene frame-col anim-view">
       <div className="party-heading neon-beam">
         <h2>Roster</h2>
         <div className="party-heading-actions">

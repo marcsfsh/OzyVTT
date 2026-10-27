@@ -5,7 +5,7 @@
    - Paint only: nothing here may make a field render that did not before; a new field on the shared
      screen is a leak.
    - Themed like every page: viewer.html's no-flash script reads the browser's stored theme, so a screen that
-     never chose one shows Night and the GM's own preview shows the GM's theme. */
+     never chose one follows its system (Dusk when it can't tell) and the GM's own preview shows the GM's theme. */
 .viewer-eyebrow {
   color: var(--text-dim);
   font-size: clamp(0.8rem, 1.35vw, 1.15rem);
@@ -13,7 +13,7 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-/* The idle screens hold no map, so they take the full sky. */
+/* The idle screens hold no map, so they show the app's ground. */
 .viewer-pairing,
 .viewer-waiting {
   position: relative;
@@ -27,57 +27,9 @@
   padding: var(--space-8);
   text-align: center;
   overflow: hidden;
-  background-image:
-    linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--sky-horizon-a) 22%,
-      var(--sky-horizon-b) 50%,
-      var(--sky-horizon-a) 78%,
-      transparent 100%
-    ),
-    var(--sky-bloom), var(--sky-horizon-glow),
-    radial-gradient(1px 1px at 22px 31px, var(--sky-star) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 193px 22px, var(--sky-star) 50%, transparent 51%),
-    radial-gradient(1px 1px at 71px 140px, var(--sky-star-dim) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 45px 213px, var(--sky-star-dim) 50%, transparent 51%), var(--sky-wash);
-  background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat, repeat, repeat, no-repeat;
-  background-position:
-    0 calc(100% - var(--sky-horizon-inset)),
-    0 0,
-    0 0,
-    0 0,
-    0 0,
-    0 0,
-    0 0,
-    0 0;
-  background-size:
-    100% 2px,
-    auto,
-    auto,
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    auto;
+  background: var(--sky);
 }
-/* The crest: the sun masked to the top of a --sky-sun-d circle on the horizon, as `.pane-sky::after`
-   in styles.css. It stands on the line, so the sun rises from the horizon and never hangs under it. */
-.viewer-pairing::after,
-.viewer-waiting::after {
-  content: "";
-  position: absolute;
-  left: calc(50% - var(--sky-sun-d) / 2);
-  bottom: var(--sky-horizon-inset);
-  width: var(--sky-sun-d);
-  height: var(--sky-sun-crown);
-  background-image: var(--sky-sun);
-  opacity: var(--sky-sun-opacity);
-  -webkit-mask-image: var(--sky-sun-mask);
-  mask-image: var(--sky-sun-mask);
-  pointer-events: none;
-}
-/* The words stay over the sun on a short screen, where the crest reaches up behind them. */
+/* The words stay above the page's own layers. */
 .viewer-pairing-card,
 .viewer-waiting > :is(h1, p, .viewer-eyebrow) {
   position: relative;
@@ -324,16 +276,7 @@
   position: relative;
   overflow: hidden;
   border-left: var(--rim-w) solid var(--rim-color);
-  background-image:
-    radial-gradient(1px 1px at 22px 31px, var(--sky-star) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 193px 22px, var(--sky-star) 50%, transparent 51%),
-    radial-gradient(1px 1px at 71px 140px, var(--sky-star-dim) 50%, transparent 51%), var(--sky-wash);
-  background-repeat: repeat, repeat, repeat, no-repeat;
-  background-size:
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    auto;
+  background: var(--surface-1);
 }
 .viewer-initiative-scroll {
   padding: 0 clamp(0.6rem, 1.4vw, 1.4rem) clamp(0.6rem, 1.4vw, 1.4rem);

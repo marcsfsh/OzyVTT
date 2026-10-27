@@ -201,6 +201,20 @@ describe("a player's Settings", () => {
     expect(screen.queryByText("GM only")).toBeNull();
   });
 
+  it("turns Reduce transparency on for this device, and makes the page solid at once", async () => {
+    const user = userEvent.setup();
+    localStorage.removeItem("vtt.reduce-transparency");
+    renderPlayer("/settings");
+    const toggle = screen.getByRole("switch", { name: "Reduce transparency" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(document.documentElement).toHaveAttribute("data-transparency", "reduced");
+    expect(localStorage.getItem("vtt.reduce-transparency")).toBe("on");
+    await user.click(toggle);
+    expect(document.documentElement).not.toHaveAttribute("data-transparency");
+  });
+
   it("never mounts a GM section, even at its address", () => {
     renderPlayer("/settings/fights");
     expect(screen.queryByText(SETTING.rulesAssistant.label)).toBeNull();

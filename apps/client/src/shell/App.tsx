@@ -82,7 +82,6 @@ export function App() {
 
   return (
     <main className={entry.phase === "settle" ? "anim-cascade" : undefined}>
-      <div className="app-texture" aria-hidden="true" />
       {signedIn && <TableEventToasts />}
       {/* Row 1: the connection strip. A real frame row, so it never paints over a surface and nothing
         covers it, full-page layers included. */}

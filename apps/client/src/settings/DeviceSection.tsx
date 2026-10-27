@@ -1,4 +1,4 @@
-import { Button, SegmentedControl, Switch, ThemeToggle } from "@vtt/ui";
+import { Button, SegmentedControl, setReduceTransparency, Switch, ThemeToggle, useReduceTransparency } from "@vtt/ui";
 import { useRollPreference } from "../dice/roll-preference";
 import { setAutoArrange, setPinchZoom, useAutoArrange, usePinchZoom } from "./preferences";
 import { SETTING } from "./sections";
@@ -19,10 +19,23 @@ export function DeviceSection({
   const { rollInput, mayType, setRollInput } = useRollPreference();
   const autoArrange = useAutoArrange();
   const pinchZoom = usePinchZoom();
+  const transparency = useReduceTransparency();
   return (
     <SettingsSection id="device" gmOnly={false}>
       <SettingRow setting={SETTING.theme} stacked>
         <ThemeToggle />
+      </SettingRow>
+      {/* A system request for reduction outranks this device's choice, so the switch shows it on and says why. */}
+      <SettingRow
+        setting={SETTING.reduceTransparency}
+        hint={transparency.system ? "Your system asks for reduced transparency, so panels stay solid." : undefined}
+      >
+        <Switch
+          checked={transparency.setting || transparency.system}
+          disabled={transparency.system}
+          onChange={setReduceTransparency}
+          label="Reduce transparency"
+        />
       </SettingRow>
       {/* The GM's table setting outranks this device's choice, so the reason replaces the control. */}
       {mayType ? (

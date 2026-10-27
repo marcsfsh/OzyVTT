@@ -196,10 +196,9 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
      it stays visible beside its coordinate fields) and the access column. */
   return (
     <section
-      className="viewer-controls pane-frame pane-scene scanlines frame-col anim-view"
+      className="viewer-controls pane-frame pane-scene frame-col anim-view"
       aria-labelledby="viewer-controls-title"
     >
-      <div className="pane-sky" aria-hidden="true" />
       <header className="viewer-controls-heading neon-beam">
         <div className="viewer-controls-title">
           <h2 id="viewer-controls-title">Shared screen</h2>

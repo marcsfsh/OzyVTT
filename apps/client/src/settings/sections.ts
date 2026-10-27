@@ -149,7 +149,13 @@ export const SETTING = entries({
     section: "device",
     label: "Theme",
     hint: "It applies to this device, and every page's app bar has the same switch.",
-    words: "night dusk dawn day dark light colours appearance"
+    words: "dusk dawn dark light night day colours appearance"
+  },
+  reduceTransparency: {
+    section: "device",
+    label: "Reduce transparency",
+    hint: "Panels turn solid, and the scanlines and glows go.",
+    words: "transparency blur glass solid scanlines glow contrast accessibility"
   },
   rollInput: {
     section: "device",

@@ -4,9 +4,23 @@
 */
 
 /* Theme */
-export { type Theme, THEMES, THEME_NAMES } from "./theme/theme";
+export { resolveTheme, type Theme, THEME_COLOURS, THEMES, THEME_NAMES } from "./theme/theme";
+export {
+  initTransparency,
+  setReduceTransparency,
+  transparencyReduced,
+  useReduceTransparency
+} from "./theme/transparency";
 export { ThemeSwitch, ThemeToggle } from "./theme/ThemeToggle";
-export { colourDistance, contrastRatio, parseColour, type Rgb } from "./theme/colour";
+export {
+  colourDistance,
+  composite,
+  contrastRatio,
+  parseColour,
+  parseColourAlpha,
+  type Rgb,
+  type Rgba
+} from "./theme/colour";
 
 /* Primitives */
 export { cx } from "./primitives/util";

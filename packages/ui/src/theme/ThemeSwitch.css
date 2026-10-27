@@ -1,4 +1,4 @@
-/* The app bar's theme switch: a square trigger at the 44px floor, and the four themes as a menu of choices. */
+/* The app bar's theme switch: a square trigger at the 44px floor, and the two themes as a menu of choices. */
 .nh-theme-switch {
   flex: none;
 }

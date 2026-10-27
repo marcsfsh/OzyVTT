@@ -15,6 +15,23 @@ export function parseColour(value: string): Rgb | null {
   return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : null;
 }
 
+export type Rgba = readonly [number, number, number, number];
+
+/** As `parseColour`, keeping the alpha (1 when the colour gives none), so glass can be composited. */
+export function parseColourAlpha(value: string): Rgba | null {
+  const rgb = parseColour(value);
+  if (!rgb) return null;
+  const alpha = /^rgba?\(\s*[\d.]+[\s,]+[\d.]+[\s,]+[\d.]+\s*[,/]\s*([\d.]+)(%?)/.exec(value.trim().toLowerCase());
+  const a = alpha ? Number(alpha[1]) / (alpha[2] ? 100 : 1) : 1;
+  return [rgb[0], rgb[1], rgb[2], a];
+}
+
+/** `top` painted over an opaque `bottom` (source-over in sRGB, as a browser composites). */
+export function composite(top: Rgba, bottom: Rgb): Rgb {
+  const a = top[3];
+  return [0, 1, 2].map((at) => top[at] * a + bottom[at] * (1 - a)) as unknown as Rgb;
+}
+
 const linear = (channel: number) => {
   const value = channel / 255;
   return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;

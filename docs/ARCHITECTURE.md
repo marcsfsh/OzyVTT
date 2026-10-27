@@ -1094,9 +1094,15 @@ OpenAPI document the route registry generates, through `integrations/openapi-mod
 document's tags, in its order, group the table, and an operation's page shows the document's example body where it
 has one.
 
-The themes are Night, Dusk, Dawn and Day (`dark`, `dusk`, `dawn`, `light` on `<html data-theme>`), one token set in
-`packages/ui/src/styles/design-tokens.css`. Each HTML entry sets the stored theme before first paint, and `ThemeSwitch`
-in every app bar and `ThemeToggle` in Settings share `useTheme`, which hears every change on the page.
+The themes are Dusk and Dawn (`dusk` and `dawn` on `<html data-theme>`, ADR-0037), one token set in
+`packages/ui/src/styles/design-tokens.css` with Dusk in `:root`. Each HTML entry decides the theme before first paint
+with the rules of `resolveTheme` (`packages/ui/src/theme/theme.ts`): a saved `dusk` or `dawn` wins, a retired `dark` or
+`light` becomes Dusk or Dawn and is rewritten, and anything else follows `prefers-color-scheme`.
+`apps/client/src/shell/theme-startup.test.ts` runs each entry's script against it. `ThemeSwitch` in every app bar and
+`ThemeToggle` in Settings share `useTheme`, which hears every change on the page. Reduce transparency
+(`theme/transparency.ts`, Settings > Device) is the device setting `vtt.reduce-transparency` or the system's request;
+while it is on, `<html data-transparency="reduced">` turns the glass tokens solid and drops the scanlines and glows. The
+same script sets it before first paint, and each entry calls `initTransparency` to follow the system after that.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map

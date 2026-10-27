@@ -113,7 +113,7 @@ export function TableView(props: TableViewProps) {
     />
   ) : claimingOnly ? null : (
     /* No map yet. The GM's box is the first evening's start: the scene, and the address players open. */
-    <div className={`empty map-empty-hero scanlines${gm ? " map-empty-hero--gm scroll-y" : ""}`}>
+    <div className={`empty map-empty-hero${gm ? " map-empty-hero--gm scroll-y" : ""}`}>
       <div className="empty-atmos" aria-hidden="true">
         <span className="home-hero-bloom" />
         <span className="home-hero-grid grid-floor" />

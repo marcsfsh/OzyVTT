@@ -305,8 +305,7 @@ export function MyCharacter({
     );
 
   return (
-    <section className="my-character pane-frame pane-scene scanlines frame-col anim-view" aria-label="My character">
-      <div className="pane-sky" aria-hidden="true" />
+    <section className="my-character pane-frame pane-scene frame-col anim-view" aria-label="My character">
       <div className="my-character-head neon-beam">
         <h2>My character</h2>
         <div className="my-character-head-actions">
