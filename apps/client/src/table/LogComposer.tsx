@@ -110,7 +110,7 @@ export function LogComposer({ options, talk }: Readonly<{ options?: ReactNode; t
           value={hears}
           onChange={(event) => setHears(event.target.value)}
         >
-          <option value="">Everyone</option>
+          <option value="">To the table</option>
           {whisperOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
