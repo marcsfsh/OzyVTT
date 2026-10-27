@@ -1,4 +1,4 @@
-import type { GmView, RuleExceptions, RuleFamily, RuleMode } from "@vtt/domain";
+import type { DiceMode, GmView, RuleExceptions, RuleFamily, RuleMode } from "@vtt/domain";
 import { Badge, RevealSwitch, SegmentedControl, Select, Switch } from "@vtt/ui";
 import { HealthStyleOptions } from "../encounter/health-display";
 import { SETTING } from "./sections";
@@ -6,6 +6,8 @@ import { SettingRow, SettingsSection } from "./SettingRow";
 import {
   BADGE_AUDIENCE_REASON,
   DIAL_COPY,
+  DICE_MODE_HELP,
+  DICE_MODE_OPTIONS,
   dialLabel,
   dialLine,
   HEALTH_AUDIENCE_LABEL,
@@ -30,7 +32,7 @@ const FAMILY_COPY: ReadonlyArray<Readonly<{ family: RuleFamily; label: string }>
 
 /** Fights: the rules assistant and what it checks, how players' hits, initiative and dice work, and tokens. */
 export function FightsSection({ state }: Readonly<{ state: GmView }>) {
-  const { send, setBuilderPolicy } = useTableWrites(state);
+  const { send } = useTableWrites(state);
   const policy = state.rulesPolicy;
   const health = state.combat.healthDisplay;
 
@@ -116,12 +118,28 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
         />
       </SettingRow>
 
-      <SettingRow setting={SETTING.typedRolls}>
-        <Switch
-          checked={state.builderPolicy.typedRolls === "open"}
-          onChange={(open) => void setBuilderPolicy({ typedRolls: open ? "open" : "gm-only" })}
-          label="Players may type what their dice show"
+      <SettingRow setting={SETTING.d20Dice} stacked>
+        <SegmentedControl
+          ariaLabel="Players' d20 rolls"
+          value={state.playerDice.d20}
+          onChange={(value) =>
+            void send("table:set-player-dice", { d20: value as DiceMode }, "That setting was rejected.")
+          }
+          options={DICE_MODE_OPTIONS.map((option) => ({ ...option }))}
         />
+        <p className="settings-note">{DICE_MODE_HELP[state.playerDice.d20]}</p>
+      </SettingRow>
+
+      <SettingRow setting={SETTING.damageDice} stacked>
+        <SegmentedControl
+          ariaLabel="Players' damage"
+          value={state.playerDice.damage}
+          onChange={(value) =>
+            void send("table:set-player-dice", { damage: value as DiceMode }, "That setting was rejected.")
+          }
+          options={DICE_MODE_OPTIONS.map((option) => ({ ...option }))}
+        />
+        <p className="settings-note">{DICE_MODE_HELP[state.playerDice.damage]}</p>
       </SettingRow>
 
       <SettingRow setting={SETTING.healthDisplay} stacked>

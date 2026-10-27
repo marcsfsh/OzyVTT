@@ -59,6 +59,21 @@ Every typed number is validated on the server; no bonus or rule result is taken 
 
 The numbered migration maps the old setting exactly, so a table's behavior is unchanged until the GM picks a new mode.
 
+## As built
+
+- **d20 rolls.** `rolledTotal` (and `attackRolledTotal`) on `save.answer`, `save.roll`, `death-save.roll`, `check.roll`,
+  `roll-call.answer`, `initiative.roll-self`, `action.resolve` and a reaction's strike. The server takes off the bonus
+  it works out and uses the face that leaves, so a typed total is checked and recorded as typed, and a natural 20 or 1
+  is still known. "The bonus" is every fixed modifier; dice an effect adds (Bless's d4, a Bardic Inspiration die) the
+  server still throws in both typed modes, and the box says the bonus is included. A Heroic Inspiration reroll of a
+  typed die takes the rerolled face.
+- **The player's box.** A player has no device choice: `app` rolls, `die` asks for the face (with a Roll button still
+  there), `total` asks for the total. The GM keeps the device choice, except for a character played at the table, whose
+  prompts ask the GM for the total.
+- **Builder.** Typed rolled scores and hit points follow `d20`: allowed unless it is `app`.
+- **Where it is set.** Settings > Encounters has both modes; an encounter's Encounter settings can use the table's or
+  pick its own (`encounter.set-player-dice`); Start the encounter says what applies.
+
 ## Validation evidence
 
 To be added with the code: each mode for each kind of roll on both transports, the range check, a save-for-damage

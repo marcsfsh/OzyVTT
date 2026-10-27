@@ -22,7 +22,7 @@ import {
 } from "./targeting";
 import { command, read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
-import { useRollPreference } from "../dice/roll-preference";
+import { typedDie, useRollPreference } from "../dice/roll-preference";
 import { useTableCalibration } from "../scene/tableGeometry";
 import { caughtByArea } from "../table/targetHints";
 import { foesFirst, pickableTargets, targetRows } from "../table/targetRows";
@@ -290,8 +290,13 @@ export function ActionRunner({
           onMap
           busy={resolveBusy}
           onInvalidFace={onFeedback}
+          actorId={actor.id}
           onRoll={(face) =>
-            resolveTargeting(state.revision, onOutcome, face !== undefined ? { attackNatural: face } : {})
+            resolveTargeting(
+              state.revision,
+              onOutcome,
+              face !== undefined ? typedDie("attackNatural", face, actor.id) : {}
+            )
           }
           onMoveFirst={() => takeMoveFirst(onOutcome)}
         />

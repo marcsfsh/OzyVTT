@@ -52,6 +52,9 @@ export type ResolveInput = Readonly<{
   attackNatural?: number;
   /** `attackNatural` was typed from a physical die, so its record says so. */
   typedFace?: boolean;
+  /** A player's typed attack total (ADR-0043): the d20 and the attack bonus, turned back into the d20's face here,
+   *  where the bonus is worked out. */
+  attackRolledTotal?: number;
   /** The key the attack's d20 is held under between a preview and its confirm (ADR-0012); absent, nothing is held. */
   holdKey?: string;
   /** Throw the held attack d20 again: a player's Heroic Inspiration rerolls one die, the GM throws afresh. */

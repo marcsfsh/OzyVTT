@@ -404,7 +404,6 @@ export const characterCommands = [
           maxLevel: request.maxLevel ?? state.builderPolicy.maxLevel,
           playerBuilder: request.playerBuilder ?? state.builderPolicy.playerBuilder,
           playerRandom: request.playerRandom ?? state.builderPolicy.playerRandom,
-          typedRolls: request.typedRolls ?? state.builderPolicy.typedRolls,
           hitPointRollFloor: request.hitPointRollFloor ?? state.builderPolicy.hitPointRollFloor
         };
       });

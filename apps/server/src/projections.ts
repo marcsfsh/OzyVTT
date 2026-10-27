@@ -20,6 +20,7 @@ import type {
   PresenceStatus,
   RollRecord
 } from "@vtt/domain";
+import { effectivePlayerDice } from "@vtt/domain";
 import { commandedBySession } from "./authorization.js";
 import type { RepeatSave } from "@vtt/schemas";
 import { actionPools } from "./effective-actions.js";
@@ -995,10 +996,12 @@ export function projectPlayerView(
       maxLevel: state.builderPolicy.maxLevel,
       playerBuilder: state.builderPolicy.playerBuilder,
       playerRandom: state.builderPolicy.playerRandom,
-      // Players need both to know whether they may type their dice and how a rolled level counts.
-      typedRolls: state.builderPolicy.typedRolls,
+      // Players need it to know how a rolled level counts.
       hitPointRollFloor: state.builderPolicy.hitPointRollFloor
     },
+    // The modes that apply now, a table rule players read: which box their rolls ask for. The encounter's own
+    // record stays the GM's.
+    playerDice: effectivePlayerDice(state),
     // Archived characters the GM shared: id + name only, and only ones that were public.
     archivedCharacters: state.actors
       .filter((actor) => actor.archived && actor.sheetPreview && actor.visibility === "public")

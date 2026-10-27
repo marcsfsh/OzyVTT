@@ -33,6 +33,19 @@ export const PLAYER_INITIATIVE = {
   ]
 } as const;
 
+/** How players' dice are entered (ADR-0043), in Settings and in an encounter's own settings. */
+export const DICE_MODE_OPTIONS = [
+  { value: "total", label: "Type the total" },
+  { value: "die", label: "Type each die" },
+  { value: "app", label: "The app rolls" }
+] as const;
+/** What each dice mode means, under the choice. */
+export const DICE_MODE_HELP = {
+  total: "Players type the final number, bonus included. The app checks it can be rolled.",
+  die: "Players type what each die shows. The app adds the bonus.",
+  app: "The app rolls players' dice."
+} as const;
+
 /** The health display's name, and who sees it. */
 export const HEALTH_DISPLAY_LABEL = "Health display";
 export const HEALTH_AUDIENCE_LABEL = "Health is";

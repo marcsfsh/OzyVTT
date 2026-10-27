@@ -3,7 +3,7 @@ import type { CheckRollResult, PlayerRollCall, PlayerView } from "@vtt/domain";
 import { Button, useToast } from "@vtt/ui";
 import { useSkillCatalog } from "../content/catalogs";
 import { callLabel } from "../dice/roll-call-words";
-import { useRollPreference } from "../dice/roll-preference";
+import { typedDie, useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { FaceEntry, RerollControl } from "./RollControls";
 import { SavePrompt } from "./SavePrompt";
@@ -101,7 +101,7 @@ export function RollCallCard({
 }>) {
   const { call, entry, outcome } = card;
   const { toast } = useToast();
-  const { mayType, rollMode } = useRollPreference();
+  const { mayType, rollMode, typeAs } = useRollPreference(card.entry.actorId);
   const skillCatalog = useSkillCatalog();
   const [busy, setBusy] = useState(false);
   // The answer was typed from a physical die, so a Heroic Inspiration reroll is typed too.
@@ -121,7 +121,7 @@ export function RollCallCard({
     const result = await command("roll-call:answer", {
       callId: call.id,
       actorId: entry.actorId,
-      ...(face !== undefined ? { face } : {}),
+      ...(face !== undefined ? typedDie("face", face, entry.actorId) : {}),
       ...(picked.length > 0 ? { situations: [...picked] } : {})
     });
     setBusy(false);
@@ -200,6 +200,7 @@ export function RollCallCard({
               <FaceEntry
                 label={`Your d20 for the ${label}`}
                 busy={busy}
+                typeAs={typeAs}
                 onFace={(face) => void answer(face)}
                 onInvalid={(message) => toast(message, { tone: "error" })}
               />

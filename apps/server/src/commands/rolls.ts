@@ -101,6 +101,7 @@ export const rollCommands = [
         dc,
         visibility,
         face,
+        rolledTotal,
         rollMode,
         findActorId,
         sense,
@@ -126,6 +127,7 @@ export const rollCommands = [
           actorId,
           visibility,
           ...(face !== undefined ? { face } : {}),
+          ...(rolledTotal !== undefined ? { total: rolledTotal } : {}),
           ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
           ...(situations !== undefined ? { situations } : {}),
           ...(bonusAction !== undefined ? { bonusAction } : {})
@@ -158,6 +160,7 @@ export const rollCommands = [
               dc: dc ?? null,
               visibility,
               ...(face !== undefined ? { face } : {}),
+              ...(rolledTotal !== undefined ? { total: rolledTotal } : {}),
               ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
               ...(findActorId !== undefined ? { findActorId } : {}),
               ...(situations !== undefined ? { situations } : {})
@@ -328,6 +331,7 @@ export const rollCommands = [
             callId: request.callId,
             actorId: request.actorId,
             ...(request.face !== undefined ? { face: request.face } : {}),
+            ...(request.rolledTotal !== undefined ? { total: request.rolledTotal } : {}),
             ...(request.situations !== undefined ? { situations: request.situations } : {})
           },
           checkDeps(kit, principal, draft, geometry)

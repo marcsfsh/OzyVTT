@@ -3,6 +3,7 @@ import { type DeathSaveResult, type DeathSaves } from "@vtt/domain";
 import { command } from "../lib/command";
 import { RollControls, type AnswerChoice, type DieMode } from "./RollControls";
 import { modeWords } from "./roll-mode-notes";
+import { rollModeOf, typedDie, useRollPreference } from "../dice/roll-preference";
 import "./dying-tracker.css";
 
 type DeathPreview = NonNullable<DeathSaveResult["deathSave"]>;
@@ -51,10 +52,19 @@ export function DyingTracker({
   // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
   const [forced, setForced] = useState<DieMode | undefined>(undefined);
   const [typed, setTyped] = useState(false);
+  // The table's mode, or the GM typing for a character played at the table, wins over the caller's device choice.
+  const entry = useRollPreference(actorId);
+  const ownMode = entry.chooses ? rollMode : rollModeOf(entry.rollInput);
   const dead = deathSaves.failures >= 3;
   const send = (
     commit: boolean,
-    extra: Readonly<{ naturalRoll?: number; reroll?: boolean; mode?: DieMode; answer?: AnswerChoice }> = {}
+    extra: Readonly<{
+      naturalRoll?: number;
+      rolledTotal?: number;
+      reroll?: boolean;
+      mode?: DieMode;
+      answer?: AnswerChoice;
+    }> = {}
   ) => {
     setBusy(true);
     const mode = "mode" in extra ? extra.mode : forced;
@@ -63,6 +73,7 @@ export function DyingTracker({
       commit,
       ...(mode ? { rollMode: mode } : {}),
       ...(extra.naturalRoll !== undefined ? { naturalRoll: extra.naturalRoll } : {}),
+      ...(extra.rolledTotal !== undefined ? { rolledTotal: extra.rolledTotal } : {}),
       ...(extra.reroll ? { reroll: true } : {}),
       ...(extra.answer ? { answer: { ...extra.answer } } : {})
     }).then((result) => {
@@ -75,7 +86,7 @@ export function DyingTracker({
       if (!outcome) return;
       if (!outcome.committed) {
         // A typed die stays typed until a reroll the server throws (the GM's) replaces it.
-        if (extra.naturalRoll !== undefined) setTyped(true);
+        if (extra.naturalRoll !== undefined || extra.rolledTotal !== undefined) setTyped(true);
         else if (extra.reroll) setTyped(false);
         setRolled(outcome);
         return;
@@ -120,7 +131,7 @@ export function DyingTracker({
       {canRoll && !deathSaves.stable && !dead && (
         <RollControls
           rollMode={rollMode}
-          autoRoll={rollMode === "auto" && isActingTurn}
+          autoRoll={ownMode === "auto" && isActingTurn}
           busy={busy}
           rolled={rolled !== null}
           viewer={viewer}
@@ -131,7 +142,8 @@ export function DyingTracker({
           {...(rollLabel !== undefined ? { rollLabel } : {})}
           onInvalidFace={onFeedback}
           onRoll={() => send(false)}
-          onTyped={(face) => send(false, { naturalRoll: face })}
+          actorId={actorId}
+          onTyped={(face) => send(false, typedDie("naturalRoll", face, actorId))}
           onConfirm={() => send(true)}
           onReroll={(face) => send(false, { reroll: true, ...(face !== undefined ? { naturalRoll: face } : {}) })}
           onForce={(mode) => {

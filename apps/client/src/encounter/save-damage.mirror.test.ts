@@ -262,6 +262,8 @@ describe("the save prompt's damage field", () => {
 
   it("lets the owner amend their own save and refuses the stranger who tries", () => {
     const mine = tableWith({ resistant: false, halfOnSuccess: false });
+    // A player types damage only while the table's damage mode takes typed numbers (ADR-0043).
+    mine.state.playerDice = { d20: "die", damage: "total" };
     const before = mine.hp();
     // A d20 of 3 makes 5 against DC 15: a failure, so the amended 3 lands whole.
     answerFromThePrompt(mine, "3", { face: 3 }, { role: "player", sessionId: IDS.borinSession });

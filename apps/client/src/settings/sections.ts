@@ -102,11 +102,17 @@ export const SETTING = entries({
     hint: "When players roll their own initiative, whether turns wait for every roll.",
     words: "turn order roll initiative"
   },
-  typedRolls: {
+  d20Dice: {
     section: "fights",
-    label: "Players' dice",
-    hint: "When this is off, the server rolls every check, save, attack and damage roll for players.",
-    words: "physical dice type manual roll"
+    label: "Players' d20 rolls",
+    hint: "Attacks, checks, saves, initiative and death saves, unless an encounter chooses its own.",
+    words: "physical dice type manual roll total face d20"
+  },
+  damageDice: {
+    section: "fights",
+    label: "Players' damage",
+    hint: "Damage and healing dice, unless an encounter chooses its own.",
+    words: "physical dice type manual roll total face damage healing"
   },
   healthDisplay: {
     section: "fights",

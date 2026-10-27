@@ -5,7 +5,8 @@ import {
   type GameState,
   type Scene,
   type SceneCombat,
-  type SceneInitiativeDefaults
+  type SceneInitiativeDefaults,
+  type ScenePlayerDice
 } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { assertNotArchived } from "./actor-roster.js";
@@ -182,6 +183,25 @@ export function setSceneInitiativeDefaults(state: GameState, encounterId: string
       if (candidate.id !== encounterId) return candidate;
       const { initiativeDefaults: _dropped, ...rest } = candidate;
       return Object.keys(kept).length > 0 ? { ...rest, initiativeDefaults: kept } : rest;
+    })
+  };
+}
+
+/** Replaces an encounter's own dice modes (ADR-0043); a kind left out goes back to the table's. It applies at once
+ *  while the encounter is live, since it decides only how the next roll is entered. */
+export function setScenePlayerDice(state: GameState, encounterId: string, dice: ScenePlayerDice) {
+  if (!state.combat.encounters.some((candidate) => candidate.id === encounterId))
+    throw new CommandRejectedError("That encounter no longer exists.");
+  const kept: ScenePlayerDice = {
+    ...(dice.d20 !== undefined ? { d20: dice.d20 } : {}),
+    ...(dice.damage !== undefined ? { damage: dice.damage } : {})
+  };
+  state.combat = {
+    ...state.combat,
+    encounters: state.combat.encounters.map((candidate) => {
+      if (candidate.id !== encounterId) return candidate;
+      const { playerDice: _dropped, ...rest } = candidate;
+      return Object.keys(kept).length > 0 ? { ...rest, playerDice: kept } : rest;
     })
   };
 }

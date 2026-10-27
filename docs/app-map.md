@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 17 GameState fields · 184 commands · 361 HTTP paths
+- 18 GameState fields · 186 commands · 363 HTTP paths
 
 ## GameState shape
 
@@ -22,6 +22,7 @@ single JSON blob the server persists and projects per role.
 - `heldRolls`
 - `partyVisibility`
 - `pendingImports`
+- `playerDice`
 - `rest`
 - `revision`
 - `rollCalls`
@@ -145,6 +146,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `encounter.set-health-display` | `combat:write` |
 | `encounter.set-initiative-defaults` | `encounter:write` |
 | `encounter.set-player-damage-mode` | `combat:write` |
+| `encounter.set-player-dice` | `encounter:write` |
 | `encounter.set-player-initiative-mode` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.start` | `combat:write` |
@@ -200,6 +202,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `summon.recall` | `combat:write` |
 | `survival.set-tracking` | `combat:write` |
 | `table.set-party-visibility` | `combat:write` |
+| `table.set-player-dice` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
 | `terrain.paint` | `encounter:write` |
 | `terrain.reset` | `encounter:write` |
@@ -441,6 +444,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/encounters/{encounterId}/combatants`
 - `POST /api/v1/game/encounters/{encounterId}/duplicate`
 - `POST /api/v1/game/encounters/{encounterId}/initiative-defaults`
+- `POST /api/v1/game/encounters/{encounterId}/player-dice`
 - `GET /api/v1/game/encounters/{encounterId}/preview`
 - `POST /api/v1/game/encounters/{encounterId}/rename`
 - `POST /api/v1/game/encounters/{encounterId}/sound`
@@ -491,6 +495,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/spell-zones/{zoneId}/place`
 - `POST /api/v1/game/survival`
 - `POST /api/v1/game/table/party-visibility`
+- `POST /api/v1/game/table/player-dice`
 - `POST /api/v1/game/table/staging-defaults`
 - `POST /api/v1/game/terrain/paint`
 - `POST /api/v1/game/terrain/reset`

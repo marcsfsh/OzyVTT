@@ -1963,6 +1963,24 @@ const sceneCombatShape = {
 export const SceneCombatSchema = z.object(sceneCombatShape).superRefine(refineCombatContext);
 export type SceneCombat = z.infer<typeof SceneCombatSchema>;
 
+/**
+ * How a player's dice are entered (ADR-0043): `total`, the final number with the bonus included; `die`, each die's
+ * face, the server adding every modifier; `app`, the server throws. The server checks every typed number.
+ */
+export const DiceModeSchema = z.enum(["total", "die", "app"]);
+export type DiceMode = z.infer<typeof DiceModeSchema>;
+/** The table's dice modes: `d20` for attacks, checks, saves, initiative and death saves (and the builder's rolled
+ *  scores and hit points), `damage` for damage and healing dice. */
+export const PlayerDiceSchema = z
+  .object({ d20: DiceModeSchema.default("die"), damage: DiceModeSchema.default("app") })
+  .strict();
+export type PlayerDice = z.infer<typeof PlayerDiceSchema>;
+/** An encounter's own dice modes; one left out uses the table's. */
+export const ScenePlayerDiceSchema = z
+  .object({ d20: DiceModeSchema.optional(), damage: DiceModeSchema.optional() })
+  .strict();
+export type ScenePlayerDice = z.infer<typeof ScenePlayerDiceSchema>;
+
 /** A prepared encounter the GM can switch to: its map plus a frozen combat context that resumes exactly when activated. */
 /** A scene's own starting choices for its fight: whether claimed characters roll their initiative and whether
  *  identical monsters share one roll. An omitted field has no default. */
@@ -1979,6 +1997,9 @@ export const SceneSchema = z
     /** How this scene's fight starts when Start the fight leaves a choice out (ADR-0039). GM-only, as every scene is;
      * a launched replay carries none. */
     initiativeDefaults: SceneInitiativeDefaultsSchema.optional(),
+    /** The encounter's own dice modes (ADR-0043); absent or partial, the table's apply. GM-set; players read the
+     *  modes that apply, never this record. */
+    playerDice: ScenePlayerDiceSchema.optional(),
     /** When the GM prepared it, last changed its record and last made it live, in epoch ms. GM-only, as every scene
      * is; a scene saved before these existed has none. */
     createdAt: z.number().int().nonnegative().optional(),
@@ -2001,6 +2022,20 @@ export type Scene = z.infer<typeof SceneSchema>;
 
 /** The campaign roster every management surface lists, shared so server and client agree. Excludes a launched
  * replay's clones (`Actor.replayEncounterId`), which fight on the map but are never claimable. */
+/** The dice modes that apply now: the live encounter's own, where it chose, over the table's (ADR-0043). */
+export function effectivePlayerDice(
+  state: Readonly<{
+    playerDice: PlayerDice;
+    combat: Readonly<{
+      activeEncounterId: string | null;
+      encounters: readonly Readonly<{ id: string; playerDice?: ScenePlayerDice | undefined }>[];
+    }>;
+  }>
+): PlayerDice {
+  const live = state.combat.encounters.find((scene) => scene.id === state.combat.activeEncounterId)?.playerDice;
+  return { d20: live?.d20 ?? state.playerDice.d20, damage: live?.damage ?? state.playerDice.damage };
+}
+
 export function rosterActors<T extends { readonly replayEncounterId?: string | undefined }>(
   actors: readonly T[]
 ): readonly T[] {
@@ -2181,11 +2216,6 @@ export const BuilderPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).default("open"),
     /** Whether players may roll a random character; "gm-only" by default because it fills a roster slot in one tap. */
     playerRandom: z.enum(["open", "gm-only"]).default("gm-only"),
-    /** The table's one setting for typed dice (ADR-0012): whether players may type what their physical dice show, for
-     *  every roll (checks, saves, attacks, damage, death saves, initiative, and rolled scores and hit points in the
-     *  builder). Open by default, for tables that roll physical dice; "gm-only" refuses a player's typed faces and the
-     *  server throws them. The GM may always type. */
-    typedRolls: z.enum(["open", "gm-only"]).default("open"),
     /** A table rule raising a rolled hit-point level to the class average; "none" is the SRD (the roll stands). */
     hitPointRollFloor: z.enum(["none", "average"]).default("none")
   })
@@ -2362,6 +2392,9 @@ export const GameStateSchema = z.object({
   builderPolicy: BuilderPolicySchema.prefault({}),
   /** Standing rules policy every new fight starts from. GM-set, player-read. */
   rulesPolicy: RulesPolicySchema.prefault({}),
+  /** How players' dice are entered, the table's default (ADR-0043); an encounter may choose its own. GM-set,
+   *  player-read as the modes that apply (`effectivePlayerDice`). */
+  playerDice: PlayerDiceSchema.prefault({}),
   /** Table defaults for staging new combatants. GM-set, GM-read. */
   stagingDefaults: StagingDefaultsSchema.prefault({}),
   /** How much a player sees of another player's character (see PartyVisibilitySchema). GM-set; player-read via `PlayerView`. */

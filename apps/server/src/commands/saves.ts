@@ -61,7 +61,7 @@ export const saveCommands = [
     malformed: "The saving throw is malformed.",
     issueMessage: true,
     async run({ principal, request, dispatch, execute }, kit) {
-      const { commandId, actorId, ability, rollMode, face, total, reroll, expectedRevision } = request;
+      const { commandId, actorId, ability, rollMode, face, rolledTotal, total, reroll, expectedRevision } = request;
       const initiator = initiatorOf(principal);
       const snapshot = kit.read();
       requireActorAccess(initiator, snapshot, actorId, "save");
@@ -79,6 +79,7 @@ export const saveCommands = [
           method: total === undefined ? "roll" : "manual",
           ...(total === undefined ? {} : { total }),
           ...(face === undefined ? {} : { face }),
+          ...(rolledTotal === undefined ? {} : { rolledTotal }),
           ...(rollMode ? { rollMode } : {}),
           commit: true,
           ...(expectedRevision === undefined ? {} : { expectedRevision })
@@ -152,7 +153,11 @@ export const saveCommands = [
           forced ?? aggregated.mode,
           saveTotalFor(definition, live, ability, derivation) + aura,
           saveRiderDiceTerms(derivation, ability),
-          { ...(face === undefined ? {} : { face }), ...(reroll === true ? { reroll: true } : {}) },
+          {
+            ...(face === undefined ? {} : { face }),
+            ...(rolledTotal === undefined ? {} : { total: rolledTotal }),
+            ...(reroll === true ? { reroll: true } : {})
+          },
           (sides) => kit.context.random(sides)
         );
         holdRoll(draft, {
@@ -256,6 +261,7 @@ export const saveCommands = [
           damageOverride,
           {
             ...(face !== undefined ? { face } : {}),
+            ...(request.rolledTotal !== undefined ? { total: request.rolledTotal } : {}),
             ...(reroll === true ? { reroll: true } : {}),
             ...(request.answer ? { answer: request.answer } : {})
           }
@@ -346,12 +352,15 @@ export const saveCommands = [
         const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
         const forced = initiator.role === "gm" ? rollMode : undefined;
         const key = `death-save:${actorId}`;
-        if (request.answer && (commit || reroll === true || naturalRoll !== undefined))
+        if (
+          request.answer &&
+          (commit || reroll === true || naturalRoll !== undefined || request.rolledTotal !== undefined)
+        )
           throw new CommandRejectedError("Answer the death save on a look of its own, before you confirm it.");
         if (request.answer && !heldRollFor(draft, key))
           throw new CommandRejectedError("Roll first: an answer meets a roll that was made.");
         const mode = forced ?? aggregated.mode;
-        const throwDeathSave = (choice: Readonly<{ face?: number; reroll?: boolean }>) =>
+        const throwDeathSave = (choice: Readonly<{ face?: number; total?: number; reroll?: boolean }>) =>
           rollHeldTest(
             draft,
             key,
@@ -368,6 +377,7 @@ export const saveCommands = [
             ? {}
             : {
                 ...(naturalRoll !== undefined ? { face: naturalRoll } : {}),
+                ...(request.rolledTotal !== undefined ? { total: request.rolledTotal } : {}),
                 ...(reroll === true ? { reroll: true } : {})
               }
         );

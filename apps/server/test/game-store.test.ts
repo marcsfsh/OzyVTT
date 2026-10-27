@@ -63,7 +63,8 @@ describe("SQLite GameStore", () => {
         { store: "game", version: 1 },
         { store: "game", version: 2 },
         { store: "game", version: 3 },
-        { store: "game", version: 4 }
+        { store: "game", version: 4 },
+        { store: "game", version: 5 }
       ]);
       database.close();
     } finally {
@@ -170,6 +171,37 @@ describe("SQLite GameStore", () => {
       check.close();
     } finally {
       await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("moves a saved typed-dice setting to the d20 dice mode, with damage left to the server", async () => {
+    for (const [typedRolls, d20] of [
+      ["open", "die"],
+      ["gm-only", "app"]
+    ] as const) {
+      const directory = await mkdtemp(join(tmpdir(), "vtt-game-store-"));
+      const databasePath = join(directory, "vtt.sqlite");
+      try {
+        const store = new GameStore(databasePath);
+        await store.initialize();
+        store.close();
+        // Back to how an older build left it: migration 5 not applied, and the old setting on the builder policy.
+        const old = GameStateSchema.parse({ schemaVersion: 1 });
+        const { playerDice: _new, ...withoutDice } = old;
+        const saved = { ...withoutDice, builderPolicy: { ...old.builderPolicy, typedRolls } };
+        const database = new DatabaseSync(databasePath);
+        database.prepare("DELETE FROM migrations WHERE store = 'game' AND version = 5").run();
+        database.prepare("UPDATE game_state SET state_json = ? WHERE id = 1").run(JSON.stringify(saved));
+        database.close();
+
+        const reopened = new GameStore(databasePath);
+        await reopened.initialize();
+        expect(reopened.snapshot.playerDice).toEqual({ d20, damage: "app" });
+        expect(reopened.snapshot.builderPolicy).not.toHaveProperty("typedRolls");
+        reopened.close();
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
     }
   });
 

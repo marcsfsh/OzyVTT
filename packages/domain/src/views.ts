@@ -3,6 +3,7 @@ import type { Actor, ActorDefinition, EffectInstance } from "@vtt/schemas";
 import type {
   Annotation,
   BuilderPolicy,
+  PlayerDice,
   CheckSubject,
   CraftingProject,
   CombatState,
@@ -372,6 +373,7 @@ export type PlayerView = Pick<GameState, "revision"> & {
   actors: PlayerActor[];
   rolls: PlayerRollRecord[];
   /** The GM's builder policy, verbatim (GM-set and player-read: a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy;
+  /** How this player's dice are entered now: the live encounter's modes over the table's (ADR-0043). */ playerDice: PlayerDice;
   /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[];
   /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;

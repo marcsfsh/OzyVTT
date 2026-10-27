@@ -7,6 +7,7 @@ import {
   SetPlayerInitiativeModeSchema,
   SetRulesModeSchema,
   TableSetPartyVisibilitySchema,
+  TableSetPlayerDiceSchema,
   TableSetStagingDefaultsSchema
 } from "@vtt/domain/commands";
 import { HOLDING_BREATH_TAG, startHoldingBreath } from "../breath.js";
@@ -111,6 +112,26 @@ export const tableSettingCommands = [
         committed,
         `New combatants now stage as ${visibility === "gm-only" ? "GM only" : "shown to players"}.`
       );
+    }
+  }),
+
+  defineCommand({
+    type: "table.set-player-dice",
+    operationId: "setPlayerDice",
+    description:
+      "Sets how players' dice are entered, the table's default (GM-grade only, ADR-0043): `d20` for attacks, checks, saves, initiative and death saves (and the builder's rolled scores and hit points), `damage` for damage and healing dice. Each is `total` (the player types the final number, the bonus included; the server checks it against what the roll can come to), `die` (the player types each die's face and the server adds every modifier) or `app` (the server throws). A kind left out keeps what is stored. An encounter may choose its own (`encounter.set-player-dice`). The GM may always type or roll. Players read the modes that apply.",
+    summary: "Set how players' dice are entered, for d20 rolls and for damage (GM).",
+    schema: TableSetPlayerDiceSchema,
+    malformed: "The dice-mode command is malformed.",
+    gmOnly: "Only the GM can set how players' dice are entered.",
+    async run({ request, execute }, kit) {
+      const committed = await execute((state) => {
+        state.playerDice = {
+          d20: request.d20 ?? state.playerDice.d20,
+          damage: request.damage ?? state.playerDice.damage
+        };
+      });
+      audit(kit, committed, "Players' dice modes changed.");
     }
   }),
 

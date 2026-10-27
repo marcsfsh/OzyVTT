@@ -55,3 +55,11 @@
   min-width: 0;
   font-size: var(--fs-sm);
 }
+/* An encounter's own dice modes: the label over the select, full width at 390px. */
+.sc-encounter-dice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}

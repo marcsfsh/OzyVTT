@@ -20,7 +20,12 @@ const sceneWith = (initiativeDefaults?: Scene["initiativeDefaults"]) =>
     ...(initiativeDefaults ? { initiativeDefaults } : {})
   });
 const context = (scene: Scene): ScenesContextValue => ({
-  state: { revision: 7, combat: { encounters: [scene], activeEncounterId: null, active: false }, actors: [] } as never,
+  state: {
+    revision: 7,
+    playerDice: { d20: "die", damage: "app" },
+    combat: { encounters: [scene], activeEncounterId: null, active: false },
+    actors: []
+  } as never,
   token: "gm",
   maps: [],
   reloadMaps: async () => [],

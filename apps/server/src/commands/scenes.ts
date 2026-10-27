@@ -12,6 +12,7 @@ import {
   SceneReorderSchema,
   SceneSetCombatantsSchema,
   SceneSetInitiativeDefaultsSchema,
+  SceneSetPlayerDiceSchema,
   TerrainPaintSchema,
   TerrainResetSchema
 } from "@vtt/domain/commands";
@@ -27,7 +28,8 @@ import {
   renameScene,
   reorderScenes,
   setSceneCombatants,
-  setSceneInitiativeDefaults
+  setSceneInitiativeDefaults,
+  setScenePlayerDice
 } from "../scenes.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -93,6 +95,20 @@ export const sceneCommands = [
     gmOnly: "Only the GM can change an encounter's settings.",
     async run({ request, execute }) {
       await execute((state) => setSceneInitiativeDefaults(state, request.encounterId, request.initiativeDefaults));
+    }
+  }),
+
+  defineCommand({
+    type: "encounter.set-player-dice",
+    operationId: "setEncounterPlayerDice",
+    description:
+      "Replaces an encounter's own dice modes (GM-grade only, ADR-0043): `d20` for attacks, checks, saves, initiative and death saves, `damage` for damage and healing dice, each `total` (the player types the final number, bonus included), `die` (the player types each die's face and the server adds every modifier) or `app` (the server throws). A kind left out uses the table's mode (`table.set-player-dice`); an empty object hands both back. While the encounter is live, the next roll uses it. A character played at the table always has the GM's box ask for the total.",
+    summary: "Set an encounter's own dice modes, or hand them back to the table's (GM).",
+    schema: SceneSetPlayerDiceSchema,
+    malformed: "The encounter's dice modes are malformed.",
+    gmOnly: "Only the GM can change an encounter's settings.",
+    async run({ request, execute }) {
+      await execute((state) => setScenePlayerDice(state, request.encounterId, request.playerDice));
     }
   }),
 

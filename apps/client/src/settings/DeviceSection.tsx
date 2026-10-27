@@ -1,5 +1,5 @@
 import { Button, SegmentedControl, setReduceTransparency, Switch, ThemeToggle, useReduceTransparency } from "@vtt/ui";
-import { useRollPreference } from "../dice/roll-preference";
+import { tableDiceLine, useRollPreference } from "../dice/roll-preference";
 import { setAutoArrange, setPinchZoom, useAutoArrange, usePinchZoom } from "./preferences";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
@@ -16,7 +16,8 @@ export function DeviceSection({
   /** A player leaving the table; asks first. */
   onLeave?: () => void;
 }>) {
-  const { rollInput, mayType, setRollInput } = useRollPreference();
+  const dice = useRollPreference();
+  const { rollInput, setRollInput } = dice;
   const autoArrange = useAutoArrange();
   const pinchZoom = usePinchZoom();
   const transparency = useReduceTransparency();
@@ -37,8 +38,8 @@ export function DeviceSection({
           label="Reduce transparency"
         />
       </SettingRow>
-      {/* The GM's table setting outranks this device's choice, so the reason replaces the control. */}
-      {mayType ? (
+      {/* A player's dice follow the table's mode, so the rule replaces the control. */}
+      {dice.chooses ? (
         <SettingRow setting={SETTING.rollInput}>
           <SegmentedControl
             ariaLabel="How you roll"
@@ -51,10 +52,7 @@ export function DeviceSection({
           />
         </SettingRow>
       ) : (
-        <SettingRow
-          setting={SETTING.rollInput}
-          hint="At this table the server rolls players' dice, and only the GM can change that."
-        />
+        <SettingRow setting={SETTING.rollInput} hint={tableDiceLine(dice)} />
       )}
       <SettingRow setting={SETTING.pinchZoom}>
         <Switch checked={pinchZoom} onChange={setPinchZoom} label="Let pinch zoom the page" />

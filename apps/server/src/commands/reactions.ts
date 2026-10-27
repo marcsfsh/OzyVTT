@@ -230,6 +230,7 @@ export const reactionCommands = [
             commit,
             ...(forcedMode !== undefined ? { rollMode: forcedMode } : {}),
             ...(attackNatural !== undefined ? { attackNatural } : {}),
+            ...(request.attackRolledTotal !== undefined ? { attackRolledTotal: request.attackRolledTotal } : {}),
             ...(reroll === true ? { reroll: true } : {}),
             ...(pushFeet !== undefined ? { pushFeet } : {}),
             ...(hitOptions ? { hitOptions } : {}),

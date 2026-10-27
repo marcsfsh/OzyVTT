@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Button, IconCheck, IconWarning, Switch, useToast } from "@vtt/ui";
+import type { DiceMode, ScenePlayerDice } from "@vtt/domain";
+import { Button, IconCheck, IconWarning, Select, Switch, useToast } from "@vtt/ui";
+import { DICE_MODE_OPTIONS } from "../settings/table-words";
 import { EncounterMeter } from "../encounter/EncounterMeter";
 import { command } from "../lib/command";
 import { useScenes } from "./context";
@@ -89,7 +91,46 @@ export function FightSettings({ facts }: Readonly<{ facts: SceneFacts }>) {
         onChange={(on) => void save({ playersRollInitiative: playersRoll, groupMonsters: on })}
       />
       <p className="sc-encounter-hint">Start the encounter opens with these. Surprise is chosen when it starts.</p>
+      <EncounterDice facts={facts} />
     </section>
+  );
+}
+
+const TABLES = "table";
+/** An encounter's own dice modes (ADR-0043): each kind uses the table's unless the GM picks one here. */
+function EncounterDice({ facts }: Readonly<{ facts: SceneFacts }>) {
+  const { state } = useScenes();
+  const { toast } = useToast();
+  const own = facts.scene.playerDice ?? {};
+  const tableWord = (mode: DiceMode) => DICE_MODE_OPTIONS.find((option) => option.value === mode)?.label ?? mode;
+  const save = async (kind: keyof ScenePlayerDice, value: string) => {
+    const { [kind]: _dropped, ...rest } = own;
+    const next: ScenePlayerDice = value === TABLES ? rest : { ...rest, [kind]: value as DiceMode };
+    const result = await command("encounter:set-player-dice", {
+      encounterId: facts.scene.id,
+      playerDice: next,
+      expectedRevision: state.revision
+    });
+    if (!result.ok) toast(result.message ?? "The dice settings weren't saved.", { tone: "error" });
+  };
+  const choice = (kind: keyof ScenePlayerDice, label: string) => (
+    <label className="sc-encounter-dice">
+      <span>{label}</span>
+      <Select value={own[kind] ?? TABLES} onChange={(event) => void save(kind, event.target.value)}>
+        <option value={TABLES}>Use the table&apos;s: {tableWord(state.playerDice[kind])}</option>
+        {DICE_MODE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+    </label>
+  );
+  return (
+    <>
+      {choice("d20", "Players' d20 rolls")}
+      {choice("damage", "Players' damage")}
+    </>
   );
 }
 

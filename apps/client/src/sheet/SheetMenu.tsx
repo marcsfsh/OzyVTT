@@ -18,7 +18,7 @@ import {
   Select
 } from "@vtt/ui";
 import { ROLL_VISIBILITY_WORD, VISIBILITY_OPTIONS } from "../dice/DicePanel";
-import { useRollPreference } from "../dice/roll-preference";
+import { tableDiceLine, useRollPreference } from "../dice/roll-preference";
 
 /** What the sheet's menu offers beyond the roll settings; each item shows only when its door is passed. */
 export type SheetMenuItems = Readonly<{
@@ -156,7 +156,8 @@ export function RollSettings({
   attackModeChoice: boolean;
   onClose: () => void;
 }>) {
-  const { rollInput, mayType, sheetAttackMode, setRollInput, setSheetAttackMode } = useRollPreference();
+  const dice = useRollPreference();
+  const { rollInput, sheetAttackMode, setRollInput, setSheetAttackMode } = dice;
   return (
     <Modal
       open
@@ -170,7 +171,7 @@ export function RollSettings({
       }
     >
       <div className="cs-roll-settings">
-        {mayType ? (
+        {dice.chooses ? (
           <div className="cs-setting">
             <span className="cs-eyebrow">Dice</span>
             <SegmentedControl
@@ -185,7 +186,7 @@ export function RollSettings({
             <p className="cs-sub">Manual asks for the number your own die shows. The server adds the bonus.</p>
           </div>
         ) : (
-          <p className="cs-sub">This table throws every player's dice on the server.</p>
+          <p className="cs-sub">{tableDiceLine(dice)}</p>
         )}
         <label className="cs-setting">
           <span className="cs-eyebrow">Who sees the roll</span>

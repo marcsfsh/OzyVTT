@@ -703,8 +703,7 @@ describe("public game API over /api/v1", () => {
       maxLevel: 20,
       playerBuilder: "open",
       playerRandom: "gm-only",
-      // Players may type what their physical dice show until the GM closes it, and a rolled level counts as rolled.
-      typedRolls: "open",
+      // A rolled level counts as rolled.
       hitPointRollFloor: "none"
     });
 
@@ -738,7 +737,6 @@ describe("public game API over /api/v1", () => {
       maxLevel: 20,
       playerBuilder: "open",
       playerRandom: "gm-only",
-      typedRolls: "open",
       hitPointRollFloor: "none"
     });
   });

@@ -6,7 +6,7 @@ import {
   type RollAnswerOffer,
   type RollAnswered
 } from "@vtt/domain";
-import { useRollPreference } from "../dice/roll-preference";
+import { typedDie, useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { RollControls, type AnswerChoice, type DieMode } from "./RollControls";
 import { damageAdjustments } from "./format";
@@ -60,7 +60,7 @@ export function SavePrompt({
 }>) {
   const [busy, setBusy] = useState(false);
   // A player's typed damage stands in for dice, so it follows the table's setting for typed dice.
-  const { mayType } = useRollPreference();
+  const { mayTypeDamage } = useRollPreference(save.targetActorId);
   // A rolled-but-not-applied result: the server records the die and returns the projected outcome,
   // shown until the answerer confirms. `basis` is the pre-halving damage that preview used, so a later
   // amend is detectable; `defences` says what resistances and the like did to it.
@@ -110,6 +110,7 @@ export function SavePrompt({
     options: Readonly<{
       commit: boolean;
       face?: number;
+      rolledTotal?: number;
       reroll?: boolean;
       legendaryResistance?: boolean;
       mode?: DieMode;
@@ -129,6 +130,7 @@ export function SavePrompt({
         commit: options.commit,
         legendaryResistance: options.legendaryResistance ?? false,
         ...(options.face !== undefined ? { face: options.face } : {}),
+        ...(options.rolledTotal !== undefined ? { rolledTotal: options.rolledTotal } : {}),
         ...(options.reroll ? { reroll: true } : {}),
         ...(mode ? { dieMode: mode } : {}),
         ...(damageOverride !== undefined ? { damageOverride } : {}),
@@ -249,7 +251,7 @@ export function SavePrompt({
       </span>
       {/* The server rolls this save but applies nothing of it: the spell's text says what a failure does. */}
       {save.gmApplies && <span className="save-prompt-gm">The GM applies what this save does.</span>}
-      {save.proposedDamage > 0 && (viewer === "gm" || mayType) && (
+      {save.proposedDamage > 0 && (viewer === "gm" || mayTypeDamage) && (
         <label className="save-damage-amend">
           <span>Damage on a failure{save.halfOnSuccess ? ", half on a success" : ""}</span>
           <input
@@ -281,7 +283,8 @@ export function SavePrompt({
         faceLabel="Your save d20"
         onInvalidFace={onFeedback}
         onRoll={() => send({ commit: false })}
-        onTyped={(face) => send({ commit: false, face })}
+        actorId={save.targetActorId}
+        onTyped={(face) => send({ commit: false, ...typedDie("face", face, save.targetActorId) })}
         onConfirm={() => send({ commit: true })}
         onReroll={(face) => send({ commit: false, reroll: true, ...(face !== undefined ? { face } : {}) })}
         onForce={(mode) => {

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { Button, Input, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
-import { useRollPreference } from "../dice/roll-preference";
+import { typedDie, useRollPreference } from "../dice/roll-preference";
 import "./prompts.css";
 
 /**
@@ -44,13 +44,17 @@ export function InitiativeReroll({ actorId, onDone }: Readonly<{ actorId: string
  * has rolled.
  */
 export function InitiativePrompt({ actorId, onRolled }: Readonly<{ actorId: string; onRolled?: () => void }>) {
-  const { rollInput } = useRollPreference();
+  const { rollInput, typeAs } = useRollPreference(actorId);
+  const total = typeAs === "total";
   const [busy, setBusy] = useState(false);
   const [manual, setManual] = useState("");
   const [feedback, setFeedback] = useState("");
   const roll = (natural?: number) => {
     setBusy(true);
-    void command("initiative:roll-self", { actorId, ...(natural !== undefined ? { natural } : {}) }).then((result) => {
+    void command("initiative:roll-self", {
+      actorId,
+      ...(natural !== undefined ? typedDie("natural", natural, actorId) : {})
+    }).then((result) => {
       setBusy(false);
       if (!result.ok) setFeedback(result.message ?? "Initiative could not be rolled.");
       else onRolled?.();
@@ -58,34 +62,50 @@ export function InitiativePrompt({ actorId, onRolled }: Readonly<{ actorId: stri
   };
   const submitManual = () => {
     const value = Number(manual.trim());
-    if (!Number.isInteger(value) || value < 1 || value > 20) {
-      setFeedback("Enter your d20 (1-20).");
+    if (!Number.isInteger(value) || (total ? value < -50 || value > 100 : value < 1 || value > 20)) {
+      setFeedback(total ? "Enter your initiative total." : "Enter your d20 (1-20).");
       return;
     }
     roll(value);
+  };
+  const field = {
+    type: "text",
+    inputMode: "numeric" as const,
+    value: manual,
+    disabled: busy,
+    onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter" && manual.trim() !== "") submitManual();
+    }
   };
   return (
     <div className="save-prompt initiative-prompt" role="group" aria-label="Roll your initiative">
       <p className="save-prompt-label">
         <strong>Roll for initiative</strong>
-        {rollInput === "manual" && ". With Advantage or Disadvantage, roll two d20s and type the one that counts."}
+        {rollInput === "manual" &&
+          (total
+            ? ". Type the total, your bonus included."
+            : ". With Advantage or Disadvantage, roll two d20s and type the one that counts.")}
       </p>
       {rollInput === "manual" ? (
         <span className="save-prompt-actions">
           <span className="save-prompt-manual">
-            <Input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="type your d20"
-              aria-label="Initiative d20"
-              value={manual}
-              disabled={busy}
-              onChange={(event) => setManual(event.target.value.replace(/[^0-9]/g, ""))}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && manual.trim() !== "") submitManual();
-              }}
-            />
+            {total ? (
+              <Input
+                {...field}
+                pattern="-?[0-9]*"
+                placeholder="type your total"
+                aria-label="Initiative total"
+                onChange={(event) => setManual(event.target.value.replace(/[^0-9-]/g, ""))}
+              />
+            ) : (
+              <Input
+                {...field}
+                pattern="[0-9]*"
+                placeholder="type your d20"
+                aria-label="Initiative d20"
+                onChange={(event) => setManual(event.target.value.replace(/[^0-9]/g, ""))}
+              />
+            )}
             <Button type="button" variant="secondary" disabled={busy || manual.trim() === ""} onClick={submitManual}>
               Set
             </Button>

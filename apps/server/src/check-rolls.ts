@@ -34,6 +34,7 @@ import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.j
 import { CommandRejectedError } from "./game-store.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { heldRollFor, holdRoll, requireTypedDie, requireTypedReroll, spendRerollRight } from "./held-rolls.js";
+import { faceFromTotal } from "./player-dice.js";
 import type { EffectNarration } from "./effects.js";
 import {
   answeredLines,
@@ -80,6 +81,8 @@ export type CheckRollInput = Readonly<{
   visibility: RollVisibility;
   /** A typed d20, the face a physical die shows. */
   face?: number;
+  /** A typed total, the d20 and the check's bonus (ADR-0043), turned back into its face. */
+  total?: number;
   /** The GM's choice of roll mode; a player's is never passed. */
   forcedMode?: "advantage" | "disadvantage" | "normal";
   findActorId?: string;
@@ -484,9 +487,10 @@ export function rollAbilityCheck(
   const { actor, plan } = planFor(state, scope, input, deps);
   const forced = scope.role === "gm" ? input.forcedMode : undefined;
   let result: CheckResult;
-  if (input.face !== undefined) {
-    requireTypedDie(state, scope, undefined, input.face);
-    result = recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, [input.face], "normal", true, {
+  const typedFace = input.total !== undefined ? faceFromTotal(input.total, plan.modifier) : input.face;
+  if (typedFace !== undefined) {
+    requireTypedDie(state, scope, undefined, typedFace, input.total !== undefined ? "total" : "face");
+    result = recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, [typedFace], "normal", true, {
       fresh: true
     });
   } else {
@@ -647,6 +651,8 @@ export function answerRollCall(
     callId: string;
     actorId: string;
     face?: number;
+    /** A typed total (ADR-0043). */
+    total?: number;
     situations?: readonly string[];
   }>,
   deps: CheckRollDependencies
@@ -676,6 +682,7 @@ export function answerRollCall(
       callId: call.id,
       ...(call.aboutActorId !== undefined ? { aboutActorId: call.aboutActorId } : {}),
       ...(input.face !== undefined ? { face: input.face } : {}),
+      ...(input.total !== undefined ? { total: input.total } : {}),
       ...(situations.length > 0 ? { situations } : {})
     },
     deps

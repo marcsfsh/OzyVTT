@@ -1,5 +1,12 @@
 import { settleReincarnations } from "../reincarnation.js";
-import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, GameState, RollRecord } from "@vtt/domain";
+import {
+  effectivePlayerDice,
+  type ActionResolution,
+  type AnnotationPoint,
+  type AnnotationShapeKind,
+  type GameState,
+  type RollRecord
+} from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
@@ -533,6 +540,7 @@ export const actionCommands = [
             commit,
             attackNatural,
             ...(attackNatural !== undefined ? { typedFace: true } : {}),
+            ...(request.attackRolledTotal !== undefined ? { attackRolledTotal: request.attackRolledTotal } : {}),
             holdKey,
             ...(request.reroll === true ? { reroll: true } : {}),
             ...(request.answer ? { answer: request.answer } : {}),
@@ -1353,7 +1361,8 @@ export const actionCommands = [
       // A formula with no dice is a number typed from physical dice (the sheet's manual entry): a player may send one
       // only while the table lets players type their dice.
       const typed = !resolution.terms.some((term) => term.kind === "dice");
-      if (typed && !gmGrade && kit.read().builderPolicy.typedRolls !== "open")
+      const dice = effectivePlayerDice(kit.read());
+      if (typed && !gmGrade && dice.d20 === "app" && dice.damage === "app")
         throw new CommandRejectedError("At this table the server rolls players' dice. Tap Roll to roll them.");
       const rollId = kit.context.newId();
       const { state, duplicate } = await execute((draft) => {

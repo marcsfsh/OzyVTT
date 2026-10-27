@@ -296,6 +296,14 @@ function rollUnderMode(rollD20: () => number, mode: RollMode): number {
   return rollD20();
 }
 
+/** A combatant's initiative bonus without the dice its riders add: what a typed total is the d20 plus (ADR-0043). */
+export function initiativeBonus(state: GameState, actorId: string, deps: InitiativeRollDeps = {}): number {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const surprised = state.combat.initiative.find((entry) => entry.actorId === actorId)?.surprised === true;
+  const { penalty, checkBonus } = initiativeRollFor(state, actorId, surprised, deps);
+  return (actor?.initiative ?? 0) + checkBonus + penalty;
+}
+
 /** One combatant's initiative: the d20 (rolled, or a hand-typed `natural`) plus its modifier, the dice its check
  *  riders add and the Exhaustion penalty. Every path that rolls initiative goes through here, so they all follow the
  *  same rules. */

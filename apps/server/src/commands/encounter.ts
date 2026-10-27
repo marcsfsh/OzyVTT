@@ -10,6 +10,7 @@ import {
   removeCombatant,
   rollRemainingInitiative,
   rollSelfInitiative,
+  initiativeBonus,
   orderTiedCharacters,
   setInitiativeScore,
   startEncounter,
@@ -36,6 +37,7 @@ import { checkOrder } from "../simultaneous-effects.js";
 import { askEndOrder, playStartSteps } from "../turn-boundaries.js";
 import { CommandRejectedError, type JournalEntry } from "../game-store.js";
 import { requireTypedDie } from "../held-rolls.js";
+import { faceFromTotal } from "../player-dice.js";
 import { rerollInitiative } from "../initiative-reroll.js";
 import { endTurn, ownsTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
 import { initiatorOf, isGmGrade, principalTag, type Kit } from "./kit.js";
@@ -414,12 +416,23 @@ export const encounterCommands = [
           );
           return;
         }
-        // A typed d20 only while the table lets players type their dice.
-        if (natural !== undefined) requireTypedDie(draft, initiatorOf(principal), undefined, natural);
+        // A typed die or total only as the dice mode asks; a total is the face it means once the bonus is off.
+        const typed =
+          request.rolledTotal !== undefined
+            ? faceFromTotal(request.rolledTotal, initiativeBonus(draft, actorId, kit.initiativeRollDeps(draft)))
+            : natural;
+        if (typed !== undefined)
+          requireTypedDie(
+            draft,
+            initiatorOf(principal),
+            undefined,
+            typed,
+            request.rolledTotal !== undefined ? "total" : "face"
+          );
         score = rollSelfInitiative(
           draft,
           actorId,
-          { natural, rollMode: isGmGrade(principal) ? rollMode : undefined },
+          { natural: typed, rollMode: isGmGrade(principal) ? rollMode : undefined },
           () => kit.context.random(20),
           kit.initiativeRollSink(draft, commandId, principal),
           kit.initiativeRollDeps(draft)

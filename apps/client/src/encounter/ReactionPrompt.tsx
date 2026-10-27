@@ -7,7 +7,7 @@ import {
   type PlayerPendingReaction
 } from "@vtt/domain";
 import { Button, IconX, SegmentedControl } from "@vtt/ui";
-import { useRollPreference } from "../dice/roll-preference";
+import { typedDie, useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { castsSpell, damageAdjustments, plainActionName } from "./format";
 import { HitOfferChoices, PushChoice } from "./AttackPreview";
@@ -81,7 +81,7 @@ export function ReactionPrompt({
   /** The reacting character holds Heroic Inspiration. */
   inspired?: boolean;
 }>) {
-  const { mayType } = useRollPreference();
+  const { mayType, typeAs } = useRollPreference(reaction.actorId);
   const [busy, setBusy] = useState(false);
   // Answering rolls a melee swing first: an opportunity attack, or Retaliation.
   const opportunity =
@@ -132,6 +132,7 @@ export function ReactionPrompt({
     opts: {
       commit?: boolean;
       attackNatural?: number;
+      attackRolledTotal?: number;
       reroll?: boolean;
       pushFeet?: number;
       mode?: DieMode;
@@ -161,7 +162,7 @@ export function ReactionPrompt({
         // A preview keeps the prompt open to confirm; an applied answer clears it.
         if (outcome.resolution?.preview && outcome.resolution.attack) {
           // A typed die stays typed until a reroll the server throws (the GM's) replaces it.
-          if (opts.attackNatural !== undefined) setTyped(true);
+          if (opts.attackNatural !== undefined || opts.attackRolledTotal !== undefined) setTyped(true);
           else if (opts.reroll) setTyped(false);
           setRolled({
             attack: outcome.resolution.attack,
@@ -426,7 +427,10 @@ export function ReactionPrompt({
                   label="Attack d20"
                   busy={busy}
                   onInvalid={onFeedback}
-                  onFace={(face) => answer(true, { commit: false, attackNatural: face })}
+                  typeAs={typeAs}
+                  onFace={(face) =>
+                    answer(true, { commit: false, ...typedDie("attackNatural", face, reaction.actorId) })
+                  }
                 />
               )}
               <button

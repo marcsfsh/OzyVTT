@@ -17,11 +17,13 @@ import {
 } from "@vtt/rules-5e";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
 import { CommandRejectedError } from "../game-store.js";
+import { faceFromTotal } from "../player-dice.js";
 import {
   heldD20s,
   heldRollFor,
   holdRoll,
   releaseHeldRoll,
+  requireTypedDie,
   requireTypedReroll,
   spendRerollRight
 } from "../held-rolls.js";
@@ -592,8 +594,13 @@ function rollD20(
     deps.initiatorRole === "player"
       ? { role: "player" as const, sessionId: deps.initiatorSessionId ?? "" }
       : { role: "gm" as const };
-  if (input.attackNatural !== undefined) {
-    const naturalRoll = input.attackNatural;
+  // A typed total is the face it means once the attack bonus is off; its mode and held die are checked here.
+  const typedNatural =
+    input.attackRolledTotal !== undefined ? faceFromTotal(input.attackRolledTotal, bonus) : input.attackNatural;
+  if (input.attackRolledTotal !== undefined && input.reroll !== true)
+    requireTypedDie(state, scope, key ? heldRollFor(state, key) : undefined, typedNatural!, "total");
+  if (typedNatural !== undefined) {
+    const naturalRoll = typedNatural;
     const held = key ? heldRollFor(state, key) : undefined;
     // A typed reroll: Heroic Inspiration, then the face the physical reroll shows.
     if (input.reroll) {
@@ -608,7 +615,7 @@ function rollD20(
         resolveDice(parseDiceFormula(d20TestFormula("normal", bonus)), () => naturalRoll),
         "attack",
         undefined,
-        { typed: input.typedFace === true }
+        { typed: input.typedFace === true || input.attackRolledTotal !== undefined }
       );
     if (key && isPreview) holdRoll(state, { key, actorId: ctx.attacker.id, faces: [naturalRoll], typed: true });
     if (key && !isPreview) releaseHeldRoll(state, key);

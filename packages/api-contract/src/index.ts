@@ -342,6 +342,7 @@ export const GAME_PATHS = {
   rulesAsk: `${API_NAMESPACE}/game/rules/ask`,
   rulesAnswer: `${API_NAMESPACE}/game/rules/answer`,
   stagingDefaults: `${API_NAMESPACE}/game/table/staging-defaults`,
+  playerDice: `${API_NAMESPACE}/game/table/player-dice`,
   partyVisibility: `${API_NAMESPACE}/game/table/party-visibility`,
   annotations: `${API_NAMESPACE}/game/annotations`,
   annotationsPing: `${API_NAMESPACE}/game/annotations/ping`,
@@ -374,6 +375,7 @@ export const GAME_PATHS = {
   chatDelete: `${API_NAMESPACE}/game/chat/delete`,
   sceneRename: `${API_NAMESPACE}/game/encounters/{encounterId}/rename`,
   sceneInitiativeDefaults: `${API_NAMESPACE}/game/encounters/{encounterId}/initiative-defaults`,
+  scenePlayerDice: `${API_NAMESPACE}/game/encounters/{encounterId}/player-dice`,
   sceneActivate: `${API_NAMESPACE}/game/encounters/{encounterId}/activate`,
   sceneCombatants: `${API_NAMESPACE}/game/encounters/{encounterId}/combatants`,
   sceneDuplicate: `${API_NAMESPACE}/game/encounters/{encounterId}/duplicate`,
@@ -740,6 +742,7 @@ export const GAME_COMMANDS = {
   "rules.ask": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAsk },
   "rules.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAnswer },
   "table.set-staging-defaults": { scope: "combat:write", method: "post", path: GAME_PATHS.stagingDefaults },
+  "table.set-player-dice": { scope: "combat:write", method: "post", path: GAME_PATHS.playerDice },
   "table.set-party-visibility": { scope: "combat:write", method: "post", path: GAME_PATHS.partyVisibility },
   "encounter.set-player-damage-mode": { scope: "combat:write", method: "post", path: GAME_PATHS.playerDamageMode },
   "encounter.set-player-initiative-mode": {
@@ -831,6 +834,7 @@ export const GAME_COMMANDS = {
     method: "post",
     path: GAME_PATHS.sceneInitiativeDefaults
   },
+  "encounter.set-player-dice": { scope: "encounter:write", method: "post", path: GAME_PATHS.scenePlayerDice },
   "encounter.remove": { scope: "encounter:write", method: "delete", path: GAME_PATHS.sceneById },
   "encounter.activate": { scope: "encounter:write", method: "post", path: GAME_PATHS.sceneActivate },
   "encounter.set-combatants": { scope: "encounter:write", method: "post", path: GAME_PATHS.sceneCombatants },

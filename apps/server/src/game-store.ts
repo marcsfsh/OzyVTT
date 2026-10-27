@@ -238,6 +238,31 @@ const MIGRATIONS: readonly Migration[] = [
       rewrite("encounter_journal", "command_type", renameEncounterCommand);
       rewrite("command_receipts", "command_type", renameEncounterCommand);
     }
+  },
+  {
+    // Players' dice have a mode for d20 rolls and one for damage (ADR-0043). Typing faces was `typedRolls: "open"`,
+    // which is the d20's `die`; "gm-only" is `app`. Damage starts at `app`, which is how it always ran.
+    version: 5,
+    up: (database) => {
+      const move = (json: string) => {
+        const state = JSON.parse(json) as {
+          builderPolicy?: { typedRolls?: string };
+          playerDice?: { d20?: string; damage?: string };
+        };
+        const typed = state.builderPolicy?.typedRolls;
+        if (state.builderPolicy) delete state.builderPolicy.typedRolls;
+        state.playerDice = { d20: typed === "gm-only" ? "app" : "die", damage: "app", ...state.playerDice };
+        return JSON.stringify(state);
+      };
+      for (const table of ["game_state", "turn_snapshots"] as const) {
+        const rows = database.prepare(`SELECT rowid AS row_id, state_json FROM ${table}`).all() as {
+          row_id: number;
+          state_json: string;
+        }[];
+        const update = database.prepare(`UPDATE ${table} SET state_json = ? WHERE rowid = ?`);
+        for (const row of rows) update.run(move(row.state_json), row.row_id);
+      }
+    }
   }
 ];
 

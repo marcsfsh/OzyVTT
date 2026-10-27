@@ -15,6 +15,8 @@ import {
   RuleModeSchema,
   SceneEnvironmentSchema,
   SceneInitiativeDefaultsSchema,
+  DiceModeSchema,
+  ScenePlayerDiceSchema,
   TableRollPurposeSchema
 } from "./state.js";
 import {
@@ -116,6 +118,9 @@ export const InitiativeRollSelfSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     natural: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** Reroll the initiative die just thrown (SRD Heroic Inspiration), before the character's first turn: a player
      *  spends Heroic Inspiration to reroll one die, the GM rerolls freely. With `natural`, the face a physical reroll
@@ -558,6 +563,9 @@ export const ActionResolveSchema = z
     /** GM only: a hand-entered final attack total, used verbatim vs AC; pair with `critical` for a nat 20 or `fumble`
      *  for a nat 1. */
     attackTotal: z.number().int().min(-50).max(100).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    attackRolledTotal: z.number().int().min(-50).max(100).optional(),
     /** GM only: declares a natural 20 (critical hit) for the hand-entered-total path. */
     critical: z.boolean().optional(),
     /** GM only: declares a natural 1 (a miss whatever the total) for the hand-entered-total path. */
@@ -740,6 +748,9 @@ export const SaveAnswerSchema = z
     /** A typed d20 for `method: "roll"`: the face a physical die shows (the one that counts). A player may type one only
      *  while the table lets players type their dice, and not once the server has thrown this save's die. */
     face: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** The GM's choice of roll mode, which wins over the engine's count. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** With `commit: false`, throw the held d20 again: a player spends Heroic Inspiration to reroll one die (the
@@ -788,6 +799,9 @@ export const ReactionAnswerSchema = z
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** A typed d20 for the strike (see `action.resolve`). */
     attackNatural: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    attackRolledTotal: z.number().int().min(-50).max(100).optional(),
     /** With `commit: false`, throw the held strike d20 again: Heroic Inspiration for a player, free for the GM. */
     reroll: z.boolean().optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
@@ -907,6 +921,9 @@ export const DeathSaveRollSchema = z
     /** A typed d20: the face a physical die shows. A player may type one only while the table lets players type their
      *  dice, and not once the server has thrown this death save's die. */
     naturalRoll: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** With `commit: false`, throw the held d20 again: Heroic Inspiration for a player, free for the GM. */
     reroll: z.boolean().optional(),
     /** With `commit: false`, answer the held death save with one of the preview's `answers` (the halfling's Luck). */
@@ -979,6 +996,9 @@ export const SaveRollSchema = z
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** A typed d20: the face a physical die shows (see `save.answer`). */
     face: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** GM only: a hand-entered final total, used as given. */
     total: z.number().int().min(-50).max(100).optional(),
     /** Throw the character's latest loose save of this ability again, while it is still the character's latest roll
@@ -1017,6 +1037,9 @@ export const CheckRollSchema = z
     visibility: RollVisibilitySchema.default("public"),
     /** A typed d20: the face a physical die shows (the one that counts). Players only while the table lets them. */
     face: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** The GM's choice of roll mode. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** The creature the check is about: one a Wisdom (Perception or Survival) check is made to find (the roller's
@@ -1119,6 +1142,8 @@ export const RollCallAnswerSchema = z
     callId: z.uuid(),
     actorId: z.uuid(),
     face: z.number().int().min(1).max(20).optional(),
+    /** A typed total (see `check.roll`). */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** The situations the check fits, of those the call's card offers for the character (a Book's topic). */
     situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -1210,6 +1235,15 @@ export const TableSetStagingDefaultsSchema = z
   .object({
     commandId: z.uuid(),
     visibility: z.enum(["public", "gm-only"]),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM sets how players' dice are entered (ADR-0043); an omitted kind keeps what is stored. */
+export const TableSetPlayerDiceSchema = z
+  .object({
+    commandId: z.uuid(),
+    d20: DiceModeSchema.optional(),
+    damage: DiceModeSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -2251,8 +2285,6 @@ export const BuilderSetPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).optional(),
     /** Whether players may roll a random character themselves; omitted keeps the stored setting. */
     playerRandom: z.enum(["open", "gm-only"]).optional(),
-    /** Whether players may type what their physical dice show, for every roll they make; omitted keeps the stored setting. */
-    typedRolls: z.enum(["open", "gm-only"]).optional(),
     /** Whether a rolled hit-point level is raised to the average; omitted keeps the stored setting. */
     hitPointRollFloor: z.enum(["none", "average"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -2436,6 +2468,15 @@ export const SceneSetInitiativeDefaultsSchema = z
     commandId: z.uuid(),
     encounterId: z.uuid(),
     initiativeDefaults: SceneInitiativeDefaultsSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** An encounter's own dice modes (ADR-0043), replacing what it had; a kind left out uses the table's. */
+export const SceneSetPlayerDiceSchema = z
+  .object({
+    commandId: z.uuid(),
+    encounterId: z.uuid(),
+    playerDice: ScenePlayerDiceSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

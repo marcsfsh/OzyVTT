@@ -17,6 +17,8 @@ export function saveAnswerPayload(
     total?: number;
     /** The face a physical d20 shows, for `method: "roll"`; the server adds the bonus. */
     face?: number;
+    /** A typed total, the d20 and the save's bonus, where the table asks for totals (ADR-0043). */
+    rolledTotal?: number;
     /** The GM's forced Adv/Disadv, which wins over the engine's count; the server ignores a player's. */
     dieMode?: "advantage" | "disadvantage" | "normal";
     /** Throw the held die again: Heroic Inspiration for a player, free for the GM. */
@@ -34,6 +36,7 @@ export function saveAnswerPayload(
     ...(input.legendaryResistance ? { legendaryResistance: true } : {}),
     ...(input.total !== undefined ? { total: input.total } : {}),
     ...(input.face !== undefined ? { face: input.face } : {}),
+    ...(input.rolledTotal !== undefined ? { rolledTotal: input.rolledTotal } : {}),
     ...(input.dieMode ? { rollMode: input.dieMode } : {}),
     ...(input.reroll ? { reroll: true } : {}),
     ...(input.damageOverride !== undefined ? { damageOverride: input.damageOverride } : {}),

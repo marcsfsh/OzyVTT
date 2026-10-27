@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { typedDie } from "../dice/roll-preference";
 import {
   actionChoicesOf,
   choosesAbility,
@@ -581,7 +582,10 @@ export function PlayerActionRunner({
           carried={actor?.inventory ?? []}
           busy={busy}
           onInvalidFace={onFeedback}
-          onRoll={(face) => resolveTargeting(revision, onOutcome, face !== undefined ? { attackNatural: face } : {})}
+          actorId={actorId}
+          onRoll={(face) =>
+            resolveTargeting(revision, onOutcome, face !== undefined ? typedDie("attackNatural", face, actorId) : {})
+          }
           {...(picking.action.damageLook && picking.action.attackBonus === null
             ? { onLookAtDamage: () => resolveTargeting(revision, onOutcome, { damageLook: true }) }
             : {})}

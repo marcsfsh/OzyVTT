@@ -65,6 +65,7 @@ export const rollsNothing = (action: ContentActionSummary): boolean =>
  */
 export function ActionTargetPicker({
   picking,
+  actorId,
   targets,
   onMap = false,
   busy,
@@ -90,12 +91,14 @@ export function ActionTargetPicker({
   carried?: readonly CarriedRow[];
   /** What another creature carries, for an action at its armor or weapon (a rust monster's Antennae). */
   carriedBy?: (actorId: string) => readonly CarriedRow[];
+  /** Who acts: one played at the table has the GM type its total (ADR-0042). */
+  actorId?: string;
   /** Take the action's own move first (Pounce), when it has one that comes before the rest. */
   onMoveFirst?: () => void;
   /** Roll the damage and look at it before it counts, for an answer to it (Empowered Spell, Heroic Inspiration). */
   onLookAtDamage?: () => void;
 }>) {
-  const { mayType } = useRollPreference();
+  const { mayType, typeAs } = useRollPreference(actorId);
   // On a phone the panel under the map is short, so the picker scrolls up to show its first rows.
   const groupRef = useRef<HTMLDivElement | null>(null);
   const actionId = picking.action.id;
@@ -463,6 +466,7 @@ export function ActionTargetPicker({
             label={`Attack d20 for ${picking.action.name}`}
             busy={busy}
             onInvalid={onInvalidFace}
+            typeAs={typeAs}
             onFace={(face) => onRoll(face)}
           />
         </div>

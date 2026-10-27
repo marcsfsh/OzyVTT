@@ -169,6 +169,7 @@ import type {
   SceneIdSchema,
   SceneRenameSchema,
   SceneSetInitiativeDefaultsSchema,
+  SceneSetPlayerDiceSchema,
   ChatSendSchema,
   ChatDeleteSchema,
   SceneReorderSchema,
@@ -192,6 +193,7 @@ import type {
   SetTokenImageSchema,
   TableSetPartyVisibilitySchema,
   TableSetStagingDefaultsSchema,
+  TableSetPlayerDiceSchema,
   TempHpSchema,
   TimePassSchema,
   SurvivalSetTrackingSchema,
@@ -471,6 +473,11 @@ export interface ClientToServerEvents {
   /** GM answers a parked ask: Allow re-runs the parked command with an override (reason optional), Deny tells the player. */
   "rules:answer": (
     payload: CommandPayload<typeof RulesAnswerSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM sets how players' dice are entered, for d20 rolls and for damage (ADR-0043). */
+  "table:set-player-dice": (
+    payload: CommandPayload<typeof TableSetPlayerDiceSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM sets the table's staging defaults (the visibility a newly staged combatant's token starts at). */
@@ -974,6 +981,11 @@ export interface ClientToServerEvents {
   /** GM sets how a scene's fight starts when Start the fight leaves a choice out (ADR-0039). */
   "encounter:set-initiative-defaults": (
     payload: CommandPayload<typeof SceneSetInitiativeDefaultsSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM sets an encounter's own dice modes, or hands a kind back to the table's (ADR-0043). */
+  "encounter:set-player-dice": (
+    payload: CommandPayload<typeof SceneSetPlayerDiceSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "encounter:remove": (

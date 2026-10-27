@@ -76,8 +76,8 @@ const mountSave = (viewer: "gm" | "player", inspired = false) =>
     />
   );
 
-const openTable = { builderPolicy: { typedRolls: "open" } } as unknown as PlayerView;
-const closedTable = { builderPolicy: { typedRolls: "gm-only" } } as unknown as PlayerView;
+const openTable = { playerDice: { d20: "die", damage: "die" } } as unknown as PlayerView;
+const closedTable = { playerDice: { d20: "app", damage: "app" } } as unknown as PlayerView;
 
 describe("a player's saving throw", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -210,7 +210,7 @@ describe("typing dice at the table", () => {
     followTable(closedTable);
     render(<SettingsPage role="player" state={null} />, { wrapper: ToastProvider });
     expect(
-      screen.getByText("At this table the server rolls players' dice, and only the GM can change that.")
+      screen.getByText("At this table the app rolls players' dice, and only the GM can change that.")
     ).toBeTruthy();
     expect(screen.queryByRole("group", { name: "How you roll" })).toBeNull();
     followTable(openTable);
