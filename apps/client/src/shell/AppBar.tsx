@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { GmView, PlayerView } from "@vtt/domain";
 import {
   IconButton,
+  ThemeSwitch,
   IconCog,
   IconDie,
   IconList,
@@ -176,6 +177,7 @@ export function GmTopBar({ state, token }: Readonly<{ state: GmView; token: stri
           { label: "Settings", path: "/settings" }
         ]}
       />
+      <ThemeSwitch className="app-bar-theme" />
       <SettingsButton />
     </TopBar>
   );
@@ -272,6 +274,7 @@ export function PlayerTopBar({
           { label: "Settings", path: "/settings" }
         ]}
       />
+      <ThemeSwitch className="app-bar-theme" />
       <SettingsButton />
     </TopBar>
   );

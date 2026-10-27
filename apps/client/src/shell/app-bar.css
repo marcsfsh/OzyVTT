@@ -82,7 +82,7 @@
   display: none;
 }
 
-/* The utilities at the right end: the table screen lamp, who is connected, search and settings. */
+/* The utilities at the right end: the table screen lamp, who is connected, search, the theme and settings. */
 .app-bar-icon.nh-iconbtn {
   color: var(--text-dim);
 }

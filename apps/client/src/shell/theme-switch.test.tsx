@@ -3,8 +3,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ThemeSwitch, ThemeToggle } from "@vtt/ui";
 
-// The theme is a device choice in Settings > Device; the standalone sheet, which has no Settings, keeps the compact
-// switch in its header. The two always agree, whichever changes the theme.
+// The theme is a device choice: the top bar's switch on every page, the toggle in Settings > Device, and the compact
+// switch in the standalone sheet's header. They always agree, whichever changes the theme.
 
 beforeEach(() => {
   localStorage.setItem("vtt.theme", "dusk");

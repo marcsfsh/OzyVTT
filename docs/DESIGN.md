@@ -161,7 +161,8 @@ surround, a control over the map is a plate in the theme's surface, and lamps st
 The shells:
 
 - GM, laptop. A 56px top bar: the wordmark; Play, Prep, Codex and Compendium; the live scene picker on Play; then, on
-  the right, the table screen lamp, who is connected, search (Ctrl K) and settings. Each section has a 52px bar under it
+  the right, the table screen lamp, who is connected, search (Ctrl K), the theme switch (the current theme's mark,
+  which opens Dusk and Dawn) and settings (a toothed gear, so it never reads as the theme's sun). Each section has a 52px bar under it
   for its pages, with the section's search or its primary at the right end.
 - GM, phone. The same four sections as a bottom tab bar. The top bar belongs to the page on screen. In a fight, Play
   stacks the VCR counter and scene picker, the turn order, the map, and the acting creature's card (portrait and
