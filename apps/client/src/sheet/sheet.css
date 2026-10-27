@@ -543,8 +543,10 @@
 .cs-menu-trigger {
   flex: none;
 }
+/* The sheet's close sits in its window's top-right corner, however tall the band beside it grows. */
 .cs-close {
   flex: none;
+  align-self: flex-start;
 }
 
 /* ---- The laptop's band ---- */

@@ -327,3 +327,13 @@
     padding: 0 var(--space-3);
   }
 }
+/* In the bar the theme switch is an icon like its neighbours: no plate until it is hovered or open. */
+.app-bar-theme .nh-theme-switch-trigger::before {
+  border-color: transparent;
+  background: transparent;
+}
+.app-bar-theme .nh-theme-switch-trigger:hover::before,
+.app-bar-theme[open] .nh-theme-switch-trigger::before {
+  border-color: var(--line-raised);
+  background: var(--surface-2);
+}
