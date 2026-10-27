@@ -511,13 +511,14 @@ const cardsIn = (section: HTMLElement) =>
 async function toClassFeatures(user: ReturnType<typeof userEvent.setup>, level: number) {
   await user.click(await screen.findByRole("radio", { name: /Elf/ }));
   await user.click(within(offerNamed("Keen Senses")).getByRole("radio", { name: /Perception/ }));
-  await user.click(screen.getByRole("button", { name: "Next" }));
+  // The primary names the step it goes to.
+  await user.click(screen.getByRole("button", { name: "Next: Background" }));
   await user.click(await screen.findByRole("radio", { name: /Acolyte/ }));
-  await user.click(screen.getByRole("button", { name: "Next" }));
+  await user.click(screen.getByRole("button", { name: /^Next: / }));
   await user.click(await screen.findByRole("radio", { name: /Cleric/ }));
   const stepper = screen.getByRole("group", { name: "Character level" });
   for (let at = 1; at < level; at++) await user.click(within(stepper).getByRole("button", { name: "Increase" }));
-  await user.click(screen.getByRole("button", { name: "Next" }));
+  await user.click(screen.getByRole("button", { name: /^Next: / }));
 }
 
 // Issue 1
@@ -775,9 +776,9 @@ describe("multiclassing on the class step", () => {
     mount();
     await user.click(await screen.findByRole("radio", { name: /Elf/ }));
     await user.click(within(offerNamed("Keen Senses")).getByRole("radio", { name: /Perception/ }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: /^Next: / }));
     await user.click(await screen.findByRole("radio", { name: /Acolyte/ }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: /^Next: / }));
     await user.click(await screen.findByRole("radio", { name: /Cleric/ }));
 
     await user.selectOptions(screen.getByLabelText("Add a class"), "fighter");
@@ -823,9 +824,9 @@ describe("multiclassing on the class step", () => {
         </ToastProvider>
       );
       await screen.findByRole("radio", { name: /Elf/, checked: true });
-      await user.click(screen.getByRole("button", { name: "Next" }));
+      await user.click(screen.getByRole("button", { name: /^Next: / }));
       await screen.findByRole("radio", { name: /Acolyte/, checked: true });
-      await user.click(screen.getByRole("button", { name: "Next" }));
+      await user.click(screen.getByRole("button", { name: /^Next: / }));
       await screen.findByRole("group", { name: "Fighter levels" });
       return view;
     };

@@ -841,7 +841,15 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
             goTo(stepIndex + 1);
           }
         }}
-        nextLabel={isLast ? (rebuild ? `Apply level ${draft.level}` : "Create character") : "Next"}
+        stepsPlacement="side"
+        /* The primary names where it goes, as the drawn builder's does. */
+        nextLabel={
+          isLast
+            ? rebuild
+              ? `Apply level ${draft.level}`
+              : "Create character"
+            : `Next: ${stepsForShell[stepIndex + 1]?.shortLabel ?? String(stepsForShell[stepIndex + 1]?.label ?? "")}`
+        }
         blockedReason={reasonNode}
         busy={submitting}
         /* The one way out: the draft is already parked, so no "leave without saving" exit. Discarding

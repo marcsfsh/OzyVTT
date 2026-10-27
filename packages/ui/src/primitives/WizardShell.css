@@ -220,3 +220,88 @@
     overflow-y: auto;
   }
 }
+
+/* The steps as a column beside the step (`stepsPlacement="side"`): above 760px the title spans the top, the steps
+   take a 280px column down the left, and the step and its footer share the rest. A phone keeps the compact progress
+   under the title. */
+@media (min-width: 761px) {
+  .nh-wizard--side {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 0;
+    row-gap: var(--space-4);
+  }
+  .nh-wizard--side > .nh-wizard-head {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .nh-wizard--side > .nh-wizard-side {
+    grid-column: 1;
+    grid-row: 2 / -1;
+    min-height: 0;
+    margin-top: calc(-1 * var(--space-4));
+    padding: var(--space-3) 0;
+    border-right: 1px solid var(--line-strong);
+    background: var(--surface-1);
+  }
+  .nh-wizard--side > .nh-wizard-resume {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .nh-wizard--side > .nh-wizard-body {
+    grid-column: 2;
+    grid-row: 3;
+    padding: 0 var(--space-6);
+  }
+  .nh-wizard--side > .nh-wizard-foot {
+    grid-column: 2;
+    grid-row: 4;
+  }
+}
+@media (max-width: 760px) {
+  .nh-wizard--side > .nh-wizard-side {
+    padding: 0 var(--space-4);
+  }
+}
+
+/* The side column's steps read like the drawn builder: 60px rows with a square marker (a cyan tick for done, the
+   caution mark for unfinished, the number for upcoming), and the current row tinted with a cyan bar on its edge. */
+.nh-wizard-side .nh-steps--vertical .nh-step {
+  min-height: 60px;
+  padding: 0 var(--space-4);
+}
+.nh-wizard-side .nh-steps--vertical .nh-step:has(> .nh-step-jump) {
+  padding: 0;
+}
+.nh-wizard-side .nh-step-jump {
+  min-height: 60px;
+  padding: 0 var(--space-4);
+}
+.nh-wizard-side .nh-step-marker {
+  width: 26px;
+  height: 26px;
+  border-radius: 0;
+}
+.nh-wizard-side .nh-step--done .nh-step-marker {
+  border-color: var(--state-on-edge);
+  background: var(--state-on);
+  color: var(--state-on-ink);
+}
+.nh-wizard-side .nh-step--current {
+  background: color-mix(in srgb, var(--state-on) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--state-on-edge);
+}
+.nh-wizard-side .nh-step--current .nh-step-marker {
+  border-color: var(--state-on-edge);
+  background: none;
+  color: var(--text);
+  box-shadow: none;
+}
+.nh-wizard-side .nh-step--incomplete .nh-step-marker {
+  border-style: solid;
+}
+.nh-wizard-side .nh-step-label {
+  font-size: 15px;
+  font-weight: 600;
+}
