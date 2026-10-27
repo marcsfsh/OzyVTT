@@ -47,7 +47,7 @@ The owner confirmed these choices.
   out at the next send instead of lingering.
 - **Preview parity.** The GM's preview loads the same `/viewer.html` over the same feed, so it shows the same card.
 - **Revocation.** Unchanged: a revoked screen gets 401 and stops; the card adds no credential or session to the feed.
-- **Client.** The column's reserved card shows `latestRoll` when present and keeps its notice text when null.
+- **Client.** The column shows `latestRoll` when present, and "No roll to show yet." when it is null.
 
 ## Consequences and tradeoffs
 

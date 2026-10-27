@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Portrait, VcrCounter, Wordmark, cx, defaultAvatarFor, useDragSurface, type PictureSource } from "@vtt/ui";
 import { frameOf } from "../actors/ActorPortrait";
-import type { Presentation } from "./ViewerApp";
+import type { Presentation, ViewerRollCard } from "./ViewerApp";
 import "./screen-parts.css";
 
 type Entry = Presentation["initiative"]["entries"][number];
@@ -150,9 +150,42 @@ function ActingNow({ presentation }: Readonly<{ presentation: Presentation }>) {
   );
 }
 
+/** The dice as the card reads them: "d20 12 +7", a die left out of the total in brackets. */
+export function diceWords(card: ViewerRollCard): string {
+  const dice = card.dice.map((die) => (die.kept ? `d${die.sides} ${die.face}` : `(d${die.sides} ${die.face})`));
+  const modifier = card.modifier === 0 ? [] : [card.modifier > 0 ? `+${card.modifier}` : `${card.modifier}`];
+  return [...dice, ...modifier].join(" ");
+}
+
+/** The newest public roll, as the room reads it across the table: who and what, the total, the dice. */
+function LatestRoll({ card }: Readonly<{ card: ViewerRollCard | null }>) {
+  if (!card)
+    return (
+      <section className="screen-card screen-roll" aria-label="Latest roll">
+        <p className="screen-card-label">Latest roll</p>
+        <p className="screen-roll-empty">No roll to show yet.</p>
+      </section>
+    );
+  return (
+    <section
+      key={card.id}
+      className="screen-card screen-roll is-rolled"
+      aria-label={`Latest roll: ${card.who}, ${card.what}, ${card.total}`}
+      aria-live="polite"
+    >
+      <p className="screen-roll-who">
+        <b>{card.who}</b> {card.what}
+      </p>
+      <p className="screen-roll-line">
+        <span className="screen-roll-total">{card.total}</span>
+        <span className="screen-roll-dice">{diceWords(card)}</span>
+      </p>
+    </section>
+  );
+}
+
 /**
- * The column beside the map: who acts now, and the place the latest public roll will take once the screen's feed
- * carries one. Dragging its inner edge resizes it; left grows it.
+ * The column beside the map: who acts now, and the latest public roll. Dragging its inner edge resizes it; left grows it.
  */
 export function ScreenColumn({
   presentation,
@@ -188,10 +221,7 @@ export function ScreenColumn({
       )}
       <div className="screen-column-scroll scroll-y">
         <ActingNow presentation={presentation} />
-        <section className="screen-card screen-roll" aria-label="Latest roll">
-          <p className="screen-card-label">Latest roll</p>
-          <p className="screen-roll-empty">Roll display is not available yet.</p>
-        </section>
+        <LatestRoll card={presentation.latestRoll ?? null} />
       </div>
     </aside>
   );

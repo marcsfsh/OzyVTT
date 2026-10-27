@@ -168,7 +168,11 @@ audience. There are five:
   `ViewerPresentationProjection` types, plus `sound` (`ViewerSoundProjection`, added by
   `viewer-coordinator.ts` when the feed is sent): only what is playing, by file id, level and
   position, never a name, the playlist or the library. The screen may fetch a sound file only
-  while it is in that projection.
+  while it is in that projection. `latestRoll` (`viewer-roll.ts`, ADR-0040) is built on each send
+  from an allow-list: the newest `public` roll that isn't the builder's, by no creature or one the
+  table can see (`hiddenFrom`), made since the presentation's `rollsSince`, the live scene's
+  `liveAt` and the last ten minutes; it carries who, what, total, dice and modifier, and an id of
+  its own.
 - **Codex** (`codex-projections.ts`): a player gets the parts of a revealed record that reach
   them and nothing else. Each read is for one reader: the party characters the session has
   claimed, or the ones the GM's preview names. A page or quest holds player text and hidden
@@ -1078,8 +1082,8 @@ through `dice:roll` at the visibility the dice options chose (`dice/roll-visibil
 full `DicePanel`, the GM's calls for a roll included. The table screen lamp
 (`table/TvControl.tsx`) pauses or resumes the screen and opens its preview (`viewer/preview-open.ts`). The screen
 itself (`viewer/ViewerApp.tsx`, with `viewer/ScreenParts.tsx`) draws a strip of the turn order with the VCR counter,
-the map fitted whole unless the screen chose Follow GM view or zoomed, and a column with who acts now and the place
-the latest roll will take; its pictures read only the feed's placed tokens and the actor id. The GM's preview loads the
+the map fitted whole unless the screen chose Follow GM view or zoomed, and a column with who acts now and the
+latest public roll; its pictures read only the feed's placed tokens and the actor id. The GM's preview loads the
 same page, so the two lay out alike. Nothing floats
 over the map but tokens and marks; notices land in the status line through `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).

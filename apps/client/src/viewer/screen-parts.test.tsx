@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { ScreenColumn, ScreenTop, screenTiles } from "./ScreenParts";
+import { ScreenColumn, ScreenTop, diceWords, screenTiles } from "./ScreenParts";
 import type { Presentation } from "./ViewerApp";
 
 const MAP = "map-1";
@@ -103,8 +103,24 @@ describe("the table screen's strip and column", () => {
     expect(screen.getByRole("img", { name: "No fight running" })).toBeTruthy();
     expect(screen.queryByRole("list", { name: /Turn order/ })).toBeNull();
     expect(screen.getByRole("region", { name: "No fight running" }).textContent).toContain("Goblin warren");
-    expect(
-      within(screen.getByRole("region", { name: "Latest roll" })).getByText("Roll display is not available yet.")
-    ).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Latest roll" })).getByText("No roll to show yet.")).toBeTruthy();
+  });
+
+  it("shows the latest roll's who, what, total and dice", () => {
+    const card = {
+      id: "card-1",
+      who: "Lyra",
+      what: "Fire Bolt",
+      total: 19,
+      dice: [{ sides: 20, face: 12, kept: true }],
+      modifier: 7,
+      at: "2026-10-27T12:00:00.000Z"
+    };
+    render(<ScreenColumn presentation={{ ...presentation(), latestRoll: card }} />);
+    const shown = screen.getByRole("region", { name: "Latest roll: Lyra, Fire Bolt, 19" });
+    expect(within(shown).getByText("d20 12 +7")).toBeTruthy();
+    expect(diceWords({ ...card, dice: [...card.dice, { sides: 20, face: 3, kept: false }], modifier: -1 })).toBe(
+      "d20 12 (d20 3) -1"
+    );
   });
 });

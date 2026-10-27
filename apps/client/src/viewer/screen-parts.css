@@ -188,6 +188,40 @@
 .screen-acting.is-gm-turn .screen-acting-name {
   color: var(--violet-hi);
 }
+.screen-roll-who {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(17px, 1.15vw, 22px);
+}
+.screen-roll-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+}
+.screen-roll-total {
+  color: var(--text);
+  font: 400 clamp(48px, 3.4vw, 68px) / 1 var(--font-numeric);
+}
+.screen-roll-dice {
+  color: var(--text-dim);
+  font: 400 clamp(20px, 1.4vw, 28px) / 1 var(--font-numeric);
+}
+/* A new card lands with one flash of the edge; reduced motion shows it without. */
+.screen-roll.is-rolled {
+  animation: screen-roll-land 0.6s ease-out 1;
+}
+@keyframes screen-roll-land {
+  from {
+    border-color: var(--cyan);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen-roll.is-rolled {
+    animation: none;
+  }
+}
 .screen-roll-empty {
   margin: 0;
   color: var(--text-dim);

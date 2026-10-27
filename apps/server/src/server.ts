@@ -66,6 +66,7 @@ import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
 import { projectViewerEncounter } from "./viewer-encounter.js";
+import { projectViewerRoll } from "./viewer-roll.js";
 import { ViewerPresentationStore } from "./viewer-presentation-store.js";
 import { SoundCatalogStore } from "./sound-catalog.js";
 import { createSoundRouter } from "./sound-http.js";
@@ -225,6 +226,8 @@ export function createServer(options: CreateServerOptions) {
     (now) => sound.viewerSound(now),
     () => pushSoundToGm()
   );
+  // The screen's latest-roll card, read from the committed game as the table's audience (ADR-0040).
+  viewerCoordinator.attachRolls((since, now) => projectViewerRoll(committedState.read(), since, now, sightContent()));
   const gmLoginRateLimiter = new LoginRateLimiter();
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
@@ -643,6 +646,7 @@ export function createServer(options: CreateServerOptions) {
         state.revision,
         projectViewerEncounter(state, Date.now(), sightContent())
       );
+      viewerCoordinator.refreshRoll();
     } catch {
       for (const socket of io.sockets.sockets.values())
         if (auth.verify(socket.handshake.auth?.token))

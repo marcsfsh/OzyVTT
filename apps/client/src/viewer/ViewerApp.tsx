@@ -91,6 +91,19 @@ export type Presentation = Readonly<{
   }>;
   /** What the sound board is playing, with how far in each sound was when this was sent. */
   sound?: ViewerSoundProjection;
+  /** The newest public roll the room may see, built on the server (ADR-0040); absent from a feed older than it. */
+  latestRoll?: ViewerRollCard | null;
+}>;
+
+/** One roll as the screen shows it: who, what for, the total and the dice. Nothing about targets or outcomes. */
+export type ViewerRollCard = Readonly<{
+  id: string;
+  who: string;
+  what: string;
+  total: number;
+  dice: readonly Readonly<{ sides: number; face: number; kept: boolean }>[];
+  modifier: number;
+  at: string;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
