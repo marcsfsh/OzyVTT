@@ -18,15 +18,15 @@ const gm = (atTable: boolean) =>
   }) as unknown as GmView;
 
 describe("how a roll is entered", () => {
-  it("follows the table's d20 mode for a player, with no choice of their own", () => {
+  it("lets a player roll or type where the table takes typed dice, and says what a typed number is", () => {
     expect(entryFor(player("app"), "manual")).toEqual({
       rollInput: "digital",
       mayType: false,
       typeAs: "face",
       chooses: false
     });
-    expect(entryFor(player("die"), "digital")).toMatchObject({ rollInput: "manual", typeAs: "face", chooses: false });
-    expect(entryFor(player("total"), "digital")).toMatchObject({ rollInput: "manual", typeAs: "total" });
+    expect(entryFor(player("die"), "digital")).toMatchObject({ rollInput: "digital", typeAs: "face", chooses: true });
+    expect(entryFor(player("total"), "manual")).toMatchObject({ rollInput: "manual", typeAs: "total", chooses: true });
   });
 
   it("lets the GM choose, and asks the GM for the total of a character played at the table", () => {
@@ -44,7 +44,7 @@ describe("how a roll is entered", () => {
     followTable(player("die"));
     expect(typedDie("naturalRoll", 12)).toEqual({ naturalRoll: 12 });
     expect(tableDiceLine(entryFor(player("total"), "digital"))).toBe(
-      "At this table you type the total you rolled, your bonus included. Only the GM can change that."
+      "When you roll your own dice, type the total, your bonus included."
     );
   });
 });

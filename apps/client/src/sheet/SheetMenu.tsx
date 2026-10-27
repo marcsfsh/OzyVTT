@@ -183,7 +183,7 @@ export function RollSettings({
                 { value: "manual", label: "Manual" }
               ]}
             />
-            <p className="cs-sub">Manual asks for the number your own die shows. The server adds the bonus.</p>
+            <p className="cs-sub">{tableDiceLine(dice)}</p>
           </div>
         ) : (
           <p className="cs-sub">{tableDiceLine(dice)}</p>

@@ -81,7 +81,7 @@ export type RollEntry = Readonly<{
   /** Whether a typed number is taken at all. */
   mayType: boolean;
   typeAs: TypeAs;
-  /** Whether this browser picks between rolling and typing (the GM's own rolls); otherwise the table decides. */
+  /** Whether this browser picks between rolling and typing; otherwise the table or the character decides. */
   chooses: boolean;
 }>;
 
@@ -93,8 +93,9 @@ function atTable(gm: GmView, actorId: string): boolean {
 }
 
 /**
- * A roll's entry: a player's follows the table's d20 mode (the server throws, or they type the face, or the total);
- * the GM chooses, except for a character played at the table, whose total the GM types as its player reports it.
+ * A roll's entry: where the table takes typed d20s, a player chooses to roll or type, and the mode says whether a
+ * typed number is the face or the total; where the app rolls, it rolls. The GM chooses too, except for a character
+ * played at the table, whose total the GM types as its player reports it.
  */
 export function entryFor(current: GmView | PlayerView | null, chosen: RollInput, actorId?: string): RollEntry {
   if (current === null || "definitions" in current) {
@@ -104,15 +105,15 @@ export function entryFor(current: GmView | PlayerView | null, chosen: RollInput,
   }
   const mode = current.playerDice?.d20 ?? "die";
   if (mode === "app") return { rollInput: "digital", mayType: false, typeAs: "face", chooses: false };
-  return { rollInput: "manual", mayType: true, typeAs: mode === "total" ? "total" : "face", chooses: false };
+  return { rollInput: chosen, mayType: true, typeAs: mode === "total" ? "total" : "face", chooses: true };
 }
 
-/** What the table asks of a player's dice, said where a GM would see the choice. */
+/** What a typed number is at this table, said beside the choice, or the rule where there is no choice. */
 export function tableDiceLine(entry: RollEntry): string {
   if (!entry.mayType) return "At this table the app rolls players' dice, and only the GM can change that.";
   return entry.typeAs === "total"
-    ? "At this table you type the total you rolled, your bonus included. Only the GM can change that."
-    : "At this table you type what your d20 shows, and the app adds your bonus. Only the GM can change that.";
+    ? "When you roll your own dice, type the total, your bonus included."
+    : "When you roll your own dice, type what your d20 shows. The app adds your bonus.";
 }
 
 type TypedField = "face" | "natural" | "naturalRoll" | "attackNatural";
