@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
-import { Select, Switch } from "@vtt/ui";
+import { IconChevron, Select, Switch } from "@vtt/ui";
 import { command } from "../lib/command";
 import { HealthAudienceOptions, HealthStyleOptions, healthStylePhrase, type HealthStyle } from "./health-display";
 import "./fight-menu.css";
@@ -81,7 +81,8 @@ export function FightMenu({
   onFeedback,
   onAddMonsters,
   onEnd,
-  onAwardExperience
+  onAwardExperience,
+  labelled = false
 }: Readonly<{
   state: GmView;
   busy: boolean;
@@ -93,6 +94,8 @@ export function FightMenu({
   /** Shares the defeated monsters' XP among the characters in the fight, at the lair XP for a legendary creature
    *  fought in its lair; absent until there is something to share. */
   onAwardExperience?: ((inLair: boolean) => void) | undefined;
+  /** Shows the word Fight on the trigger, as the strip over the map does, in place of the ⋯. */
+  labelled?: boolean;
 }>) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [inLair, setInLair] = useState(false);
@@ -159,14 +162,20 @@ export function FightMenu({
       <button
         type="button"
         ref={menuButtonRef}
-        className="encounter-menu-toggle"
+        className={`encounter-menu-toggle${labelled ? " is-labelled" : ""}`}
         aria-expanded={menuOpen}
         aria-haspopup="menu"
         aria-label="Fight options"
         title="Fight options · rules assistant, environment, roster, end"
         onClick={() => setMenuOpen((current) => !current)}
       >
-        ⋯
+        {labelled ? (
+          <>
+            Fight <IconChevron />
+          </>
+        ) : (
+          "⋯"
+        )}
       </button>
       {menuOpen &&
         createPortal(

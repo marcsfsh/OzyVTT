@@ -5,17 +5,23 @@ import { JoinAddress } from "../components/JoinAddress";
 import { focusTokenOnMap } from "../scene/tableGeometry";
 import { NowPlaying } from "../sound/NowPlaying";
 import { LiveScenePicker } from "./LiveScenePicker";
-import { idleStatus, tableStatus } from "./status";
+import { TurnTiles } from "./TurnTiles";
+import { idleStatus } from "./status";
 import "./table-strip.css";
 
-type StripProps = Readonly<{ phone: boolean; token: string }> &
+type StripProps = Readonly<{
+  phone: boolean;
+  token: string;
+  /** Where the GM's Fight menu lands during a fight. */
+  endRef?: (node: HTMLElement | null) => void;
+}> &
   Readonly<{ role: "gm"; state: GmView } | { role: "player"; state: PlayerView }>;
 
 /**
  * The strip above the map: the VCR counter, then what the table is doing. Before a fight that is "No fight running"
- * with who is on the map and, for the GM, the join address; in a fight, the round and who acts. The status line
- * also carries the newest notice in its place, so a toast never floats over the map. On a GM's phone the strip is
- * Play's header, with the live scene picker and Join.
+ * with who is on the map and, for the GM, the join address; in a fight, the turn order and the GM's Fight menu. The
+ * newest notice shows in the strip, so a toast never floats over the map. On a GM's phone the strip is Play's
+ * header, with the live scene picker and Join, and the turn order as its second row.
  */
 export function TableStrip(props: StripProps) {
   const { state, phone } = props;
@@ -23,22 +29,44 @@ export function TableStrip(props: StripProps) {
   const view =
     props.role === "gm" ? { role: "gm" as const, state: props.state } : { role: "player" as const, state: props.state };
   const idle = idleStatus(view);
-  const status: ReactNode = fighting ? (
-    tableStatus(view)
-  ) : (
+  const status: ReactNode = (
     <>
       <b>{idle.lead}</b> {idle.detail}
     </>
   );
   const counter = <VcrCounter round={fighting ? state.combat.round : null} className="table-strip-counter" />;
+  const tiles =
+    props.role === "gm" ? (
+      <TurnTiles role="gm" state={props.state} token={props.token} />
+    ) : (
+      <TurnTiles role="player" state={props.state} token={null} />
+    );
+  const end = <div className="table-strip-end" ref={props.endRef} />;
 
   if (props.role === "gm" && phone)
     return (
-      <header className="table-strip is-header" aria-label="The table">
+      <header className={`table-strip is-header${fighting ? " is-fighting" : ""}`} aria-label="The table">
+        <div className="table-strip-row">
+          {counter}
+          <LiveScenePicker state={props.state} compact />
+          <NowPlaying token={props.token} compact />
+          {!fighting && <JoinButton token={props.token} />}
+          {end}
+        </div>
+        {fighting && <div className="table-strip-row is-tiles">{tiles}</div>}
+      </header>
+    );
+  if (fighting)
+    return (
+      <header className="table-strip is-fighting" aria-label="The table">
         {counter}
-        <LiveScenePicker state={props.state} compact />
-        <NowPlaying token={props.token} compact />
-        {!fighting && <JoinButton token={props.token} />}
+        <span className="table-strip-divider" aria-hidden="true" />
+        {tiles}
+        {/* Notices land here during a fight, so a toast never floats over the map. */}
+        <ToastOutlet className="table-strip-notice" />
+        {props.role === "gm" && <NowPlaying token={props.token} compact />}
+        {props.role === "player" && <MeButton state={props.state} />}
+        {end}
       </header>
     );
   return (
@@ -57,6 +85,7 @@ export function TableStrip(props: StripProps) {
       ) : (
         <MeButton state={props.state} />
       )}
+      {end}
     </header>
   );
 }

@@ -111,7 +111,7 @@ const tabNames = (list: HTMLElement) =>
 
 describe("the GM's panel", () => {
   const fightTab = "Fight2, 2 waiting on you";
-  it("on a laptop: Fight, Log, Party and Notes, with what waits on the GM leading Fight and Next turn in the footer", async () => {
+  it("on a laptop: Fight, Log, Party and Notes, with what waits on the GM leading Fight and End turn in the footer", async () => {
     const user = userEvent.setup();
     render(
       <ToastProvider>
@@ -130,15 +130,17 @@ describe("the GM's panel", () => {
     const fight = screen.getByRole("tabpanel", { name: /^Fight/ });
     expect(within(fight).getByText("Needs you · 2")).toBeTruthy();
     expect(within(fight).getByRole("region", { name: "Now acting · Lyra" })).toBeTruthy();
-    expect(within(fight).getByText("Borin")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Next turn/ })).toBeTruthy();
+    // The order and its row tools fold under the acting creature.
+    expect(within(fight).getByText("Turn order and tools")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "End turn" })).toBeTruthy();
+    expect(screen.getByText("Next: Borin")).toBeTruthy();
     // Log holds the log and the dice. A tab shows its own panel and is remembered on this device.
     await user.click(within(list).getByRole("tab", { name: "Log" }));
     expect(screen.getByRole("tabpanel", { name: "Log" }).textContent).toBe("The logThe dice");
     expect(screen.queryByText("Needs you · 2")).toBeNull();
     expect(localStorage.getItem("vtt.table-tab.gm.laptop")).toBe("log");
-    // Next turn stays in the footer while another tab is shown.
-    expect(screen.getByRole("button", { name: /Next turn/ })).toBeTruthy();
+    // End turn stays in the footer while another tab is shown.
+    expect(screen.getByRole("button", { name: "End turn" })).toBeTruthy();
     // Notes switches between Tonight and the Codex.
     await user.click(within(list).getByRole("tab", { name: "Notes" }));
     expect(screen.getByText("Tonight board")).toBeTruthy();

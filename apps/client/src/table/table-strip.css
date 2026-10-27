@@ -42,9 +42,6 @@
 /* A GM's phone: the strip is Play's header, with the counter, the live scene picker centred, and Join. The horizon
    line closes it the way it closes every top bar. */
 .table-strip.is-header {
-  gap: var(--space-2);
-  min-height: 56px;
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
   border-bottom: 0;
   background:
     var(--grad-horizon) bottom / 100% 2px no-repeat,
@@ -73,4 +70,51 @@
     max-width: 8.5rem;
     padding: 0;
   }
+}
+
+/* In a fight the turn order takes the strip, with the newest notice and the Fight menu at its end. */
+.table-strip.is-fighting {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.table-strip-notice:empty {
+  display: none;
+}
+.table-strip-notice {
+  flex: 0 1 16rem;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.table-strip-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+.table-strip-end:empty {
+  display: none;
+}
+.table-strip.is-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+.table-strip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 56px;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+}
+.table-strip-row.is-tiles {
+  min-height: 64px;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+.table-strip-row.is-tiles .turn-tiles {
+  margin: 0;
 }

@@ -1,6 +1,8 @@
 import type { KeyboardEvent } from "react";
-import type { EncounterToken, EncounterTokenPosition, GmActor, HealthDisplay, PlayerActor } from "@vtt/domain";
+import type { EncounterToken, EncounterTokenPosition, GmActor, GmView, HealthDisplay, PlayerActor } from "@vtt/domain";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
+import { avatarUrl } from "@vtt/ui";
+import { pictureOf } from "../actors/actor-picture";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { hpFillFraction, TokenAltitudeBadge, TokenHealthAura, TokenStatusBadges } from "./tokenGlyph";
 
@@ -18,6 +20,7 @@ export function MapToken({
   tableHealthDisplay,
   number,
   label,
+  definitions,
   onKeyDown
 }: Readonly<{
   encounterToken: EncounterToken & { position: EncounterTokenPosition };
@@ -36,6 +39,8 @@ export function MapToken({
   number?: number;
   /** The short text under the token. */
   label: string;
+  /** The GM's definitions, for the default picture of a character's class. */
+  definitions?: GmView["definitions"];
   onKeyDown: (event: KeyboardEvent<SVGGElement>) => void;
 }>) {
   const band = healthBandFor(actor.hp);
@@ -74,6 +79,7 @@ export function MapToken({
         name={actor.name}
         label={label}
         {...(number !== undefined ? { number } : {})}
+        fallbackUrl={avatarUrl(pictureOf(actor, null, definitions).fallback)}
         active={active}
         turnClassName="encounter-token-turn"
         bodyClassName="encounter-token-body"

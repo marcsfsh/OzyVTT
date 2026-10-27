@@ -1,21 +1,45 @@
-import { IconStar } from "@vtt/ui";
+import { IconStar, Lamp, MoveLamp, type LampKind } from "@vtt/ui";
 import { useEffect, useState } from "react";
 import type { GmActor, GmView, MutationResult } from "@vtt/domain";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
+import { ActingCard } from "./ActingCard";
 import { ActionRunner } from "./ActionRunner";
 import "./acting-console.css";
 
+/** One lamp as a toggle: lit while the resource is there, a press marks it spent or gives it back. */
+function LampToggle({
+  kind,
+  label,
+  used,
+  busy,
+  onToggle
+}: Readonly<{ kind: LampKind; label: string; used: boolean; busy: boolean; onToggle: () => void }>) {
+  return (
+    <button
+      type="button"
+      className="lamp-toggle"
+      aria-label={label}
+      aria-pressed={used}
+      disabled={busy}
+      onClick={onToggle}
+    >
+      <Lamp kind={kind} lit={!used} label={label} unavailableReason="Used this turn" className="lamp-toggle-lamp" />
+    </button>
+  );
+}
+
 /**
- * The acting creature's console under the active row: its turn economy and its action runner. A
- * normal turn needs no name header (the row names it); an off-turn legendary actor keeps its name.
+ * The acting creature's console: its card, its turn's lamps and its action runner. An off-turn legendary actor takes
+ * the card and offers its pool in place of the lamps.
  */
 export function ActingConsole({
   state,
   actorsById,
   busy,
   run,
-  onFeedback
+  onFeedback,
+  token = null
 }: Readonly<{
   state: GmView;
   actorsById: ReadonlyMap<string, GmActor>;
@@ -23,6 +47,8 @@ export function ActingConsole({
   /** Runs a command with the panel's busy flag and reports `success` on the panel's feedback line. */
   run: (operation: () => Promise<MutationResult>, success: string) => Promise<void>;
   onFeedback: (text: string) => void;
+  /** The GM's bearer, for the card's token art. */
+  token?: string | null;
 }>) {
   // A legendary creature acting off-turn (SRD Legendary Actions) takes over the acting console until
   // the real turn advances.
@@ -60,8 +86,10 @@ export function ActingConsole({
   const down = actor.hp.current <= 0;
   const legendaryPool = legendaryActor?.legendary?.actionsPerRound;
   const legendarySpent = legendaryActor ? (state.combat.legendaryUsed[legendaryActor.id] ?? 0) : 0;
+  const speedFeet = legendaryActor ? undefined : (movement?.speedFeet ?? actor.speedFeet);
   return (
     <>
+      <ActingCard state={state} actor={actor} token={token} speedFeet={speedFeet} />
       {legendaryOffers.length > 0 && (
         <div className="legendary-strip" role="group" aria-label="Legendary actions available">
           {legendaryOffers.map(({ candidate, remaining }) => (
@@ -103,24 +131,15 @@ export function ActingConsole({
         <header className="acting-console-head">
           {/* Only when there is something to show: the legendary actor's name and pool, or the turn
               actor's movement. */}
-          {(legendaryActor || actor.speedFeet !== undefined) && (
+          {legendaryActor && (
             <div className="acting-console-title">
-              {legendaryActor && <strong className="acting-console-name">{actor.name}</strong>}
-              {legendaryActor ? (
-                <span
-                  className="economy-slot legendary-pill"
-                  title="Legendary actions remaining this round; the pool refills on its own turn."
-                >
-                  <IconStar /> {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}
-                </span>
-              ) : (
-                actor.speedFeet !== undefined && (
-                  <span className="economy-movement" title="Movement spent this turn / this turn's movement">
-                    {/* One text node: Chromium drew a lone leading "0" node invisibly here. */}
-                    {`Move ${Math.round(state.combat.turn.movementUsedFeet)}/${movement?.speedFeet ?? actor.speedFeet} ft`}
-                  </span>
-                )
-              )}
+              <strong className="acting-console-name">Legendary action</strong>
+              <span
+                className="economy-slot legendary-pill"
+                title="Legendary actions remaining this round; the pool refills on its own turn."
+              >
+                <IconStar /> {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}
+              </span>
             </div>
           )}
           {legendaryActor ? (
@@ -170,13 +189,13 @@ export function ActingConsole({
               </button>
             </div>
           ) : (
-            <div className="acting-console-economy-row">
-              <button
-                type="button"
-                className="economy-slot"
-                aria-pressed={state.combat.turn.actionUsed}
-                disabled={busy}
-                onClick={() =>
+            <div className="lamp-row" role="group" aria-label="This turn">
+              <LampToggle
+                kind="action"
+                label="Action"
+                used={state.combat.turn.actionUsed}
+                busy={busy}
+                onToggle={() =>
                   void run(
                     () =>
                       command("turn:use", {
@@ -187,15 +206,13 @@ export function ActingConsole({
                     state.combat.turn.actionUsed ? "Action restored." : "Action spent."
                   )
                 }
-              >
-                Action
-              </button>
-              <button
-                type="button"
-                className="economy-slot"
-                aria-pressed={state.combat.turn.bonusActionUsed}
-                disabled={busy}
-                onClick={() =>
+              />
+              <LampToggle
+                kind="bonus"
+                label="Bonus"
+                used={state.combat.turn.bonusActionUsed}
+                busy={busy}
+                onToggle={() =>
                   void run(
                     () =>
                       command("turn:use", {
@@ -206,16 +223,14 @@ export function ActingConsole({
                     state.combat.turn.bonusActionUsed ? "Bonus Action restored." : "Bonus Action spent."
                   )
                 }
-              >
-                Bonus
-              </button>
-              <button
-                type="button"
-                className="economy-slot"
-                aria-pressed={state.combat.reactionsUsed.includes(actor.id)}
-                disabled={busy}
-                title="Reactions refresh on its own turn"
-                onClick={() =>
+              />
+              {/* Reactions refresh on the creature's own turn. */}
+              <LampToggle
+                kind="reaction"
+                label="Reaction"
+                used={state.combat.reactionsUsed.includes(actor.id)}
+                busy={busy}
+                onToggle={() =>
                   void run(
                     () =>
                       command("turn:use-reaction", {
@@ -226,9 +241,13 @@ export function ActingConsole({
                     state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent."
                   )
                 }
-              >
-                Reaction
-              </button>
+              />
+              {speedFeet !== undefined && (
+                <MoveLamp
+                  feetLeft={Math.max(0, speedFeet - Math.round(state.combat.turn.movementUsedFeet))}
+                  speedFeet={speedFeet}
+                />
+              )}
             </div>
           )}
         </header>

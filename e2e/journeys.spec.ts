@@ -274,12 +274,12 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   await expect(gm.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
   await expectPageFits(gm);
   // The one primary sits in the panel's footer, inside the viewport and uncovered.
-  await expectUncovered(gm.getByRole("button", { name: "Next turn" }));
+  await expectUncovered(gm.getByRole("button", { name: "End turn" }));
 
   // A move off the mover's turn goes to the GM, so if the goblin won initiative the GM ends its turn first.
   await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
   const yourTurn = player.getByRole("heading", { name: "Your turn" });
-  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
+  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "End turn" }));
   await expect(yourTurn).toBeVisible();
   await expectUncovered(player.getByRole("button", { name: "End turn" }));
   if (hasTouch) {
@@ -433,7 +433,7 @@ test("a player takes a turn on a phone: a tile, its cast, a target and the roll"
   await press(gm.getByRole("button", { name: "Start the fight" }));
   await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
   const yourTurn = player.getByRole("heading", { name: "Your turn" });
-  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
+  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "End turn" }));
   await expect(yourTurn).toBeVisible();
 
   // The Turn tab is the turn card alone: the favourite tiles, each saying what it costs.

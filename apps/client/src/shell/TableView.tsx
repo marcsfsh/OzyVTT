@@ -22,6 +22,7 @@ import { needsItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
 import { PaneDivider, useMomentShare } from "../table/PaneDivider";
 import { PromptSlot } from "../table/PromptSlot";
+import { StripEndContext } from "../table/stripSlot";
 import { TableStrip } from "../table/TableStrip";
 import { usePhoneShell } from "./AppBar";
 import { TokenTab } from "../table/TokenTab";
@@ -61,6 +62,8 @@ export function TableView(props: TableViewProps) {
   const phone = useMediaQuery(PHONE_TABLE_QUERY);
   // The narrower phone shell, where Play's strip stands in for the top bar.
   const phoneShell = usePhoneShell();
+  // The strip's right end, where the GM's Fight menu lands during a fight.
+  const [stripEnd, setStripEnd] = useState<HTMLElement | null>(null);
   /**
    * Whether this player has claimed anyone, which decides between the pre-claim picker and their own
    * character. Read from the projection's `claimStatus`.
@@ -90,7 +93,7 @@ export function TableView(props: TableViewProps) {
 
   const header =
     props.role === "gm" ? (
-      <TableStrip role="gm" state={props.state} token={token} phone={phoneShell} />
+      <TableStrip role="gm" state={props.state} token={token} phone={phoneShell} endRef={setStripEnd} />
     ) : (
       <TableStrip role="player" state={props.state} token={token} phone={phoneShell} />
     );
@@ -221,7 +224,9 @@ export function TableView(props: TableViewProps) {
       >
         {map && <div className="table-bench-map">{map}</div>}
         {phone && map && <PaneDivider value={mapShare} onChange={moveSplit} container={() => splitRef.current} />}
-        <div className="table-bench-panel">{panel}</div>
+        <div className="table-bench-panel">
+          <StripEndContext.Provider value={stripEnd}>{panel}</StripEndContext.Provider>
+        </div>
       </div>
     </div>
   );

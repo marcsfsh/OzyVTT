@@ -837,6 +837,9 @@ export function EncounterMap({
                         }
                         tableHealthDisplay={healthDisplay}
                         label={tokenLabel(actor, numbers.get(actor.id))}
+                        definitions={
+                          role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined
+                        }
                         {...(numbers.has(actor.id) ? { number: numbers.get(actor.id) } : {})}
                         onKeyDown={(event) => keyboardMove(event, encounterToken)}
                       />

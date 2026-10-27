@@ -193,7 +193,7 @@ const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: str
   ["apps/client/src/actors/pdf-import.css", 5, "import-status hues (amber/red/violet) that never became tokens"],
   ["apps/client/src/maps/calibration.css", 11, "SVG paint: grid strokes and drop-shadows over image content"],
   ["apps/client/src/scene/annotation.css", 3, "SVG paint: annotation strokes over image content"],
-  ["apps/client/src/scene/encounter-map.css", 8, "SVG paint, and the black/white pair a token ring needs on any map"],
+  ["apps/client/src/scene/encounter-map.css", 6, "SVG paint, and the black/white pair a token ring needs on any map"],
   ["apps/client/src/styles.css", 2, "a two-stop black mask, read only for its alpha"],
   ["apps/client/src/viewer/viewer-controls.css", 1, "the white A/B measurement labels, over arbitrary map art"],
   ["apps/client/src/viewer/viewer.css", 6, "SVG paint and a scrim over the projected map"],

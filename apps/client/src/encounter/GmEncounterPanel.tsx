@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/map-catalog";
-import { Button, IconArrow, IconChevronLeft } from "@vtt/ui";
+import { Button, IconChevronLeft } from "@vtt/ui";
 import { command } from "../lib/command";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { MonsterBrowser } from "./MonsterBrowser";
@@ -18,6 +18,8 @@ import { holdsTheTurn } from "../table/NeedsYou";
 import { isDefeatedMonster } from "../table/needs";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
 import { revealInRegion } from "../lib/reveal";
+import { InStripEnd } from "../table/stripSlot";
+import { turnTiles } from "../table/TurnTiles";
 import { useSelectedToken } from "../scene/selectedToken";
 import { NotesTab } from "../table/NotesTab";
 import { rollsLine, StartFight } from "./StartFight";
@@ -206,7 +208,7 @@ export function GmEncounterPanel({
           label: (state.turnHistory ?? []).find((entry) => entry.index === cursor)?.label,
           resumeNext: (state.turnHistory ?? []).find((entry) => entry.index > cursor)?.kind === "return"
         };
-  const nextLabel = reviewing?.resumeNext ? "Resume live play" : "Next turn";
+  const nextLabel = reviewing ? (reviewing.resumeNext ? "Resume live play" : "Next turn") : "End turn";
   // One primary at a time: while a roll waits to be made or answered, Next turn steps down.
   const targeting = useTargeting();
   const targetingResult = useTargetingResult();
@@ -489,20 +491,18 @@ export function GmEncounterPanel({
     </section>
   );
 
-  // The acting creature's console: its economy and actions, with its name, HP and AC at the top.
+  // The acting creature's card, lamps and actions.
   const actBody = actingActor ? (
-    <section className="encounter-acting" aria-label={`Now acting · ${actingActor.name}`}>
-      {/* Outside the console's scroll, so who acts stays in view while their actions scroll. */}
-      <p className="encounter-acting-head">
-        <span>Now acting · {actingActor.name}</span>
-        <span className="encounter-acting-numbers">
-          {`${actingActor.hp.current}/${actingActor.hp.maximum}${actingActor.armorClass !== undefined ? ` · AC ${actingActor.armorClass}` : ""}`}
-        </span>
-      </p>
-      <div className="encounter-acting-body scroll-y">
-        <ActingConsole state={state} actorsById={actorsById} busy={busy} run={run} onFeedback={setMessage} />
-      </div>
-    </section>
+    <div className="encounter-acting">
+      <ActingConsole
+        state={state}
+        actorsById={actorsById}
+        busy={busy}
+        run={run}
+        onFeedback={setMessage}
+        token={token}
+      />
+    </div>
   ) : (
     <p className="table-panel-empty">Nobody is acting yet.</p>
   );
@@ -513,43 +513,45 @@ export function GmEncounterPanel({
     </p>
   ) : null;
 
+  // Who acts after this turn, as the strip's NEXT marks it.
+  const nextUp = turnTiles({ role: "gm", state }).find((tile) => tile.next);
   const turnControls = (
-    <div className="table-panel-foot-row turn-controls">
-      <button
-        type="button"
-        className="encounter-primary turn-prev"
-        disabled={busy}
-        onClick={previous}
-        title="Previous turn"
-        aria-label="Previous turn"
-      >
-        <IconChevronLeft />
-      </button>
-      <button
-        type="button"
-        className={`encounter-primary turn-next${reviewing?.resumeNext ? " resume" : ""}${rollPending ? " is-quiet" : ""}`}
-        disabled={busy}
-        onClick={next}
-      >
-        {nextLabel}
-        <span className="nav-arrow" aria-hidden="true">
-          <IconArrow />
-        </span>
-      </button>
-      {/* Ending the fight sits beside the turn, where the GM looks for it. */}
-      <Button variant="secondary" size="sm" className="encounter-end" disabled={busy} onClick={() => void end()}>
-        End fight
-      </Button>
-      {/* Adding monsters mid-fight is in the fight menu beside it, so the bar keeps room for the turn. */}
-      <FightMenu
-        state={state}
-        busy={busy}
-        run={run}
-        onFeedback={setMessage}
-        onAddMonsters={() => setBrowsing(true)}
-        onEnd={() => void end()}
-        {...(fightExperience ? { onAwardExperience: (inLair: boolean) => void awardFightExperience(inLair) } : {})}
-      />
+    <div className="table-panel-foot-turn">
+      <div className="table-panel-foot-row turn-controls">
+        <button
+          type="button"
+          className="encounter-primary turn-prev"
+          disabled={busy}
+          onClick={previous}
+          title="Previous turn"
+          aria-label="Previous turn"
+        >
+          <IconChevronLeft />
+        </button>
+        {/* One primary at a time: while a roll waits, or history is under review, End turn steps down. */}
+        <Button
+          variant={rollPending || reviewing ? "secondary" : "primary"}
+          className="table-panel-primary turn-next"
+          disabled={busy}
+          onClick={next}
+        >
+          {nextLabel}
+        </Button>
+      </div>
+      {nextUp && !reviewing && <p className="start-fight-count">Next: {nextUp.name}</p>}
+      {/* Adding to the fight, its settings and ending it are in the Fight menu at the strip's end. */}
+      <InStripEnd>
+        <FightMenu
+          state={state}
+          busy={busy}
+          run={run}
+          onFeedback={setMessage}
+          onAddMonsters={() => setBrowsing(true)}
+          onEnd={() => void end()}
+          labelled
+          {...(fightExperience ? { onAwardExperience: (inLair: boolean) => void awardFightExperience(inLair) } : {})}
+        />
+      </InStripEnd>
     </div>
   );
   const startControls = (
@@ -576,18 +578,17 @@ export function GmEncounterPanel({
     </>
   );
   const fightBody = fighting ? (
-    phone ? (
-      <>
-        {slots?.needs}
-        {actBody}
-      </>
-    ) : (
-      <div className="encounter-fight">
-        {slots?.needs}
-        {orderBody}
-        {actBody}
-      </div>
-    )
+    <>
+      {slots?.needs}
+      {actBody}
+      {/* The order with each row's tools (score, HP, conditions, the sheet); a phone has an Order tab for it. */}
+      {!phone && (
+        <details className="encounter-order-tools">
+          <summary>Turn order and tools</summary>
+          {orderBody}
+        </details>
+      )}
+    </>
   ) : (
     <>
       {slots?.needs}
@@ -607,7 +608,7 @@ export function GmEncounterPanel({
     </>
   );
   const tabs: PanelTab[] = [
-    { id: "fight", label: fightLabel, content: fightBody, scrolls: !fighting || phone },
+    { id: "fight", label: fightLabel, content: fightBody },
     // A phone has no room beside the acting card, so the order is its own tab there.
     ...(phone && fighting ? [{ id: "order", label: "Order", content: orderBody, scrolls: false }] : []),
     { id: "log", label: "Log", content: logBody, scrolls: false },
