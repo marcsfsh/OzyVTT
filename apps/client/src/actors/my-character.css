@@ -26,7 +26,9 @@
 }
 .my-character-party-head {
   margin: 0 0 var(--space-2);
-  font: 400 1.1rem/1.2 var(--font-display);
+  font: var(--fw-display) 1.1rem/1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--text-dim);
 }
 .my-character-party-list {

@@ -435,7 +435,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 400 1.15rem/1.1 var(--font-display);
+  font: var(--fw-display) 1.15rem/1.1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
 }
@@ -701,7 +703,8 @@ button.cs-lastroll-open {
   font: 500 var(--fs-xs) / 1.2 var(--font-numeric);
 }
 .cs-lastroll-total {
-  font: 400 1.35rem/1 var(--font-display);
+  font: var(--fw-display) 1.35rem/1 var(--font-display);
+  text-transform: uppercase;
   color: var(--cyan-hi);
 }
 
@@ -1065,7 +1068,8 @@ button.cs-lastroll-open {
   gap: var(--space-2);
 }
 .cs-hp-big {
-  font: 400 1.9rem/1 var(--font-display);
+  font: var(--fw-display) 1.9rem/1 var(--font-display);
+  text-transform: uppercase;
   min-width: 2.5ch;
 }
 .cs-hp-of,
@@ -1209,7 +1213,9 @@ button.cs-lastroll-open {
   box-shadow: var(--glow-danger);
 }
 .cs-death-title {
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .cs-death-boxes {
   display: flex;
@@ -1454,7 +1460,9 @@ button.cs-lastroll-open {
   min-width: 0;
 }
 .cs-cast-name {
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .cs-cast-options {
   display: grid;
@@ -1542,7 +1550,8 @@ button.cs-lastroll-open {
   color: var(--text-muted);
 }
 .cs-level-v {
-  font: 400 1.1rem/1 var(--font-display);
+  font: var(--fw-display) 1.1rem/1 var(--font-display);
+  text-transform: uppercase;
 }
 .cs-level-panel {
   position: absolute;
@@ -2025,7 +2034,9 @@ button.cs-circle::after {
 }
 .cs-turn-title {
   margin: 0;
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
 }

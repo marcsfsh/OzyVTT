@@ -106,7 +106,8 @@
 /* Title variant: the field a record's own name is typed into. Display face and no resting well, so it reads as
    a heading; the well returns on hover and focus. */
 .nh-input--title {
-  font: 400 var(--fs-h2) / 1.25 var(--font-display);
+  font: var(--fw-display) var(--fs-h2) / 1.25 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: var(--tracking-display);
   background: transparent;
   border-color: transparent;

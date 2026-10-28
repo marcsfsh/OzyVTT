@@ -98,7 +98,8 @@
 .cp-bar-title {
   margin: 0 var(--space-2) 0 0;
   color: var(--heading-ink);
-  font: 400 var(--fs-h3) / 1.1 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.1 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: var(--tracking-display);
   white-space: nowrap;
 }
@@ -517,7 +518,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--heading-ink);
-  font: 400 var(--fs-h3) / 1.15 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.15 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: var(--tracking-display);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -678,7 +680,8 @@
 .cp-card-name {
   margin: 0;
   color: var(--heading-ink);
-  font: 400 var(--fs-h3) / 1.15 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.15 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: var(--tracking-display);
 }
 .cp-card-list {

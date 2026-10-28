@@ -17,7 +17,7 @@
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-  font: 400 30px / 1.05 var(--font-display);
+  font: 400 30px / 1.05 var(--font-wordmark);
   text-transform: uppercase;
 }
 .player-turn-card-counter {

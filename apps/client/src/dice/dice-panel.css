@@ -244,6 +244,8 @@
 .roll-total {
   margin-left: auto;
   font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
   font-size: var(--fs-h2);
   color: var(--text);
 }

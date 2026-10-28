@@ -77,7 +77,9 @@
 .nh-empty-title {
   color: var(--text);
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   font-size: var(--fs-h3);
 }
 .nh-empty-text {

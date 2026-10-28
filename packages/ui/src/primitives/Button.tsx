@@ -30,7 +30,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 /** The one button. Variants map to the semantic roles in the design language: primary = the arcade button (one per
     view, its label names its result), secondary = a flat control with an edge, ghost = quiet text, link = cyan words,
-    destructive = danger. Labels use sentence case, except the primary's Bungee. */
+    destructive = danger. Labels are written in sentence case; the primary shows its label in capitals. */
 export function Button({
   variant = "secondary",
   size = "md",

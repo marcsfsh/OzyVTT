@@ -268,7 +268,9 @@ span.tpl-crumb {
 }
 .tpl-panel-title {
   margin: 0;
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
 }
 .tpl-form {

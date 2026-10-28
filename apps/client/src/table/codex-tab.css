@@ -48,7 +48,8 @@
 .cx-tab-title {
   flex: 1 1 auto;
   margin: 0;
-  font: 400 var(--fs-body) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-body) / 1.2 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: var(--tracking-display);
   color: var(--heading-ink);
 }

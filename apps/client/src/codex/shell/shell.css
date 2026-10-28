@@ -116,7 +116,8 @@
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: var(--tracking-display);
   color: var(--heading-ink);
   text-overflow: ellipsis;

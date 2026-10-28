@@ -308,7 +308,9 @@
   border: 1px solid transparent;
 }
 .verification-card strong {
-  font: 400 0.95rem var(--font-display);
+  font: var(--fw-display) 0.95rem var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .verification-card p {
   margin: 0 0 0.3rem;

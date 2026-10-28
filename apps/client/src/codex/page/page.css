@@ -61,10 +61,11 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
-/* The page's name at the size the drawn page gives it: the one Bungee line on the screen. */
+/* The page's name at the size the drawn page gives it: the one display-face line on the screen. */
 .cx-page-title {
   margin: 0;
-  font: 400 34px / 1.1 var(--font-display);
+  font: var(--fw-display) 34px / 1.1 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: var(--tracking-display);
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
@@ -416,7 +417,8 @@ dt.cx-meta-key .cx-meta-hidden {
   border: 2px solid var(--line-raised);
   background: var(--surface-2);
   color: var(--text);
-  font: 400 var(--fs-sm) / 1 var(--font-display);
+  font: var(--fw-display) var(--fs-sm) / 1 var(--font-display);
+  text-transform: uppercase;
 }
 .cx-recordhead-text {
   display: flex;

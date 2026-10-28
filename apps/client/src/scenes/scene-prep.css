@@ -12,6 +12,8 @@
 .scene-prep-heading {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
   font-size: 1rem;
   letter-spacing: 0.02em;
 }

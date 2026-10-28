@@ -1,8 +1,11 @@
 /* Self-hosted fonts (no runtime CDN on a LAN): @fontsource bundles WOFF2 and Vite serves them. Family names match
    the --font-* tokens in design-tokens.css, and only the weights the tokens and primitives use are loaded. */
 
-/* Wordmark, titles and the primary button: Bungee (one weight) */
+/* The wordmark and chrome lettering: Bungee (one weight) */
 @import "@fontsource/bungee/400.css";
+
+/* Titles and the primary button, in capitals: Chakra Petch (the one weight --fw-display names) */
+@import "@fontsource/chakra-petch/600.css";
 
 /* The wordmark's script: Mr Dafoe */
 @import "@fontsource/mr-dafoe/400.css";

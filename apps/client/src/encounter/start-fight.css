@@ -1,4 +1,4 @@
-/* Start a fight (DESIGN.md, Layout): a Bungee title, In this fight as ticked rows, the initiative switches and
+/* Start a fight (DESIGN.md, Layout): a display-face title, In this fight as ticked rows, the initiative switches and
    Surprised. On a phone it is a card under the map whose rows open sheets. */
 .start-fight {
   display: flex;
@@ -8,7 +8,7 @@
 }
 .start-fight-title {
   margin: 0;
-  font: 400 24px / 1.1 var(--font-display);
+  font: var(--fw-display) 24px / 1.1 var(--font-display);
   letter-spacing: 0.01em;
   text-transform: uppercase;
 }

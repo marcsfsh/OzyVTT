@@ -24,6 +24,9 @@
 .viewer-controls-heading h2 {
   margin: var(--space-1) 0 0;
   font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .viewer-controls-status {
   display: flex;
@@ -64,7 +67,9 @@
 }
 .viewer-tools-head h3 {
   margin: 0.2rem 0 0;
-  font: 400 1.15rem var(--font-display);
+  font: var(--fw-display) 1.15rem var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .viewer-tools-head p {
   margin: 0.4rem 0 0;
@@ -129,7 +134,9 @@
 }
 .viewer-pair-form h3 {
   margin: 0;
-  font: 400 1.05rem var(--font-display);
+  font: var(--fw-display) 1.05rem var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .viewer-pair-form p {
   margin: 0;
@@ -230,7 +237,9 @@
 
 .viewer-access-list h3 {
   margin: 0;
-  font: 400 1rem var(--font-display);
+  font: var(--fw-display) 1rem var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .viewer-access-list ul {
   list-style: none;

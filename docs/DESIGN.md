@@ -146,15 +146,17 @@ surround, a control over the map is a plate in the theme's surface, and lamps st
 | Role                 | Token                              | Face                          | Use                                                                                                                                 |
 | -------------------- | ---------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Wordmark             | `--font-wordmark`, `--font-script` | Bungee and Mr Dafoe           | OZY in chrome and vtt in neon script. The wordmark only.                                                                            |
-| Display              | `--font-display`                   | Bungee                        | Record titles (a creature, a character, an encounter, a page), page titles and the primary button. One or two per view.             |
+| Chrome               | `--font-wordmark`                  | Bungee                        | Chrome lettering only: YOUR TURN, the acting creature's name and the table screen's acting name.                                    |
+| Display              | `--font-display`, `--fw-display`   | Chakra Petch 600, in capitals | Record titles (a creature, a character, an encounter, a page), page and dialog titles, and the primary button. One or two per view. |
 | UI                   | `--font-label`, `--font-body`      | Bai Jamjuree 500, 600 and 700 | Everything else: labels, body, tabs, buttons and names.                                                                             |
 | Numbers and readouts | `--font-numeric`                   | VT323                         | Every game number at 15px or more (HP, AC, initiative, to-hit, DC, XP, dice), the VCR counter, and tags such as NEXT, WAIT and HIT. |
 | Code                 | `--font-mono`                      | Space Mono                    | The API reference only.                                                                                                             |
 
-- Fonts are self-hosted with `@fontsource`. VT323 and Mr Dafoe come from `@fontsource/vt323` and
-  `@fontsource/mr-dafoe`; Tomorrow is retired once nothing uses it.
+- Fonts are self-hosted with `@fontsource`. Chakra Petch, VT323 and Mr Dafoe come from `@fontsource/chakra-petch`
+  (600 only), `@fontsource/vt323` and `@fontsource/mr-dafoe`; Tomorrow is retired once nothing uses it.
 - VT323 is monospaced, so a number that changes live keeps its width.
-- Labels are sentence case. Uppercase belongs to Bungee titles and VT323 tags, which are always short.
+- Labels are sentence case. Uppercase belongs to display titles and VT323 tags, which are always short. A display title
+  is written in sentence case and its rule sets the capitals.
 - Sizes: titles 22 to 34px; body 14 to 16px; labels 12px semibold in `--text-muted`; numbers 18 to 40px.
 
 ## Layout
@@ -293,7 +295,7 @@ from the mockups.
   action appropriate to that pending state. Declining a reaction uses `reaction:answer` with `use: false` and lets
   the normal resolution proceed. `reaction:dismiss` drops held results in most cases; label it "Dismiss, settled by
   hand" and explain that consequence. Never wire "Resolve without waiting" to dismiss.
-- Reaction prompt: a 2px cyan edge with glow; the title in Bungee with a slight RGB split; a three-box readout when
+- Reaction prompt: a 2px cyan edge with glow; the title in the display face with a slight RGB split; a three-box readout when
   those values are available (their roll, your AC, the result with the reaction); one line on the cost; the primary
   and one secondary. Shield is one sample state. Preserve all existing reaction kinds and server outcomes. Omit a
   withheld attack roll; do not recover it from a stat block or show a predicted hit/miss as an authoritative result.
@@ -401,7 +403,7 @@ burst plays with no number, and healing never shows one.
 
 ## The character sheet
 
-- On a laptop the header holds the numbers read most: portrait, name in Bungee, species, class, level, subclass and
+- On a laptop the header holds the numbers read most: portrait, name in the display face, species, class, level, subclass and
   background; AC, initiative, speed and proficiency in VT323 boxes; the life bar with Change HP; and Rest as one menu
   with Short rest and Long rest. The phone uses the compact UI-font identity with AC and HP; its rest row has the two
   separate buttons drawn in sheet-phone. Rest controls are hidden in an encounter. Keep the other vitals and HP editing

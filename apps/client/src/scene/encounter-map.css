@@ -611,7 +611,9 @@
 .terrain-trap text {
   fill: var(--danger-hi);
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .terrain-trap-hidden rect {
   fill-opacity: 0.08;

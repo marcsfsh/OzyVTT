@@ -362,7 +362,8 @@
   flex: 0 1 16rem;
   min-height: 3.5rem;
   padding: 1rem 2rem;
-  font: 400 1.1rem / 1 var(--font-display);
+  font: var(--fw-display) 1.1rem / 1 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 .choices .nh-btn--secondary {

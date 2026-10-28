@@ -171,6 +171,11 @@
   --primary-ink-shadow: none;
   --primary-tint: linear-gradient(transparent, transparent);
   --primary-tint-hover: linear-gradient(rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.14));
+  /* The Cup: a plate holding a horizon. The veil is how much of the plate covers the horizon's cast, at rest and on
+     hover or press; the drop is the glow on its lines. */
+  --primary-veil: 66%;
+  --primary-veil-hover: 54%;
+  --primary-drop: drop-shadow(0 0 4px rgba(255, 47, 146, 0.8));
 
   /* Cabinet lamps: available, or on. A lit lamp glows in its colour; an unlit one is --surface-3 with a 1px edge. */
   --lamp-action: var(--magenta);
@@ -325,7 +330,8 @@
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
   /* Typography (DESIGN.md, Type):
-       Bungee        the wordmark, record and page titles, and the primary button
+       Bungee        the wordmark and chrome lettering (YOUR TURN and the acting creature's name)
+       Chakra Petch  record and page titles, dialog titles and the primary button, in capitals
        Mr Dafoe      the wordmark's script, and nothing else
        Bai Jamjuree  everything else: labels, body, tabs, buttons and names
        VT323         every game number at 15px or more, the VCR counter and tags; monospaced, so a live number keeps
@@ -333,7 +339,9 @@
      Space Mono stays for code alone (API reference, `code`, `kbd`). */
   --font-wordmark: "Bungee", system-ui, sans-serif;
   --font-script: "Mr Dafoe", cursive;
-  --font-display: "Bungee", system-ui, sans-serif;
+  --font-display: "Chakra Petch", "Bai Jamjuree", system-ui, sans-serif;
+  /* Chakra Petch loads at this one weight. */
+  --fw-display: 600;
   --font-label: "Bai Jamjuree", system-ui, sans-serif;
   --font-body: "Bai Jamjuree", system-ui, sans-serif;
   --font-mono: "Space Mono", ui-monospace, "Courier New", monospace;
@@ -462,6 +470,20 @@
   --cyan-tail: rgba(79, 227, 255, 0.6);
   --red-head: #ffe1de;
   --red-tail: rgba(255, 93, 80, 0.6);
+  /* Horizon light: the horizon's five stops for lit parts, at 0, 30, 60, 85 and 100%. A chosen tab's ink, the Cup's
+     lines and a lit row paint --hz-paint, and a cast is that paint at --ink-cast. A comet or burst with no meaning of
+     its own takes the stop where it leaves and lands: its head is --spark white with a glow in Dusk
+     (--lr-head-k 0, --lr-glow-k 1) and the landing colour, flat, in Dawn. */
+  --hz-1: #4fe3ff;
+  --hz-2: #9a5cff;
+  --hz-3: #ff2f92;
+  --hz-4: #ff8a1f;
+  --hz-5: #ffe14d;
+  --hz-paint: linear-gradient(90deg, var(--hz-1), var(--hz-2) 30%, var(--hz-3) 60%, var(--hz-4) 85%, var(--hz-5));
+  --ink-cast: 0.24;
+  --ink-bright: brightness(1.35) saturate(1.15);
+  --lr-head-k: 0;
+  --lr-glow-k: 1;
   --wash-strength: 0.24;
   --wash-blend: screen;
   /* The wash's mask stops: read only for their alpha, the same in both themes. */
@@ -472,8 +494,8 @@
   --flash: #ffffff;
   /* A line that waits on someone: grey and unlit until it resolves. */
   --unlit: rgba(255, 255, 255, 0.16);
-  /* The ink under a chosen tab. */
-  --ink-glow: 0 0 8px rgba(43, 228, 255, 0.7);
+  /* The ink under a chosen tab: a horizon, so its glow is the horizon's middle. */
+  --ink-glow: 0 0 8px rgba(255, 47, 146, 0.45);
   /* Chroma settle: a condition chip arrives on a pink and cyan split that settles; the -0 twins are its rest. */
   --split-cyan: rgba(43, 228, 255, 0.6);
   --split-pink: rgba(255, 47, 146, 0.6);
@@ -605,6 +627,21 @@
   --cyan-tail: rgba(42, 143, 168, 0.55);
   --red-head: #b8263a;
   --red-tail: rgba(217, 73, 63, 0.55);
+  /* Horizon light on paper: darker stops than --grad-horizon, whose yellow end disappears on paper, a fainter cast,
+     and comets and bursts in their landing colour with no glow. */
+  --hz-1: #1d6a80;
+  --hz-2: #6a46b0;
+  --hz-3: #b0306e;
+  --hz-4: #c4610f;
+  --hz-5: #8a5612;
+  --hz-paint: linear-gradient(90deg, var(--hz-1), var(--hz-2) 30%, var(--hz-3) 60%, var(--hz-4) 85%, var(--hz-5));
+  --ink-cast: 0.14;
+  --ink-bright: brightness(0.8) saturate(1.2);
+  --lr-head-k: 1;
+  --lr-glow-k: 0;
+  --primary-veil: 80%;
+  --primary-veil-hover: 74%;
+  --primary-drop: none;
   --wash-strength: 0.14;
   --wash-blend: multiply;
   --unlit: #d3ccdc;
@@ -696,6 +733,10 @@
   --spark-glow: drop-shadow(0 0 0 transparent);
   --wash-strength: 0;
   --ink-glow: 0 0 #0000;
+  /* No casts and no glows: an ink and the Cup's lines stay as flat colour. */
+  --ink-cast: 0;
+  --lr-glow-k: 0;
+  --primary-drop: none;
 }
 
 /* A browser that can't blur what is behind a panel gets the solid surfaces too. */
@@ -721,7 +762,8 @@ body {
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
-  /* Bungee and VT323 ship one weight; a synthesized bold smears them. Bai Jamjuree ships the weights it is used at. */
+  /* Bungee and VT323 ship one weight and Chakra Petch loads one; a synthesized bold smears them. Bai Jamjuree ships
+     the weights it is used at. */
   font-synthesis-weight: none;
 }
 
@@ -994,8 +1036,10 @@ a:focus-visible .nav-arrow {
 }
 
 /* Chrome lettering, for who is acting alone: the acting creature's name and YOUR TURN. Dusk clips the chrome to the
-   letters; Dawn's chrome token is one ink, so the same rule prints solid ink. Both carry the pink and cyan split. */
+   letters; Dawn's chrome token is one ink, so the same rule prints solid ink. Both carry the pink and cyan split.
+   Chrome keeps the wordmark's Bungee; each chrome element's own rule names it too, so rule order can't undo it. */
 .chrome {
+  font-family: var(--font-wordmark);
   background: var(--grad-chrome);
   -webkit-background-clip: text;
   background-clip: text;

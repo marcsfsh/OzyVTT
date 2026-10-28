@@ -8,6 +8,7 @@
  *   (f) one breakpoint ladder
  *   (g) no viewport-fraction caps on in-flow content
  *   (h) scroll regions are declared with `.scroll-y`
+ *   (i) the display face is set in capitals
  *
  * Where a rule has known offenders they are listed with a reason; a new offender fails, and so does a
  * row that excuses nothing, so a fixed offender loses its row. Source text only: inline styles and
@@ -335,5 +336,41 @@ describe("(h) scroll regions are declared with .scroll-y", () => {
       hits.map((hit) => hit.at),
       "Mark the region with `.scroll-y` in the markup; the utility owns the scrollbar and the gutter."
     ).toEqual([]);
+  });
+});
+
+// (i) The display face is set in capitals
+
+/**
+ * Chakra Petch is set in capitals, as Bungee always was, while the text in the code is in sentence case, so a rule
+ * that names the display face sets `text-transform: uppercase` beside it. Chrome lettering names `--font-wordmark`.
+ */
+const DISPLAY_CASE_ALLOW: ReadonlyArray<readonly [rule: string, why: string]> = [];
+
+describe("(i) the display face is set in capitals", () => {
+  it("sets text-transform: uppercase in every rule that names var(--font-display)", () => {
+    const hits: Hit[] = [];
+    for (const source of stylesheets()) {
+      const src = stripBlockComments(source.read());
+      for (const rule of src.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const [, head = "", body = ""] = rule;
+        if (!body.includes("var(--font-display)") || /text-transform\s*:\s*uppercase/.test(body)) continue;
+        const selector = head.trim().replace(/\s+/g, " ");
+        hits.push({
+          key: `${source.path} ${selector}`,
+          at: cite(source.path, src, rule.index + head.length, selector)
+        });
+      }
+    }
+    const { unexcused, dead } = settle(
+      hits,
+      DISPLAY_CASE_ALLOW.map(([rule]) => rule)
+    );
+    expect(
+      unexcused,
+      "Set `text-transform: uppercase` and `font-weight: var(--fw-display)` beside the display face. Chrome " +
+        "lettering takes `--font-wordmark` instead; an exception goes in DISPLAY_CASE_ALLOW with the reason."
+    ).toEqual([]);
+    expect(dead, "DISPLAY_CASE_ALLOW excuses rules that are gone: delete them.").toEqual([]);
   });
 });

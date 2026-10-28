@@ -43,7 +43,8 @@
 }
 .cb-offer-title {
   margin: 0;
-  font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / var(--lh-snug) var(--font-display);
+  text-transform: uppercase;
   color: var(--text);
   letter-spacing: var(--tracking-display);
 }
@@ -160,7 +161,9 @@
 }
 .cb-level-head h2 {
   margin: 0.2rem 0 0;
-  font: 700 1.5rem/1.15 var(--font-display);
+  font: var(--fw-display) 1.5rem/1.15 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .cb-level-head p {
   margin: var(--space-1) 0 0;
@@ -241,7 +244,9 @@
 }
 .cb-level-gate h2 {
   margin: 0;
-  font: 700 1.2rem/1.2 var(--font-display);
+  font: var(--fw-display) 1.2rem/1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .cb-level-gate p {
   margin: 0;

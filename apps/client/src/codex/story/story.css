@@ -27,7 +27,9 @@
 }
 .story-empty h3 {
   margin: 0;
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .story-empty p {
   margin: 0;
@@ -165,7 +167,9 @@
   border: 0;
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
-  font: 400 var(--fs-h3) / 1.1 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   cursor: pointer;
   text-align: left;
 }
@@ -271,7 +275,9 @@
   flex: 1 1 auto;
   text-align: center;
   color: var(--heading-ink);
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .story-cal-grid {
   display: grid;
@@ -587,7 +593,9 @@
 .story-aside-title {
   flex: 1 1 auto;
   margin: 0;
-  font: 400 var(--fs-h3) / 1.15 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.15 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
 }
 
@@ -1051,7 +1059,9 @@
 }
 .session-title {
   margin: 0;
-  font: 400 var(--fs-h2) / 1.1 var(--font-display);
+  font: var(--fw-display) var(--fs-h2) / 1.1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
 }
@@ -1287,7 +1297,9 @@
 }
 .recap-title {
   margin: 0;
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
 }
 .recap-title.is-gm {

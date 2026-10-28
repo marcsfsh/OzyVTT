@@ -118,11 +118,13 @@ main.anim-cascade > * {
   animation: none;
 }
 
-/* Headings are solid Bungee with the hard heading shadow. Bungee ships one weight; 400 stops a bold. */
+/* Headings are the display face in capitals, solid, with the hard heading shadow. */
 h1,
 h2 {
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
 }
@@ -266,7 +268,9 @@ textarea:focus {
 .empty strong {
   color: var(--text);
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .empty span {
   margin-top: 0.4rem;

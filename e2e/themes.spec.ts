@@ -145,8 +145,8 @@ test("Dusk paints glass over the sky with no scanlines, and every ink reads on i
   // Each face loads from the built client itself, so the app works on a LAN with no font service.
   const fonts = await page.evaluate(async () =>
     Promise.all(
-      ["Bungee", "Mr Dafoe", "Bai Jamjuree", "VT323"].map(
-        async (family) => (await document.fonts.load(`16px "${family}"`)).length
+      ['16px "Bungee"', '600 16px "Chakra Petch"', '16px "Mr Dafoe"', '16px "Bai Jamjuree"', '16px "VT323"'].map(
+        async (face) => (await document.fonts.load(face)).length
       )
     )
   );

@@ -15,7 +15,9 @@
 .sb-name {
   margin: 0;
   color: var(--heading-ink);
-  font: 400 var(--fs-h2) / var(--lh-tight) var(--font-display);
+  font: var(--fw-display) var(--fs-h2) / var(--lh-tight) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   text-shadow: var(--heading-shadow);
 }
 .sb-type {
@@ -83,7 +85,9 @@
   padding-bottom: 3px;
   border-bottom: 1px solid color-mix(in srgb, var(--magenta) 45%, transparent);
   color: var(--magenta-text);
-  font: 400 var(--fs-sm) / var(--lh-tight) var(--font-display);
+  font: var(--fw-display) var(--fs-sm) / var(--lh-tight) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 /* Three boxes a row on a phone, so each number keeps its width. */
 @media (max-width: 560px) {

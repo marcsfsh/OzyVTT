@@ -83,14 +83,15 @@
   width: 100%;
 }
 
-/* Primary: the arcade button, the one primary action in a view. A magenta face with dark Bungee ink over a 5px
+/* Primary: the arcade button, the one primary action in a view. A magenta face with dark display-face ink over a 5px
    pressed edge, and a soft pink glow in Dusk. The edge is a shadow, so the margin under the button keeps it clear of
    what follows. Pressing sinks the face onto its edge. */
 .nh-btn--primary {
   min-height: 52px;
   margin-bottom: 5px;
   padding: 0 var(--space-8);
-  font: 400 16px / 1 var(--font-display);
+  font: var(--fw-display) 16px / 1 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--primary-ink);
   text-shadow: var(--primary-ink-shadow);

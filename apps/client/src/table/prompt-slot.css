@@ -50,7 +50,9 @@
 .prompt-card--danger .prompt-card-title > span:first-child {
   color: var(--danger-text);
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .prompt-card-title:focus {
   outline: none;

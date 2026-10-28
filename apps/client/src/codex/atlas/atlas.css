@@ -318,7 +318,9 @@
 }
 .atlas-panel-title {
   margin: 0;
-  font: 400 var(--fs-h2) / 1.1 var(--font-display);
+  font: var(--fw-display) var(--fs-h2) / 1.1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
   overflow-wrap: anywhere;
@@ -545,7 +547,9 @@
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-  font: 400 var(--fs-h3) / 1.15 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.15 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
   overflow-wrap: anywhere;
 }
@@ -769,7 +773,9 @@
 }
 .atlas-firstmap h3 {
   margin: 0;
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .atlas-firstmap p {
   margin: 0;

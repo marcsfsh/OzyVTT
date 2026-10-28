@@ -157,6 +157,9 @@
 }
 .codex-main-empty h3 {
   font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--text);
   margin: 0;
 }
@@ -207,6 +210,9 @@
 /* Markdown render */
 .codex-md-h {
   font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--text);
   margin: var(--space-4) 0 var(--space-2);
 }
@@ -865,6 +871,9 @@
 }
 .codex-audit-title {
   font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   font-size: var(--fs-h2);
   color: var(--text);
   margin: 0;

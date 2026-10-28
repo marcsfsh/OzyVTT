@@ -263,7 +263,7 @@ describe("fields on a touch screen", () => {
     const selector = floorSelector();
     for (const field of container.querySelectorAll("input"))
       expect(field.matches(selector), field.outerHTML).toBe(false);
-    const title = /\.nh-input--title \{\s*font: 400 var\((--fs-[\w-]+)\)/.exec(
+    const title = /\.nh-input--title \{\s*font: \S+ var\((--fs-[\w-]+)\)/.exec(
       read("packages/ui/src/primitives/forms.css")
     );
     expect(parseFloat(resolveVars(document.documentElement, `var(${title![1]})`))).toBeGreaterThan(16);

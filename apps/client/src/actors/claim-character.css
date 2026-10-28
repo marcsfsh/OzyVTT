@@ -9,7 +9,8 @@
 }
 .claim-heading h2 {
   margin: 0;
-  font: 400 30px / 1.1 var(--font-display);
+  font: var(--fw-display) 30px / 1.1 var(--font-display);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 .claim-status {

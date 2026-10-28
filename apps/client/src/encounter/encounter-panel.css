@@ -27,6 +27,9 @@
   font-size: var(--fs-h2);
   line-height: var(--lh-tight);
   font-family: var(--font-display);
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .encounter-round {
   flex: none;
@@ -201,7 +204,7 @@
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  font: var(--fs-h3) / 1 var(--font-display);
+  font: var(--fs-h3) / 1 var(--font-wordmark);
 }
 /* The tracker's scroll region. overscroll-behavior: the page behind is locked. scroll-padding keeps
    an auto-scrolled row off the pinned header. The 5.5rem floor guarantees two rows; where the
@@ -298,7 +301,9 @@
 .initiative-list > li.active .initiative-name-text,
 .initiative-list > li.active .init-row-name {
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
 }
 .initiative-list > li.you {
@@ -1016,7 +1021,8 @@
 .encounter-primary:not(.turn-prev, .is-quiet) {
   color: var(--primary-ink);
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: var(--fw-display);
+  text-transform: uppercase;
   letter-spacing: 0.02em;
   text-shadow: var(--primary-ink-shadow);
 }

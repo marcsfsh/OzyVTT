@@ -74,7 +74,9 @@
 }
 .nh-modal-title {
   margin: 0;
-  font: 400 var(--fs-h1) / var(--lh-snug) var(--font-display);
+  font: var(--fw-display) var(--fs-h1) / var(--lh-snug) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
 }

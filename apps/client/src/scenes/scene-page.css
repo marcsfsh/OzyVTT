@@ -14,7 +14,8 @@
   margin: 0;
   overflow: hidden;
   color: var(--heading-ink);
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: var(--tracking-display);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -273,7 +274,8 @@
 .sc-step-title {
   margin: 0;
   color: var(--heading-ink);
-  font: 400 var(--fs-h2) / 1.2 var(--font-display);
+  font: var(--fw-display) var(--fs-h2) / 1.2 var(--font-display);
+  text-transform: uppercase;
   letter-spacing: var(--tracking-display);
   text-shadow: var(--heading-shadow);
 }
@@ -529,7 +531,8 @@
   color: var(--violet-hi);
 }
 .sc-scene-bench .sc-scene-title {
-  font: 400 24px / 1.1 var(--font-display);
+  font: var(--fw-display) 24px / 1.1 var(--font-display);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 .sc-make-live {

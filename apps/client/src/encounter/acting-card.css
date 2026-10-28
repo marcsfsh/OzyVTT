@@ -20,7 +20,7 @@
 .acting-card-name {
   margin: 0;
   overflow: hidden;
-  font: 400 24px / 1.1 var(--font-display);
+  font: 400 24px / 1.1 var(--font-wordmark);
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;

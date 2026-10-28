@@ -49,7 +49,8 @@
 .viewer-screen-code {
   display: block;
   margin: var(--space-4) 0;
-  font: 400 clamp(2rem, 16cqi, 9rem) / 1 var(--font-display);
+  font: var(--fw-display) clamp(2rem, 16cqi, 9rem) / 1 var(--font-display);
+  text-transform: uppercase;
   white-space: nowrap;
   letter-spacing: 0.08em;
   color: var(--text);
@@ -61,7 +62,9 @@
 .viewer-pairing h1,
 .viewer-waiting h1 {
   margin: var(--space-2) 0;
-  font: 400 clamp(2.5rem, 7vw, 5.5rem)/1 var(--font-display);
+  font: var(--fw-display) clamp(2.5rem, 7vw, 5.5rem)/1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .viewer-pairing p,
 .viewer-waiting p {
