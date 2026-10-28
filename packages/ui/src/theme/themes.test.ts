@@ -175,8 +175,25 @@ describe("the themes", () => {
       });
 
       it("prints the primary's label and the on-state's label at 4.5:1 on their own fills", () => {
-        const primary = contrastRatio(colourOf(tokens, "--primary-ink"), colourOf(tokens, "--primary-base"));
-        expect(primary, "--primary-ink on --primary-base").toBeGreaterThanOrEqual(4.5);
+        // The Cup's label is the text ink on its plate, and on the plate over the horizon's cast at each stop. At rest
+        // the cast is read through the veil alone, which is darker than what paints; on hover the plate's fade lies
+        // over it at the label's midline, as it paints.
+        const ink = colourOf(tokens, "--text");
+        const percent = (name: string) => parseFloat(resolved(tokens, name)!) / 100;
+        for (const [state, plateName, veil, fade] of [
+          ["at rest", "--surface-2", percent("--primary-veil"), null],
+          ["on hover", "--surface-3", percent("--primary-veil-hover"), (50 - 10) / (100 - 10)]
+        ] as const) {
+          const plate = colourOf(tokens, plateName);
+          expect(contrastRatio(ink, plate), `--text on the Cup's plate ${state}`).toBeGreaterThanOrEqual(4.5);
+          for (const stop of ["--hz-1", "--hz-2", "--hz-3", "--hz-4", "--hz-5"]) {
+            const veiled = composite([...plate, veil], colourOf(tokens, stop));
+            const cast = fade === null ? veiled : composite([...plate, fade], veiled);
+            expect(contrastRatio(ink, cast), `--text on the Cup's cast over ${stop} ${state}`).toBeGreaterThanOrEqual(
+              4.5
+            );
+          }
+        }
         const on = contrastRatio(colourOf(tokens, "--state-on-ink"), colourOf(tokens, "--state-on"));
         expect(on, "--state-on-ink on --state-on").toBeGreaterThanOrEqual(4.5);
       });

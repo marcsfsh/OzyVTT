@@ -36,6 +36,7 @@ export {
   cometPath,
   cometTo,
   cool,
+  cupPress,
   countUp,
   drain,
   fadeIn,
@@ -73,6 +74,7 @@ export { edgeIn, ghostOut, openerNow, openerX, type EdgeEntry, type GhostOptions
 export { useOnChange, usePrevious } from "./motion/hooks";
 export { useChipStrip } from "./motion/chips";
 export { usePipLight } from "./motion/pips";
+export { installCupPress } from "./motion/press";
 
 /* Primitives */
 export { cx } from "./primitives/util";

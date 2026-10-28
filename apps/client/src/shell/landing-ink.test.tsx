@@ -31,7 +31,8 @@ function inkElementOf(control: HTMLElement): Element {
 /** The token whose colours lie under a control's words, by the primitive it is. */
 function plateOf(control: HTMLElement): string {
   if (control.matches(".nh-btn:disabled")) return "--surface-2";
-  if (control.matches(".nh-btn--primary")) return "--primary-base";
+  // The Cup: its label lies on the plate; the horizon under it is checked in packages/ui (button-ink, themes).
+  if (control.matches(".nh-btn--primary")) return "--surface-2";
   if (control.matches(".nh-btn--secondary")) return "--raised";
   if (control.matches(".nh-modal-close")) return "--surface-3";
   if (control.matches(".nh-segmented-option[aria-pressed='true']")) return "--tab-on";

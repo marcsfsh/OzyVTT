@@ -12,11 +12,6 @@
   gap: 0.6rem;
   margin: 0 0 1.4rem;
 }
-/* "Create a character" is this surface's way in and takes the resting glow (`--nh-glow`, the Button
-   primitive's hook). It is the only primary on the surface. */
-.party-heading-actions .nh-btn--primary {
-  --nh-glow: var(--glow-drop-magenta);
-}
 .party-queue {
   margin: 0 0 1.6rem;
   padding: var(--space-4) 1.1rem;

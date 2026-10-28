@@ -35,24 +35,24 @@ An arcade cabinet at dusk and at dawn. There are two themes and nothing else:
 
 Neon appears only where it means something, and each 80s element has one job.
 
-| Element                                  | Its job                                        | Where it appears                                                                                                                                      |
-| ---------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sun frame (`--grad-sun`, 3px, with glow) | Now: who is acting                             | The acting tile in the turn order, the acting creature's portrait in the sidebar or turn card, its token ring, and the "is acting" line on a phone    |
-| Sunset scene                             | Arrival                                        | The title and join screens only. Dusk paints it at night; Dawn paints it as daybreak.                                                                 |
-| Horizon line (`--grad-horizon`, 2px)     | The top of the app, and of what opens above it | The bottom edge of every top bar, laptop and phone, and the top edge of a dialog, menu, drawer or toast, which lights from the control that opened it |
-| Chrome lettering (`.chrome`)             | Who is acting                                  | The wordmark, the acting creature's name and YOUR TURN. Nowhere else. Dawn prints it as solid ink with the same pink and cyan split.                  |
-| Cabinet lamp                             | Available, or on                               | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live encounter                                                         |
-| Life bar                                 | Hit points                                     | Every hit point readout                                                                                                                               |
-| VCR counter                              | The round                                      | PLAY and RND 03 during an encounter, STOP and RND -- between encounters, at the start of the turn order and beside YOUR TURN                          |
-| Arcade button                            | Press this                                     | The one primary action in a view                                                                                                                      |
-| Neon grid (`--grid-neon`)                | Map squares                                    | The grid drawn over a map image                                                                                                                       |
-| Reticle                                  | The target                                     | The creature an attack or spell is aimed at                                                                                                           |
+| Element                                  | Its job                                        | Where it appears                                                                                                                                                                                                |
+| ---------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sun frame (`--grad-sun`, 3px, with glow) | Now: who is acting                             | The acting tile in the turn order, the acting creature's portrait in the sidebar or turn card, its token ring, and the "is acting" line on a phone                                                              |
+| Sunset scene                             | Arrival                                        | The title and join screens only. Dusk paints it at night; Dawn paints it as daybreak.                                                                                                                           |
+| Horizon line (`--grad-horizon`, 2px)     | The top of the app, and of what opens above it | The bottom edge of every top bar, laptop and phone, and the top edge of a dialog, menu, drawer or toast, which lights from the control that opened it. The primary's lines are the same horizon (`--hz-paint`). |
+| Chrome lettering (`.chrome`)             | Who is acting                                  | The wordmark, the acting creature's name and YOUR TURN. Nowhere else. Dawn prints it as solid ink with the same pink and cyan split.                                                                            |
+| Cabinet lamp                             | Available, or on                               | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live encounter                                                                                                                   |
+| Life bar                                 | Hit points                                     | Every hit point readout                                                                                                                                                                                         |
+| VCR counter                              | The round                                      | PLAY and RND 03 during an encounter, STOP and RND -- between encounters, at the start of the turn order and beside YOUR TURN                                                                                    |
+| The Cup (`--hz-paint` in a plate)        | Press this                                     | The one primary action in a view                                                                                                                                                                                |
+| Neon grid (`--grid-neon`)                | Map squares                                    | The grid drawn over a map image                                                                                                                                                                                 |
+| Reticle                                  | The target                                     | The creature an attack or spell is aimed at                                                                                                                                                                     |
 
 - Nothing pulses or loops. One-shot cues (a crit flash, a bar filling) are fine.
 - No scanlines or other CRT texture over text or surfaces (ADR-0045). A surface is plain glass in Dusk and plain
   paper in Dawn; the light that moves across them on a change is all the cabinet's shimmer.
-- Glow belongs to four things: the sun frame, a lit lamp, the selected item and the primary button. Resting surfaces
-  never glow. Dawn keeps only the sun frame's glow and the primary's pressed edge.
+- Glow belongs to four things: the sun frame, a lit lamp, the selected item and the primary's lines. Resting surfaces
+  never glow. Dawn keeps only the sun frame's glow.
 - Every surface is square. `--radius-pill` is for tokens, presence dots and swatches.
 - A panel is a flat plate with a 1px edge. There is no chrome lip and no rim.
 - Legibility wins every conflict with mood. Reduced transparency turns Dusk's glass solid and drops the glows.
@@ -92,39 +92,45 @@ Dawn:
 In both: pictures keep their own colours (map art, avatars, the sun frame), the map stays as drawn on its dark
 surround, a control over the map is a plate in the theme's surface, and lamps stay filled squares.
 
-| Meaning                                                    | Token                         | Dusk solid (glass)                   | Dawn      |
-| ---------------------------------------------------------- | ----------------------------- | ------------------------------------ | --------- |
-| Bars                                                       | `--bg`                        | `#151728` (`rgba(18, 20, 34, 0.7)`)  | `#ebe7ef` |
-| Wells, inputs                                              | `--void`                      | `#131524` (`rgba(10, 12, 22, 0.55)`) | `#e3dee8` |
-| Panels and sidebars                                        | `--surface-1`                 | `#1b1e31` (`rgba(26, 29, 46, 0.62)`) | `#f3f0f5` |
-| Controls and cards at rest                                 | `--surface-2`                 | `#25283f` (`rgba(44, 48, 72, 0.5)`)  | `#f7f5f9` |
-| Hover                                                      | `--surface-3`                 | `#2b2f49` (`rgba(60, 66, 96, 0.45)`) | `#e8e3ee` |
-| Row dividers                                               | `--line`                      | `rgba(255, 255, 255, 0.07)`          | `#e0dbe6` |
-| Panel edges                                                | `--line-strong`               | `rgba(255, 255, 255, 0.12)`          | `#d3ccdc` |
-| Control edges                                              | `--line-raised`               | `rgba(255, 255, 255, 0.2)`           | `#b9b0c8` |
-| Text                                                       | `--text`, `--heading-ink`     | `#eef0f8`                            | `#2a2537` |
-| Secondary text                                             | `--text-dim`                  | `#c3c7d9`                            | `#4f4862` |
-| Labels and hints                                           | `--text-muted`                | `#b0b4ca`                            | `#655d77` |
-| Press this: the primary, the Action lamp                   | `--magenta`, `--primary-base` | `#ff2f92`                            | `#f0559b` |
-| The primary's label                                        | `--primary-ink`               | `#12020a`                            | `#12020a` |
-| The primary's pressed edge                                 | `--primary-edge`              | `#8a0f4d`                            | `#b0306e` |
-| Pink as words                                              | `--magenta-text`              | `#ff8cc0`                            | `#b0306e` |
-| Selection, focus, targeting, active effects, Reaction lamp | `--cyan`, `--state-on`        | `#4fe3ff`                            | `#2a8fa8` |
-| Cyan as words                                              | `--cyan-hi`                   | `#6fe8ff`                            | `#1d6a80` |
-| Ink on a cyan fill                                         | `--text-on-neon`              | `#04141c`                            | `#04141c` |
-| The party: token rings, portrait edges, spell slot pips    | `--party` (also `--indigo`)   | `#7aa2ff`                            | `#4a72d9` |
-| Party blue as words                                        | `--indigo-text`               | `#a8c2ff`                            | `#3a5aa8` |
-| Enemies: token rings, portrait edges                       | `--hostile` (also `--danger`) | `#ff5d50`                            | `#d9493f` |
-| Red as words                                               | `--danger-text`               | `#ff9d94`                            | `#a8352c` |
-| Hit points left, Bonus lamp                                | `--hp`, `--lamp-bonus`        | `#ffd54d`                            | `#d9a43a` |
-| Gold as words (the HP label, damage numbers)               | `--hp-text`                   | `#ffd54d`                            | `#7a5718` |
-| Hit points lost                                            | `--hp-lost`                   | `rgba(120, 30, 50, 0.6)`             | `#ecd6dc` |
-| Waiting, caution, a choice still owed                      | `--caution`                   | `#ffb733`                            | `#d08a2a` |
-| Caution as words                                           | `--caution-hi`                | `#ffcb7a`                            | `#8a5612` |
-| GM-only                                                    | `--violet`                    | `#bb90ff`                            | `#8a62d6` |
-| GM-only as words                                           | `--violet-hi`                 | `#d9c2ff`                            | `#6a46b0` |
-| Now                                                        | `--grad-sun`                  | `#ffe14d`, `#ff8a1f`, `#ff2f92`      | the same  |
-| Map grid                                                   | `--grid-neon`                 | `rgba(43, 228, 255, 0.24)`           | the same  |
+| Meaning                                                                 | Token                                    | Dusk solid (glass)                   | Dawn         |
+| ----------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------ | ------------ |
+| Bars                                                                    | `--bg`                                   | `#151728` (`rgba(18, 20, 34, 0.7)`)  | `#ebe7ef`    |
+| Wells, inputs                                                           | `--void`                                 | `#131524` (`rgba(10, 12, 22, 0.55)`) | `#e3dee8`    |
+| Panels and sidebars                                                     | `--surface-1`                            | `#1b1e31` (`rgba(26, 29, 46, 0.62)`) | `#f3f0f5`    |
+| Controls and cards at rest                                              | `--surface-2`                            | `#25283f` (`rgba(44, 48, 72, 0.5)`)  | `#f7f5f9`    |
+| Hover                                                                   | `--surface-3`                            | `#2b2f49` (`rgba(60, 66, 96, 0.45)`) | `#e8e3ee`    |
+| Row dividers                                                            | `--line`                                 | `rgba(255, 255, 255, 0.07)`          | `#e0dbe6`    |
+| Panel edges                                                             | `--line-strong`                          | `rgba(255, 255, 255, 0.12)`          | `#d3ccdc`    |
+| Control edges                                                           | `--line-raised`                          | `rgba(255, 255, 255, 0.2)`           | `#b9b0c8`    |
+| Text                                                                    | `--text`, `--heading-ink`                | `#eef0f8`                            | `#2a2537`    |
+| Secondary text                                                          | `--text-dim`                             | `#c3c7d9`                            | `#4f4862`    |
+| Labels and hints                                                        | `--text-muted`                           | `#b0b4ca`                            | `#655d77`    |
+| Press this: the Action lamp                                             | `--magenta`                              | `#ff2f92`                            | `#f0559b`    |
+| The primary's label, on its `--surface-2` plate                         | `--text`                                 | `#eef0f8`                            | `#2a2537`    |
+| The horizon in the primary's lines and plate                            | `--hz-paint`                             | `--hz-1` to `--hz-5`, left to right  | the same     |
+| How much of the primary's plate veils the horizon, at rest and on hover | `--primary-veil`, `--primary-veil-hover` | `66%`, `54%`                         | `80%`, `74%` |
+| Horizon light at 0%: cyan                                               | `--hz-1`                                 | `#4fe3ff`                            | `#1d6a80`    |
+| Horizon light at 30%: violet                                            | `--hz-2`                                 | `#9a5cff`                            | `#6a46b0`    |
+| Horizon light at 60%: pink                                              | `--hz-3`                                 | `#ff2f92`                            | `#b0306e`    |
+| Horizon light at 85%: orange                                            | `--hz-4`                                 | `#ff8a1f`                            | `#c4610f`    |
+| Horizon light at 100%: yellow                                           | `--hz-5`                                 | `#ffe14d`                            | `#8a5612`    |
+| Pink as words                                                           | `--magenta-text`                         | `#ff8cc0`                            | `#b0306e`    |
+| Selection, focus, targeting, active effects, Reaction lamp              | `--cyan`, `--state-on`                   | `#4fe3ff`                            | `#2a8fa8`    |
+| Cyan as words                                                           | `--cyan-hi`                              | `#6fe8ff`                            | `#1d6a80`    |
+| Ink on a cyan fill                                                      | `--text-on-neon`                         | `#04141c`                            | `#04141c`    |
+| The party: token rings, portrait edges, spell slot pips                 | `--party` (also `--indigo`)              | `#7aa2ff`                            | `#4a72d9`    |
+| Party blue as words                                                     | `--indigo-text`                          | `#a8c2ff`                            | `#3a5aa8`    |
+| Enemies: token rings, portrait edges                                    | `--hostile` (also `--danger`)            | `#ff5d50`                            | `#d9493f`    |
+| Red as words                                                            | `--danger-text`                          | `#ff9d94`                            | `#a8352c`    |
+| Hit points left, Bonus lamp                                             | `--hp`, `--lamp-bonus`                   | `#ffd54d`                            | `#d9a43a`    |
+| Gold as words (the HP label, damage numbers)                            | `--hp-text`                              | `#ffd54d`                            | `#7a5718`    |
+| Hit points lost                                                         | `--hp-lost`                              | `rgba(120, 30, 50, 0.6)`             | `#ecd6dc`    |
+| Waiting, caution, a choice still owed                                   | `--caution`                              | `#ffb733`                            | `#d08a2a`    |
+| Caution as words                                                        | `--caution-hi`                           | `#ffcb7a`                            | `#8a5612`    |
+| GM-only                                                                 | `--violet`                               | `#bb90ff`                            | `#8a62d6`    |
+| GM-only as words                                                        | `--violet-hi`                            | `#d9c2ff`                            | `#6a46b0`    |
+| Now                                                                     | `--grad-sun`                             | `#ffe14d`, `#ff8a1f`, `#ff2f92`      | the same     |
+| Map grid                                                                | `--grid-neon`                            | `rgba(43, 228, 255, 0.24)`           | the same     |
 
 - Every state carries an icon or a text label as well as a colour. Party blue and enemy red differ in lightness as well
   as hue. Green appears only inside pictures (map art, avatars) and never carries a meaning.
@@ -267,9 +273,13 @@ Characters built with a class also have twelve class avatars, one per SRD 5.2.1 
 Build from `@vtt/ui`. A new primitive goes into `packages/ui` with `nh-` prefixed CSS and a test next to it. Sizes come
 from the mockups.
 
-- Primary (arcade) button: 52px tall (42px visual face in a section bar, within a 44px minimum hit area), `--primary-base` fill, `--primary-ink` label in Bungee
-  at 16 to 18px, a 5px solid `--primary-edge` shadow under it and a soft pink glow. The label names the result: END
-  TURN, MAKE LIVE, PLAY AS BORIN.
+- Primary button, the Cup (ADR-0046): 52px tall, or a 42px plate in a 44px box in a section bar. A `--surface-2` plate
+  with a 1px `--line-raised` edge holds a horizon: a 3px `--hz-paint` line along its base and 1px lines up both sides
+  at full height, with no top, and the horizon's colours tint the lower half of the plate through `--primary-veil`.
+  The label is `--text` in Chakra Petch capitals at 16px (14px small). Hover and press lift the plate to `--surface-3`.
+  A press sinks it 1px and lights it: the base fills from the press point, and a wash of the horizon rises in the cup
+  and settles back. Disabled is a flat `--surface-2` box with a 1px `--line` edge and no lines. The label names the
+  result: END TURN, MAKE LIVE, PLAY AS BORIN.
 - Secondary button: at least 44px, a 1px `--line-raised` edge, `--surface-2` fill, Bai Jamjuree 14px semibold, with an
   optional 18px icon.
 - Link button: cyan text without a box, at least 44px tall.

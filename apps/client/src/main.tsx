@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { initTransparency, ToastProvider } from "@vtt/ui";
+import { initTransparency, installCupPress, ToastProvider } from "@vtt/ui";
 import "@vtt/ui/styles.css";
 import "./styles.css";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
@@ -9,6 +9,7 @@ import { App } from "./shell/App";
 
 installZoomGuard();
 initTransparency();
+installCupPress();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

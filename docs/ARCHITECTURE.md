@@ -1200,7 +1200,10 @@ and removes it when it ends. `useOnChange` runs a moment after a render that cha
 `canMove()` is the one guard: it is false under reduced motion, without the Web Animations API (so in jsdom), while the
 page is hidden and while the motion gate is held. `useSession` holds the gate from a connect or reconnect until one
 frame after the first snapshot has rendered, across a switch of encounter or map, and for a frame when the tab comes
-back; the sheet window holds it on connect the same way.
+back; the sheet window holds it on connect the same way. Every primary is the Cup (ADR-0046), and each entry calls
+`installCupPress` (`motion/press.ts`) once: one listener lights whichever primary a press lands on, the Button
+primitive's or the encounter panel's own `.encounter-primary`, from the press point or, for a keyboard press, the
+middle.
 
 A tab strip's underline is its ink (`StripInk` in `@vtt/ui`), one line that `Tabs` and the link bars (the Codex,
 Compendium and Settings section bars, their phone tab bars and the sheet's) carry as their last child. A change of

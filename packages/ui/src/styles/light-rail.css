@@ -204,3 +204,21 @@
   letter-spacing: 0.06em;
   text-shadow: 0 0 6px var(--void);
 }
+
+/* The Cup's press (ADR-0046): the horizon rising in the plate behind the label, and a line in the head's colour
+   lighting the base outward from the press. Both cover the plate: the border box, or 1px inside a small primary's
+   44px box (`--nh-plate-y`). The rising layer sits behind the label, over the plate. */
+.lr-cup-fill {
+  z-index: -1;
+  inset: var(--nh-plate-y, -1px) -1px;
+  transform-origin: 50% 100%;
+  background: var(--hz-paint);
+}
+.lr-cup-line {
+  left: -1px;
+  right: -1px;
+  bottom: var(--nh-plate-y, -1px);
+  height: 3px;
+  background: color-mix(in srgb, var(--hz-3) calc(var(--lr-head-k) * 100%), var(--spark));
+  box-shadow: var(--ink-glow);
+}

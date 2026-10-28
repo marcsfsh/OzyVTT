@@ -83,40 +83,68 @@
   width: 100%;
 }
 
-/* Primary: the arcade button, the one primary action in a view. A magenta face with dark display-face ink over a 5px
-   pressed edge, and a soft pink glow in Dusk. The edge is a shadow, so the margin under the button keeps it clear of
-   what follows. Pressing sinks the face onto its edge. */
+/* Primary: the Cup, the one primary action in a view (ADR-0046). A plate like the other controls that holds a horizon:
+   a 3px horizon line along its base and 1px lines up both sides at full height, with no top, and the horizon's
+   colours tinting the lower half of the plate through a veil. The label is the text ink in display capitals. A press
+   sinks the plate 1px and lights it (`motion/press.ts`). The plate is `::before` and the lines `::after`, both on the
+   border box, so nothing around the button moves. */
 .nh-btn--primary {
   min-height: 52px;
-  margin-bottom: 5px;
-  padding: 0 var(--space-8);
+  padding: 0 26px;
   font: var(--fw-display) 16px / 1 var(--font-display);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--primary-ink);
-  text-shadow: var(--primary-ink-shadow);
-  --nh-ink: var(--primary-ink);
-  --nh-edge: 5px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  --nh-ink: var(--text);
+  /* The plate's colour and edge, how much of it veils the horizon, and where its fade up from the base starts. Hover
+     and press change them. */
+  --nh-plate: var(--surface-2);
+  --nh-plate-edge: var(--line-raised);
+  --nh-veil: var(--primary-veil);
+  --nh-fade: 0%;
+  /* The plate's top and bottom against the box: on the border box, or 1px inside the small one's 44px box. */
+  --nh-plate-y: -1px;
   transition: transform var(--dur-press) ease-out;
 }
 .nh-btn--primary::before {
-  border: 0;
-  background: var(--primary-tint), linear-gradient(var(--primary-base), var(--primary-base));
-  box-shadow:
-    0 var(--nh-edge) 0 var(--primary-edge),
-    var(--glow-primary);
+  inset: var(--nh-plate-y) -1px;
+  border: 1px solid var(--nh-plate-edge);
+  background:
+    linear-gradient(to top, transparent var(--nh-fade), var(--nh-plate)),
+    linear-gradient(
+      color-mix(in srgb, var(--nh-plate) var(--nh-veil), transparent),
+      color-mix(in srgb, var(--nh-plate) var(--nh-veil), transparent)
+    ),
+    var(--hz-paint);
+  box-shadow: none;
+  filter: none;
 }
-/* In a section bar: a 42px face over a 4px edge, with `.tap-target` for the 44px hit area. */
+.nh-btn--primary::after {
+  content: "";
+  position: absolute;
+  inset: var(--nh-plate-y) -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: 3px;
+  border-image: var(--hz-paint) 1;
+  -webkit-mask-image: linear-gradient(to top, var(--mask-solid) 40%, var(--mask-cup-top));
+  mask-image: linear-gradient(to top, var(--mask-solid) 40%, var(--mask-cup-top));
+  filter: var(--primary-drop);
+}
+/* In a section bar: a 42px plate in a 44px box. The box is the hit area, since `::after` draws the lines and can't be
+   the `.tap-target` layer. */
 .nh-btn--primary.nh-btn--sm {
-  min-height: 42px;
-  margin-bottom: 4px;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
   padding: 0 18px;
   font-size: 14px;
-  --nh-edge: 4px;
+  --nh-plate-y: 0px;
 }
 .nh-btn--primary:active:not(:disabled) {
-  transform: translateY(3px);
-  --nh-edge: 2px;
+  transform: translateY(1px);
 }
 
 /* Secondary: the resting default, a flat control with a 1px edge. */
@@ -148,7 +176,10 @@
 /* ---- Interaction, on :active as well as :hover ---- */
 .nh-btn--primary:hover:not(:disabled),
 .nh-btn--primary:active:not(:disabled) {
-  --primary-tint: var(--primary-tint-hover);
+  --nh-plate: var(--surface-3);
+  --nh-plate-edge: var(--line-raised-hover);
+  --nh-veil: var(--primary-veil-hover);
+  --nh-fade: 10%;
 }
 .nh-btn--secondary:hover:not(:disabled),
 .nh-btn--secondary:active:not(:disabled) {
@@ -192,6 +223,9 @@
   border: var(--rim-w) solid var(--line);
   background: var(--surface-2);
   box-shadow: none;
+}
+.nh-btn--primary:disabled::after {
+  display: none;
 }
 .nh-btn--link:disabled {
   --nh-fill: transparent;

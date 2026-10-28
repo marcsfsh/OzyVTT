@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { holdMotion, initTransparency, releaseMotion, ThemeSwitch, ToastProvider } from "@vtt/ui";
+import { holdMotion, initTransparency, installCupPress, releaseMotion, ThemeSwitch, ToastProvider } from "@vtt/ui";
 // The global styles load before any component's own stylesheet, as in main.tsx: CSS lands in import order.
 import "@vtt/ui/styles.css";
 import "./styles.css";
@@ -79,6 +79,7 @@ function Message({ children }: Readonly<{ children: ReactNode }>) {
 
 installZoomGuard();
 initTransparency();
+installCupPress();
 
 createRoot(document.getElementById("sheet-root")!).render(
   <StrictMode>

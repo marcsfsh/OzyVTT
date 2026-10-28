@@ -267,8 +267,6 @@
   font-size: var(--fs-sm);
 }
 .save-prompt-confirm .encounter-primary {
-  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
-  border-color: var(--magenta);
   color: var(--text);
   margin-left: auto;
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { contrastRatio, parseColour } from "../theme/colour";
+import { composite, contrastRatio, parseColour } from "../theme/colour";
 import { THEME_NAMES, THEMES } from "../theme/theme";
 import { Button } from "./Button";
 
@@ -49,10 +49,14 @@ describe("the primary button's label", () => {
       );
       const [enabled, disabled] = screen.getAllByRole("button", { hidden: true });
       const label = enabled.querySelector("nh-label")!;
-      expect(resolved(label, getComputedStyle(label).color)).toBe(resolved(label, "var(--primary-ink)"));
+      expect(resolved(label, getComputedStyle(label).color)).toBe(resolved(label, "var(--text)"));
       const ink = parseColour(resolved(label, getComputedStyle(label).color))!;
-      const plate = parseColour(resolved(label, "var(--primary-base)"))!;
+      // The Cup's plate, and the plate at the label's midline with the horizon's yellow end seen through the veil.
+      const plate = parseColour(resolved(label, "var(--surface-2)"))!;
       expect(contrastRatio(ink, plate)).toBeGreaterThanOrEqual(4.5);
+      const veil = parseFloat(resolved(label, "var(--primary-veil)")) / 100;
+      const cast = composite([...plate, veil], parseColour(resolved(label, "var(--hz-5)"))!);
+      expect(contrastRatio(ink, cast)).toBeGreaterThanOrEqual(4.5);
 
       // Disabled dims the words alone: the label is the muted ink and the button keeps full opacity.
       const off = disabled.querySelector("nh-label")!;

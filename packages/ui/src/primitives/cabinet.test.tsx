@@ -146,17 +146,19 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Open map" })).toHaveClass("nh-btn--link");
   });
 
-  it("gives the section bar's 42px primary the hit-area layer", () => {
+  it("gives the section bar's small primary its own 44px box for a hit area, since its lines take ::after", () => {
     render(
-      <Button variant="primary" size="sm">
-        Make live
-      </Button>
+      <>
+        <Button variant="primary" size="sm">
+          Make live
+        </Button>
+        <Button size="sm">Rename</Button>
+      </>
     );
-    expect(screen.getByRole("button", { name: "Make live" })).toHaveClass(
-      "nh-btn--primary",
-      "nh-btn--sm",
-      "tap-target"
-    );
+    const primary = screen.getByRole("button", { name: "Make live" });
+    expect(primary).toHaveClass("nh-btn--primary", "nh-btn--sm");
+    expect(primary).not.toHaveClass("tap-target");
+    expect(screen.getByRole("button", { name: "Rename" })).toHaveClass("nh-btn--sm", "tap-target");
   });
 });
 
@@ -274,6 +276,12 @@ describe("the hit-area floor in the stylesheets", () => {
   const css = ["Switch", "SegmentedControl", "Chip", "Button"]
     .map((name) => readFileSync(`${process.cwd()}/src/primitives/${name}.css`, "utf8"))
     .join("\n");
+
+  it("makes the small primary's own box 44px, around its 42px plate", () => {
+    expect(css).toMatch(
+      /\.nh-btn--primary\.nh-btn--sm \{[^}]*min-width: var\(--tap-min\);\s*min-height: var\(--tap-min\);/
+    );
+  });
 
   it("makes the switch at least 44px tall around its 46 by 26 track", () => {
     expect(css).toMatch(/\.nh-switch \{\s*min-height: var\(--tap-min\);\s*min-width: 46px;/);

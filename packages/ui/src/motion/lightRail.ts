@@ -813,3 +813,35 @@ export function stripSwitch(host: Element, o: StripSwitchOptions): Animation | n
   }
   return fill(o.ink, { axis, origin: dir > 0 ? "0%" : "100%" });
 }
+
+/**
+ * The Cup's press (ADR-0046): the horizon rises in the plate behind the label and settles back, and the base lights
+ * outward from `x`, where the press landed in the button's border box. The parts cover the plate, which a small
+ * primary draws 1px inside its 44px box (`--nh-plate-y`).
+ */
+export function cupPress(button: HTMLElement, x: number): void {
+  if (!canMove()) return;
+  const at = Math.max(8, Math.min(button.offsetWidth - 8, x));
+  temp(
+    button,
+    "lr-cup-fill",
+    {},
+    [
+      { transform: "scaleY(0)", opacity: 0.45 },
+      { transform: "scaleY(1)", opacity: 0.32, offset: 0.5 },
+      { transform: "scaleY(1)", opacity: 0 }
+    ],
+    { dur: 320, ease: EASE.travel }
+  );
+  temp(
+    button,
+    "lr-cup-line",
+    { "transform-origin": `${px(at)} 50%` },
+    [
+      { transform: "scaleX(0)", opacity: 1 },
+      { transform: "scaleX(1)", opacity: 1, offset: 0.55 },
+      { transform: "scaleX(1)", opacity: 0 }
+    ],
+    { dur: 380, ease: EASE.travel }
+  );
+}

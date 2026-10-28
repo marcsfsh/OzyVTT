@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { initTransparency } from "@vtt/ui";
+import { initTransparency, installCupPress } from "@vtt/ui";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { installZoomGuard } from "./lib/zoom-guard";
 import "@vtt/ui/styles.css";
@@ -9,6 +9,7 @@ import { ViewerApp } from "./viewer/ViewerApp";
 
 installZoomGuard();
 initTransparency();
+installCupPress();
 
 createRoot(document.getElementById("viewer-root")!).render(
   <StrictMode>

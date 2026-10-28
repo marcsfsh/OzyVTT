@@ -119,14 +119,13 @@
   --qr-ink: #04141c;
   --qr-paper: #ffffff;
 
-  /* Glows belong to the sun frame, a lit lamp, the selected item and the primary button. Resting surfaces never
+  /* Glows belong to the sun frame, a lit lamp, the selected item and the primary's lines. Resting surfaces never
      glow, and nothing pulses. Reduced transparency keeps the 1px rings and drops the blooms. */
   --glow-magenta: 0 0 0 1px rgba(255, 47, 146, 0.55), 0 0 16px 2px rgba(255, 47, 146, 0.35);
   --glow-magenta-strong: 0 0 0 1.5px rgba(255, 47, 146, 0.7), 0 0 26px 4px rgba(255, 47, 146, 0.5);
   --glow-cyan: 0 0 0 1px rgba(43, 228, 255, 0.55), 0 0 16px 2px rgba(43, 228, 255, 0.32);
   --glow-violet: 0 0 0 1px rgba(187, 144, 255, 0.55), 0 0 16px 2px rgba(187, 144, 255, 0.32);
   --glow-danger: 0 0 0 1px rgba(255, 93, 80, 0.55), 0 0 16px 2px rgba(255, 93, 80, 0.32);
-  --glow-primary: 0 0 18px rgba(255, 47, 146, 0.45);
 
   /* Filter twins of the glows, for layers that glow through `filter` (backing layers, SVG). */
   --glow-drop-magenta: drop-shadow(0 0 6px rgba(255, 47, 146, 0.55)) drop-shadow(0 0 18px rgba(255, 47, 146, 0.33));
@@ -164,15 +163,8 @@
   --script-ink: #ff4fa3;
   --script-glow: 0 0 8px rgba(255, 47, 146, 0.9), 0 0 18px rgba(255, 47, 146, 0.5);
 
-  /* The arcade button: the one primary action in a view. A magenta face over a pressed edge, with a soft glow. */
-  --primary-base: var(--magenta);
-  --primary-ink: #12020a;
-  --primary-edge: #8a0f4d;
-  --primary-ink-shadow: none;
-  --primary-tint: linear-gradient(transparent, transparent);
-  --primary-tint-hover: linear-gradient(rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.14));
-  /* The Cup: a plate holding a horizon. The veil is how much of the plate covers the horizon's cast, at rest and on
-     hover or press; the drop is the glow on its lines. */
+  /* The Cup, the one primary action in a view: a plate holding a horizon. The veil is how much of the plate covers
+     the horizon's cast, at rest and on hover or press; the drop is the glow on its lines. */
   --primary-veil: 66%;
   --primary-veil-hover: 54%;
   --primary-drop: drop-shadow(0 0 4px rgba(255, 47, 146, 0.8));
@@ -491,6 +483,8 @@
   --wash-mask-mid: rgba(0, 0, 0, 0.45);
   /* A mask's solid stop, for a part cut to a frame. */
   --mask-solid: #000;
+  /* The Cup's lines fade to this toward their top. */
+  --mask-cup-top: rgba(0, 0, 0, 0.6);
   --flash: #ffffff;
   /* A line that waits on someone: grey and unlit until it resolves. */
   --unlit: rgba(255, 255, 255, 0.16);
@@ -517,8 +511,7 @@
 }
 
 /* ---- Dawn: soft lilac-grey paper, plum-grey ink, gentler edges and slightly muted accents. No pure white and no
-   harsh black. No coloured glow: the sun frame keeps its warm glow and the primary its pressed
-   edge. ---- */
+   harsh black. No coloured glow: the sun frame keeps its warm glow, and the primary's lines are flat ink. ---- */
 [data-theme="dawn"] {
   color-scheme: light;
   --sky: var(--bg);
@@ -587,7 +580,6 @@
   --glow-cyan: 0 0 0 2px var(--state-on-edge);
   --glow-violet: 0 0 0 2px var(--violet);
   --glow-danger: 0 0 0 2px var(--hostile);
-  --glow-primary: 0 0 #0000;
   --glow-drop-magenta: drop-shadow(0 0 0 transparent);
   --glow-drop-magenta-strong: drop-shadow(0 0 0 transparent);
   --glow-drop-cyan: drop-shadow(0 0 0 transparent);
@@ -603,8 +595,6 @@
   --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
   --script-ink: #c23b7e;
   --script-glow: 0 0 #0000;
-
-  --primary-edge: #b0306e;
 
   --tag-next-bg: #2a2537;
   --tag-next-ink: #ebe7ef;
@@ -710,7 +700,6 @@
   --glow-cyan: 0 0 0 1px var(--state-on-edge);
   --glow-violet: 0 0 0 1px var(--violet);
   --glow-danger: 0 0 0 1px var(--hostile);
-  --glow-primary: 0 0 #0000;
   --glow-drop-magenta: drop-shadow(0 0 0 transparent);
   --glow-drop-magenta-strong: drop-shadow(0 0 0 transparent);
   --glow-drop-cyan: drop-shadow(0 0 0 transparent);
@@ -881,7 +870,7 @@ summary {
 
 /* Forward-nav nudge: end the label with `<IconArrow className="nav-arrow" />`. `color: inherit` is
    needed because the client's `button span { color: var(--text-dim) }` would otherwise paint the arrow
-   unreadably on a primary button's fill. */
+   unreadably on a primary button's plate. */
 .nav-arrow {
   display: inline-block;
   margin-left: 0.35em;

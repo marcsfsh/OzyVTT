@@ -1014,36 +1014,67 @@
   border-color: var(--rim-color-hi);
   background: var(--raised-hover);
 }
-/* The primary action is the sun frame, as `.nh-btn--primary`: a 3px sunset edge round a dark warm-tinted
-   fill, the label in the display face. `.turn-prev` (‹) shares `.encounter-primary` only for its metrics
-   and stays a plain raised control, and `.is-quiet` steps a primary down while another one leads the view
-   (a roll waiting to be confirmed). */
+/* The primary action is the Cup, as `.nh-btn--primary` (ADR-0046): a plate holding a horizon, with a 3px line along
+   its base and 1px lines up its sides, and the label in display capitals. The sun frame is left to show who is
+   acting. `.turn-prev` (‹) shares `.encounter-primary` only for its metrics and stays a plain raised control,
+   `.is-quiet` steps a primary down while another one leads the view (a roll waiting to be confirmed), and `.resume`
+   keeps its cyan edge. A press lights the Cup as it does every primary (`motion/press.ts`). */
 .encounter-primary:not(.turn-prev, .is-quiet) {
-  color: var(--primary-ink);
+  color: var(--text);
   font-family: var(--font-display);
   font-weight: var(--fw-display);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
-  text-shadow: var(--primary-ink-shadow);
-}
-.encounter-primary:not(.turn-prev, .is-quiet)::before,
-.encounter-primary:not(.turn-prev, .is-quiet):hover:not(:disabled)::before,
-.encounter-primary:not(.turn-prev, .is-quiet):focus-visible::before,
-.encounter-primary:not(.turn-prev, .is-quiet):active:not(:disabled)::before {
-  border: 3px solid transparent;
-  background:
-    var(--primary-tint) padding-box,
-    linear-gradient(var(--primary-base), var(--primary-base)) padding-box,
-    var(--grad-sun-x) border-box;
-  box-shadow: var(--glow-sun);
+  letter-spacing: 0.08em;
+  transition: transform var(--dur-press) ease-out;
+  --nh-plate: var(--surface-2);
+  --nh-plate-edge: var(--line-raised);
+  --nh-veil: var(--primary-veil);
+  --nh-fade: 0%;
 }
 .encounter-primary:not(.turn-prev, .is-quiet):hover:not(:disabled),
-.encounter-primary:not(.turn-prev, .is-quiet):focus-visible,
 .encounter-primary:not(.turn-prev, .is-quiet):active:not(:disabled) {
-  --primary-tint: var(--primary-tint-hover);
+  --nh-plate: var(--surface-3);
+  --nh-plate-edge: var(--line-raised-hover);
+  --nh-veil: var(--primary-veil-hover);
+  --nh-fade: 10%;
 }
-/* Reviewing history, Next turn resumes live play: a cyan edge where the sun would be, since it is a different
-   kind of step. */
+.encounter-primary:not(.turn-prev, .is-quiet):active:not(:disabled) {
+  transform: translateY(1px);
+}
+.encounter-primary:not(.turn-prev, .is-quiet, .resume)::before,
+.encounter-primary:not(.turn-prev, .is-quiet, .resume):hover:not(:disabled)::before,
+.encounter-primary:not(.turn-prev, .is-quiet, .resume):focus-visible::before,
+.encounter-primary:not(.turn-prev, .is-quiet, .resume):active:not(:disabled)::before {
+  border: 1px solid var(--nh-plate-edge);
+  background:
+    linear-gradient(to top, transparent var(--nh-fade), var(--nh-plate)),
+    linear-gradient(
+      color-mix(in srgb, var(--nh-plate) var(--nh-veil), transparent),
+      color-mix(in srgb, var(--nh-plate) var(--nh-veil), transparent)
+    ),
+    var(--hz-paint);
+  box-shadow: none;
+}
+.encounter-primary:not(.turn-prev, .is-quiet, .resume)::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: 3px;
+  border-image: var(--hz-paint) 1;
+  -webkit-mask-image: linear-gradient(to top, var(--mask-solid) 40%, var(--mask-cup-top));
+  mask-image: linear-gradient(to top, var(--mask-solid) 40%, var(--mask-cup-top));
+  filter: var(--primary-drop);
+}
+.encounter-primary:not(.turn-prev, .is-quiet, .resume):disabled::after {
+  display: none;
+}
+/* Reviewing history, Next turn resumes live play: a cyan edge where the Cup's lines would be, since it is a
+   different kind of step. */
 .turn-controls .encounter-primary.resume::before,
 .turn-controls .encounter-primary.resume:hover:not(:disabled)::before {
   border: 2px solid var(--cyan);
