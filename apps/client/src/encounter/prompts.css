@@ -130,6 +130,11 @@
   border-color: var(--indigo);
   background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo));
 }
+/* Its top edge is cyan, the Reaction lamp's colour, and lights from under the lamp. */
+.reaction-prompt-edge {
+  --nh-edge: var(--cyan);
+  --nh-edge-glow: var(--glow-lamp-reaction);
+}
 .pending-damage {
   border-color: color-mix(in srgb, var(--line-strong) 55%, var(--magenta));
   background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta));

@@ -69,7 +69,7 @@ export function TurnTiles(
         const actor = props.state.actors.find((candidate) => candidate.id === tile.actorId);
         const placed = props.state.combat.tokens.some((entry) => entry.actorId === tile.actorId && entry.position);
         return (
-          <li key={tile.actorId}>
+          <li key={tile.actorId} data-key={tile.actorId}>
             <button
               type="button"
               className={cx(

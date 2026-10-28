@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Button, IconLocate, Modal, ToastOutlet, VcrCounter } from "@vtt/ui";
 import { JoinAddress } from "../components/JoinAddress";
 import { focusTokenOnMap } from "../scene/tableGeometry";
 import { NowPlaying } from "../sound/NowPlaying";
 import { LiveScenePicker } from "./LiveScenePicker";
+import { useOrderLight } from "./orderLight";
 import { TurnTiles } from "./TurnTiles";
 import { idleStatus } from "./status";
 import "./table-strip.css";
@@ -26,6 +27,23 @@ type StripProps = Readonly<{
 export function TableStrip(props: StripProps) {
   const { state, phone } = props;
   const fighting = state.combat.active;
+  // The turn order's light runs along the strip's bottom line, between its tiles and the round counter (ADR-0045).
+  const strip = useRef<HTMLElement>(null);
+  const tile = (key: string) =>
+    strip.current?.querySelector<HTMLElement>(`.turn-tiles > li[data-key="${CSS.escape(key)}"]`) ?? null;
+  const hiddenTurn = props.role === "player" && props.state.combat.hiddenTurn;
+  useOrderLight(strip, {
+    keys: fighting ? state.combat.initiative.map((entry) => entry.actorId) : [],
+    acting: fighting && !hiddenTurn ? state.combat.turnActorId : null,
+    round: fighting ? state.combat.round : null,
+    item: tile,
+    point: (key) => tile(key)?.querySelector<HTMLElement>(".turn-tile-face") ?? null,
+    frame: (key) => tile(key)?.querySelector<HTMLElement>(".nh-portrait") ?? null,
+    counter: () => strip.current?.querySelector<HTMLElement>(".table-strip-counter") ?? null,
+    axis: "x",
+    rail: (host) => host.clientHeight - 1,
+    lamps: true
+  });
   const view =
     props.role === "gm" ? { role: "gm" as const, state: props.state } : { role: "player" as const, state: props.state };
   const idle = idleStatus(view);
@@ -46,6 +64,7 @@ export function TableStrip(props: StripProps) {
   if (props.role === "gm" && phone)
     return (
       <header
+        ref={strip}
         className={`table-strip is-header${fighting ? " is-fighting" : ""}`}
         aria-label="The table"
         data-horizon=""
@@ -62,7 +81,7 @@ export function TableStrip(props: StripProps) {
     );
   if (fighting)
     return (
-      <header className="table-strip is-fighting" aria-label="The table">
+      <header ref={strip} className="table-strip is-fighting" aria-label="The table">
         {counter}
         <span className="table-strip-divider" aria-hidden="true" />
         {tiles}
@@ -74,7 +93,7 @@ export function TableStrip(props: StripProps) {
       </header>
     );
   return (
-    <header className="table-strip" aria-label="The table">
+    <header ref={strip} className="table-strip" aria-label="The table">
       {counter}
       <span className="table-strip-divider" aria-hidden="true" />
       <p className="table-status">

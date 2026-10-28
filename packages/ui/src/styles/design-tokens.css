@@ -467,6 +467,8 @@
   /* The wash's mask stops: read only for their alpha, the same in both themes. */
   --wash-mask-core: #000;
   --wash-mask-mid: rgba(0, 0, 0, 0.45);
+  /* A mask's solid stop, for a part cut to a frame. */
+  --mask-solid: #000;
   --flash: #ffffff;
   /* A line that waits on someone: grey and unlit until it resolves. */
   --unlit: rgba(255, 255, 255, 0.16);
@@ -486,6 +488,7 @@
   --lamp-afterglow: 0 0 18px 4px rgba(255, 47, 146, 0.9);
   --pip-afterglow: 0 0 14px 3px rgba(122, 162, 255, 0.85);
   --use-afterglow: 0 0 14px 3px rgba(79, 227, 255, 0.8);
+  --bonus-afterglow: 0 0 14px 3px rgba(255, 213, 77, 0.8);
 
   /* Focus ring: the --focus-ring colour, under the name its callers use. */
   --focus-ring-color: var(--focus-ring);
@@ -617,6 +620,7 @@
   --lamp-afterglow: 0 0 0 3px rgba(240, 85, 155, 0.45);
   --pip-afterglow: 0 0 0 3px rgba(74, 114, 217, 0.4);
   --use-afterglow: 0 0 0 3px rgba(42, 143, 168, 0.4);
+  --bonus-afterglow: 0 0 0 3px rgba(217, 164, 58, 0.45);
 
   --track-edge: var(--line-raised);
   --tab-on: linear-gradient(#fbfafc, #fbfafc);
@@ -684,7 +688,11 @@
   --glow-lamp-reaction: 0 0 #0000;
   --vcr-glow: 0 0 #0000;
   --glow-tab-text: 0 0 #0000;
-  /* The light keeps its flat colour: no glow around a comet or burst, and no wash. */
+  /* The light keeps its flat colour: no glow around a comet or burst, and no wash. An afterglow is a ring. */
+  --lamp-afterglow: 0 0 0 2px var(--lamp-action);
+  --pip-afterglow: 0 0 0 2px var(--party);
+  --use-afterglow: 0 0 0 2px var(--cyan);
+  --bonus-afterglow: 0 0 0 2px var(--lamp-bonus);
   --spark-glow: drop-shadow(0 0 0 transparent);
   --wash-strength: 0;
   --ink-glow: 0 0 #0000;

@@ -139,6 +139,7 @@ export function GmInitiativeRow({
   return (
     <li
       ref={rowRef}
+      data-key={entry.actorId}
       className={`${active ? "active" : ""}${down ? " down" : ""}${expanded ? " expanded" : ""}`.trim()}
       aria-current={active ? "step" : undefined}
     >

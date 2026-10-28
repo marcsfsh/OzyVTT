@@ -44,17 +44,20 @@ export {
   flipDelta,
   flipFrom,
   floatText,
+  lightLamps,
   lightLine,
   lightTiming,
   parseDuration,
   pop,
   px,
   rel,
+  rollOver,
   rollTo,
   sheen,
   splitIn,
   splitOut,
   stripSwitch,
+  sunFrame,
   warm,
   wash,
   type Axis,
@@ -87,6 +90,7 @@ export { Tag, type TagTone } from "./primitives/Tag";
 export { Lamp, MoveLamp, StatusLamp, type LampKind } from "./primitives/Lamp";
 export { LifeBar, type ExactHp, type HpBand } from "./primitives/LifeBar";
 export { VcrCounter } from "./primitives/VcrCounter";
+export { Roll } from "./primitives/Roll";
 export { Picture, Portrait, type PictureSource, type PortraitFrame } from "./primitives/Portrait";
 export {
   avatarHash,

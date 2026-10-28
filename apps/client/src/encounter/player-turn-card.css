@@ -12,6 +12,8 @@
   min-width: 0;
 }
 .player-turn-card-head .player-turn-title {
+  /* Positioned for its one sweep of the horizon's colours (ADR-0045). */
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;

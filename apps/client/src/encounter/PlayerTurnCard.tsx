@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { PlayerView } from "@vtt/domain";
-import { VcrCounter } from "@vtt/ui";
+import { VcrCounter, fadeIn, sheen, useOnChange } from "@vtt/ui";
 import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
 import "./player-turn-card.css";
 
@@ -20,7 +20,8 @@ export function nextTurnWords(combat: PlayerView["combat"], myId: string): strin
 
 /**
  * The head of a player's turn card on the table: YOUR TURN in chrome with the VCR counter on their turn; off it, who
- * is acting in the sun frame and when they act next. The lamps sit under it.
+ * is acting in the sun frame and when they act next. The lamps sit under it. When the turn becomes theirs, the chrome
+ * lettering catches one sweep of the horizon's colours (Chrome catch, ADR-0045); another creature's turn fades in.
  */
 export function PlayerTurnCard({
   state,
@@ -44,8 +45,15 @@ export function PlayerTurnCard({
   const actingActor = actingEntry ? state.actors.find((actor) => actor.id === actingEntry.actorId) : undefined;
   const when = myId ? nextTurnWords(combat, myId) : null;
   const own = myTurn || title !== undefined;
+  const card = useRef<HTMLElement>(null);
+  useOnChange(`${own}:${actingEntry?.actorId ?? ""}`, () => {
+    const head = card.current?.querySelector(".player-turn-card-head");
+    if (head) fadeIn(head, { dur: 160 });
+    const lettering = card.current?.querySelector<HTMLElement>(".player-turn-title");
+    if (lettering) sheen(lettering, { delay: 60 });
+  });
   return (
-    <section className={`player-turn-card${own ? " is-own" : ""}`}>
+    <section ref={card} className={`player-turn-card${own ? " is-own" : ""}`}>
       {own ? (
         <div className="player-turn-card-head">
           <h2 className="player-turn-title chrome">{title ?? "Your turn"}</h2>

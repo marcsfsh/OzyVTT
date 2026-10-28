@@ -36,30 +36,6 @@
   flex-wrap: wrap;
   row-gap: 0.1em;
 }
-/* The sun glyph renders only for the active entry, so it mounts on the turn change and this one-shot rise runs
-   exactly once. The map token pulses in the same beat (`encounter-turn-pulse`, encounter-map.css), so a player
-   watching the map also notices. */
-.init-row-caret,
-.initiative-caret {
-  animation: init-turn-rise 0.6s var(--ease-settle, ease-out) 1;
-}
-@keyframes init-turn-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(0.35em) scale(0.7);
-  }
-  100% {
-    opacity: 1;
-    transform: none;
-  }
-}
-/* The glyph still marks the active row; it just arrives without the rise. */
-@media (prefers-reduced-motion: reduce) {
-  .init-row-caret,
-  .initiative-caret {
-    animation: none;
-  }
-}
 .init-row-name {
   color: var(--text);
   font-size: 1em;

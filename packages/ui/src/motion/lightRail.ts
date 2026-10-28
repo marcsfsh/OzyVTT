@@ -474,6 +474,95 @@ export function rollTo(roll: HTMLElement, text: string, o: Timed = {}): Animatio
   );
 }
 
+/**
+ * A tape counter's roll, for a value React renders (`Roll`): the old value leaves upward as a throwaway part over
+ * `now`, which arrives from below. `roll` is positioned, and clips only while the roll runs.
+ */
+export function rollOver(roll: HTMLElement, now: HTMLElement, before: string, o: Timed = {}): Animation | null {
+  if (!canMove()) return null;
+  for (const leaving of roll.querySelectorAll(":scope > .lr-roll-out")) leaving.remove();
+  const dur = o.dur ?? 180;
+  const delay = o.delay ?? 0;
+  roll.style.overflow = "hidden";
+  const leaving = spawn(roll, "lr-roll-out", {});
+  leaving.textContent = before;
+  const out = play(
+    leaving,
+    [
+      { transform: "translateY(0)", opacity: 1 },
+      { transform: "translateY(-100%)", opacity: 0 }
+    ],
+    { dur, delay, ease: EASE.in, fill: "both" }
+  );
+  const remove = () => leaving.remove();
+  out.finished.then(remove, remove);
+  const arrive = play(
+    now,
+    [
+      { transform: "translateY(100%)", opacity: 0 },
+      { transform: "translateY(0)", opacity: 1 }
+    ],
+    { dur, delay: delay + 50, ease: EASE.out }
+  );
+  const unclip = () => {
+    roll.style.overflow = "";
+  };
+  arrive.finished.then(unclip, unclip);
+  return arrive;
+}
+
+/**
+ * The sun frame moving: a frame-only part that slides from one box to another (the next turn), pops in on one (an
+ * encounter starting) or drains away from one (an encounter ending). Boxes are in `host` coordinates.
+ */
+export function sunFrame(
+  host: Element,
+  o: Timed & { from: Box; to?: Box; mode: "slide" | "arrive" | "leave" }
+): Animation | null {
+  if (!canMove()) return null;
+  const { from } = o;
+  const css = { left: px(from.x), top: px(from.y), width: px(from.w), height: px(from.h) };
+  const frames: Keyframe[] =
+    o.mode === "slide" && o.to
+      ? [
+          { transform: "translate(0, 0)", opacity: 1 },
+          { offset: 0.85, opacity: 1 },
+          { transform: `translate(${px(o.to.x - from.x)}, ${px(o.to.y - from.y)})`, opacity: 0 }
+        ]
+      : o.mode === "arrive"
+        ? [
+            { transform: "scale(0.6)", opacity: 0 },
+            { transform: "scale(1)", opacity: 1 },
+            { transform: "scale(1)", opacity: 0 }
+          ]
+        : [
+            { transform: "scale(1)", opacity: 1 },
+            { transform: "scale(0.6)", opacity: 0 }
+          ];
+  return temp(host, "lr-sunframe", css, frames, {
+    dur: o.dur ?? (o.mode === "slide" ? 200 : 180),
+    delay: o.delay ?? 0,
+    ease: EASE.settle
+  });
+}
+
+/**
+ * Lamps lighting one after another, as a new turn or an encounter starts: each light in `scope` warms with a small
+ * burst in its own colour, `step` apart.
+ */
+export function lightLamps(scope: ParentNode, o: { delay?: number; step?: number } = {}): void {
+  if (!canMove()) return;
+  const lamps = [...scope.querySelectorAll<HTMLElement>(".nh-lamp.is-lit")];
+  lamps.forEach((lamp, index) => {
+    const light = lamp.querySelector<HTMLElement>(".nh-lamp-light, .nh-lamp-gauge");
+    if (!light) return;
+    const delay = (o.delay ?? 0) + index * (o.step ?? 60);
+    warm(light, { delay });
+    const box = rel(light, lamp);
+    pop(lamp, { x: box.cx, y: box.cy, size: 38, delay, color: "var(--nh-lamp)" });
+  });
+}
+
 /** Chrome catch: one sweep of the horizon's colours across an element's letters. `el` must be positioned. */
 export function sheen(el: HTMLElement, o: Timed = {}): Animation | null {
   if (!canMove()) return null;
@@ -523,17 +612,17 @@ export function splitOut(el: Element, o: Timed = {}): Animation | null {
 }
 
 /**
- * A lamp or pip switching off: it holds its colour and an afterglow for a moment, then cools. `color` and `glow` are
- * token references (`var(--lamp-action)`, `var(--lamp-afterglow)`).
+ * A lamp or pip switching off: it holds its colour and an afterglow for a moment, then cools into its own unlit style.
+ * `color` and `glow` are token references (`var(--lamp-action)`, `var(--lamp-afterglow)`).
  */
 export function cool(el: Element, color: string, glow: string, o: Timed = {}): Animation | null {
   if (!canMove()) return null;
+  // No last keyframe: the animation ends on whatever the stylesheet paints an unlit lamp with.
   return play(
     el,
     [
-      { backgroundColor: color, borderColor: color, boxShadow: glow },
-      { offset: 0.2, backgroundColor: color, borderColor: color, boxShadow: glow },
-      { backgroundColor: "transparent", boxShadow: "0 0 0 0 transparent" }
+      { offset: 0, backgroundColor: color, borderColor: color, boxShadow: glow },
+      { offset: 0.2, backgroundColor: color, borderColor: color, boxShadow: glow }
     ],
     { dur: o.dur ?? 320, delay: o.delay ?? 0, ease: "ease-out" }
   );

@@ -1,5 +1,24 @@
+import { useRef } from "react";
+import { useOnChange } from "../motion/hooks";
+import { cool, pop, rel, warm } from "../motion/lightRail";
 import { cx } from "./util";
 import "./Lamp.css";
+
+/** A lamp lighting warms up with a burst in its colour; one going out holds an afterglow as it cools (ADR-0045). */
+function useLampLight(lit: boolean) {
+  const lamp = useRef<HTMLDivElement>(null);
+  useOnChange(lit, (_was, now) => {
+    const tile = lamp.current;
+    const light = tile?.querySelector<HTMLElement>(".nh-lamp-light, .nh-lamp-gauge");
+    if (!tile || !light) return;
+    if (now) {
+      warm(light);
+      const box = rel(light, tile);
+      pop(tile, { x: box.cx, y: box.cy, size: 38, color: "var(--nh-lamp)" });
+    } else cool(light, "var(--nh-lamp)", "var(--nh-lamp-afterglow)");
+  });
+  return lamp;
+}
 
 /** Which economy a lamp shows. Action is magenta, Bonus yellow and Reaction cyan; `on` marks a live or ready thing. */
 export type LampKind = "action" | "bonus" | "reaction" | "on";
@@ -26,10 +45,16 @@ export function Lamp({
   unavailableReason?: string;
   className?: string;
 }>) {
+  const lamp = useLampLight(lit);
   const shown = lit ? (value ?? "READY") : "--";
   const spoken = lit ? `${label}: ${value ?? "ready"}` : `${label}: ${unavailableReason ?? "not available"}`;
   return (
-    <div className={cx("nh-lamp", `nh-lamp--${kind}`, lit && "is-lit", className)} role="group" aria-label={spoken}>
+    <div
+      ref={lamp}
+      className={cx("nh-lamp", `nh-lamp--${kind}`, lit && "is-lit", className)}
+      role="group"
+      aria-label={spoken}
+    >
       <span className="nh-lamp-light" aria-hidden="true" />
       <span className="nh-lamp-label" aria-hidden="true">
         {label}
@@ -58,8 +83,10 @@ export function MoveLamp({
   const squares = Math.min(MAX_SQUARES, Math.max(1, Math.ceil(total / 5)));
   const litSquares = total === 0 ? 0 : Math.min(squares, Math.round((left / total) * squares));
   const lit = left > 0;
+  const lamp = useLampLight(lit);
   return (
     <div
+      ref={lamp}
       className={cx("nh-lamp", "nh-lamp--move", lit && "is-lit", className)}
       role="group"
       aria-label={`Move: ${left} of ${total} feet left`}

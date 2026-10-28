@@ -24,6 +24,7 @@ import { revealInRegion } from "../lib/reveal";
 import { LampToggle } from "./LampToggle";
 import { PlayerTurnCard } from "./PlayerTurnCard";
 import { navigate, replaceQuery, useRoute } from "../router";
+import { useOrderLight } from "../table/orderLight";
 
 /**
  * A player's own prompts keep their outcome line beside them: answering one unmounts it, and the
@@ -296,6 +297,19 @@ export function PlayerEncounterPanel({
     myActor && commanded.length > 0 ? (
       <CommandedCreatures creatures={commanded} commanderId={myActor.id} commanderName={myActor.name} />
     ) : null;
+  // The order's light runs down the rows' leading edge (ADR-0045).
+  const orderList = useRef<HTMLOListElement>(null);
+  const orderRow = (key: string) =>
+    orderList.current?.querySelector<HTMLElement>(`:scope > li[data-key="${CSS.escape(key)}"]`) ?? null;
+  useOrderLight(orderList, {
+    keys: state.combat.active ? state.combat.initiative.map((entry) => entry.actorId) : [],
+    acting: state.combat.active && !state.combat.hiddenTurn ? state.combat.turnActorId : null,
+    round: state.combat.active ? state.combat.round : null,
+    item: orderRow,
+    point: (key) => orderRow(key)?.querySelector<HTMLElement>(".init-row") ?? null,
+    axis: "y",
+    rail: () => 2
+  });
   // Bring the active combatant's row into view when the turn advances.
   const activeRowRef = useRef<HTMLLIElement | null>(null);
   useEffect(() => {
@@ -542,13 +556,14 @@ export function PlayerEncounterPanel({
 
   const orderBody = (
     <section className="encounter-panel combat-active" aria-label={`Turn order · round ${combat.round}`}>
-      <ol className="initiative-list player">
+      <ol ref={orderList} className="initiative-list player">
         {combat.initiative.map((entry) => {
           const isMe = entry.actorId === myId;
           const rowActor = state.actors.find((actor) => actor.id === entry.actorId);
           return (
             <li
               key={entry.actorId}
+              data-key={entry.actorId}
               ref={entry.active ? activeRowRef : undefined}
               className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()}
               aria-current={entry.active ? "step" : undefined}

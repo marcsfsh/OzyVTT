@@ -1213,6 +1213,12 @@ Overlays (`Modal`, `Menu`, `Drawer`, `Toast`) carry an `OverlayEdge` along their
 outward from the control last pressed or focused. Closing never waits on it: the overlay closes at once and an inert,
 id-free copy of its surface drains the edge and fades where it was (`ghostOut`), so focus return, Escape and the
 backdrop behave as they would with no motion.
+The turn order is a rail. `table/orderLight.ts` (`useOrderLight`) measures a list's rows after each render and lights
+what changed: a new turn runs a comet from the acting row to the next and slides the sun frame, a new round runs it
+back to the VCR counter, an encounter starting or ending runs it from or to the counter, and a join, a leave or a swap
+slides the rows with `flipFrom`. The table strip, the GM's order and the player's order each run it; only the strip
+lights the turn's lamps. `Roll` in `@vtt/ui` rolls a value over like a tape counter (the VCR counter's word and round,
+the legendary count), and `Lamp` warms as it lights and cools through `--nh-lamp-afterglow` when it is spent.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map

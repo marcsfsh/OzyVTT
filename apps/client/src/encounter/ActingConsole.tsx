@@ -1,4 +1,4 @@
-import { IconStar, MoveLamp } from "@vtt/ui";
+import { IconStar, MoveLamp, Roll } from "@vtt/ui";
 import { useEffect, useState } from "react";
 import type { GmActor, GmView, MutationResult } from "@vtt/domain";
 import { command } from "../lib/command";
@@ -117,7 +117,7 @@ export function ActingConsole({
                 className="economy-slot legendary-pill"
                 title="Legendary actions remaining this round; the pool refills on its own turn."
               >
-                <IconStar /> {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}
+                <IconStar /> <Roll value={`${Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/${legendaryPool}`} />
               </span>
             </div>
           )}

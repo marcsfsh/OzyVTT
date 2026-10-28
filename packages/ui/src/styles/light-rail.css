@@ -124,6 +124,34 @@
   white-space: nowrap;
 }
 
+/* A tape counter's old value leaving upward over the new one (Roll, rollTo). */
+.lr-roll-out {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The sun frame on the move as a turn passes: the sun's colours cut to a 3px frame. */
+.lr-sunframe {
+  box-sizing: border-box;
+  padding: 3px;
+  background: var(--grad-sun);
+  -webkit-mask:
+    linear-gradient(var(--mask-solid) 0 0) content-box,
+    linear-gradient(var(--mask-solid) 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(var(--mask-solid) 0 0) content-box exclude,
+    linear-gradient(var(--mask-solid) 0 0);
+}
+
+/* A creature's stretch of the turn order's rail, draining as it leaves the order. */
+.lr-drop-mark {
+  background: var(--text-muted);
+}
+
 /* A part that briefly covers a whole surface: the white flash of a critical hit or a natural 20. */
 .lr-flash {
   inset: 0;
