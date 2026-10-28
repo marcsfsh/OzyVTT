@@ -1216,7 +1216,7 @@ top bar's sections hand their trip to `shell/pageLight.ts`, which runs it along 
 opening a record from a list and going back to it, for the Codex's pages and the Compendium's tables, whose rows carry
 `data-record-key`.
 Overlays (`Modal`, `Menu`, `Drawer`, `Toast`) carry an `OverlayEdge` along their top, which `motion/overlay.ts` lights
-outward from the control last pressed or focused. Closing never waits on it: the overlay closes at once and an inert,
+outward from the control last pressed or focused, and which casts its paint faintly down into the surface. Closing never waits on it: the overlay closes at once and an inert,
 id-free copy of its surface drains the edge and fades where it was (`ghostOut`), so focus return, Escape and the
 backdrop behave as they would with no motion.
 The turn order is a rail. `table/orderLight.ts` (`useOrderLight`) measures a list's rows after each render and lights

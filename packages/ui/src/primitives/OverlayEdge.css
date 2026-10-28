@@ -10,3 +10,18 @@
   box-shadow: var(--nh-edge-glow, var(--glow-horizon));
   pointer-events: none;
 }
+/* The edge casts its own paint faintly 18px down into the surface (ADR-0046), fading as it goes. It spans the surface,
+   so its ends meet the surface's sides and need no fade of their own. Reduced transparency sets --ink-cast to 0. */
+.nh-overlay-edge::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 18px;
+  background: var(--nh-edge, var(--grad-horizon));
+  opacity: var(--ink-cast);
+  -webkit-mask-image: linear-gradient(to bottom, var(--mask-solid), transparent);
+  mask-image: linear-gradient(to bottom, var(--mask-solid), transparent);
+  pointer-events: none;
+}
