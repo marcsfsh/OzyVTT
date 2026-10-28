@@ -15,7 +15,7 @@ function boxOf(tab: HTMLElement): Box {
 }
 
 /**
- * The chosen tab's ink (ADR-0045): one line in a strip that moves with the light. When the chosen tab changes, the
+ * The chosen tab's ink (ADR-0045, ADR-0046): one line in a strip that moves with the light, lying on the strip's line. When the chosen tab changes, the
  * old ink drains toward the trip, a comet runs along the strip's line, a burst lands and the ink fills from the side
  * the light arrived on. Render it as the strip's last child; the strip must be positioned. It finds the chosen tab
  * with `selector` among the strip's own children, so a strip of links or of tab buttons can carry it.
@@ -25,6 +25,7 @@ export function StripInk({
   selector = ".nh-tab--active",
   edge = "bottom",
   onTravel,
+  onHorizon = false,
   panel
 }: Readonly<{
   /** Which tab is chosen. The light runs when it changes, never on the first render. */
@@ -33,6 +34,8 @@ export function StripInk({
   edge?: InkEdge;
   /** Draws the trip elsewhere: the ink still drains and fills, and no comet runs in the strip. */
   onTravel?: (from: HTMLElement, to: HTMLElement) => void;
+  /** The ink lies on the horizon of the bar it sits in (marked `data-horizon`), and shows its colours there. */
+  onHorizon?: boolean;
   /** What the chosen tab shows. It fades in as the light lands; its light lives in the strip, so it only fades. */
   panel?: () => Element | null | undefined;
 }>) {
@@ -53,10 +56,20 @@ export function StripInk({
       line.style.left = `${tab.offsetLeft}px`;
       line.style.top = `${tab.offsetTop}px`;
       line.style.height = `${tab.offsetHeight}px`;
-    } else {
-      line.style.left = `${tab.offsetLeft}px`;
-      line.style.width = `${tab.offsetWidth}px`;
-      line.style.top = `${edge === "top" ? tab.offsetTop : tab.offsetTop + tab.offsetHeight - line.offsetHeight}px`;
+      return tab;
+    }
+    // The strip's line may be an edge just past its tabs: the shift seats the ink on it.
+    const shift = parseFloat(getComputedStyle(strip).getPropertyValue("--nh-ink-shift")) || 0;
+    line.style.left = `${tab.offsetLeft}px`;
+    line.style.width = `${tab.offsetWidth}px`;
+    line.style.top = `${(edge === "top" ? tab.offsetTop : tab.offsetTop + tab.offsetHeight - line.offsetHeight) + shift}px`;
+    const bar = onHorizon ? strip.closest<HTMLElement>("[data-horizon]") : null;
+    if (bar) {
+      // The stretch of the bar's horizon the ink lies over, so it shows the line's own colours there.
+      const rail = bar.getBoundingClientRect();
+      const left = strip.getBoundingClientRect().left + strip.clientLeft - strip.scrollLeft + tab.offsetLeft;
+      line.style.setProperty("--ink-win-w", `${rail.width}px`);
+      line.style.setProperty("--ink-win-x", `${rail.left - left}px`);
     }
     return tab;
   };
@@ -91,10 +104,24 @@ export function StripInk({
     const observer = new ResizeObserver(() => place());
     observer.observe(strip);
     for (const tab of strip.children) if (tab !== ink.current) observer.observe(tab);
-    return () => observer.disconnect();
+    // A strip that scrolls moves its ink along the horizon too.
+    const scrolled = () => place();
+    if (onHorizon) strip.addEventListener("scroll", scrolled, { passive: true });
+    return () => {
+      observer.disconnect();
+      strip.removeEventListener("scroll", scrolled);
+    };
     // `place` reads refs and props that the per-render effect keeps current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <span ref={ink} className="nh-tabs-ink" data-edge={edge} aria-hidden="true" />;
+  return (
+    <span
+      ref={ink}
+      className="nh-tabs-ink"
+      data-edge={edge}
+      {...(onHorizon ? { "data-on-horizon": "" } : {})}
+      aria-hidden="true"
+    />
+  );
 }

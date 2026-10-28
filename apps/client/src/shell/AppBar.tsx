@@ -95,6 +95,7 @@ function SectionTabs({
       onChange={onChange}
       inkEdge={bottom ? "top" : "bottom"}
       onTravel={pageLight}
+      onHorizon={!bottom}
       tabs={tabs.map((tab) => ({
         id: tab.id,
         label: bottom ? (

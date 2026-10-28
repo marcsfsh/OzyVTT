@@ -990,6 +990,60 @@ test("the light runs as the GM changes sections and tabs, opens a record and goe
   expect(errors, "console errors").toEqual([]);
 });
 
+test("a chosen tab's ink lies on its strip's line, with no second line beside it", async ({ open, request }) => {
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await expect(gm.locator(".landing")).toHaveCount(0);
+  // Every line drawn at an ink's strip (its own or its bar's border, a line drawn inside it, the top bar's horizon)
+  // must lie under the ink, never 1 to 3px beside it as a second line (ADR-0046).
+  const beside = () =>
+    gm.evaluate(() => {
+      const found: string[] = [];
+      for (const ink of document.querySelectorAll<HTMLElement>(".nh-tabs-ink")) {
+        const at = ink.getBoundingClientRect();
+        if (ink.hidden || at.width === 0) continue;
+        const lines: Array<{ top: number; bottom: number; what: string }> = [];
+        let element: HTMLElement | null = ink.parentElement;
+        for (let depth = 0; element && depth < 3; depth++, element = element.parentElement) {
+          const box = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const under = parseFloat(style.borderBottomWidth);
+          const over = parseFloat(style.borderTopWidth);
+          if (under > 0 && under <= 3) lines.push({ top: box.bottom - under, bottom: box.bottom, what: "a border" });
+          if (over > 0 && over <= 3) lines.push({ top: box.top, bottom: box.top + over, what: "a border" });
+          if (/inset 0px -1px 0px/.test(style.boxShadow))
+            lines.push({ top: box.bottom - 1, bottom: box.bottom, what: "a line drawn inside" });
+          const after = getComputedStyle(element, "::after");
+          const height = parseFloat(after.height);
+          if (after.content !== "none" && after.position === "absolute" && after.bottom === "0px" && height <= 3)
+            lines.push({ top: box.bottom - height, bottom: box.bottom, what: "the horizon" });
+        }
+        for (const line of lines) {
+          if (line.top < at.bottom && line.bottom > at.top) continue;
+          const gap = Math.min(Math.abs(line.top - at.bottom), Math.abs(at.top - line.bottom));
+          if (gap <= 3) found.push(`${ink.parentElement!.className}: ${line.what} ${Math.round(gap)}px from the ink`);
+        }
+      }
+      return found;
+    });
+  const look = async (where: string) => {
+    await settleLight(gm);
+    expect(await beside(), where).toEqual([]);
+  };
+  await look("Play");
+  for (const name of ["Encounters", "Party", "Maps", "Tokens"]) {
+    await openGmSection(gm, name);
+    await look(`Prep, ${name}`);
+  }
+  for (const name of ["Codex", "Compendium"] as const) {
+    await press(gmSection(gm, name));
+    await look(name);
+  }
+  await openGmSection(gm, "Settings");
+  await look("Settings");
+});
+
 test("under reduced motion the sections and tabs change with no light", async ({ open, request }) => {
   await ensureGmPassword(request);
   const gm = await open("/");

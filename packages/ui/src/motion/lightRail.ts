@@ -847,6 +847,10 @@ export function stripSwitch(host: Element, o: StripSwitchOptions): Animation | n
     ghost.style.height = px(o.from.h);
   }
   ghost.style.transformOrigin = originOf({ axis, origin: dir > 0 ? "100%" : "0%" });
+  // An ink on the horizon shows the stretch of it where it lies, so the copy left on the old tab shows that stretch.
+  const onRail = o.ink.style.getPropertyValue("--ink-win-x");
+  if (onRail && axis === "x")
+    ghost.style.setProperty("--ink-win-x", px(parseFloat(onRail) + o.ink.offsetLeft - o.from.x));
   host.appendChild(ghost);
   const scale = axis === "x" ? "scaleX" : "scaleY";
   const drained = play(ghost, [{ transform: `${scale}(1)` }, { transform: `${scale}(0)` }], {

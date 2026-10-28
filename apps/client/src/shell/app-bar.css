@@ -51,10 +51,10 @@
   padding-right: var(--space-1);
 }
 
-/* The sections in the top bar: words that light cyan with the ink under them when chosen. No track: the bar is the
-   plate. A change of section runs its light along the horizon (shell/pageLight.ts). */
+/* The sections in the top bar: words that light cyan when chosen, over an ink that is the horizon glowing where it lies
+   (`onHorizon`). No track: the bar is the plate. A change of section runs its light along the horizon
+   (shell/pageLight.ts). */
 .app-sections.nh-tabs--horizontal {
-  --nh-ink: var(--state-on-edge);
   align-self: stretch;
   padding: 0;
   gap: 2px;
@@ -160,10 +160,11 @@
   border-bottom: 1px solid var(--line-strong);
   background: var(--surface-1);
 }
+/* The bar's line is its bottom border: the tabs reach over it, so the ink at their foot lies on it. */
 .section-bar-tabs.nh-tabs--horizontal {
-  --nh-ink: var(--state-on-edge);
   align-self: stretch;
   min-width: 0;
+  margin-bottom: -1px;
   padding: 0;
   background: none;
   box-shadow: none;
@@ -212,8 +213,9 @@
 
 /* The phone's bottom tabs: 64px, an icon over each name, the chosen one cyan with the ink along its top. They sit above
    the home indicator. */
+/* The ink lies on the tabs' top border, as its own horizon (this line is not the top bar's). */
 .app-bottom-tabs.nh-tabs--horizontal {
-  --nh-ink: var(--state-on-edge);
+  --nh-ink-shift: -1px;
   padding: 0 0 env(safe-area-inset-bottom);
   gap: 0;
   border-top: 1px solid var(--line-strong);

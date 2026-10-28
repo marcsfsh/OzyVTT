@@ -65,4 +65,66 @@ describe("the strip's ink", () => {
     );
     expect(container.querySelector(".nh-tabs-ink")).toHaveAttribute("data-edge", "start");
   });
+
+  describe("on its line", () => {
+    // jsdom lays nothing out: tabs 100px apart in a strip 100px into a 1280px bar marked as the horizon.
+    const layout = () => {
+      vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute("role") === "tab") return TABS.findIndex((tab) => tab.label === this.textContent) * 100;
+        return parseFloat(this.style.left) || 0;
+      });
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+        if (this.hasAttribute("data-horizon")) return { left: 0, width: 1280 } as DOMRect;
+        if (this.getAttribute("role") === "tablist") return { left: 100, width: 300 } as DOMRect;
+        return { left: 0, width: 0 } as DOMRect;
+      });
+    };
+    afterEach(() => vi.restoreAllMocks());
+
+    it("lies on its bar's horizon and shows the stretch of it where it lies", () => {
+      layout();
+      const { container } = render(
+        <header data-horizon="">
+          <Tabs tabs={TABS} activeId="gear" onChange={() => {}} ariaLabel="Sections" onHorizon />
+        </header>
+      );
+      const ink = container.querySelector<HTMLElement>(".nh-tabs-ink")!;
+      expect(ink).toHaveAttribute("data-on-horizon");
+      expect(ink.style.getPropertyValue("--ink-win-w")).toBe("1280px");
+      // The bar's left edge is 200px left of the ink, under Gear.
+      expect(ink.style.getPropertyValue("--ink-win-x")).toBe("-200px");
+    });
+
+    it("leaves the old tab a copy that shows its own stretch of the horizon as it drains", () => {
+      layout();
+      stubAnimate();
+      const { container, rerender } = render(
+        <header data-horizon="">
+          <Tabs tabs={TABS} activeId="spells" onChange={() => {}} ariaLabel="Sections" onHorizon />
+        </header>
+      );
+      rerender(
+        <header data-horizon="">
+          <Tabs tabs={TABS} activeId="notes" onChange={() => {}} ariaLabel="Sections" onHorizon />
+        </header>
+      );
+      const ghost = container.querySelector<HTMLElement>(".lr-ink-ghost")!;
+      expect(
+        container.querySelector<HTMLElement>(".nh-tabs-ink:not(.lr-ink-ghost)")!.style.getPropertyValue("--ink-win-x")
+      ).toBe("-300px");
+      expect(ghost.style.getPropertyValue("--ink-win-x")).toBe("-100px");
+    });
+
+    it("moves onto the strip's line by the strip's --nh-ink-shift", () => {
+      const style = document.createElement("style");
+      style.textContent = ".over-the-line { --nh-ink-shift: 1px; }";
+      document.head.append(style);
+      const { container } = render(
+        <Tabs tabs={TABS} activeId="gear" onChange={() => {}} ariaLabel="Sheet" className="over-the-line" />
+      );
+      expect(container.querySelector<HTMLElement>(".nh-tabs-ink")!.style.top).toBe("1px");
+      expect(container.querySelector(".nh-tabs-ink")).not.toHaveAttribute("data-on-horizon");
+      style.remove();
+    });
+  });
 });

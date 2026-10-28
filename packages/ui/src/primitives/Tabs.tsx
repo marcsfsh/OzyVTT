@@ -25,6 +25,8 @@ interface TabsProps {
   inkEdge?: "bottom" | "top";
   /** Draws the trip between two tabs elsewhere (the top bar's sections light the horizon); the ink still moves. */
   onTravel?: (from: HTMLElement, to: HTMLElement) => void;
+  /** The strip lies on its bar's horizon (the top bar's sections): the ink shows the horizon's colours there. */
+  onHorizon?: boolean;
   /** What the chosen tab shows, to fade in on a change; the panel `idBase` names unless given. */
   panel?: () => Element | null | undefined;
 }
@@ -43,6 +45,7 @@ export function Tabs({
   idBase,
   inkEdge = "bottom",
   onTravel,
+  onHorizon = false,
   panel
 }: TabsProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -170,6 +173,7 @@ export function Tabs({
         active={activeId}
         edge={horizontal ? inkEdge : "start"}
         onTravel={onTravel}
+        onHorizon={horizontal && onHorizon}
         panel={panel ?? (idBase ? () => document.getElementById(`${idBase}-panel-${activeId}`) : undefined)}
       />
     </div>

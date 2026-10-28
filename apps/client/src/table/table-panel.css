@@ -18,15 +18,15 @@
 .table-panel > .prompt-slot {
   padding: var(--space-2) var(--space-3) 0;
 }
-/* The sidebar's tabs read like a section bar: names across the top, the chosen one in cyan with a bar under it. */
+/* The sidebar's tabs read like a section bar: names across the top, the chosen one with the ink under it. They scroll
+   sideways, so the line under them is drawn inside the strip, where the ink can lie on it. */
 .table-panel-tabs.nh-tabs--horizontal {
-  --nh-ink: var(--state-on-edge);
+  --nh-ink-shift: 1px;
   flex: none;
   margin: 0;
-  padding: 0;
-  border-bottom: 1px solid var(--line-strong);
+  padding: 0 0 1px;
   background: none;
-  box-shadow: none;
+  box-shadow: inset 0 -1px 0 var(--line-strong);
 }
 .table-panel-tabs .nh-tab,
 .table-panel-tabs .nh-tab:hover {

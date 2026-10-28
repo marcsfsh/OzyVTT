@@ -1206,7 +1206,10 @@ primitive's or the encounter panel's own `.encounter-primary`, from the press po
 middle.
 
 A tab strip's underline is its ink (`StripInk` in `@vtt/ui`), one line that `Tabs` and the link bars (the Codex,
-Compendium and Settings section bars, their phone tab bars and the sheet's) carry as their last child. A change of
+Compendium and Settings section bars, their phone tab bars and the sheet's) carry as their last child. The ink is a
+horizon with a faint cast, and it lies on the strip's line: `place()` adds the strip's `--nh-ink-shift` to seat it on
+an edge line, and an ink marked `onHorizon` (the top bar's sections) measures the bar marked `data-horizon` and shows
+that horizon's own stretch under it. A change of
 tab drains it, runs a comet along the strip and fills it under the new tab, and fades in the panel the strip names. The
 top bar's sections hand their trip to `shell/pageLight.ts`, which runs it along the horizon (the first bar marked
 `data-horizon`), washes the pane and fades the page in; the scanline wipe is gone. `shell/recordLight.ts` lights
