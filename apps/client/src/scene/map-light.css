@@ -1,0 +1,45 @@
+/* Light rail on the map (ADR-0045, group 6): throwaway SVG parts in map units, drawn by scene/mapLight.ts. Each
+   removes itself when its animation ends. */
+.lr-trail {
+  fill: none;
+  stroke: var(--party);
+  stroke-linecap: round;
+  stroke-dasharray: 1 1;
+  opacity: 0.8;
+}
+.lr-trail.lr-tone-hostile {
+  stroke: var(--hostile);
+}
+.lr-trail.lr-tone-neutral {
+  stroke: var(--text-muted);
+}
+.lr-svg-pop {
+  fill: none;
+  stroke: var(--spark);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.lr-svg-pop.lr-tone-gold {
+  stroke: var(--gold-head);
+}
+.lr-svg-pop.lr-tone-red,
+.lr-svg-pop.lr-tone-hostile {
+  stroke: var(--red-head);
+}
+.lr-svg-pop.lr-tone-party {
+  stroke: var(--party);
+}
+.lr-door-swing {
+  stroke: var(--text);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.lr-trap-flash {
+  fill: var(--danger);
+}
+.lr-fog-edge {
+  fill: var(--spark);
+  filter: var(--spark-glow);
+}

@@ -1233,6 +1233,12 @@ numbers come from `scene/damageNumbers.ts`, which compares each creature's healt
 raises the drop only where the viewer holds exact hit points; the table screen holds only bands, so it bursts with no
 number. No projection or table event gained a field for it. `encounter/WaitNote.tsx` is the still WAIT line that
 lights when settled, and `encounter/requestLight.ts` brings a save to a player along the horizon.
+The map's own light is SVG in map units, from `scene/mapLight.ts`: a token glides to where it moved with a trail (never
+the token this device is dragging), a fog reveal clears behind an edge of light (a cover over the new area, since an
+SVG mask can't animate), an opened door swings on its hinge, a light or area spreads from its centre and a trap that
+springs flashes once. A ping rings once. The table screen's `viewer/screenLight.ts` glides the view when it follows
+the GM's camera, picking up from where a glide in progress is, and uncovers a new map behind a sweep; it moves only
+the map's own layer.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map

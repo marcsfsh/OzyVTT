@@ -11,6 +11,7 @@ import { bandFraction, TokenAltitudeBadge, TokenGlyph, TokenHealthAura, TokenSta
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { useDamageNumbers, type SeenHealth } from "../scene/damageNumbers";
+import { useScreenLight } from "./screenLight";
 import { ScreenColumn, ScreenTop } from "./ScreenParts";
 import { ScreenPairing } from "./ScreenPairing";
 import { TableSound } from "./TableSound";
@@ -193,6 +194,8 @@ export function MapStage({
     const height = size.height / camera.zoom;
     return `${camera.center.x - width / 2} ${camera.center.y - height / 2} ${width} ${height}`;
   }, [camera, size]);
+  // Following the GM's camera glides; a hand on the screen's own view moves it directly (ADR-0045).
+  useScreenLight(stageRef, svgRef, viewBox, presentation.activeMap?.assetId ?? null, follow && localCamera === null);
 
   const zoomAt = useCallback(
     (clientX: number, clientY: number, factor: number) => {

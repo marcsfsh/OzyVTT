@@ -1,4 +1,7 @@
+import { useRef } from "react";
+import { canMove, useOnChange } from "@vtt/ui";
 import { AREA_KINDS } from "./mapTools";
+import { spreadFrom, swingDoor } from "./mapLight";
 
 type Point = Readonly<{ x: number; y: number }>;
 /** A wall as this view has it: the GM's carry what holds a door shut and the statistics of one that is an object. */
@@ -88,8 +91,9 @@ export function VisionLayer({
   onDoorMenu: (wallId: string, x: number, y: number) => void;
 }>) {
   const handle = Math.max(6, cellSizePx * 0.18);
+  const layer = useVisionLight(walls, lights, areas, cellSizePx);
   return (
-    <g className={`vision-layer${erasing ? " erasing" : ""}`}>
+    <g ref={layer} className={`vision-layer${erasing ? " erasing" : ""}`}>
       {role === "gm" &&
         areas.map((area) => {
           const label = AREA_KINDS.find((entry) => entry.id === area.kind)?.label ?? area.kind;
@@ -217,4 +221,46 @@ export function VisionLayer({
       })}
     </g>
   );
+}
+
+const ids = (list: readonly string[]) => list.join(" ");
+
+/**
+ * What changes in the vision layer lights as it changes (ADR-0045, group 6): a door that opens swings on its hinge
+ * with a burst there, and a light or an area that appears (a torch lit, a Fog Cloud placed) spreads out from its
+ * centre as it fades up.
+ */
+function useVisionLight(walls: readonly Wall[], lights: readonly Light[], areas: readonly Area[], cellSizePx: number) {
+  const layer = useRef<SVGGElement>(null);
+  const open = walls.filter((wall) => wall.kind === "door" && wall.open === true).map((wall) => wall.id);
+  useOnChange(ids(open), (before) => {
+    const el = layer.current;
+    if (!el) return;
+    const was = new Set(before.split(" "));
+    for (const wall of walls)
+      if (wall.kind === "door" && wall.open === true && !was.has(wall.id))
+        swingDoor(el, wall.a, wall.b, Math.max(3, cellSizePx * 0.08));
+  });
+  const lit = lights.filter((light) => light.out !== true).map((light) => light.id);
+  const shown = [...lit, ...areas.map((area) => area.id)];
+  useOnChange(ids(shown), (before) => {
+    const el = layer.current;
+    if (!el || !canMove()) return;
+    const was = new Set(before.split(" "));
+    for (const id of shown) {
+      if (was.has(id)) continue;
+      const group = el.querySelector<SVGGElement>(
+        `[data-light-id="${CSS.escape(id)}"], [data-area-id="${CSS.escape(id)}"]`
+      );
+      const box = group && "getBBox" in group ? group.getBBox() : null;
+      if (!group || !box || box.width === 0) continue;
+      spreadFrom(
+        group,
+        { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+        Math.max(box.width, box.height) / 2,
+        el
+      );
+    }
+  });
+  return layer;
 }

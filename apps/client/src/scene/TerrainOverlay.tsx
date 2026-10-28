@@ -1,4 +1,6 @@
-import { useId } from "react";
+import { useId, useRef } from "react";
+import { canMove, fadeIn, useOnChange } from "@vtt/ui";
+import { trapFlash } from "./mapLight";
 
 type Rect = Readonly<{ x: number; y: number; width: number; height: number }>;
 
@@ -37,6 +39,21 @@ export function TerrainOverlay({
   cellSizePx: number;
 }>) {
   const baseId = useId();
+  // A trap springing flashes red once on its square, then its mark appears (ADR-0045).
+  const overlay = useRef<SVGGElement>(null);
+  const sprung = traps.filter((trap) => trap.state === "sprung").map((trap) => trap.id);
+  useOnChange(sprung.join(" "), (before) => {
+    const el = overlay.current;
+    if (!el || !canMove()) return;
+    const was = new Set(before.split(" "));
+    for (const trap of traps) {
+      if (trap.state !== "sprung" || was.has(trap.id)) continue;
+      const size = Math.min(trap.area.width, trap.area.height);
+      trapFlash(el, trap.area.x + (trap.area.width - size) / 2, trap.area.y + (trap.area.height - size) / 2, size);
+      const mark = el.querySelector(`[data-trap-id="${CSS.escape(trap.id)}"]`);
+      if (mark) fadeIn(mark, { delay: 120, dur: 140 });
+    }
+  });
   if (difficult.length + water.length + runningWater.length + ice.length + traps.length === 0) return null;
   const spacing = Math.max(6, cellSizePx / 4);
   const ids = {
@@ -46,7 +63,7 @@ export function TerrainOverlay({
     frost: `${baseId}-frost`
   };
   return (
-    <g className="terrain-overlay" pointerEvents="none">
+    <g ref={overlay} className="terrain-overlay" pointerEvents="none">
       <title>Painted ground</title>
       <defs>
         <pattern
@@ -114,6 +131,7 @@ export function TerrainOverlay({
       {traps.map((trap) => (
         <g
           key={trap.id}
+          data-trap-id={trap.id}
           className={`terrain-trap terrain-trap-${trap.state}${trap.found === false ? " terrain-trap-hidden" : ""}`}
         >
           <title>
