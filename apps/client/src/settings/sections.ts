@@ -171,8 +171,8 @@ export const SETTING = entries({
   reduceTransparency: {
     section: "device",
     label: "Reduce transparency",
-    hint: "Panels turn solid, and the scanlines and glows go.",
-    words: "transparency blur glass solid scanlines glow contrast accessibility"
+    hint: "Panels turn solid, and the glows go.",
+    words: "transparency blur glass solid glow contrast accessibility"
   },
   rollInput: {
     section: "device",

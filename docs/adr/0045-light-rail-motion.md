@@ -47,6 +47,10 @@ keeps its one job.
   900 ms, the one exception to the 500 ms rule, because it is a value someone reads. The same value stays in the
   result card and the log.
 - **Time passing animates effect durations only.** No world clock is added.
+- **No CRT texture.** At the owner's request (2026-10-28) the scanline overlay over the whole app in Dusk and the
+  loading skeleton's scanline sweep are retired, along with the scanline wipe. Text and surfaces are plain: glass in
+  Dusk, paper in Dawn, and the light that runs on a change is the only shimmer. This replaces the Scanlines row of
+  ADR-0037's table of 80s elements.
 - **One engine.** `packages/ui/src/motion/lightRail.ts` draws the parts with the Web Animations API, in the
   colours and timings of the tokens in `design-tokens.css`; `styles/light-rail.css` says how each part looks. The
   parts are throwaway `.lr-part` elements, hidden from assistive tech and the pointer, removed when they finish.

@@ -1,5 +1,5 @@
 /**
- * The themes as the browser paints them: Dusk's glass composited over the real sky and scanlines, Dawn's paper, and
+ * The themes as the browser paints them: Dusk's glass composited over the real sky, Dawn's paper, and
  * reduced transparency, from the built client's own stylesheets. The unit tests check the token values; this checks
  * the layers they become. It reads the app's ground alone, so it changes nothing on the server.
  */
@@ -124,7 +124,7 @@ async function expectInksReadOnPlates(page: Page, label: string) {
   }
 }
 
-test("Dusk paints glass over the sky with the scanlines on, and every ink reads on it", async ({ open }) => {
+test("Dusk paints glass over the sky with no scanlines, and every ink reads on it", async ({ open }) => {
   const page = await openIn(open, "dusk", false);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dusk");
   await expect(page.locator("html")).not.toHaveAttribute("data-transparency", "reduced");
@@ -137,7 +137,7 @@ test("Dusk paints glass over the sky with the scanlines on, and every ink reads 
     probe.remove();
     return {
       sky: body.backgroundImage,
-      scanlines: getComputedStyle(document.body, "::after").opacity,
+      overlay: getComputedStyle(document.body, "::after").content,
       glass,
       scheme: getComputedStyle(document.documentElement).colorScheme
     };
@@ -157,7 +157,8 @@ test("Dusk paints glass over the sky with the scanlines on, and every ink reads 
       .filter((name) => /\.woff2?($|\?)/.test(name) && !name.startsWith(location.origin))
   );
   expect(layers.sky).toContain("radial-gradient");
-  expect(Number(layers.scanlines)).toBeCloseTo(0.25);
+  // No scanlines lie over the app (ADR-0045).
+  expect(layers.overlay).toBe("none");
   expect(layers.glass).toContain("blur(16px)");
   expect(layers.scheme).toBe("dark");
   for (const [index, count] of fonts.entries()) expect(count, `font face ${index} loads`).toBeGreaterThan(0);
@@ -186,7 +187,7 @@ for (const [theme, reduce] of [
         glass: style.backdropFilter,
         plate: style.backgroundColor,
         solid: getComputedStyle(document.body).getPropertyValue("--surface-1").trim(),
-        scanlines: getComputedStyle(document.body, "::after").opacity,
+        overlay: getComputedStyle(document.body, "::after").content,
         scheme: getComputedStyle(document.documentElement).colorScheme
       };
       probe.remove();
@@ -194,7 +195,7 @@ for (const [theme, reduce] of [
     });
     expect(layers.glass).toBe("none");
     expect(parseColour(layers.plate)).toEqual(parseColour(layers.solid));
-    expect(Number(layers.scanlines)).toBe(0);
+    expect(layers.overlay).toBe("none");
     expect(layers.scheme).toBe(theme === "dawn" ? "light" : "dark");
     await floatPlates(page);
     await expectInksReadOnPlates(page, `${theme}${reduce ? " reduced" : ""}`);

@@ -1,7 +1,8 @@
 /* OzyVTT design tokens: an arcade cabinet at dusk and at dawn. Import once at the app root and reference these
    variables; never hardcode a colour elsewhere. See docs/DESIGN.md.
    Themes: data-theme="dusk|dawn" on <html>. Dusk is :root, so it renders before anything is chosen; the Dawn block
-   overrides only values. <html data-transparency="reduced"> makes the glass solid and drops scanlines and glows. */
+   overrides only values. <html data-transparency="reduced"> makes the glass solid and drops the glows. There are no
+   scanlines (ADR-0045): surfaces are plain glass and paper. */
 
 :root {
   /* Native controls (date fields, scrollbars, checkboxes) follow the theme's ground. */
@@ -205,10 +206,6 @@
   --plate-ink: #f4f4fa;
   --plate-ink-hidden: #d4b8ff;
 
-  /* Scanlines: one overlay over the whole app, in Dusk only. */
-  --scanline-color: rgba(0, 0, 0, 0.2);
-  --scanline-opacity: 0.25;
-
   /* ---- Surfaces you can read the edges of ----
      A panel is a flat plate with a 1px edge. The chrome lip and the two-step raised fill are retired; their names
      stay as flat values so a caller that still uses them paints the new look. */
@@ -324,7 +321,6 @@
 
   /* Texture sizing and noise tile. */
   --grid-cell: 34px;
-  --scanline-gap: 3px;
   --noise-opacity: 0.045;
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
@@ -496,7 +492,7 @@
 }
 
 /* ---- Dawn: soft lilac-grey paper, plum-grey ink, gentler edges and slightly muted accents. No pure white and no
-   harsh black. No scanlines and no coloured glow: the sun frame keeps its warm glow and the primary its pressed
+   harsh black. No coloured glow: the sun frame keeps its warm glow and the primary its pressed
    edge. ---- */
 [data-theme="dawn"] {
   color-scheme: light;
@@ -589,8 +585,6 @@
   --tag-next-ink: #ebe7ef;
   --tag-miss-bg: #d3ccdc;
 
-  --scanline-opacity: 0;
-
   --glow-lamp-action: 0 0 #0000;
   --glow-lamp-bonus: 0 0 #0000;
   --glow-lamp-reaction: 0 0 #0000;
@@ -661,7 +655,7 @@
 }
 
 /* ---- Reduced transparency: the device setting or the system's request (theme/transparency.ts sets the
-   attribute). The glass turns solid, the blur and scanlines go, and every glow drops to its ring. It outranks
+   attribute). The glass turns solid, the blur goes, and every glow drops to its ring. It outranks
    either theme's block. ---- */
 :root[data-transparency="reduced"] {
   --glass-bg: var(--bg);
@@ -670,7 +664,6 @@
   --glass-surface-2: var(--surface-2);
   --glass-surface-3: var(--surface-3);
   --glass-blur: none;
-  --scanline-opacity: 0;
   --glow-magenta: 0 0 0 1px var(--magenta);
   --glow-magenta-strong: 0 0 0 2px var(--magenta);
   --glow-cyan: 0 0 0 1px var(--state-on-edge);
@@ -722,18 +715,6 @@ body {
   -webkit-font-smoothing: antialiased;
   /* Bungee and VT323 ship one weight; a synthesized bold smears them. Bai Jamjuree ships the weights it is used at. */
   font-synthesis-weight: none;
-}
-
-/* Scanlines: one noninteractive overlay over the whole app, in Dusk only, so nothing nests a second comb. Its opacity
-   is a token that Dawn and reduced transparency set to zero. */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 2147483000;
-  pointer-events: none;
-  background: repeating-linear-gradient(180deg, var(--scanline-color) 0 1px, transparent 1px var(--scanline-gap));
-  opacity: var(--scanline-opacity);
 }
 
 /* Numbers that update live (HP, initiative, totals). VT323 is monospaced; `tabular-nums` covers a fallback face. */
@@ -1014,19 +995,9 @@ a:focus-visible .nav-arrow {
   text-shadow: var(--chrome-split);
 }
 
-/* Subtle magenta/cyan fringing, app wordmark only; optional garnish on top of the chrome fill. */
-.chromatic {
-  text-shadow:
-    -1px 0 rgba(255, 46, 154, 0.55),
-    1px 0 rgba(45, 226, 255, 0.55);
-}
-
-/* Dawn: texture off, wordmark fringing off */
+/* Dawn: texture off */
 [data-theme="dawn"] .grid-floor {
   display: none;
-}
-[data-theme="dawn"] .chromatic {
-  text-shadow: none;
 }
 
 /* ---- State treatments ---- */

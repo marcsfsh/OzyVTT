@@ -1191,7 +1191,7 @@ with the rules of `resolveTheme` (`packages/ui/src/theme/theme.ts`): a saved `du
 `apps/client/src/shell/theme-startup.test.ts` runs each entry's script against it. `ThemeToggle` in Settings > Device and
 the standalone sheet's `ThemeSwitch` share `useTheme`, which hears every change on the page. Reduce transparency
 (`theme/transparency.ts`, Settings > Device) is the device setting `vtt.reduce-transparency` or the system's request;
-while it is on, `<html data-transparency="reduced">` turns the glass tokens solid and drops the scanlines and glows. The
+while it is on, `<html data-transparency="reduced">` turns the glass tokens solid and drops the glows. The
 same script sets it before first paint, and each entry calls `initTransparency` to follow the system after that.
 
 Motion is Light rail (ADR-0045), in `packages/ui/src/motion/`. `lightRail.ts` is the engine: each part (a comet, a

@@ -47,14 +47,15 @@ Neon appears only where it means something, and each 80s element has one job.
 | Arcade button                            | Press this         | The one primary action in a view                                                                                                                   |
 | Neon grid (`--grid-neon`)                | Map squares        | The grid drawn over a map image                                                                                                                    |
 | Reticle                                  | The target         | The creature an attack or spell is aimed at                                                                                                        |
-| Scanlines                                | The CRT            | One overlay over the whole app at 25%, in Dusk only                                                                                                |
 
 - Nothing pulses or loops. One-shot cues (a crit flash, a bar filling) are fine.
+- No scanlines or other CRT texture over text or surfaces (ADR-0045). A surface is plain glass in Dusk and plain
+  paper in Dawn; the light that moves across them on a change is all the cabinet's shimmer.
 - Glow belongs to four things: the sun frame, a lit lamp, the selected item and the primary button. Resting surfaces
   never glow. Dawn keeps only the sun frame's glow and the primary's pressed edge.
 - Every surface is square. `--radius-pill` is for tokens, presence dots and swatches.
 - A panel is a flat plate with a 1px edge. There is no chrome lip and no rim.
-- Legibility wins every conflict with mood. Reduced transparency turns Dusk's glass solid and drops scanlines and glows.
+- Legibility wins every conflict with mood. Reduced transparency turns Dusk's glass solid and drops the glows.
 
 ## Colour and themes
 
@@ -84,7 +85,7 @@ linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%)`.
 
 Dawn:
 
-- No scanlines and no coloured glow; the sun frame keeps its warm glow and the primary its pressed edge.
+- No coloured glow; the sun frame keeps its warm glow and the primary its pressed edge.
 - Chrome lettering is solid ink with a 1px pink and cyan split at 35%.
 - The join screen's sunset becomes daybreak: pale lilac to peach to pink over a pink grid, mountains with a teal rim.
 

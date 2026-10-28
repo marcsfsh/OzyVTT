@@ -72,8 +72,8 @@ Dawn and reduced transparency alias each glass token to its corresponding solid.
 not every nested `section` or `main`. Unsupported backdrop-filter also falls back to solids. Add the missing Reduce
 transparency Device preference: `vtt.reduce-transparency` uses `on` / `off`; combine it with the OS media query using
 OR. Initialize it for the main app, standalone sheet and viewer; use one shared preference implementation rather than
-three independent stores. Entry scripts may repeat only the small startup decision. Reduction disables blur, scanlines
-and decorative glow. A single noninteractive app overlay provides scanlines; delete old nested scanline layers.
+three independent stores. Entry scripts may repeat only the small startup decision. Reduction disables blur
+and decorative glow. There are no scanlines over the app (ADR-0045 retired the overlay and the skeleton's sweep).
 
 Keep existing semantic tokens working while their callers migrate. Alias `--indigo` to party and `--danger` to hostile;
 update `--turn-*`, `--grid-line`, `--primary-*`, `--state-on-*`, heading shadows and old sky/landing effects as needed.

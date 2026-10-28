@@ -9,8 +9,7 @@ interface SkeletonProps {
   className?: string;
 }
 
-/** Loading placeholder with a quiet shimmer (neutralized under reduced-motion).
-    Mirror the shape of the content it stands in for while data loads. */
+/** Loading placeholder: a still plate. Mirror the shape of the content it stands in for while data loads. */
 export function Skeleton({ variant = "text", width, height, className }: SkeletonProps) {
   return (
     <span
