@@ -47,6 +47,7 @@ export {
   flipDelta,
   flipFrom,
   floatText,
+  horizonAt,
   lightLamps,
   lightLine,
   lightTiming,

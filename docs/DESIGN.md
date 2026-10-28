@@ -363,6 +363,10 @@ with every moment and the phase that builds it, and the approved mockup are in `
    and cyan split.
 9. Dawn has no glow. The burst is a flash on the line, and the wash is half as strong.
 10. Reduced motion skips the light, and content swaps instantly. Reduced transparency drops the wash and the glow.
+11. Light with no meaning of its own is the horizon (ADR-0046): a comet takes the horizon's colour where it leaves and
+    where it lands, and a burst or pop the colour where it lands (`horizonAt`, the `lr-hz` parts). In Dusk its head is
+    white with a glow; in Dawn it is the landing colour, flat. Hit points, damage, healing and targeting keep their own
+    gold, red and cyan, because those colours mean something.
 
 Light presents state that has arrived from the server, and only what the viewer's projection already holds. It never
 plays on first mount, and `canMove()` holds it while a whole snapshot lands (a connect, a reconnect, a switch of

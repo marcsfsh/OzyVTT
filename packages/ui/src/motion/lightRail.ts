@@ -183,6 +183,40 @@ export function clearLight(host: Element): void {
 
 const toneClass = (tone?: Tone) => (tone ? ` lr-${tone}` : "");
 
+/** Where the horizon's five stops sit along it (`--hz-1` to `--hz-5`). */
+const HORIZON_AT = [0, 0.3, 0.6, 0.85, 1] as const;
+
+function rgbOf(value: string): [number, number, number] | null {
+  const text = value.trim();
+  const hex = /^#([0-9a-f]{6})$/i.exec(text);
+  if (hex) return [0, 2, 4].map((at) => parseInt(hex[1]!.slice(at, at + 2), 16)) as [number, number, number];
+  const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(text);
+  return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : null;
+}
+
+/**
+ * The horizon's colour at `t` along it, 0 at its cyan end and 1 at its yellow end (ADR-0046), from the stops as `el`
+ * sees them, so Dawn's darker stops come with Dawn. Light with no meaning of its own takes the colour of where it is.
+ */
+export function horizonAt(t: number, el: Element): string {
+  const style = getComputedStyle(el);
+  const stops = HORIZON_AT.map((_, index) => rgbOf(style.getPropertyValue(`--hz-${index + 1}`)));
+  if (stops.some((stop) => stop === null)) return "var(--hz-3)";
+  const at = Math.min(1, Math.max(0, Number.isFinite(t) ? t : 0));
+  const next = Math.max(
+    1,
+    HORIZON_AT.findIndex((stop) => at <= stop)
+  );
+  const [a, b] = [stops[next - 1]!, stops[next]!];
+  const k = (at - HORIZON_AT[next - 1]!) / (HORIZON_AT[next]! - HORIZON_AT[next - 1]!);
+  return `rgb(${a.map((channel, index) => Math.round(channel + (b[index]! - channel) * k)).join(", ")})`;
+}
+
+/** The host's length along a line's axis, never 0, so a place on the line is a share of it. */
+function lengthOf(host: Element, axis: Axis): number {
+  return Math.max(1, axis === "x" ? host.clientWidth : host.clientHeight);
+}
+
 export interface CometOptions extends Timed {
   /** Where the trip starts and ends along the line, in host coordinates. */
   from: number;
@@ -222,11 +256,19 @@ export function cometPath(o: CometOptions) {
   return { dir, len, face, css, frames };
 }
 
-/** A comet: travels from `from` to `to` along a line. */
+/**
+ * A comet: travels from `from` to `to` along a line. With no tone of its own it takes the horizon's colour where it
+ * leaves and where it lands, as shares of the host's length along the line (`lr-hz`).
+ */
 export function comet(host: Element, o: CometOptions): Animation | null {
   if (!canMove()) return null;
   const path = cometPath(o);
-  return temp(host, `lr-comet ${path.face}${toneClass(o.tone)}`, path.css, path.frames, {
+  let css = path.css;
+  if (!o.tone) {
+    const length = lengthOf(host, o.axis ?? "x");
+    css = { ...css, "--lr-tail-a": horizonAt(o.from / length, host), "--lr-tail-b": horizonAt(o.to / length, host) };
+  }
+  return temp(host, `lr-comet ${path.face}${o.tone ? toneClass(o.tone) : " lr-hz"}`, css, path.frames, {
     dur: o.dur ?? lightTiming(host).comet,
     delay: o.delay ?? COMET_DELAY,
     ease: EASE.travel
@@ -254,7 +296,8 @@ export interface PointTrip extends Timed {
 
 /**
  * A comet between two points at any angle, for the map, where an attack runs from one token to another. The trip runs
- * in a track turned to face the target, so it is the same comet as on a line.
+ * in a track turned to face the target, so it is the same comet as on a line; with no tone it runs the horizon from
+ * one end to the other, since the track is as long as the trip.
  */
 export function cometTo(host: Element, o: PointTrip): Animation | null {
   if (!canMove()) return null;
@@ -295,7 +338,7 @@ export interface BurstOptions extends Timed {
   tone?: Tone;
 }
 
-/** A burst: one short flash on a line. */
+/** A burst: one short flash on a line. With no tone it takes the horizon's colour where it lands (`lr-hz`). */
 export function burst(host: Element, o: BurstOptions): Animation | null {
   if (!canMove()) return null;
   const axis = o.axis ?? "x";
@@ -303,15 +346,16 @@ export function burst(host: Element, o: BurstOptions): Animation | null {
   const h = o.h ?? 10;
   const move = axis === "x" ? "translateX" : "translateY";
   const scale = axis === "x" ? "scaleX" : "scaleY";
-  const css: Css =
+  const css: Record<string, string> =
     axis === "x"
       ? { left: px(-w / 2), top: px(o.line - h / 2), width: px(w), height: px(h) }
       : { top: px(-w / 2), left: px(o.line - h / 2), height: px(w), width: px(h) };
+  if (!o.tone) css["--lr-ring"] = horizonAt(o.at / lengthOf(host, axis), host);
   const at = px(o.at);
   const timing = lightTiming(host);
   return temp(
     host,
-    `lr-burst${toneClass(o.tone)}`,
+    `lr-burst${o.tone ? toneClass(o.tone) : " lr-hz"}`,
     css,
     [
       { opacity: 0, transform: `${move}(${at}) ${scale}(0.3)` },
@@ -331,7 +375,10 @@ export interface PopOptions extends Timed {
   color?: string;
 }
 
-/** A pop: the round burst, for points that are not on a line (pips, tokens, places on the map). */
+/**
+ * A pop: the round burst, for points that are not on a line (pips, tokens, places on the map). With no tone or colour
+ * it takes the horizon's colour at its place across the host (`lr-hz`).
+ */
 export function pop(host: Element, o: PopOptions): Animation | null {
   if (!canMove()) return null;
   const size = o.size ?? 40;
@@ -342,9 +389,11 @@ export function pop(host: Element, o: PopOptions): Animation | null {
     height: px(size)
   };
   if (o.color) css["--lr-burst"] = o.color;
+  const hz = !o.tone && !o.color;
+  if (hz) css["--lr-ring"] = horizonAt(o.x / lengthOf(host, "x"), host);
   return temp(
     host,
-    `lr-pop${toneClass(o.tone)}`,
+    `lr-pop${toneClass(o.tone)}${hz ? " lr-hz" : ""}`,
     css,
     [
       { opacity: 0, transform: "scale(0.3)" },

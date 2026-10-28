@@ -10,12 +10,15 @@ import {
   LIGHT_TIMING,
   TIMING_TOKENS,
   canMove,
+  burst,
   comet,
   cometPath,
   drain,
   fill,
   flipDelta,
+  horizonAt,
   parseDuration,
+  pop,
   stripSwitch,
   wash,
   type Box
@@ -204,5 +207,70 @@ describe("useOnChange", () => {
     expect(seen).toHaveBeenCalledWith(0, 12);
     act(() => rerender(<Watch value={7} seen={seen} />));
     expect(seen).toHaveBeenLastCalledWith(12, 7);
+  });
+});
+
+describe("horizon light", () => {
+  /** The five stops a block of the token file declares, as `rgb(r, g, b)`. */
+  const stopsIn = (block: string) =>
+    [1, 2, 3, 4, 5].map((index) => {
+      const hex = new RegExp(`--hz-${index}:\\s*#([0-9a-f]{6});`, "i").exec(block)![1]!;
+      return `rgb(${[0, 2, 4].map((at) => parseInt(hex.slice(at, at + 2), 16)).join(", ")})`;
+    });
+  const dawnBlock = /\[data-theme="dawn"\] \{([^}]*)\}/.exec(tokens)![1]!;
+  let style: HTMLStyleElement;
+  beforeEach(() => {
+    style = document.createElement("style");
+    style.textContent = readFileSync(`${process.cwd()}/src/styles/design-tokens.css`, "utf8");
+    document.head.append(style);
+  });
+  afterEach(() => {
+    style.remove();
+    document.documentElement.removeAttribute("data-theme");
+  });
+
+  it("reads the horizon's colour at each stop and between them, in Dusk and Dawn", () => {
+    const root = document.documentElement;
+    for (const [theme, stops] of [
+      ["dusk", stopsIn(tokens)],
+      ["dawn", stopsIn(dawnBlock)]
+    ] as const) {
+      if (theme === "dawn") root.setAttribute("data-theme", "dawn");
+      expect(
+        [0, 0.3, 0.6, 0.85, 1].map((t) => horizonAt(t, root)),
+        theme
+      ).toEqual(stops);
+      expect(horizonAt(-1, root)).toBe(stops[0]);
+      expect(horizonAt(2, root)).toBe(stops[4]);
+    }
+    root.removeAttribute("data-theme");
+    // Half way from cyan (79, 227, 255) to violet (154, 92, 255).
+    expect(horizonAt(0.15, root)).toBe("rgb(117, 160, 255)");
+  });
+
+  it("colours light with no meaning of its own by where it leaves and lands, and leaves toned light alone", () => {
+    stubAnimate();
+    const host = document.createElement("div");
+    Object.defineProperty(host, "clientWidth", { value: 400 });
+    document.body.append(host);
+    comet(host, { from: 0, to: 300, line: 2 });
+    comet(host, { from: 0, to: 300, line: 2, tone: "gold" });
+    const [plain, gold] = [...host.querySelectorAll<HTMLElement>(".lr-comet")];
+    expect(plain!.classList.contains("lr-hz")).toBe(true);
+    expect(plain!.style.getPropertyValue("--lr-tail-a")).toBe(horizonAt(0, host));
+    expect(plain!.style.getPropertyValue("--lr-tail-b")).toBe(horizonAt(0.75, host));
+    expect(gold!.classList.contains("lr-hz")).toBe(false);
+    expect(gold!.style.getPropertyValue("--lr-tail-a")).toBe("");
+
+    burst(host, { at: 400, line: 2 });
+    pop(host, { x: 200, y: 10 });
+    pop(host, { x: 200, y: 10, color: "var(--party)" });
+    const ring = host.querySelector<HTMLElement>(".lr-burst")!;
+    expect(ring.classList.contains("lr-hz")).toBe(true);
+    expect(ring.style.getPropertyValue("--lr-ring")).toBe(horizonAt(1, host));
+    const [round, party] = [...host.querySelectorAll<HTMLElement>(".lr-pop")];
+    expect(round!.style.getPropertyValue("--lr-ring")).toBe(horizonAt(0.5, host));
+    expect(party!.classList.contains("lr-hz")).toBe(false);
+    host.remove();
   });
 });

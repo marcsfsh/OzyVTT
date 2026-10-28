@@ -222,3 +222,34 @@
   background: color-mix(in srgb, var(--hz-3) calc(var(--lr-head-k) * 100%), var(--spark));
   box-shadow: var(--ink-glow);
 }
+
+/* Horizon light (ADR-0046): a comet, burst or pop with no meaning of its own takes the horizon's colour where it leaves
+   and where it lands (the engine sets --lr-tail-a, --lr-tail-b and --lr-ring). In Dusk its head is the spark's white
+   with a glow in the landing colour; in Dawn the head is the landing colour, flat. Toned light keeps its own. */
+.lr-comet.lr-hz {
+  --lr-head: color-mix(in srgb, var(--lr-tail-b) calc(var(--lr-head-k) * 100%), var(--spark));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--spark) calc(var(--lr-glow-k) * 85%), transparent))
+    drop-shadow(0 0 8px color-mix(in srgb, var(--lr-tail-b) calc(var(--lr-glow-k) * 100%), transparent));
+}
+.lr-comet.lr-hz.lr-face-r {
+  background: linear-gradient(90deg, transparent, var(--lr-tail-a) 40%, var(--lr-tail-b) 80%, var(--lr-head));
+}
+.lr-comet.lr-hz.lr-face-l {
+  background: linear-gradient(270deg, transparent, var(--lr-tail-a) 40%, var(--lr-tail-b) 80%, var(--lr-head));
+}
+.lr-comet.lr-hz.lr-face-d {
+  background: linear-gradient(180deg, transparent, var(--lr-tail-a) 40%, var(--lr-tail-b) 80%, var(--lr-head));
+}
+.lr-comet.lr-hz.lr-face-u {
+  background: linear-gradient(0deg, transparent, var(--lr-tail-a) 40%, var(--lr-tail-b) 80%, var(--lr-head));
+}
+.lr-burst.lr-hz,
+.lr-pop.lr-hz {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--lr-ring) calc(var(--lr-head-k) * 100%), var(--spark)),
+    var(--lr-ring) 45%,
+    transparent
+  );
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lr-ring) calc(var(--lr-glow-k) * 100%), transparent));
+}
