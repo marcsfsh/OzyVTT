@@ -80,3 +80,9 @@
   overflow-wrap: normal;
   white-space: nowrap;
 }
+
+/* The light that runs along the address on a copy is placed in these. */
+.join-address--strip,
+.join-address-text {
+  position: relative;
+}

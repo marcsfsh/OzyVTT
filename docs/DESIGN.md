@@ -317,8 +317,9 @@ from the mockups.
 - Reconnecting: when the connection drops, show a bar under the top bar with a WAIT tag and "Reconnecting. Wait before
   making changes." Controls that need the server are disabled with that reason; reading the last snapshot still
   works. Preserve unsent text as a local draft. Existing in-flight commands may time out; do not automatically
-  replay them with new command IDs or announce success before an acknowledgement. When
-  the connection returns the bar says "Back at the table" for 2 seconds, then goes.
+  replay them with new command IDs or announce success before an acknowledgement. The bar's own line is grey and
+  unlit while it waits. When the connection returns a comet lights that line in the horizon's colours and the bar
+  says "Back at the table" for 2 seconds, then goes.
 - Empty states: one line saying what is missing and one button that fixes it, in the space the content would fill. For
   example, the log says "No rolls yet." above the dice, and an encounter without a map says "No map yet." with Pick a map.
   No illustrations; the sunset belongs to arrival screens.

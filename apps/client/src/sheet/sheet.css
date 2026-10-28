@@ -276,6 +276,7 @@
 /* Boxes and pips: uses, Hit Point Dice, slots. Filled is what is left to spend. */
 .cs-boxes,
 .cs-pips {
+  position: relative;
   display: inline-flex;
   flex-wrap: wrap;
   gap: 3px;
@@ -1314,6 +1315,7 @@ button.cs-lastroll-open {
   gap: var(--space-1);
 }
 .cs-vital-line {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -1508,6 +1510,7 @@ button.cs-lastroll-open {
   flex: none;
 }
 .cs-level {
+  position: relative;
   display: grid;
   justify-items: center;
   align-content: center;
@@ -1698,6 +1701,7 @@ button.cs-lastroll-open {
   border-bottom: 1px solid var(--line-strong);
 }
 .cs-slotpips {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 2px;

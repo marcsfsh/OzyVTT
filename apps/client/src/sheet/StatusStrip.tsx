@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Chip, IconConcentration, IconPlus, IconStar, useChipStrip } from "@vtt/ui";
+import { Chip, IconConcentration, IconPlus, IconStar, Roll, useChipStrip } from "@vtt/ui";
 import {
   ConditionDetail,
   ConditionPicker,
@@ -83,14 +83,18 @@ export function StatusStrip({
         key={effect.id}
         tone="info"
         icon={concentrating ? <IconConcentration /> : undefined}
-        leave={concentrating ? "split" : undefined}
+        leave="split"
         pressed={isShown("effect", effect.id)}
         aria-expanded={isShown("effect", effect.id)}
         aria-label={`${concentrating ? `Concentration on ${concentrationSpell(effect.name)}` : effect.name}${time ? `, ${time} left` : ""}`}
         onClick={() => toggle({ kind: "effect", id: effect.id })}
       >
         {label}
-        {time && <span className="cs-chip-time">{time}</span>}
+        {time && (
+          <span className="cs-chip-time">
+            <Roll value={time} />
+          </span>
+        )}
       </Chip>
     );
   };

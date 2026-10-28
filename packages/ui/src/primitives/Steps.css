@@ -174,3 +174,8 @@
     display: flex;
   }
 }
+
+/* A step change's light runs over the rail inside this frame (ADR-0045). */
+.nh-steps-wrap {
+  position: relative;
+}

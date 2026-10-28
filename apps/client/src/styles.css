@@ -303,20 +303,31 @@ textarea:focus {
    since it came back. Reading the last snapshot still works; the bar says to wait before making changes. */
 .reconnect-bar {
   grid-row: 2;
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-height: var(--tap-min);
   margin: 0;
   padding: var(--space-1) var(--space-5);
-  border-bottom: 1px solid var(--caution);
   background: color-mix(in srgb, var(--caution) 10%, var(--surface-1));
   color: var(--text);
   font-size: var(--fs-sm);
 }
 .reconnect-bar.is-back {
-  border-bottom-color: var(--state-on-edge);
   background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1));
+}
+/* The bar's own line (ADR-0045): grey and unlit while it waits, lit in the horizon's colours once the table is back. */
+.reconnect-bar-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--unlit);
+}
+.reconnect-bar.is-back .reconnect-bar-line {
+  background: var(--grad-horizon);
 }
 
 .home-hero {

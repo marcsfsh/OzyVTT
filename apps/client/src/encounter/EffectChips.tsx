@@ -64,9 +64,6 @@ function ongoingDamageNote(effect: ChipEffect): string | null {
   return `${what} at the ${edge} of each of ${when}${save}`;
 }
 
-/** Concentration's tag: its chip comes apart when it breaks (ADR-0045). */
-const CONCENTRATING_TAG = "concentrating";
-
 /** The SRD Burning hazard's tag, and the builtin action that puts the fire out on its bearer. */
 const BURNING_TAG = "burning";
 const PUT_OUT_FIRE_ACTION_ID = "extinguish-fire";
@@ -106,7 +103,7 @@ export function EffectChips({
           <Chip
             key={effect.id}
             tone="info"
-            leave={effect.tags.includes(CONCENTRATING_TAG) ? "split" : undefined}
+            leave="split"
             pressed={shown === effect.id}
             aria-expanded={shown === effect.id}
             title={`${effect.name}${effect.sourceName ? ` from ${effect.sourceName}` : ""} · ${effectDurationLabel(effect)}`}

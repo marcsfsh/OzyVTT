@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, IconChevronLeft, IconChevronRight, IconPlay, SegmentedControl } from "@vtt/ui";
+import {
+  Button,
+  IconChevronLeft,
+  IconChevronRight,
+  IconPlay,
+  Roll,
+  SegmentedControl,
+  burst,
+  canMove,
+  comet,
+  useOnChange
+} from "@vtt/ui";
 import { useAuthorizedMapImage } from "../scene/mapImage";
 import { TokenStatusBadges } from "../scene/tokenGlyph";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
@@ -165,8 +176,19 @@ export function Transport({
   onPlay: () => void;
   onSeek: (index: number) => void;
 }>) {
+  // Moving to another turn runs a comet along the scrubber to it, with a burst where it lands (ADR-0045).
+  const transport = useRef<HTMLDivElement>(null);
+  useOnChange(index, (before, now) => {
+    const el = transport.current;
+    const scrubber = el?.querySelector<HTMLInputElement>("input[type='range']");
+    if (!el || !scrubber || count < 2 || !canMove()) return;
+    const at = (turn: number) => scrubber.offsetLeft + (scrubber.offsetWidth * turn) / (count - 1);
+    const line = scrubber.offsetTop + scrubber.offsetHeight / 2;
+    comet(el, { from: at(before), to: at(now), line, thick: 3, delay: 0, dur: 240 });
+    burst(el, { at: at(now), line, delay: 220, w: 60, h: 8 });
+  });
   return (
-    <div className="replay-transport" role="group" aria-label="Replay controls">
+    <div ref={transport} className="replay-transport" role="group" aria-label="Replay controls">
       <Button
         variant="secondary"
         size="sm"
@@ -197,7 +219,7 @@ export function Transport({
         aria-label="Turn position"
       />
       <span className="replay-position tabular">
-        {index + 1} / {count}
+        <Roll value={`${index + 1} / ${count}`} />
       </span>
     </div>
   );

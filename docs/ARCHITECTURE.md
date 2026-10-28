@@ -1245,6 +1245,13 @@ A new log line fades in with a comet along its lower edge (from the Send side fo
 revealed to a player while their page is open arrives under a comet with a wash; player blocks have no ids, so one is
 known by when it reached the reader and its title. A player's face in the top bar warms as they connect and fades as
 they drop, the table screen's lamp lights or cools with ON and OFF rolling, and picking a character lights its card.
+Resources are pips: `usePipLight` in `@vtt/ui` (through the sheet's `PipRow`) cools a pip as it is spent and relights
+them in order as a rest brings them back, for uses, spell slots, Hit Point Dice and Exhaustion. Counters that change
+roll over with `Roll` (an effect's time left, Heroic Inspiration, the level, the replay's position, a track's title,
+Copy and Copied) or count with `countUp` (experience, the encounter budget, rolled ability scores). An effect that ends
+comes apart like Concentration. The small controls light at a smaller size: `Switch`, `Checklist`, `Steps` and a
+`RowEditor` reorder. `Skeleton` runs one comet over a group of plates and never loops, and the reconnect bar has its
+own still grey line, lit by a comet when the table is back.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map

@@ -32,6 +32,7 @@ import {
 } from "./spell-model";
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
+import { PipRow } from "./PipRow";
 
 /** "book" is the laptop's and the GM's list (Prepared, Spellbook, Rituals); "list" is a player's phone list (All,
  *  Prepared, Rituals) with a circle that says where each spell stands. */
@@ -81,7 +82,12 @@ function SlotPips({
   onSet: (remaining: number) => void;
 }>) {
   return (
-    <span className="cs-slotpips" role="group" aria-label={`${label} (${pool.remaining} of ${pool.max} left)`}>
+    <PipRow
+      lit={pool.remaining}
+      className="cs-slotpips"
+      role="group"
+      aria-label={`${label} (${pool.remaining} of ${pool.max} left)`}
+    >
       {Array.from({ length: Math.max(pool.max, pool.remaining) }, (_, index) =>
         index < pool.remaining || restore ? (
           <button
@@ -99,7 +105,7 @@ function SlotPips({
       <span className="cs-count">
         {pool.remaining}/{pool.max}
       </span>
-    </span>
+    </PipRow>
   );
 }
 

@@ -13,7 +13,7 @@ import type {
   SceneVision,
   VisionPreviewReply
 } from "@vtt/domain";
-import { Button, useDragSurface, useToastMute } from "@vtt/ui";
+import { Button, useDragSurface, useOnChange, useToastMute } from "@vtt/ui";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { read } from "../lib/command";
 import { useTargeting } from "../encounter/targeting";
@@ -39,6 +39,7 @@ import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
 import { cameraFocus, useCameraFollow } from "./cameraFollow";
 import { useAimLight, useAttackLight } from "./attackLight";
+import { svgPop } from "./mapLight";
 import { useDamageNumbers, type SeenHealth } from "./damageNumbers";
 import { VisionLayer, type MapWall } from "./VisionLayer";
 import { DoorMenu } from "./DoorMenu";
@@ -226,6 +227,18 @@ export function EncounterMap({
   );
   useAttackLight(stageRef);
   useDamageNumbers(stageRef, seenHealth);
+  // A token set down on the map (from the staging tray) settles into its square with a burst (ADR-0045).
+  const placedIds = tokens.flatMap((placed) => (placed.position ? [placed.actorId] : [])).join(" ");
+  useOnChange(placedIds, (before) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const was = new Set(before.split(" "));
+    for (const placed of tokens) {
+      if (!placed.position || was.has(placed.actorId)) continue;
+      const glyph = stage.querySelector(`[data-token-id="${CSS.escape(placed.actorId)}"]`);
+      if (glyph?.parentNode) svgPop(glyph.parentNode as Element, placed.position, placed.sizePx * 0.7, "lr-tone-party");
+    }
+  });
   const tokensById = useMemo(
     () => new Map(tokens.map((encounterToken) => [encounterToken.actorId, encounterToken])),
     [tokens]

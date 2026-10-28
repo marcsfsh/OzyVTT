@@ -72,6 +72,7 @@ export { holdMotion, motionReleased, releaseMotion } from "./motion/gate";
 export { edgeIn, ghostOut, openerNow, openerX, type EdgeEntry, type GhostOptions } from "./motion/overlay";
 export { useOnChange, usePrevious } from "./motion/hooks";
 export { useChipStrip } from "./motion/chips";
+export { usePipLight } from "./motion/pips";
 
 /* Primitives */
 export { cx } from "./primitives/util";

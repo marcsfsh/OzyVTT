@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { IconButton, IconMusic, IconPause, IconPlay, IconVolume, IconVolumeOff } from "@vtt/ui";
+import { IconButton, IconMusic, IconPause, IconPlay, IconVolume, IconVolumeOff, Roll } from "@vtt/ui";
 import { navigate, SOUND_BOARD_PATH } from "../router";
 import { isSounding, playOrPause, useSoundBoard, useSoundCommand, useSoundLibrary } from "./sound-data";
 import { LevelSlider } from "./LevelSlider";
@@ -59,7 +59,9 @@ export function NowPlaying({
         >
           <span className="now-playing-title">
             {heard && !waiting ? <IconVolume /> : <IconVolumeOff />}
-            <span>{paused ? `Paused · ${on}` : on}</span>
+            <span>
+              <Roll value={paused ? `Paused · ${on}` : on} />
+            </span>
           </span>
           <span className="nh-sr-only">{screenLine}. Open the sound board</span>
         </button>
@@ -77,7 +79,9 @@ export function NowPlaying({
       <button type="button" className="now-playing-what" onClick={() => navigate(SOUND_BOARD_PATH)}>
         <span className="now-playing-title">
           <IconMusic />
-          <span>{paused ? `Paused · ${on}` : on}</span>
+          <span>
+            <Roll value={paused ? `Paused · ${on}` : on} />
+          </span>
         </span>
         <span className="now-playing-screen">
           {heard && !waiting ? <IconVolume /> : <IconVolumeOff />}

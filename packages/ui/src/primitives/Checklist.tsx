@@ -1,4 +1,6 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { useOnChange } from "../motion/hooks";
+import { burst, canMove, comet, pop, rel } from "../motion/lightRail";
 import { cx } from "./util";
 import { Button } from "./Button";
 import { Input } from "./forms";
@@ -43,6 +45,21 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
   const editable = onChange != null;
   const full = max != null && items.length >= max;
   const nameOf = (item: ChecklistItem, index: number) => item.text.trim() || `Item ${index + 1}`;
+  // An item checked off fills its box with a burst, and a comet runs along its row's line (ADR-0045).
+  const list = useRef<HTMLUListElement>(null);
+  useOnChange(items.map((item) => (item.done ? "1" : "0")).join(""), (before, now) => {
+    const rows = list.current ? [...list.current.children] : [];
+    if (!canMove()) return;
+    [...now].forEach((done, index) => {
+      const row = rows[index];
+      const box = row?.querySelector(".nh-checklist-tick, .nh-checklist-mark");
+      if (done !== "1" || before[index] === "1" || !(row instanceof HTMLElement) || !box) return;
+      const at = rel(box, row);
+      pop(row, { x: at.cx, y: at.cy, size: 30, tone: "cyan" });
+      comet(row, { from: at.r, to: row.clientWidth, line: row.clientHeight - 1, thick: 2, delay: 60, dur: 260 });
+      burst(row, { at: row.clientWidth, line: row.clientHeight - 1, delay: 300, w: 50, h: 6 });
+    });
+  });
 
   const setAt = (index: number, patch: Partial<ChecklistItem>) => {
     onChange?.(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -58,6 +75,7 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
     <div className={cx("nh-checklist", className)}>
       {items.length > 0 && (
         <ul
+          ref={list}
           className={cx("nh-checklist-items", !editable && "nh-checklist-items--static")}
           role="list"
           aria-label={ariaLabel}

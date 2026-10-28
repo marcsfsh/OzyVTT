@@ -37,6 +37,7 @@
   letter-spacing: var(--tracking-eyebrow);
 }
 .nh-abil-pool-values {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);

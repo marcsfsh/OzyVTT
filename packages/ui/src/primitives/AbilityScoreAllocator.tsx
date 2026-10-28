@@ -1,4 +1,6 @@
-import { useId, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
+import { useOnChange } from "../motion/hooks";
+import { canMove, countUp, pop, rel } from "../motion/lightRail";
 import { cx } from "./util";
 import { Alert } from "./Alert";
 import { Badge } from "./Badge";
@@ -93,6 +95,24 @@ export function AbilityScoreAllocator({
 }: AbilityScoreAllocatorProps) {
   const tableId = useId();
   const unassigned = (pool ?? []).filter((entry) => !entry.assignedTo);
+  // Rolled scores land one after another, each counting up with a small burst (ADR-0045).
+  const values = useRef<HTMLDivElement>(null);
+  useOnChange((pool ?? []).map((entry) => entry.id).join(" "), (before) => {
+    const el = values.current;
+    if (!el || !canMove()) return;
+    const was = new Set(before.split(" "));
+    let order = 0;
+    for (const entry of pool ?? []) {
+      if (was.has(entry.id)) continue;
+      const number = el.querySelector<HTMLElement>(`[data-pool-id="${CSS.escape(entry.id)}"]`);
+      if (!number) continue;
+      const delay = order * 80;
+      order += 1;
+      void countUp(number, 0, entry.value, { delay, dur: 240 });
+      const at = rel(number, el);
+      pop(el, { x: at.cx, y: at.cy, size: 34, delay: delay + 220, tone: "gold" });
+    }
+  });
   const overspent = budget != null && budget.spent > budget.total;
 
   return (
@@ -116,13 +136,15 @@ export function AbilityScoreAllocator({
       {mode === "assign" && pool != null && (
         <div className="nh-abil-pool">
           <span className="nh-abil-pool-label">Still to assign</span>
-          <div className="nh-abil-pool-values">
+          <div ref={values} className="nh-abil-pool-values">
             {unassigned.length === 0 ? (
               <span className="nh-abil-pool-done">All assigned</span>
             ) : (
               unassigned.map((entry) => (
                 <Badge key={entry.id} tone="info">
-                  <span className="tabular">{entry.value}</span>
+                  <span className="tabular" data-pool-id={entry.id}>
+                    {entry.value}
+                  </span>
                 </Badge>
               ))
             )}

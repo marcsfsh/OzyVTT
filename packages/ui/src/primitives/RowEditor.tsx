@@ -1,5 +1,6 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { useId, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
+import { burst, canMove, flipFrom } from "../motion/lightRail";
 import { cx } from "./util";
 import { useDragSurface } from "./dragSurface";
 import { Button } from "./Button";
@@ -63,11 +64,35 @@ export function RowEditor<T>({
   const full = max != null && rows.length >= max;
   const labelOf = (row: T, index: number) => rowLabel?.(row, index) || `Row ${index + 1}`;
 
+  // A reorder settles (ADR-0045): the rows slide from where they were, and the moved row's line lights with a burst.
+  const settling = useRef<{ boxes: Map<string, DOMRect>; moved: string } | null>(null);
+  useLayoutEffect(() => {
+    const pending = settling.current;
+    const list = listRef.current;
+    if (!pending || !list) return;
+    settling.current = null;
+    if (!canMove()) return;
+    const items = [...list.children] as HTMLElement[];
+    rows.forEach((row, index) => {
+      const item = items[index];
+      const was = pending.boxes.get(rowKey(row));
+      if (!item || !was) return;
+      flipFrom(item, was);
+      if (rowKey(row) === pending.moved)
+        burst(item, { at: item.clientWidth / 2, line: item.clientHeight - 1, delay: 200, w: 120 });
+    });
+  });
+
   const move = (from: number, to: number) => {
     if (to < 0 || to >= rows.length || to === from) return;
     const next = rows.slice();
     const [row] = next.splice(from, 1);
     next.splice(to, 0, row);
+    const items = listRef.current ? ([...listRef.current.children] as HTMLElement[]) : [];
+    settling.current = {
+      boxes: new Map(rows.map((each, index) => [rowKey(each), items[index]?.getBoundingClientRect() ?? new DOMRect()])),
+      moved: rowKey(row)
+    };
     onChange(next);
     setAnnouncement(`${labelOf(rows[from], from)} moved to position ${to + 1} of ${rows.length}.`);
   };

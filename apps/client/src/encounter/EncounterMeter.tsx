@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Roll, burst, canMove, comet, countUp, useOnChange } from "@vtt/ui";
 import type { ContentMonsterSummary, GmActor, GmView } from "@vtt/domain";
 import { encounterBudget, encounterDifficulty, type EncounterBudget, type EncounterDifficulty } from "@vtt/rules-5e";
 import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
@@ -133,13 +134,33 @@ function Meter({ reading }: Readonly<{ reading: Extract<EncounterReading, { kind
   const end = Math.max(budget.high * 1.25, xp, 1);
   const at = (value: number) => Math.min(100, (value / end) * 100);
   const label = `${DIFFICULTY_WORD[reading.difficulty]}, ${xp.toLocaleString()} XP`;
+  // A change to the budget runs a comet along the track to the new level, the total counts to it, and crossing into
+  // another band rolls its name over (ADR-0045).
+  const track = useRef<HTMLDivElement>(null);
+  const total = useRef<HTMLSpanElement>(null);
+  const lastEnd = useRef(end);
+  useOnChange(xp, (before, now) => {
+    const el = track.current;
+    const was = lastEnd.current;
+    lastEnd.current = end;
+    if (!el || !canMove()) return;
+    const x = (value: number, span: number) => (Math.min(100, (value / span) * 100) / 100) * el.clientWidth;
+    const line = el.clientHeight / 2;
+    comet(el, { from: x(before, was), to: x(now, end), line, thick: 3, delay: 0, dur: 260 });
+    burst(el, { at: x(now, end), line, delay: 240, w: 60, h: 10 });
+    if (total.current) void countUp(total.current, before, now, { format: (value) => `${value.toLocaleString()} XP` });
+  });
   return (
     <div className="encounter-meter-reading">
       <p className="encounter-meter-head">
-        <b>{DIFFICULTY_WORD[reading.difficulty]}</b>
-        <span className="encounter-meter-total">{xp.toLocaleString()} XP</span>
+        <b>
+          <Roll value={DIFFICULTY_WORD[reading.difficulty]} />
+        </b>
+        <span ref={total} className="encounter-meter-total">
+          {xp.toLocaleString()} XP
+        </span>
       </p>
-      <div className="encounter-meter-track" role="img" aria-label={label}>
+      <div ref={track} className="encounter-meter-track" role="img" aria-label={label}>
         <span
           className="encounter-meter-band is-low"
           style={{ left: `${at(budget.low)}%`, right: `${100 - at(budget.moderate)}%` }}
