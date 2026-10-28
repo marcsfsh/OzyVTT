@@ -4,8 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_PATHS } from "@vtt/api-contract";
+import { loadSpells } from "@vtt/content-srd-5.2.1";
 import { GameStateSchema } from "@vtt/domain";
 import { ActorDefinitionSchema } from "@vtt/schemas";
+import { withDefinitionProseFacts } from "../src/actor-roster.js";
+import { withMonsterSpells } from "../src/monster-spells.js";
 import { createServer } from "../src/server.js";
 
 // A stat block brought in by the GM casts its Spellcasting list as the SRD bundle's do: its "At Will" and "1/Day"
@@ -121,5 +124,38 @@ describe("an imported stat block's spells", () => {
     ]);
     const names = (await actionsOf(base, gmToken, STORED)).map((action) => action.name);
     expect(names).toEqual(expect.arrayContaining(["Fire Bolt", "Fireball"]));
+  });
+});
+
+describe("a stat block whose casting action has a long id", () => {
+  it("stores its casts so the campaign loads them again", () => {
+    // An imported action's id comes from its own text and has no length limit, and each spell an action casts a choice
+    // of becomes a cast that names that action (\`partOf\`). A stored copy of the cast stat block (a form taken, a
+    // summon, a replay) must read back when the server starts.
+    const actionId = `divine-aid-${"of-the-hedge-mage-".repeat(8)}choice`;
+    const long = {
+      ...definition,
+      actions: [
+        {
+          id: actionId,
+          name: "Divine Aid",
+          activation: "bonus-action" as const,
+          description:
+            "The mage casts Cure Wounds, Lesser Restoration or Remove Curse, using Wisdom as the spellcasting ability (spell save DC 14).",
+          damage: [],
+          // Its casts share its use, under a pool named for it.
+          uses: { limit: 1, per: "long-rest" as const }
+        }
+      ]
+    };
+    const spells = loadSpells();
+    const cast = withMonsterSpells(withDefinitionProseFacts(long), (id) => spells.find((spell) => spell.id === id));
+    expect(actionId.length).toBeGreaterThan(120);
+    expect(cast.actions.filter((action) => action.partOf === actionId)).toHaveLength(3);
+    const saved = GameStateSchema.safeParse({
+      schemaVersion: 1,
+      definitions: [{ id: "form-hedge-mage", definition: cast }]
+    });
+    expect(saved.success, saved.error?.message).toBe(true);
   });
 });

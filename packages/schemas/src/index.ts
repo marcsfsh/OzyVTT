@@ -3439,10 +3439,11 @@ export const ActionUsesSchema = z
   .object({
     limit: z.number().int().min(1).max(MAX_ACTION_USES),
     per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]),
+    // A stat block's casts share their action's uses under its id (`monster-spells.ts`), so a pool takes any id an
+    // action may have.
     pool: z
       .string()
       .regex(/^[a-z0-9-]+$/)
-      .max(60)
       .optional()
       .describe(
         "Shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon)"
@@ -6333,11 +6334,11 @@ export const ActionSchema = z
     /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
     castsSpells: CastsSpellsSchema.optional(),
     /** The printed entry it belongs to (a spell of a Spellcasting list, Protective Magic's Counterspell): the stat block
-     *  prints it inside that entry, and the turn list offers it on its own. */
+     *  prints it inside that entry, and the turn list offers it on its own. It holds that entry's action id, so it takes
+     *  any id an action may have; a shorter cap would refuse a stored copy of a cast stat block as the campaign loads. */
     partOf: z
       .string()
       .regex(/^[a-z0-9-]+$/)
-      .max(120)
       .optional()
       .describe(
         "The id of the printed entry it belongs to (a spell of a Spellcasting list): the stat block prints it inside that entry, and the turn list offers it on its own"

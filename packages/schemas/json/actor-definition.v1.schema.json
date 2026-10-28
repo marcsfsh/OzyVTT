@@ -9047,7 +9047,6 @@
     },
     "__schema733": {
       "type": "string",
-      "maxLength": 60,
       "pattern": "^[a-z0-9-]+$"
     },
     "__schema734": {
@@ -13946,7 +13945,6 @@
     },
     "__schema962": {
       "type": "string",
-      "maxLength": 120,
       "pattern": "^[a-z0-9-]+$"
     },
     "__schema963": {
