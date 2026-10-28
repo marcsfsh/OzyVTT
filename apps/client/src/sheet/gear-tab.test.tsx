@@ -304,7 +304,7 @@ describe("the sheet's inventory", () => {
     });
   });
 
-  it("names a magic arrow's kind, and picks up fired arrows only outside a fight", async () => {
+  it("names a magic arrow's kind, and picks up fired arrows only outside an encounter", async () => {
     serve();
     const archer = hero();
     archer.inventory = [
@@ -657,7 +657,7 @@ describe("an item's kinds, forms and attunement prerequisites", () => {
     await user.click(rowOf(/Rod of Lordly Might/));
     const forms = within(await screen.findByRole("group", { name: "Form of Rod of Lordly Might" }));
     expect(forms.getByRole("button", { name: "Spear" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByText("Changing it takes a Bonus Action in a fight.")).toBeTruthy();
+    expect(screen.getByText("Changing it takes a Bonus Action in an encounter.")).toBeTruthy();
     await user.click(forms.getByRole("button", { name: "Battleaxe" }));
     expect(sent("item:set-form")).toEqual([
       expect.objectContaining({ actorId: HERO, itemId: "rod-of-lordly-might", variantId: "battleaxe" })

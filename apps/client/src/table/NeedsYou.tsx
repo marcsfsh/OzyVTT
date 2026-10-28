@@ -1,8 +1,10 @@
+import { DamageRollPrompt } from "../encounter/DamageRollPrompt";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { GmActor, GmView } from "@vtt/domain";
+import type { GmActor, GmView, TargetAsk } from "@vtt/domain";
 import { Button, IconBell, useToast } from "@vtt/ui";
 import { useRollPreference } from "../dice/roll-preference";
-import { command } from "../lib/command";
+import { command, read } from "../lib/command";
+import { beginTargeting, setTargetingResult } from "../encounter/targeting";
 import { DyingTracker } from "../encounter/DyingTracker";
 import { PendingDamagePrompt } from "../encounter/PendingDamagePrompt";
 import { ReactionPrompt, triggerWords } from "../encounter/ReactionPrompt";
@@ -30,10 +32,36 @@ function helpersFor(state: GmView, target: GmActor, distance: (a: string, b: str
 function dyingDetail(target: GmActor, helpers: ReturnType<typeof helpersFor>): string {
   const help = `Healing brings ${target.name} back, and Help with a DC 10 Medicine check stabilizes ${target.name}.`;
   const nearest = helpers[0];
-  if (!nearest) return `Nobody in the fight can help yet. ${help}`;
+  if (!nearest) return `Nobody in the encounter can help yet. ${help}`;
   return nearest.feet === null
     ? `${nearest.candidate.name} can help. ${help}`
     : `${nearest.candidate.name} is ${nearest.feet} ft away. ${help}`;
+}
+
+/** Opens the GM's targeting for a player's ask, cast the way its player chose; the acting console and the map aim it,
+ *  and the GM's resolve answers the ask. */
+async function aimFor(
+  state: GmView,
+  ask: TargetAsk,
+  onFeedback: (text: string) => void,
+  setBusy: (busy: boolean) => void
+) {
+  const actor = state.actors.find((candidate) => candidate.id === ask.actorId);
+  if (!actor?.definitionId) {
+    onFeedback(`${ask.actorName} is no longer in the encounter.`);
+    return;
+  }
+  setBusy(true);
+  const response = await read("content:monster-actions", { definitionId: actor.definitionId, actorId: actor.id });
+  setBusy(false);
+  const action = response.ok ? response.actions?.find((candidate) => candidate.id === ask.actionId) : undefined;
+  if (!action) {
+    onFeedback(response.message ?? `${ask.actionName} could not be found on ${ask.actorName}'s sheet.`);
+    return;
+  }
+  setTargetingResult(null);
+  beginTargeting(action, actor.id, ask.slotLevel, ask.darts, ask.shaping ?? []);
+  onFeedback(`Choose ${ask.actorName}'s target on the map.`);
 }
 
 /** A prompt a player answers on their own device, which the GM can open to answer instead. */
@@ -148,10 +176,54 @@ function NeedsCard({
       break;
     }
     case "damage": {
-      const { proposal } = item;
+      const { proposal, roll } = item;
       tone = "caution";
+      if (roll) {
+        // The player rolls it; the GM may type it instead, or settle the hit as it stands.
+        detail = `${proposal.targetName} was hit. ${roll.sourceName}'s player rolls ${roll.formula}.`;
+        body = (
+          <>
+            <DamageRollPrompt roll={roll} onFeedback={onFeedback} />
+            <PendingDamagePrompt proposal={proposal} onFeedback={onFeedback} />
+          </>
+        );
+        break;
+      }
       detail = `${damageWords(proposal.proposedDamageParts, proposal.proposedTotal)}${proposal.critical ? " · critical hit" : ""}.`;
       body = <PendingDamagePrompt proposal={proposal} onFeedback={onFeedback} />;
+      break;
+    }
+    case "damage-roll": {
+      const { roll } = item;
+      tone = "caution";
+      detail = `The saves wait for it. ${roll.sourceName}'s player rolls ${roll.formula}.`;
+      body = <DamageRollPrompt roll={roll} onFeedback={onFeedback} />;
+      break;
+    }
+    case "target": {
+      const { ask } = item;
+      tone = "caution";
+      detail = `${ask.slotLevel !== undefined ? `Cast at level ${ask.slotLevel}. ` : ""}Pick the target on the map, then roll it as you would your own.`;
+      body = (
+        <div className="needs-card-buttons">
+          <Button size="sm" disabled={busy} onClick={() => void aimFor(state, ask, onFeedback, setBusy)}>
+            Choose the target
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() =>
+              send(
+                () => command("action:withdraw-target-ask", { askId: ask.id }),
+                `Turned down ${ask.actorName}'s ${ask.actionName}.`
+              )
+            }
+          >
+            Turn down
+          </Button>
+        </div>
+      );
       break;
     }
     case "dying": {

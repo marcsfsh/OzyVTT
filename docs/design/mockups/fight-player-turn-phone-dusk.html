@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Player, your turn, Dusk</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&amp;family=Bungee&amp;family=VT323&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:rgba(10, 12, 22, 0.55)}
+.oz{font-family:'Bai Jamjuree',system-ui,sans-serif;color:#eef0f8}
+.oz button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.oz button:focus-visible{outline:2px solid #4fe3ff;outline-offset:2px}
+.oz .vt{font-family:'VT323',ui-monospace,monospace;letter-spacing:.04em}
+.oz .lbl{margin:0;font-size:12px;font-weight:600;color:#b0b4ca;letter-spacing:.02em}
+.oz .lamp{display:flex;align-items:center;gap:5px;padding:6px 5px;background:rgba(44, 48, 72, 0.5);border:1px solid rgba(255, 255, 255, 0.12);white-space:nowrap}
+.oz .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;align-items:center;width:100%;text-align:left;padding:8px 0;min-height:56px;box-sizing:border-box;border-top:1px solid rgba(255, 255, 255, 0.07)}
+.oz .navtab{flex:1;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:#c3c7d9}
+.oz .navtab[aria-current="page"]{color:#6fe8ff;text-shadow:0 0 10px rgba(43, 228, 255, .7);box-shadow:inset 0 2px 0 #4fe3ff}
+.oz .pip{width:10px;height:10px;background:#7aa2ff;box-shadow:0 0 6px rgba(92, 141, 255, .6)}
+.oz .pip-empty{width:10px;height:10px;box-sizing:border-box;border:1.5px solid rgba(255, 255, 255, 0.2)}
+.oz .scan{position:absolute;inset:0;pointer-events:none;z-index:40;background:repeating-linear-gradient(180deg,rgba(0, 0, 0, .2) 0 1px,transparent 1px 3px)}
+.oz .chrome{background:linear-gradient(180deg,#eaf8ff 0%,#9fdcff 42%,#ffffff 49%,#3b2163 51%,#ff5fae 75%,#ffd6ea 100%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:-1.5px 0 rgba(43, 228, 255, .55),1.5px 0 rgba(255, 47, 146, .55)}
+
+.oz .scan{opacity:.25 !important}
+.oz header,.oz aside,.oz nav,.oz main,.oz section:not(.oz-map):not([aria-label="Battle map"]){-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15)}
+body{background:#151a2d}</style>
+</head>
+<body>
+<div class="oz" style="position: relative; width: 390px; height: 844px; display: flex; flex-direction: column; background: radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%), linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%); overflow: hidden">
+
+<header style="position: relative; padding: 12px 16px 12px; background: rgba(18, 20, 34, 0.7)">
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="width: 44px; height: 44px; padding: 3px; box-sizing: border-box; background: linear-gradient(180deg, #ffe14d 0%, #ff8a1f 50%, #ff2f92 100%); box-shadow: 0 0 14px rgba(255, 110, 60, 0.5); flex: none" aria-hidden="true"><svg viewBox="0 0 64 64" width="38" height="38" aria-hidden="true" style="display: block"><defs><radialGradient id="a26xb" cx="0.5" cy="0.5" r="0.75"><stop offset="0" stop-color="#14205a"></stop><stop offset="1" stop-color="#05040f"></stop></radialGradient>
+<linearGradient id="a26xh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5c8dff"></stop><stop offset="1" stop-color="#2a0a52"></stop></linearGradient>
+<mask id="a26xm"><rect width="64" height="64" fill="#fff"></rect><circle cx="33.5" cy="20" r="3.4" fill="#000"></circle></mask></defs>
+<rect width="64" height="64" fill="url(#a26xb)"></rect>
+<circle cx="10" cy="14" r="0.8" fill="#fff"></circle><circle cx="54" cy="20" r="0.7" fill="#fff"></circle><circle cx="50" cy="8" r="0.6" fill="#fff" opacity="0.7"></circle><circle cx="12" cy="36" r="0.6" fill="#fff" opacity="0.7"></circle>
+<path d="M38 6C34 10 29 22 21 45H45C41 32 39 18 38 6Z" fill="url(#a26xh)" stroke="#2be4ff" stroke-width="1.5" stroke-linejoin="round"></path>
+<circle cx="32" cy="21" r="3.6" fill="#ffe14d" mask="url(#a26xm)"></circle>
+<path d="M28 29.8l0.90 2.30 2.30 0.90-2.30 0.90L28 36.2l-0.90-2.30-2.30-0.90 2.30-0.90z" fill="#ffe14d"></path><path d="M37 25.8l0.62 1.58 1.58 0.62-1.58 0.62L37 30.2l-0.62-1.58-1.58-0.62 1.58-0.62z" fill="#ffe14d"></path><path d="M35 36.2l0.50 1.30 1.30 0.50-1.30 0.50L35 39.8l-0.50-1.30-1.30-0.50 1.30-0.50z" fill="#ffe14d"></path>
+<path d="M22 41.5H44.5" stroke="#ff2f92" stroke-width="3"></path>
+<ellipse cx="33" cy="46" rx="24" ry="5.5" fill="#1a0638" stroke="#2be4ff" stroke-width="1.5"></ellipse>
+<ellipse cx="33" cy="45" rx="12" ry="1.8" fill="#0b0414"></ellipse></svg></span>
+<div style="flex: 1; min-width: 0">
+<div style="font-size: 17px; font-weight: 700; line-height: 1.2">Lyra Emberwise</div>
+<div style="font-size: 13px; color: #c3c7d9">Elf wizard 7</div>
+</div>
+<div style="width: 48px; height: 48px; border: 1px solid rgba(255, 255, 255, 0.2); display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none"><span class="vt" style="font-size: 26px; line-height: 0.9">15</span><span style="font-size: 10px; font-weight: 600; color: #c3c7d9">AC</span></div>
+<button aria-label="Hit points 38 of 44. Change hit points" style="width: 80px; height: 48px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(44, 48, 72, 0.5); display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none"><span class="vt" style="font-size: 26px; line-height: 0.9">38<span style="color: #b0b4ca">/44</span></span><span style="font-size: 10px; font-weight: 600; color: #c3c7d9">HP</span></button>
+</div>
+<div role="img" aria-label="38 of 44 hit points" style="margin-top: 10px; display: grid; grid-template-columns: repeat(22, minmax(0, 1fr)); gap: 2px; height: 12px; padding: 2px; background: rgba(10, 12, 22, 0.55); border: 1px solid rgba(255, 255, 255, 0.2)">
+<span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: #ffd54d"></span><span style="background: rgba(120, 30, 50, 0.6)"></span><span style="background: rgba(120, 30, 50, 0.6)"></span><span style="background: rgba(120, 30, 50, 0.6)"></span>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, #4fe3ff 0%, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d 100%); box-shadow: 0 0 12px rgba(255, 47, 146, 0.6)"></div></header>
+
+<section aria-label="Your turn" style="position: relative; padding: 14px 16px 10px; background: rgba(26, 29, 46, 0.62); display: flex; align-items: center; justify-content: space-between">
+<h1 class="chrome" style="margin: 0; font-family: 'Bungee', system-ui, sans-serif; font-weight: 400; font-size: 30px; line-height: 1">YOUR TURN</h1>
+<div class="vt" style="line-height: 0.95; text-align: right; color: #eef0f8; text-shadow: 0 0 6px rgba(255, 255, 255, 0.5)">
+<div style="font-size: 15px; display: flex; align-items: center; justify-content: flex-end; gap: 5px">PLAY<svg width="8" height="9" viewBox="0 0 12 14" aria-hidden="true"><path d="M1 1l10 6-10 6z" fill="#eef0f8"></path></svg></div>
+<div style="font-size: 24px">RND 03</div>
+</div>
+</section>
+
+<div style="padding: 10px 16px 0; background: rgba(18, 20, 34, 0.7)">
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+<div class="lamp"><span style="width: 14px; height: 14px; flex: none; background: #ff2f92; box-shadow: 0 0 9px rgba(255, 47, 146, 0.85)"></span><span style="display: flex; flex-direction: column"><span style="font-size: 10px; font-weight: 600; color: #c3c7d9">Action</span><span class="vt" style="font-size: 17px; line-height: 1">READY</span></span></div>
+<div class="lamp"><span style="width: 14px; height: 14px; flex: none; background: #ffd54d; box-shadow: 0 0 9px rgba(255, 210, 63, 0.8)"></span><span style="display: flex; flex-direction: column"><span style="font-size: 10px; font-weight: 600; color: #c3c7d9">Bonus</span><span class="vt" style="font-size: 17px; line-height: 1">READY</span></span></div>
+<div class="lamp"><span style="width: 14px; height: 14px; flex: none; background: #4fe3ff; box-shadow: 0 0 9px rgba(43, 228, 255, 0.8)"></span><span style="display: flex; flex-direction: column"><span style="font-size: 10px; font-weight: 600; color: #c3c7d9">Reaction</span><span class="vt" style="font-size: 17px; line-height: 1">READY</span></span></div>
+<div class="lamp"><span role="img" aria-label="6 of 6 squares of movement left" style="width: 20px; height: 14px; flex: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px"><span style="background: #eef0f8"></span><span style="background: #eef0f8"></span><span style="background: #eef0f8"></span><span style="background: #eef0f8"></span><span style="background: #eef0f8"></span><span style="background: #eef0f8"></span></span><span style="display: flex; flex-direction: column"><span style="font-size: 10px; font-weight: 600; color: #c3c7d9">Move</span><span class="vt" style="font-size: 17px; line-height: 1">30 FT</span></span></div>
+</div>
+<p style="margin: 8px 0 0; font-size: 13px; color: #c3c7d9; display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10v-6z" fill="none" stroke="#4fe3ff" stroke-width="2.2" stroke-linejoin="round"></path></svg>Mage Armor: AC 15 for 7 more hours</p>
+</div>
+
+<div style="flex: 1; min-height: 0; overflow: hidden; padding: 0 16px">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0 8px">
+<p class="lbl">Spell slots</p>
+<div style="display: flex; gap: 12px; align-items: center" role="img" aria-label="Spell slots left: level 1, 4 of 4. Level 2, 3 of 3. Level 3, 2 of 3. Level 4, 1 of 1.">
+<span style="display: flex; align-items: center; gap: 3px"><span class="vt" style="font-size: 17px; color: #b0b4ca; margin-right: 2px">1</span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></span>
+<span style="display: flex; align-items: center; gap: 3px"><span class="vt" style="font-size: 17px; color: #b0b4ca; margin-right: 2px">2</span><span class="pip"></span><span class="pip"></span><span class="pip"></span></span>
+<span style="display: flex; align-items: center; gap: 3px"><span class="vt" style="font-size: 17px; color: #b0b4ca; margin-right: 2px">3</span><span class="pip"></span><span class="pip"></span><span class="pip-empty"></span></span>
+<span style="display: flex; align-items: center; gap: 3px"><span class="vt" style="font-size: 17px; color: #b0b4ca; margin-right: 2px">4</span><span class="pip"></span></span>
+</div>
+</div>
+
+<h2 class="lbl" style="padding: 2px 0 4px; display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; background: #ff2f92"></span>Action</h2>
+<ul style="list-style: none; margin: 0; padding: 0">
+<li><button class="row"><span style="font-size: 15px; font-weight: 600">Fire Bolt</span><span class="vt" style="font-size: 26px; line-height: 1">+7</span><span style="grid-column: 1 / -1; font-size: 13px; color: #c3c7d9">Cantrip, 120 ft. 2d10 fire</span></button></li>
+<li><button class="row"><span style="font-size: 15px; font-weight: 600">Magic Missile</span><span class="vt" style="font-size: 20px; line-height: 1">AUTO HIT</span><span style="grid-column: 1 / -1; font-size: 13px; color: #c3c7d9">Level 1, 120 ft. 3 darts of 1d4 + 1 force</span></button></li>
+<li><button class="row"><span style="font-size: 15px; font-weight: 600">Scorching Ray</span><span class="vt" style="font-size: 26px; line-height: 1">+7</span><span style="grid-column: 1 / -1; font-size: 13px; color: #c3c7d9">Level 2, 120 ft. 3 rays of 2d6 fire</span></button></li>
+<li><button class="row"><span style="font-size: 15px; font-weight: 600">Fireball</span><span class="vt" style="font-size: 26px; line-height: 1">DC 15</span><span style="grid-column: 1 / -1; font-size: 13px; color: #c3c7d9">Level 3, 150 ft. Dex save, 8d6 fire in 20 ft</span></button></li>
+<li><button class="row"><span style="font-size: 15px; font-weight: 600">Dagger</span><span class="vt" style="font-size: 26px; line-height: 1">+5</span><span style="grid-column: 1 / -1; font-size: 13px; color: #c3c7d9">Melee or thrown 20/60 ft. 1d4 + 2 piercing</span></button></li>
+</ul>
+<h2 class="lbl" style="padding: 12px 0 4px; display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; background: #ffd54d"></span>Bonus action</h2>
+<ul style="list-style: none; margin: 0; padding: 0">
+<li><button class="row"><span style="font-size: 15px; font-weight: 600">Misty Step</span><span class="vt" style="font-size: 26px; line-height: 1">30 FT</span><span style="grid-column: 1 / -1; font-size: 13px; color: #c3c7d9">Level 2. Teleport to a space you can see</span></button></li>
+</ul>
+</div>
+
+<div style="padding: 10px 16px 14px; border-top: 1px solid rgba(255, 255, 255, 0.12); background: rgba(18, 20, 34, 0.7)">
+<button style="width: 100%; height: 52px; background: #ff2f92; color: #12020a; font-family: 'Bungee', system-ui, sans-serif; font-size: 17px; letter-spacing: 0.04em; box-shadow: 0 5px 0 #8a0f4d, 0 0 26px rgba(255, 47, 146, 0.45)">END TURN</button>
+</div>
+
+<nav aria-label="Player views" style="display: flex; flex: none; background: rgba(18, 20, 34, 0.7); border-top: 1px solid rgba(255, 255, 255, 0.12)"><button class="navtab" aria-current="page"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M2.5 5l5-2 5 2 5-2v12l-5 2-5-2-5 2z"></path><path d="M7.5 3v12M12.5 5v12"></path></svg>Table</button><button class="navtab"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><rect x="4" y="2.5" width="12" height="15"></rect><path d="M7 7h6M7 10.5h6M7 14h3.5"></path></svg>Sheet</button><button class="navtab"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M3 4.5h5a2 2 0 0 1 2 2V17a2 2 0 0 0-2-2H3zM17 4.5h-5a2 2 0 0 0-2 2V17a2 2 0 0 1 2-2h5z"></path></svg>Codex</button><button class="navtab"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M3 5h14M3 10h14M3 15h9"></path></svg>Log</button></nav>
+<div class="scan" style="opacity: 0.5"></div>
+</div>
+</body>
+</html>

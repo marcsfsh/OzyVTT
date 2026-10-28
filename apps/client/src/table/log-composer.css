@@ -1,0 +1,77 @@
+/* The composer under the log: six quick dice, then who hears a line, the field and Send, then who sees a roll and
+   Dice options. */
+.log-composer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-top: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.log-composer-dice {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.log-composer-die {
+  display: grid;
+  place-items: center;
+  min-height: var(--tap-min);
+  padding: 0;
+  text-align: center;
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 400 20px / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.log-composer-die:hover {
+  border-color: var(--line-raised-hover);
+  background: var(--surface-3);
+}
+.log-composer-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.log-composer-field {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+}
+.log-composer-field .nh-input {
+  width: 100%;
+}
+/* Who sees a roll beside Dice options, on one row at 390px, so the log keeps its room. */
+.log-composer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+}
+.log-composer-audience {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.log-composer-foot > .nh-btn {
+  flex: none;
+}
+/* Who hears a line, before the field it applies to. */
+.log-composer-hears {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 6.5rem;
+  max-width: 40%;
+  min-height: var(--tap-min);
+}

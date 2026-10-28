@@ -2345,7 +2345,7 @@ export const DeathRecordSchema = z
     clockRound: z.number().int().min(-CLOCK_ROUNDS_LIMIT).max(CLOCK_ROUNDS_LIMIT),
     fightRound: z.number().int().min(1).max(1_000_000).optional(),
     /** The scene whose fight it died in, so a parked fight's rounds count for it. */
-    sceneId: z.uuid().nullable().optional(),
+    encounterId: z.uuid().nullable().optional(),
     /** What killed it, when the server knows (Disintegrate), named when a revival is refused. */
     cause: z.string().min(1).max(120).optional(),
     /** Nothing is left of its body (Disintegrate's gray dust): only a revival that makes a new body brings it back. */
@@ -3045,9 +3045,12 @@ export const ActorSchema = z.object({
   currency: CurrencySchema.prefault({}),
   /** GM-archived: hidden from players and excluded from the encounter builder and party. Never projected to players or the viewer. */
   archived: z.boolean().default(false),
+  /** Played at the table (ADR-0042): its player never opens the app, so it can't be claimed and the GM answers for
+   *  it. Set by the GM on a party character; GM-only, never projected to players or the viewer. */
+  playedAtTable: z.boolean().optional(),
   /** Set on a launched replay's cloned combatant: the replay scene's id. `rosterActors` hides these from management
    * surfaces; they are deleted with the replay scene. */
-  replaySceneId: z.uuid().optional(),
+  replayEncounterId: z.uuid().optional(),
   /** The GM shared this archived character's sheet with players as a read-only keepsake. The flag itself is
    * stripped from player projections; players get only the id-and-name `PlayerView.archivedCharacters`. */
   sheetPreview: z.boolean().default(false),

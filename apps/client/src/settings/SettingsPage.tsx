@@ -128,6 +128,14 @@ export function SettingsPage({
     setFocus(entry.id);
   };
   const go = (id: SettingsSectionId) => void navigate(pathForSection(id));
+  // The phone's bar scrolls sideways; the chosen tab is brought into it, so a section opened from far along shows.
+  const keepChosenInView = (bar: HTMLElement | null) => {
+    const chosen = bar?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!bar || !chosen) return;
+    const left = chosen.offsetLeft - bar.offsetLeft;
+    if (left < bar.scrollLeft || left + chosen.offsetWidth > bar.scrollLeft + bar.clientWidth)
+      bar.scrollLeft = Math.max(0, left - (bar.clientWidth - chosen.offsetWidth) / 2);
+  };
 
   const search = <SettingsSearch entries={settingsFor(role)} onPick={pick} autoFocus={phone && searching} />;
 
@@ -215,13 +223,8 @@ export function SettingsPage({
             <span ref={setSlot} className="settings-primary-slot" />
           </div>
         )}
-        {/* The reference is a frame of its own, with its results as the one scroller, so its filter flyout spans
-          what is on screen. Every other section scrolls as one page. */}
-        <div className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"} key={section}>
-          {body}
-        </div>
         {phone && (
-          <nav className="cx-tabbar settings-tabbar" aria-label="Settings sections">
+          <nav className="cx-tabbar settings-tabbar" aria-label="Settings sections" ref={keepChosenInView}>
             {sections.map((item) => (
               <button
                 key={item.id}
@@ -236,6 +239,11 @@ export function SettingsPage({
             ))}
           </nav>
         )}
+        {/* The reference is a frame of its own, with its results as the one scroller, so its filter flyout spans
+          what is on screen. Every other section scrolls as one page. */}
+        <div className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"} key={section}>
+          {body}
+        </div>
         {dialog}
       </div>
     </PrimarySlot.Provider>

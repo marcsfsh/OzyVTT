@@ -148,33 +148,41 @@
     var(--tab-on-sheen),
     inset 0 -2px 0 var(--cyan);
 }
+/* A phone lists a section's own views as a strip under its header (the app's sections are the bottom tabs): words
+   with a small icon, the chosen one underlined in cyan. It scrolls sideways when the views outgrow a narrow phone. */
 .cx-tabbar {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  padding-bottom: env(safe-area-inset-bottom);
-  background: var(--material-lip), var(--surface-1);
-  border-top: 1px solid var(--line-strong);
+  display: flex;
+  gap: 2px;
+  padding: 0 var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--line-strong);
   flex: none;
+}
+.cx-tabbar::-webkit-scrollbar {
+  display: none;
 }
 .cx-tabbar-tab {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex: 1 0 auto;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-height: calc(var(--tap-min) + var(--space-3));
-  padding: var(--space-1) 0;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
   border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--text-dim);
-  font: 600 var(--fs-2xs) / 1.1 var(--font-label);
+  font: 600 13px / 1.1 var(--font-label);
+  white-space: nowrap;
   cursor: pointer;
 }
 .cx-tabbar-tab .cx-icon {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.1rem;
+  height: 1.1rem;
 }
 .cx-tabbar-tab span {
   margin: 0;
@@ -183,13 +191,9 @@
 .cx-tabbar-tab:hover {
   color: var(--text);
 }
-/* The tab that is on is raised, with the cyan selection edge along its top. */
 .cx-tabbar-tab.is-on {
   color: var(--text);
-  background: var(--tab-on);
-  box-shadow:
-    var(--tab-on-sheen),
-    inset 0 2px 0 var(--cyan);
+  box-shadow: inset 0 -2px 0 var(--state-on-edge);
 }
 
 /* ----- Pieces every view uses ----- */

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Character builder, Dawn</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&amp;family=Bungee&amp;family=Mr+Dafoe&amp;family=VT323&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e3dee8}
+.oz{font-family:'Bai Jamjuree',system-ui,sans-serif;color:#2a2537}
+.oz *{box-sizing:border-box}
+.oz p,.oz h1,.oz h2,.oz h3,.oz ul,.oz ol{margin:0;padding:0}
+.oz ul,.oz ol{list-style:none}
+.oz button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+.oz input{font:inherit;color:inherit}
+.oz button:focus-visible,.oz input:focus-visible{outline:2px solid #2a8fa8;outline-offset:2px}
+.oz .vt{font-family:'VT323',ui-monospace,monospace;letter-spacing:.04em}
+.oz .lbl{font-size:12px;font-weight:600;color:#655d77;letter-spacing:.02em}
+.oz .dim{color:#4f4862}
+.oz .mute{color:#655d77}
+.oz .h1{font-family:'Bungee',system-ui,sans-serif;font-weight:400;font-size:24px;line-height:1.1}
+.oz .chrome{background:linear-gradient(180deg,#eaf8ff 0%,#9fdcff 42%,#ffffff 49%,#3b2163 51%,#ff5fae 75%,#ffd6ea 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.oz .scan{position:absolute;inset:0;pointer-events:none;z-index:40;opacity:.5;background:repeating-linear-gradient(180deg,rgba(0, 0, 0, .2) 0 1px,transparent 1px 3px)}
+.oz .navbtn{height:56px;padding:0 14px;font-size:15px;font-weight:600;color:#4f4862}
+.oz .navbtn[aria-current="page"]{color:#1d6a80;box-shadow:inset 0 -2px 0 #2a8fa8}
+.oz .subbtn{height:52px;padding:0 14px;font-size:14px;font-weight:600;color:#4f4862;display:flex;align-items:center;gap:8px}
+.oz .subbtn[aria-current="page"]{color:#2a2537;box-shadow:inset 0 -2px 0 #2a8fa8}
+.oz .btn{min-height:44px;padding:0 16px;border:1px solid #b9b0c8;background:#f7f5f9;font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.oz .btn:hover{border-color:#9c92ae}
+.oz .btn-primary{height:52px;padding:0 24px;background:#f0559b;color:#12020a;font-family:'Bungee',system-ui,sans-serif;font-size:16px;letter-spacing:.04em;box-shadow:0 5px 0 #b0306e;margin-bottom:5px;display:inline-flex;align-items:center;justify-content:center;gap:10px;white-space:nowrap}
+.oz .btn-primary.sm{height:42px;font-size:14px;padding:0 18px;box-shadow:0 4px 0 #b0306e;margin-bottom:4px}
+.oz .linkbtn{min-height:44px;font-size:14px;font-weight:600;color:#1d6a80;display:inline-flex;align-items:center;gap:6px}
+.oz .iconbtn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#4f4862;flex:none}
+.oz .port{display:flex;align-items:center;justify-content:center;font-weight:700;background:#f7f5f9;border:2px solid #4a72d9;flex:none}
+.oz .panel{background:#f3f0f5;border:1px solid #d3ccdc}
+.oz .tag{font-family:'VT323',ui-monospace,monospace;font-size:16px;line-height:1.25;padding:0 6px;letter-spacing:.04em;white-space:nowrap}
+.oz .chip{min-height:36px;padding:0 10px;border:1px solid #b9b0c8;background:#f7f5f9;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.oz .field{height:44px;border:1px solid #b9b0c8;background:#e3dee8;display:flex;align-items:center;gap:8px;padding:0 12px;color:#655d77;font-size:14px}
+.oz .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;align-items:center;width:100%;padding:8px 12px;min-height:52px;border-top:1px solid #e0dbe6}
+.oz .row:hover{background:#e8e3ee}
+.oz .navtab{flex:1;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:#4f4862}
+.oz .navtab[aria-current="page"]{color:#1d6a80;box-shadow:inset 0 2px 0 #2a8fa8}
+.oz .seg{display:flex;border:1px solid #b9b0c8;background:#e3dee8;padding:2px;gap:2px}
+.oz .seg button{flex:1;min-height:40px;padding:0 12px;font-size:14px;font-weight:600;color:#4f4862;white-space:nowrap}
+.oz .seg button[aria-pressed="true"]{background:#fbfafc;color:#2a2537;box-shadow:inset 0 -2px 0 #2a8fa8}
+.oz .switch{width:46px;height:26px;border:1px solid #b9b0c8;background:#e3dee8;padding:3px;display:flex;flex:none}
+.oz .switch span{width:18px;height:18px;background:#b9b0c8}
+.oz .switch[aria-checked="true"]{border-color:#2a8fa8;justify-content:flex-end}
+.oz .switch[aria-checked="true"] span{background:#2a8fa8;box-shadow:none}
+.oz .lamp{width:10px;height:10px;flex:none}
+.oz .tbl{width:100%;border-collapse:collapse;font-size:14px}
+.oz .tbl th{position:sticky;top:0;background:#ebe7ef;text-align:left;font-size:12px;font-weight:600;color:#655d77;padding:10px 12px;border-bottom:1px solid #d3ccdc;white-space:nowrap}
+.oz .tbl td{padding:0 12px;height:48px;border-bottom:1px solid #e0dbe6;white-space:nowrap}
+.oz .tbl tr:hover td{background:#e8e3ee}
+.oz .card{border:1px solid #d3ccdc;background:#f3f0f5;padding:12px}
+.oz.ph .chip{min-height:44px}
+.oz.ph .seg button{min-height:44px}
+.oz.ph .btn{min-height:44px}
+@media (max-width: 900px){
+.oz .lay{height:auto !important;min-height:0 !important}
+.oz .cols{display:flex !important;flex-direction:column}
+.oz .oz-nav{display:none !important}
+}
+
+.oz .scan{display:none !important}
+.oz .chrome{background:none !important;-webkit-background-clip:border-box !important;background-clip:border-box !important;color:#2a2537 !important;text-shadow:-1px 0 rgba(42, 143, 168,.35),1px 0 rgba(255,47,146,.35) !important}
+body{background:#ebe7ef}</style>
+</head>
+<body>
+<div class="oz ph" style="position: relative; width: 390px; height: 844px; display: flex; flex-direction: column; background: #ebe7ef; overflow: hidden">
+<header style="position: relative; display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 56px; flex: none"><div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%); box-shadow:none"></div><button class="iconbtn" aria-label="Back to characters"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M12 4l-6 6 6 6"></path></svg></button><span style="font-size: 16px; font-weight: 700; flex: 1">New character</span><span style="font-size: 12px; color: #655d77; padding-right: 8px">Draft saved</span></header>
+<nav aria-label="Steps" style="flex: none; overflow-x: auto; padding: 10px 16px; border-bottom: 1px solid #d3ccdc"><ol style="display: flex; gap: 6px; width: max-content"><li><button class="chip" style=""><span style="color: #1d6a80"><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M4 10.5l4 4 8-9"></path></svg></span>Class</button></li><li><button class="chip" style=""><span style="color: #1d6a80"><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M4 10.5l4 4 8-9"></path></svg></span>Species</button></li><li><button class="chip" style=""><span style="color: #1d6a80"><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M4 10.5l4 4 8-9"></path></svg></span>Background</button></li><li><button class="chip" aria-current="step" style="border-color: #2a8fa8; box-shadow:none; color: #2a2537">Ability scores</button></li><li><button class="chip" style=""><span class="vt" style="color: #8a5612; font-size: 18px; line-height: 1">!</span>Level-ups</button></li><li><button class="chip" style="color: #655d77">Equipment</button></li><li><button class="chip" style="color: #655d77">Review</button></li></ol></nav>
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 16px 16px 0; display: flex; flex-direction: column; gap: 12px">
+<h1 class="h1" style="font-size: 22px">ABILITY SCORES</h1>
+<p style="font-size: 14px; line-height: 1.45; color: #4f4862">Your background, Criminal, adds 2 to Dexterity and 1 to Constitution.</p>
+<div class="seg"><button aria-pressed="true">Standard array</button><button aria-pressed="false">Point buy</button><button aria-pressed="false">Roll</button></div>
+<ul><li style="display: flex; align-items: center; gap: 10px; min-height: 56px; border-top: 1px solid #e0dbe6"><span style="flex: 1; min-width: 0"><span style="display: block; font-size: 15px; font-weight: 600">Strength</span><span style="display: block; font-size: 12px; color: #655d77">No bonus</span></span><button class="btn" aria-label="Strength base score 8. Change" style="min-width: 76px; padding: 0 10px; justify-content: space-between"><span class="vt" style="font-size: 22px">8</span><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 8l5 5 5-5"></path></svg></button><span class="vt" style="width: 40px; text-align: right; font-size: 26px">8</span><span class="vt" style="width: 34px; text-align: right; font-size: 24px; color: #7a5718">-1</span></li><li style="display: flex; align-items: center; gap: 10px; min-height: 56px; border-top: 1px solid #e0dbe6"><span style="flex: 1; min-width: 0"><span style="display: block; font-size: 15px; font-weight: 600">Dexterity</span><span style="display: block; font-size: 12px; color: #1d6a80">Background +2</span></span><button class="btn" aria-label="Dexterity base score 15. Change" style="min-width: 76px; padding: 0 10px; justify-content: space-between"><span class="vt" style="font-size: 22px">15</span><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 8l5 5 5-5"></path></svg></button><span class="vt" style="width: 40px; text-align: right; font-size: 26px">17</span><span class="vt" style="width: 34px; text-align: right; font-size: 24px; color: #7a5718">+3</span></li><li style="display: flex; align-items: center; gap: 10px; min-height: 56px; border-top: 1px solid #e0dbe6"><span style="flex: 1; min-width: 0"><span style="display: block; font-size: 15px; font-weight: 600">Constitution</span><span style="display: block; font-size: 12px; color: #1d6a80">Background +1</span></span><button class="btn" aria-label="Constitution base score 13. Change" style="min-width: 76px; padding: 0 10px; justify-content: space-between"><span class="vt" style="font-size: 22px">13</span><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 8l5 5 5-5"></path></svg></button><span class="vt" style="width: 40px; text-align: right; font-size: 26px">14</span><span class="vt" style="width: 34px; text-align: right; font-size: 24px; color: #7a5718">+2</span></li><li style="display: flex; align-items: center; gap: 10px; min-height: 56px; border-top: 1px solid #e0dbe6"><span style="flex: 1; min-width: 0"><span style="display: block; font-size: 15px; font-weight: 600">Intelligence</span><span style="display: block; font-size: 12px; color: #655d77">No bonus</span></span><button class="btn" aria-label="Intelligence base score 12. Change" style="min-width: 76px; padding: 0 10px; justify-content: space-between"><span class="vt" style="font-size: 22px">12</span><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 8l5 5 5-5"></path></svg></button><span class="vt" style="width: 40px; text-align: right; font-size: 26px">12</span><span class="vt" style="width: 34px; text-align: right; font-size: 24px; color: #7a5718">+1</span></li><li style="display: flex; align-items: center; gap: 10px; min-height: 56px; border-top: 1px solid #e0dbe6"><span style="flex: 1; min-width: 0"><span style="display: block; font-size: 15px; font-weight: 600">Wisdom</span><span style="display: block; font-size: 12px; color: #655d77">No bonus</span></span><button class="btn" aria-label="Wisdom base score 14. Change" style="min-width: 76px; padding: 0 10px; justify-content: space-between"><span class="vt" style="font-size: 22px">14</span><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 8l5 5 5-5"></path></svg></button><span class="vt" style="width: 40px; text-align: right; font-size: 26px">14</span><span class="vt" style="width: 34px; text-align: right; font-size: 24px; color: #7a5718">+2</span></li><li style="display: flex; align-items: center; gap: 10px; min-height: 56px; border-top: 1px solid #e0dbe6"><span style="flex: 1; min-width: 0"><span style="display: block; font-size: 15px; font-weight: 600">Charisma</span><span style="display: block; font-size: 12px; color: #655d77">No bonus</span></span><button class="btn" aria-label="Charisma base score 10. Change" style="min-width: 76px; padding: 0 10px; justify-content: space-between"><span class="vt" style="font-size: 22px">10</span><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 8l5 5 5-5"></path></svg></button><span class="vt" style="width: 40px; text-align: right; font-size: 26px">10</span><span class="vt" style="width: 34px; text-align: right; font-size: 24px; color: #7a5718">+0</span></li></ul>
+</main>
+<div style="flex: none; border-top: 1px solid #d3ccdc; background: #f3f0f5">
+<button style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 16px; min-height: 56px" aria-label="Open the preview"><span class="port" style="width: 36px; height: 36px; border: 2px solid #4a72d9; overflow: hidden; padding: 0"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true" style="display: block"><defs><radialGradient id="a186xb" cx="0.5" cy="0.45" r="0.75"><stop offset="0" stop-color="#2a0a52"></stop><stop offset="1" stop-color="#07020f"></stop></radialGradient>
+<linearGradient id="a186xd" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9fdcff"></stop><stop offset="0.5" stop-color="#ffffff"></stop><stop offset="1" stop-color="#5a4a8a"></stop></linearGradient>
+<mask id="a186xh"><rect width="64" height="64" fill="#fff"></rect><ellipse cx="20" cy="31" rx="6.5" ry="4.2" transform="rotate(8 20 31)" fill="#000"></ellipse><ellipse cx="44" cy="31" rx="6.5" ry="4.2" transform="rotate(-8 44 31)" fill="#000"></ellipse></mask>
+<filter id="a186xg" x="-30%" y="-50%" width="160%" height="200%"><feGaussianBlur stdDeviation="1.8"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#a186xb)"></rect>
+<path d="M4 14c6-4 12 2 18-2M42 10c6 3 10-2 16 1" stroke="#b07cff" stroke-width="1.2" fill="none" opacity="0.5"></path>
+<g transform="translate(32 50) rotate(-62)"><path d="M-4 0L18 -2L22 0L18 2Z" fill="url(#a186xd)"></path><rect x="-6" y="-4" width="2.2" height="8" fill="#ffd23f"></rect><rect x="-13" y="-1.4" width="7" height="2.8" fill="#3b1170"></rect></g>
+<path d="M7 30C3 33 2 38 3 42M57 30C61 33 62 38 61 42" stroke="#ff2f92" stroke-width="1.6" fill="none"></path>
+<path d="M7 30C7 21.5 15.5 19.5 23.5 21.5C28 22.6 30 24.6 32 24.6C34 24.6 36 22.6 40.5 21.5C48.5 19.5 57 21.5 57 30C57 38 51 42 44.5 42C38.5 42 35 38.5 32 36C29 38.5 25.5 42 19.5 42C13 42 7 38 7 30Z" fill="none" stroke="#ff2f92" stroke-width="3" filter="url(#a186xg)" opacity="0.7"></path>
+<path d="M7 30C7 21.5 15.5 19.5 23.5 21.5C28 22.6 30 24.6 32 24.6C34 24.6 36 22.6 40.5 21.5C48.5 19.5 57 21.5 57 30C57 38 51 42 44.5 42C38.5 42 35 38.5 32 36C29 38.5 25.5 42 19.5 42C13 42 7 38 7 30Z" fill="#0b0414" stroke="#ff2f92" stroke-width="1.6" mask="url(#a186xh)"></path>
+<ellipse cx="20" cy="31" rx="6.5" ry="4.2" transform="rotate(8 20 31)" fill="none" stroke="#ff8cc0" stroke-width="0.8"></ellipse><ellipse cx="44" cy="31" rx="6.5" ry="4.2" transform="rotate(-8 44 31)" fill="none" stroke="#ff8cc0" stroke-width="0.8"></ellipse></svg></span><span style="flex: 1; min-width: 0"><span style="display: block; font-size: 14px; font-weight: 700">Pip Underbough</span><span class="vt" style="display: block; font-size: 18px; line-height: 1; color: #4f4862">AC 14 &#160; HP 52 &#160; INIT +3</span></span><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 12l5-5 5 5"></path></svg></button>
+</div>
+<div style="padding: 10px 16px 14px; flex: none; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; background: #ebe7ef">
+<button class="btn" aria-label="Back to background" style="padding: 0; height: 52px"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M12 4l-6 6 6 6"></path></svg></button>
+<button class="btn-primary" style="width: 100%">NEXT: LEVEL-UPS</button>
+</div>
+<div class="scan"></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Shades avatar"><title>Shades avatar</title><defs><linearGradient id="oz-shades-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a2a3a"></stop><stop offset="1" stop-color="#2a0a52"></stop></linearGradient>
+<linearGradient id="oz-shades-l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe14d"></stop><stop offset="0.5" stop-color="#ff8a1f"></stop><stop offset="1" stop-color="#ff2f92"></stop></linearGradient>
+<clipPath id="oz-shades-k"><path d="M9 25H30L28.5 37Q27.5 42 22 42H15Q10.5 42 9.5 37ZM34 25H55L54.5 37Q53.5 42 49 42H42Q36.5 42 35.5 37Z"></path></clipPath></defs>
+<rect width="64" height="64" fill="url(#oz-shades-b)"></rect><path d="M0 50.8H64M0 52.2H64M0 54.5H64M0 57.8H64M0 64.0H64M32 50L-64 64M32 50L-48 64M32 50L-32 64M32 50L-16 64M32 50L0 64M32 50L16 64M32 50L32 64M32 50L48 64M32 50L64 64M32 50L80 64M32 50L96 64M32 50L112 64M32 50L128 64" stroke="#2be4ff" stroke-width="0.7" opacity="0.5" fill="none"></path>
+<path d="M9 25H30L28.5 37Q27.5 42 22 42H15Q10.5 42 9.5 37ZM34 25H55L54.5 37Q53.5 42 49 42H42Q36.5 42 35.5 37Z" fill="url(#oz-shades-l)"></path>
+<g clip-path="url(#oz-shades-k)"><rect y="34" width="64" height="1.6" fill="#2a0a52"></rect><rect y="37.5" width="64" height="2" fill="#2a0a52"></rect><path d="M14 27L24 39M40 27L50 39" stroke="#ffffff" stroke-width="2" opacity="0.55"></path></g>
+<path d="M9 25H30L28.5 37Q27.5 42 22 42H15Q10.5 42 9.5 37ZM34 25H55L54.5 37Q53.5 42 49 42H42Q36.5 42 35.5 37Z" fill="none" stroke="#0b0414" stroke-width="2.4" stroke-linejoin="round"></path>
+<rect x="6" y="22.5" width="52" height="3.5" fill="#0b0414"></rect><rect x="29" y="27" width="6" height="2.4" fill="#0b0414"></rect>
+<rect x="6" y="22.5" width="52" height="1" fill="#2be4ff" opacity="0.7"></rect></svg>

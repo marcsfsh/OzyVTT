@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { Button, IconScene } from "@vtt/ui";
+import { Button, IconScene, cx } from "@vtt/ui";
 import { ClaimCharacter } from "../actors/ClaimCharacter";
 import { JoinAddress } from "../components/JoinAddress";
 import { partyVisibilityOf } from "../actors/MyCharacter";
@@ -20,9 +20,11 @@ import { PartyRest } from "../rest/PartyRest";
 import { RestPrompt } from "../rest/RestPrompt";
 import { needsItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
-import { PaneDivider, useMomentShare } from "../table/PaneDivider";
-import { PromptSlot } from "../table/PromptSlot";
-import { TableHeader } from "../table/TableHeader";
+import { useScrollPast } from "../table/scrollPast";
+import { hasPlayerPrompt, PromptSlot } from "../table/PromptSlot";
+import { StripEndContext } from "../table/stripSlot";
+import { TableStrip } from "../table/TableStrip";
+import { usePhoneShell } from "./AppBar";
 import { TokenTab } from "../table/TokenTab";
 import { useCodexNotice } from "../table/useCodexNotice";
 import "./table-view.css";
@@ -37,8 +39,7 @@ export type GmTable = Readonly<{
   mapLibrary: readonly MapSelection[];
   onSelectMap: (map: MapSelection | null) => void;
   /** Makes a prepared scene live, asked first while a fight is on: Tonight's board names its fights' scenes. */
-  onMakeLive: (sceneId: string) => void;
-  viewerPreview: Readonly<{ on: boolean; onToggle: () => void }>;
+  onMakeLive: (encounterId: string) => void;
 }>;
 
 // Leave table is in Settings, confirmed, away from the fight's controls.
@@ -59,6 +60,10 @@ export function TableView(props: TableViewProps) {
   const { role, state, token } = props;
   const gm = props.role === "gm" ? props.gm : null;
   const phone = useMediaQuery(PHONE_TABLE_QUERY);
+  // The narrower phone shell, where Play's strip stands in for the top bar.
+  const phoneShell = usePhoneShell();
+  // The strip's right end, where the GM's Fight menu lands during a fight.
+  const [stripEnd, setStripEnd] = useState<HTMLElement | null>(null);
   /**
    * Whether this player has claimed anyone, which decides between the pre-claim picker and their own
    * character. Read from the projection's `claimStatus`.
@@ -69,16 +74,17 @@ export function TableView(props: TableViewProps) {
   // A player who has claimed nobody while no map is live sees the picker across the whole table, never under an empty
   // map box.
   const claimingOnly = props.role === "player" && !playerHasClaimed && !state.combat.mapAssetId;
-  // The phone's split between the map pane and the panel. Choosing a target lowers the divider so the map takes
-  // most of the height, and the player's sheet raises it so the sheet does; the person's own split comes back after.
-  const splitRef = useRef<HTMLDivElement | null>(null);
+  // On a phone the map scrolls away above the panel. Choosing a target scrolls back to the map, and the player's sheet
+  // or a prompt they owe scrolls past it to the panel.
   const targeting = useTargeting();
   const myId =
     props.role === "player" ? (props.state.actors.find((actor) => actor.claimStatus === "mine")?.id ?? null) : null;
   const choosing = phone && targeting !== null && (role === "gm" || targeting.attackerId === myId);
   const [sheetShown, setSheetShown] = useState(false);
-  const moment = choosing ? "choosing" : phone && sheetShown && playerHasClaimed ? "sheet" : null;
-  const [mapShare, moveSplit] = useMomentShare(moment);
+  // A prompt the player owes takes the panel's room too, so its answer and End turn stay on screen.
+  const promptWaits = props.role === "player" && hasPlayerPrompt(props.state);
+  const moment = choosing ? "choosing" : phone && (sheetShown || promptWaits) && playerHasClaimed ? "sheet" : null;
+  const column = useScrollPast(phone && !claimingOnly, moment);
   const liveMapName = gm?.selectedMap?.id === state.combat.mapAssetId ? (gm?.selectedMap?.name ?? null) : null;
   // A player hears, in the status line, when the Codex gives them something new.
   useCodexNotice(role === "player" ? token : null);
@@ -88,9 +94,9 @@ export function TableView(props: TableViewProps) {
 
   const header =
     props.role === "gm" ? (
-      <TableHeader role="gm" state={props.state} gm={{ token, liveMapName, viewerPreview: props.gm.viewerPreview }} />
+      <TableStrip role="gm" state={props.state} token={token} phone={phoneShell} endRef={setStripEnd} />
     ) : (
-      <TableHeader role="player" state={props.state} />
+      <TableStrip role="player" state={props.state} token={token} phone={phoneShell} />
     );
 
   const map = state.combat.mapAssetId ? (
@@ -113,7 +119,7 @@ export function TableView(props: TableViewProps) {
     />
   ) : claimingOnly ? null : (
     /* No map yet. The GM's box is the first evening's start: the scene, and the address players open. */
-    <div className={`empty map-empty-hero scanlines${gm ? " map-empty-hero--gm scroll-y" : ""}`}>
+    <div className={`empty map-empty-hero${gm ? " map-empty-hero--gm scroll-y" : ""}`}>
       <div className="empty-atmos" aria-hidden="true">
         <span className="home-hero-bloom" />
         <span className="home-hero-grid grid-floor" />
@@ -121,12 +127,12 @@ export function TableView(props: TableViewProps) {
       <strong>No map loaded yet</strong>
       <span>
         {role === "gm"
-          ? "Prepare a scene: pick a map and who is in it, then make it live."
-          : "The map appears here when the GM makes a scene live."}
+          ? "Prepare an encounter: pick a map and who is in it, then make it live."
+          : "The map appears here when the GM makes an encounter live."}
       </span>
       {gm && (
         <Button variant="secondary" className="empty-scene-prep" onClick={() => navigate(SCENES_PATHS.newScene)}>
-          <IconScene /> Prepare a scene
+          <IconScene /> Prepare an encounter
         </Button>
       )}
       {gm && <JoinAddress token={token} layout="hero" />}
@@ -134,7 +140,20 @@ export function TableView(props: TableViewProps) {
   );
 
   const dice = <DicePanel role={role} state={state} />;
-  const log = <CombatLogPanel />;
+  // The GM may remove any chat line; a player, what their own characters said.
+  const myCharacters = new Set(
+    role === "gm"
+      ? []
+      : state.actors.filter((actor) => "claimStatus" in actor && actor.claimStatus === "mine").map((a) => a.id)
+  );
+  const log = (
+    <CombatLogPanel
+      canRemove={(entry) =>
+        entry.kind === "chat" &&
+        (role === "gm" || (entry.author?.role === "player" && myCharacters.has(entry.author.actorId ?? "")))
+      }
+    />
+  );
   let panel;
   if (props.role === "gm") {
     panel = (
@@ -145,6 +164,7 @@ export function TableView(props: TableViewProps) {
         mapLibrary={props.gm.mapLibrary}
         onSelectMap={props.gm.onSelectMap}
         phone={phone}
+        token={token}
         slots={{
           needs: <NeedsYou state={props.state} token={token} />,
           needsCount: needsItems(props.state).length,
@@ -157,8 +177,8 @@ export function TableView(props: TableViewProps) {
             <TonightTab
               token={token}
               party={party}
-              scenes={props.state.combat.scenes}
-              liveSceneId={props.state.combat.activeSceneId}
+              scenes={props.state.combat.encounters}
+              liveSceneId={props.state.combat.activeEncounterId}
               onMakeLive={props.gm.onMakeLive}
             />
           ),
@@ -190,7 +210,6 @@ export function TableView(props: TableViewProps) {
           ),
           dice,
           log,
-          codex: <CodexTab role="player" token={token} />,
           // The party is a party surface, so the `off` tier removes it for players.
           ...(partyVisibilityOf(props.state) !== "off"
             ? { party: <PartyStrip role="player" state={props.state} /> }
@@ -208,17 +227,21 @@ export function TableView(props: TableViewProps) {
     );
   }
 
+  // With no map live the picker is the whole table, beside the title screen's sunset.
+  if (claimingOnly && props.role === "player")
+    return (
+      <div className="table-claim anim-view">
+        <ClaimCharacter state={props.state} art />
+      </div>
+    );
   return (
     <div className={`table-bench anim-view ${role}${claimingOnly ? " is-claiming" : ""}`}>
       {header}
-      <div
-        className="table-bench-split"
-        ref={splitRef}
-        style={phone ? ({ "--map-share": `${mapShare}%` } as React.CSSProperties) : undefined}
-      >
+      <div className={cx("table-bench-split", column.className)} ref={column.columnRef}>
         {map && <div className="table-bench-map">{map}</div>}
-        {phone && map && <PaneDivider value={mapShare} onChange={moveSplit} container={() => splitRef.current} />}
-        <div className="table-bench-panel">{panel}</div>
+        <div className="table-bench-panel">
+          <StripEndContext.Provider value={stripEnd}>{panel}</StripEndContext.Provider>
+        </div>
       </div>
     </div>
   );

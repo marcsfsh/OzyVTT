@@ -51,10 +51,10 @@ export function StagingTray({
 }>) {
   const placed = entries.filter((entry) => entry.placed).length;
   return (
-    <section className="staging-tray" aria-label="In this scene">
+    <section className="staging-tray" aria-label="In this encounter">
       <header className="staging-tray-head">
         <div className="staging-tray-title">
-          <strong>In this scene</strong>
+          <strong>In this encounter</strong>
           <span>{entries.length === 0 ? "Nothing staged yet" : `${entries.length} staged · ${placed} on the map`}</span>
         </div>
         <label className="staging-tray-reveal">

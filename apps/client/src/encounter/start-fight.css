@@ -1,0 +1,229 @@
+/* Start a fight (DESIGN.md, Layout): a Bungee title, In this fight as ticked rows, the initiative switches and
+   Surprised. On a phone it is a card under the map whose rows open sheets. */
+.start-fight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+.start-fight-title {
+  margin: 0;
+  font: 400 24px / 1.1 var(--font-display);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.start-fight-lede {
+  margin: calc(-1 * var(--space-3)) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.start-fight-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.start-fight-label {
+  margin: 0;
+  padding: 0;
+  color: var(--text-muted);
+  font: 600 12px / 1.3 var(--font-label);
+}
+.start-fight-empty,
+.start-fight-rule {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.start-fight-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+.start-fight-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.start-fight-pick.is-out .start-fight-pick-text,
+.start-fight-pick.is-out .nh-portrait {
+  opacity: 0.6;
+}
+.start-fight-pick-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 2px;
+}
+.start-fight-pick-text b {
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.start-fight-pick-text span {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+/* The tick: a 28px square inside the row's 52px hit area; ticked, the selected fill with a check in its ink. */
+.start-fight-tick {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+}
+.start-fight-tick input {
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.start-fight-tick input:checked {
+  border-color: var(--state-on-edge);
+  background: var(--state-on);
+}
+.start-fight-tick:has(input:checked)::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 5px;
+  width: 7px;
+  height: 13px;
+  border: solid var(--state-on-ink);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.start-fight-tick input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.start-fight-tick input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.start-fight .scene-prep-adds {
+  margin-top: var(--space-2);
+}
+.start-fight-staging > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  color: var(--cyan-hi);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The phone's card: the title and "No fight running", the faces, then three rows that open sheets. */
+.start-fight.is-card {
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-2);
+}
+.start-fight-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.start-fight-card-state {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.start-fight-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.start-fight-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+.start-fight-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 60px;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.start-fight-row-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 2px;
+}
+.start-fight-row-text b {
+  font-weight: 600;
+}
+.start-fight-row-text span {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.start-fight-row svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--text-dim);
+}
+
+/* The count under the primary: who rolls. */
+.start-fight-count {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+/* Who plays: one row per party character, its name and where it is played. Wraps under the name at 390px. */
+.start-fight-plays {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.start-fight-plays li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+.start-fight-plays-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.start-fight-plays-name b {
+  color: var(--text);
+  font-weight: 600;
+}
+.start-fight-plays-name span {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}

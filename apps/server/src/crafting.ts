@@ -532,7 +532,7 @@ export function startCraft(
   requireActorAccess(scope, state, request.actorId, "resource", "You can only craft with your own character.");
   const actor = state.actors.find((candidate) => candidate.id === request.actorId);
   if (!actor) throw new CommandRejectedError("That character no longer exists.");
-  if (inFight(state, actor.id)) throw new CommandRejectedError("Crafting is downtime. End the fight first.");
+  if (inFight(state, actor.id)) throw new CommandRejectedError("Crafting is downtime. End the encounter first.");
   if (isDead(actor)) throw new CommandRejectedError(`${actor.name} is dead.`);
   if (state.crafting.projects.length >= MAX_PROJECTS)
     throw new CommandRejectedError("Too many projects are under way. Finish or cancel one first.");

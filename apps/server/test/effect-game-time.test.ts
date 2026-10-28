@@ -23,7 +23,7 @@ describe("what lasts in game time", () => {
     expect(table.state.rest).toMatchObject({ clockHours: 8, clockMinutes: 0 });
   });
 
-  it("counts 10 rounds to the minute: a 1-minute Bless ends when a minute passes outside the fight", () => {
+  it("counts 10 rounds to the minute: a 1-minute Bless ends when a minute passes outside the encounter", () => {
     const table = caster({ combat: false });
     table.state.combat.active = true;
     table.state.combat.initiative = [{ actorId: HERO, score: 20, tieBreaker: 0 }];
@@ -37,7 +37,7 @@ describe("what lasts in game time", () => {
     expect(table.state.rest).toMatchObject({ clockHours: 0, clockMinutes: 1 });
   });
 
-  it("ends what has a minute or less left with the fight", () => {
+  it("ends what has a minute or less left with the encounter", () => {
     const table = caster();
     cast(table, "bless", { targetIds: [ALLY] });
     heroTurnAgain(table.state);
@@ -47,7 +47,7 @@ describe("what lasts in game time", () => {
     expect(effectNames(table.state, HERO)).toEqual([]);
   });
 
-  it("ends a 10-minute Concentration spell that outlives its fight once 10 minutes pass", () => {
+  it("ends a 10-minute Concentration spell that outlives its encounter once 10 minutes pass", () => {
     const table = caster();
     cast(table, "fly", { targetIds: [HERO] });
     endFight(table.state);

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Waves avatar"><title>Waves avatar</title><defs><linearGradient id="oz-waves-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a1440"></stop><stop offset="1" stop-color="#7a1268"></stop></linearGradient>
+<linearGradient id="oz-waves-u" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe14d"></stop><stop offset="1" stop-color="#ff2f92"></stop></linearGradient>
+<mask id="oz-waves-m"><rect width="64" height="34" fill="#fff"></rect><rect y="25" width="64" height="1.6" fill="#000"></rect><rect y="29" width="64" height="2.2" fill="#000"></rect></mask></defs>
+<rect width="64" height="34" fill="url(#oz-waves-s)"></rect><circle cx="32" cy="34" r="14" fill="url(#oz-waves-u)" mask="url(#oz-waves-m)"></circle>
+<rect y="34" width="64" height="30" fill="#06122a"></rect>
+<path d="M22 37h20M25 40h14M28 43h8" stroke="#ff8cc0" stroke-width="1.4" opacity="0.8"></path>
+<path d="M-4 40q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0" fill="none" stroke="#2be4ff" stroke-width="1.2" opacity="0.5"></path><path d="M-4 47q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0" fill="none" stroke="#2be4ff" stroke-width="1.6" opacity="0.75"></path><path d="M-4 55q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0q4 -5 8 0" fill="none" stroke="#2be4ff" stroke-width="2" opacity="1"></path></svg>

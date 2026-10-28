@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { GmView } from "@vtt/domain";
-import { ThemeSwitch, Wordmark } from "@vtt/ui";
 import { PartyRosterTab } from "../actors/PartyRosterTab";
 import { useConfirm } from "../components/feedback";
 import { lazySurface } from "../components/lazySurface";
@@ -9,16 +8,17 @@ import { listMaps, type MapAsset, type MapSelection } from "../maps/map-catalog"
 import {
   isKnownPath,
   isPlayerOnlyPath,
-  lastLocationForTab,
   layerOf,
   litGmTab,
   navigate,
   pathForGmTab,
+  prepPageFor,
   useRoute,
   type GmTab
 } from "../router";
 import { useSceneActions } from "../scenes/sceneActions";
-import { AppTabs, type TabFit } from "./AppTabs";
+import { PrepFrame } from "./AppBar";
+import { setViewerPreviewOpen, useViewerPreviewOpen } from "../viewer/preview-open";
 import { isFullPageLayer, LayerView } from "./LayerView";
 import { TableView } from "./TableView";
 import type { Connection } from "./useSession";
@@ -30,60 +30,12 @@ const ScenesShell = lazySurface(() => import("../scenes/ScenesShell").then((m) =
 const ReplayList = lazySurface(() => import("../replay/ReplayList").then((m) => m.ReplayList));
 const ViewerControls = lazySurface(() => import("../viewer/ViewerControls").then((m) => m.ViewerControls));
 const SoundBoard = lazySurface(() => import("../sound/SoundBoard").then((m) => m.SoundBoard));
+const TokensPage = lazySurface(() => import("../tokens/TokensPage").then((m) => m.TokensPage));
 // A floating panel over the table: nothing to hold its place while it loads.
 const ViewerPreviewPanel = lazySurface(
   () => import("../viewer/ViewerPreviewPanel").then((m) => m.ViewerPreviewPanel),
   null
 );
-
-const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
-  // The place is the "Table" (an encounter is the fight on it); the roster is "Roster".
-  { id: "table", label: "Table" },
-  { id: "scenes", label: "Scenes" },
-  { id: "roster", label: "Roster" },
-  { id: "codex", label: "Codex" },
-  // The Compendium sits right after Codex: the two GM authoring surfaces are adjacent.
-  { id: "compendium", label: "Compendium" },
-  // Controls for the shared screen.
-  { id: "viewer", label: "Shared screen" },
-  { id: "replay", label: "Replays" },
-  { id: "settings", label: "Settings" }
-];
-
-/** All eight tabs from 980px; then five, four, and three on a phone, the rest in the More menu. */
-const GM_TAB_FIT: TabFit = [GM_TABS.length, 5, 4, 3];
-
-/**
- * The GM's tab bar. The tab is read from the address, which names one; addresses that name none
- * (`/`, `/codex/pages/x`) resolve to "table". A tab returns you to where you were in it, and re-tapping
- * the current tab goes to its front door. It stays up while a full-page layer is open, with the theme switch at its
- * end.
- */
-export function GmTabBar() {
-  const route = useRoute();
-  const gmTab: GmTab = litGmTab(route.path) ?? "table";
-  return (
-    <div className="frame-tabbar rim-gm">
-      <Wordmark variant="solid" sun className="app-logo" aria-hidden="true" />
-      <AppTabs
-        className="gm-tabs"
-        ariaLabel="GM sections"
-        tabs={GM_TABS.map((tab) => ({ id: tab.id, label: tab.label, name: tab.label }))}
-        fits={GM_TAB_FIT}
-        activeId={gmTab}
-        onChange={(id) => {
-          const next = id as GmTab;
-          navigate(
-            next === gmTab
-              ? pathForGmTab(next)
-              : (lastLocationForTab("gm", pathForGmTab(next).slice(1)) ?? pathForGmTab(next))
-          );
-        }}
-      />
-      <ThemeSwitch className="app-theme-switch" />
-    </div>
-  );
-}
 
 /** The GM's pane: the surface the address names, and the scene dialogs over the table. */
 export function GmShell({
@@ -117,14 +69,14 @@ export function GmShell({
   const addressUnknown = (!isKnownPath(route.path) || isPlayerOnlyPath(route.path)) && route.segments[0] !== "codex";
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
   const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
-  const [showViewerPreview, setShowViewerPreview] = useState(false);
+  const showViewerPreview = useViewerPreviewOpen();
   const { confirm, dialog } = useConfirm();
   /**
    * Read defensively: the first `state:updated` a signing-in GM receives can still be the player-shaped
    * projection, which has no scenes. The scene surfaces wait for the GM's.
    */
-  const scenesLoaded = Array.isArray(state.combat.scenes);
-  const scenes = useMemo(() => state.combat.scenes ?? [], [state.combat.scenes]);
+  const scenesLoaded = Array.isArray(state.combat.encounters);
+  const scenes = useMemo(() => state.combat.encounters ?? [], [state.combat.encounters]);
   /** The party's player characters, for the Compendium's Who sees it. */
   const party = useMemo(
     () =>
@@ -135,8 +87,8 @@ export function GmShell({
   );
   const sceneActions = useSceneActions(scenes, { combatActive: state.combat.active });
   // One way to make a scene live from anywhere: asked first while a fight is on, since that fight is parked.
-  const makeSceneLive = async (sceneId: string): Promise<boolean> => {
-    const scene = scenes.find((candidate) => candidate.id === sceneId);
+  const makeSceneLive = async (encounterId: string): Promise<boolean> => {
+    const scene = scenes.find((candidate) => candidate.id === encounterId);
     return scene ? sceneActions.makeLive(scene) : false;
   };
 
@@ -200,12 +152,16 @@ export function GmShell({
   if (isFullPageLayer(layer))
     return <LayerView layer={layer} role="gm" state={state} token={token} connection={connection} />;
   const tab = (id: GmTab) => !addressUnknown && gmTab === id;
+  // Prep's pages stand under its section bar; the other sections own their frames.
+  const prep = !addressUnknown && prepPageFor(route.path) !== null;
+  const Frame = prep ? PrepFrame : Passthrough;
   return (
-    <>
+    <Frame>
       {/* An unknown address and a player-only address both land here, indistinguishably. */}
       {addressUnknown && <NotFoundPage role="gm" />}
 
-      {tab("table") && route.segments[0] !== "codex" && (
+      {/* The table waits for the GM's own view too: the acting console reads fields the player shape lacks. */}
+      {tab("table") && scenesLoaded && route.segments[0] !== "codex" && (
         <TableView
           role="gm"
           state={state}
@@ -214,8 +170,7 @@ export function GmShell({
             selectedMap,
             mapLibrary,
             onSelectMap: setSelectedMap,
-            onMakeLive: (sceneId) => void makeSceneLive(sceneId),
-            viewerPreview: { on: showViewerPreview, onToggle: () => setShowViewerPreview((current) => !current) }
+            onMakeLive: (encounterId) => void makeSceneLive(encounterId)
           }}
         />
       )}
@@ -230,13 +185,13 @@ export function GmShell({
         <SoundBoard
           gmToken={token}
           scenes={scenes.map((scene) => ({ id: scene.id, name: scene.name }))}
-          activeSceneId={state.combat.activeSceneId ?? null}
+          activeEncounterId={state.combat.activeEncounterId ?? null}
         />
       )}
       {tab("viewer") && route.segments[1] !== "sound" && (
         <ViewerControls
           gmToken={token}
-          onPreview={() => setShowViewerPreview(true)}
+          onPreview={() => setViewerPreviewOpen(true)}
           {...(selectedMap
             ? {
                 map: {
@@ -271,11 +226,11 @@ export function GmShell({
             archived: actor.archived,
             kind: actor.kind
           }))}
-          activeSceneId={state.combat.activeSceneId ?? null}
+          activeEncounterId={state.combat.activeEncounterId ?? null}
           gameHours={state.rest?.clockHours ?? null}
           gameMinutes={state.rest?.clockMinutes ?? 0}
-          onActivateScene={(sceneId: string) =>
-            void makeSceneLive(sceneId).then((live) => {
+          onActivateScene={(encounterId: string) =>
+            void makeSceneLive(encounterId).then((live) => {
               if (live) navigate(pathForGmTab("table"));
             })
           }
@@ -284,9 +239,9 @@ export function GmShell({
       )}
 
       {/* The Compendium owns its frame: a section bar over its tables, and a record at its own address. */}
-      {tab("compendium") && <CompendiumShell token={token} party={party} />}
+      {tab("compendium") && <CompendiumShell token={token} party={party} game={state} />}
 
-      {showViewerPreview && <ViewerPreviewPanel gmToken={token} onClose={() => setShowViewerPreview(false)} />}
+      {showViewerPreview && <ViewerPreviewPanel gmToken={token} onClose={() => setViewerPreviewOpen(false)} />}
 
       {/* Settings owns its addresses: a section at `/settings/<section>` and an operation of the API reference at
         `/settings/api/<operation id>`. Opening the reference in a new tab asks for the GM password once, since the GM
@@ -297,14 +252,20 @@ export function GmShell({
           state={state}
           gmToken={token}
           busy={busy}
-          onPreviewPlayers={() => setShowViewerPreview(true)}
+          onPreviewPlayers={() => setViewerPreviewOpen(true)}
           onSignOut={onSignOut}
           onRevokeAll={() => void revokeAll()}
           onChangePassword={onChangePassword}
         />
       )}
+      {/* Prep's token library: every creature at the table, each opening the token picker. */}
+      {tab("tokens") && <TokensPage state={state} token={token} />}
       {dialog}
       {sceneActions.dialogs}
-    </>
+    </Frame>
   );
+}
+
+function Passthrough({ children }: Readonly<{ children: ReactNode }>) {
+  return <>{children}</>;
 }

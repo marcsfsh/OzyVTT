@@ -48,7 +48,7 @@ const effect = (fields: Record<string, unknown>) => ({
 });
 
 describe("light levels", () => {
-  it("reads the scene's ambient light at every point", () => {
+  it("reads the encounter's ambient light at every point", () => {
     expect(sceneSight(visionGame({ ambient: "bright" })).lightAt(cell(3, 3)).level).toBe("bright");
     expect(sceneSight(visionGame({ ambient: "dim" })).lightAt(cell(3, 3)).level).toBe("dim");
     expect(sceneSight(visionGame({ ambient: "dark" })).lightAt(cell(3, 3)).level).toBe("dark");
@@ -88,7 +88,7 @@ describe("light levels", () => {
     expect(sight.perceives(HERO, GOBLIN)).toBe(true);
   });
 
-  it("marks sunlight: the scene's daylight, a sunlit area, and a light whose Bright Light is sunlight", () => {
+  it("marks sunlight: the encounter's daylight, a sunlit area, and a light whose Bright Light is sunlight", () => {
     expect(sceneSight(visionGame({ sunlight: true })).lightAt(cell(3, 3)).sunlight).toBe(true);
     expect(sceneSight(visionGame()).lightAt(cell(3, 3)).sunlight).toBe(false);
     const daylight = sceneSight(
@@ -315,7 +315,7 @@ describe("senses from effects and items", () => {
 });
 
 describe("what a player's view draws", () => {
-  it("leaves out the inside of fog and paints nothing dim in a bright scene", () => {
+  it("leaves out the inside of fog and paints nothing dim in a bright encounter", () => {
     const fog = circleArea("heavily-obscured", cell(8, 5), 10);
     const sight = sceneSight(visionGame({ areas: [fog] }));
     expect(sight.brightOf([HERO])).toBeNull();
@@ -325,7 +325,7 @@ describe("what a player's view draws", () => {
     expect(reachesBehind).toBe(false);
   });
 
-  it("marks the Bright Light in sight in a dim scene", () => {
+  it("marks the Bright Light in sight in a dim encounter", () => {
     const sight = sceneSight(visionGame({ ambient: "dim", lights: [light(cell(8, 5), 10, 10)] }));
     const bright = sight.brightOf([HERO]);
     expect(bright).not.toBeNull();

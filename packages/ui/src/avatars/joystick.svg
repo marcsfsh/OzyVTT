@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Joystick avatar"><title>Joystick avatar</title><defs><linearGradient id="oz-joystick-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a0638"></stop><stop offset="1" stop-color="#07020f"></stop></linearGradient>
+<radialGradient id="oz-joystick-ball" cx="0.35" cy="0.35" r="0.7"><stop offset="0" stop-color="#ff8cc0"></stop><stop offset="0.55" stop-color="#ff2f92"></stop><stop offset="1" stop-color="#8a0f4d"></stop></radialGradient>
+<linearGradient id="oz-joystick-c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8e8ea6"></stop><stop offset="0.5" stop-color="#f4f4fa"></stop><stop offset="1" stop-color="#5a5a78"></stop></linearGradient></defs>
+<rect width="64" height="64" fill="url(#oz-joystick-b)"></rect><path d="M0 52.7H64M0 53.9H64M0 55.8H64M0 58.7H64M0 64.0H64M32 52L-64 64M32 52L-48 64M32 52L-32 64M32 52L-16 64M32 52L0 64M32 52L16 64M32 52L32 64M32 52L48 64M32 52L64 64M32 52L80 64M32 52L96 64M32 52L112 64M32 52L128 64" stroke="#ff2f92" stroke-width="0.7" opacity="0.55" fill="none"></path>
+<path d="M12 50L16 41H48L52 50Z" fill="#16161f" stroke="#2be4ff" stroke-width="1.4" stroke-linejoin="round"></path>
+<circle cx="42" cy="45.5" r="2.2" fill="#2be4ff"></circle><circle cx="47" cy="45.5" r="2.2" fill="#ffd23f"></circle>
+<ellipse cx="28" cy="42" rx="7" ry="2" fill="#07060f"></ellipse>
+<rect x="26.5" y="19" width="3" height="23" fill="url(#oz-joystick-c)" transform="rotate(-10 28 42)"></rect>
+<circle cx="24.5" cy="18" r="8.5" fill="url(#oz-joystick-ball)"></circle><circle cx="21.5" cy="15" r="2.2" fill="#ffffff" opacity="0.7"></circle></svg>

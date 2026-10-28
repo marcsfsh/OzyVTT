@@ -3,7 +3,14 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GAME_PATHS } from "@vtt/api-contract";
-import { GameStateSchema, type GameState } from "@vtt/domain";
+import {
+  DamageRollSchema,
+  GameStateSchema,
+  PendingSaveSchema,
+  SceneSchema,
+  effectivePlayerDice,
+  type GameState
+} from "@vtt/domain";
 import { loadActorFixture } from "@vtt/test-fixtures";
 import type { ActorDefinition } from "@vtt/schemas";
 import { afterEach, describe, expect, it } from "vitest";
@@ -216,10 +223,10 @@ describe("a saving throw shown before it counts", () => {
     expect(typed.actors[0].heroicInspiration).toBe(false);
 
     const closed = fight();
-    closed.builderPolicy = { ...closed.builderPolicy, typedRolls: "gm-only" };
+    closed.playerDice = { d20: "app", damage: "app" };
     const closedSave = owedSave(closed);
     expect(() => answer(closed, closedSave, OWNER, [], { face: 18 })).toThrow(/server rolls players' dice/);
-    expect(() => answer(closed, closedSave, OWNER, [9], { damage: 4 })).toThrow(/server rolls the dice/);
+    expect(() => answer(closed, closedSave, OWNER, [9], { damage: 4 })).toThrow(/server rolls the damage/);
     expect(answer(closed, closedSave, GM, [], { face: 18 }).natural).toBe(18);
   });
 });
@@ -331,11 +338,7 @@ const bearer = (token: string) => ({ authorization: `Bearer ${token}`, "content-
 const post = (base: string, path: string, token: string, body: unknown = {}) =>
   fetch(base + path, { method: "POST", headers: bearer(token), body: JSON.stringify(body) });
 const closeTypedDice = (base: string, gmToken: string) =>
-  post(base, GAME_PATHS.builderPolicy, gmToken, {
-    commandId: randomUUID(),
-    allowedAbilityMethods: ["standard-array", "point-buy", "roll"],
-    typedRolls: "gm-only"
-  });
+  post(base, GAME_PATHS.playerDice, gmToken, { commandId: randomUUID(), d20: "app", damage: "app" });
 
 /** Hero at 0 HP and dying, outside a fight, blessed (a d4 on every saving throw). */
 function dying(): GameState {
@@ -500,6 +503,98 @@ describe("players type faces, never totals or modes", () => {
   });
 });
 
+describe("totals, when the table asks for them (ADR-0043)", () => {
+  const askForTotals = (base: string, gmToken: string) =>
+    post(base, GAME_PATHS.playerDice, gmToken, { commandId: randomUUID(), d20: "total" });
+
+  it("turns a player's attack total back into the face, and refuses one the bonus can't reach or a bare face", async () => {
+    const { base, gmToken, player } = await boot(fight());
+    expect((await askForTotals(base, gmToken)).status).toBe(200);
+    const resolve = (extra: Record<string, unknown>) =>
+      post(base, GAME_PATHS.actionResolve, player, {
+        commandId: randomUUID(),
+        actorId: HERO,
+        actionId: "swing",
+        targetIds: [FOE],
+        commit: false,
+        ...extra
+      });
+    const faced = await resolve({ attackNatural: 14 });
+    expect(faced.status).toBe(409);
+    expect((await faced.json()).error.message).toBe("At this table you type the total, with the bonus included.");
+    const unreachable = await resolve({ attackRolledTotal: 26 });
+    expect(unreachable.status).toBe(409);
+    expect((await unreachable.json()).error.message).toBe("A d20 + 5 total is 6 to 25. Check the total you typed.");
+    const typed = await resolve({ attackRolledTotal: 19 });
+    expect((await typed.json()).data.resolution.attack).toMatchObject({ naturalRoll: 14, total: 19 });
+  });
+
+  it("takes a death save's total and still throws Bless's d4 on top", async () => {
+    const { base, server, gmToken, player } = await boot(dying());
+    await askForTotals(base, gmToken);
+    const path = GAME_PATHS.deathSaveRoll.replace("{actorId}", HERO);
+    const answer = await post(base, path, player, {
+      commandId: randomUUID(),
+      actorId: HERO,
+      commit: false,
+      rolledTotal: 12
+    });
+    const deathSave = (await answer.json()).data.deathSave;
+    expect(deathSave.naturalRoll).toBe(12);
+    expect(deathSave.total - 12).toBeGreaterThanOrEqual(1);
+    expect(deathSave.total - 12).toBeLessThanOrEqual(4);
+    expect(server.store.snapshot.rolls.at(-1)?.typed).toBe(true);
+  });
+
+  it("scores a typed initiative total as typed, and lets an encounter ask for faces instead", async () => {
+    const state = fight();
+    const crypt = SceneSchema.parse({ id: randomUUID(), name: "Crypt", mapAssetId: randomUUID() });
+    state.combat = { ...state.combat, pendingInitiative: [HERO], encounters: [crypt] };
+    const { base, server, gmToken, player } = await boot(state);
+    await askForTotals(base, gmToken);
+    const bonus = server.store.snapshot.actors.find((actor) => actor.id === HERO)?.initiative ?? 0;
+    expect(
+      (
+        await post(base, GAME_PATHS.initiativeRollSelf, player, {
+          commandId: randomUUID(),
+          actorId: HERO,
+          rolledTotal: 9 + bonus
+        })
+      ).status
+    ).toBe(200);
+    expect(server.store.snapshot.combat.initiative.find((entry) => entry.actorId === HERO)?.score).toBe(9 + bonus);
+
+    // An encounter's own mode wins over the table's, and players read the one that applies.
+    const view = async () => (await (await fetch(base + "/api/v1/game", { headers: bearer(player) })).json()).data.game;
+    expect((await view()).playerDice).toEqual({ d20: "total", damage: "app" });
+    const encounterId = server.store.snapshot.combat.encounters[0]!.id;
+    expect(
+      (
+        await post(base, GAME_PATHS.scenePlayerDice.replace("{encounterId}", encounterId), player, {
+          commandId: randomUUID(),
+          playerDice: { d20: "die" }
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await post(base, GAME_PATHS.scenePlayerDice.replace("{encounterId}", encounterId), gmToken, {
+          commandId: randomUUID(),
+          playerDice: { d20: "die" }
+        })
+      ).status
+    ).toBe(200);
+    // Parked, it changes nothing; live, it applies.
+    expect((await view()).playerDice).toEqual({ d20: "total", damage: "app" });
+    const live = {
+      ...server.store.snapshot,
+      combat: { ...server.store.snapshot.combat, activeEncounterId: encounterId }
+    };
+    expect(effectivePlayerDice(live)).toEqual({ d20: "die", damage: "app" });
+    expect(JSON.stringify(await view())).not.toContain('"encounters"');
+  });
+});
+
 describe("the free dice roller", () => {
   it("marks a player's roll for their character as a free roll, on the record and in the feed", async () => {
     const { base, server, gmToken, player } = await boot(fight());
@@ -525,5 +620,137 @@ describe("the free dice roller", () => {
     expect(feed).toContainEqual(
       expect.stringMatching(/^Hero rolled \d+ on Stealth \(1d20\+30\) with the free dice roller\.$/)
     );
+  });
+});
+
+describe("a player's damage, when the table has players type it (ADR-0043)", () => {
+  const swingAndConfirm = async (base: string, player: string) => {
+    const resolve = (commit: boolean) =>
+      post(base, GAME_PATHS.actionResolve, player, {
+        commandId: randomUUID(),
+        actorId: HERO,
+        actionId: "swing",
+        targetIds: [FOE],
+        commit,
+        ...(commit ? {} : { attackNatural: 15 })
+      });
+    expect((await resolve(false)).status).toBe(200);
+    expect((await resolve(true)).status).toBe(200);
+  };
+
+  it("waits for the player's total, checks it against the dice, and leaves the hit for the GM", async () => {
+    const { base, server, gmToken, player } = await boot(fight());
+    await post(base, GAME_PATHS.playerDice, gmToken, { commandId: randomUUID(), damage: "total" });
+    await swingAndConfirm(base, player);
+    const [roll] = server.store.snapshot.combat.damageRolls;
+    expect(roll).toMatchObject({ formula: "1d8 + 3", dice: [{ count: 1, sides: 8 }], fixed: 3, mode: "total" });
+    const [proposal] = server.store.snapshot.combat.pendingDamage;
+    expect(proposal?.awaitingRoll).toBe(roll!.id);
+
+    // The player reads what to roll, and nothing of the proposal waiting on it.
+    const view = (await (await fetch(base + "/api/v1/game", { headers: bearer(player) })).json()).data.game;
+    expect(view.combat.damageRolls).toEqual([
+      {
+        id: roll!.id,
+        sourceActorId: HERO,
+        actionName: "Longsword",
+        formula: "1d8 + 3",
+        dice: [{ count: 1, sides: 8 }],
+        fixed: 3,
+        mode: "total"
+      }
+    ]);
+    expect(JSON.stringify(view)).not.toContain("awaitingRoll");
+
+    const report = (body: Record<string, unknown>) =>
+      post(base, GAME_PATHS.damageReport, player, { commandId: randomUUID(), rollId: roll!.id, ...body });
+    const unreachable = await report({ total: 20 });
+    expect(unreachable.status).toBe(409);
+    expect((await unreachable.json()).error.message).toBe("1d8 + 3 comes to 4 to 11. Check the total you typed.");
+    expect((await report({ faces: [5] })).status).toBe(409);
+    expect((await report({ total: 9 })).status).toBe(200);
+    expect(server.store.snapshot.combat.damageRolls).toEqual([]);
+    expect(server.store.snapshot.combat.pendingDamage[0]).toMatchObject({ proposedTotal: 9 });
+    expect(server.store.snapshot.combat.pendingDamage[0]?.awaitingRoll).toBeUndefined();
+    expect(server.store.snapshot.actors.find((actor) => actor.id === FOE)?.hp.current).toBe(30);
+  });
+
+  it("applies a direct table's hit once each die is in", async () => {
+    const { base, server, gmToken, player } = await boot(fight());
+    await post(base, GAME_PATHS.playerDice, gmToken, { commandId: randomUUID(), damage: "die" });
+    await post(base, GAME_PATHS.playerDamageMode, gmToken, { commandId: randomUUID(), mode: "direct" });
+    await swingAndConfirm(base, player);
+    expect(server.store.snapshot.actors.find((actor) => actor.id === FOE)?.hp.current).toBe(30);
+    const [roll] = server.store.snapshot.combat.damageRolls;
+    const wrongDie = await post(base, GAME_PATHS.damageReport, player, {
+      commandId: randomUUID(),
+      rollId: roll!.id,
+      faces: [9]
+    });
+    expect((await wrongDie.json()).error.message).toBe("A d8 shows 1 to 8. Check die 1.");
+    expect(
+      (await post(base, GAME_PATHS.damageReport, player, { commandId: randomUUID(), rollId: roll!.id, faces: [5] }))
+        .status
+    ).toBe(200);
+    expect(server.store.snapshot.actors.find((actor) => actor.id === FOE)?.hp.current).toBe(22);
+    expect(server.store.snapshot.combat.pendingDamage).toEqual([]);
+  });
+});
+
+describe("a save whose damage waits for the caster's roll", () => {
+  it("takes no confirm until the caster's player reports, then deals the reported damage", async () => {
+    const rollId = randomUUID();
+    const saveId = randomUUID();
+    const state = fight();
+    state.combat = {
+      ...state.combat,
+      pendingSaves: [
+        PendingSaveSchema.parse({
+          id: saveId,
+          targetActorId: FOE,
+          ability: "dex",
+          dc: 13,
+          sourceActorId: HERO,
+          sourceName: "Hero",
+          actionName: "Burning Hands",
+          proposedDamage: 10,
+          proposedDamageParts: [{ amount: 10, type: "fire" }],
+          damageRollId: rollId,
+          createdAt: 1
+        })
+      ],
+      damageRolls: [
+        DamageRollSchema.parse({
+          id: rollId,
+          sourceActorId: HERO,
+          sourceName: "Hero",
+          actionName: "Burning Hands",
+          formula: "3d6",
+          dice: [{ count: 3, sides: 6 }],
+          fixed: 0,
+          mode: "total",
+          saveIds: [saveId],
+          createdAt: 1
+        })
+      ]
+    };
+    const { base, server, gmToken, player } = await boot(state);
+    const confirm = () =>
+      post(base, GAME_PATHS.saveAnswer.replace("{saveId}", saveId), gmToken, {
+        commandId: randomUUID(),
+        saveId,
+        method: "roll",
+        face: 2,
+        commit: true
+      });
+    const waiting = await confirm();
+    expect(waiting.status).toBe(409);
+    expect((await waiting.json()).error.message).toBe("Hero's damage roll isn't in yet.");
+    expect(
+      (await post(base, GAME_PATHS.damageReport, player, { commandId: randomUUID(), rollId, total: 16 })).status
+    ).toBe(200);
+    expect(server.store.snapshot.combat.pendingSaves[0]).toMatchObject({ proposedDamage: 16 });
+    expect((await confirm()).status).toBe(200);
+    expect(server.store.snapshot.actors.find((actor) => actor.id === FOE)?.hp.current).toBe(14);
   });
 });

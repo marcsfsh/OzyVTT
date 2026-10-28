@@ -1,0 +1,77 @@
+/* The life bar: a 1px well holding segments, lit ones in --hp and lost ones in --hp-lost. The segments are two
+   identical stripes, the lit one clipped to the share of hit points left, so a fill can end inside a segment. */
+.nh-lifebar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.nh-lifebar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  font: 400 20px / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+.nh-lifebar-hp {
+  font-size: 18px;
+  color: var(--hp-text);
+}
+.nh-lifebar-max {
+  color: var(--text-muted);
+}
+.nh-lifebar-temp {
+  color: var(--cyan-hi);
+}
+.nh-lifebar-well {
+  position: relative;
+  display: block;
+  height: 12px;
+  padding: 2px;
+  box-sizing: content-box;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+}
+.nh-lifebar-segments {
+  position: absolute;
+  inset: 2px;
+  /* One segment per 1/N of the width with a 2px gap: the stripe repeats every (100% + 2px) / N. */
+  background: repeating-linear-gradient(
+    90deg,
+    var(--nh-seg) 0 calc((100% + 2px) / var(--nh-segments) - 2px),
+    transparent calc((100% + 2px) / var(--nh-segments) - 2px) calc((100% + 2px) / var(--nh-segments))
+  );
+}
+.nh-lifebar-lost {
+  --nh-seg: var(--hp-lost);
+}
+.nh-lifebar-left {
+  --nh-seg: var(--hp);
+  transition: clip-path var(--dur-base) ease-out;
+}
+/* Damage lands: the lost segments flash white once, for two frames. */
+.nh-lifebar.is-hit .nh-lifebar-lost {
+  --nh-seg: var(--text);
+}
+
+/* A band: its word and a plain indicator in the band's colour, with no segments. */
+.nh-lifebar-band {
+  font: 600 var(--fs-sm) / 1 var(--font-label);
+  letter-spacing: 0;
+}
+.nh-lifebar-indicator {
+  display: block;
+  height: 4px;
+  background: var(--line-raised);
+}
+.nh-lifebar--healthy .nh-lifebar-indicator {
+  background: var(--hp);
+}
+.nh-lifebar--bloodied .nh-lifebar-indicator {
+  background: var(--caution);
+}
+.nh-lifebar--down .nh-lifebar-indicator {
+  background: var(--hostile);
+}

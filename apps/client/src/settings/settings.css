@@ -33,21 +33,24 @@
 .settings-primary-slot {
   display: contents;
 }
-/* Six sections share the phone's tab bar. Each tab starts from its word's width, so Characters fits beside API. */
+/* Six sections share the phone's tab bar: each tab keeps its whole word, and the bar scrolls sideways when they
+   outgrow the screen (the chosen one is scrolled into view). No icons here, so more of them fit at once. */
 .settings-tabbar {
   display: flex;
 }
 .settings-tabbar .cx-tabbar-tab {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: var(--tap-min);
-  padding-inline: 1px;
 }
-.settings-tabbar .cx-tabbar-tab span {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  letter-spacing: 0;
+.settings-tabbar .cx-tabbar-tab > svg {
+  display: none;
+}
+/* The phone bar's primary is the small size, so a section with one keeps the bar's height and the tabs don't jump. */
+.settings-phonebar .settings-primary-slot .nh-btn {
+  min-height: var(--tap-min);
+  padding-block: 0;
+  padding-inline: var(--space-3);
+  font-size: var(--fs-sm);
 }
 .settings-phonebar .settings-search {
   flex: 1 1 auto;

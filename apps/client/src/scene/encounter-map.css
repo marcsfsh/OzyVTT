@@ -174,9 +174,8 @@
   color: #fff;
   font-weight: 900;
 }
-/* `--void` is light in Day and Dawn, so white initials on the disc fail contrast there; those two alone
-   switch to `--text`. */
-:root:is([data-theme="light"], [data-theme="dawn"]) .tray-token > span {
+/* `--void` is light in Dawn, so white initials on the disc fail contrast there; Dawn switches them to `--text`. */
+:root[data-theme="dawn"] .tray-token > span {
   color: var(--text);
 }
 .tray-token > strong {
@@ -258,22 +257,25 @@
   cursor: grabbing;
   opacity: 0.82;
 }
+/* The ring says whose side a token is on, as the portraits' frames do: party blue, enemy red, an NPC neutral, and a
+   hidden one dashed violet. */
 .encounter-token-body {
-  fill: color-mix(in srgb, var(--cyan) 40%, var(--void));
-  stroke: var(--cyan-hi);
+  fill: color-mix(in srgb, var(--party) 40%, var(--void));
+  stroke: var(--party);
   stroke-width: 3;
   vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 3px 4px #000);
 }
 .encounter-token.monster .encounter-token-body {
-  fill: color-mix(in srgb, var(--magenta) 40%, var(--void));
-  stroke: var(--magenta-hi);
+  fill: color-mix(in srgb, var(--hostile) 40%, var(--void));
+  stroke: var(--hostile);
 }
 .encounter-token.npc .encounter-token-body {
-  fill: color-mix(in srgb, var(--indigo) 45%, var(--void));
-  stroke: var(--violet-hi);
+  fill: color-mix(in srgb, var(--text-dim) 30%, var(--void));
+  stroke: var(--text-dim);
 }
 .encounter-token.hidden .encounter-token-body {
+  stroke: var(--violet);
   stroke-dasharray: 6 4;
   opacity: 0.72;
 }
@@ -281,15 +283,15 @@
 .encounter-token.ethereal {
   opacity: 0.5;
 }
-/* Active turn: magenta ring and glow that pulses once. The ring only renders while active, so the
+/* Active turn: the sun frame's gold ring and glow, pulsing once. The ring only renders while active, so the
    one-shot animation runs on each turn change. `transform-box: fill-box` is required, or the SVG
    default (view box) would scale it about the centre of the whole map. */
 .encounter-token-turn {
-  fill: rgb(255 46 154 / 18%);
-  stroke: var(--magenta);
-  stroke-width: 5;
+  fill: color-mix(in srgb, var(--hp) 14%, transparent);
+  stroke: var(--hp);
+  stroke-width: 4;
   vector-effect: non-scaling-stroke;
-  filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--caution) 70%, transparent));
   transform-box: fill-box;
   transform-origin: center;
   animation: encounter-turn-pulse 0.72s var(--ease-settle, ease-out) 1;

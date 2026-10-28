@@ -267,13 +267,13 @@ describe("The board", () => {
     expect(clocks.getByText("The Black Gull sails.").closest("li")).toHaveTextContent("Hidden");
   });
 
-  it("lists the quests and the fights, and makes a fight live", async () => {
+  it("lists the quests and the encounters, and makes an encounter live", async () => {
     const user = userEvent.setup();
     const onMakeLive = renderTonight();
     expect(
       within(await screen.findByRole("region", { name: "Quests" })).getByText("The Black Gull")
     ).toBeInTheDocument();
-    const encounters = within(screen.getByRole("region", { name: "Fights" }));
+    const encounters = within(screen.getByRole("region", { name: "Encounters" }));
     expect(encounters.getByText("The roof").closest("li")).toHaveTextContent("Live");
     await user.click(encounters.getByRole("button", { name: "Make live" }));
     expect(onMakeLive).toHaveBeenCalledWith("fight-1");

@@ -21,7 +21,7 @@ export type ArchiveSummary = Readonly<{
   /** The GM's own name for it, or null. */
   name: string | null;
   /** The scene the fight was on; only the GM's list carries it. */
-  sceneName?: string | null;
+  encounterName?: string | null;
 }>;
 type ArchiveTurn = Readonly<{
   index: number;
@@ -65,21 +65,19 @@ export const failure = "That replay could not be loaded.";
 
 /** One archive: the GM's full document, or the player projection, by the token's role. */
 export function readArchive<T>(archiveId: number, token: string): Promise<T> {
-  return apiRequest<{ document: T }>(`/api/v1/encounters/${archiveId}`, { token, failure }).then(
-    (data) => data.document
-  );
+  return apiRequest<{ document: T }>(`/api/v1/replays/${archiveId}`, { token, failure }).then((data) => data.document);
 }
 
 export const dateOnly = (iso: string) => new Date(iso).toLocaleDateString([], { dateStyle: "medium" });
 
 /** What a replay is called: the GM's name, else its scene and the day it was fought ("Fight" with no scene). */
 export function replayTitle(archive: ArchiveSummary): string {
-  return archive.name ?? `${archive.sceneName ?? "Fight"} · ${dateOnly(archive.endedAt)}`;
+  return archive.name ?? `${archive.encounterName ?? "Encounter"} · ${dateOnly(archive.endedAt)}`;
 }
 
 /** The line under a replay's name: its scene and day when the GM named it, then how long the fight was. */
 export function replayMeta(archive: ArchiveSummary): string {
-  const where = archive.name ? [archive.sceneName, dateOnly(archive.endedAt)].filter(Boolean).join(" · ") : null;
+  const where = archive.name ? [archive.encounterName, dateOnly(archive.endedAt)].filter(Boolean).join(" · ") : null;
   const duration = durationOf(archive.startedAt, archive.endedAt);
   return [where, countOf(archive.turnCount, "turn"), duration].filter(Boolean).join(" · ");
 }
@@ -116,7 +114,7 @@ export function stepsOf(document: ArchiveDocument): readonly Step[] {
     const last = steps[steps.length - 1];
     steps[steps.length - 1] = { ...last, to: document.finalState.revision };
     steps.push({
-      label: "Aftermath · how the fight ended",
+      label: "Aftermath · how the encounter ended",
       at: document.endedAt,
       state: document.finalState,
       from: document.finalState.revision,
@@ -142,10 +140,10 @@ export function useReplays(
       return;
     }
     let cancelled = false;
-    apiRequest<{ encounters: readonly ArchiveSummary[] }>("/api/v1/encounters", { token, failure })
+    apiRequest<{ replays: readonly ArchiveSummary[] }>("/api/v1/replays", { token, failure })
       .then((data) => {
         if (!cancelled) {
-          setArchives(data.encounters);
+          setArchives(data.replays);
           setError(null);
         }
       })

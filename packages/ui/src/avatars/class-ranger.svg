@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Ranger avatar"><title>Ranger avatar</title><defs><linearGradient id="oz-class-ranger-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#062a2a"></stop><stop offset="1" stop-color="#03101a"></stop></linearGradient>
+<filter id="oz-class-ranger-g" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.5"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#oz-class-ranger-b)"></rect><path d="M0 54.6H64M0 55.6H64M0 57.2H64M0 59.6H64M0 64.0H64M32 54L-64 64M32 54L-48 64M32 54L-32 64M32 54L-16 64M32 54L0 64M32 54L16 64M32 54L32 64M32 54L48 64M32 54L64 64M32 54L80 64M32 54L96 64M32 54L112 64M32 54L128 64" stroke="#ffb020" stroke-width="0.7" opacity="0.4" fill="none"></path>
+<g transform="translate(30 34) rotate(-40)">
+<path d="M3 -26C17 -14 17 14 3 26" fill="none" stroke="#ffb020" stroke-width="3.6" stroke-linecap="round"></path>
+<path d="M3 -26C17 -14 17 14 3 26" fill="none" stroke="#fff0c2" stroke-width="1" opacity="0.6"></path>
+<rect x="11" y="-4" width="4" height="8" fill="#6a4f36"></rect>
+<path d="M3 -26L-10 0L3 26" fill="none" stroke="#f4f4fa" stroke-width="0.8"></path>
+<path d="M-12 0H25" stroke="#2be4ff" stroke-width="2.6" filter="url(#oz-class-ranger-g)" opacity="0.7"></path>
+<path d="M-12 0H25" stroke="#a6f3ff" stroke-width="1.6"></path>
+<path d="M29 0L22 -4.5V4.5Z" fill="#f4f4fa"></path>
+<path d="M-13 0L-17 -5H-11L-8 0L-11 5H-17Z" fill="#ff2f92"></path>
+</g></svg>

@@ -607,7 +607,7 @@ describe("migration 5 and the backup", () => {
           revealedToPlayers: false,
           status: "planned",
           tags: [],
-          sceneIds: [],
+          encounterIds: [],
           rev: 1,
           createdAt: "2026-01-01T00:00:00.000Z",
           updatedAt: "2026-01-01T00:00:00.000Z"
@@ -619,5 +619,26 @@ describe("migration 5 and the backup", () => {
     store.importBundle(older);
     expect(prepNotesOf(store.getSession(sessionId)!)).toBe("Strahd waits at the gate.");
     expect(store.getSession(sessionId)!.prep[0]!.title).toBe("Prep notes");
+  });
+
+  it("reads an Encounters section saved, or backed up, before scenes became encounters", async () => {
+    const encounterId = crypto.randomUUID();
+    const session = store.createSession({
+      prep: [{ title: "Encounters", type: "encounters", encounterIds: [encounterId] }]
+    });
+    const bundle = store.exportBundle();
+    store.close();
+    // The file and the backup as an older build left them: the section's list under its scene name.
+    const path = join(directory, "vtt.sqlite");
+    const raw = openDatabase(path);
+    raw.prepare("UPDATE codex_sessions SET prep_json = replace(prep_json, '\"encounterIds\"', '\"sceneIds\"')").run();
+    raw.prepare("DELETE FROM migrations WHERE store = 'codex' AND version = 6").run();
+    raw.close();
+    store = new CodexStore(path, () => (clock += 1000));
+    await store.initialize();
+    expect(sectionOf(store.getSession(session.id)!, "encounters").encounterIds).toEqual([encounterId]);
+
+    store.importBundle(JSON.parse(JSON.stringify(bundle).replaceAll('"encounterIds"', '"sceneIds"')));
+    expect(sectionOf(store.getSession(session.id)!, "encounters").encounterIds).toEqual([encounterId]);
   });
 });

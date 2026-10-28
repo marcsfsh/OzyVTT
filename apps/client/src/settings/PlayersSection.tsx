@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { GmView, PartyVisibility } from "@vtt/domain";
-import { Avatar, Button, Menu, MenuItem, Select } from "@vtt/ui";
+import { Button, Menu, MenuItem, Select } from "@vtt/ui";
 import { useForceRelease } from "../actors/useForceRelease";
 import { JoinAddress } from "../components/JoinAddress";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -8,6 +8,7 @@ import { TokenLibrary } from "../tokens/TokenLibrary";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import { useTableWrites } from "./table-writes";
+import { ActorAvatar } from "../actors/ActorAvatar";
 
 /**
  * How much a player sees of another player's character. The wire values are
@@ -99,7 +100,10 @@ export function PlayersSection({
           <ul className="settings-list" aria-label="Characters at the table">
             {claimed.map((actor) => (
               <li key={actor.id} className="settings-list-row">
-                <Avatar
+                <ActorAvatar
+                  actor={actor}
+                  token={gmToken}
+                  definitions={state.definitions}
                   name={actor.name}
                   size="sm"
                   presence={
@@ -133,7 +137,10 @@ export function PlayersSection({
                 <tr key={actor.id}>
                   <td>
                     <span className="settings-cell-name">
-                      <Avatar
+                      <ActorAvatar
+                        actor={actor}
+                        token={gmToken}
+                        definitions={state.definitions}
                         name={actor.name}
                         size="sm"
                         presence={

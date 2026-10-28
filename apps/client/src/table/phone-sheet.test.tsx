@@ -137,7 +137,7 @@ describe("the player's sheet in the table's panel", () => {
     expect(shown).toHaveBeenLastCalledWith(false);
     await user.click(screen.getByRole("tab", { name: "Sheet" }));
     expect(shown).toHaveBeenLastCalledWith(true);
-    await user.click(screen.getByRole("tab", { name: "Order" }));
+    await user.click(screen.getByRole("tab", { name: "Log" }));
     expect(shown).toHaveBeenLastCalledWith(false);
   });
 

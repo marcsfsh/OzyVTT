@@ -12,6 +12,7 @@ type GmProps = Readonly<{
   onSelectMap?: (map: MapSelection | null) => void;
   phone?: boolean;
   slots?: GmPanelSlots;
+  token?: string | null;
 }>;
 type PlayerProps = Readonly<{
   role: "player";
@@ -40,6 +41,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
       onSelectMap={props.onSelectMap}
       phone={props.phone}
       slots={props.slots}
+      token={props.token}
     />
   );
 }

@@ -1,48 +1,29 @@
-import { useCallback, useEffect, useState } from "react";
-import { IconTv, Menu, MenuItem, useToast } from "@vtt/ui";
+import { useState } from "react";
+import type { GmView } from "@vtt/domain";
+import { IconTv, Menu, MenuItem, StatusLamp, cx, useToast } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import { newId } from "../lib/ids";
 import { navigate, pathForGmTab } from "../router";
 import { useTableMapSize } from "../scene/tableGeometry";
-
-type Presentation = Readonly<{
-  revision: number;
-  enabled: boolean;
-  pausedByGm?: boolean;
-  activeMap: Readonly<{ assetId: string }> | null;
-}>;
-
-const PRESENTATION = "/api/v1/viewer/presentation";
+import { setViewerPreviewOpen, useViewerPreviewOpen } from "../viewer/preview-open";
+import { PRESENTATION, tableScreenOn, usePresentation } from "./presentation";
 
 /**
- * The GM's TV control in the header bar: whether the table screen shows the live scene, and one tap to pause it or put
- * the live scene back on it. The TV follows the live scene by itself unless it is paused here or on the Shared
- * screen tab.
+ * The table screen lamp in the GM's top bar: on while the screen shows a map, and a menu to pause it, put the live
+ * scene back on it, preview it here, or open its settings. The screen follows the live scene by itself unless it is
+ * paused here or in its settings.
  */
-export function TvControl({
-  gmToken,
-  liveMap,
-  preview
-}: Readonly<{
-  gmToken: string;
-  /** The live scene's map, or null while no scene is live. */
-  liveMap: Readonly<{ assetId: string; name: string }> | null;
-  /** The floating preview of what the table screen shows. */
-  preview: Readonly<{ on: boolean; onToggle: () => void }>;
-}>) {
-  const [presentation, setPresentation] = useState<Presentation | null>(null);
+export function TvControl({ gmToken, state, compact }: Readonly<{ gmToken: string; state: GmView; compact: boolean }>) {
+  const { presentation, refresh } = usePresentation(gmToken);
+  const previewOpen = useViewerPreviewOpen();
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
+  const scenes = state.combat.encounters ?? [];
+  const live = scenes.find((scene) => scene.id === state.combat.activeEncounterId) ?? null;
+  const liveMap = state.combat.mapAssetId
+    ? { assetId: state.combat.mapAssetId, name: live?.name ?? "Battle map" }
+    : null;
   const size = useTableMapSize(liveMap?.assetId ?? null);
-  const refresh = useCallback(async () => {
-    const data = await apiRequest<{ presentation: Presentation }>(PRESENTATION, { token: gmToken });
-    setPresentation(data.presentation);
-  }, [gmToken]);
-  useEffect(() => {
-    void refresh().catch(() => {});
-    const interval = window.setInterval(() => void refresh().catch(() => {}), 5_000);
-    return () => window.clearInterval(interval);
-  }, [refresh]);
 
   const send = async (payload: Record<string, unknown>, done: string) => {
     if (!presentation) return;
@@ -56,40 +37,41 @@ export function TvControl({
     } catch (error) {
       toast((error as Error).message, { tone: "error" });
     } finally {
-      await refresh().catch(() => {});
+      await refresh();
       setBusy(false);
     }
   };
 
-  const showsLive = Boolean(presentation?.enabled && liveMap && presentation.activeMap?.assetId === liveMap.assetId);
-  const state = !presentation
-    ? "…"
-    : showsLive
-      ? "Live"
-      : presentation.enabled && presentation.activeMap
-        ? "Another map"
-        : "Paused";
+  const on = tableScreenOn(presentation);
+  const showsLive = Boolean(on && liveMap && presentation?.activeMap?.assetId === liveMap.assetId);
+  const status =
+    presentation === null ? "status unknown" : !on ? "off" : liveMap && !showsLive ? "on, another map" : "on";
   return (
     <Menu
       className="tv-control"
-      triggerClassName={`tv-control-trigger${showsLive ? " is-live" : ""}`}
+      triggerClassName={cx("app-bar-screen", compact && "is-compact")}
       align="end"
-      label={`TV · ${state}`}
+      hideCaret
+      label={`Table screen, ${status}`}
       trigger={
         <>
           <IconTv />
-          <span className="tv-control-label">TV · {state}</span>
+          {!compact && <span className="app-bar-screen-label">Table screen</span>}
+          <StatusLamp lit={on} />
+          <span className="app-bar-screen-word" aria-hidden="true">
+            {presentation === null ? "--" : on ? "ON" : "OFF"}
+          </span>
         </>
       }
     >
-      {presentation?.enabled && presentation.activeMap ? (
+      {on && (
         <MenuItem
           disabled={busy}
-          onClick={() => void send({ type: "viewer.enabled.set", enabled: false }, "The TV is paused.")}
+          onClick={() => void send({ type: "viewer.enabled.set", enabled: false }, "The table screen is paused.")}
         >
-          Pause the TV
+          Pause the table screen
         </MenuItem>
-      ) : null}
+      )}
       {liveMap && !showsLive && (
         <MenuItem
           disabled={busy || !size}
@@ -101,15 +83,17 @@ export function TvControl({
                 altText: liveMap.name,
                 camera: { center: { x: (size?.width ?? 0) / 2, y: (size?.height ?? 0) / 2 }, zoom: 1 }
               },
-              "The TV shows the live scene."
+              "The table screen shows the live encounter."
             )
           }
         >
-          Show the live scene
+          Show the live encounter
         </MenuItem>
       )}
-      <MenuItem onClick={preview.onToggle}>{preview.on ? "Hide the preview" : "Preview the TV here"}</MenuItem>
-      <MenuItem onClick={() => navigate(pathForGmTab("viewer"))}>Shared screen settings</MenuItem>
+      <MenuItem onClick={() => setViewerPreviewOpen(!previewOpen)}>
+        {previewOpen ? "Hide the preview" : "Preview the table screen here"}
+      </MenuItem>
+      <MenuItem onClick={() => navigate(pathForGmTab("viewer"))}>Table screen settings</MenuItem>
     </Menu>
   );
 }

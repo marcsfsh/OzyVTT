@@ -124,7 +124,7 @@ describe("Web burns", () => {
     ).toBe(false);
   });
 
-  it("burns away at once outside a fight", () => {
+  it("burns away at once outside an encounter", () => {
     const { state } = webs(false);
     igniteUnder(state, { ...fireball, target: cell(12, 11) }, zoneDeps());
     expect(state.combat.spellZones[0]!.cut?.length).toBeGreaterThan(0);

@@ -79,8 +79,9 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  /* Reserve room on the right for the absolutely-positioned close button so a long title never underlaps it. */
-  padding: var(--space-5) calc(var(--space-6) + 2.4rem) var(--space-5) var(--space-6);
+  /* The close sits at the head's right end in its own flow, the same distance from the top and right edges, so a
+     long title wraps beside it instead of under it. */
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--line);
 }
 .nh-modal-title {
@@ -89,13 +90,13 @@
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
 }
+/* `position: relative` comes from `.tap-target`, which holds its 44px hit area; the button is a flex item, never
+   absolutely placed, so the two never fight over where it sits. */
 .nh-modal-close {
-  /* Pinned to the surface's top-right corner (position:relative on .nh-modal-surface), with or without a header. */
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
   z-index: 3;
   flex: none;
+  align-self: center;
+  margin-left: auto;
   width: 2rem;
   height: 2rem;
   padding: 0;

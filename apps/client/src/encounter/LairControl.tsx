@@ -27,7 +27,7 @@ export function LairControl({
       checked={inLair}
       disabled={busy}
       onChange={(next) => void toggle(next)}
-      label="Fights in its lair"
+      label="In its lair"
       className="lair-control"
     />
   );

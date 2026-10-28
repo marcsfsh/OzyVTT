@@ -103,7 +103,7 @@ export function resumeLongRest(state: GameState, actorId: string, scope: Initiat
   if (!member) throw new CommandRejectedError(`${actor.name} isn't in a Long Rest.`);
   if (!member.interrupted) throw new CommandRejectedError(`${actor.name}'s Long Rest is under way already.`);
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-    throw new CommandRejectedError(`End the fight before ${actor.name} rests again.`);
+    throw new CommandRejectedError(`End the encounter before ${actor.name} rests again.`);
   if (isDead(actor) || actor.hp.current < 1)
     throw new CommandRejectedError(`${actor.name} has 0 Hit Points. A Long Rest needs at least 1.`);
   const interruptions = Math.min(24, member.interruptions + 1);

@@ -52,6 +52,9 @@ describe("recipient-safe encounter projections", () => {
     expect(combat).toEqual({
       active: true,
       round: 3,
+      // A player's own damage rolls (ADR-0043); none here.
+      damageRolls: [],
+      targetAsks: [],
       turnActorId: null,
       mapAssetId: MAP,
       hiddenTurn: true,
@@ -161,7 +164,7 @@ describe("recipient-safe encounter projections", () => {
     expect(token.conditionIds).toEqual(["poisoned", "exhaustion"]);
   });
 
-  it("hides the Initiative list when a scene is live but not fighting, keeping the map, fog and placed public tokens", () => {
+  it("hides the Initiative list when an encounter is live but not fighting, keeping the map, fog and placed public tokens", () => {
     const state = game(PUBLIC);
     state.combat = { ...state.combat, active: false, turnActorId: null };
     expect(projectViewerInitiative(state)).toEqual({ visible: false, round: 0, hiddenTurn: false, entries: [] });
@@ -281,7 +284,7 @@ describe("recipient-safe annotation projections", () => {
     expect(view.annotations.some((annotation) => annotation.id === "90000000-0000-4000-8000-000000000001")).toBe(false);
   });
 
-  it("keeps the live map's annotations between fights and drops them with no map", () => {
+  it("keeps the live map's annotations between encounters and drops them with no map", () => {
     const state = gameWithAnnotations();
     state.combat = { ...state.combat, active: false };
     expect(projectPlayerCombat(state, PLAYER_A, 1000).annotations).toEqual(
@@ -516,7 +519,7 @@ describe("shared initiative source (player == viewer)", () => {
 });
 
 describe("combatant recency (GM-only)", () => {
-  it("stamps lastUsedAt when an actor enters a fight and keeps it off the player projection", () => {
+  it("stamps lastUsedAt when an actor enters an encounter and keeps it off the player projection", () => {
     const state = GameStateSchema.parse({
       schemaVersion: 1,
       actors: [

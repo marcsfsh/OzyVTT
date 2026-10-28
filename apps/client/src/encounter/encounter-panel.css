@@ -95,6 +95,15 @@
   padding-top: var(--space-2);
   border-top: 1px solid var(--line-strong);
 }
+/* In the Fight tab the acting creature scrolls with the tab, so it keeps its whole height. */
+.table-panel-body > .encounter-acting {
+  flex: none;
+  padding-top: 0;
+  border-top: 0;
+}
+.table-panel-body > .encounter-order-tools {
+  flex: none;
+}
 .encounter-acting-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -231,7 +240,7 @@
   font-size: var(--fs-sm);
 }
 .encounter-primary,
-.turn-controls button {
+.turn-controls button:not(.nh-btn) {
   padding: 0.7rem var(--space-4);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
@@ -240,7 +249,7 @@
   cursor: pointer;
 }
 .encounter-primary:disabled,
-.turn-controls button:disabled {
+.turn-controls button:not(.nh-btn):disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -903,7 +912,7 @@
 .dock-log-door,
 .encounter-dock-choice,
 .encounter-primary,
-.turn-controls button,
+.turn-controls button:not(.nh-btn),
 .encounter-menu-toggle,
 .initiative-score-edit,
 .menu-add-row button,
@@ -930,7 +939,7 @@
 .dock-log-door::before,
 .encounter-dock-choice::before,
 .encounter-primary::before,
-.turn-controls button::before,
+.turn-controls button:not(.nh-btn)::before,
 .encounter-menu-toggle::before,
 .initiative-score-edit::before,
 .menu-add-row button::before,
@@ -971,9 +980,9 @@
 .encounter-primary:hover:not(:disabled)::before,
 .encounter-primary:focus-visible::before,
 .encounter-primary:active:not(:disabled)::before,
-.turn-controls button:hover:not(:disabled)::before,
-.turn-controls button:focus-visible::before,
-.turn-controls button:active:not(:disabled)::before,
+.turn-controls button:not(.nh-btn):hover:not(:disabled)::before,
+.turn-controls button:not(.nh-btn):focus-visible::before,
+.turn-controls button:not(.nh-btn):active:not(:disabled)::before,
 .encounter-menu-toggle:hover:not(:disabled)::before,
 .encounter-menu-toggle:focus-visible::before,
 .encounter-menu-toggle:active:not(:disabled)::before,
@@ -1070,7 +1079,7 @@
 .dock-log-door:disabled::before,
 .encounter-primary:disabled::before,
 .encounter-primary:not(.turn-prev):disabled::before,
-.turn-controls button:disabled::before,
+.turn-controls button:not(.nh-btn):disabled::before,
 .hp-editor > button:disabled::before,
 .builtin-chip:disabled::before,
 .legendary-offer:disabled::before,
@@ -1151,4 +1160,44 @@
 .economy-slot.legendary-pill::after,
 .economy-slot:not([aria-pressed])::after {
   display: none;
+}
+
+/* The strip's Fight menu: the word and a caret on a raised plate, at the right end of the turn order. */
+.encounter-menu-toggle.is-labelled {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 15px / 1 var(--font-body);
+}
+.encounter-menu-toggle.is-labelled svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* The GM's turn footer: Previous, End turn filling the row, and who is next under it. */
+.table-panel-foot-turn {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-1) 0;
+}
+.table-panel-foot-turn .turn-controls > .table-panel-primary {
+  flex: 1 1 auto;
+}
+/* The order and each row's tools, folded under the acting creature on a laptop. */
+.encounter-order-tools > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  color: var(--cyan-hi);
+  font-weight: 600;
+  cursor: pointer;
+}
+.encounter-order-tools .encounter-region {
+  max-height: none;
+  overflow: visible;
 }

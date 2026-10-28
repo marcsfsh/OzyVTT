@@ -9,14 +9,14 @@ import {
 } from "react";
 import type { GmActor, GmView, PlayerActor } from "@vtt/domain";
 import {
-  Avatar,
   Button,
   Chip,
   GmOnlyTag,
   IconButton,
+  IconPencil,
   IconSkull,
   IconX,
-  Meter,
+  LifeBar,
   Modal,
   ToastOutlet,
   useDragSurface,
@@ -44,7 +44,7 @@ import { IdentityEditor } from "./IdentityEditor";
 import { CheckAnswers, LatestRoll, useSessionRoll } from "./LatestRoll";
 import { LevelBox } from "./LevelBox";
 import { NotesTab } from "./NotesTab";
-import { PlayFight } from "./PlayFight";
+import { ActionsTab } from "./ActionsTab";
 import { DeathSavesCard, PlayCalm, RestMenu, StatTile } from "./PlayTab";
 import {
   armorClassOf,
@@ -61,7 +61,7 @@ import {
 } from "./sheet-model";
 import { type DetailPlace } from "./SheetDetail";
 import { RollSettings, SheetMenu, type SheetMenuItems } from "./SheetMenu";
-import { SheetTabBar, SheetTabStrip, sheetTabs, tabIds, type SheetTabId } from "./SheetTabs";
+import { SheetTabStrip, sheetTabs, tabIds, type SheetTabId } from "./SheetTabs";
 import { SpellsTab } from "./SpellsTab";
 import { StatusStrip } from "./StatusStrip";
 import { useSheetController, type SheetCombat } from "./useSheetController";
@@ -72,6 +72,8 @@ import { useSheetRolls } from "./useSheetRolls";
 import { poolsOf } from "./Uses";
 import { useRememberedTab } from "../table/TablePanel";
 import "./sheet.css";
+import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
+import { atTableBlocked, setPlayedAtTable } from "../actors/playedAtTable";
 
 /** Where the sheet sits: a page of its own (My character, `/characters/<id>`, `sheet.html`), a dialog over the page
  *  it was opened from, or the table's panel. */
@@ -201,7 +203,14 @@ export function CharacterSheet({
   const hasSpells = Boolean(definition?.spellcasting && definition.spellcasting.spells.length > 0);
   const tabs = sheetTabs({ layout, role, hasSpells, hidePlay });
   const down = isDown(actor);
-  const [remembered, setTab] = useRememberedTab(`vtt.sheet.tab.${layout}`, tabs, tabs[0] ?? "play", down);
+  // Going down opens Play, where the Death Saving Throws are; an encounter starting or ending opens Actions or Play.
+  const fightOpens = controller.inFight && !down && tabs.includes("actions");
+  const [remembered, setTab] = useRememberedTab(
+    `vtt.sheet.tab.${layout}`,
+    tabs,
+    fightOpens ? "actions" : (tabs[0] ?? "play"),
+    `${down}:${controller.inFight}`
+  );
   const tab = remembered as SheetTabId;
   const idBase = `cs-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
   // Going down opens Play at its top, where the Death Saving Throws are.
@@ -209,11 +218,11 @@ export function CharacterSheet({
   useEffect(() => {
     if (down) bodyRef.current?.scrollTo({ top: 0 });
   }, [down]);
-  // An attack or a cast aimed from a tab other than Play (or from the table's Sheet tab) is picked and rolled at the
-  // top of that tab; the Play tab's own list holds its own.
+  // An attack or a cast aimed from a tab other than Actions (or from the table's Sheet tab) is picked and rolled at the
+  // top of that tab; the Actions tab's own list holds its own.
   const aim = useTargeting();
   const [aimedHere, setAimedHere] = useState(false);
-  const aimingElsewhere = attackMode === "inline" && (tab !== "play" || hidePlay);
+  const aimingElsewhere = attackMode === "inline" && (tab !== "actions" || hidePlay);
   useEffect(() => {
     if (aim?.attackerId === actor.id && aimingElsewhere) setAimedHere(true);
   }, [aim?.attackerId, aim?.action.id, actor.id, aimingElsewhere]);
@@ -244,6 +253,18 @@ export function CharacterSheet({
     ...(canLevel && !phoneViews && level! > 1 ? { levelDown: { to: level! - 1, onSelect: onLevel! } } : {}),
     ...(actor.kind === "player-character" && definition ? { editNames: () => setEditingNames(true) } : {}),
     ...(token ? { tokenImage: () => setPickingToken(true) } : {}),
+    ...(role === "gm" && actor.kind === "player-character" && "ownerSessionId" in actor && !actor.archived
+      ? {
+          playedAtTable: {
+            on: actor.playedAtTable === true,
+            blocked: atTableBlocked(actor),
+            onToggle: () =>
+              void setPlayedAtTable(actor.id, actor.playedAtTable !== true).then(
+                (refused) => refused && toast(refused, { tone: "error" })
+              )
+          }
+        }
+      : {}),
     ...(layout === "wide" && state ? { dockDice: { docked, onToggle: () => setDocked((current) => !current) } } : {}),
     ...(presentation === "dialog" && wideScreen
       ? { popOut: { floating, onToggle: () => setFloating((current) => !current) } }
@@ -295,22 +316,8 @@ export function CharacterSheet({
         onFeedback={say}
       />
     ) : null;
-  const playBody = controller.inFight ? (
-    <PlayFight
-      actor={actor}
-      role={role}
-      state={state}
-      definition={definition}
-      serverActions={serverActions}
-      facts={facts}
-      place={place}
-      controller={controller}
-      showEconomy={presentation !== "panel"}
-      card={phoneViews}
-      death={deathCard}
-      onFeedback={say}
-    />
-  ) : (
+  // Play holds the character's state; in an encounter a save it owes is the table's prompt, or the Actions tab's.
+  const playBody = (
     <PlayCalm
       actor={actor}
       role={role}
@@ -324,11 +331,29 @@ export function CharacterSheet({
       restAsked={restAsked}
       restOpen={restOpen}
       inFight={controller.inFight}
-      savesOwed={controller.savesOwed}
+      savesOwed={controller.inFight ? [] : controller.savesOwed}
       death={deathCard}
       onFeedback={say}
     />
   );
+  const actionsBody = definition ? (
+    <ActionsTab
+      actor={actor}
+      role={role}
+      state={state}
+      definition={definition}
+      derived={derived}
+      serverActions={serverActions}
+      facts={facts}
+      place={place}
+      controller={controller}
+      rolls={rolls}
+      showEconomy={presentation !== "panel"}
+      card={phoneViews}
+      death={deathCard}
+      onFeedback={say}
+    />
+  ) : null;
   const checksBody = definition ? (
     <ChecksTab
       actor={actor}
@@ -479,6 +504,8 @@ export function CharacterSheet({
     switch (id) {
       case "play":
         return playBody;
+      case "actions":
+        return actionsBody;
       case "checks":
         return checksBody;
       case "spells":
@@ -493,9 +520,9 @@ export function CharacterSheet({
         return gmBody;
     }
   };
-  // On a phone's Play tab between fights the Vitals hold the numbers and live states, so the header shows only who and
+  // On a phone's Play tab the Vitals hold the numbers and live states, so the header shows only who and
   // the table's row only its numbers.
-  const vitalsShow = phoneViews && tab === "play" && !controller.inFight;
+  const vitalsShow = phoneViews && tab === "play";
   // The laptop's band carries Heroic Inspiration, so its strip leaves it out.
   const status = (
     <StatusStrip
@@ -570,7 +597,13 @@ export function CharacterSheet({
     frame = (
       <section className={`cs cs--wide${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
         <header className="cs-band">
-          <Avatar name={actor.name} size="lg" />
+          <ActorPortrait
+            actor={actor}
+            token={token}
+            definitions={role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined}
+            frame={frameOf(actor, role)}
+            size="lg"
+          />
           {name}
           <div className="cs-band-stats">
             <StatTile
@@ -593,6 +626,14 @@ export function CharacterSheet({
             )}
             {inspired !== undefined && <StatTile label="Heroic Inspiration" value={inspired ? "Held" : "None"} />}
           </div>
+          {hp && (
+            <div className="cs-band-life">
+              <LifeBar hp={hp} />
+              <Button variant="secondary" size="sm" onClick={() => setHpOpen(true)}>
+                <IconPencil /> Change HP
+              </Button>
+            </div>
+          )}
           <span className="cs-grow" />
           {role === "gm" && <GmOnlyTag />}
           {/* A rest is taken between fights, so the band's Rest leaves while one runs. */}
@@ -685,58 +726,50 @@ export function CharacterSheet({
       <section className={`cs cs--narrow${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
         <header className="cs-head">
           <div className="cs-id">
-            <Avatar name={actor.name} size="md" />
+            <ActorPortrait
+              actor={actor}
+              token={token}
+              definitions={role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined}
+              frame={frameOf(actor, role)}
+              size="sm"
+            />
             {name}
-            {levelBox}
-            {menu}
-            {close}
-            {headerEnd}
-          </div>
-          {!vitalsShow && (
-            <div className="cs-tiles">
-              <button
-                type="button"
-                className={`cs-tile-hp${down ? " is-down" : ""}`}
-                aria-label={
-                  hp
-                    ? `Hit Points ${hp.current} of ${hp.maximum}${down ? ", dying" : ""}. Change Hit Points`
-                    : "Hit Points"
-                }
-                onClick={() => setHpOpen(true)}
-              >
-                <span className="cs-stat-k">{down ? "Hit Points · Dying" : "Hit Points"}</span>
-                <span className="cs-tile-hp-row">
-                  <strong className="cs-stat-v">{hp ? hp.current : "None"}</strong>
-                  {hp && (
-                    <span className="cs-stat-n">
-                      of {hp.maximum}
-                      {hp.temporary > 0 ? ` · ${hp.temporary} temp` : ""}
-                    </span>
-                  )}
-                </span>
-                {hp && <Meter tone="health" value={hp.current} max={hp.maximum} />}
-              </button>
+            {!vitalsShow && (
               <StatTile
                 label="AC"
                 value={armorClassOf(actor) ?? "None"}
                 note={actor.armorClassOverride !== undefined ? "Set by GM" : null}
               />
-              <StatTile
-                label="Speed"
-                value={speed.now ?? "None"}
-                note={speed.lowered ? `of ${speed.base} ft` : null}
-                caution={speed.lowered}
-              />
-              <StatTile label="Init" value={actor.initiative !== undefined ? signed(actor.initiative) : "None"} />
-            </div>
-          )}
+            )}
+            {/* The compact header keeps AC and HP; the HP box opens the hit points with the other vitals. */}
+            {!vitalsShow && (
+              <button
+                type="button"
+                className={`cs-stat cs-tile-hp${down ? " is-down" : ""}`}
+                aria-label={
+                  hp
+                    ? `Hit Points ${hp.current} of ${hp.maximum}${down ? ", dying" : ""}. Change Hit Points and see the other vitals`
+                    : "Hit Points and the other vitals"
+                }
+                onClick={() => setHpOpen(true)}
+              >
+                <strong className="cs-stat-v">{hp ? `${hp.current}/${hp.maximum}` : "None"}</strong>
+                <span className="cs-stat-k">{down ? "Dying" : "HP"}</span>
+              </button>
+            )}
+            {levelBox}
+            {menu}
+            {close}
+            {headerEnd}
+          </div>
+          {!vitalsShow && hp && <LifeBar hp={hp} showNumbers={false} className="cs-head-life" />}
         </header>
+        <SheetTabStrip tabs={tabs} active={tab} onChange={setTab} idBase={idBase} strip />
         {!vitalsShow && status}
         {toastRow}
         {lastRoll}
         {top}
         {body}
-        <SheetTabBar tabs={tabs} active={tab} onChange={setTab} idBase={idBase} />
       </section>
     );
   }
@@ -747,6 +780,23 @@ export function CharacterSheet({
       {controller.healDialog}
       {hpOpen && (
         <Modal open onClose={() => setHpOpen(false)} align="bottom" title="Hit Points">
+          {layout === "narrow" && (
+            <div className="cs-vitals-strip">
+              <StatTile
+                label="Speed"
+                value={speed.now ?? "None"}
+                note={speed.lowered ? `of ${speed.base} ft` : null}
+                caution={speed.lowered}
+              />
+              <StatTile label="Init" value={actor.initiative !== undefined ? signed(actor.initiative) : "None"} />
+              {definition && (
+                <StatTile
+                  label="Proficiency"
+                  value={signed(derived?.proficiencyBonus ?? definition.proficiencyBonus)}
+                />
+              )}
+            </div>
+          )}
           <HpCard actor={actor} role={role} withSet onFeedback={say} />
         </Modal>
       )}

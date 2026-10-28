@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IconCheck, IconThemeDawn, IconThemeDay, IconThemeDusk, IconThemeNight } from "../primitives/icons";
+import { IconCheck, IconThemeDawn, IconThemeDusk } from "../primitives/icons";
 import { Menu, MenuItem } from "../primitives/Menu";
 import { SegmentedControl } from "../primitives/SegmentedControl";
 import { THEME_NAMES, THEMES, type Theme } from "./theme";
@@ -7,10 +7,8 @@ import { useTheme } from "./useTheme";
 import "./ThemeSwitch.css";
 
 const THEME_ICONS: Record<Theme, ReactNode> = {
-  dark: <IconThemeNight />,
   dusk: <IconThemeDusk />,
-  dawn: <IconThemeDawn />,
-  light: <IconThemeDay />
+  dawn: <IconThemeDawn />
 };
 
 interface ThemeToggleProps {
@@ -19,7 +17,7 @@ interface ThemeToggleProps {
   className?: string;
 }
 
-/** The four themes side by side, built as a `SegmentedControl` so it shares its look and 44px floor. */
+/** The two themes side by side, built as a `SegmentedControl` so it shares its look and 44px floor. */
 export function ThemeToggle({ compact = false, className }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme();
   return (
@@ -40,7 +38,7 @@ export function ThemeToggle({ compact = false, className }: ThemeToggleProps) {
 }
 
 /**
- * The app bar's theme switch: one square showing the current theme's mark, which opens the four choices. It takes
+ * The app bar's theme switch: one square showing the current theme's mark, which opens the two choices. It takes
  * the 44px floor as paint, so it needs no hit-area layer in a crowded bar.
  */
 export function ThemeSwitch({ className }: Readonly<{ className?: string }>) {

@@ -25,7 +25,7 @@ function timeLeft(effect: Effect, bearerId: string, sourceName: string): string 
       if (!ownTurn) return `until the end of ${sourceName}'s turn`;
       return duration.skipsCurrentTurn ? "until the end of its next turn" : "ends at the end of this turn";
     case "encounter":
-      return "for this fight";
+      return "for this encounter";
     case "manual":
       return "until ended";
   }

@@ -136,7 +136,7 @@
 .nh-abil-num--mod {
   color: var(--cyan-hi);
 }
-:root:is([data-theme="light"], [data-theme="dawn"]) .nh-abil-num--mod {
+:root[data-theme="dawn"] .nh-abil-num--mod {
   color: var(--cyan);
 }
 .nh-abil-note {

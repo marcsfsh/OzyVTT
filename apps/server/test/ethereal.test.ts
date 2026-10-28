@@ -90,7 +90,7 @@ describe("a creature on the Border Ethereal", () => {
     expect(hiddenFrom(state, {}, SESSION_A)(GOBLIN)).toBe(false);
   });
 
-  it("is seen by Truesight within its range on a scene with dynamic vision", () => {
+  it("is seen by Truesight within its range on an encounter with dynamic vision", () => {
     const state = visionGame();
     ethereal(state, GOBLIN);
     settlePlanes(state, GEOMETRY);

@@ -295,7 +295,7 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     })
     .optional()
     .describe(
-      "Who picks a copy's kind: the GM says what a found copy is (`gm`), or its holder changes its form with item.set-form (`holder`), which takes `activation` on its turn in a fight. Present with `variants`"
+      "Who picks a copy's kind: the GM says what a found copy is (`gm`), or its holder changes its form with item.set-form (`holder`), which takes `activation` on its turn in an encounter. Present with `variants`"
     ),
   /** A light source: lit and put out on the row unless it always glows, with a hood to lower or a Cone to aim. */
   light: z
@@ -329,7 +329,7 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     })
     .optional()
     .describe(
-      "What a container holds as its text prints it: up to `capacityLb` pounds, `pieces` of ammunition, or a load in each of its `compartments`; `weighsLb` when it weighs the same whatever it holds, and `retrieval` when taking a thing out costs more than the free object interaction in a fight. A row is put in one by its `containerId` (and `compartment`). Absent on anything that holds nothing"
+      "What a container holds as its text prints it: up to `capacityLb` pounds, `pieces` of ammunition, or a load in each of its `compartments`; `weighsLb` when it weighs the same whatever it holds, and `retrieval` when taking a thing out costs more than the free object interaction in an encounter. A row is put in one by its `containerId` (and `compartment`). Absent on anything that holds nothing"
     )
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;

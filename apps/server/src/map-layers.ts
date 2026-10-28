@@ -10,11 +10,11 @@ export type PaintRectInput = Readonly<{ x: number; y: number; width: number; hei
 /** A layer of the combat a stroke targets: the live table, or a parked scene's stored combat. */
 export function layerSlice<Key extends "fog" | "terrain" | "vision" | "traps">(
   state: GameState,
-  sceneId: string | undefined,
+  encounterId: string | undefined,
   key: Key,
   liveRefusal: string
 ): { layer: SceneCombat[Key]; write: (layer: SceneCombat[Key]) => void } {
-  if (sceneId === undefined) {
+  if (encounterId === undefined) {
     return {
       layer: state.combat[key],
       write: (layer) => {
@@ -22,17 +22,17 @@ export function layerSlice<Key extends "fog" | "terrain" | "vision" | "traps">(
       }
     };
   }
-  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
-  if (!scene) throw new CommandRejectedError("That scene no longer exists.");
+  const scene = state.combat.encounters.find((candidate) => candidate.id === encounterId);
+  if (!scene) throw new CommandRejectedError("That encounter no longer exists.");
   // The active scene's stored combat must stay empty (single source of truth); the live copy is edited instead.
-  if (scene.id === state.combat.activeSceneId) throw new CommandRejectedError(liveRefusal);
+  if (scene.id === state.combat.activeEncounterId) throw new CommandRejectedError(liveRefusal);
   return {
     layer: scene.combat[key],
     write: (layer) => {
       state.combat = {
         ...state.combat,
-        scenes: state.combat.scenes.map((candidate) =>
-          candidate.id === sceneId ? { ...candidate, combat: { ...candidate.combat, [key]: layer } } : candidate
+        encounters: state.combat.encounters.map((candidate) =>
+          candidate.id === encounterId ? { ...candidate, combat: { ...candidate.combat, [key]: layer } } : candidate
         )
       };
     }

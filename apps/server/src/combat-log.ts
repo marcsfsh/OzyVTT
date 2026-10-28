@@ -1,6 +1,6 @@
 import { createHmac, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { CombatLogEntry, PlayerRollRecord, RollRecord, RollVisibility } from "@vtt/domain";
+import type { ChatAuthor, CombatLogEntry, PlayerRollRecord, RollRecord, RollVisibility } from "@vtt/domain";
 import { migrate, openDatabase, type Migration } from "./database.js";
 import { playerRoll } from "./projections.js";
 
@@ -55,14 +55,22 @@ export function playerFeedId(id: number): number {
   return Number.parseInt(createHmac("sha256", FEED_ID_KEY).update(String(id)).digest("hex").slice(0, 12), 16);
 }
 
-/** Who is reading the feed. `sessionId` is the reader's own, the only thing that unlocks a `self-only` roll row. */
-export type FeedReader = Readonly<{ gm: boolean; sessionId?: string }>;
+/** Who is reading the feed. `sessionId` is the reader's own, the only thing that unlocks a `self-only` roll row;
+ *  `characterIds` are the party characters the reader plays now, which unlock a whisper to one of them. */
+export type FeedReader = Readonly<{ gm: boolean; sessionId?: string; characterIds?: ReadonlySet<string> }>;
+
+/** What a chat row keeps beside its text: who said it, the whispered character, and the command that sent it. */
+type ChatPayload = Readonly<{
+  chat: Readonly<{ commandId: string; author: ChatAuthor; whisper?: Readonly<{ characterId: string; name: string }> }>;
+}>;
+/** A whisper's stored visibility: the GM and the players of `whisper.characterId` read it, nobody else. */
+const WHISPER = "whisper";
 
 /** A stored feed row before projection. Carries `initiatorSessionId` and the raw roll visibility, which
  *  must never reach a player: never serialize it without `projectFeedRow`. */
 export type StoredFeedRow = Readonly<{
   entry: CombatLogEntry;
-  visibility: RollVisibility | null;
+  visibility: RollVisibility | typeof WHISPER | null;
   initiatorSessionId: string | null;
 }>;
 
@@ -72,6 +80,10 @@ export function projectFeedRow(row: StoredFeedRow, reader: FeedReader): CombatLo
   if (reader.gm) return row.entry;
   if (row.entry.gmOnly) return null;
   switch (row.visibility) {
+    case WHISPER:
+      return row.entry.whisper !== undefined && reader.characterIds?.has(row.entry.whisper.characterId) === true
+        ? { ...row.entry, id: playerFeedId(row.entry.id) }
+        : null;
     case null:
     case "public":
       return { ...row.entry, id: playerFeedId(row.entry.id) };
@@ -117,15 +129,27 @@ export class CombatLogStore {
       revision: number;
       actorId?: string | null;
       roll?: RollRecord | null;
+      /** A chat line's author and whisper, and its sender's session (which never leaves the server). */
+      chat?: ChatPayload["chat"] & Readonly<{ sessionId: string }>;
     }>
   ): StoredFeedRow {
     const database = this.requireDatabase();
     const at = new Date(this.now()).toISOString();
     const roll = entry.roll ?? null;
-    const actorId = entry.actorId ?? roll?.actorId ?? null;
-    const visibility = roll?.visibility ?? null;
-    const initiatorSessionId = roll?.initiatorSessionId ?? null;
+    const chat = entry.chat ?? null;
+    const actorId = entry.actorId ?? roll?.actorId ?? chat?.author.actorId ?? chat?.whisper?.characterId ?? null;
+    const visibility = roll?.visibility ?? (chat?.whisper ? WHISPER : null);
+    const initiatorSessionId = roll?.initiatorSessionId ?? chat?.sessionId ?? null;
     const safe = roll ? playerRoll(roll) : null;
+    const chatPayload: ChatPayload | null = chat
+      ? {
+          chat: {
+            commandId: chat.commandId,
+            author: chat.author,
+            ...(chat.whisper ? { whisper: chat.whisper } : {})
+          }
+        }
+      : null;
     const info = database
       .prepare(
         `INSERT INTO combat_log (at, kind, text, gm_only, revision, actor_id, visibility, initiator_session_id, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -139,7 +163,7 @@ export class CombatLogStore {
         actorId,
         visibility,
         initiatorSessionId,
-        safe ? JSON.stringify(safe) : null
+        safe ? JSON.stringify(safe) : chatPayload ? JSON.stringify(chatPayload) : null
       );
     const id = Number(info.lastInsertRowid);
     database.prepare("DELETE FROM combat_log WHERE id <= ?").run(id - CAP);
@@ -152,11 +176,43 @@ export class CombatLogStore {
         gmOnly: entry.gmOnly,
         revision: entry.revision,
         ...(actorId !== null ? { actorId } : {}),
-        ...(safe ? { roll: safe } : {})
+        ...(safe ? { roll: safe } : {}),
+        ...(chatPayload ? chatFields(chatPayload) : {})
       },
       visibility,
       initiatorSessionId
     };
+  }
+
+  /** The chat row a command already wrote, so a resent command answers with it instead of writing again. */
+  chatByCommand(commandId: string): StoredFeedRow | null {
+    const row = this.requireDatabase()
+      .prepare(
+        `SELECT ${SELECT_COLUMNS} FROM combat_log WHERE kind = 'chat' AND json_extract(payload_json, '$.chat.commandId') = ?`
+      )
+      .get(commandId) as LogRow | undefined;
+    return row ? toStoredRow(row) : null;
+  }
+
+  /** A retained row by the id its reader holds: the row's own for the GM, the feed id a player was sent. */
+  findForReader(entryId: number, gm: boolean): StoredFeedRow | null {
+    const database = this.requireDatabase();
+    if (gm) {
+      const row = database.prepare(`SELECT ${SELECT_COLUMNS} FROM combat_log WHERE id = ?`).get(entryId) as
+        LogRow | undefined;
+      return row ? toStoredRow(row) : null;
+    }
+    // A player's ids carry no order, so the row is found by recomputing them over the retained chat rows.
+    const rows = database
+      .prepare(`SELECT ${SELECT_COLUMNS} FROM combat_log WHERE kind = 'chat' ORDER BY id DESC`)
+      .all() as LogRow[];
+    const row = rows.find((candidate) => playerFeedId(candidate.id) === entryId);
+    return row ? toStoredRow(row) : null;
+  }
+
+  /** Removes one row; nothing of it is kept. */
+  remove(id: number): void {
+    this.requireDatabase().prepare("DELETE FROM combat_log WHERE id = ?").run(id);
   }
 
   /** Every retained line at or after a revision, oldest first: an encounter archive's commentary (GM export, so GM-only lines included). */
@@ -169,11 +225,20 @@ export class CombatLogStore {
 
   /** The recent feed, oldest first, projected for one reader. `limit` counts rows before filtering, which keeps
    *  the visibility rule in code and out of SQL. */
-  list(includeGmOnly: boolean, limit = 250, sessionId?: string): readonly CombatLogEntry[] {
+  list(
+    includeGmOnly: boolean,
+    limit = 250,
+    sessionId?: string,
+    characterIds?: ReadonlySet<string>
+  ): readonly CombatLogEntry[] {
     const rows = this.requireDatabase()
       .prepare(`SELECT ${SELECT_COLUMNS} FROM combat_log WHERE (? = 1 OR gm_only = 0) ORDER BY id DESC LIMIT ?`)
       .all(includeGmOnly ? 1 : 0, limit) as LogRow[];
-    const reader: FeedReader = { gm: includeGmOnly, ...(sessionId !== undefined ? { sessionId } : {}) };
+    const reader: FeedReader = {
+      gm: includeGmOnly,
+      ...(sessionId !== undefined ? { sessionId } : {}),
+      ...(characterIds !== undefined ? { characterIds } : {})
+    };
     return rows
       .flatMap((row) => {
         const projected = projectFeedRow(toStoredRow(row), reader);
@@ -193,8 +258,14 @@ export class CombatLogStore {
 }
 
 /** One stored row to the pre-projection shape. */
+/** The fields a chat row's entry carries. */
+function chatFields(payload: ChatPayload): Pick<CombatLogEntry, "author" | "whisper"> {
+  return { author: payload.chat.author, ...(payload.chat.whisper ? { whisper: payload.chat.whisper } : {}) };
+}
+
 function toStoredRow(row: LogRow): StoredFeedRow {
-  const roll = row.payload_json === null ? null : (JSON.parse(row.payload_json) as PlayerRollRecord);
+  const chat = row.kind === "chat" && row.payload_json !== null ? (JSON.parse(row.payload_json) as ChatPayload) : null;
+  const roll = row.payload_json === null || chat !== null ? null : (JSON.parse(row.payload_json) as PlayerRollRecord);
   return {
     entry: {
       id: row.id,
@@ -204,9 +275,10 @@ function toStoredRow(row: LogRow): StoredFeedRow {
       gmOnly: row.gm_only === 1,
       revision: row.revision,
       ...(row.actor_id !== null ? { actorId: row.actor_id } : {}),
-      ...(roll ? { roll } : {})
+      ...(roll ? { roll } : {}),
+      ...(chat ? chatFields(chat) : {})
     },
-    visibility: row.visibility as RollVisibility | null,
+    visibility: row.visibility as StoredFeedRow["visibility"],
     initiatorSessionId: row.initiator_session_id
   };
 }

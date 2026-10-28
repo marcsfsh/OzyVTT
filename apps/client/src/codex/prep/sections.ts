@@ -8,7 +8,7 @@ export const SECTION_TYPES: ReadonlyArray<Readonly<{ type: CodexPrepSectionType;
   { type: "scenes", label: "Scenes", holds: "Holds an ordered list. Each scene has a title, a place and notes." },
   { type: "clocks", label: "Clocks", holds: "Holds deadlines picked from the calendar." },
   { type: "quests", label: "Quests in play", holds: "Holds the quests you pick." },
-  { type: "encounters", label: "Encounters", holds: "Holds table scenes you pick to run." }
+  { type: "encounters", label: "Encounters", holds: "Holds table encounters you pick to run." }
 ];
 
 export function sectionTypeLabel(type: CodexPrepSectionType): string {
@@ -32,7 +32,7 @@ export function emptySection(type: CodexPrepSectionType, title: string): CodexPr
     case "quests":
       return { ...base, type, questIds: [] };
     case "encounters":
-      return { ...base, type, sceneIds: [] };
+      return { ...base, type, encounterIds: [] };
   }
 }
 
@@ -52,7 +52,7 @@ export function sectionHasContent(section: CodexPrepSection): boolean {
     case "quests":
       return section.questIds.length > 0;
     case "encounters":
-      return section.sceneIds.length > 0;
+      return section.encounterIds.length > 0;
   }
 }
 

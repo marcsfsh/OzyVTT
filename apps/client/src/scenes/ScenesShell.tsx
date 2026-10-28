@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { GmView } from "@vtt/domain";
-import { Button, Combobox, IconHome, IconMap, IconPlus, IconScene, Kbd, cx } from "@vtt/ui";
+import { Button, Combobox, IconButton, IconMap, IconPlus, IconScene, Kbd, Tabs, cx } from "@vtt/ui";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { useMapLibrary, type MapAsset } from "../maps/map-catalog";
 import { navigate, useRoute } from "../router";
+import { PrepBarSlot } from "../shell/AppBar";
 import { ScenesContext, useSceneLinks, type ScenesContextValue } from "./context";
 import { SCENES_PATHS, pathForMap, pathForScene, scenesViewOf, sectionOf, type ScenesSection } from "./routes";
-import { ScenesOverview } from "./ScenesOverview";
 import { SceneList } from "./SceneList";
 import { SceneDocument } from "./SceneDocument";
 import { SceneEditor } from "./SceneEditor";
@@ -16,11 +16,37 @@ import { MapDocument } from "../maps/MapDocument";
 import { MapEditor } from "../maps/MapEditor";
 import "./scenes.css";
 
-const SECTIONS: ReadonlyArray<{ id: ScenesSection; label: string; path: string; icon: ReactNode }> = [
-  { id: "overview", label: "Overview", path: SCENES_PATHS.overview, icon: <IconHome /> },
-  { id: "scenes", label: "Scenes", path: SCENES_PATHS.list, icon: <IconScene /> },
-  { id: "maps", label: "Maps", path: SCENES_PATHS.maps, icon: <IconMap /> }
+/** The front page's two views, in the order they are drawn. */
+const LIST_TABS: ReadonlyArray<{ id: ScenesSection; label: string; path: string }> = [
+  { id: "maps", label: "Maps", path: SCENES_PATHS.maps },
+  { id: "scenes", label: "Encounters", path: SCENES_PATHS.list }
 ];
+
+/**
+ * Prep's front page above its lists: New map and New scene side by side, then the Maps and Scenes views. The lists
+ * under it keep their own filters and sort.
+ */
+function ListHead({ section }: Readonly<{ section: ScenesSection }>) {
+  return (
+    <div className="sc-front-head">
+      <div className="sc-front-new">
+        <Button variant="secondary" onClick={() => void navigate(SCENES_PATHS.newMap)}>
+          <IconMap /> New map
+        </Button>
+        <Button variant="primary" onClick={() => void navigate(SCENES_PATHS.newScene)}>
+          <IconScene /> New encounter
+        </Button>
+      </div>
+      <Tabs
+        ariaLabel="Maps and encounters"
+        className="sc-front-tabs"
+        activeId={section}
+        onChange={(id) => void navigate(LIST_TABS.find((tab) => tab.id === id)!.path)}
+        tabs={LIST_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+      />
+    </div>
+  );
+}
 
 const PHONE_QUERY = "(max-width: 760px)";
 const NARROW_QUERY = "(max-width: 979px)";
@@ -40,11 +66,11 @@ function FindBox({ state, maps }: Readonly<{ state: GmView; maps: readonly MapAs
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   const options = [
-    ...state.combat.scenes.map((scene) => ({
+    ...state.combat.encounters.map((scene) => ({
       id: `scene:${scene.id}`,
       label: scene.name,
       icon: <IconScene />,
-      meta: scene.id === state.combat.activeSceneId ? "Scene · Live" : "Scene"
+      meta: scene.id === state.combat.activeEncounterId ? "Encounter · Live" : "Encounter"
     })),
     ...(maps ?? []).map((map) => ({ id: `map:${map.id}`, label: map.name, icon: <IconMap />, meta: "Map" }))
   ];
@@ -53,8 +79,8 @@ function FindBox({ state, maps }: Readonly<{ state: GmView; maps: readonly MapAs
       <Combobox
         options={options}
         value={null}
-        placeholder="Find a scene or a map"
-        ariaLabel="Find a scene or a map"
+        placeholder="Find an encounter or a map"
+        ariaLabel="Find an encounter or a map"
         onChange={(id) => {
           if (!id) return;
           const [kind, recordId] = id.split(":");
@@ -67,9 +93,9 @@ function FindBox({ state, maps }: Readonly<{ state: GmView; maps: readonly MapAs
 }
 
 /**
- * The Scenes tab: a section bar (Overview, Scenes, Maps, the find box and the view's one primary) over the view the
- * address names, and on a phone the same sections in a tab bar under the thumb. A scene or map that is open takes the
- * pane as one document; on a phone its workbench fills the pane and Back returns to the list.
+ * Prep's Scenes and Maps pages: the view the address names under Prep's section bar, whose right end holds the
+ * find box (and a secondary New while a record is open). The lists open under New map, New scene and their tabs. A scene or map that is open takes the pane
+ * as one document; on a phone its workbench fills the pane and Back returns to the list.
  */
 export function ScenesShell({
   state,
@@ -84,7 +110,7 @@ export function ScenesShell({
   onOpenMap: (map: MapAsset) => void;
 }>) {
   const route = useRoute();
-  const view = scenesViewOf(route.segments, route.query) ?? { view: "overview" as const };
+  const view = scenesViewOf(route.segments, route.query) ?? { view: "scenes" as const };
   const section = sectionOf(view);
   const phone = useMediaQuery(PHONE_QUERY);
   const narrow = useMediaQuery(NARROW_QUERY);
@@ -122,31 +148,35 @@ export function ScenesShell({
     ]
   );
 
-  // An open scene or map is a document of its own: the bottom tabs give way to its workbench on a phone.
-  const recordOpen =
-    (view.view === "scene" && view.sceneId !== null && view.step === null) ||
-    (view.view === "map" && view.mapId !== null && view.step === null);
+  // The front page has its own New map and New scene; an open record keeps a secondary New in the bar.
+  const listing = view.view === "scenes" || view.view === "maps";
   const primary =
     section === "maps"
-      ? { label: "Add a map", path: SCENES_PATHS.newMap }
-      : { label: "New scene", path: SCENES_PATHS.newScene };
-  // A record's own primary is in its footer, so the bar's New steps down to a secondary while one is open.
-  const barPrimary = view.view === "overview" || view.view === "scenes" || view.view === "maps";
+      ? { label: "New map", path: SCENES_PATHS.newMap }
+      : { label: "New encounter", path: SCENES_PATHS.newScene };
 
   const content = (() => {
     switch (view.view) {
-      case "overview":
-        return <ScenesOverview />;
       case "scenes":
-        return <SceneList />;
+        return (
+          <>
+            <ListHead section="scenes" />
+            <SceneList />
+          </>
+        );
       case "scene":
-        return view.step === null && view.sceneId ? (
-          <SceneDocument key={view.sceneId} sceneId={view.sceneId} />
+        return view.step === null && view.encounterId ? (
+          <SceneDocument key={view.encounterId} encounterId={view.encounterId} />
         ) : (
-          <SceneEditor key={view.sceneId ?? "new"} sceneId={view.sceneId} step={view.step ?? "map"} />
+          <SceneEditor key={view.encounterId ?? "new"} encounterId={view.encounterId} step={view.step ?? "map"} />
         );
       case "maps":
-        return <MapList />;
+        return (
+          <>
+            <ListHead section="maps" />
+            <MapList />
+          </>
+        );
       case "map":
         return view.step === null && view.mapId ? (
           <MapDocument key={view.mapId} mapId={view.mapId} />
@@ -159,57 +189,21 @@ export function ScenesShell({
   return (
     <ScenesContext.Provider value={context}>
       <div className={cx("sc-shell anim-view", phone ? "is-phone" : "is-laptop")}>
-        {!phone && (
-          <div className="sc-bar">
-            <h2 className="sc-bar-title">Scenes</h2>
-            <nav className="sc-bar-sections nh-tabs nh-tabs--horizontal" aria-label="Scenes sections">
-              {SECTIONS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={cx("nh-tab sc-bar-tab", section === item.id && "nh-tab--active")}
-                  aria-current={section === item.id ? "page" : undefined}
-                  onClick={() => void navigate(item.path)}
-                >
-                  {item.icon}
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-            <span className="sc-grow" />
-            <FindBox state={state} maps={library.maps} />
-            <Button variant={barPrimary ? "primary" : "secondary"} onClick={() => void navigate(primary.path)}>
-              <IconPlus /> {primary.label}
-            </Button>
-          </div>
-        )}
+        {/* Prep's section bar names the page; its right end holds this page's views, the find box and the primary. */}
+        <PrepBarSlot>
+          {!phone && <FindBox state={state} maps={library.maps} />}
+          {!listing &&
+            (phone ? (
+              <IconButton label={primary.label} onClick={() => void navigate(primary.path)}>
+                <IconPlus />
+              </IconButton>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={() => void navigate(primary.path)}>
+                <IconPlus /> {primary.label}
+              </Button>
+            ))}
+        </PrepBarSlot>
         <div className="sc-content">{content}</div>
-        {phone && !recordOpen && (
-          <nav className="sc-tabbar" aria-label="Scenes sections">
-            {[
-              ...SECTIONS.slice(0, 2),
-              { id: "new" as const, label: "New", path: SCENES_PATHS.newScene, icon: <IconPlus /> },
-              SECTIONS[2]!
-            ].map((item) => {
-              const on =
-                item.id === "new"
-                  ? view.view === "scene" && view.sceneId === null
-                  : section === item.id && !(view.view === "scene" && view.sceneId === null);
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={cx("sc-tabbar-tab", on && "is-on")}
-                  aria-current={on ? "page" : undefined}
-                  onClick={() => void navigate(item.path)}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        )}
       </div>
     </ScenesContext.Provider>
   );

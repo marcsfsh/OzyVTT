@@ -12,9 +12,9 @@ export const SCREEN_HEIGHT = 1080;
 const MIN_WIDTH = 280;
 const GUTTER = 16;
 
-/** The top edge the panel keeps below: the app's tab bar, so every tab stays reachable while it is open. */
+/** The top edge the panel keeps below: the app's top bar, so every section stays reachable while it is open. */
 function topLimit(): number {
-  const bar = document.querySelector(".frame-tabbar")?.getBoundingClientRect().bottom ?? 0;
+  const bar = document.querySelector(".app-bar")?.getBoundingClientRect().bottom ?? 0;
   return Math.round(bar) + 8;
 }
 
@@ -23,7 +23,7 @@ function topLimit(): number {
  * wider than the window allows.
  */
 function openingPlace(): Place {
-  const header = document.querySelector(".table-header")?.getBoundingClientRect().bottom ?? 0;
+  const header = document.querySelector(".table-strip, .table-header")?.getBoundingClientRect().bottom ?? 0;
   const width = Math.min(480, window.innerWidth - GUTTER * 2);
   return {
     x: Math.max(GUTTER, window.innerWidth - width - GUTTER),

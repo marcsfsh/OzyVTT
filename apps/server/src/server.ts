@@ -24,7 +24,8 @@ import { reconcileMagicMarkers } from "./inventory.js";
 import { refreshBuiltSheets, refreshIsDue, type SheetRefresh } from "./sheet-refresh.js";
 import { AuthService } from "./auth.js";
 import { developmentClientUrl } from "./client-hosting.js";
-import { CombatLogStore, projectFeedRow } from "./combat-log.js";
+import { ChatLimiter } from "./chat.js";
+import { CombatLogStore, projectFeedRow, type StoredFeedRow } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
 import {
@@ -66,6 +67,7 @@ import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
 import { projectViewerEncounter } from "./viewer-encounter.js";
+import { projectViewerRoll } from "./viewer-roll.js";
 import { ViewerPresentationStore } from "./viewer-presentation-store.js";
 import { SoundCatalogStore } from "./sound-catalog.js";
 import { createSoundRouter } from "./sound-http.js";
@@ -157,6 +159,7 @@ export function createServer(options: CreateServerOptions) {
   // Every read of the game state outside a command's own transaction goes through here.
   const committedState = createStateReader(store);
   const combatLog = new CombatLogStore(options.databasePath);
+  const chatLimiter = new ChatLimiter();
   const credentials = new IntegrationCredentialStore(options.integrationCredentialsPath);
   const mapAssets = new MapAssetStore(options.mapAssetsPath ?? join(dirname(options.databasePath), "map-assets"));
   const mapCatalog = new MapCatalogStore(options.databasePath);
@@ -225,6 +228,8 @@ export function createServer(options: CreateServerOptions) {
     (now) => sound.viewerSound(now),
     () => pushSoundToGm()
   );
+  // The screen's latest-roll card, read from the committed game as the table's audience (ADR-0040).
+  viewerCoordinator.attachRolls((since, now) => projectViewerRoll(committedState.read(), since, now, sightContent()));
   const gmLoginRateLimiter = new LoginRateLimiter();
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
@@ -299,7 +304,7 @@ export function createServer(options: CreateServerOptions) {
     return new Set(
       committedState
         .read()
-        .actors.filter((actor) => actor.kind === "player-character" && actor.replaySceneId === undefined)
+        .actors.filter((actor) => actor.kind === "player-character" && actor.replayEncounterId === undefined)
         .map((actor) => actor.id)
     );
   }
@@ -570,18 +575,38 @@ export function createServer(options: CreateServerOptions) {
       actorId: entry.actorId ?? null,
       roll: entry.roll ?? null
     });
-    // Per-recipient delivery: a `self-only` roll belongs to one player, unlocked by their session id.
-    // `projectFeedRow` decides and strips the roller's session id. The public viewer has no game socket.
+    sendFeedRow(row);
+  }
+  /** The party characters a player's session plays now: what unlocks a whisper to one of them (ADR-0038). */
+  function charactersOf(state: GameState, sessionId: string): ReadonlySet<string> {
+    return new Set(
+      state.actors
+        .filter((actor) => actor.kind === "player-character" && actor.ownerSessionId === sessionId)
+        .map((actor) => actor.id)
+    );
+  }
+  /** Per-recipient delivery: a `self-only` roll belongs to one player, unlocked by their session id, and a whisper to
+   *  whoever plays its character. `projectFeedRow` decides and strips the sender's session id. The public viewer has
+   *  no game socket. With `removed`, each reader that held the row is told its id is gone. */
+  function sendFeedRow(row: StoredFeedRow, removed = false) {
+    const current = committedState.read();
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
       if (auth.verify(token)) {
-        socket.emit("log:entry", row.entry);
+        if (removed) socket.emit("log:removed", { id: row.entry.id });
+        else socket.emit("log:entry", row.entry);
         continue;
       }
       const player = auth.verifyPlayer(token);
       if (!player) continue;
-      const projected = projectFeedRow(row, { gm: false, sessionId: player.sessionId });
-      if (projected) socket.emit("log:entry", projected);
+      const projected = projectFeedRow(row, {
+        gm: false,
+        sessionId: player.sessionId,
+        characterIds: charactersOf(current, player.sessionId)
+      });
+      if (!projected) continue;
+      if (removed) socket.emit("log:removed", { id: projected.id });
+      else socket.emit("log:entry", projected);
     }
   }
   /** "Round 3 · Borin's turn.", then what Borin carries into it (`turnReminder`). A hidden combatant's turn stays
@@ -643,6 +668,7 @@ export function createServer(options: CreateServerOptions) {
         state.revision,
         projectViewerEncounter(state, Date.now(), sightContent())
       );
+      viewerCoordinator.refreshRoll();
     } catch {
       for (const socket of io.sockets.sockets.values())
         if (auth.verify(socket.handshake.auth?.token))
@@ -673,7 +699,7 @@ export function createServer(options: CreateServerOptions) {
         if (auth.verify(socket.handshake.auth?.token))
           socket.emit(
             "system:error",
-            "The scene is live, but the shared screen could not switch to its map. Present it from the Viewer tab."
+            "The encounter is live, but the shared screen could not switch to its map. Present it from the Viewer tab."
           );
     }
   }
@@ -724,17 +750,38 @@ export function createServer(options: CreateServerOptions) {
         console.error("moving the codex date failed:", error instanceof Error ? error.message : error);
       }
     },
+    chat: {
+      byCommand: (commandId) => combatLog.chatByCommand(commandId),
+      allow: (sessionId, gm) => chatLimiter.allow(sessionId, gm),
+      post: (line) => {
+        const row = combatLog.append({
+          kind: "chat",
+          text: line.text,
+          gmOnly: false,
+          revision: committedState.read().revision,
+          chat: line
+        });
+        sendFeedRow(row);
+        return row;
+      },
+      find: (entryId, gm) => combatLog.findForReader(entryId, gm),
+      remove: (row) => {
+        // Told before the row goes, while each reader's right to it can still be worked out.
+        sendFeedRow(row, true);
+        combatLog.remove(row.entry.id);
+      }
+    },
     claimReleased: (sessionId, event) => {
       for (const socket of io.sockets.sockets.values())
         if (auth.verifyPlayer(socket.handshake.auth?.token)?.sessionId === sessionId)
           socket.emit("claim:released", event);
     },
-    onEncounterArchived: ({ sceneId, turnCount }) => {
+    onEncounterArchived: ({ encounterId, turnCount }) => {
       // Log the fight to the codex timeline, pinned to the location marker that links this scene, if any.
       try {
         const latest = store.listEncounterArchives()[0];
         if (!latest) return;
-        const marker = sceneId ? codexStore.markerForScene(sceneId) : null;
+        const marker = encounterId ? codexStore.markerForScene(encounterId) : null;
         const turns = turnCount > 0 ? ` (${turnCount} ${turnCount === 1 ? "turn" : "turns"})` : "";
         codexStore.appendCombatEntry({
           sourceEncounterId: latest.id,

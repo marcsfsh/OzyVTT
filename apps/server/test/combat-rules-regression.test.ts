@@ -786,7 +786,7 @@ describe("effect lifecycle: Frenzy's Exhaustion and Rage duration", () => {
     expect(torva.conditions).toEqual([{ id: "exhaustion", level: 1 }]);
   });
 
-  it("ends the fight's effects at encounter end but leaves non-combatants' effects alone (parked scenes)", () => {
+  it("ends the encounter's effects at encounter end but leaves non-combatants' effects alone (parked encounters)", () => {
     const game = buildGame([
       { actorId: IDS.torva, score: 16 },
       { actorId: IDS.croc1, score: 8 }
@@ -4079,7 +4079,7 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
         { role: "gm" },
         (definitionId) => fighting.definitions.find((entry) => entry.id === definitionId)?.definition
       )
-    ).toThrowError(/end the fight/i);
+    ).toThrowError(/end the encounter/i);
   });
 
   function buildDiceGameInCombat(): GameState {
@@ -4337,7 +4337,7 @@ describe("Haste: one more action from a short list, and lethargy when it ends (S
     expect(torva().conditions.some((condition) => condition.id === "incapacitated")).toBe(false);
   });
 
-  it("starts no lethargy when the fight's end sweeps Haste away", () => {
+  it("starts no lethargy when the encounter's end sweeps Haste away", () => {
     const game = buildGame();
     hasten(game);
     endEncounterEffects(

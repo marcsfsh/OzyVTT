@@ -73,7 +73,7 @@ const DOC = {
 
 vi.mock("../lib/api", () => ({
   jsonRequest: async () => DOC,
-  apiRequest: async () => ({ commands: [{ type: "token:move", scope: "scene:write", summary: "Moves a token." }] })
+  apiRequest: async () => ({ commands: [{ type: "token:move", scope: "encounter:write", summary: "Moves a token." }] })
 }));
 
 import { ToastProvider } from "@vtt/ui";
@@ -203,7 +203,7 @@ describe("the reference's table", () => {
     renderReference();
     await user.click(await screen.findByRole("button", { name: "Commands" }));
     expect(screen.getByRole("table")).toHaveTextContent("token:move");
-    expect(screen.getByRole("table")).toHaveTextContent("scene:write");
+    expect(screen.getByRole("table")).toHaveTextContent("encounter:write");
   });
 });
 

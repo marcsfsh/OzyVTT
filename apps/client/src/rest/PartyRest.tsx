@@ -37,7 +37,8 @@ const MINUTE_STEPS = [0, 1, 5, 10, 15, 20, 30, 45] as const;
 
 /** Why a character can't rest at all now (no Short Rest either); null when nothing stands in the way. */
 function blockedNote(state: GmView, actor: GmActor): string | null {
-  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id)) return "In the fight";
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id))
+    return "In the encounter";
   if (isDead(actor)) return "Dead";
   if (actor.hp.current < 1) return "Needs 1 HP to rest";
   return null;
@@ -260,7 +261,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
             )}
             <p className="party-rest-hint">
               Time that passes here moves the Codex calendar too, and counts down spells and effects: a minute is 10
-              rounds. A fight&apos;s rounds don&apos;t move the clock. A Long Rest can start 16 hours after a
+              rounds. An encounter&apos;s rounds don&apos;t move the clock. A Long Rest can start 16 hours after a
               character&apos;s last one ends. While the party travels, each character&apos;s checks read the pace until
               time passes without one.
             </p>
@@ -430,8 +431,8 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                 </ul>
               )}
               <p className="party-rest-hint">
-                A Short Rest opens on each player&apos;s device. A Long Rest stays open for its 8 hours, so a fight or
-                damage can interrupt it, until you finish it.
+                A Short Rest opens on each player&apos;s device. A Long Rest stays open for its 8 hours, so an encounter
+                or damage can interrupt it, until you finish it.
               </p>
             </section>
           )}

@@ -3,6 +3,7 @@ import type { GmView, PlayerView, RollPurpose, RollVisibility, TableRollPurpose 
 import { Button, Input, SegmentedControl, Select, Stepper, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "./roll-preference";
+import { setRollVisibility, useRollVisibility } from "./roll-visibility";
 import { RollCallPanel } from "./RollCallPanel";
 import "./dice-panel.css";
 
@@ -69,7 +70,9 @@ export function DicePanel({
 }) {
   const [formula, setFormula] = useState("1d20");
   const [purpose, setPurpose] = useState<TableRollPurpose>("manual");
-  const [visibility, setVisibility] = useState<RollVisibility>("public");
+  // Shared with the log's composer, so a quick die there goes to the audience chosen here.
+  const visibility = useRollVisibility();
+  const setVisibility = setRollVisibility;
   const [rollFilter, setRollFilter] = useState<"all" | "mine">("all");
   const [modifier, setModifier] = useState(0);
   const [advantage, setAdvantage] = useState(false);
@@ -80,8 +83,8 @@ export function DicePanel({
   const [mode, setMode] = useState<"roll" | "call">("roll");
   const openCalls = gmState?.rollCalls.length ?? 0;
   const { toast } = useToast();
-  // The shared per-browser dice-input preference; no choice at a table that keeps players' dice on the server.
-  const { rollInput, mayType, setRollInput } = useRollPreference();
+  // The shared per-browser dice-input preference: the GM's choice; a player's follows the table's mode.
+  const { rollInput, chooses, setRollInput } = useRollPreference();
   // A player's "self-only" roll is seen by the roller and the GM but no other player. "blind" hides
   // the result from the roller too.
   const visibilityOptions = VISIBILITY_OPTIONS[role];
@@ -186,7 +189,7 @@ export function DicePanel({
         </label>
       </div>
       {/* The per-browser roll-input preference, shared with the character sheet's toggle. */}
-      {mayType && (
+      {chooses && (
         <div className="dice-roll-pref" role="group" aria-label="How you roll">
           <SegmentedControl
             size="sm"

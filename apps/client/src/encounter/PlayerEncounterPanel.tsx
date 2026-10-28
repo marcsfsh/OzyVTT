@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { type MutationResult, type PlayerView } from "@vtt/domain";
-import { Button, SunMark } from "@vtt/ui";
+import { Button, Lamp, MoveLamp, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
 import { MyPendingAsks } from "./RuleAsk";
@@ -16,11 +16,14 @@ import { CommandedCreatures, commandedOf } from "./CommandedCreatures";
 import { UnconsciousNote } from "../sheet/PlayFight";
 import { isDying, owesDeathSave } from "../table/playerPrompts";
 import { hasPlayerPrompt } from "../table/PromptSlot";
+import { LogComposer } from "../table/LogComposer";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
 import { usePlayerTargetRows } from "../table/targetRows";
 import { useTargeting } from "./targeting";
 import { revealInRegion } from "../lib/reveal";
-import { navigate } from "../router";
+import { LampToggle } from "./LampToggle";
+import { PlayerTurnCard } from "./PlayerTurnCard";
+import { navigate, replaceQuery, useRoute } from "../router";
 
 /**
  * A player's own prompts keep their outcome line beside them: answering one unmounts it, and the
@@ -109,31 +112,23 @@ function OwnFeedback({
   );
 }
 
-/** A player's own economy: Action/Bonus only on their turn; the reaction is markable any time. Pressed = spent. Only
- *  the GM gives a spent one back while the table polices the action economy, so a pressed slot is locked then. */
+/** A player's own economy as the turn card's four lamps: Action and Bonus lit only on their turn, the Reaction
+ *  markable any time, Move from the server's budget. Pressed = spent. Only the GM gives a spent one back while the
+ *  table polices the action economy, so a pressed lamp is locked then. */
 export function PlayerTurnEconomy({
   combat,
   myId,
   myTurn,
   mySpeedFeet,
   revision,
-  endWaits,
-  quiet = false,
-  unconscious = false,
-  hp
+  unconscious = false
 }: Readonly<{
   combat: PlayerView["combat"];
   myId: string;
   myTurn: boolean;
   mySpeedFeet?: number;
-  /** The character's hit points, shown beside the movement. */
-  hp?: string;
   /** The game's revision: this turn's movement budget (Dash and Slow included) is asked again as it changes. */
   revision?: number;
-  /** Why End turn waits (a death save still to roll); it is disabled meanwhile. */
-  endWaits?: string;
-  /** Another primary leads the view (a roll to make), so End turn steps down. */
-  quiet?: boolean;
   /** The character is Unconscious, so it can't take a reaction. */
   unconscious?: boolean;
 }>) {
@@ -149,62 +144,48 @@ export function PlayerTurnEconomy({
     });
   };
   const reactionUsed = combat.reactionsUsed.includes(myId);
-  const showMove = myTurn && moveBudget !== undefined && moveBudget !== null;
   const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
   const lockedTitle = "Spent. Only the GM can give it back.";
+  const usedFeet = Math.round(combat.turn.movementUsedFeet);
   return (
     <div
-      className={`turn-economy${unconscious ? " is-unconscious" : ""}`}
+      className={`turn-economy lamp-row${unconscious ? " is-unconscious" : ""}`}
       role="group"
       aria-label={unconscious ? "Your turn resources · Unconscious" : "Your turn resources"}
     >
-      {myTurn && (
-        <>
-          <button
-            type="button"
-            className="economy-slot"
-            aria-pressed={combat.turn.actionUsed}
-            disabled={busy || unconscious || (combat.turn.actionUsed && giveBackLocked)}
-            title={combat.turn.actionUsed && giveBackLocked ? lockedTitle : undefined}
-            onClick={() =>
-              emit(
-                () => command("turn:use", { slot: "action", used: !combat.turn.actionUsed }),
-                "The action could not be updated."
-              )
-            }
-          >
-            Action
-          </button>
-          <button
-            type="button"
-            className="economy-slot"
-            aria-pressed={combat.turn.bonusActionUsed}
-            disabled={busy || unconscious || (combat.turn.bonusActionUsed && giveBackLocked)}
-            title={combat.turn.bonusActionUsed && giveBackLocked ? lockedTitle : undefined}
-            onClick={() =>
-              emit(
-                () =>
-                  command("turn:use", {
-                    slot: "bonus-action",
-                    used: !combat.turn.bonusActionUsed
-                  }),
-                "The Bonus Action could not be updated."
-              )
-            }
-          >
-            Bonus
-          </button>
-          {combat.turn.extraActionReady && (
-            <span className="economy-movement" title="Action Surge or Haste gives you another action this turn">
-              +1 action
-            </span>
-          )}
-        </>
-      )}
-      <button
-        type="button"
-        className="economy-slot"
-        aria-pressed={reactionUsed}
+      <LampToggle
+        kind="action"
+        label="Action"
+        used={myTurn && combat.turn.actionUsed}
+        lit={myTurn && !combat.turn.actionUsed && !unconscious}
+        disabled={!myTurn || busy || unconscious || (combat.turn.actionUsed && giveBackLocked)}
+        title={!myTurn ? "On your turn" : combat.turn.actionUsed && giveBackLocked ? lockedTitle : undefined}
+        onToggle={() =>
+          emit(
+            () => command("turn:use", { slot: "action", used: !combat.turn.actionUsed }),
+            "The action could not be updated."
+          )
+        }
+      />
+      <LampToggle
+        kind="bonus"
+        label="Bonus"
+        used={myTurn && combat.turn.bonusActionUsed}
+        lit={myTurn && !combat.turn.bonusActionUsed && !unconscious}
+        disabled={!myTurn || busy || unconscious || (combat.turn.bonusActionUsed && giveBackLocked)}
+        title={!myTurn ? "On your turn" : combat.turn.bonusActionUsed && giveBackLocked ? lockedTitle : undefined}
+        onToggle={() =>
+          emit(
+            () => command("turn:use", { slot: "bonus-action", used: !combat.turn.bonusActionUsed }),
+            "The Bonus Action could not be updated."
+          )
+        }
+      />
+      <LampToggle
+        kind="reaction"
+        label="Reaction"
+        used={reactionUsed}
+        lit={!reactionUsed && !unconscious}
         disabled={busy || unconscious || (reactionUsed && giveBackLocked)}
         title={
           unconscious
@@ -213,42 +194,65 @@ export function PlayerTurnEconomy({
               ? lockedTitle
               : "Reactions refresh when your turn starts"
         }
-        onClick={() =>
+        onToggle={() =>
           emit(
             () => command("turn:use-reaction", { actorId: myId, used: !reactionUsed }),
             "The reaction could not be updated."
           )
         }
-      >
-        Reaction
-      </button>
-      {myTurn && (
-        <button
-          type="button"
-          className={`encounter-primary turn-end${quiet || endWaits ? " is-quiet" : ""}`}
-          disabled={busy || endWaits !== undefined}
-          title={endWaits}
-          onClick={() => emit(() => command("turn:end", {}), "The turn could not end.")}
-        >
-          End turn
-        </button>
+      />
+      {myTurn && moveBudget !== undefined && moveBudget !== null ? (
+        <MoveLamp feetLeft={moveBudget - usedFeet} speedFeet={moveBudget} />
+      ) : (
+        <Lamp kind="on" lit={false} label="Move" unavailableReason="On your turn" />
       )}
-      {/* The readouts follow the buttons, so on a phone End turn shares the buttons' row and the bar keeps two rows. */}
-      {(hp !== undefined || showMove) && (
-        <span className="economy-status">
-          {hp !== undefined && <span className="economy-hp">{hp}</span>}
-          {showMove && (
-            <span className="economy-movement" title="Movement spent this turn / this turn's movement">
-              Move {Math.round(combat.turn.movementUsedFeet)}/{moveBudget} ft
-            </span>
-          )}
+      {myTurn && combat.turn.extraActionReady && (
+        <span className="economy-extra" title="Action Surge or Haste gives you another action this turn">
+          +1 action
         </span>
+      )}
+      {myTurn && moveBudget !== undefined && moveBudget !== null && usedFeet > moveBudget && (
+        // Past the budget the gauge sits empty; the feet over it still read exactly.
+        <span className="economy-extra">{usedFeet - moveBudget} ft over</span>
       )}
       {feedback && (
         <span className="economy-feedback" role="status">
           {feedback}
         </span>
       )}
+    </div>
+  );
+}
+
+/** End turn, under the thumb on this player's turn; it waits while a death save is owed and steps down for a roll. */
+export function PlayerEndTurn({
+  endWaits,
+  quiet = false
+}: Readonly<{
+  /** Why End turn waits (a death save still to roll); it is disabled meanwhile. */
+  endWaits?: string;
+  /** Another primary leads the view (a roll to make), so End turn steps down. */
+  quiet?: boolean;
+}>) {
+  const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
+  return (
+    <div className="player-end-turn">
+      <Button
+        variant={quiet || endWaits ? "secondary" : "primary"}
+        className="table-panel-primary turn-end"
+        disabled={busy || endWaits !== undefined}
+        title={endWaits}
+        onClick={() => {
+          setBusy(true);
+          void command("turn:end", {}).then((result) => {
+            setBusy(false);
+            if (!result.ok) toast(result.message ?? "The turn could not end.", { tone: "error" });
+          });
+        }}
+      >
+        End turn
+      </Button>
     </div>
   );
 }
@@ -262,8 +266,6 @@ export type PlayerPanelSlots = Readonly<{
   party?: ReactNode;
   /** Under the player's own sheet: the shared replays and Leave table. */
   sheetFooter?: ReactNode;
-  /** The Codex at the table, read through this player's projection. */
-  codex?: ReactNode;
 }>;
 
 /**
@@ -300,21 +302,32 @@ export function PlayerEncounterPanel({
     revealInRegion(activeRowRef.current, "nearest", "smooth");
   }, [combat.turnActorId]);
   const fighting = combat.active;
-  const codexIds = slots?.codex ? ["codex"] : [];
-  const tabIds = fighting
-    ? ["turn", "order", "sheet", ...codexIds, "dice", "log"]
-    : ["me", "party", ...codexIds, "dice", "log"];
-  const [tab, setTab] = useRememberedTab(
+  const tabIds = fighting ? ["turn", "sheet", "log", "party"] : ["me", "log", "party"];
+  const [rememberedTab, setRememberedTab] = useRememberedTab(
     `vtt.table-tab.player.${phone ? "phone" : "laptop"}`,
     tabIds,
     fighting ? "turn" : "me",
     `${fighting}|${phone}`
   );
+  // The Log section is this panel at `/table?panel=log`: the address opens the Log tab, and choosing another tab
+  // takes the key away again. Same panel, same subscriptions, so a typed formula survives the switch.
+  const route = useRoute();
+  const logAddressed = route.query.get("panel") === "log";
+  const tab = logAddressed ? "log" : rememberedTab;
+  const setTab = useCallback(
+    (next: string) => {
+      if (logAddressed && next !== "log") replaceQuery((query) => query.delete("panel"));
+      setRememberedTab(next);
+    },
+    [logAddressed, setRememberedTab]
+  );
   const sheetShown = myActor !== null && tab === (fighting ? "sheet" : "me");
+  // The phone's Log section is this panel too, and like the sheet it takes the height from the map.
+  const wantsRoom = sheetShown || (phone && logAddressed);
   useEffect(() => {
-    onSheetShown?.(sheetShown);
+    onSheetShown?.(wantsRoom);
     return () => onSheetShown?.(false);
-  }, [onSheetShown, sheetShown]);
+  }, [onSheetShown, wantsRoom]);
   // "Jump" sheet-attack mode: an attack tapped on the sheet comes to the Turn tab to pick and confirm, then
   // returns to the sheet once it commits.
   const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
@@ -400,6 +413,7 @@ export function PlayerEncounterPanel({
       acting={acting}
       turnTitle={`${actingFor.name}'s turn`}
       pinnable={false}
+      cardHead={false}
     />
   ) : inFight && myId !== null && myActor?.definition && !dying ? (
     <PlayerActionRunner
@@ -416,6 +430,26 @@ export function PlayerEncounterPanel({
       acting={acting}
       targetRows={targetHints.rows}
       {...(targetHints.insideNow ? { insideNow: targetHints.insideNow } : {})}
+      cardHead={false}
+    />
+  ) : null;
+  // The turn card's lamps: the commanded creature's on its turn, the character's own otherwise.
+  const economy = actingFor ? (
+    <PlayerTurnEconomy
+      combat={combat}
+      myId={actingFor.id}
+      myTurn
+      mySpeedFeet={actingFor.speedFeet}
+      revision={state.revision}
+    />
+  ) : inFight && myId !== null ? (
+    <PlayerTurnEconomy
+      combat={combat}
+      myId={myId}
+      myTurn={myTurn}
+      mySpeedFeet={myActor?.speedFeet}
+      revision={state.revision}
+      unconscious={myActor !== null && isDying(myActor)}
     />
   ) : null;
   const turnBody = (
@@ -423,43 +457,25 @@ export function PlayerEncounterPanel({
       className="player-turn"
       aria-label={myTurn ? "Your turn" : actingFor ? `${actingFor.name}'s turn` : "The turn"}
     >
-      {/* On a phone the turn card carries its own heading; a laptop's list sits under this one. */}
-      {/* A phone's turn card names the creature; the note under it says whose orders it follows. */}
-      {phone && actingFor && runner && (
-        <p className="encounter-quiet-note">
-          {myActor ? `${myActor.name} commands it: you act for it.` : "You act for it."}
-        </p>
-      )}
-      {(!phone || !runner) && (
-        <div className="player-turn-head">
-          {actingFor ? (
-            <>
-              <h2 className="player-turn-title">
-                <SunMark size="sm" />
-                {actingFor.name}&apos;s turn
-              </h2>
-              <p className="encounter-quiet-note">
-                {myActor ? `${myActor.name} commands it: you act for it.` : "You act for it."}
-              </p>
-            </>
-          ) : myTurn ? (
-            <h2 className="player-turn-title">
-              <SunMark size="sm" />
-              Your turn
-            </h2>
-          ) : (
-            // Who acts is in the header's status line; this tab is about the player's own turn.
-            <p className="encounter-quiet-note">Your Reaction stays ready. The rest waits for your turn.</p>
+      {(myId !== null || actingFor) && (
+        <PlayerTurnCard
+          state={state}
+          myId={myId}
+          myTurn={myTurn}
+          {...(actingFor ? { title: `${actingFor.name}'s turn` } : {})}
+          lamps={economy}
+        >
+          {actingFor && (
+            <p className="encounter-quiet-note">
+              {myActor ? `${myActor.name} commands it: you act for it.` : "You act for it."}
+            </p>
           )}
           {combat.rewound && <p className="encounter-quiet-note">The GM is reviewing an earlier turn.</p>}
-        </div>
-      )}
-      {phone && runner && combat.rewound && (
-        <p className="encounter-quiet-note">The GM is reviewing an earlier turn.</p>
+        </PlayerTurnCard>
       )}
       {/* Questions this player has waiting. */}
       <MyPendingAsks state={state} />
-      {!inFight && myActor && <p className="table-panel-empty">{myActor.name} isn't in this fight.</p>}
+      {!inFight && myActor && <p className="table-panel-empty">{myActor.name} isn't in this encounter.</p>}
       {/* The death save waits in the prompt slot above the tabs; this tab says what Unconscious leaves. */}
       {inFight && dying && myActor && <UnconsciousNote name={myActor.name} />}
       {runner}
@@ -608,70 +624,61 @@ export function PlayerEncounterPanel({
     </section>
   );
 
-  const codexTab: PanelTab[] = slots?.codex
-    ? [{ id: "codex", label: "Codex", content: slots.codex, scrolls: false }]
-    : [];
+  const logBody = (
+    <div className="table-log-tab">
+      {slots?.log}
+      <LogComposer
+        options={slots?.dice}
+        talk={{
+          role: "player",
+          speaker:
+            state.actors
+              .filter((actor) => actor.claimStatus === "mine")
+              .map((actor) => ({ id: actor.id, name: actor.name }))[0] ?? null
+        }}
+      />
+    </div>
+  );
+  const party = slots?.party ?? <p className="table-panel-empty">The party is hidden.</p>;
   const tabs: PanelTab[] = fighting
     ? [
-        { id: "turn", label: "Turn", content: turnBody },
-        { id: "order", label: "Order", content: orderBody },
+        {
+          id: "turn",
+          label: "Turn",
+          content: (
+            <>
+              {turnBody}
+              {/* The order with what the player can do from it: break a tie, swap with Alert, let go of a hold. */}
+              <details className="encounter-order-tools">
+                <summary>Turn order</summary>
+                {orderBody}
+              </details>
+            </>
+          )
+        },
         // The sheet holds its own row and strip above the one region that scrolls.
         { id: "sheet", label: "Sheet", content: sheet(true), scrolls: !myActor },
-        ...codexTab,
-        { id: "dice", label: "Dice", content: slots?.dice },
-        { id: "log", label: "Log", content: slots?.log, scrolls: false }
+        { id: "log", label: "Log", content: logBody, scrolls: false },
+        { id: "party", label: "Party", content: party }
       ]
     : [
         { id: "me", label: "Me", content: sheet(false), scrolls: !myActor },
-        {
-          id: "party",
-          label: "Party",
-          content: slots?.party ?? <p className="table-panel-empty">The party is hidden.</p>
-        },
-        ...codexTab,
-        { id: "dice", label: "Dice", content: slots?.dice },
-        { id: "log", label: "Log", content: slots?.log, scrolls: false }
+        { id: "log", label: "Log", content: logBody, scrolls: false },
+        { id: "party", label: "Party", content: party }
       ];
 
-  // The footer keeps the turn under the thumb: the economy and End turn on this player's turn, and their reaction
-  // and HP while someone else acts.
-  const ownHp = myActor && myActor.hp.kind === "exact" ? myActor.hp : null;
-  const creatureHp = actingFor && actingFor.hp.kind === "exact" ? actingFor.hp : null;
-  const footer = actingFor ? (
-    // The creature's turn: its economy and End turn, which its commander's player runs.
-    <div className="table-panel-foot-row player-foot">
-      <PlayerTurnEconomy
-        combat={combat}
-        myId={actingFor.id}
-        myTurn
-        mySpeedFeet={actingFor.speedFeet}
-        revision={state.revision}
+  // End turn under the thumb, on this player's turn or the turn of a creature they command.
+  const footer =
+    actingFor || (fighting && inFight && myTurn) ? (
+      <PlayerEndTurn
         quiet={rollPending}
-        {...(creatureHp ? { hp: `HP ${creatureHp.current}/${creatureHp.maximum}` } : {})}
+        {...(!actingFor && myActor && owesDeathSave(state, myActor) ? { endWaits: "Roll your death save first." } : {})}
       />
-    </div>
-  ) : fighting && inFight && myId !== null ? (
-    <div className="table-panel-foot-row player-foot">
-      <PlayerTurnEconomy
-        combat={combat}
-        myId={myId}
-        myTurn={myTurn}
-        mySpeedFeet={myActor?.speedFeet}
-        revision={state.revision}
-        quiet={rollPending}
-        unconscious={myActor !== null && isDying(myActor)}
-        /* The character's hit points, in view on every tab. */
-        {...(ownHp
-          ? { hp: `HP ${ownHp.current}/${ownHp.maximum}${ownHp.temporary > 0 ? ` +${ownHp.temporary}` : ""}` }
-          : {})}
-        {...(myActor && owesDeathSave(state, myActor) ? { endWaits: "Roll your death save first." } : {})}
-      />
-    </div>
-  ) : null;
+    ) : null;
 
   return (
     <TablePanel
-      label={fighting ? `The fight · round ${combat.round}` : "The table"}
+      label={fighting ? `The encounter · round ${combat.round}` : "The table"}
       top={slots?.top}
       tabs={tabs}
       active={tab}

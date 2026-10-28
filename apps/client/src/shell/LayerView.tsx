@@ -49,8 +49,7 @@ export function LayerView({
         />
       ) : (
         /* The builder is closed to players at this table: one line and one door back. */
-        <div className="anim-view builder-gate pane-frame pane-scene scanlines frame-col">
-          <div className="pane-sky" aria-hidden="true" />
+        <div className="anim-view builder-gate pane-frame pane-scene frame-col">
           <div className="scene-empty frame-fill">
             <p>
               Your GM builds the characters at this table. Ask them to make you one, or claim one that's already on the

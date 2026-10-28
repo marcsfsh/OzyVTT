@@ -46,7 +46,7 @@ function fight() {
 }
 const actor = (game: ReturnType<typeof fight>, id: string) => game.actors.find((candidate) => candidate.id === id)!;
 
-describe("turns in a fight", () => {
+describe("turns in an encounter", () => {
   it("passes over a defeated monster, in the round and across its end", () => {
     const game = fight();
     actor(game, IDS.goblin).hp.current = 0;

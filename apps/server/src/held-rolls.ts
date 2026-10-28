@@ -10,6 +10,7 @@ import {
 } from "@vtt/rules-5e";
 import type { Initiator } from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
+import { faceFromTotal, requirePlayerEntry, requirePlayerMayType, type Entered } from "./player-dice.js";
 
 /**
  * Dice authority for rolls a player sees before they count (ADR-0012). A preview's d20s are held on the server under
@@ -65,13 +66,18 @@ export function releaseHeldRoll(state: GameState, key: string): void {
     state.heldRolls = state.heldRolls.filter((entry) => entry.key !== key);
 }
 
-const SERVER_ROLLS = "At this table the server rolls players' dice. Tap Roll.";
-
-/** Refuses a typed die the table doesn't take: a player's, while the table has the server throw players' dice, or one
- *  typed over a die the server already threw for this roll. The GM may always type. */
-export function requireTypedDie(state: GameState, scope: Initiator, held: HeldRoll | undefined, face: number): void {
+/** Refuses a typed die the table doesn't take: a player's that isn't what the dice mode asks for (a face, or a total
+ *  the caller turned into its face), or one typed over a die the server already threw for this roll. The GM may
+ *  always type. */
+export function requireTypedDie(
+  state: GameState,
+  scope: Initiator,
+  held: HeldRoll | undefined,
+  face: number,
+  entered: Entered = "face"
+): void {
   if (scope.role === "gm") return;
-  if (state.builderPolicy.typedRolls !== "open") throw new CommandRejectedError(SERVER_ROLLS);
+  requirePlayerEntry(state, scope, "d20", entered);
   if (held && !(held.typed && held.faces.length === 1 && held.faces[0] === face))
     throw new CommandRejectedError(
       "This roll's die is already thrown. Confirm it, or use Heroic Inspiration to reroll it."
@@ -83,7 +89,7 @@ export function requireTypedDie(state: GameState, scope: Initiator, held: HeldRo
 export function requireTypedReroll(state: GameState, scope: Initiator, held: HeldRoll | undefined): void {
   if (!held) throw new CommandRejectedError("Roll first: a reroll throws again a die that was thrown.");
   if (scope.role === "gm") return;
-  if (state.builderPolicy.typedRolls !== "open") throw new CommandRejectedError(SERVER_ROLLS);
+  requirePlayerMayType(state, scope, "d20");
   if (!held.typed)
     throw new CommandRejectedError("The server threw this die, so it throws the reroll too. Reroll without typing.");
 }
@@ -138,20 +144,23 @@ export function rollHeldTest(
   rulesMode: RollMode,
   modifier: number,
   diceTerms: string,
-  options: Readonly<{ face?: number; reroll?: boolean }>,
+  options: Readonly<{ face?: number; total?: number; reroll?: boolean }>,
   random: RandomSource
 ): HeldTest {
   const held = heldRollFor(state, key);
+  // A typed total is the face it means once the bonus is taken off (ADR-0043); `diceTerms` the server still throws.
+  const entered = options.total !== undefined ? "total" : "face";
+  const typedFace = options.total !== undefined ? faceFromTotal(options.total, modifier) : options.face;
   // A reroll with Advantage (Countercharm) reads its dice that way.
   const mode = held?.readAs ?? rulesMode;
   const resolveFor = (faces: readonly number[], readAs: RollMode, others: HeldRoll["others"]) =>
     resolveWithD20s(d20TestFormula(readAs, modifier) + diceTerms, faces, random, others);
-  if (options.face !== undefined) {
-    const face = options.face;
+  if (typedFace !== undefined) {
+    const face = typedFace;
     if (options.reroll) {
       requireTypedReroll(state, scope, held);
       spendRerollRight(actor, scope);
-    } else requireTypedDie(state, scope, held, face);
+    } else requireTypedDie(state, scope, held, face, entered);
     const same = !options.reroll && held?.typed === true && held.faces[0] === face;
     return {
       faces: [face],

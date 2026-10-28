@@ -1,0 +1,26 @@
+/* The turn's lamps as buttons: a press marks the resource spent or gives it back, as the server records it. */
+.lamp-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.lamp-toggle {
+  display: flex;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lamp-toggle > .nh-lamp {
+  flex: 1 1 auto;
+}
+.lamp-toggle:disabled {
+  cursor: not-allowed;
+}
+.lamp-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

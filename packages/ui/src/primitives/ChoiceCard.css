@@ -232,11 +232,10 @@
   border-color: color-mix(in srgb, var(--line) 60%, transparent);
 }
 
-/* The selection glow would out-specify the global :focus-visible ring; restate the ring so focus always shows. */
+/* The selection glow is a box-shadow and the focus ring an outline, so both show; restated so focus always does. */
 .nh-choice:focus-visible {
-  box-shadow:
-    0 0 0 2px var(--bg),
-    0 0 0 4px var(--focus-ring-color);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

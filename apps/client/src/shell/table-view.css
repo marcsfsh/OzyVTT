@@ -14,7 +14,7 @@
   overscroll-behavior: contain;
   background: var(--void);
 }
-.table-bench > .table-header {
+.table-bench > .table-strip {
   grid-area: head;
 }
 /* On a laptop the split is no box of its own: the map and the panel are cells of the bench's grid. */
@@ -28,7 +28,7 @@
   min-width: 0;
   min-height: 0;
 }
-/* The panel is part of the shell: no shadow, its seam against the map in the role hue. The fill is 88% opaque so the
+/* The panel is part of the shell: no shadow, and a plain seam against the map. The fill is 88% opaque so the
    horizon shows through; reduced transparency makes it solid. */
 .table-bench-panel {
   grid-area: panel;
@@ -36,7 +36,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border-left: var(--rim-w) solid var(--role-hue);
+  border-left: var(--rim-w) solid var(--line-strong);
   background:
     var(--material-lip),
     linear-gradient(
@@ -51,8 +51,8 @@
   }
 }
 
-/* On a phone the map pane takes its share of the height under the header (the divider sets it) and the panel the
-   rest, down to a floor that keeps the tabs and the bar under the thumb. */
+/* On a phone the header stays and the map and panel stack under it in one column that scrolls the map away
+   (`table/scroll-past.css`). */
 @media (max-width: 979px) {
   .table-bench {
     display: flex;
@@ -65,8 +65,7 @@
     min-height: 0;
   }
   .table-bench-map {
-    flex: 0 1 var(--map-share, 42%);
-    min-height: 9rem;
+    flex: none;
   }
   .table-bench-panel {
     flex: 1 1 0;
@@ -129,4 +128,10 @@
 /* In a fight it holds nothing, and its rule would take height from the sheet. */
 .table-sheet-foot:empty {
   display: none;
+}
+
+/* A player with nobody claimed and no map live: the picker and its art take the whole pane. */
+.table-claim {
+  height: 100%;
+  min-height: 0;
 }

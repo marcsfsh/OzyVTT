@@ -112,7 +112,7 @@ describe("Amulet of the Planes", () => {
     expect(said(passed)).not.toContain("fails the check");
   });
 
-  it("rolls the check outside a fight too", async () => {
+  it("rolls the check outside an encounter too", async () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
     write(table, IDS.wizard, catalogRow("amulet-of-the-planes", { attuned: true }));
     const served = await serve(table);

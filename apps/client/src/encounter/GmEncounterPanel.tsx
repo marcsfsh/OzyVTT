@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
+import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/map-catalog";
-import { Button, Chip, Switch, IconArrow, IconChevronLeft, Eyebrow } from "@vtt/ui";
+import { Button, IconChevronLeft } from "@vtt/ui";
 import { command } from "../lib/command";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { MonsterBrowser } from "./MonsterBrowser";
@@ -16,8 +16,14 @@ import { SpellAreas } from "./SpellAreas";
 import { useTargeting, useTargetingResult } from "./targeting";
 import { holdsTheTurn } from "../table/NeedsYou";
 import { isDefeatedMonster } from "../table/needs";
+import { LogComposer } from "../table/LogComposer";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
 import { revealInRegion } from "../lib/reveal";
+import { InStripEnd } from "../table/stripSlot";
+import { turnTiles } from "../table/TurnTiles";
+import { useSelectedToken } from "../scene/selectedToken";
+import { NotesTab } from "../table/NotesTab";
+import { rollsLine, StartFight } from "./StartFight";
 
 /** A monster defeated in the last fight on this scene stays out of the next one unless the GM adds it back. */
 function stillStanding(actors: GmView["actors"], actorId: string) {
@@ -51,7 +57,7 @@ export type GmPanelSlots = Readonly<{
   log?: ReactNode;
   token?: ReactNode;
   party?: ReactNode;
-  /** The rest button, beside Start the fight. */
+  /** The party's rest, on the Party tab. */
   rest?: ReactNode;
   /** The active session's live board. */
   tonight?: ReactNode;
@@ -65,7 +71,8 @@ export function GmEncounterPanel({
   mapLibrary,
   onSelectMap,
   phone = false,
-  slots
+  slots,
+  token = null
 }: Readonly<{
   state: GmView;
   selectedMap: MapSelection | null;
@@ -74,7 +81,10 @@ export function GmEncounterPanel({
   /** Below 980px: the fight splits into Act and Order tabs, and Needs you becomes a tab. */
   phone?: boolean;
   slots?: GmPanelSlots;
+  /** The GM's bearer, for the portraits' token art. */
+  token?: string | null;
 }>) {
+  const selectedTokenId = useSelectedToken();
   const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() =>
     state.combat.initiative.length > 0
       ? new Set(state.combat.initiative.map((entry) => entry.actorId).filter((id) => stillStanding(state.actors, id)))
@@ -90,11 +100,26 @@ export function GmEncounterPanel({
   // until shortly after the last turn command settled; otherwise one double tap skips a combatant.
   const turnSettlesAt = useRef(0);
   const [message, setMessage] = useState("");
-  // Encounter-setup opt-in: claimed players roll their own initiative (per encounter, never persisted).
+  // Encounter-setup opt-in: claimed players roll their own initiative, for this fight.
   const [playersRollInitiative, setPlayersRollInitiative] = useState(false);
   // SRD Surprise and group rolls, per fight: who rolls initiative at Disadvantage, and one roll per stat block.
   const [surprised, setSurprised] = useState<ReadonlySet<string>>(() => new Set());
   const [groupMonsters, setGroupMonsters] = useState(true);
+  // Who plays each party character this encounter, where the GM changed it from the saved mark (ADR-0042).
+  const [atTableChoice, setAtTableChoice] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  const atTable = (actor: GmActor) =>
+    actor.ownerSessionId === null && (atTableChoice.get(actor.id) ?? actor.playedAtTable === true);
+  // The live scene's fight settings seed both switches, and a change to them or to the live scene seeds them again;
+  // the start sends what the switches show (ADR-0039).
+  const liveDefaults = state.combat.encounters.find(
+    (scene) => scene.id === state.combat.activeEncounterId
+  )?.initiativeDefaults;
+  const defaultPlayersRoll = liveDefaults?.playersRollInitiative ?? false;
+  const defaultGroup = liveDefaults?.groupMonsters ?? true;
+  useEffect(() => {
+    setPlayersRollInitiative(defaultPlayersRoll);
+    setGroupMonsters(defaultGroup);
+  }, [state.combat.activeEncounterId, defaultPlayersRoll, defaultGroup]);
   // A pending history rewrite/discard the GM must confirm (see the Previous/Next flow).
   const [confirm, setConfirm] = useState<{
     message: string;
@@ -165,22 +190,26 @@ export function GmEncounterPanel({
       if (!startMapId)
         throw new Error(
           selectedMap && selectedMap.kind !== "battlemap"
-            ? "Pick a battle map before starting the fight. Regional and world maps stay available outside fights."
-            : "Pick a battle map first, or make a scene live from the Scenes tab."
+            ? "Pick a battle map before starting the encounter. Regional and world maps stay available outside encounters."
+            : "Pick a battle map first, or make an encounter live from Encounters."
         );
       // No scores: the server rolls every staged combatant, so a previous fight's order never carries over.
       const entries = rosterActors(state.actors)
         .filter((actor) => selectedActors.has(actor.id))
         .map((actor) => (surprised.has(actor.id) ? { actorId: actor.id, surprised: true } : { actorId: actor.id }));
       if (entries.length === 0) throw new Error("Stage at least one character or monster.");
+      const party = rosterActors(state.actors).filter(
+        (actor) => selectedActors.has(actor.id) && actor.kind === "player-character"
+      );
       return command("encounter:start", {
         mapAssetId: startMapId,
         entries,
         playersRollInitiative,
         groupMonsters,
+        atTable: Object.fromEntries(party.map((actor) => [actor.id, atTable(actor)])),
         expectedRevision: state.revision
       });
-    }, "The fight has started, and initiative was rolled.");
+    }, "The encounter has started, and initiative was rolled.");
   const changeScore = (actorId: string, score: number) =>
     void run(
       () => command("initiative:set", { actorId, score, expectedRevision: state.revision }),
@@ -199,7 +228,7 @@ export function GmEncounterPanel({
           label: (state.turnHistory ?? []).find((entry) => entry.index === cursor)?.label,
           resumeNext: (state.turnHistory ?? []).find((entry) => entry.index > cursor)?.kind === "return"
         };
-  const nextLabel = reviewing?.resumeNext ? "Resume live play" : "Next turn";
+  const nextLabel = reviewing ? (reviewing.resumeNext ? "Resume live play" : "Next turn") : "End turn";
   // One primary at a time: while a roll waits to be made or answered, Next turn steps down.
   const targeting = useTargeting();
   const targetingResult = useTargetingResult();
@@ -249,14 +278,14 @@ export function GmEncounterPanel({
   const end = async () => {
     if (
       !(await askConfirm({
-        title: "End the fight?",
+        title: "End the encounter?",
         body: "Turn order stays saved for reference, but the shared screen will hide it.",
-        confirmLabel: "End the fight",
+        confirmLabel: "End the encounter",
         danger: true
       }))
     )
       return;
-    void run(() => command("encounter:end", { expectedRevision: state.revision }), "Fight ended.");
+    void run(() => command("encounter:end", { expectedRevision: state.revision }), "Encounter ended.");
   };
   // SRD Experience Points: the characters in the fight share the XP of the monsters they brought to 0 Hit Points.
   const fightExperience = fightExperienceOf(state);
@@ -265,7 +294,7 @@ export function GmEncounterPanel({
     const names = fightExperience.recipients.map((actor) => actor.name);
     if (
       !(await askConfirm({
-        title: "Award the fight's XP?",
+        title: "Award the encounter's XP?",
         body: `${listOf(names)} share the XP of ${listOf(fightExperience.defeated.map((actor) => actor.name))}${inLair ? ", at the lair XP for a legendary creature" : ""}.`,
         confirmLabel: "Award XP"
       }))
@@ -280,7 +309,7 @@ export function GmEncounterPanel({
           // A creature with no lair XP gives its usual XP.
           ...(inLair ? { inLairIds: fightExperience.defeated.map((actor) => actor.id) } : {})
         }),
-      `${listOf(names)} share the fight's XP.`
+      `${listOf(names)} share the encounter's XP.`
     );
   };
   // The quick-start door: everyone active is pre-listed in the staging tray, archived characters
@@ -290,7 +319,7 @@ export function GmEncounterPanel({
     .map((actor) => actor.id);
   // Only a live scene owns its map. `combat.mapAssetId` stays set after a fight ends and must not
   // lock the GM to it.
-  const sceneLive = state.combat.activeSceneId !== null;
+  const sceneLive = state.combat.activeEncounterId !== null;
   // The just-picked map first: the shell's library is refetched only on a tab change, so a map
   // uploaded from this panel is not in it yet.
   const nameOf = (id: string | null) =>
@@ -302,13 +331,13 @@ export function GmEncounterPanel({
   const quickStartMapId =
     pickedMap?.id ?? state.combat.mapAssetId ?? (selectedMap?.kind === "battlemap" ? selectedMap.id : null);
   const panelMapName = sceneLive
-    ? (nameOf(state.combat.mapAssetId) ?? "the live scene's map")
+    ? (nameOf(state.combat.mapAssetId) ?? "the live encounter's map")
     : (pickedMap?.name ?? nameOf(quickStartMapId) ?? (selectedMap?.kind === "battlemap" ? selectedMap.name : null));
   const readyToStart =
     stagedIds.length > 0 && (sceneLive ? state.combat.mapAssetId !== null : quickStartMapId !== null);
   /**
    * Picking a map from the quick-start door. With no scene live it is just a choice. With a scene
-   * live the server requires the fight to use that scene's map, so one `scene.create {activate}`
+   * live the server requires the fight to use that scene's map, so one `encounter.create {activate}`
    * parks the current scene and goes live on a new one named after the map. Only offered before a
    * fight starts.
    */
@@ -318,7 +347,7 @@ export function GmEncounterPanel({
     if (!sceneLive || map.id === state.combat.mapAssetId) return;
     void run(
       () =>
-        command("scene:create", {
+        command("encounter:create", {
           name: map.name.slice(0, 120),
           mapAssetId: map.id,
           combatantIds: stagedIds,
@@ -336,85 +365,80 @@ export function GmEncounterPanel({
   const placed = state.combat.tokens.filter((token) => token.position !== null).length;
   const total = state.combat.initiative.length;
 
+  // In this fight offers everyone staged on the map or in the tray, and anyone ticked, so an untick keeps its row.
+  const onMapOrTray = new Set(state.combat.tokens.map((entry) => entry.actorId));
+  const candidates = rosterActors(state.actors)
+    .filter((actor) => !actor.archived && (selectedActors.has(actor.id) || onMapOrTray.has(actor.id)))
+    .sort((left, right) => Number(right.kind === "player-character") - Number(left.kind === "player-character"));
+  const stagedActors = candidates.filter((actor) => selectedActors.has(actor.id));
+  const tick = (actorId: string, ticked: boolean) =>
+    setSelectedActors((current) => {
+      const next = new Set(current);
+      if (ticked) next.add(actorId);
+      else next.delete(actorId);
+      return next;
+    });
+  const prep = (
+    <ScenePrepPanel
+      actors={state.actors}
+      staged={stagedIds}
+      placedIds={new Set(state.combat.tokens.filter((token) => token.position !== null).map((token) => token.actorId))}
+      onAdd={(actorId) => tick(actorId, true)}
+      onRemove={(actorId) => tick(actorId, false)}
+      mapName={panelMapName}
+      mapNote={sceneLive ? "An encounter is live. Choosing another map makes a new encounter live on it." : undefined}
+      selectedMapId={quickStartMapId}
+      onSelectMap={chooseQuickStartMap}
+      mapFallback={mapLibrary}
+      stagingRevealed={stagingVisibility !== "gm-only"}
+      combatActive={false}
+      busy={busy}
+      emptyNote="No one staged yet. The party lands here automatically; add monsters below."
+    />
+  );
+  // A live scene owns its map, so its staging folds away under the list; a quick start needs the map choice open.
+  const staging = sceneLive ? (
+    <details className="start-fight-staging">
+      <summary>Add characters or monsters</summary>
+      {prep}
+    </details>
+  ) : (
+    prep
+  );
   const setupBody = (
-    <div className="encounter-panel setup" aria-labelledby="gm-encounter-title">
-      <div className="encounter-heading">
-        <div>
-          <Eyebrow>FIGHT</Eyebrow>
-          <h2 id="gm-encounter-title">Start a fight</h2>
-        </div>
-      </div>
-      {/* Spell areas outlast a fight and can be cast outside one (Glyph of Warding, Alarm), so they are listed here too. */}
-      <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
-      <ScenePrepPanel
-        actors={state.actors}
-        staged={stagedIds}
-        placedIds={
-          new Set(state.combat.tokens.filter((token) => token.position !== null).map((token) => token.actorId))
-        }
-        onAdd={(actorId) => setSelectedActors((current) => new Set(current).add(actorId))}
-        onRemove={(actorId) =>
-          setSelectedActors((current) => {
-            const next = new Set(current);
-            next.delete(actorId);
-            return next;
-          })
-        }
-        mapName={panelMapName}
-        mapNote={sceneLive ? "A scene is live. Choosing another map makes a new scene live on it." : undefined}
-        selectedMapId={quickStartMapId}
-        onSelectMap={chooseQuickStartMap}
-        mapFallback={mapLibrary}
-        stagingRevealed={stagingVisibility !== "gm-only"}
-        combatActive={false}
-        busy={busy}
-        emptyNote="No one staged yet. The party lands here automatically; add monsters below."
-        footer={
-          <>
-            <Switch
-              label="Players roll their own initiative"
-              checked={playersRollInitiative}
-              disabled={busy}
-              onChange={setPlayersRollInitiative}
-            />
-            <Switch
-              label="One roll for each group of identical monsters"
-              checked={groupMonsters}
-              disabled={busy}
-              onChange={setGroupMonsters}
-            />
-            {stagedIds.length > 0 && (
-              <fieldset className="encounter-surprise">
-                <legend>Pick who is Surprised. They roll initiative at Disadvantage.</legend>
-                <div className="encounter-surprise-chips">
-                  {stagedIds.map((actorId) => (
-                    <Chip
-                      key={actorId}
-                      pressed={surprised.has(actorId)}
-                      disabled={busy}
-                      onClick={() =>
-                        setSurprised((current) => {
-                          const next = new Set(current);
-                          if (!next.delete(actorId)) next.add(actorId);
-                          return next;
-                        })
-                      }
-                    >
-                      {state.actors.find((actor) => actor.id === actorId)?.name ?? "Unknown"}
-                    </Chip>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-            {!readyToStart && (
-              <p className="encounter-start-blocked" role="status">
-                {stagedIds.length === 0 ? "Stage at least one character or monster." : "Pick a battle map first."}
-              </p>
-            )}
-          </>
-        }
-      />
-    </div>
+    <StartFight
+      state={state}
+      token={token}
+      candidates={candidates}
+      ticked={selectedActors}
+      onTick={tick}
+      surprised={surprised}
+      onSurprised={(actorId) =>
+        setSurprised((current) => {
+          const next = new Set(current);
+          if (!next.delete(actorId)) next.add(actorId);
+          return next;
+        })
+      }
+      playersRoll={playersRollInitiative}
+      onPlayersRoll={setPlayersRollInitiative}
+      groupMonsters={groupMonsters}
+      onGroupMonsters={setGroupMonsters}
+      atTable={atTable}
+      onAtTable={(actorId, on) => setAtTableChoice((current) => new Map(current).set(actorId, on))}
+      busy={busy}
+      // Spell areas outlast a fight and can be cast outside one (Glyph of Warding, Alarm), so they are listed here too.
+      spellAreas={<SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />}
+      staging={staging}
+      blocked={
+        readyToStart
+          ? null
+          : stagedIds.length === 0
+            ? "Stage at least one character or monster."
+            : "Pick a battle map first."
+      }
+      phone={phone}
+    />
   );
 
   const orderBody = (
@@ -489,20 +513,18 @@ export function GmEncounterPanel({
     </section>
   );
 
-  // The acting creature's console: its economy and actions, with its name, HP and AC at the top.
+  // The acting creature's card, lamps and actions.
   const actBody = actingActor ? (
-    <section className="encounter-acting" aria-label={`Now acting · ${actingActor.name}`}>
-      {/* Outside the console's scroll, so who acts stays in view while their actions scroll. */}
-      <p className="encounter-acting-head">
-        <span>Now acting · {actingActor.name}</span>
-        <span className="encounter-acting-numbers">
-          {`${actingActor.hp.current}/${actingActor.hp.maximum}${actingActor.armorClass !== undefined ? ` · AC ${actingActor.armorClass}` : ""}`}
-        </span>
-      </p>
-      <div className="encounter-acting-body scroll-y">
-        <ActingConsole state={state} actorsById={actorsById} busy={busy} run={run} onFeedback={setMessage} />
-      </div>
-    </section>
+    <div className="encounter-acting">
+      <ActingConsole
+        state={state}
+        actorsById={actorsById}
+        busy={busy}
+        run={run}
+        onFeedback={setMessage}
+        token={token}
+      />
+    </div>
   ) : (
     <p className="table-panel-empty">Nobody is acting yet.</p>
   );
@@ -513,111 +535,128 @@ export function GmEncounterPanel({
     </p>
   ) : null;
 
+  // Who acts after this turn, as the strip's NEXT marks it.
+  const nextUp = turnTiles({ role: "gm", state }).find((tile) => tile.next);
   const turnControls = (
-    <div className="table-panel-foot-row turn-controls">
-      <button
-        type="button"
-        className="encounter-primary turn-prev"
-        disabled={busy}
-        onClick={previous}
-        title="Previous turn"
-        aria-label="Previous turn"
-      >
-        <IconChevronLeft />
-      </button>
-      <button
-        type="button"
-        className={`encounter-primary turn-next${reviewing?.resumeNext ? " resume" : ""}${rollPending ? " is-quiet" : ""}`}
-        disabled={busy}
-        onClick={next}
-      >
-        {nextLabel}
-        <span className="nav-arrow" aria-hidden="true">
-          <IconArrow />
-        </span>
-      </button>
-      {/* Ending the fight sits beside the turn, where the GM looks for it. */}
-      <Button variant="secondary" size="sm" className="encounter-end" disabled={busy} onClick={() => void end()}>
-        End fight
-      </Button>
-      {/* Adding monsters mid-fight is in the fight menu beside it, so the bar keeps room for the turn. */}
-      <FightMenu
-        state={state}
-        busy={busy}
-        run={run}
-        onFeedback={setMessage}
-        onAddMonsters={() => setBrowsing(true)}
-        onEnd={() => void end()}
-        {...(fightExperience ? { onAwardExperience: (inLair: boolean) => void awardFightExperience(inLair) } : {})}
-      />
+    <div className="table-panel-foot-turn">
+      <div className="table-panel-foot-row turn-controls">
+        <button
+          type="button"
+          className="encounter-primary turn-prev"
+          disabled={busy}
+          onClick={previous}
+          title="Previous turn"
+          aria-label="Previous turn"
+        >
+          <IconChevronLeft />
+        </button>
+        {/* One primary at a time: while a roll waits, or history is under review, End turn steps down. */}
+        <Button
+          variant={rollPending || reviewing ? "secondary" : "primary"}
+          className="table-panel-primary turn-next"
+          disabled={busy}
+          onClick={next}
+        >
+          {nextLabel}
+        </Button>
+      </div>
+      {nextUp && !reviewing && <p className="start-fight-count">Next: {nextUp.name}</p>}
+      {/* Adding to the fight, its settings and ending it are in the Fight menu at the strip's end. */}
+      <InStripEnd>
+        <FightMenu
+          state={state}
+          busy={busy}
+          run={run}
+          onFeedback={setMessage}
+          onAddMonsters={() => setBrowsing(true)}
+          onEnd={() => void end()}
+          labelled
+          {...(fightExperience ? { onAwardExperience: (inLair: boolean) => void awardFightExperience(inLair) } : {})}
+        />
+      </InStripEnd>
     </div>
   );
   const startControls = (
-    <div className="table-panel-foot-row">
-      {slots?.rest}
-      <Button variant="primary" arrow className="table-panel-primary" disabled={busy || !readyToStart} onClick={start}>
-        Start the fight
+    <div className="table-panel-foot-start">
+      <Button variant="primary" className="table-panel-primary" disabled={busy || !readyToStart} onClick={start}>
+        Start the encounter
       </Button>
+      <p className="start-fight-count">{rollsLine(stagedActors, playersRollInitiative)}</p>
     </div>
   );
 
   const fighting = state.combat.active;
   const needsCount = slots?.needsCount ?? 0;
-  // Tonight and the Codex sit beside the fight's own tabs, so a lookup or a logged line never leaves the map.
-  const campaignTabs: PanelTab[] = [
-    ...(slots?.tonight ? [{ id: "tonight", label: "Tonight", content: slots.tonight, scrolls: false }] : []),
-    ...(slots?.codex ? [{ id: "codex", label: "Codex", content: slots.codex, scrolls: false }] : [])
-  ];
-  const tabs: PanelTab[] = phone
-    ? fighting
+  // What waits on the GM leads the Fight tab, and the tab's count follows the GM to the other tabs.
+  const fightLabel = (
+    <>
+      Encounter
+      {needsCount > 0 && (
+        <span className="table-tab-count">
+          <span aria-hidden="true">{needsCount}</span>
+          <span className="nh-sr-only">, {needsCount} waiting on you</span>
+        </span>
+      )}
+    </>
+  );
+  const fightBody = fighting ? (
+    <>
+      {slots?.needs}
+      {actBody}
+      {/* The order with each row's tools (score, HP, conditions, the sheet); a phone has an Order tab for it. */}
+      {!phone && (
+        <details className="encounter-order-tools">
+          <summary>Turn order and tools</summary>
+          {orderBody}
+        </details>
+      )}
+    </>
+  ) : (
+    <>
+      {slots?.needs}
+      {setupBody}
+    </>
+  );
+  const logBody = (
+    <div className="table-log-tab">
+      {slots?.log}
+      <LogComposer
+        options={slots?.dice}
+        talk={{
+          role: "gm",
+          characters: rosterActors(state.actors)
+            .filter((actor) => actor.kind === "player-character" && !actor.archived)
+            .map((actor) => ({ id: actor.id, name: actor.name }))
+        }}
+      />
+    </div>
+  );
+  const partyBody = (
+    <>
+      {slots?.rest && <div className="table-party-rest">{slots.rest}</div>}
+      {slots?.party}
+    </>
+  );
+  const tabs: PanelTab[] = [
+    { id: "fight", label: fightLabel, content: fightBody },
+    // A phone has no room beside the acting card, so the order is its own tab there.
+    ...(phone && fighting ? [{ id: "order", label: "Order", content: orderBody, scrolls: false }] : []),
+    { id: "log", label: "Log", content: logBody, scrolls: false },
+    { id: "party", label: "Party", content: partyBody },
+    ...(slots?.tonight || slots?.codex
       ? [
-          { id: "act", label: "Act", content: actBody },
-          { id: "order", label: "Order", content: orderBody, scrolls: false },
           {
-            id: "needs",
-            label: needsCount > 0 ? `Needs ${needsCount}` : "Needs",
-            content: slots?.needs ?? <p className="table-panel-empty">Nothing waits on you.</p>
-          },
-          ...campaignTabs,
-          { id: "dice", label: "Dice", content: slots?.dice },
-          { id: "log", label: "Log", content: slots?.log, scrolls: false }
+            id: "notes",
+            label: "Notes",
+            content: <NotesTab tonight={slots?.tonight} codex={slots?.codex} />,
+            scrolls: false
+          }
         ]
-      : [
-          {
-            id: "scene",
-            label: "Scene",
-            content: (
-              <>
-                {slots?.needs}
-                {setupBody}
-              </>
-            )
-          },
-          ...campaignTabs,
-          { id: "party", label: "Party", content: slots?.party },
-          { id: "dice", label: "Dice", content: slots?.dice },
-          { id: "log", label: "Log", content: slots?.log, scrolls: false }
-        ]
-    : [
-        {
-          id: "fight",
-          label: "Fight",
-          content: fighting ? (
-            <div className="encounter-fight">
-              {orderBody}
-              {actBody}
-            </div>
-          ) : (
-            setupBody
-          ),
-          scrolls: !fighting
-        },
-        ...campaignTabs,
-        { id: "dice", label: "Dice", content: slots?.dice },
-        { id: "log", label: "Log", content: slots?.log, scrolls: false },
-        { id: "token", label: "Token", content: slots?.token }
-      ];
-  const fallback = phone ? (fighting ? "act" : "scene") : "fight";
+      : []),
+    // The token last pressed on the map, with the same controls as its menu there.
+    ...(selectedTokenId && slots?.token ? [{ id: "token", label: "Token", content: slots.token }] : [])
+  ];
+  const fallback = "fight";
   const [tab, setTab] = useRememberedTab(
     `vtt.table-tab.gm.${phone ? "phone" : "laptop"}`,
     tabs.map((entry) => entry.id),
@@ -628,8 +667,7 @@ export function GmEncounterPanel({
   return (
     <>
       <TablePanel
-        label={fighting ? `The fight · round ${state.combat.round}` : "The table"}
-        {...(!phone && slots?.needs ? { top: slots.needs } : {})}
+        label={fighting ? `The encounter · round ${state.combat.round}` : "The table"}
         tabs={tabs}
         active={tab}
         onActive={setTab}

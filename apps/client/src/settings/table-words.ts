@@ -33,6 +33,35 @@ export const PLAYER_INITIATIVE = {
   ]
 } as const;
 
+/** How players' dice are entered (ADR-0043), in Settings and in an encounter's own settings. */
+export const DICE_MODE_OPTIONS = [
+  { value: "total", label: "Total" },
+  { value: "die", label: "Each die" },
+  { value: "app", label: "App rolls" }
+] as const;
+/** The same, as a sentence's end ("Players' d20 rolls: they type each die."). */
+export const DICE_MODE_PHRASE = {
+  total: "they type the total",
+  die: "they type each die",
+  app: "the app rolls"
+} as const;
+/** What each dice mode means, under the choice. */
+export const DICE_MODE_HELP = {
+  total: "Players type the final number, bonus included. The app checks it can be rolled.",
+  die: "Players type what each die shows. The app adds the bonus.",
+  app: "The app rolls players' dice."
+} as const;
+
+/** Who picks the targets of a player's action in an encounter (ADR-0044). */
+export const TARGETING_OPTIONS = [
+  { value: "player", label: "The player" },
+  { value: "gm", label: "The GM" }
+] as const;
+export const TARGETING_HELP = {
+  player: "Players tap an action and pick its target on the map.",
+  gm: "Players tap an action and it waits in Needs you. You pick the target, then it resolves."
+} as const;
+
 /** The health display's name, and who sees it. */
 export const HEALTH_DISPLAY_LABEL = "Health display";
 export const HEALTH_AUDIENCE_LABEL = "Health is";

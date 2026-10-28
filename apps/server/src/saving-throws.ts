@@ -104,6 +104,7 @@ import { legendaryResistancesPerDay } from "./lair.js";
 import { unseat } from "./mounts.js";
 import { spendKillCharge } from "./item-charges.js";
 import { turnSaveBack } from "./spell-reflection.js";
+import { playerMayType } from "./player-dice.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -861,6 +862,8 @@ export function shownRollMode(
  *  the held roll (`roll-answers.ts`). */
 export type SaveAnswerOptions = Readonly<{
   face?: number;
+  /** A typed total, turned back into its face (ADR-0043). */
+  total?: number;
   reroll?: boolean;
   /** `by` names another creature answering (Countercharm, through its Reaction prompt); absent, the saving one. */
   answer?: Readonly<{ id: string; subtract?: boolean; face?: number; by?: string }>;
@@ -918,10 +921,13 @@ export function answerSave(
   if (!pending) throw new CommandRejectedError("That saving throw was already answered or dismissed.");
   const target = adjustableActor(state, pending.targetActorId, scope);
   if (!ABILITIES.includes(pending.ability)) throw new CommandRejectedError("That saving throw has an unknown ability.");
-  // A player's typed damage stands in for dice, so it follows the table's setting for typed dice.
-  if (damageOverride !== undefined && scope.role !== "gm" && state.builderPolicy.typedRolls !== "open")
-    throw new CommandRejectedError("At this table the server rolls the dice. Ask the GM to change the damage.");
+  // A player's typed damage stands in for dice, so it follows the damage dice mode.
+  if (damageOverride !== undefined && !playerMayType(state, scope, "damage"))
+    throw new CommandRejectedError("At this table the server rolls the damage. Ask the GM to change it.");
   const heldKey = `save:${saveId}`;
+  // Its damage waits for the caster's player to type their roll (ADR-0043); a look at the die is fine meanwhile.
+  if (commit && pending.damageRollId !== undefined)
+    throw new CommandRejectedError(`${pending.sourceName ?? "The caster"}'s damage roll isn't in yet.`);
   // A confirmed save waiting on another creature's answer moves only through that answer.
   if (pending.confirmed && options.settling !== true && options.answer?.by === undefined)
     throw new CommandRejectedError(`${target.name}'s save waits on an answer to the roll. The GM can close it.`);
@@ -1018,12 +1024,12 @@ export function answerSave(
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
     const forced = scope.role === "gm" ? explicitRollMode : undefined;
     const mode = forced ?? aggregated.mode;
-    if (options.answer && (commit || options.reroll || options.face !== undefined))
+    if (options.answer && (commit || options.reroll || options.face !== undefined || options.total !== undefined))
       throw new CommandRejectedError("Answer the save on a look of its own, before you confirm it.");
     if (options.answer && !heldRollFor(state, heldKey))
       throw new CommandRejectedError("Roll first: an answer meets a roll that was made.");
     // Bless's d4 rolls into the save itself, and is held with its d20s.
-    const throwSave = (choice: Pick<SaveAnswerOptions, "face" | "reroll">) =>
+    const throwSave = (choice: Pick<SaveAnswerOptions, "face" | "total" | "reroll">) =>
       rollHeldTest(
         state,
         heldKey,

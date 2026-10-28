@@ -1116,7 +1116,7 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(before);
   });
 
-  it("does not shove a token onto the map the fight just left", async () => {
+  it("does not shove a token onto the map the encounter just left", async () => {
     // `actionResolve` reads the grid before its mutation opens, so a scene switch in between must not be
     // measured against the departed map; the push degrades to the unmeasurable-map sentence.
     const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));

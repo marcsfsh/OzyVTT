@@ -122,6 +122,9 @@ import type {
   CheckRollSchema,
   CommandIdentitySchema,
   DamageResolveSchema,
+  DamageReportSchema,
+  TargetAskCreateSchema,
+  TargetAskWithdrawSchema,
   DeathSaveRollSchema,
   DiceRollSchema,
   EffectAddSchema,
@@ -168,6 +171,10 @@ import type {
   SceneCreateSchema,
   SceneIdSchema,
   SceneRenameSchema,
+  SceneSetInitiativeDefaultsSchema,
+  SceneSetPlayerDiceSchema,
+  ChatSendSchema,
+  ChatDeleteSchema,
   SceneReorderSchema,
   SceneSetCombatantsSchema,
   SetActorArchivedSchema,
@@ -175,6 +182,7 @@ import type {
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
   SetActorLairSchema,
+  SetActorPlayedAtTableSchema,
   SetActorPickSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
@@ -188,6 +196,8 @@ import type {
   SetTokenImageSchema,
   TableSetPartyVisibilitySchema,
   TableSetStagingDefaultsSchema,
+  TableSetPlayerDiceSchema,
+  TableSetTargetingSchema,
   TempHpSchema,
   TimePassSchema,
   SurvivalSetTrackingSchema,
@@ -259,6 +269,8 @@ export interface ServerToClientEvents {
   "system:error": (message: string) => void;
   "table:event": (event: TableEvent) => void;
   "log:entry": (entry: CombatLogEntry) => void;
+  /** A feed line was removed (a deleted chat line), by the id this reader holds it under. */
+  "log:removed": (event: Readonly<{ id: number }>) => void;
   "codex:changed": (event: CodexChangedEvent) => void;
   "homebrew:changed": (event: HomebrewChangedEvent) => void;
   /** The sound board changed, or a table screen's sound did. Sent to GM sessions only: players learn nothing of it. */
@@ -467,6 +479,16 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof RulesAnswerSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** GM sets how players' dice are entered, for d20 rolls and for damage (ADR-0043). */
+  "table:set-player-dice": (
+    payload: CommandPayload<typeof TableSetPlayerDiceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM sets who picks the targets of a player's action in an encounter (ADR-0044). */
+  "table:set-targeting": (
+    payload: CommandPayload<typeof TableSetTargetingSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   /** GM sets the table's staging defaults (the visibility a newly staged combatant's token starts at). */
   "table:set-staging-defaults": (
     payload: CommandPayload<typeof TableSetStagingDefaultsSchema>,
@@ -496,6 +518,11 @@ export interface ClientToServerEvents {
   /** GM shares (or un-shares) an archived character's sheet with players as a read-only keepsake. Default hidden. */
   "actor:set-sheet-preview": (
     payload: CommandPayload<typeof SetActorSheetPreviewSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM marks a party character played at the table, or takes the mark off (ADR-0042). */
+  "actor:set-played-at-table": (
+    payload: CommandPayload<typeof SetActorPlayedAtTableSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM marks a legendary creature as fighting in its lair, with the lair's counts, or out of it. */
@@ -802,6 +829,21 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof DamageResolveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** A player (or the GM) reports what a damage roll came to (ADR-0043). */
+  "damage:report": (
+    payload: CommandPayload<typeof DamageReportSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A player asks the GM to pick their action's targets (ADR-0044). */
+  "action:ask-target": (
+    payload: CommandPayload<typeof TargetAskCreateSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Its player takes back an action waiting for the GM's aim, or the GM declines it. */
+  "action:withdraw-target-ask": (
+    payload: CommandPayload<typeof TargetAskWithdrawSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "actor:available-actions": (
     payload: { actorId: string },
     acknowledgement: (result: ActorActionsAvailabilityResult) => void
@@ -850,6 +892,15 @@ export interface ClientToServerEvents {
   /** The creature's controller orders what happens at once as its turn starts or ends. */
   "turn:order": (
     payload: CommandPayload<typeof TurnOrderSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A chat line, or a whisper between the GM and one character (ADR-0038). */
+  "chat:send": (
+    payload: CommandPayload<typeof ChatSendSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "chat:delete": (
+    payload: CommandPayload<typeof ChatDeleteSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "dice:roll": (
@@ -943,41 +994,51 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof TokenSetAltitudeSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  "scene:create": (
+  "encounter:create": (
     payload: CommandPayload<typeof SceneCreateSchema>,
     acknowledgement: (result: SceneCreateResult) => void
   ) => void;
-  "scene:rename": (
+  "encounter:rename": (
     payload: CommandPayload<typeof SceneRenameSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  "scene:remove": (
+  /** GM sets how a scene's fight starts when Start the fight leaves a choice out (ADR-0039). */
+  "encounter:set-initiative-defaults": (
+    payload: CommandPayload<typeof SceneSetInitiativeDefaultsSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM sets an encounter's own dice modes, or hands a kind back to the table's (ADR-0043). */
+  "encounter:set-player-dice": (
+    payload: CommandPayload<typeof SceneSetPlayerDiceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "encounter:remove": (
     payload: CommandPayload<typeof SceneIdSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  "scene:activate": (
+  "encounter:activate": (
     payload: CommandPayload<typeof SceneIdSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** Launch one recorded moment of an archived fight; combatants are cloned so live characters are never rewritten. GM only. */
   "replay:launch": (
     payload: CommandPayload<typeof ReplayLaunchSchema>,
-    acknowledgement: (result: MutationResult & { sceneId?: string; actorIds?: readonly string[] }) => void
+    acknowledgement: (result: MutationResult & { encounterId?: string; actorIds?: readonly string[] }) => void
   ) => void;
-  "scene:set-combatants": (
+  "encounter:set-combatants": (
     payload: CommandPayload<typeof SceneSetCombatantsSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  "scene:duplicate": (
+  "encounter:duplicate": (
     payload: CommandPayload<typeof SceneIdSchema>,
     acknowledgement: (result: SceneCreateResult) => void
   ) => void;
-  "scene:reorder": (
+  "encounter:reorder": (
     payload: CommandPayload<typeof SceneReorderSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM only: what the shared screen or one party character's player would receive if the scene were live now. */
-  "scene:preview": (
+  "encounter:preview": (
     payload: CommandPayload<typeof ScenePreviewSchema>,
     acknowledgement: (result: ScenePreviewResult) => void
   ) => void;
@@ -1166,7 +1227,7 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof SoundPauseSchema>,
     acknowledgement: (result: SoundCommandResult) => void
   ) => void;
-  "sound:set-scene-preset": (
+  "sound:set-encounter-preset": (
     payload: CommandPayload<typeof SoundScenePresetSchema>,
     acknowledgement: (result: SoundCommandResult) => void
   ) => void;

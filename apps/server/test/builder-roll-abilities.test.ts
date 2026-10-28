@@ -145,11 +145,7 @@ const assigned = (scores: readonly number[]) => ({
 describe("a player's rolled dice are the table's", () => {
   it("refuses typed scores from a player at a server-rolled table, and takes the six the server rolled", async () => {
     const { base, server, gmToken, playerToken } = await boot();
-    await post(base, GAME_PATHS.builderPolicy, gmToken, {
-      commandId: randomUUID(),
-      allowedAbilityMethods: ALL_METHODS,
-      typedRolls: "gm-only"
-    });
+    await post(base, GAME_PATHS.playerDice, gmToken, { commandId: randomUUID(), d20: "app" });
     const typed = await post(base, GAME_PATHS.characters, playerToken, fighterCreate());
     expect(typed.status).toBe(409);
     expect((await typed.json()).error.message).toMatch(/Roll them in the builder/);
@@ -304,11 +300,7 @@ describe("a player's rolled dice are the table's", () => {
 
   it("refuses a player's typed hit points at a server-rolled table, and rolls them on the server instead", async () => {
     const { base, server, gmToken, playerToken } = await boot();
-    await post(base, GAME_PATHS.builderPolicy, gmToken, {
-      commandId: randomUUID(),
-      allowedAbilityMethods: ALL_METHODS,
-      typedRolls: "gm-only"
-    });
+    await post(base, GAME_PATHS.playerDice, gmToken, { commandId: randomUUID(), d20: "app" });
     const standard = {
       abilityMethod: "standard-array",
       baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 }
@@ -356,11 +348,7 @@ describe("a player's rolled dice are the table's", () => {
 
   it("lets players type their own dice by default, and the GM always", async () => {
     const { base, gmToken, playerToken } = await boot();
-    await post(base, GAME_PATHS.builderPolicy, gmToken, {
-      commandId: randomUUID(),
-      allowedAbilityMethods: ALL_METHODS,
-      typedRolls: "gm-only"
-    });
+    await post(base, GAME_PATHS.playerDice, gmToken, { commandId: randomUUID(), d20: "app" });
     const byGm = await post(
       base,
       GAME_PATHS.characters,

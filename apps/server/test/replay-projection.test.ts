@@ -226,18 +226,18 @@ describe("the player's replay is a projection, not a filtered archive", () => {
   // A player may load only the battlefield the replay itself renders. Scanning the stored document for
   // map ids would also hand out `scenes[].mapAssetId`, the maps of fights prepared but not yet run;
   // reading from the player projection cannot, since a parked scene has no player shape.
-  it("yields only the battlefield the player's own document renders, never a prepared scene's map", () => {
+  it("yields only the battlefield the player's own document renders, never a prepared encounter's map", () => {
     const prepared = "20000000-0000-5000-8000-0000000000ff";
     const source = document();
     const staged = structuredClone(source.turns[0].state);
     staged.combat = {
       ...staged.combat,
-      scenes: [
+      encounters: [
         {
           id: "40000000-0000-4000-8000-0000000000f1",
           name: "Next week",
           mapAssetId: prepared,
-          combat: staged.combat.scenes[0]?.combat ?? GameStateSchema.parse({ schemaVersion: 1 }).combat
+          combat: staged.combat.encounters[0]?.combat ?? GameStateSchema.parse({ schemaVersion: 1 }).combat
         }
       ] as never
     };
@@ -253,7 +253,7 @@ describe("the player's replay is a projection, not a filtered archive", () => {
     expect(JSON.stringify(withPrepared)).toContain(prepared);
   });
 
-  it("yields nothing at all for a recording whose turns were never an active fight", () => {
+  it("yields nothing at all for a recording whose turns were never an active encounter", () => {
     const source = document();
     const idle = structuredClone(source.turns[0].state);
     idle.combat = { ...idle.combat, active: false };
@@ -263,7 +263,7 @@ describe("the player's replay is a projection, not a filtered archive", () => {
 });
 
 describe("a player's list of shared replays", () => {
-  it("carries the listed fields alone: the GM's name, never the scene, nor a field the GM's summary gains later", () => {
+  it("carries the listed fields alone: the GM's name, never the encounter, nor a field the GM's summary gains later", () => {
     const entry = {
       id: 7,
       archivedAt: "2026-10-17T20:30:00.000Z",
@@ -272,7 +272,7 @@ describe("a player's list of shared replays", () => {
       turnCount: 3,
       playerVisible: true,
       name: "Ambush at the bridge",
-      sceneName: "Goblin cave",
+      encounterName: "Goblin cave",
       // A GM-side field added after this projection was written.
       gmNote: "The goblins were the bait."
     };

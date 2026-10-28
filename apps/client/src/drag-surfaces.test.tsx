@@ -29,8 +29,8 @@ import { MapTokenTray } from "./scene/MapTokenTray";
 import { ScenesContext, type ScenesContextValue } from "./scenes/context";
 import { SceneList } from "./scenes/SceneList";
 import { FloatingSheet } from "./sheet/CharacterSheet";
-import { PaneDivider } from "./table/PaneDivider";
-import { Initiative, MapStage, type Presentation } from "./viewer/ViewerApp";
+import { ScreenColumn } from "./viewer/ScreenParts";
+import { MapStage, type Presentation } from "./viewer/ViewerApp";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
 
 // Every element with `touch-action: none` is a drag surface, and each one cancels its own touchmove: a drag that lifts
@@ -85,7 +85,7 @@ function CalibrationCanvas() {
 
 /** What the Scenes tab's views read, with these scenes in the GM's view. */
 const scenesContext = (scenes: ReturnType<typeof scene>[]): ScenesContextValue => ({
-  state: { combat: { scenes, activeSceneId: null, active: false }, actors: [] } as never,
+  state: { combat: { encounters: scenes, activeEncounterId: null, active: false }, actors: [] } as never,
   token: "gm",
   maps: [],
   reloadMaps: async () => [],
@@ -149,15 +149,11 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
   },
   { selector: ".viewer-stage", ui: () => <MapStage presentation={presentation} /> },
   {
-    selector: ".viewer-initiative-resize",
-    ui: () => <Initiative presentation={presentation} onResize={() => {}} />
+    selector: ".screen-column-resize",
+    ui: () => <ScreenColumn presentation={presentation} onResize={() => {}} />
   },
   { selector: ".viewer-preview-titlebar", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },
   { selector: ".viewer-preview-resize", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },
-  {
-    selector: ".pane-divider",
-    ui: () => <PaneDivider value={50} onChange={() => {}} container={() => null} />
-  },
   { selector: ".cs-float-grip", ui: () => <FloatingSheet name="Lyra">Sheet</FloatingSheet> },
   { selector: ".cs-float-resize", ui: () => <FloatingSheet name="Lyra">Sheet</FloatingSheet> },
   {

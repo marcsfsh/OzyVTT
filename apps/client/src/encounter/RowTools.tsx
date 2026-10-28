@@ -222,7 +222,7 @@ export function RowTools({
           </Button>
           {removable && !confirmingRemoval && (
             <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirmingRemoval(true)}>
-              Take out of fight
+              Take out of the encounter
             </Button>
           )}
           <Button type="button" variant="secondary" onClick={onClose}>
@@ -231,7 +231,7 @@ export function RowTools({
         </div>
         {removable && confirmingRemoval && (
           <ConfirmRow
-            ariaLabel={`Take ${actor.name} out of the fight`}
+            ariaLabel={`Take ${actor.name} out of the encounter`}
             confirmLabel="Take out"
             busy={busy}
             onCancel={() => setConfirmingRemoval(false)}
@@ -239,12 +239,12 @@ export function RowTools({
               setConfirmingRemoval(false);
               void run(
                 () => command("encounter:remove-combatant", { actorId: actor.id, expectedRevision: state.revision }),
-                `${actor.name} left the fight.`
+                `${actor.name} left the encounter.`
               ).then(onClose);
             }}
           >
-            Take {actor.name} out of the fight? {actor.name}'s turn and token are removed, and anything {actor.name} is
-            grappling or concentrating on ends.
+            Take {actor.name} out of the encounter? {actor.name}'s turn and token are removed, and anything {actor.name}{" "}
+            is grappling or concentrating on ends.
           </ConfirmRow>
         )}
       </div>

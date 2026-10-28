@@ -29,8 +29,7 @@ export function NotFoundView({ role: _role }: Readonly<{ role: "gm" | "player" }
  */
 export function NotFoundPage({ role }: Readonly<{ role: "gm" | "player" }>) {
   return (
-    <div className="pane-frame pane-scene scanlines frame-col">
-      <div className="pane-sky" aria-hidden="true" />
+    <div className="pane-frame pane-scene frame-col">
       <div className="scroll-y frame-fill notfound-stage">
         <NotFoundView role={role} />
       </div>

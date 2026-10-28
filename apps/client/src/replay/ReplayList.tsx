@@ -34,7 +34,7 @@ export function ReplayList({
   const setShared = async (archive: ArchiveSummary, shared: boolean) => {
     setBusy(archive.id);
     try {
-      await apiRequest(`/api/v1/encounters/${archive.id}/visibility`, {
+      await apiRequest(`/api/v1/replays/${archive.id}/visibility`, {
         token,
         body: { playerVisible: shared },
         failure
@@ -69,7 +69,7 @@ export function ReplayList({
     if (!ok) return;
     setBusy(archive.id);
     try {
-      await apiRequest(`/api/v1/encounters/${archive.id}`, { token, method: "DELETE", failure });
+      await apiRequest(`/api/v1/replays/${archive.id}`, { token, method: "DELETE", failure });
       toast("Replay deleted.", { tone: "success" });
       refresh();
     } catch (cause) {
@@ -82,8 +82,7 @@ export function ReplayList({
   /* Heading (and the player's way back) stay fixed; the rows are the one scroll region. Rows are
      plain `<li>`s with rules drawn in `replay.css`, and no cards. */
   return (
-    <section className="replay-panel replay-list-page pane-frame pane-scene scanlines frame-col anim-view">
-      <div className="pane-sky" aria-hidden="true" />
+    <section className="replay-panel replay-list-page pane-frame pane-scene frame-col anim-view">
       <header className="replay-list-head neon-beam">
         {onBack && (
           <Button variant="ghost" className="replay-list-back" onClick={onBack}>
@@ -92,7 +91,7 @@ export function ReplayList({
         )}
         <h2>Replays</h2>
         {/* Player only: why their list may be short. */}
-        {role === "player" && <p>The fights your GM has shared with the party.</p>}
+        {role === "player" && <p>The encounters your GM has shared with the party.</p>}
         {error && <p className="replay-error">{error}</p>}
       </header>
       <div className="replay-list-body scroll-y frame-fill">
@@ -102,8 +101,8 @@ export function ReplayList({
           <div className="scene-empty">
             <p>
               {role === "gm"
-                ? "No replays yet. Every fight that ends is kept here."
-                : "Your GM hasn't shared a fight yet."}
+                ? "No replays yet. Every encounter that ends is kept here."
+                : "Your GM hasn't shared an encounter yet."}
             </p>
           </div>
         )}
@@ -173,7 +172,7 @@ function RenameReplay({
   const save = async () => {
     setSaving(true);
     try {
-      await apiRequest(`/api/v1/encounters/${archive.id}/name`, {
+      await apiRequest(`/api/v1/replays/${archive.id}/name`, {
         token,
         body: { name: name.trim() === "" ? null : name.trim() },
         failure: "That name could not be saved."
@@ -204,14 +203,14 @@ function RenameReplay({
       <Field
         label="Name"
         htmlFor="replay-name"
-        help={`Players see this name once you share the replay. Leave it empty to call it ${archive.sceneName ?? "Fight"} again.`}
+        help={`Players see this name once you share the replay. Leave it empty to call it ${archive.encounterName ?? "Encounter"} again.`}
         error={error ?? undefined}
       >
         <Input
           id="replay-name"
           value={name}
           maxLength={80}
-          placeholder={archive.sceneName ?? "Fight"}
+          placeholder={archive.encounterName ?? "Encounter"}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") void save();

@@ -107,7 +107,7 @@ beforeEach(() => {
 });
 afterEach(() => act(() => clearTargeting()));
 
-describe("the picks a shape-shift asks for in a fight", () => {
+describe("the picks a shape-shift asks for in an encounter", () => {
   it("waits for Wild Shape's form, then sends it with the gear melded", async () => {
     const user = userEvent.setup();
     act(() => beginTargeting(WILD_SHAPE, HERO));
@@ -163,7 +163,7 @@ describe("the picks a shape-shift asks for in a fight", () => {
   });
 });
 
-describe("a shape-shift outside a fight", () => {
+describe("a shape-shift outside an encounter", () => {
   it("asks for the form, and for Polymorph's target, before it is used", async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();

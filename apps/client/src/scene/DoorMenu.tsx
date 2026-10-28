@@ -142,7 +142,7 @@ export function DoorMenu({
           </button>
         ))}
       {actorName !== null && !open && (
-        <p className="token-context-feedback">{`${actorName} does it. Each takes an action in a fight.`}</p>
+        <p className="token-context-feedback">{`${actorName} does it. Each takes an action in an encounter.`}</p>
       )}
       <p className="token-context-feedback">
         To attack the door or cast a spell on it, choose the attack or the spell, then tap the door.

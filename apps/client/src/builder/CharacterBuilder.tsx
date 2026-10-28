@@ -132,6 +132,8 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
         : state.builderPolicy,
     [state.builderPolicy, recordedMethod]
   );
+  // Rolled scores and hit points are typed only where players' d20 rolls are (ADR-0043); the GM always may.
+  const mayTypeDice = "definitions" in state || state.playerDice?.d20 !== "app";
   const [draft, setDraft] = useState<BuilderDraft>(() => rebuild?.seed ?? emptyDraft());
   // A level-up opens on the new level's choices, with every earlier step answered and a tap away; it does not walk
   // the steps from Species again.
@@ -660,7 +662,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
           <AbilitiesStep
             draft={draft}
             policy={policy}
-            mayTypeDice={"definitions" in state || policy.typedRolls === "open"}
+            mayTypeDice={mayTypeDice}
             context={context}
             base={base}
             bonuses={bonuses}
@@ -690,7 +692,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
               <HitPointsSection
                 draft={draft}
                 policy={policy}
-                mayTypeDice={"definitions" in state || policy.typedRolls === "open"}
+                mayTypeDice={mayTypeDice}
                 context={context}
                 base={base}
                 bonuses={bonuses}
@@ -841,7 +843,15 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
             goTo(stepIndex + 1);
           }
         }}
-        nextLabel={isLast ? (rebuild ? `Apply level ${draft.level}` : "Create character") : "Next"}
+        stepsPlacement="side"
+        /* The primary names where it goes, as the drawn builder's does. */
+        nextLabel={
+          isLast
+            ? rebuild
+              ? `Apply level ${draft.level}`
+              : "Create character"
+            : `Next: ${stepsForShell[stepIndex + 1]?.shortLabel ?? String(stepsForShell[stepIndex + 1]?.label ?? "")}`
+        }
         blockedReason={reasonNode}
         busy={submitting}
         /* The one way out: the draft is already parked, so no "leave without saving" exit. Discarding

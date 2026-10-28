@@ -15,6 +15,7 @@ import {
   type CodexPhoneTab,
   type CodexSection
 } from "../routes";
+import { replaceQuery, useRoute } from "../../router";
 import { PhoneBarContext, type PhoneBarSlot } from "./PhoneBar";
 import "./shell.css";
 
@@ -72,6 +73,14 @@ export function CodexFrame({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [embedded, paletteOpen, onPaletteChange]);
+
+  // The top bar's search launcher sends `openSearch=1` once: open the palette and clear that one key.
+  const route = useRoute();
+  useEffect(() => {
+    if (embedded || route.query.get("openSearch") !== "1") return;
+    onPaletteChange(true);
+    replaceQuery((query) => query.delete("openSearch"));
+  }, [embedded, route.query, onPaletteChange]);
 
   const litBar = section ? barItemOf(section) : null;
   const litTab = section ? phoneTabOf(section) : null;
@@ -173,6 +182,22 @@ export function CodexFrame({
           </div>
         )}
 
+        {phone && (
+          <nav className="cx-tabbar" aria-label="Codex sections">
+            {CODEX_PHONE_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`cx-tabbar-tab${litTab === tab.id ? " is-on" : ""}`}
+                aria-current={litTab === tab.id ? "page" : undefined}
+                onClick={() => go(tabPath(tab.id))}
+              >
+                <CodexIcon iconId={tab.iconId} className="cx-icon" />
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
         {phone && part && (
           <nav className="cx-campaign" aria-label="Campaign">
             <div className="nh-segmented nh-segmented--sm">
@@ -194,22 +219,6 @@ export function CodexFrame({
         {notices}
         <div className="cx-content">{children}</div>
 
-        {phone && (
-          <nav className="cx-tabbar" aria-label="Codex sections">
-            {CODEX_PHONE_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={`cx-tabbar-tab${litTab === tab.id ? " is-on" : ""}`}
-                aria-current={litTab === tab.id ? "page" : undefined}
-                onClick={() => go(tabPath(tab.id))}
-              >
-                <CodexIcon iconId={tab.iconId} className="cx-icon" />
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </nav>
-        )}
         {overlays}
       </div>
     </PhoneBarContext.Provider>

@@ -292,20 +292,20 @@ function SectionBody({
     case "encounters":
       return (
         <IdList
-          ids={section.sceneIds}
+          ids={section.encounterIds}
           limit={CODEX_PREP_LIMITS.encounters}
           describe={(id) => {
             const scene = context.scenes.find((each) => each.id === id);
             return scene
               ? { title: scene.name, icon: <CodexIcon iconId="battle" className="prep-icon" /> }
-              : { title: "A deleted scene", icon: null };
+              : { title: "A deleted encounter", icon: null };
           }}
-          onChange={(sceneIds) => onChange({ ...section, sceneIds })}
+          onChange={(encounterIds) => onChange({ ...section, encounterIds })}
           adder={(add) => (
             <AddSelect
               label="Add an encounter"
               options={context.scenes
-                .filter((each) => !section.sceneIds.includes(each.id))
+                .filter((each) => !section.encounterIds.includes(each.id))
                 .map((each) => ({ id: each.id, label: each.name }))}
               onAdd={add}
             />

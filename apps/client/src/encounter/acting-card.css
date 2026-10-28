@@ -1,0 +1,60 @@
+/* The acting creature's card: a 60px portrait in the sun frame beside its chrome name, then the life bar with AC and
+   speed in VT323 boxes. */
+.acting-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.acting-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.acting-card-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.acting-card-name {
+  margin: 0;
+  overflow: hidden;
+  font: 400 24px / 1.1 var(--font-display);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.acting-card-side {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.acting-card-numbers {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.acting-card-life {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+.acting-card-box {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+}
+.acting-card-box b {
+  font: 400 26px / 1 var(--font-numeric);
+  color: var(--text);
+}
+.acting-card-box span {
+  color: var(--text-muted);
+  font: 600 10px / 1.2 var(--font-label);
+}

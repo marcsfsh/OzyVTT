@@ -5,11 +5,11 @@ import { activateNewScene, sceneHeadroom, sceneSlotsNeededToGoLive, SCENE_ROOM_R
 
 /**
  * "Launch from here": parks the current table as a scene switch does and makes an archived moment live.
- * The parked scene resumes through `scene.activate`.
+ * The parked scene resumes through `encounter.activate`.
  *
  * Combatants are cloned under new ids because actor state (HP, conditions) is global; restoring onto
  * current ids would overwrite the party's present. Clones are unowned (`ownerSessionId: null`) so no
- * session gets a second body. Clones keep their recorded names and carry `replaySceneId`, which keeps
+ * session gets a second body. Clones keep their recorded names and carry `replayEncounterId`, which keeps
  * them out of roster surfaces (`rosterActors`) and lets `scenes.ts` delete them with the scene.
  */
 
@@ -23,7 +23,7 @@ export type ReplayLaunchInput = Readonly<{
   /** Which recorded boundary to make live: an index into `document.turns` (0 = the first turn). */
   turnIndex: number;
   /** Scene id for the launched moment, and the id an unbound live encounter parks under. */
-  sceneId: string;
+  encounterId: string;
   implicitSceneId: string;
   newActorId: () => string;
 }>;
@@ -92,7 +92,10 @@ function sceneCombatFrom(combat: GameState["combat"]): SceneCombat {
     pendingDamage: combat.pendingDamage,
     pendingRuleAsks: combat.pendingRuleAsks,
     pendingInitiative: combat.pendingInitiative,
-    initiativeWindow: combat.initiativeWindow
+    initiativeWindow: combat.initiativeWindow,
+    // A replay starts with nothing waiting on a player's roll or the GM's aim.
+    damageRolls: [],
+    targetAsks: []
   };
 }
 
@@ -106,7 +109,7 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
 
   // Scene headroom first: a launch can need two slots, and discovering that mid-way would mangle the table.
   if (sceneHeadroom(state) < sceneSlotsNeededToGoLive(state)) {
-    throw new CommandRejectedError(SCENE_ROOM_REFUSAL, "scene_room_full");
+    throw new CommandRejectedError(SCENE_ROOM_REFUSAL, "encounter_room_full");
   }
 
   const combatantIds = [...new Set(archived.combat.initiative.map((entry) => entry.actorId))];
@@ -165,7 +168,7 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
         ownerSessionId: null,
         archived: false,
         // Scoped to this launch; a clone of a clone is re-scoped, so it never points at its old scene.
-        replaySceneId: input.sceneId,
+        replayEncounterId: input.encounterId,
         ...(clone.definitionId ? { definitionId: definitionIdMap.get(clone.definitionId) ?? clone.definitionId } : {})
       }
     ];
@@ -180,7 +183,7 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
   const scene = activateNewScene(
     state,
     {
-      sceneId: input.sceneId,
+      encounterId: input.encounterId,
       name: label,
       mapAssetId: archived.combat.mapAssetId,
       combat,

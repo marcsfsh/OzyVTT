@@ -132,7 +132,7 @@ describe("a Bag of Holding", () => {
     ).toThrow(/destroys both/);
   });
 
-  it("takes the Utilize action to take a thing out in a fight", () => {
+  it("takes the Utilize action to take a thing out in an encounter", () => {
     const table = packed();
     write(table, IDS.fighter, catalogRow("bag-of-holding", { equipped: false }));
     write(table, IDS.fighter, { ...anvil(3), containerId: "bag-of-holding" });
@@ -166,7 +166,7 @@ describe("a Handy Haversack", () => {
     write(table, IDS.fighter, { ...anvil(1, "anvil-2"), containerId: "handy-haversack", compartment: "right" });
   });
 
-  it("gives up a thing for the Bonus Action in a fight, and the Utilize action once that is spent", () => {
+  it("gives up a thing for the Bonus Action in an encounter, and the Utilize action once that is spent", () => {
     const table = packed();
     write(table, IDS.fighter, catalogRow("handy-haversack", { equipped: false }));
     write(table, IDS.fighter, { ...anvil(3), containerId: "handy-haversack" });

@@ -20,7 +20,12 @@ export type SettingsSection = Readonly<{
 /** In the bar's order. Players leads because the join address is what a GM opens at every session. */
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: "players", label: "Players", hint: "Who is at the table, and what they see of each other.", audience: "gm" },
-  { id: "fights", label: "Fights", hint: "How the rules assistant and the turn order treat a fight.", audience: "gm" },
+  {
+    id: "fights",
+    label: "Encounters",
+    hint: "How the rules assistant and the turn order treat an encounter.",
+    audience: "gm"
+  },
   { id: "characters", label: "Characters", hint: "How players build and level their characters.", audience: "gm" },
   { id: "device", label: "Device", hint: "Choices for this device alone.", audience: "everyone" },
   {
@@ -82,7 +87,7 @@ export const SETTING = entries({
   rulesAssistant: {
     section: "fights",
     label: "Rules assistant",
-    hint: "Each fight starts with this, and you can change it mid-fight on the Table.",
+    hint: "Each encounter starts with this, and you can change it mid-encounter on the Table.",
     words: "enforce advise off dial rules checks movement action economy spell slots targeting"
   },
   playerHits: {
@@ -97,11 +102,23 @@ export const SETTING = entries({
     hint: "When players roll their own initiative, whether turns wait for every roll.",
     words: "turn order roll initiative"
   },
-  typedRolls: {
+  d20Dice: {
     section: "fights",
-    label: "Players' dice",
-    hint: "When this is off, the server rolls every check, save, attack and damage roll for players.",
-    words: "physical dice type manual roll"
+    label: "Players' d20 rolls",
+    hint: "Attacks, checks, saves, initiative and death saves, unless an encounter chooses its own.",
+    words: "physical dice type manual roll total face d20"
+  },
+  damageDice: {
+    section: "fights",
+    label: "Players' damage",
+    hint: "Damage dice, unless an encounter chooses its own.",
+    words: "physical dice type manual roll total face damage healing"
+  },
+  targeting: {
+    section: "fights",
+    label: "Who picks targets",
+    hint: "In an encounter, the player aims their own actions, or asks you to choose.",
+    words: "target targeting aim choose pick gm player attack spell"
   },
   healthDisplay: {
     section: "fights",
@@ -148,8 +165,14 @@ export const SETTING = entries({
   theme: {
     section: "device",
     label: "Theme",
-    hint: "It applies to this device, and every page's app bar has the same switch.",
-    words: "night dusk dawn day dark light colours appearance"
+    hint: "It applies to this device alone.",
+    words: "dusk dawn dark light night day colours appearance"
+  },
+  reduceTransparency: {
+    section: "device",
+    label: "Reduce transparency",
+    hint: "Panels turn solid, and the scanlines and glows go.",
+    words: "transparency blur glass solid scanlines glow contrast accessibility"
   },
   rollInput: {
     section: "device",
@@ -166,9 +189,9 @@ export const SETTING = entries({
   arrangeScenes: {
     section: "device",
     audience: "gm",
-    label: "Arrange new scenes",
-    hint: "A new scene opens on your table first, so you can place tokens before players see it.",
-    words: "staging preview scene arrange"
+    label: "Arrange new encounters",
+    hint: "A new encounter opens on your table first, so you can place tokens before players see it.",
+    words: "staging preview encounter arrange"
   },
   leaveTable: {
     section: "device",

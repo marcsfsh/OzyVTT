@@ -166,15 +166,15 @@ function SectionRead({
         </ul>
       );
     case "encounters":
-      return section.sceneIds.length === 0 ? (
+      return section.encounterIds.length === 0 ? (
         <Nothing />
       ) : (
         <ul className="prep-read-list">
-          {section.sceneIds.map((id) => (
+          {section.encounterIds.map((id) => (
             <li key={id} className="prep-read-row">
               <CodexIcon iconId="battle" className="prep-icon" />
               <span className="prep-row-title">
-                {context.scenes.find((scene) => scene.id === id)?.name ?? "A scene no longer at the table"}
+                {context.scenes.find((scene) => scene.id === id)?.name ?? "An encounter no longer at the table"}
               </span>
             </li>
           ))}

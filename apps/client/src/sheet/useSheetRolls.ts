@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { AbilityId, ActorDerivedSheet, CheckRollOutcome, CheckSubject, RollVisibility } from "@vtt/domain";
 import { parseDiceFormula } from "@vtt/rules-5e";
 import { usePrompt } from "../components/feedback";
-import { useRollPreference } from "../dice/roll-preference";
+import { typedDie, useRollPreference } from "../dice/roll-preference";
 import { command, type Reply } from "../lib/command";
 import { modeWords } from "../encounter/roll-mode-notes";
 import { withArticle } from "@vtt/domain";
@@ -66,7 +66,7 @@ export function useSheetRolls(
   const said = (text: string) => {
     if (!lineShows) onFeedback(text);
   };
-  const { rollMode } = useRollPreference();
+  const { rollMode, typeAs } = useRollPreference(actorId);
   const [rolling, setRolling] = useState(false);
   const [visibility, setVisibility] = useState<RollVisibility>("public");
   // The check this sheet rolled last, which a reroll throws again while it is still the character's latest roll.
@@ -86,15 +86,28 @@ export function useSheetRolls(
   const { prompt, dialog } = usePrompt();
 
   /** Asks for the face a physical d20 shows; null when cancelled or not a face. */
-  const typedFace = async (title: string): Promise<number | null> => {
+  /** The number a physical roll came to: the d20's face, or the total where the table asks for totals (a reroll's
+   *  face stays a face). */
+  const typedFace = async (title: string, reroll = false): Promise<number | null> => {
+    const total = typeAs === "total" && !reroll;
     const entered = await prompt({
       title,
-      body: "Type the number your d20 shows. Your bonus is added for you.",
-      placeholder: "1 to 20",
+      body: total
+        ? "Type the total you rolled, your bonus included."
+        : "Type the number your d20 shows. Your bonus is added for you.",
+      placeholder: total ? "Your total" : "1 to 20",
       inputMode: "numeric",
       confirmLabel: "Roll"
     });
     if (entered === null) return null;
+    if (total) {
+      const typed = Number(entered.trim());
+      if (entered.trim() === "" || !Number.isInteger(typed)) {
+        onFeedback("Type the total, a whole number.");
+        return null;
+      }
+      return typed;
+    }
     const face = Number(entered.trim());
     if (!Number.isInteger(face) || face < 1 || face > 20) {
       onFeedback("Type the d20's face, a whole number from 1 to 20.");
@@ -121,7 +134,7 @@ export function useSheetRolls(
       ...(subject.skill ? { skill: subject.skill } : {}),
       ...(subject.tool ? { tool: subject.tool } : {}),
       visibility,
-      ...(face !== undefined ? { face } : {}),
+      ...(face !== undefined ? typedDie("face", face, actorId) : {}),
       ...(findActorId ? { findActorId } : {}),
       ...(dc !== undefined ? { dc } : {}),
       ...(fitting.length > 0 ? { situations: fitting } : {}),
@@ -164,7 +177,7 @@ export function useSheetRolls(
       ...(use.item !== undefined ? { item: use.item } : {}),
       use: use.index,
       visibility,
-      ...(face !== undefined ? { face } : {}),
+      ...(face !== undefined ? typedDie("face", face, actorId) : {}),
       ...(use.bonusAction ? { bonusAction: true } : {}),
       ...(use.forActorId !== undefined ? { forActorId: use.forActorId } : {})
     });
@@ -174,7 +187,7 @@ export function useSheetRolls(
   /** Rerolls the check this sheet rolled last: Heroic Inspiration for a player, free for the GM. A typed check is
    *  rerolled with the face the physical reroll shows. */
   const rerollCheck = async () => {
-    const face = lastCheck?.typed ? await typedFace("Reroll the check") : undefined;
+    const face = lastCheck?.typed ? await typedFace("Reroll the check", true) : undefined;
     if (face === null) return;
     setRolling(true);
     const result = await command("check:reroll", { actorId, ...(face !== undefined ? { face } : {}) });
@@ -209,7 +222,11 @@ export function useSheetRolls(
     const face = rollMode === "manual" ? await typedFace(`Roll ${withArticle(name)}`) : undefined;
     if (face === null) return;
     setRolling(true);
-    const result = await command("save:roll", { actorId, ability, ...(face !== undefined ? { face } : {}) });
+    const result = await command("save:roll", {
+      actorId,
+      ability,
+      ...(face !== undefined ? typedDie("face", face, actorId) : {})
+    });
     setRolling(false);
     if (!result.ok) {
       onFeedback(result.message ?? "The saving throw was refused.");
@@ -228,7 +245,7 @@ export function useSheetRolls(
   const rerollSave = async () => {
     if (!lastSave) return;
     const name = `${ABILITY_WORDS[lastSave.ability]} save`;
-    const face = lastSave.typed ? await typedFace(`Reroll ${withArticle(name)}`) : undefined;
+    const face = lastSave.typed ? await typedFace(`Reroll ${withArticle(name)}`, true) : undefined;
     if (face === null) return;
     setRolling(true);
     const result = await command("save:roll", {

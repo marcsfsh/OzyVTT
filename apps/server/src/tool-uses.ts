@@ -28,6 +28,8 @@ export type UtilizeCheckInput = Readonly<{
   label: string;
   visibility: RollVisibility;
   face?: number;
+  /** A typed total (ADR-0043). */
+  total?: number;
   forcedMode?: CheckRollInput["forcedMode"];
   situations?: readonly string[];
   /** Take the use as a Bonus Action (Fast Hands). */
@@ -61,6 +63,7 @@ export function rollUtilizeCheck(
       visibility: input.visibility,
       label: input.label,
       ...(input.face !== undefined ? { face: input.face } : {}),
+      ...(input.total !== undefined ? { total: input.total } : {}),
       ...(input.forcedMode !== undefined ? { forcedMode: input.forcedMode } : {}),
       ...(input.situations !== undefined ? { situations: input.situations } : {}),
       ...(input.onSuccess !== undefined ? { onSuccess: input.onSuccess } : {})
@@ -77,6 +80,8 @@ export type ItemUseInput = Readonly<{
   use: number;
   visibility: RollVisibility;
   face?: number;
+  /** A typed total (ADR-0043). */
+  total?: number;
   forcedMode?: CheckRollInput["forcedMode"];
   situations?: readonly string[];
   bonusAction?: boolean;
@@ -127,6 +132,7 @@ export function rollItemUse(
       label: useRollName(use.label, itemName),
       visibility: input.visibility,
       ...(input.face !== undefined ? { face: input.face } : {}),
+      ...(input.total !== undefined ? { total: input.total } : {}),
       ...(input.forcedMode !== undefined ? { forcedMode: input.forcedMode } : {}),
       ...(input.situations !== undefined ? { situations: input.situations } : {}),
       ...(input.bonusAction !== undefined ? { bonusAction: input.bonusAction } : {}),

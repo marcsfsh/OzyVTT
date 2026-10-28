@@ -14,6 +14,10 @@ import {
   RuleFamilySchema,
   RuleModeSchema,
   SceneEnvironmentSchema,
+  SceneInitiativeDefaultsSchema,
+  DiceModeSchema,
+  TargetingSchema,
+  ScenePlayerDiceSchema,
   TableRollPurposeSchema
 } from "./state.js";
 import {
@@ -92,6 +96,9 @@ export const EncounterStartSchema = z
     playersRollInitiative: z.boolean().optional(),
     /** SRD: one initiative roll for each group of identical monsters, so they act together. */
     groupMonsters: z.boolean().optional(),
+    /** Party characters played at the table for this encounter (true) or on their players' devices (false), by id
+     *  (ADR-0042). One left out takes its saved mark; a claimed character can't be played at the table. */
+    atTable: z.record(z.uuid(), z.boolean()).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -112,6 +119,9 @@ export const InitiativeRollSelfSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     natural: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** Reroll the initiative die just thrown (SRD Heroic Inspiration), before the character's first turn: a player
      *  spends Heroic Inspiration to reroll one die, the GM rerolls freely. With `natural`, the face a physical reroll
@@ -263,6 +273,15 @@ export const SetActorSheetPreviewSchema = z
   })
   .strict();
 /** GM switch: a legendary creature fights in its lair, with the lair's legendary counts (SRD 5.2.1). */
+/** The GM marks a party character played at the table, or takes the mark off (ADR-0042). */
+export const SetActorPlayedAtTableSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    playedAtTable: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const SetActorLairSchema = z
   .object({
     commandId: z.uuid(),
@@ -545,6 +564,9 @@ export const ActionResolveSchema = z
     /** GM only: a hand-entered final attack total, used verbatim vs AC; pair with `critical` for a nat 20 or `fumble`
      *  for a nat 1. */
     attackTotal: z.number().int().min(-50).max(100).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    attackRolledTotal: z.number().int().min(-50).max(100).optional(),
     /** GM only: declares a natural 20 (critical hit) for the hand-entered-total path. */
     critical: z.boolean().optional(),
     /** GM only: declares a natural 1 (a miss whatever the total) for the hand-entered-total path. */
@@ -727,6 +749,9 @@ export const SaveAnswerSchema = z
     /** A typed d20 for `method: "roll"`: the face a physical die shows (the one that counts). A player may type one only
      *  while the table lets players type their dice, and not once the server has thrown this save's die. */
     face: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** The GM's choice of roll mode, which wins over the engine's count. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** With `commit: false`, throw the held d20 again: a player spends Heroic Inspiration to reroll one die (the
@@ -775,6 +800,9 @@ export const ReactionAnswerSchema = z
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** A typed d20 for the strike (see `action.resolve`). */
     attackNatural: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    attackRolledTotal: z.number().int().min(-50).max(100).optional(),
     /** With `commit: false`, throw the held strike d20 again: Heroic Inspiration for a player, free for the GM. */
     reroll: z.boolean().optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
@@ -894,6 +922,9 @@ export const DeathSaveRollSchema = z
     /** A typed d20: the face a physical die shows. A player may type one only while the table lets players type their
      *  dice, and not once the server has thrown this death save's die. */
     naturalRoll: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** With `commit: false`, throw the held d20 again: Heroic Inspiration for a player, free for the GM. */
     reroll: z.boolean().optional(),
     /** With `commit: false`, answer the held death save with one of the preview's `answers` (the halfling's Luck). */
@@ -966,6 +997,9 @@ export const SaveRollSchema = z
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** A typed d20: the face a physical die shows (see `save.answer`). */
     face: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** GM only: a hand-entered final total, used as given. */
     total: z.number().int().min(-50).max(100).optional(),
     /** Throw the character's latest loose save of this ability again, while it is still the character's latest roll
@@ -1004,6 +1038,9 @@ export const CheckRollSchema = z
     visibility: RollVisibilitySchema.default("public"),
     /** A typed d20: the face a physical die shows (the one that counts). Players only while the table lets them. */
     face: z.number().int().min(1).max(20).optional(),
+    /** A typed total (ADR-0043): the d20 and the bonus the server works out, which the server turns back into the
+     *  d20's face; dice an effect adds it still throws. A player sends one only while the table asks for totals. */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** The GM's choice of roll mode. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** The creature the check is about: one a Wisdom (Perception or Survival) check is made to find (the roller's
@@ -1106,6 +1143,8 @@ export const RollCallAnswerSchema = z
     callId: z.uuid(),
     actorId: z.uuid(),
     face: z.number().int().min(1).max(20).optional(),
+    /** A typed total (see `check.roll`). */
+    rolledTotal: z.number().int().min(-50).max(100).optional(),
     /** The situations the check fits, of those the call's card offers for the character (a Book's topic). */
     situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -1200,6 +1239,23 @@ export const TableSetStagingDefaultsSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** GM sets how players' dice are entered (ADR-0043); an omitted kind keeps what is stored. */
+export const TableSetPlayerDiceSchema = z
+  .object({
+    commandId: z.uuid(),
+    d20: DiceModeSchema.optional(),
+    damage: DiceModeSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM sets who picks the targets of a player's action in an encounter (ADR-0044). */
+export const TableSetTargetingSchema = z
+  .object({
+    commandId: z.uuid(),
+    targeting: TargetingSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** GM sets how much a player sees of another player's character (tiers in `PartyVisibilitySchema`). */
 export const TableSetPartyVisibilitySchema = z
   .object({
@@ -1223,6 +1279,42 @@ export const DamageResolveSchema = z
     proposalId: z.uuid(),
     apply: z.boolean(),
     amount: z.number().int().min(0).max(1000).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A player reports what their damage dice came to (ADR-0043): the total, or each die's face in the roll's order. */
+export const DamageReportSchema = z
+  .object({
+    commandId: z.uuid(),
+    rollId: z.uuid(),
+    total: z.number().int().min(0).max(2000).optional(),
+    faces: z.array(z.number().int().min(1).max(100)).min(1).max(100).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((payload) => (payload.total === undefined) !== (payload.faces === undefined), {
+    error: "Send the damage total or each die's face, and only one of the two."
+  });
+/** A player asks the GM to pick the targets of their character's action (ADR-0044), with how they chose to cast it. */
+export const TargetAskCreateSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    actionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    slotLevel: z.number().int().min(1).max(9).optional(),
+    darts: z.number().int().min(1).max(20).optional(),
+    shaping: CastShapingListSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Takes back an action waiting for the GM's aim: its player, or the GM declining it. */
+export const TargetAskWithdrawSchema = z
+  .object({
+    commandId: z.uuid(),
+    askId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1263,12 +1355,12 @@ export const SetEnvironmentSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Manual fog of war (GM-only). `sceneId` targets a parked scene's private prep; without it, the live table. */
+/** Manual fog of war (GM-only). `encounterId` targets a parked scene's private prep; without it, the live table. */
 export const FogSetEnabledSchema = z
   .object({
     commandId: z.uuid(),
     enabled: z.boolean(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1286,19 +1378,19 @@ export const FogPaintSchema = z
     commandId: z.uuid(),
     op: z.enum(["reveal", "hide"]),
     rect: PaintRectSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const FogResetSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 /** Traps (SRD 5.2.1 Gameplay Toolbox): the GM sets one of the toolbox's traps at a band of levels over a dragged area,
- *  hidden from the players. `sceneId` targets a parked scene. */
+ *  hidden from the players. `encounterId` targets a parked scene. */
 export const TrapPlaceSchema = z
   .object({
     commandId: z.uuid(),
@@ -1309,7 +1401,7 @@ export const TrapPlaceSchema = z
     /** The band of levels it is scaled for: 1 for levels 1-4, 2 for 5-10, 3 for 11-16, 4 for 17-20. */
     tier: z.number().int().min(1).max(4),
     rect: PaintRectSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1323,7 +1415,7 @@ export const TrapEditSchema = z
     blast: PaintRectSchema.nullable().optional(),
     found: z.boolean().optional(),
     state: z.enum(["armed", "disarmed"]).optional(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1331,7 +1423,7 @@ export const TrapRemoveSchema = z
   .object({
     commandId: z.uuid(),
     trapId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1365,31 +1457,31 @@ export const EnvironmentSetSchema = z
   .object({
     commandId: z.uuid(),
     environment: SceneEnvironmentSchema.partial(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 
 /** Painted ground (GM-only): mark a dragged area as difficult terrain, still or running water, or slippery ice, or clear
- *  every kind from it. `sceneId` targets a parked scene. */
+ *  every kind from it. `encounterId` targets a parked scene. */
 export const TerrainPaintSchema = z
   .object({
     commandId: z.uuid(),
     op: z.enum(["difficult", "water", "running-water", "ice", "clear"]),
     rect: PaintRectSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const TerrainResetSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 
-// Dynamic vision (ADR-0023). The GM's edits take `sceneId` to prep a parked scene, as fog and terrain do.
+// Dynamic vision (ADR-0023). The GM's edits take `encounterId` to prep a parked scene, as fog and terrain do.
 /** A map point in image pixels, before the server snaps and clamps it. */
 const VisionPointWireSchema = z
   .object({ x: z.number().min(-100000).max(1_000_000), y: z.number().min(-100000).max(1_000_000) })
@@ -1398,7 +1490,7 @@ export const VisionSetEnabledSchema = z
   .object({
     commandId: z.uuid(),
     enabled: z.boolean(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1408,7 +1500,7 @@ export const VisionSetAmbientSchema = z
     ambient: z.enum(["bright", "dim", "dark"]),
     /** The bright ambient light is sunlight (daylight outdoors). Left as it was when absent. */
     sunlight: z.boolean().optional(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1436,7 +1528,7 @@ export const VisionAreaAddSchema = z
       })
       .strict()
       .optional(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -1447,7 +1539,7 @@ export const VisionAreaRemoveSchema = z
   .object({
     commandId: z.uuid(),
     areaId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1492,7 +1584,7 @@ export const ItemSetFormSchema = z
 export const VisionResetExploredSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1502,7 +1594,7 @@ export const WallAddSchema = z
     commandId: z.uuid(),
     kind: z.enum(["wall", "door", "window"]),
     points: z.array(VisionPointWireSchema).min(2).max(64),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1512,7 +1604,7 @@ export const WallMoveSchema = z
     wallId: z.uuid(),
     a: VisionPointWireSchema,
     b: VisionPointWireSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1520,14 +1612,14 @@ export const WallRemoveSchema = z
   .object({
     commandId: z.uuid(),
     wallId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const WallClearSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1537,7 +1629,7 @@ export const DoorSetOpenSchema = z
     commandId: z.uuid(),
     wallId: z.uuid(),
     open: z.boolean(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1548,7 +1640,7 @@ export const DoorSetStateSchema = z
     commandId: z.uuid(),
     wallId: z.uuid(),
     door: DoorStateSchema.nullable(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1579,7 +1671,7 @@ export const ObjectSetSchema = z
     commandId: z.uuid(),
     wallId: z.uuid(),
     object: ObjectStatsSchema.nullable(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1615,7 +1707,7 @@ export const LightAddSchema = z
     actorId: z.uuid().optional(),
     brightFeet: z.number().min(0).max(240),
     dimFeet: z.number().min(0).max(240),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -1627,7 +1719,7 @@ export const LightMoveSchema = z
     commandId: z.uuid(),
     lightId: z.uuid(),
     position: VisionPointWireSchema,
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1635,7 +1727,7 @@ export const LightRemoveSchema = z
   .object({
     commandId: z.uuid(),
     lightId: z.uuid(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1643,7 +1735,7 @@ export const LightRemoveSchema = z
 export const VisionPreviewSchema = z.object({ actorId: z.uuid().optional() }).strict();
 /** What a prepared or live scene shows one audience: the shared screen, or with `actorId` that party character's
  *  player. */
-export const ScenePreviewSchema = z.object({ sceneId: z.uuid(), actorId: z.uuid().optional() }).strict();
+export const ScenePreviewSchema = z.object({ encounterId: z.uuid(), actorId: z.uuid().optional() }).strict();
 export const ActorRestSchema = z
   .object({
     commandId: z.uuid(),
@@ -2238,8 +2330,6 @@ export const BuilderSetPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).optional(),
     /** Whether players may roll a random character themselves; omitted keeps the stored setting. */
     playerRandom: z.enum(["open", "gm-only"]).optional(),
-    /** Whether players may type what their physical dice show, for every roll they make; omitted keeps the stored setting. */
-    typedRolls: z.enum(["open", "gm-only"]).optional(),
     /** Whether a rolled hit-point level is raised to the average; omitted keeps the stored setting. */
     hitPointRollFloor: z.enum(["none", "average"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -2265,6 +2355,25 @@ export const DiceRollSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Longest chat line, in code points after the server's clean-up (ADR-0038). */
+export const CHAT_MAX_LENGTH = 500;
+/** A chat line (ADR-0038). `actorId` names which claimed character speaks, needed when a player plays several.
+ *  `whisperTo` makes it a whisper: a party character's id from the GM, or "gm" from a player. */
+export const ChatSendSchema = z
+  .object({
+    commandId: z.uuid(),
+    text: z.string().min(1).max(2000),
+    actorId: z.uuid().optional(),
+    whisperTo: z.union([z.uuid(), z.literal("gm")]).optional()
+  })
+  .strict();
+/** Removes a chat line: its author's own, or any for the GM. `entryId` is the line's id as the reader holds it. */
+export const ChatDeleteSchema = z
+  .object({
+    commandId: z.uuid(),
+    entryId: z.number().int().nonnegative()
+  })
+  .strict();
 /** How a token move travels (SRD Movement): on foot or by one of the special speeds, which spend movement; by
  *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
 export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "jump", "teleport", "forced"]);
@@ -2280,7 +2389,7 @@ export const TokenMoveSchema = z
     /** Feet above the ground the move ends at; absent keeps the height it has. Rising or descending costs movement as
      *  distance does, and only flying, climbing, jumping, teleporting or a forced move changes it. */
     altitudeFeet: z.number().int().min(0).max(10000).optional(),
-    sceneId: z.uuid().optional(),
+    encounterId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -2385,7 +2494,7 @@ export const ActorSetArmorClassSchema = z
   })
   .strict();
 export const SceneNameSchema = z.string().trim().min(1).max(120);
-/** `activate: true` goes live on the new scene in the same command and parks whatever was live (as `scene.activate` does). */
+/** `activate: true` goes live on the new scene in the same command and parks whatever was live (as `encounter.activate` does). */
 export const SceneCreateSchema = z
   .object({
     commandId: z.uuid(),
@@ -2393,13 +2502,33 @@ export const SceneCreateSchema = z
     mapAssetId: z.uuid(),
     combatantIds: z.array(z.uuid()).max(200),
     activate: z.boolean().optional(),
+    /** The fight's starting choices for Start the fight to read (ADR-0039). */
+    initiativeDefaults: SceneInitiativeDefaultsSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Replaces a scene's starting choices for its fight; an empty object clears them (ADR-0039). */
+export const SceneSetInitiativeDefaultsSchema = z
+  .object({
+    commandId: z.uuid(),
+    encounterId: z.uuid(),
+    initiativeDefaults: SceneInitiativeDefaultsSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** An encounter's own dice modes (ADR-0043), replacing what it had; a kind left out uses the table's. */
+export const SceneSetPlayerDiceSchema = z
+  .object({
+    commandId: z.uuid(),
+    encounterId: z.uuid(),
+    playerDice: ScenePlayerDiceSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const SceneRenameSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid(),
+    encounterId: z.uuid(),
     name: SceneNameSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -2407,7 +2536,7 @@ export const SceneRenameSchema = z
 export const SceneIdSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid(),
+    encounterId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -2423,7 +2552,7 @@ export const ReplayLaunchSchema = z
 export const SceneSetCombatantsSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid(),
+    encounterId: z.uuid(),
     combatantIds: z.array(z.uuid()).max(200),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -2549,16 +2678,16 @@ export const SoundArrangeSchema = z
 export const SoundPlaySchema = z
   .object({
     commandId: z.uuid(),
-    target: z.enum(["music", "ambient", "effect", "scene"]),
+    target: z.enum(["music", "ambient", "effect", "encounter"]),
     assetId: z.uuid().optional(),
-    sceneId: z.uuid().optional()
+    encounterId: z.uuid().optional()
   })
   .strict()
   .superRefine((value, context) => {
     if ((value.target === "ambient" || value.target === "effect") && !value.assetId)
       context.addIssue({ code: "custom", path: ["assetId"], message: "Name the sound to play." });
-    if (value.target === "scene" && !value.sceneId)
-      context.addIssue({ code: "custom", path: ["sceneId"], message: "Name the scene whose sound to play." });
+    if (value.target === "encounter" && !value.encounterId)
+      context.addIssue({ code: "custom", path: ["encounterId"], message: "Name the encounter whose sound to play." });
   });
 /** Stops the music, one ambient layer, or everything. */
 export const SoundStopSchema = z
@@ -2574,7 +2703,7 @@ export const SoundPauseSchema = z.object({ commandId: z.uuid(), paused: z.boolea
 export const SoundScenePresetSchema = z
   .object({
     commandId: z.uuid(),
-    sceneId: z.uuid(),
+    encounterId: z.uuid(),
     preset: z.enum(["save-current", "clear"]).optional(),
     autoplay: z.boolean().optional()
   })

@@ -89,7 +89,7 @@ export const TRAP_TIERS = [
 ] as const;
 
 /** The uncalibrated-map reason, reused so a disabled control always says why. */
-export const NEEDS_GRID = "Needs a calibrated grid. Set one up on the Scenes tab, under Maps.";
+export const NEEDS_GRID = "Needs a calibrated grid. Set one up in Encounters, under Maps.";
 
 /**
  * Who a new drawing is for: "Shown to players" for public, "GM only" for GM-secret. The owner-scoped

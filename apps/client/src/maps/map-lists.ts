@@ -31,12 +31,13 @@ export const NO_MAP_FILTERS: MapFilters = {
   to: null
 };
 
-export type MapSortKey = "name" | "type" | "grid" | "folder" | "used" | "modified";
-export const MAP_SORT_KEYS: readonly MapSortKey[] = ["name", "type", "grid", "folder", "used", "modified"];
+export type MapSortKey = "name" | "type" | "grid" | "attention" | "folder" | "used" | "modified";
+export const MAP_SORT_KEYS: readonly MapSortKey[] = ["name", "type", "grid", "attention", "folder", "used", "modified"];
 export const MAP_SORT_LABEL: Readonly<Record<MapSortKey, string>> = {
   name: "Name",
   type: "Type",
   grid: "Grid",
+  attention: "Needs attention",
   folder: "Folder",
   used: "Used in",
   modified: "Modified"
@@ -104,6 +105,8 @@ export function filterMaps(
 
 const GRID_RANK: Readonly<Record<GridState, number>> = { none: 0, scale: 1, grid: 2, unknown: 3 };
 
+const needsGrid = (map: MapAsset) => (map.kind === "battlemap" && gridStateOf(map) === "none" ? 1 : 0);
+
 export function sortMaps(
   maps: readonly MapAsset[],
   levels: readonly SortLevel<MapSortKey>[],
@@ -117,6 +120,9 @@ export function sortMaps(
         return MAP_KINDS.indexOf(left.kind) - MAP_KINDS.indexOf(right.kind);
       case "grid":
         return GRID_RANK[gridStateOf(left)] - GRID_RANK[gridStateOf(right)];
+      // A battle map with no grid yet needs the GM; it comes first in the natural direction.
+      case "attention":
+        return needsGrid(right) - needsGrid(left);
       case "folder":
         return (left.folder ?? "").localeCompare(right.folder ?? "");
       case "used":

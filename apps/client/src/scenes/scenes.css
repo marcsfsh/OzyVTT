@@ -212,105 +212,25 @@
   height: 1em;
 }
 
-/* ----- The front page ----- */
-.sc-overview {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--pane-gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
-  overscroll-behavior: contain;
-}
-.sc-overview-counts {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-.sc-card {
+/* ----- The front page: New map and New scene side by side, then the Maps and Scenes views ----- */
+.sc-front-head {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line-strong);
-  background: var(--material-lip), var(--surface-1);
-}
-.sc-card-title {
-  margin: 0;
-  color: var(--heading-ink);
-  font: 400 var(--fs-h3) / 1.2 var(--font-display);
-  letter-spacing: var(--tracking-display);
-}
-.sc-needs {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.sc-needs li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--line);
-}
-.sc-needs li:last-child {
-  border-bottom: 0;
-}
-.sc-needs-icon {
-  display: inline-grid;
-  place-items: center;
-  color: var(--caution-hi);
-}
-.sc-needs li.is-live .sc-needs-icon {
-  color: var(--magenta-text);
-}
-.sc-needs-text {
-  color: var(--text);
-  font-size: var(--fs-sm);
-  line-height: 1.45;
-}
-.sc-needs-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-.sc-start {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: var(--space-3);
-}
-.sc-start-item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  min-height: var(--tap-min);
-  padding: var(--space-3);
-  border: 1px solid var(--line-raised);
-  background: var(--surface-2);
-  color: var(--text);
-  text-align: start;
-  cursor: pointer;
-}
-.sc-start-item:hover,
-.sc-start-item:focus-visible {
-  border-color: var(--line-hover);
-}
-.sc-start-item svg {
   flex: none;
-  width: 1.4rem;
-  height: 1.4rem;
-  color: var(--cyan-hi);
+  padding: var(--space-3) var(--pane-gutter) 0;
 }
-.sc-start-item span {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+.sc-front-new {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  max-width: 34rem;
 }
-.sc-start-item small {
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
+.sc-front-new > .nh-btn {
+  justify-content: center;
+}
+.sc-front-tabs {
+  align-self: flex-start;
 }
 
 /* ----- Lists: a table on a laptop, rows with two facts on a phone ----- */
@@ -494,19 +414,9 @@
   font-size: var(--fs-xs);
 }
 @media (max-width: 760px) {
-  .sc-overview,
+  .sc-front-head,
   .sc-list-body,
   .sc-sub {
     padding-inline: var(--space-3);
-  }
-  .sc-card {
-    padding: var(--space-3);
-  }
-  .sc-needs li {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .sc-needs-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
   }
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { withArticle, type ActorDefinition, type ActorDerivedSheet, type DerivedDefence } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { ABILITIES, abilityModifier, saveBonus, skillBonus, type Ability } from "@vtt/rules-5e";
@@ -124,65 +124,109 @@ export function CheckSituations({
 const tierWord = (tier: SkillRow["tier"]) =>
   tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient";
 
+/** Each ability's score, check and saving throw, as the engine works them out. */
+function abilityRows(definition: ActorDefinition, derived: ActorDerivedSheet | null) {
+  return ABILITIES.map((ability) => {
+    const score = definition.abilityScores[ability];
+    const row = derived?.abilities.find((entry) => entry.ability === ability) ?? null;
+    const proficient = row?.saveProficient ?? definition.proficiencies?.saves.includes(ability) ?? false;
+    return {
+      ability,
+      score,
+      row,
+      check: row?.check ?? abilityModifier(score),
+      proficient,
+      save: row?.save ?? saveBonus(score, definition.proficiencyBonus, proficient),
+      fromItems: row?.saveFromItems ?? 0,
+      // Paralyzed, Stunned, Petrified or Unconscious: a Strength or Dexterity save fails without a roll.
+      fails: row?.saveAutoFails ?? null
+    };
+  });
+}
+
+/**
+ * The six saving throws as rows, with a cyan square where the character is proficient. A save the character owes now
+ * (`owed`) takes its ability's row, so the tap answers it; the others roll freely.
+ */
+export function SavingThrowList({
+  definition,
+  derived,
+  rolls,
+  owed
+}: Readonly<{
+  definition: ActorDefinition;
+  derived: ActorDerivedSheet | null;
+  rolls: SheetRolls;
+  owed?: (ability: Ability) => ReactNode;
+}>) {
+  return (
+    <ul className="cs-saves">
+      {abilityRows(definition, derived).map(({ ability, row, proficient, save, fromItems, fails }) => {
+        const answer = owed?.(ability);
+        if (answer) return <li key={ability}>{answer}</li>;
+        const saveName = `${ABILITY_WORDS[ability]} saving throw`;
+        return (
+          <li key={ability}>
+            <button
+              type="button"
+              className={`cs-save interactive${proficient ? " is-proficient" : ""}${fails ? " is-failing" : ""}`}
+              disabled={rolls.rolling}
+              aria-label={`Roll ${withArticle(saveName)}, ${signed(save)}${proficient ? ", proficient" : ""}${fromItems !== 0 ? `, ${signed(fromItems)} from equipment` : ""}${fails ? ", fails automatically" : modeLabel(row?.saveMode)}`}
+              onClick={() => void rolls.rollSave(ability)}
+            >
+              <span className={`cs-tier${proficient ? " is-proficient" : ""}`} aria-hidden="true" />
+              <span className="cs-save-name">
+                <span className="cs-save-long">{ABILITY_WORDS[ability]}</span>
+                <span className="cs-save-short">{ability.toUpperCase()}</span>
+              </span>
+              {fails ? (
+                <span className="roll-mode-tag is-disadvantage" aria-hidden="true">
+                  Fails
+                </span>
+              ) : (
+                <RollModeTag mode={row?.saveMode} />
+              )}
+              <strong className="cs-save-bonus">{signed(save)}</strong>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** The six scores, each with its check and its saving throw side by side. */
 function AbilityGrid({
   definition,
   derived,
   rolls
 }: Readonly<{ definition: ActorDefinition; derived: ActorDerivedSheet | null; rolls: SheetRolls }>) {
+  // Abilities as tiles that roll the check (the modifier large, the score under it), then the saving throws.
   return (
-    <div className="cs-abilities">
-      {ABILITIES.map((ability) => {
-        const score = definition.abilityScores[ability];
-        const row = derived?.abilities.find((entry) => entry.ability === ability) ?? null;
-        const check = row?.check ?? abilityModifier(score);
-        const proficient = row?.saveProficient ?? definition.proficiencies?.saves.includes(ability) ?? false;
-        const save = row?.save ?? saveBonus(score, definition.proficiencyBonus, proficient);
-        const fromItems = row?.saveFromItems ?? 0;
-        // Paralyzed, Stunned, Petrified or Unconscious: a Strength or Dexterity save fails without a roll.
-        const fails = row?.saveAutoFails ?? null;
-        const checkName = `${ABILITY_WORDS[ability]} check`;
-        const saveName = `${ABILITY_WORDS[ability]} saving throw`;
-        return (
-          <div key={ability} className="cs-ability">
-            <span className="cs-ability-head">
-              <span className="cs-eyebrow">{ABILITY_WORDS[ability].slice(0, 3)}</span>
-              <strong className="cs-ability-score">{score}</strong>
-            </span>
-            <span className="cs-ability-rolls">
-              <button
-                type="button"
-                className="cs-roll is-stacked"
-                disabled={rolls.rolling}
-                aria-label={`Roll ${withArticle(checkName)}, ${signed(check)}${modeLabel(row?.checkMode)}`}
-                onClick={() => void rolls.rollCheck({ ability }, checkName)}
-              >
-                <span className="cs-roll-label">Check</span>
-                <strong>{signed(check)}</strong>
-                <RollModeTag mode={row?.checkMode} />
-              </button>
-              <button
-                type="button"
-                className={`cs-roll is-stacked${proficient ? " is-proficient" : ""}${fails ? " is-failing" : ""}`}
-                disabled={rolls.rolling}
-                aria-label={`Roll ${withArticle(saveName)}, ${signed(save)}${proficient ? ", proficient" : ""}${fromItems !== 0 ? `, ${signed(fromItems)} from equipment` : ""}${fails ? ", fails automatically" : modeLabel(row?.saveMode)}`}
-                onClick={() => void rolls.rollSave(ability)}
-              >
-                <span className="cs-roll-label">Save</span>
-                <strong>{signed(save)}</strong>
-                {fails ? (
-                  <span className="roll-mode-tag is-disadvantage" aria-hidden="true">
-                    Fails
-                  </span>
-                ) : (
-                  <RollModeTag mode={row?.saveMode} />
-                )}
-              </button>
-            </span>
-          </div>
-        );
-      })}
-    </div>
+    <>
+      <div className="cs-abilities" role="group" aria-label="Abilities">
+        {abilityRows(definition, derived).map(({ ability, score, row, check }) => {
+          const checkName = `${ABILITY_WORDS[ability]} check`;
+          return (
+            <button
+              key={ability}
+              type="button"
+              className="cs-ability interactive"
+              disabled={rolls.rolling}
+              aria-label={`Roll ${withArticle(checkName)}, ${signed(check)}${modeLabel(row?.checkMode)}`}
+              onClick={() => void rolls.rollCheck({ ability }, checkName)}
+            >
+              <span className="cs-ability-name">{ABILITY_WORDS[ability]}</span>
+              <strong className="cs-ability-mod">{signed(check)}</strong>
+              <span className="cs-ability-score">{score}</span>
+              <RollModeTag mode={row?.checkMode} />
+            </button>
+          );
+        })}
+      </div>
+      <span className="cs-eyebrow">Saving throws</span>
+      <SavingThrowList definition={definition} derived={derived} rolls={rolls} />
+    </>
   );
 }
 
@@ -393,9 +437,7 @@ export function ChecksTab({
                 className={`cs-tier${skill.tier === "expertise" ? " is-expertise" : skill.tier === "proficient" ? " is-proficient" : ""}`}
                 role="img"
                 aria-label={`${tierWord(skill.tier)}${skill.sources.length > 0 ? ` from ${skill.sources.join(", ")}` : ""}`}
-              >
-                {skill.tier === "expertise" ? "E" : skill.tier === "proficient" ? "P" : ""}
-              </span>
+              ></span>
               <span className="cs-skill-name">
                 {skill.name}
                 {skill.ability && <em>{skill.ability.toUpperCase()}</em>}

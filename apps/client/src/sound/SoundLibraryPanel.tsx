@@ -80,7 +80,7 @@ export function SoundLibraryPanel({
   const remove = async (sound: SoundAsset) => {
     const ok = await confirm({
       title: `Delete ${sound.name}?`,
-      body: "It comes off the sound board and every scene's sound, and stops if it is playing.",
+      body: "It comes off the sound board and every encounter's sound, and stops if it is playing.",
       confirmLabel: "Delete",
       danger: true
     });

@@ -53,7 +53,7 @@ describe("the GM's Settings", () => {
     expect(within(bar).getByRole("button", { name: "Players" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("heading", { name: "Players", level: 2 })).toBeInTheDocument();
 
-    await user.click(within(bar).getByRole("button", { name: "Fights" }));
+    await user.click(within(bar).getByRole("button", { name: "Encounters" }));
     expect(window.location.pathname).toBe("/settings/fights");
     expect(screen.getByRole("heading", { name: "Rules assistant", level: 3 })).toBeInTheDocument();
   });
@@ -75,9 +75,11 @@ describe("the GM's Settings", () => {
 
   it("marks every GM section GM only, and the GM's own row in Device", async () => {
     renderAt("/settings/fights");
-    expect(screen.getByRole("heading", { name: /^Fights/, level: 2 }).parentElement).toHaveTextContent("GM only");
+    expect(screen.getByRole("heading", { name: /^Encounters/, level: 2 }).parentElement).toHaveTextContent("GM only");
     act(() => goTo("/settings/device"));
-    expect(await screen.findByRole("heading", { name: /^Arrange new scenes/, level: 3 })).toHaveTextContent("GM only");
+    expect(await screen.findByRole("heading", { name: /^Arrange new encounters/, level: 3 })).toHaveTextContent(
+      "GM only"
+    );
     expect(screen.getByRole("heading", { name: /^Device/, level: 2 }).parentElement).not.toHaveTextContent("GM only");
   });
 
@@ -199,6 +201,20 @@ describe("a player's Settings", () => {
     expect(screen.getByRole("group", { name: "Theme" })).toBeInTheDocument();
     expect(screen.queryByText(SETTING.arrangeScenes.label)).toBeNull();
     expect(screen.queryByText("GM only")).toBeNull();
+  });
+
+  it("turns Reduce transparency on for this device, and makes the page solid at once", async () => {
+    const user = userEvent.setup();
+    localStorage.removeItem("vtt.reduce-transparency");
+    renderPlayer("/settings");
+    const toggle = screen.getByRole("switch", { name: "Reduce transparency" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(document.documentElement).toHaveAttribute("data-transparency", "reduced");
+    expect(localStorage.getItem("vtt.reduce-transparency")).toBe("on");
+    await user.click(toggle);
+    expect(document.documentElement).not.toHaveAttribute("data-transparency");
   });
 
   it("never mounts a GM section, even at its address", () => {

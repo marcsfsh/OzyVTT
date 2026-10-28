@@ -432,3 +432,130 @@
     max-width: 8.5rem;
   }
 }
+
+/* A laptop's scene page: the scenes down the left, the scene's header and map in the middle, its panel on the right. */
+.table-bench.sc-scene-bench.has-list {
+  grid-template-columns: 260px minmax(0, 1fr) 24.5rem;
+  grid-template-areas:
+    "list head panel"
+    "list map panel";
+}
+.sc-list-col {
+  grid-area: list;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-3) 0;
+  border-right: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.sc-list-col-title {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-3);
+  color: var(--text-muted);
+  font: 600 12px / 1.3 var(--font-label);
+}
+.sc-list-col-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-list-col-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 60px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sc-list-col-row:hover {
+  background: var(--surface-2);
+}
+.sc-list-col-row.is-current {
+  background: color-mix(in srgb, var(--state-on) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--state-on-edge);
+}
+.sc-list-col-thumb {
+  flex: none;
+  width: 56px;
+  height: 40px;
+}
+.sc-list-col-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sc-list-col-text b {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-list-col-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
+.sc-readiness {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+}
+.sc-readiness svg {
+  width: 12px;
+  height: 12px;
+}
+.sc-readiness.is-live {
+  color: var(--cyan-hi);
+}
+.sc-readiness.is-ready {
+  color: var(--text);
+}
+.sc-readiness.is-needs-map,
+.sc-readiness.is-map-unavailable {
+  color: var(--caution-hi);
+}
+.sc-list-col-extra {
+  color: var(--violet-hi);
+}
+.sc-scene-bench .sc-scene-title {
+  font: 400 24px / 1.1 var(--font-display);
+  text-transform: uppercase;
+}
+.sc-make-live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.sc-make-live-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+.sc-scene-bench .sc-scene-head .sc-scene-title {
+  flex: 1 1 auto;
+  min-width: 6rem;
+}
+.sc-scene-bench .sc-scene-head .sc-grow {
+  display: none;
+}
+/* The choice names itself; the word beside it gives the title its room. */
+.sc-scene-bench .sc-see-as-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

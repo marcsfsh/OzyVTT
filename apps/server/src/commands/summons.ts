@@ -32,7 +32,7 @@ export const summonCommands = [
     type: "summon.command",
     operationId: "commandSummons",
     description:
-      "A creature commands the creatures it summoned that take a command (SRD 5.2.1 Animate Dead, Animate Objects, Create Undead, Unseen Servant): those in `creatureIds`, or every one it commands that way, within the range the spell gives. It costs the commander's Bonus Action (a Magic action for some) on its own turn in a fight. A commanded creature acts on its next turn, where one left uncommanded takes the Dodge action; a summoned thing with no turns of its own moves the distance its command gives it this turn. A player commands only through their own character; the GM may `override` an economy or range rule.",
+      "A creature commands the creatures it summoned that take a command (SRD 5.2.1 Animate Dead, Animate Objects, Create Undead, Unseen Servant): those in `creatureIds`, or every one it commands that way, within the range the spell gives. It costs the commander's Bonus Action (a Magic action for some) on its own turn in an encounter. A commanded creature acts on its next turn, where one left uncommanded takes the Dodge action; a summoned thing with no turns of its own moves the distance its command gives it this turn. A player commands only through their own character; the GM may `override` an economy or range rule.",
     summary: "Command the creatures a creature summoned (a Bonus Action).",
     schema: SummonCommandSchema,
     malformed: "The command is malformed.",

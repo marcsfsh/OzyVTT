@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Rogue avatar"><title>Rogue avatar</title><defs><radialGradient id="oz-class-rogue-b" cx="0.5" cy="0.45" r="0.75"><stop offset="0" stop-color="#2a0a52"></stop><stop offset="1" stop-color="#07020f"></stop></radialGradient>
+<linearGradient id="oz-class-rogue-d" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9fdcff"></stop><stop offset="0.5" stop-color="#ffffff"></stop><stop offset="1" stop-color="#5a4a8a"></stop></linearGradient>
+<mask id="oz-class-rogue-h"><rect width="64" height="64" fill="#fff"></rect><ellipse cx="20" cy="31" rx="6.5" ry="4.2" transform="rotate(8 20 31)" fill="#000"></ellipse><ellipse cx="44" cy="31" rx="6.5" ry="4.2" transform="rotate(-8 44 31)" fill="#000"></ellipse></mask>
+<filter id="oz-class-rogue-g" x="-30%" y="-50%" width="160%" height="200%"><feGaussianBlur stdDeviation="1.8"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#oz-class-rogue-b)"></rect>
+<path d="M4 14c6-4 12 2 18-2M42 10c6 3 10-2 16 1" stroke="#b07cff" stroke-width="1.2" fill="none" opacity="0.5"></path>
+<g transform="translate(32 50) rotate(-62)"><path d="M-4 0L18 -2L22 0L18 2Z" fill="url(#oz-class-rogue-d)"></path><rect x="-6" y="-4" width="2.2" height="8" fill="#ffd23f"></rect><rect x="-13" y="-1.4" width="7" height="2.8" fill="#3b1170"></rect></g>
+<path d="M7 30C3 33 2 38 3 42M57 30C61 33 62 38 61 42" stroke="#ff2f92" stroke-width="1.6" fill="none"></path>
+<path d="M7 30C7 21.5 15.5 19.5 23.5 21.5C28 22.6 30 24.6 32 24.6C34 24.6 36 22.6 40.5 21.5C48.5 19.5 57 21.5 57 30C57 38 51 42 44.5 42C38.5 42 35 38.5 32 36C29 38.5 25.5 42 19.5 42C13 42 7 38 7 30Z" fill="none" stroke="#ff2f92" stroke-width="3" filter="url(#oz-class-rogue-g)" opacity="0.7"></path>
+<path d="M7 30C7 21.5 15.5 19.5 23.5 21.5C28 22.6 30 24.6 32 24.6C34 24.6 36 22.6 40.5 21.5C48.5 19.5 57 21.5 57 30C57 38 51 42 44.5 42C38.5 42 35 38.5 32 36C29 38.5 25.5 42 19.5 42C13 42 7 38 7 30Z" fill="#0b0414" stroke="#ff2f92" stroke-width="1.6" mask="url(#oz-class-rogue-h)"></path>
+<ellipse cx="20" cy="31" rx="6.5" ry="4.2" transform="rotate(8 20 31)" fill="none" stroke="#ff8cc0" stroke-width="0.8"></ellipse><ellipse cx="44" cy="31" rx="6.5" ry="4.2" transform="rotate(-8 44 31)" fill="none" stroke="#ff8cc0" stroke-width="0.8"></ellipse></svg>

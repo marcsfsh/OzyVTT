@@ -74,7 +74,7 @@ export function gameCommandRoute(command: CommandDefinition): ApiRoute {
     method: route.method,
     path: route.path,
     operationId: command.operationId,
-    tag: route.path.startsWith(`${API_NAMESPACE}/encounters`) ? "Fight replays" : "Live game",
+    tag: route.path.startsWith(`${API_NAMESPACE}/replays`) ? "Replays" : "Live game",
     summary: command.summary.replace(/\.$/, ""),
     description: command.description,
     access,

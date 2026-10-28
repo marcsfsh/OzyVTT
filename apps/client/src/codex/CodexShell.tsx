@@ -43,7 +43,7 @@ export function CodexShell({
   gmToken,
   scenes = [],
   actors = [],
-  activeSceneId = null,
+  activeEncounterId = null,
   onActivateScene = () => {},
   onOpenReplay,
   gameHours = null,
@@ -52,8 +52,8 @@ export function CodexShell({
   gmToken: string;
   scenes?: readonly WorkspaceScene[];
   actors?: readonly WorkspaceActor[];
-  activeSceneId?: string | null;
-  onActivateScene?: (sceneId: string) => void;
+  activeEncounterId?: string | null;
+  onActivateScene?: (encounterId: string) => void;
   onOpenReplay?: (archiveId: number) => void;
   /** The game clock (`rest.clockHours`), whose hour goes with the calendar's date. */
   gameHours?: number | null;
@@ -159,7 +159,7 @@ export function CodexShell({
       scenes,
       actors,
       party,
-      activeSceneId,
+      activeEncounterId,
       onActivateScene,
       onOpenReplay,
       gameHours,
@@ -170,7 +170,18 @@ export function CodexShell({
       reportError: setActionError,
       openPreview: (characterId) => void openPreview(characterId)
     }),
-    [scenes, actors, party, activeSceneId, onActivateScene, onOpenReplay, gameHours, gameMinutes, feeds, openPreview]
+    [
+      scenes,
+      actors,
+      party,
+      activeEncounterId,
+      onActivateScene,
+      onOpenReplay,
+      gameHours,
+      gameMinutes,
+      feeds,
+      openPreview
+    ]
   );
 
   const View = section ? CODEX_SECTIONS[section].gm : null;

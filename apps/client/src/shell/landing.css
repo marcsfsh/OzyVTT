@@ -338,6 +338,16 @@
   font-size: clamp(3.4rem, 16vw, 10.5rem);
   line-height: 0.92;
 }
+/* The cabinet wordmark at title size: OZY in chrome and the script vtt beside it, as the drawn join screen has. */
+.landing .home-hero-title .home-hero-mark {
+  gap: 0.1em;
+}
+.landing .home-hero-mark .nh-wordmark-ozy {
+  font-size: clamp(3.4rem, 15vw, 8.5rem);
+}
+.landing .home-hero-mark .nh-wordmark-vtt {
+  font-size: clamp(4.4rem, 19vw, 11rem);
+}
 
 /* The two ways in, both in the display face: the player's is the primary (the sun frame), the GM's a raised
    control with the GM violet on its leading edge. */

@@ -1,0 +1,55 @@
+/* A player's turn card on the table: YOUR TURN in chrome beside the VCR counter, or who acts in the sun frame, then
+   the four lamps. */
+.player-turn-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.player-turn-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.player-turn-card-head .player-turn-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: 400 30px / 1.05 var(--font-display);
+  text-transform: uppercase;
+}
+.player-turn-card-counter {
+  margin-left: auto;
+  align-items: flex-end;
+}
+.player-turn-card-who {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.player-turn-card-acting {
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+}
+.player-turn-card-when {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.economy-extra {
+  grid-column: 1 / -1;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.player-end-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-1) 0;
+}
+.player-end-turn > .table-panel-primary {
+  width: 100%;
+}

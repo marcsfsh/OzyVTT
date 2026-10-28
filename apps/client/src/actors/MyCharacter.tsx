@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ActorDefinition, PartyVisibility, PlayerActor, PlayerView } from "@vtt/domain";
 import { abilityModifier } from "@vtt/rules-5e";
-import { Avatar, Button, Modal, useToast } from "@vtt/ui";
+import { Button, Modal, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
@@ -10,6 +10,7 @@ import { aidGiverOf, isKnockedOut, StabilizeControl } from "../encounter/Stabili
 import { RestPrompt } from "../rest/RestPrompt";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import "./my-character.css";
+import { ActorAvatar } from "./ActorAvatar";
 
 /** Dying and not yet stable: what first aid, a Healer's Kit or Spare the Dying is for. */
 const needsAid = (actor: PlayerActor) =>
@@ -170,7 +171,9 @@ function PartyList({
           .join(" · ");
         const body = (
           <>
-            <Avatar
+            <ActorAvatar
+              actor={actor}
+
               name={actor.name}
               size="sm"
               presence={claimed && actor.presence ? presenceDot(actor.presence) : undefined}
@@ -305,8 +308,7 @@ export function MyCharacter({
     );
 
   return (
-    <section className="my-character pane-frame pane-scene scanlines frame-col anim-view" aria-label="My character">
-      <div className="pane-sky" aria-hidden="true" />
+    <section className="my-character pane-frame pane-scene frame-col anim-view" aria-label="My character">
       <div className="my-character-head neon-beam">
         <h2>My character</h2>
         <div className="my-character-head-actions">

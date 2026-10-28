@@ -238,7 +238,7 @@ describe("Sacred Flame", () => {
 describe("a spell that takes a minute or more to cast", () => {
   const caster = build(wizardInput(["alarm", "magic-missile"]));
 
-  it("takes the Magic action, and in a fight the action on each turn of its minute", () => {
+  it("takes the Magic action, and in an encounter the action on each turn of its minute", () => {
     const { resolve, action, hero } = fight(caster);
     expect(action("spell-alarm").activation).toBe("action");
     expect(

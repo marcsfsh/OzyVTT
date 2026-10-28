@@ -167,7 +167,7 @@ export const CODEX_PATHS = {
   // GM-only, read-only aggregation of reveal state; each row carries the id its own reveal route takes.
   revealAudit: `${API_NAMESPACE}/codex/reveal-audit`,
   // GM-only: the sessions and pins that name each table scene.
-  sceneLinks: `${API_NAMESPACE}/codex/scene-links`,
+  sceneLinks: `${API_NAMESPACE}/codex/encounter-links`,
   calendar: `${API_NAMESPACE}/codex/calendar`,
   calendarPublish: `${API_NAMESPACE}/codex/calendar/publish`,
   calendarUnpublish: `${API_NAMESPACE}/codex/calendar/unpublish`,
@@ -268,6 +268,9 @@ export const GAME_PATHS = {
   reactionAnswer: `${API_NAMESPACE}/game/reactions/{reactionId}/answer`,
   reactionDismiss: `${API_NAMESPACE}/game/reactions/{reactionId}/dismiss`,
   damageResolve: `${API_NAMESPACE}/game/damage/resolve`,
+  damageReport: `${API_NAMESPACE}/game/damage/report`,
+  targetAsk: `${API_NAMESPACE}/game/actions/target-asks`,
+  targetAskWithdraw: `${API_NAMESPACE}/game/actions/target-asks/withdraw`,
   actorAvailableActions: `${API_NAMESPACE}/game/actors/{actorId}/available-actions`,
   actorMovement: `${API_NAMESPACE}/game/actors/{actorId}/movement`,
   effects: `${API_NAMESPACE}/game/actors/{actorId}/effects`,
@@ -342,6 +345,8 @@ export const GAME_PATHS = {
   rulesAsk: `${API_NAMESPACE}/game/rules/ask`,
   rulesAnswer: `${API_NAMESPACE}/game/rules/answer`,
   stagingDefaults: `${API_NAMESPACE}/game/table/staging-defaults`,
+  playerDice: `${API_NAMESPACE}/game/table/player-dice`,
+  targeting: `${API_NAMESPACE}/game/table/targeting`,
   partyVisibility: `${API_NAMESPACE}/game/table/party-visibility`,
   annotations: `${API_NAMESPACE}/game/annotations`,
   annotationsPing: `${API_NAMESPACE}/game/annotations/ping`,
@@ -362,19 +367,24 @@ export const GAME_PATHS = {
   actorArchived: `${API_NAMESPACE}/game/actors/{actorId}/archived`,
   actorSheetPreview: `${API_NAMESPACE}/game/actors/{actorId}/sheet-preview`,
   actorLair: `${API_NAMESPACE}/game/actors/{actorId}/lair`,
+  actorPlayedAtTable: `${API_NAMESPACE}/game/actors/{actorId}/played-at-table`,
   actorPick: `${API_NAMESPACE}/game/actors/{actorId}/pick`,
   actorHealthDisplay: `${API_NAMESPACE}/game/actors/{actorId}/health-display`,
   actorAttitude: `${API_NAMESPACE}/game/actors/{actorId}/attitude`,
   actorSpeed: `${API_NAMESPACE}/game/actors/{actorId}/speed`,
   actorArmorClass: `${API_NAMESPACE}/game/actors/{actorId}/armor-class`,
-  scenes: `${API_NAMESPACE}/game/scenes`,
-  sceneById: `${API_NAMESPACE}/game/scenes/{sceneId}`,
-  sceneRename: `${API_NAMESPACE}/game/scenes/{sceneId}/rename`,
-  sceneActivate: `${API_NAMESPACE}/game/scenes/{sceneId}/activate`,
-  sceneCombatants: `${API_NAMESPACE}/game/scenes/{sceneId}/combatants`,
-  sceneDuplicate: `${API_NAMESPACE}/game/scenes/{sceneId}/duplicate`,
-  sceneReorder: `${API_NAMESPACE}/game/scenes/reorder`,
-  scenePreview: `${API_NAMESPACE}/game/scenes/{sceneId}/preview`,
+  scenes: `${API_NAMESPACE}/game/encounters`,
+  sceneById: `${API_NAMESPACE}/game/encounters/{encounterId}`,
+  chat: `${API_NAMESPACE}/game/chat`,
+  chatDelete: `${API_NAMESPACE}/game/chat/delete`,
+  sceneRename: `${API_NAMESPACE}/game/encounters/{encounterId}/rename`,
+  sceneInitiativeDefaults: `${API_NAMESPACE}/game/encounters/{encounterId}/initiative-defaults`,
+  scenePlayerDice: `${API_NAMESPACE}/game/encounters/{encounterId}/player-dice`,
+  sceneActivate: `${API_NAMESPACE}/game/encounters/{encounterId}/activate`,
+  sceneCombatants: `${API_NAMESPACE}/game/encounters/{encounterId}/combatants`,
+  sceneDuplicate: `${API_NAMESPACE}/game/encounters/{encounterId}/duplicate`,
+  sceneReorder: `${API_NAMESPACE}/game/encounters/reorder`,
+  scenePreview: `${API_NAMESPACE}/game/encounters/{encounterId}/preview`,
   fogEnabled: `${API_NAMESPACE}/game/fog/enabled`,
   fogPaint: `${API_NAMESPACE}/game/fog/paint`,
   fogReset: `${API_NAMESPACE}/game/fog/reset`,
@@ -393,7 +403,7 @@ export const GAME_PATHS = {
   soundStop: `${API_NAMESPACE}/game/sound/stop`,
   soundNextTrack: `${API_NAMESPACE}/game/sound/next-track`,
   soundPause: `${API_NAMESPACE}/game/sound/pause`,
-  sceneSound: `${API_NAMESPACE}/game/scenes/{sceneId}/sound`,
+  sceneSound: `${API_NAMESPACE}/game/encounters/{encounterId}/sound`,
   visionEnabled: `${API_NAMESPACE}/game/vision/enabled`,
   visionAmbient: `${API_NAMESPACE}/game/vision/ambient`,
   visionExploredReset: `${API_NAMESPACE}/game/vision/explored/reset`,
@@ -452,13 +462,13 @@ export const ENCOUNTER_ARCHIVE_SCHEMA_VERSION = 3 as const;
 
 /** Permanent Time Machine records of ended encounters (archiveSchemaVersion 3). GM-grade only: documents hold full state. */
 export const ENCOUNTER_ARCHIVE_PATHS = {
-  collection: `${API_NAMESPACE}/encounters`,
-  byId: `${API_NAMESPACE}/encounters/{id}`,
-  visibility: `${API_NAMESPACE}/encounters/{id}/visibility`,
+  collection: `${API_NAMESPACE}/replays`,
+  byId: `${API_NAMESPACE}/replays/{id}`,
+  visibility: `${API_NAMESPACE}/replays/{id}/visibility`,
   /** The GM's own name for a replay. */
-  name: `${API_NAMESPACE}/encounters/{id}/name`,
+  name: `${API_NAMESPACE}/replays/{id}/name`,
   /** Make one recorded moment live on the table. */
-  launch: `${API_NAMESPACE}/encounters/{id}/launch`
+  launch: `${API_NAMESPACE}/replays/{id}/launch`
 } as const;
 
 export const ApiErrorCodeSchema = z.enum([
@@ -478,8 +488,8 @@ export const IntegrationScopeSchema = z.enum([
   "game:read",
   "actor:read",
   "actor:write",
-  "scene:read",
-  "scene:write",
+  "encounter:read",
+  "encounter:write",
   "combat:read",
   "combat:write",
   "roll:create",
@@ -513,7 +523,7 @@ export const ApiErrorEnvelopeSchema = z
           .record(z.string(), z.unknown())
           .optional()
           .describe(
-            "Facts about the error. On a refused game command or read, `reason` is a stable code for why, finer than `code` and safe to branch on (the message may be reworded): not_joined, validation_failed, forbidden, not_found, stale_revision, needs_confirm, refused, history_review, scene_room_full or internal_error; a rules-mode block's reason is the blocking rule's id (`details.blocked.rule`)."
+            "Facts about the error. On a refused game command or read, `reason` is a stable code for why, finer than `code` and safe to branch on (the message may be reworded): not_joined, validation_failed, forbidden, not_found, stale_revision, needs_confirm, refused, history_review, encounter_room_full or internal_error; a rules-mode block's reason is the blocking rule's id (`details.blocked.rule`)."
           ),
         retryAfterSeconds: z.number().int().positive().optional(),
         currentRevision: z.number().int().nonnegative().optional()
@@ -700,12 +710,17 @@ export const GAME_COMMANDS = {
   "actor.set-hp": { scope: "actor:write", method: "post", path: GAME_PATHS.actorHp },
   "actor.set-condition": { scope: "actor:write", method: "post", path: GAME_PATHS.actorConditions },
   "dice.roll": { scope: "roll:create", method: "post", path: GAME_PATHS.rolls },
+  "chat.send": { scope: "roll:create", method: "post", path: GAME_PATHS.chat },
+  "chat.delete": { scope: "roll:create", method: "post", path: GAME_PATHS.chatDelete },
   "action.resolve": { scope: "combat:write", method: "post", path: GAME_PATHS.actionResolve },
   "save.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.saveAnswer },
   "save.dismiss": { scope: "combat:write", method: "post", path: GAME_PATHS.saveDismiss },
   "reaction.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.reactionAnswer },
   "reaction.dismiss": { scope: "combat:write", method: "post", path: GAME_PATHS.reactionDismiss },
   "damage.resolve": { scope: "combat:write", method: "post", path: GAME_PATHS.damageResolve },
+  "damage.report": { scope: "combat:write", method: "post", path: GAME_PATHS.damageReport },
+  "action.ask-target": { scope: "combat:write", method: "post", path: GAME_PATHS.targetAsk },
+  "action.withdraw-target-ask": { scope: "combat:write", method: "post", path: GAME_PATHS.targetAskWithdraw },
   "effect.add": { scope: "combat:write", method: "post", path: GAME_PATHS.effects },
   "effect.end": { scope: "combat:write", method: "post", path: GAME_PATHS.effectEnd },
   "death-save.roll": { scope: "combat:write", method: "post", path: GAME_PATHS.deathSaveRoll },
@@ -734,6 +749,8 @@ export const GAME_COMMANDS = {
   "rules.ask": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAsk },
   "rules.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAnswer },
   "table.set-staging-defaults": { scope: "combat:write", method: "post", path: GAME_PATHS.stagingDefaults },
+  "table.set-player-dice": { scope: "combat:write", method: "post", path: GAME_PATHS.playerDice },
+  "table.set-targeting": { scope: "combat:write", method: "post", path: GAME_PATHS.targeting },
   "table.set-party-visibility": { scope: "combat:write", method: "post", path: GAME_PATHS.partyVisibility },
   "encounter.set-player-damage-mode": { scope: "combat:write", method: "post", path: GAME_PATHS.playerDamageMode },
   "encounter.set-player-initiative-mode": {
@@ -814,56 +831,63 @@ export const GAME_COMMANDS = {
   "actor.set-archived": { scope: "actor:write", method: "post", path: GAME_PATHS.actorArchived },
   "actor.set-sheet-preview": { scope: "actor:write", method: "post", path: GAME_PATHS.actorSheetPreview },
   "actor.set-lair": { scope: "actor:write", method: "post", path: GAME_PATHS.actorLair },
+  "actor.set-played-at-table": { scope: "actor:write", method: "post", path: GAME_PATHS.actorPlayedAtTable },
   "actor.set-pick": { scope: "actor:write", method: "post", path: GAME_PATHS.actorPick },
   "actor.set-speed": { scope: "actor:write", method: "post", path: GAME_PATHS.actorSpeed },
   "actor.set-armor-class": { scope: "actor:write", method: "post", path: GAME_PATHS.actorArmorClass },
-  "scene.create": { scope: "scene:write", method: "post", path: GAME_PATHS.scenes },
-  "scene.rename": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneRename },
-  "scene.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.sceneById },
-  "scene.activate": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneActivate },
-  "scene.set-combatants": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneCombatants },
-  "scene.duplicate": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneDuplicate },
-  "scene.reorder": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneReorder },
+  "encounter.create": { scope: "encounter:write", method: "post", path: GAME_PATHS.scenes },
+  "encounter.rename": { scope: "encounter:write", method: "post", path: GAME_PATHS.sceneRename },
+  "encounter.set-initiative-defaults": {
+    scope: "encounter:write",
+    method: "post",
+    path: GAME_PATHS.sceneInitiativeDefaults
+  },
+  "encounter.set-player-dice": { scope: "encounter:write", method: "post", path: GAME_PATHS.scenePlayerDice },
+  "encounter.remove": { scope: "encounter:write", method: "delete", path: GAME_PATHS.sceneById },
+  "encounter.activate": { scope: "encounter:write", method: "post", path: GAME_PATHS.sceneActivate },
+  "encounter.set-combatants": { scope: "encounter:write", method: "post", path: GAME_PATHS.sceneCombatants },
+  "encounter.duplicate": { scope: "encounter:write", method: "post", path: GAME_PATHS.sceneDuplicate },
+  "encounter.reorder": { scope: "encounter:write", method: "post", path: GAME_PATHS.sceneReorder },
   "replay.launch": { scope: "combat:write", method: "post", path: ENCOUNTER_ARCHIVE_PATHS.launch },
   "character.rebuild": { scope: "actor:write", method: "post", path: GAME_PATHS.characterRebuild },
   "builder.roll-abilities": { scope: "actor:write", method: "post", path: GAME_PATHS.builderRollAbilities },
-  "fog.set-enabled": { scope: "scene:write", method: "post", path: GAME_PATHS.fogEnabled },
-  "fog.paint": { scope: "scene:write", method: "post", path: GAME_PATHS.fogPaint },
-  "fog.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.fogReset },
-  "terrain.paint": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainPaint },
-  "terrain.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainReset },
-  "trap.place": { scope: "scene:write", method: "post", path: GAME_PATHS.trapPlace },
-  "trap.edit": { scope: "scene:write", method: "post", path: GAME_PATHS.trapEdit },
-  "trap.remove": { scope: "scene:write", method: "post", path: GAME_PATHS.trapRemove },
+  "fog.set-enabled": { scope: "encounter:write", method: "post", path: GAME_PATHS.fogEnabled },
+  "fog.paint": { scope: "encounter:write", method: "post", path: GAME_PATHS.fogPaint },
+  "fog.reset": { scope: "encounter:write", method: "post", path: GAME_PATHS.fogReset },
+  "terrain.paint": { scope: "encounter:write", method: "post", path: GAME_PATHS.terrainPaint },
+  "terrain.reset": { scope: "encounter:write", method: "post", path: GAME_PATHS.terrainReset },
+  "trap.place": { scope: "encounter:write", method: "post", path: GAME_PATHS.trapPlace },
+  "trap.edit": { scope: "encounter:write", method: "post", path: GAME_PATHS.trapEdit },
+  "trap.remove": { scope: "encounter:write", method: "post", path: GAME_PATHS.trapRemove },
   "trap.spring": { scope: "combat:write", method: "post", path: GAME_PATHS.trapSpring },
   "trap.disarm": { scope: "combat:write", method: "post", path: GAME_PATHS.trapDisarm },
-  "environment.set": { scope: "scene:write", method: "post", path: GAME_PATHS.environmentSet },
-  "sound.arrange": { scope: "scene:write", method: "post", path: GAME_PATHS.soundArrange },
-  "sound.play": { scope: "scene:write", method: "post", path: GAME_PATHS.soundPlay },
-  "sound.stop": { scope: "scene:write", method: "post", path: GAME_PATHS.soundStop },
-  "sound.next-track": { scope: "scene:write", method: "post", path: GAME_PATHS.soundNextTrack },
-  "sound.pause": { scope: "scene:write", method: "post", path: GAME_PATHS.soundPause },
-  "sound.set-scene-preset": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneSound },
-  "vision.set-enabled": { scope: "scene:write", method: "post", path: GAME_PATHS.visionEnabled },
-  "vision.set-ambient": { scope: "scene:write", method: "post", path: GAME_PATHS.visionAmbient },
-  "vision.reset-explored": { scope: "scene:write", method: "post", path: GAME_PATHS.visionExploredReset },
-  "wall.add": { scope: "scene:write", method: "post", path: GAME_PATHS.walls },
-  "wall.move": { scope: "scene:write", method: "post", path: GAME_PATHS.wallMove },
-  "wall.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.wallById },
-  "wall.clear": { scope: "scene:write", method: "post", path: GAME_PATHS.wallsClear },
+  "environment.set": { scope: "encounter:write", method: "post", path: GAME_PATHS.environmentSet },
+  "sound.arrange": { scope: "encounter:write", method: "post", path: GAME_PATHS.soundArrange },
+  "sound.play": { scope: "encounter:write", method: "post", path: GAME_PATHS.soundPlay },
+  "sound.stop": { scope: "encounter:write", method: "post", path: GAME_PATHS.soundStop },
+  "sound.next-track": { scope: "encounter:write", method: "post", path: GAME_PATHS.soundNextTrack },
+  "sound.pause": { scope: "encounter:write", method: "post", path: GAME_PATHS.soundPause },
+  "sound.set-encounter-preset": { scope: "encounter:write", method: "post", path: GAME_PATHS.sceneSound },
+  "vision.set-enabled": { scope: "encounter:write", method: "post", path: GAME_PATHS.visionEnabled },
+  "vision.set-ambient": { scope: "encounter:write", method: "post", path: GAME_PATHS.visionAmbient },
+  "vision.reset-explored": { scope: "encounter:write", method: "post", path: GAME_PATHS.visionExploredReset },
+  "wall.add": { scope: "encounter:write", method: "post", path: GAME_PATHS.walls },
+  "wall.move": { scope: "encounter:write", method: "post", path: GAME_PATHS.wallMove },
+  "wall.remove": { scope: "encounter:write", method: "delete", path: GAME_PATHS.wallById },
+  "wall.clear": { scope: "encounter:write", method: "post", path: GAME_PATHS.wallsClear },
   // Players open doors beside their own character, so it is a combat command.
   "door.set-open": { scope: "combat:write", method: "post", path: GAME_PATHS.doorOpen },
-  "door.set-state": { scope: "scene:write", method: "post", path: GAME_PATHS.doorState },
+  "door.set-state": { scope: "encounter:write", method: "post", path: GAME_PATHS.doorState },
   // Players pick, force and jam doors beside their own character, and attack objects with it.
   "door.use": { scope: "combat:write", method: "post", path: GAME_PATHS.doorUse },
-  "object.set": { scope: "scene:write", method: "post", path: GAME_PATHS.wallObject },
+  "object.set": { scope: "encounter:write", method: "post", path: GAME_PATHS.wallObject },
   "object.damage": { scope: "combat:write", method: "post", path: GAME_PATHS.objectDamage },
   "object.attack": { scope: "combat:write", method: "post", path: GAME_PATHS.objectAttack },
-  "light.add": { scope: "scene:write", method: "post", path: GAME_PATHS.lights },
-  "light.move": { scope: "scene:write", method: "post", path: GAME_PATHS.lightMove },
-  "light.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.lightById },
-  "vision.add-area": { scope: "scene:write", method: "post", path: GAME_PATHS.visionAreas },
-  "vision.remove-area": { scope: "scene:write", method: "delete", path: GAME_PATHS.visionAreaById },
+  "light.add": { scope: "encounter:write", method: "post", path: GAME_PATHS.lights },
+  "light.move": { scope: "encounter:write", method: "post", path: GAME_PATHS.lightMove },
+  "light.remove": { scope: "encounter:write", method: "delete", path: GAME_PATHS.lightById },
+  "vision.add-area": { scope: "encounter:write", method: "post", path: GAME_PATHS.visionAreas },
+  "vision.remove-area": { scope: "encounter:write", method: "delete", path: GAME_PATHS.visionAreaById },
   // A player lights a Torch in their own character's hand, so it is a combat command.
   "item.set-light": { scope: "combat:write", method: "post", path: GAME_PATHS.itemLight },
   "item.set-form": { scope: "combat:write", method: "post", path: GAME_PATHS.itemForm }
@@ -977,14 +1001,16 @@ export const EncounterArchiveSummarySchema = z
       .describe("The GM's own name for the replay, or null; a player sees it on a shared replay"),
     /** The live scene the fight was on, when it had one. GM-only: a player's list leaves it out, as their view
      *  of the table never names scenes. */
-    sceneName: z
+    encounterName: z
       .string()
       .nullable()
       .optional()
-      .describe("The live scene the fight was on, or null. GM-grade callers only; a player's list leaves it out")
+      .describe(
+        "The live encounter the replay was recorded on, or null. GM-grade callers only; a player's list leaves it out"
+      )
   })
   .strict();
-export const EncounterArchiveListSchema = z.object({ encounters: z.array(EncounterArchiveSummarySchema) }).strict();
+export const EncounterArchiveListSchema = z.object({ replays: z.array(EncounterArchiveSummarySchema) }).strict();
 export const EncounterArchiveVisibilitySchema = z
   .object({ id: z.number().int().positive(), playerVisible: z.boolean() })
   .strict();
@@ -992,7 +1018,7 @@ export const EncounterArchiveVisibilitySchema = z
 export const EncounterArchiveNameRequestSchema = z.object({ name: z.string().trim().max(80).nullable() }).strict();
 /** Shares a replay with players, or takes it back. Keys beside `playerVisible` are ignored. */
 export const EncounterArchiveVisibilityRequestSchema = z.object({
-  playerVisible: z.boolean().describe("True shares this fight with players; false hides it again, as it starts.")
+  playerVisible: z.boolean().describe("True shares this encounter with players; false hides it again, as it starts.")
 });
 export const EncounterArchiveNameSchema = z
   .object({ id: z.number().int().positive(), name: z.string().min(1).max(80).nullable() })
@@ -1008,16 +1034,16 @@ export const EncounterArchiveDocumentSchema = z
       )
   })
   .strict();
-/** What `POST /encounters/{id}/launch` returns: the new live scene and the combatants it cloned. */
+/** What `POST /replays/{id}/launch` returns: the new live encounter and the combatants it cloned. */
 export const EncounterArchiveLaunchSchema = z
   .object({
     commandId: z.uuid(),
     revision: z.number().int().nonnegative(),
     duplicate: z.boolean(),
-    sceneId: z.string().describe("The new live scene holding the restored moment"),
+    encounterId: z.string().describe("The new live encounter holding the restored moment"),
     actorIds: z
       .array(z.string())
-      .describe("The cloned combatants, so a client can offer to remove them with the replay scene")
+      .describe("The cloned combatants, so a client can offer to remove them with the replay encounter")
   })
   .strict();
 export const EncounterArchiveDeletedSchema = z

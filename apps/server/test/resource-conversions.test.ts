@@ -92,7 +92,7 @@ describe("Font of Magic", () => {
     expect(() => sorcerer.convert({ conversionId: "font-of-magic-slot", level: 2 })).toThrow(/costs 3/);
   });
 
-  it("takes a Bonus Action on the Sorcerer's own turn in a fight", () => {
+  it("takes a Bonus Action on the Sorcerer's own turn in an encounter", () => {
     const sorcerer = table({ classId: "sorcerer", level: 5 });
     const { state } = sorcerer;
     state.combat = {
@@ -162,7 +162,7 @@ describe("slot recovery when a Short Rest finishes", () => {
 });
 
 describe("Magical Cunning", () => {
-  it("regains half a Warlock's Pact Magic slots, rounded up, outside a fight, once per Long Rest", () => {
+  it("regains half a Warlock's Pact Magic slots, rounded up, outside an encounter, once per Long Rest", () => {
     const warlock = table({ classId: "warlock", level: 5 });
     const pact = warlock.actor().pactSlots!;
     warlock.actor().pactSlots = { ...pact, remaining: 0 };

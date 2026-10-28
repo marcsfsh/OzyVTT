@@ -356,7 +356,7 @@ describe("live authoritative encounter workflow", () => {
 
       // Empty to begin with, and GM-gated.
       expect((await fetch(archives)).status).toBe(401);
-      expect((await (await fetch(archives, { headers: gmHeaders })).json()).data).toEqual({ encounters: [] });
+      expect((await (await fetch(archives, { headers: gmHeaders })).json()).data).toEqual({ replays: [] });
 
       gmSocket = await joinSocket(base, gmToken);
       const started = await emitCommand(gmSocket, "encounter:start", {
@@ -379,14 +379,13 @@ describe("live authoritative encounter workflow", () => {
 
       // The fight is archived permanently even though the live buffer was wiped.
       const list = (await (await fetch(archives, { headers: gmHeaders })).json()).data;
-      expect(list.encounters).toHaveLength(1);
-      expect(list.encounters[0].turnCount).toBeGreaterThan(0);
-      expect(typeof list.encounters[0].endedAt).toBe("string");
+      expect(list.replays).toHaveLength(1);
+      expect(list.replays[0].turnCount).toBeGreaterThan(0);
+      expect(typeof list.replays[0].endedAt).toBe("string");
 
-      const document = (await (await fetch(archive(list.encounters[0].id), { headers: gmHeaders })).json()).data
-        .document;
+      const document = (await (await fetch(archive(list.replays[0].id), { headers: gmHeaders })).json()).data.document;
       expect(document.archiveSchemaVersion).toBe(3);
-      expect(document.turns.length).toBe(list.encounters[0].turnCount);
+      expect(document.turns.length).toBe(list.replays[0].turnCount);
       expect(document.turns[0].state.actors.some((actor: { id: string }) => actor.id === HERO_ID)).toBe(true); // full machine-readable state per turn
       expect(Array.isArray(document.log)).toBe(true);
       expect(document.log.length).toBeGreaterThan(0); // timestamped commentary bundled in
@@ -406,9 +405,9 @@ describe("live authoritative encounter workflow", () => {
 
       // 404 for an unknown id; delete removes it.
       expect((await fetch(archive(99999), { headers: gmHeaders })).status).toBe(404);
-      expect((await fetch(archive(list.encounters[0].id), { method: "DELETE" })).status).toBe(401);
-      await fetch(archive(list.encounters[0].id), { method: "DELETE", headers: gmHeaders });
-      expect((await (await fetch(archives, { headers: gmHeaders })).json()).data).toEqual({ encounters: [] });
+      expect((await fetch(archive(list.replays[0].id), { method: "DELETE" })).status).toBe(401);
+      await fetch(archive(list.replays[0].id), { method: "DELETE", headers: gmHeaders });
+      expect((await (await fetch(archives, { headers: gmHeaders })).json()).data).toEqual({ replays: [] });
     } finally {
       gmSocket?.disconnect();
       running.close();
@@ -570,7 +569,7 @@ describe("live authoritative encounter workflow", () => {
           position: null,
           expectedRevision: 4
         })
-      ).toMatchObject({ ok: false, message: "Only the GM takes a token off the map during a fight." });
+      ).toMatchObject({ ok: false, message: "Only the GM takes a token off the map during an encounter." });
       expect(
         await emitCommand(gmSocket, "token:move", {
           commandId: "61000000-0000-4000-8000-000000000007",

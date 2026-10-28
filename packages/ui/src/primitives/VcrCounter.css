@@ -1,0 +1,34 @@
+/* The VCR counter: a state word with its transport mark over the round, in VT323 with a faint phosphor in Dusk. */
+.nh-vcr {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: none;
+  font: 400 16px / 0.95 var(--font-numeric);
+  letter-spacing: 0.04em;
+  color: var(--text);
+  text-shadow: var(--vcr-glow);
+}
+.nh-vcr-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.nh-vcr-mark {
+  width: 9px;
+  height: 10px;
+  fill: currentColor;
+}
+.nh-vcr-round {
+  font-size: 28px;
+}
+.nh-vcr--lg {
+  font-size: 24px;
+}
+.nh-vcr--lg .nh-vcr-mark {
+  width: 14px;
+  height: 16px;
+}
+.nh-vcr--lg .nh-vcr-round {
+  font-size: 52px;
+}

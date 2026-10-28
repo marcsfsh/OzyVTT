@@ -15,14 +15,17 @@ import {
   expect,
   expectPageFits,
   fillIn,
+  gmSection,
   joinAndClaim,
   openGmSection,
   pageScale,
   pinch,
   pinchDuringDrag,
+  playerSection,
   positionOf,
   press,
   signInAsGm,
+  stageFight,
   test,
   toneWav
 } from "./smoke";
@@ -44,7 +47,7 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
   await expectPageFits(gm);
   await press(gm.getByRole("button", { name: "Make live" }));
   // With a fight running, making another scene live parks it, which the GM confirms.
-  const confirm = gm.getByRole("dialog", { name: "Make scene live?" });
+  const confirm = gm.getByRole("dialog", { name: "Make encounter live?" });
   const table = gm.getByRole("button", { name: "Go to the table" });
   await expect(confirm.or(table)).toBeVisible();
   if (await confirm.isVisible()) await press(confirm.getByRole("button", { name: "Make live" }));
@@ -53,10 +56,10 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
 
 /** A new scene on a freshly uploaded map, made from the Scenes tab's steps and made live; the GM ends at the table. */
 async function liveSceneOnNewMap(gm: Page, file: string, buffer: Buffer) {
-  await openGmSection(gm, "Scenes");
+  await openGmSection(gm, "Encounters");
   // The bar's New scene on a laptop, the tab bar's New on a phone.
-  await press(gm.getByRole("button", { name: /^New( scene)?$/ }).first());
-  await expect(gm.getByRole("heading", { name: "New scene" })).toBeVisible();
+  await press(gm.getByRole("button", { name: /^New( encounter)?$/ }).first());
+  await expect(gm.getByRole("heading", { name: "New encounter" })).toBeVisible();
   const chooser = gm.waitForEvent("filechooser");
   await press(gm.getByRole("button", { name: /Upload a map/ }));
   await (await chooser).setFiles({ name: file, mimeType: "image/png", buffer });
@@ -67,7 +70,7 @@ async function liveSceneOnNewMap(gm: Page, file: string, buffer: Buffer) {
   await makeLiveFromSteps(gm, ["Light", "Sound", "Review"]);
 }
 
-test("the first evening: the GM password, the join address, a player, the table screen and a live scene", async ({
+test("the first evening: the GM password, the join address, a player, the table screen and a live encounter", async ({
   open,
   hasTouch
 }) => {
@@ -103,10 +106,10 @@ test("the first evening: the GM password, the join address, a player, the table 
   await press(reset.getByRole("button", { name: "Close" }));
   await fillIn(gm.getByPlaceholder("GM password"), GM_PASSWORD);
   await press(gm.getByRole("button", { name: "Enter table" }));
-  await expect(gm.getByRole("tab", { name: "Table", selected: true })).toBeVisible();
+  await expect(gmSection(gm, "Play")).toHaveAttribute("aria-selected", "true");
   // A reload keeps the GM signed in.
   await gm.reload();
-  await expect(gm.getByRole("tab", { name: "Table", selected: true })).toBeVisible();
+  await expect(gmSection(gm, "Play")).toHaveAttribute("aria-selected", "true");
   await expectPageFits(gm);
 
   // The address players open, from the Table's empty state, with Copy and a QR code drawn here.
@@ -127,14 +130,16 @@ test("the first evening: the GM password, the join address, a player, the table 
   // A player opens that address, sees who each character is, claims one and lands on My character.
   const player = await open(address!);
   await press(player.getByRole("button", { name: "Join as Player" }));
-  await expect(player.getByRole("heading", { name: "Choose your character" })).toBeVisible();
+  await expect(player.getByRole("heading", { name: "Pick your character" })).toBeVisible();
   // The later journeys play the other two.
   const card = player.getByRole("listitem").filter({ hasText: PARTY[2] });
   await expect(card.getByText(/^Elf Wizard 7 · HP \d+$/)).toBeVisible();
   await expectPageFits(player);
-  await press(card.getByRole("button", { name: "Claim" }));
+  // Choose the character, then Play as claims it after the claim is confirmed.
+  await press(card.getByRole("radio"));
+  await press(player.getByRole("button", { name: `Play as ${PARTY[2].split(" ")[0]}` }));
   await press(player.getByRole("dialog", { name: `Claim ${PARTY[2]}?` }).getByRole("button", { name: "Claim" }));
-  await expect(player.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
+  await expect(playerSection(player, "Sheet")).toHaveAttribute("aria-selected", "true");
   await expectPageFits(player);
 
   // The table screen shows a code, and the GM types it: nothing is typed with a remote.
@@ -142,7 +147,7 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expect(screen.getByRole("heading", { name: "Pair this screen" })).toBeVisible();
   const code = (await screen.locator(".viewer-screen-code").textContent())!.replace(/\D/g, "");
   expect(code).toMatch(/^\d{6}$/);
-  await openGmSection(gm, "Shared screen");
+  await openGmSection(gm, "Table screen");
   await fillIn(gm.getByLabel("Code on the screen"), code);
   await fillIn(gm.getByLabel("Screen name"), "Living room TV");
   await press(gm.getByRole("button", { name: "Pair screen" }));
@@ -153,9 +158,9 @@ test("the first evening: the GM password, the join address, a player, the table 
 
   // A scene on a new map, from the table's own start: its steps run on the Scenes tab. The map has no grid, which the
   // picker says, and the scene's Map step leads to it.
-  await press(gm.getByRole("tab", { name: "Table" }));
-  await press(gm.getByRole("button", { name: "Prepare a scene" }));
-  await expect(gm.getByRole("heading", { name: "New scene" })).toBeVisible();
+  await press(gmSection(gm, "Play"));
+  await press(gm.getByRole("button", { name: "Prepare an encounter" }));
+  await expect(gm.getByRole("heading", { name: "New encounter" })).toBeVisible();
   const chooser = gm.waitForEvent("filechooser");
   await press(gm.getByRole("button", { name: /Upload a map/ }));
   await (await chooser).setFiles({ name: `${MAP_NAME}.png`, mimeType: "image/png", buffer: battleMap() });
@@ -183,11 +188,11 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expectPageFits(gm);
 
   // Back to the scene, now with a grid, through its steps to live: the table screen shows it.
-  await press(gm.getByRole("button", { name: "Back to the scene" }));
+  await press(gm.getByRole("button", { name: "Back to the encounter" }));
   await expect(gm.getByRole("heading", { name: "Map", exact: true })).toBeVisible();
   await expect(gm.getByRole("button", { name: "Set the grid" })).toBeHidden();
   await makeLiveFromSteps(gm, ["Tokens", "Light", "Sound", "Review"]);
-  await expect(gm.getByLabel(`Scenes · ${MAP_NAME} is live`)).toBeVisible();
+  await expect(gm.getByLabel(`Encounters · ${MAP_NAME} is live`)).toBeVisible();
   await expect(screen.getByRole("img", { name: MAP_NAME })).toBeVisible();
   await expectPageFits(gm);
   await expectPageFits(screen);
@@ -197,17 +202,19 @@ test("a player joins and claims a character", async ({ open }) => {
   const player = await open("/");
   await ensureGmPassword(player.request);
   await press(player.getByRole("button", { name: "Join as Player" }));
-  await expect(player.getByRole("heading", { name: "Choose your character" })).toBeVisible();
+  await expect(player.getByRole("heading", { name: "Pick your character" })).toBeVisible();
   await expectPageFits(player);
 
   const card = player.getByRole("listitem").filter({ hasText: PARTY[0] });
-  await press(card.getByRole("button", { name: "Claim" }));
+  // Choose the character, then Play as claims it after the claim is confirmed.
+  await press(card.getByRole("radio"));
+  await press(player.getByRole("button", { name: `Play as ${PARTY[0].split(" ")[0]}` }));
   await press(player.getByRole("dialog", { name: `Claim ${PARTY[0]}?` }).getByRole("button", { name: "Claim" }));
   await expect(player.getByText(`You're playing ${PARTY[0]}.`)).toBeVisible();
   await expectPageFits(player);
 
   // My character is the character's sheet; Release is in its menu.
-  await press(player.getByRole("tab", { name: "My character" }));
+  await press(playerSection(player, "Sheet"));
   await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
   await press(player.getByLabel(`Sheet menu for ${PARTY[0]}`));
   await expect(player.getByRole("menuitem", { name: `Release ${PARTY[0]}` })).toBeVisible();
@@ -217,7 +224,7 @@ test("a player joins and claims a character", async ({ open }) => {
   // After a reload, joining again resumes the same session: their character, on the page they left.
   await player.reload();
   await press(player.getByRole("button", { name: "Join as Player" }));
-  await expect(player.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
+  await expect(playerSection(player, "Sheet")).toHaveAttribute("aria-selected", "true");
   await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
 });
 
@@ -230,7 +237,7 @@ test("a stray pinch on a phone leaves the page at its size, and a finger still s
   await ensureGmPassword(request);
   const gm = await open("/");
   await signInAsGm(gm);
-  await openGmSection(gm, "Roster");
+  await openGmSection(gm, "Party");
   const roster = gm.locator(".party-roster-body");
   await expect(roster.getByRole("heading", { name: PARTY[0] })).toBeVisible();
 
@@ -249,7 +256,7 @@ test("a stray pinch on a phone leaves the page at its size, and a finger still s
   await expect.poll(() => pageScale(gm)).toBeGreaterThan(1);
 });
 
-test("the GM runs a fight on a new scene and the player moves their token", async ({ open, hasTouch }) => {
+test("the GM runs an encounter on a new map and the player moves their token", async ({ open, hasTouch }) => {
   const hero = PARTY[1];
   const player = await open("/");
   await joinAndClaim(player, hero);
@@ -259,41 +266,37 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   // A scene with a freshly uploaded battle map, made live. A different image from the first evening's, which the
   // library would recognise and reuse with its grid.
   await liveSceneOnNewMap(gm, "Smoke crossing.png", battleMap(700, 504));
-  await expect(gm.getByRole("heading", { name: "Start a fight" })).toBeVisible();
+  await expect(gm.getByRole("heading", { name: "Start an encounter" })).toBeVisible();
 
   // The fight: the player's character and one monster.
-  for (const other of PARTY.filter((name) => name !== hero)) {
-    const remove = gm.getByRole("button", { name: `Remove ${other} from this list` });
-    await press(remove);
-    await expect(remove).toBeHidden();
-  }
-  await press(gm.getByRole("button", { name: "Add monsters" }));
-  const bestiary = gm.getByRole("dialog", { name: "Add monsters from the bestiary" });
-  await fillIn(bestiary.getByRole("searchbox", { name: "Search monsters" }), "Goblin Minion");
-  await press(bestiary.getByRole("listitem").filter({ hasText: "Goblin Minion" }).getByRole("button", { name: "Add" }));
-  await expect(bestiary.getByText("Goblin Minion is in the staging tray.")).toBeVisible();
-  await expectPageFits(gm);
-  await press(bestiary.getByRole("button", { name: "Close" }));
-  await press(gm.getByRole("button", { name: "Start the fight" }));
-  await expect(gm.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
+  await stageFight(
+    gm,
+    PARTY.filter((name) => name !== hero),
+    "Goblin Minion"
+  );
+  await press(gm.getByRole("button", { name: "Start the encounter" }));
+  await expect(gm.getByRole("tablist", { name: "The encounter · round 1" })).toBeVisible();
   await expectPageFits(gm);
   // The one primary sits in the panel's footer, inside the viewport and uncovered.
-  await expectUncovered(gm.getByRole("button", { name: "Next turn" }));
+  await expectUncovered(gm.getByRole("button", { name: "End turn" }));
 
   // A move off the mover's turn goes to the GM, so if the goblin won initiative the GM ends its turn first.
-  await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
+  await expect(player.getByRole("tablist", { name: "The encounter · round 1" })).toBeVisible();
   const yourTurn = player.getByRole("heading", { name: "Your turn" });
-  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
+  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "End turn" }));
   await expect(yourTurn).toBeVisible();
   await expectUncovered(player.getByRole("button", { name: "End turn" }));
   if (hasTouch) {
-    // On a phone a divider splits the map pane from the panel; the keys move it as well as a finger.
-    const divider = player.getByRole("separator", { name: "Map and panel split" });
-    const before = Number(await divider.getAttribute("aria-valuenow"));
-    await divider.focus();
-    await player.keyboard.press("ArrowUp");
-    await expect(divider).toHaveAttribute("aria-valuenow", String(before - 5));
-    await player.keyboard.press("ArrowDown");
+    // On a phone the map scrolls away above the panel: scrolled to the end, the panel's tabs sit right under the turn
+    // order, and scrolled back the map is whole again.
+    const column = player.locator(".table-bench-split");
+    await column.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+    const [stripBottom, tabsTop] = await player.evaluate(() => [
+      document.querySelector(".table-strip")!.getBoundingClientRect().bottom,
+      document.querySelector(".table-bench-panel [role=tablist]")!.getBoundingClientRect().top
+    ]);
+    expect(Math.abs(tabsTop - stripBottom), "the panel's tabs sit under the turn order").toBeLessThan(80);
+    await column.evaluate((element) => element.scrollTo({ top: 0 }));
     await expectPageFits(player);
   }
 
@@ -364,7 +367,7 @@ test("a save on the player's own turn leaves the bar under the thumb on screen",
     !state.combat.active
   ) {
     if (state.combat.active) await gm("/api/v1/game/encounter/end", {});
-    let mapAssetId = state.combat.activeSceneId ? state.combat.mapAssetId : null;
+    let mapAssetId = state.combat.activeEncounterId ? state.combat.mapAssetId : null;
     if (!mapAssetId) {
       const upload = await player.request.post(`/api/v1/map-assets?name=Smoke%20yard&kind=battlemap`, {
         headers: { ...headers, "content-type": "image/png" },
@@ -428,22 +431,16 @@ test("a player takes a turn on a phone: a tile, its cast, a target and the roll"
   const gm = await open("/");
   await signInAsGm(gm);
   await liveSceneOnNewMap(gm, "Smoke ford.png", battleMap(700, 490));
-  await expect(gm.getByRole("heading", { name: "Start a fight" })).toBeVisible();
-  for (const other of PARTY.filter((name) => name !== hero)) {
-    const remove = gm.getByRole("button", { name: `Remove ${other} from this list` });
-    await press(remove);
-    await expect(remove).toBeHidden();
-  }
-  await press(gm.getByRole("button", { name: "Add monsters" }));
-  const bestiary = gm.getByRole("dialog", { name: "Add monsters from the bestiary" });
-  await fillIn(bestiary.getByRole("searchbox", { name: "Search monsters" }), "Goblin Minion");
-  await press(bestiary.getByRole("listitem").filter({ hasText: "Goblin Minion" }).getByRole("button", { name: "Add" }));
-  await expect(bestiary.getByText("Goblin Minion is in the staging tray.")).toBeVisible();
-  await press(bestiary.getByRole("button", { name: "Close" }));
-  await press(gm.getByRole("button", { name: "Start the fight" }));
-  await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
+  await expect(gm.getByRole("heading", { name: "Start an encounter" })).toBeVisible();
+  await stageFight(
+    gm,
+    PARTY.filter((name) => name !== hero),
+    "Goblin Minion"
+  );
+  await press(gm.getByRole("button", { name: "Start the encounter" }));
+  await expect(player.getByRole("tablist", { name: "The encounter · round 1" })).toBeVisible();
   const yourTurn = player.getByRole("heading", { name: "Your turn" });
-  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
+  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "End turn" }));
   await expect(yourTurn).toBeVisible();
 
   // The Turn tab is the turn card alone: the favourite tiles, each saying what it costs.
@@ -568,8 +565,8 @@ test("the GM paints water on a gridded map, sets a hidden trap and turns the wea
   await signInAsGm(gm);
 
   // A scene on a new map with its grid set, so ground and traps snap to its squares.
-  await openGmSection(gm, "Scenes");
-  await press(gm.getByRole("button", { name: /^New( scene)?$/ }).first());
+  await openGmSection(gm, "Encounters");
+  await press(gm.getByRole("button", { name: /^New( encounter)?$/ }).first());
   const chooser = gm.waitForEvent("filechooser");
   await press(gm.getByRole("button", { name: /Upload a map/ }));
   await (await chooser).setFiles({ name: "Smoke grotto.png", mimeType: "image/png", buffer: battleMap(700, 546) });
@@ -583,7 +580,7 @@ test("the GM paints water on a gridded map, sets a hidden trap and turns the wea
   await press(gm.getByRole("button", { name: "Measure this area" }));
   await press(gm.getByRole("button", { name: "Looks right" }));
   await press(gm.getByRole("button", { name: "Confirm grid" }));
-  await press(gm.getByRole("button", { name: "Back to the scene" }));
+  await press(gm.getByRole("button", { name: "Back to the encounter" }));
   const continueStep = gm.getByRole("button", { name: "Continue" });
   if (await continueStep.isDisabled()) await press(gm.getByRole("button", { name: /^Smoke grotto/ }));
   await press(continueStep);
@@ -688,7 +685,7 @@ test("the GM presents a map on a paired table screen", async ({ open, request })
 
   const gm = await open("/");
   await signInAsGm(gm);
-  await openGmSection(gm, "Shared screen");
+  await openGmSection(gm, "Table screen");
   await expect(gm.getByRole("heading", { name: "Shared screen", level: 2 })).toBeVisible();
   await expect(gm.getByText("Den TV", { exact: false }).first()).toBeVisible();
 
@@ -722,7 +719,7 @@ test("the GM plays music on the table screen and sees that the room hears it", a
 
   const gm = await open("/");
   await signInAsGm(gm);
-  await openGmSection(gm, "Shared screen");
+  await openGmSection(gm, "Table screen");
   await press(gm.getByRole("button", { name: "Sound" }));
   await expect(gm.getByRole("heading", { name: "Sound", level: 2 })).toBeVisible();
   await expectPageFits(gm);
@@ -746,12 +743,13 @@ test("the GM plays music on the table screen and sees that the room hears it", a
   await expect
     .poll(() => music.evaluate((element: HTMLAudioElement) => !element.paused && element.currentTime > 0.2))
     .toBe(true);
-  await expect(gm.getByText("Smoke TV · Sound on")).toBeVisible();
+  // The phone and laptop runs share one server, so an earlier run's Smoke TV can still be paired.
+  await expect(gm.getByText("Smoke TV · Sound on").first()).toBeVisible();
   // Only the table screen makes sound: the GM's page has no audio at all.
   await expect(gm.locator("audio")).toHaveCount(0);
 
   // Mid-fight, the Table tab's control pauses it.
-  await press(gm.getByRole("tab", { name: "Table" }));
+  await press(gmSection(gm, "Play"));
   const control = gm.getByRole("region", { name: "Sound" });
   await expect(control.getByText("Smoke Tone")).toBeVisible();
   await expectPageFits(gm);
@@ -760,8 +758,8 @@ test("the GM plays music on the table screen and sees that the room hears it", a
   await press(control.getByRole("button", { name: "Resume sound" }));
   await expect.poll(() => music.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
 
-  // Leave the board silent for whatever runs next.
-  await openGmSection(gm, "Shared screen");
+  // Leave the board silent for whatever runs next. The board is also Prep's Sound page.
+  await openGmSection(gm, "Sound");
   await press(gm.getByRole("button", { name: "Stop all" }));
   await expect(music).toHaveCount(0);
 });
@@ -786,7 +784,7 @@ test("a player turns on the situation their Crowbar names and rolls a Strength c
   expect((await gm(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item: crowbar })).ok()).toBe(true);
   await joinAndClaim(player, hero);
 
-  await press(player.getByRole("tab", { name: "My character" }));
+  await press(playerSection(player, "Sheet"));
   const sheet = player.getByRole("region", { name: `${hero} character sheet` });
   // On a phone the checks are a tab of their own; on a laptop they are the sheet's left column.
   const checksTab = sheet.getByRole("tab", { name: "Checks" });
@@ -827,7 +825,7 @@ test("a player rolls a tool's Utilize use and starts crafting from the sheet, an
   expect((await api(`/api/v1/game/actors/${actorId}/currency`, { actorId, currency })).ok()).toBe(true);
   await joinAndClaim(player, hero);
 
-  await press(player.getByRole("tab", { name: "My character" }));
+  await press(playerSection(player, "Sheet"));
   const sheet = player.getByRole("region", { name: `${hero} character sheet` });
   const checksTab = sheet.getByRole("tab", { name: "Checks" });
   if (await checksTab.isVisible()) await press(checksTab);
@@ -859,7 +857,9 @@ test("a player rolls a tool's Utilize use and starts crafting from the sheet, an
 
   const gm = await open("/");
   await signInAsGm(gm);
-  await openGmSection(gm, "Table");
+  await openGmSection(gm, "Play");
+  // The party's rest is on the table's Party tab.
+  await press(gm.getByRole("tab", { name: "Party" }));
   await press(gm.getByRole("button", { name: /^Rest/ }));
   const panel = gm.getByRole("dialog", { name: "Rest" }).getByRole("region", { name: "Crafting" });
   await expect(panel.getByText("Ink (1-ounce bottle) · 5 GP paid")).toBeVisible();
@@ -902,7 +902,7 @@ test("a player packs a thing into a container from the Gear tab and sees what it
     expect((await api(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item })).ok()).toBe(true);
   await joinAndClaim(player, hero);
 
-  await press(player.getByRole("tab", { name: "My character" }));
+  await press(playerSection(player, "Sheet"));
   const sheet = player.getByRole("region", { name: `${hero} character sheet` });
   await press(sheet.getByRole("tab", { name: "Gear" }));
   await press(sheet.getByRole("button", { name: /^Spare Rope/ }).first());

@@ -76,7 +76,7 @@ const SESSION = (over: Partial<CodexSession> = {}): CodexSession =>
     revealedToPlayers: false,
     status: "played",
     tags: [],
-    sceneIds: [],
+    encounterIds: [],
     rev: 4,
     createdAt: "2026-10-01T00:00:00.000Z",
     updatedAt: "2026-10-01T00:00:00.000Z",

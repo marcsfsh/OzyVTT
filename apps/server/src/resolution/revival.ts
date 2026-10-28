@@ -296,7 +296,7 @@ export function raiseOnAction(ctx: ResolveContext): void {
       raised = null;
     }
     if (!raised) {
-      ctx.warnings.push(`${ctx.action.name}: add the ${raises.monsterId.replace(/-/g, " ")} to the fight by hand.`);
+      ctx.warnings.push(`${ctx.action.name}: add the ${raises.monsterId.replace(/-/g, " ")} to the encounter by hand.`);
       continue;
     }
     ctx.tableNarration.push(

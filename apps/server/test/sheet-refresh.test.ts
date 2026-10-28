@@ -129,7 +129,7 @@ describe("rebuilding stored sheets when the content changes", () => {
     expect(stored(state)).toEqual(broken);
   });
 
-  it("waits for the fight to end before rebuilding a character in it", () => {
+  it("waits for the encounter to end before rebuilding a character in it", () => {
     const state = table(builtBefore(ranger()));
     state.combat = { ...state.combat, active: true, initiative: [{ actorId: RANGER, score: 12, tieBreaker: 0 }] };
     const refresh = refreshBuiltSheets(state, { library, policy, catalog });
@@ -183,7 +183,7 @@ describe("the refresh on the running table", () => {
     for (const cleanup of cleanups.splice(0)) await cleanup();
   });
 
-  it("rebuilds at start, tells the GM, and rebuilds a character the fight held once it ends", async () => {
+  it("rebuilds at start, tells the GM, and rebuilds a character the encounter held once it ends", async () => {
     const state = table(builtBefore(ranger()));
     const second = "71000000-0000-4000-8000-000000000002";
     importActorDefinition(state, builtBefore(ranger(4)), second, "public", catalog);

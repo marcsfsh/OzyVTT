@@ -108,7 +108,7 @@ describe("a swallower that dies lets its prey out", () => {
   });
 });
 
-describe("taking a combatant out of the fight", () => {
+describe("taking a combatant out of the encounter", () => {
   it("drops its turn and token, ends what lasts until its next turn, and lets out what it swallowed", () => {
     const state = fight(ALLY);
     swallow(state);
@@ -169,11 +169,11 @@ describe("taking a combatant out of the fight", () => {
     removeCombatant(state, WORM, resolveDefinition);
     expect(conditions(state, ALLY)).toEqual([]);
     expect(() => removeCombatant(state, HERO, resolveDefinition)).toThrowError(
-      "Advance past its turn before taking it out of the fight."
+      "Advance past its turn before taking it out of the encounter."
     );
     removeCombatant(state, ALLY, resolveDefinition);
     expect(() => removeCombatant(fightOf(state), HERO, resolveDefinition)).toThrowError(
-      "It is the last one in the fight. End the fight to take it out."
+      "It is the last one in the encounter. End the encounter to take it out."
     );
   });
 });

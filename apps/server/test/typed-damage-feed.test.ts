@@ -533,6 +533,10 @@ describe("save.answer takes a hand-entered damage total", () => {
     expect((await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: BORIN })).status).toBe(
       200
     );
+    // Players type damage only while the table's damage mode takes typed numbers (ADR-0043).
+    expect(
+      (await post(base, GAME_PATHS.playerDice, gmToken, { commandId: randomUUID(), damage: "total" })).status
+    ).toBe(200);
     // A player types the face their die shows: a 2 fails the save.
     const allowed = await post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), playerToken, {
       commandId: randomUUID(),

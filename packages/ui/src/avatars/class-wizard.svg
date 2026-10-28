@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Wizard avatar"><title>Wizard avatar</title><defs><radialGradient id="oz-class-wizard-b" cx="0.5" cy="0.5" r="0.75"><stop offset="0" stop-color="#14205a"></stop><stop offset="1" stop-color="#05040f"></stop></radialGradient>
+<linearGradient id="oz-class-wizard-h" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5c8dff"></stop><stop offset="1" stop-color="#2a0a52"></stop></linearGradient>
+<mask id="oz-class-wizard-m"><rect width="64" height="64" fill="#fff"></rect><circle cx="33.5" cy="20" r="3.4" fill="#000"></circle></mask></defs>
+<rect width="64" height="64" fill="url(#oz-class-wizard-b)"></rect>
+<circle cx="10" cy="14" r="0.8" fill="#fff"></circle><circle cx="54" cy="20" r="0.7" fill="#fff"></circle><circle cx="50" cy="8" r="0.6" fill="#fff" opacity="0.7"></circle><circle cx="12" cy="36" r="0.6" fill="#fff" opacity="0.7"></circle>
+<path d="M38 6C34 10 29 22 21 45H45C41 32 39 18 38 6Z" fill="url(#oz-class-wizard-h)" stroke="#2be4ff" stroke-width="1.5" stroke-linejoin="round"></path>
+<circle cx="32" cy="21" r="3.6" fill="#ffe14d" mask="url(#oz-class-wizard-m)"></circle>
+<path d="M28 29.8l0.90 2.30 2.30 0.90-2.30 0.90L28 36.2l-0.90-2.30-2.30-0.90 2.30-0.90z" fill="#ffe14d"></path><path d="M37 25.8l0.62 1.58 1.58 0.62-1.58 0.62L37 30.2l-0.62-1.58-1.58-0.62 1.58-0.62z" fill="#ffe14d"></path><path d="M35 36.2l0.50 1.30 1.30 0.50-1.30 0.50L35 39.8l-0.50-1.30-1.30-0.50 1.30-0.50z" fill="#ffe14d"></path>
+<path d="M22 41.5H44.5" stroke="#ff2f92" stroke-width="3"></path>
+<ellipse cx="33" cy="46" rx="24" ry="5.5" fill="#1a0638" stroke="#2be4ff" stroke-width="1.5"></ellipse>
+<ellipse cx="33" cy="45" rx="12" ry="1.8" fill="#0b0414"></ellipse></svg>

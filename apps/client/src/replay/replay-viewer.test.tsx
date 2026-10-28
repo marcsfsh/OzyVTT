@@ -22,7 +22,7 @@ const summary = (over: Record<string, unknown> = {}) => ({
   turnCount: 1,
   playerVisible: true,
   name: null,
-  sceneName: "Goblin cave",
+  encounterName: "Goblin cave",
   ...over
 });
 const gmDocument = {
@@ -62,14 +62,14 @@ const playerDocument = {
 
 function serve(list: readonly unknown[], document: unknown) {
   apiRequest.mockImplementation(async (path: string) =>
-    path === "/api/v1/encounters" ? { encounters: list } : { document }
+    path === "/api/v1/replays" ? { replays: list } : { document }
   );
 }
 
 describe("the replay viewer's header", () => {
   beforeEach(() => apiRequest.mockReset());
 
-  it("names the replay by its scene and day for the GM", async () => {
+  it("names the replay by its encounter and day for the GM", async () => {
     serve([summary()], gmDocument);
     render(<ReplayViewer role="gm" token="gm" archiveId={7} onBack={() => {}} />, { wrapper: ToastProvider });
     expect(await screen.findByRole("heading", { name: `Goblin cave · ${dateOnly(ENDED)}` })).toBeTruthy();
@@ -77,7 +77,7 @@ describe("the replay viewer's header", () => {
 
   it("names it by the GM's name for a player", async () => {
     // A player's list carries the GM's name and never the scene.
-    serve([summary({ name: "Ambush at the bridge", sceneName: undefined })], playerDocument);
+    serve([summary({ name: "Ambush at the bridge", encounterName: undefined })], playerDocument);
     render(<ReplayViewer role="player" token="player" archiveId={7} onBack={() => {}} />, { wrapper: ToastProvider });
     expect(await screen.findByRole("heading", { name: "Ambush at the bridge" })).toBeTruthy();
   });

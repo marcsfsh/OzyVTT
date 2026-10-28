@@ -126,8 +126,8 @@ describe("turn time-travel timeline", () => {
     expect(alpha.hitDice?.remaining).toBe(5);
   });
 
-  it("starts a resumed fight's timeline at the swap, so a rewind doesn't tick the turn twice", async () => {
-    await store.executeTimeline({ id: randomUUID(), type: "scene.activate" }, (state, timeline) =>
+  it("starts a resumed encounter's timeline at the swap, so a rewind doesn't tick the turn twice", async () => {
+    await store.executeTimeline({ id: randomUUID(), type: "encounter.activate" }, (state, timeline) =>
       restartTimeline(state, timeline)
     );
     expect(store.listTurnSnapshots().map((entry) => entry.kind)).toEqual(["turn"]);
@@ -197,7 +197,7 @@ describe("turn time-travel timeline", () => {
     expect(store.snapshot.actors.find((a) => a.id === PC)?.hp.current).toBe(20); // change undone
   });
 
-  it("rejects at the beginning of the recorded fight", async () => {
+  it("rejects at the beginning of the recorded encounter", async () => {
     await next(); // @0
     await previous(); // rewound at 0 (the only boundary)
     await expect(previous(false)).rejects.toBeInstanceOf(CommandRejectedError);
@@ -209,7 +209,7 @@ describe("turn time-travel timeline", () => {
     expect(() => endEncounter(store.snapshot)).toThrow(/reviewing the combat history/i);
     expect(() => removeActor(store.snapshot, MON)).toThrow(/reviewing the combat history/i);
     const withScene = store.snapshot;
-    createScene(withScene, { sceneId: MAP2, name: "Ambush", mapAssetId: MAP2, combatantIds: [PC] }, GEOMETRY);
+    createScene(withScene, { encounterId: MAP2, name: "Ambush", mapAssetId: MAP2, combatantIds: [PC] }, GEOMETRY);
     expect(() => activateScene(withScene, MAP2, randomUUID())).toThrow(/reviewing the combat history/i);
   });
 
@@ -262,7 +262,7 @@ describe("turn time-travel timeline", () => {
       timeline.clearJournal();
     });
 
-  it("archives the whole fight permanently on end, then wipes the live buffer", async () => {
+  it("archives the whole encounter permanently on end, then wipes the live buffer", async () => {
     await next(); // capture Alpha's turn @0
     await next(); // capture Goblin's turn @1
     const captured = store.listTurnSnapshots().length;
@@ -303,7 +303,7 @@ describe("turn time-travel timeline", () => {
     expect(store.listTurnSnapshots().length).toBeGreaterThan(0); // snapshots intact
   });
 
-  it("archives an ended fight exactly once even if the command is retried", async () => {
+  it("archives an ended encounter exactly once even if the command is retried", async () => {
     await next();
     const endId = randomUUID();
     await endAndArchive(endId);

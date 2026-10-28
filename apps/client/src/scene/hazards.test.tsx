@@ -183,7 +183,7 @@ describe("the GM's traps", () => {
 });
 
 describe("the GM's weather", () => {
-  it("switches the scene's cold on and sets heavy rain", async () => {
+  it("switches the encounter's cold on and sets heavy rain", async () => {
     const user = userEvent.setup();
     gmMap(gmState());
     const weather = await openGroup(user, "Weather");

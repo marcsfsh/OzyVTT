@@ -58,30 +58,30 @@ const start = (game: GameState, actorIds: readonly string[]) =>
   );
 
 describe("archived characters are refused by every staging door (server-side, not picker-side)", () => {
-  it("refuses to stage an archived character in a new scene", () => {
+  it("refuses to stage an archived character in a new encounter", () => {
     const game = state();
     expect(() =>
       createScene(
         game,
-        { sceneId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.active, IDS.retired] },
+        { encounterId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.active, IDS.retired] },
         GEOMETRY
       )
     ).toThrow(/Retired Hero is archived/);
     // Rejected outright: the GM's selection must not lie back to them.
-    expect(game.combat.scenes).toHaveLength(0);
+    expect(game.combat.encounters).toHaveLength(0);
   });
 
-  it("refuses to add an archived character to an existing scene's combatant list", () => {
+  it("refuses to add an archived character to an existing encounter's combatant list", () => {
     const game = state();
     createScene(
       game,
-      { sceneId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.active] },
+      { encounterId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.active] },
       GEOMETRY
     );
     expect(() => setSceneCombatants(game, IDS.scene, [IDS.active, IDS.retired], GEOMETRY)).toThrow(
       /Retired Hero is archived/
     );
-    expect(game.combat.scenes[0].combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.active]);
+    expect(game.combat.encounters[0].combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.active]);
   });
 
   it("refuses to start an encounter that names an archived character", () => {
@@ -103,7 +103,7 @@ describe("archived characters are refused by every staging door (server-side, no
     expect(() =>
       createScene(
         game,
-        { sceneId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.retired] },
+        { encounterId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.retired] },
         GEOMETRY
       )
     ).not.toThrow();

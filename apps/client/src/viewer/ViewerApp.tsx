@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewerSoundProjection } from "@vtt/domain";
-import { useDragSurface } from "@vtt/ui";
+import { avatarUrl, defaultAvatarFor, useDragSurface } from "@vtt/ui";
 import { ApiError, apiRequest } from "../lib/api";
 import { probeImageDimensions } from "../scene/mapImage";
 import { FogOverlay, type VisionMask } from "../scene/FogOverlay";
@@ -10,7 +10,7 @@ type ViewerRect = Readonly<{ x: number; y: number; width: number; height: number
 import { bandFraction, TokenAltitudeBadge, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
-import { InitiativeRow } from "../encounter/InitiativeList";
+import { ScreenColumn, ScreenTop } from "./ScreenParts";
 import { ScreenPairing } from "./ScreenPairing";
 import { TableSound } from "./TableSound";
 import "./viewer.css";
@@ -91,6 +91,19 @@ export type Presentation = Readonly<{
   }>;
   /** What the sound board is playing, with how far in each sound was when this was sent. */
   sound?: ViewerSoundProjection;
+  /** The newest public roll the room may see, built on the server (ADR-0040); absent from a feed older than it. */
+  latestRoll?: ViewerRollCard | null;
+}>;
+
+/** One roll as the screen shows it: who, what for, the total and the dice. Nothing about targets or outcomes. */
+export type ViewerRollCard = Readonly<{
+  id: string;
+  who: string;
+  what: string;
+  total: number;
+  dice: readonly Readonly<{ sides: number; face: number; kept: boolean }>[];
+  modifier: number;
+  at: string;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
@@ -103,85 +116,26 @@ function imageUrl(assetId: string) {
   return `/api/v1/map-assets/${encodeURIComponent(assetId)}/content`;
 }
 
-export function Initiative({
-  presentation,
-  onResize
-}: Readonly<{ presentation: Presentation; onResize?: (width: number) => void }>) {
-  const asideRef = useRef<HTMLElement | null>(null);
-  const resizeSurface = useDragSurface<HTMLDivElement>();
-  if (!presentation.initiative.visible) return null;
-  // Same shape as the player's list: active combatant on top, then turn order; no HP bars or controls.
-  const { entries, round, hiddenTurn } = presentation.initiative;
-  const activeIndex = entries.findIndex((entry) => entry.active);
-  const ordered = activeIndex > 0 ? [...entries.slice(activeIndex), ...entries.slice(0, activeIndex)] : entries;
-  // Dragging the left edge resizes the column; left grows it. Clamped to a legible minimum and 60% of the screen.
-  const startResize = (event: React.PointerEvent) => {
-    if (!onResize) return;
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = asideRef.current?.offsetWidth ?? 320;
-    const onMove = (move: PointerEvent) =>
-      onResize(Math.max(240, Math.min(window.innerWidth * 0.6, startWidth + (startX - move.clientX))));
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-  return (
-    <aside ref={asideRef} className="viewer-initiative frame-col" aria-label={`Initiative, round ${round}`}>
-      {onResize && (
-        <div
-          ref={resizeSurface}
-          className="viewer-initiative-resize"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Drag to resize the initiative panel"
-          onPointerDown={startResize}
-        />
-      )}
-      {/* The screen's one scroll region, at both aspects; portrait caps the panel at 32vh. */}
-      <div className="viewer-initiative-scroll frame-fill scroll-y">
-        <div className="viewer-initiative-head">
-          <strong className="viewer-initiative-round">Round {round}</strong>
-        </div>
-        {hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
-        <ol>
-          {ordered.map((entry) => (
-            <li
-              key={entry.actorId}
-              className={entry.active ? "active" : ""}
-              aria-current={entry.active ? "step" : undefined}
-            >
-              <InitiativeRow
-                entry={{
-                  actorId: entry.actorId,
-                  name: entry.name,
-                  score: entry.initiative,
-                  active: entry.active,
-                  health: entry.health ?? "healthy",
-                  conditionIds: entry.conditionIds,
-                  conditions: entry.conditions
-                }}
-              />
-            </li>
-          ))}
-        </ol>
-      </div>
-    </aside>
-  );
-}
-
 type LocalCamera = Readonly<{ center: Point; zoom: number }>;
 type PanGesture = Readonly<{ startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>;
 const LOCAL_MIN_ZOOM = 0.5;
 const LOCAL_MAX_ZOOM = 8;
 
+const FOLLOW_KEY = "vtt.viewer-follow-gm";
+
+/** Whether this screen follows the GM's camera: a choice made on the screen and kept by its browser. */
+function readFollow(): boolean {
+  try {
+    return localStorage.getItem(FOLLOW_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * This screen's own zoom/pan over what the GM presents. Purely local (nothing is sent to the server),
- * so each display can be framed independently. Follows the GM's camera again when the presented map
- * changes or "Follow GM view" is pressed.
+ * so each display can be framed independently. It fits the whole map until someone zooms, or follows the GM's
+ * camera once Follow GM view is chosen; a new map starts from that choice again.
  */
 export function MapStage({
   presentation,
@@ -196,6 +150,16 @@ export function MapStage({
 }>) {
   const [size, setSize] = useState({ width: 16, height: 9 });
   const [localCamera, setLocalCamera] = useState<LocalCamera | null>(null);
+  const [follow, setFollow] = useState(readFollow);
+  const chooseFollow = (next: boolean) => {
+    setFollow(next);
+    setLocalCamera(null);
+    try {
+      localStorage.setItem(FOLLOW_KEY, next ? "on" : "off");
+    } catch {
+      // A browser that keeps nothing follows for this visit only.
+    }
+  };
   const [pan, setPan] = useState<PanGesture | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
@@ -205,8 +169,10 @@ export function MapStage({
     setLocalCamera(null);
   }, [presentation.activeMap?.assetId]);
   const camera: LocalCamera = useMemo(
-    () => localCamera ?? presentation.camera ?? { center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 },
-    [localCamera, presentation.camera, size]
+    () =>
+      localCamera ??
+      (follow ? presentation.camera : null) ?? { center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 },
+    [localCamera, follow, presentation.camera, size]
   );
   const viewBox = useMemo(() => {
     const width = size.width / camera.zoom;
@@ -373,6 +339,7 @@ export function MapStage({
               <AuthorizedTokenGlyph
                 assetId={token.tokenAssetId ?? null}
                 token={authToken}
+                fallbackUrl={avatarUrl(defaultAvatarFor(token.actorId))}
                 sizePx={token.sizePx}
                 name={token.name}
                 active={token.active}
@@ -387,6 +354,7 @@ export function MapStage({
                 sizePx={token.sizePx}
                 name={token.name}
                 active={token.active}
+                fallbackUrl={avatarUrl(defaultAvatarFor(token.actorId))}
                 imageUrl={
                   token.tokenAssetId ? `/api/v1/token-assets/${encodeURIComponent(token.tokenAssetId)}/content` : null
                 }
@@ -445,14 +413,11 @@ export function MapStage({
         <button type="button" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.3)}>
           −
         </button>
-        <button
-          type="button"
-          onClick={() => setLocalCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 })}
-        >
-          Reset view
+        <button type="button" onClick={() => chooseFollow(false)}>
+          Fit the map
         </button>
-        {localCamera && (
-          <button type="button" onClick={() => setLocalCamera(null)}>
+        {presentation.camera && (
+          <button type="button" aria-pressed={follow && !localCamera} onClick={() => chooseFollow(true)}>
             Follow GM view
           </button>
         )}
@@ -468,15 +433,29 @@ export function ViewerApp() {
   const [receivedAt, setReceivedAt] = useState(0);
   const [message, setMessage] = useState("");
   const sourceRef = useRef<EventSource | null>(null);
-  // The initiative column is drag-resizable (persisted) so long names can fit.
-  const [initiativeWidth, setInitiativeWidth] = useState<number | null>(() => {
+  // The column is drag-resizable (persisted) so long names can fit.
+  const [columnWidth, setColumnWidth] = useState<number | null>(() => {
     const stored = Number(localStorage.getItem("vtt.viewer-initiative-width"));
     return Number.isFinite(stored) && stored >= 240 ? stored : null;
   });
-  const resizeInitiative = (width: number) => {
-    setInitiativeWidth(width);
+  const resizeColumn = (width: number) => {
+    setColumnWidth(width);
     localStorage.setItem("vtt.viewer-initiative-width", String(Math.round(width)));
   };
+  // The screen's own utilities (fullscreen, zoom) show while someone is using it and fade after a few still seconds.
+  const [awake, setAwake] = useState(false);
+  const sleepTimer = useRef<number | null>(null);
+  const wake = useCallback(() => {
+    setAwake(true);
+    if (sleepTimer.current !== null) window.clearTimeout(sleepTimer.current);
+    sleepTimer.current = window.setTimeout(() => setAwake(false), 4000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (sleepTimer.current !== null) window.clearTimeout(sleepTimer.current);
+    },
+    []
+  );
 
   const connect = useCallback(async () => {
     setConnection("connecting");
@@ -542,12 +521,17 @@ export function ViewerApp() {
     );
   return (
     <main
-      className="viewer-shell"
-      style={
-        initiativeWidth ? ({ "--viewer-initiative-width": `${initiativeWidth}px` } as React.CSSProperties) : undefined
-      }
+      className={`viewer-shell${awake ? " is-awake" : ""}`}
+      style={columnWidth ? ({ "--viewer-column-width": `${columnWidth}px` } as React.CSSProperties) : undefined}
+      onPointerMove={wake}
+      onPointerDown={wake}
+      onKeyDown={wake}
     >
+      <ScreenTop presentation={presentation} />
+      <MapStage presentation={presentation} />
+      <ScreenColumn presentation={presentation} onResize={resizeColumn} />
       <button
+        type="button"
         className="viewer-fullscreen"
         onClick={() =>
           document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()
@@ -558,8 +542,6 @@ export function ViewerApp() {
       <div className={`viewer-connection ${connection}`} role="status">
         {connection === "live" ? "Live" : "Reconnecting"}
       </div>
-      <MapStage presentation={presentation} />
-      <Initiative presentation={presentation} onResize={resizeInitiative} />
       {sound}
     </main>
   );

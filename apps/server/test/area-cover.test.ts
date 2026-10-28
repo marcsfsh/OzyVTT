@@ -74,7 +74,7 @@ describe("cover from an area's point of origin", () => {
     expect(bonusOf(state, GOBLIN)).toBe(5);
   });
 
-  it("gives nothing with the scene's vision off", () => {
+  it("gives nothing with the encounter's vision off", () => {
     const state = visionGame({ enabled: false, walls: [LOW_WALL()], positions: { [ORC]: cell(11, 8) } });
     cast(state, "fireball", { targetIds: [GOBLIN, ORC], areaPlaced: true, areaOrigin: ORIGIN });
     expect(bonusOf(state, GOBLIN) ?? 0).toBe(0);

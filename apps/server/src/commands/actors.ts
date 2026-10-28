@@ -22,6 +22,7 @@ import {
   SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorLairSchema,
+  SetActorPlayedAtTableSchema,
   SetActorPickSchema,
   SetActorSheetPreviewSchema,
   SetActorSizeSchema,
@@ -35,6 +36,7 @@ import { setActorSize, setActorVisibility } from "../token-placement.js";
 import { importedDefinition } from "./characters.js";
 import { initiatorOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+import { setPlayedAtTable } from "../played-at-table.js";
 
 // The roster and each combatant's presentation on the table.
 
@@ -45,7 +47,7 @@ export const actorCommands = [
     description:
       "Instantiates a bundled SRD monster onto the roster (GM-grade only), with the stat block's average hit points or, with `hitPoints: \"roll\"`, its Hit Dice rolled. The response's `actorId` equals the commandId.",
     summary:
-      "Instantiate a bundled SRD monster onto the roster, optionally joining the running fight in the same command (GM).",
+      "Instantiate a bundled SRD monster onto the roster, optionally joining the running encounter in the same command (GM).",
     schema: ActorAddFromDefinitionSchema,
     malformed: "The add-combatant command is malformed.",
     gmOnly: "Only the GM can add combatants.",
@@ -117,7 +119,7 @@ export const actorCommands = [
     type: "actor.remove",
     operationId: "removeActor",
     description:
-      "Removes an actor from the roster (GM-grade only); rejected for claimed characters and, while rewound, for combatants in the fight.",
+      "Removes an actor from the roster (GM-grade only); rejected for claimed characters and, while rewound, for combatants in the encounter.",
     summary: "Remove an actor from the roster (GM).",
     schema: ActorRemoveSchema,
     malformed: "The remove-combatant command is malformed.",
@@ -131,8 +133,8 @@ export const actorCommands = [
     type: "actor.remove-samples",
     operationId: "removeSampleCharacters",
     description:
-      "Removes the sample characters a fresh table starts with (GM-grade only), in one command. Each goes unless the roster's rules keep it: a player holds it, or a running or paused fight uses it. The reply names the ones removed (`removed`) and each one kept with the reason (`kept`). Characters the GM made are untouched.",
-    summary: "Remove the sample characters no player holds and no fight uses (GM).",
+      "Removes the sample characters a fresh table starts with (GM-grade only), in one command. Each goes unless the roster's rules keep it: a player holds it, or a running or paused encounter uses it. The reply names the ones removed (`removed`) and each one kept with the reason (`kept`). Characters the GM made are untouched.",
+    summary: "Remove the sample characters no player holds and no encounter uses (GM).",
     schema: CommandIdentitySchema,
     malformed: "The remove-samples command is malformed.",
     gmOnly: "Only the GM can remove the sample characters.",
@@ -208,9 +210,9 @@ export const actorCommands = [
     type: "actor.set-archived",
     operationId: "setActorArchived",
     description:
-      "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a claimed character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
+      "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by encounter staging and encounter start/add; a character in the running encounter must be removed first. Archiving a claimed character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
     summary:
-      "Archive or restore a character (GM). An archived character is hidden from players, refused by claim and rejected by scene and encounter staging, and any claim is released on archive.",
+      "Archive or restore a character (GM). An archived character is hidden from players, refused by claim and rejected by encounter staging, and any claim is released on archive.",
     schema: SetActorArchivedSchema,
     malformed: "The archive command is malformed.",
     gmOnly: "Only the GM can archive characters.",
@@ -261,6 +263,28 @@ export const actorCommands = [
         kit.context.appendLog({
           kind: "encounter",
           text: `${kit.actorName(actorId)}'s archived sheet is now ${enabled ? "shared with players" : "hidden from players"}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.set-played-at-table",
+    operationId: "setActorPlayedAtTable",
+    description:
+      "Marks a party character played at the table, or takes the mark off (GM-grade only, ADR-0042). A character played at the table is one whose player keeps a printed sheet and tells the GM what they do: it can't be claimed, and every prompt for it (its initiative, a saving throw, a reaction, a death save) goes to the GM. Refused for a claimed character; release the claim first. An encounter keeps the choice it started with, so a change applies from the next start. GM-only: players and the table screen never see the mark.",
+    summary: "Mark a party character played at the table, or on its player's device (GM).",
+    schema: SetActorPlayedAtTableSchema,
+    malformed: "The played-at-the-table command is malformed.",
+    gmOnly: "Only the GM decides who is played at the table.",
+    async run({ request, execute }, kit) {
+      const { actorId, playedAtTable } = request;
+      const { duplicate } = await execute((state) => setPlayedAtTable(state, actorId, playedAtTable));
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `${kit.actorName(actorId)} is ${playedAtTable ? "played at the table" : "played on a player's device"}.`,
           actorIds: [actorId],
           gmOnly: true
         });

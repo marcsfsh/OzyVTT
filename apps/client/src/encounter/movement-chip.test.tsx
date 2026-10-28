@@ -37,7 +37,7 @@ const combat = {
 describe("a player's movement on their turn", () => {
   it("counts against this turn's movement, a Dash included, not the walking speed", async () => {
     render(<PlayerTurnEconomy combat={combat} myId={ME} myTurn mySpeedFeet={30} revision={7} />);
-    expect(await screen.findByText("Move 10/60 ft")).toBeDefined();
+    expect(await screen.findByRole("group", { name: "Move: 50 of 60 feet left" })).toBeDefined();
     expect(read).toHaveBeenCalledWith("actor:movement", { actorId: ME });
   });
 });

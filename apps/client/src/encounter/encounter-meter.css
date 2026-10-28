@@ -1,0 +1,80 @@
+/* The scene's encounter: the monster groups with count and XP in VT323, then the difficulty meter: Low, Moderate and
+   High as bands on a track, and a mark at the fight's total. */
+.encounter-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.encounter-meter-groups {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.encounter-meter-groups li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+}
+.encounter-meter-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.encounter-meter-count,
+.encounter-meter-xp {
+  font: 400 18px / 1 var(--font-numeric);
+  color: var(--text-dim);
+}
+.encounter-meter-xp {
+  min-width: 4.5rem;
+  text-align: right;
+  color: var(--text);
+}
+.encounter-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+}
+.encounter-meter-total {
+  font: 400 22px / 1 var(--font-numeric);
+}
+.encounter-meter-track {
+  position: relative;
+  height: 14px;
+  margin: var(--space-2) 0;
+  background: var(--surface-3);
+}
+.encounter-meter-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.encounter-meter-band.is-low {
+  background: color-mix(in srgb, var(--hp) 45%, var(--surface-3));
+}
+.encounter-meter-band.is-moderate {
+  background: color-mix(in srgb, var(--caution) 70%, var(--surface-3));
+}
+.encounter-meter-band.is-high {
+  background: color-mix(in srgb, var(--danger) 70%, var(--surface-3));
+}
+.encounter-meter-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  transform: translateX(-50%);
+  background: var(--text);
+}
+.encounter-meter-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}

@@ -146,7 +146,7 @@ describe("an octopus's Ink Cloud", () => {
     expect(actor(built, IDS.monster).effects.some((effect) => effect.grantedMove?.mode === "swim")).toBe(true);
   });
 
-  it("is never offered in a fight above water", () => {
+  it("is never offered in an encounter above water", () => {
     const built = table("octopus");
     advance(built, 5);
     advance(built, 5);

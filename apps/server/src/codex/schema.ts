@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { migrate, type Migration } from "../database.js";
+import { renameEncounterJson } from "../encounter-rename.js";
 import { backfillPagesAndEntries } from "./first-shown.js";
 import { migrateToHiddenBlocks } from "./hidden-blocks-migration.js";
 import { legacyPrep } from "./prep.js";
@@ -270,6 +271,23 @@ export const CODEX_MIGRATIONS: readonly Migration[] = [
       const update = database.prepare("UPDATE codex_sessions SET prep_json = ? WHERE id = ?");
       for (const session of sessions) update.run(JSON.stringify(legacyPrep(session.prep_body)), session.id);
       database.exec("ALTER TABLE codex_sessions DROP COLUMN prep_body");
+    }
+  },
+  {
+    // An Encounters section lists `encounterIds` now (ADR-0041), in each session's prep and each template.
+    version: 6,
+    up: (database) => {
+      for (const [table, column] of [
+        ["codex_sessions", "prep_json"],
+        ["codex_prep_templates", "sections_json"]
+      ] as const) {
+        const rows = database.prepare(`SELECT id, ${column} AS value FROM ${table}`).all() as {
+          id: string;
+          value: string;
+        }[];
+        const update = database.prepare(`UPDATE ${table} SET ${column} = ? WHERE id = ?`);
+        for (const row of rows) update.run(renameEncounterJson(row.value), row.id);
+      }
     }
   }
 ];

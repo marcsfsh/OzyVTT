@@ -387,7 +387,7 @@ describe("Weapon of Warning", () => {
     expect(mode(IDS.wizard, 40)).toBe("normal");
   });
 
-  it("wakes an ally sleeping naturally as the fight begins", () => {
+  it("wakes an ally sleeping naturally as the encounter begins", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput(), [IDS.wizard]: wizardInput() });
     write(table, IDS.fighter, catalogRow("weapon-of-warning", { baseId: "longsword", attuned: true }), "gm");
     table.actor(IDS.wizard).conditions.push({ id: "unconscious" });

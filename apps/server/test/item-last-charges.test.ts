@@ -126,7 +126,7 @@ describe("the last charge on the loose route", () => {
     for (const cleanup of cleanups.splice(0)) await cleanup();
   });
 
-  it("ends a Gem of Brightness's magic outside a fight too", async () => {
+  it("ends a Gem of Brightness's magic outside an encounter too", async () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
     write(table, IDS.wizard, catalogRow("gem-of-brightness"));
     table.actor(IDS.wizard).actionUses = { "gem-of-brightness-charges": 49 };

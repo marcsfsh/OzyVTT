@@ -32,7 +32,7 @@ export function MapList() {
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const actions = useMapActions(token, reloadMaps);
   const library = maps ?? [];
-  const usedIn = (mapId: string) => state.combat.scenes.filter((scene) => scene.mapAssetId === mapId).length;
+  const usedIn = (mapId: string) => state.combat.encounters.filter((scene) => scene.mapAssetId === mapId).length;
   const shown = sortMaps(filterMaps(library, filters, usedIn), sort, usedIn);
   const folders = folderNamesOf(library);
 
@@ -43,7 +43,7 @@ export function MapList() {
       </MenuItem>
       {map.kind === "battlemap" && (
         <MenuItem icon={<IconScene />} onClick={() => go(`${SCENES_PATHS.newScene}?map=${map.id}`)}>
-          New scene on this map
+          New encounter on this map
         </MenuItem>
       )}
       <MenuItem icon={<IconPencil />} onClick={() => void actions.rename(map)}>
@@ -157,7 +157,7 @@ export function MapList() {
                         {map.width} × {map.height}
                       </td>
                       <td>{map.folder ?? "None"}</td>
-                      <td>{uses === 0 ? "No scene" : `${uses} ${uses === 1 ? "scene" : "scenes"}`}</td>
+                      <td>{uses === 0 ? "No encounter" : `${uses} ${uses === 1 ? "encounter" : "encounters"}`}</td>
                       <td className="sc-col-date">{whenLabel(map.updatedAt)}</td>
                       <td className="sc-col-menu">{rowMenu(map)}</td>
                     </tr>

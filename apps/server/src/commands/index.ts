@@ -4,6 +4,7 @@ import { actionCommands } from "./actions.js";
 import { actorHealthCommands } from "./actor-health.js";
 import { actorCommands } from "./actors.js";
 import { characterSheetCommands } from "./character-sheet.js";
+import { chatCommands } from "./chat.js";
 import { characterCommands } from "./characters.js";
 import { effectCommands } from "./effects.js";
 import { encounterCommands } from "./encounter.js";
@@ -43,6 +44,7 @@ export const gameCommands: readonly AnyCommand[] = [
   ...actionCommands,
   ...saveCommands,
   ...rollCommands,
+  ...chatCommands,
   ...experienceCommands,
   ...reactionCommands,
   ...effectCommands,

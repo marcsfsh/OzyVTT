@@ -119,27 +119,27 @@ export const mapCommands = [
     type: "token.move",
     operationId: "moveToken",
     description:
-      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `jump` leaps straight over what lies between up to the jump distance (a foot of movement for each foot), `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once a fight is running; in a fight, moving it off its turn or teleporting is the GM's to allow unless an action or feature granted that move or teleport this turn (Tactical Shift, Misty Step), which the move is charged to, and only the GM takes a placed token back to the tray. Before a fight the GM places tokens on the live scene without narration. `sceneId` targets a prepared (GM-private) scene; without it the token moves on the live table.",
+      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `jump` leaps straight over what lies between up to the jump distance (a foot of movement for each foot), `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once an encounter is running; in an encounter, moving it off its turn or teleporting is the GM's to allow unless an action or feature granted that move or teleport this turn (Tactical Shift, Misty Step), which the move is charged to, and only the GM takes a placed token back to the tray. Before an encounter the GM places tokens on the live encounter without narration. `encounterId` targets a prepared (GM-private) encounter; without it the token moves on the live table.",
     summary:
       "Move a combatant's token (server-snapped) walking, by a special speed, teleporting or by force; position null returns it to the tray.",
     schema: TokenMoveSchema,
     malformed: "The token move is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { commandId, actorId, position, sceneId } = request;
+      const { commandId, actorId, position, encounterId } = request;
       const mode = request.mode ?? "walk";
-      if (sceneId !== undefined) {
+      if (encounterId !== undefined) {
         // GM staging a prepared (off-table) scene privately. Geometry comes from that scene's own map.
-        if (!isGmGrade(principal)) throw new GameAccessDeniedError("Only the GM can stage a prepared scene.");
-        const scene = kit.read().combat.scenes.find((candidate) => candidate.id === sceneId);
-        if (!scene) throw new CommandRejectedError("That scene no longer exists.");
+        if (!isGmGrade(principal)) throw new GameAccessDeniedError("Only the GM can stage a prepared encounter.");
+        const scene = kit.read().combat.encounters.find((candidate) => candidate.id === encounterId);
+        if (!scene) throw new CommandRejectedError("That encounter no longer exists.");
         const sceneGeometry = await kit.context.tokenGeometryFor(scene.mapAssetId);
-        await execute((state) => moveSceneToken(state, sceneId, actorId, position, sceneGeometry), {
+        await execute((state) => moveSceneToken(state, encounterId, actorId, position, sceneGeometry), {
           type: "token.move-scene"
         });
         return;
       }
       const mapAssetId = kit.read().combat.mapAssetId;
-      if (!mapAssetId) throw new CommandRejectedError("Make a scene live before moving tokens.");
+      if (!mapAssetId) throw new CommandRejectedError("Make an encounter live before moving tokens.");
       if (request.override && !isGmGrade(principal))
         throw new GameAccessDeniedError("Only the GM can override movement rules.");
       if (mode === "forced" && !isGmGrade(principal))
@@ -170,7 +170,7 @@ export const mapCommands = [
         if (mode !== "forced" && mode !== "teleport") requireStartOrdered(state, actorId, initiatorOf(principal));
         // Before a fight the GM sets the scene; players move their own tokens once it starts.
         if (!state.combat.active && !isGmGrade(principal))
-          throw new CommandRejectedError("Your GM places the tokens before the fight starts.");
+          throw new CommandRejectedError("Your GM places the tokens before the encounter starts.");
         // A rider goes where its mount takes it (SRD Mounted Combat), until it dismounts.
         const riding = position !== null && state.combat.active ? mountOf(state, actorId) : undefined;
         if (riding && mode !== "forced" && mode !== "teleport")
@@ -200,7 +200,7 @@ export const mapCommands = [
         moverHiddenAtStart = kit.hiddenFromTable(state)(actorId);
         // Taking a placed token off the map mid-fight would move it for free.
         if (position === null && from !== null && !isGmGrade(principal) && state.combat.active)
-          throw new CommandRejectedError("Only the GM takes a token off the map during a fight.");
+          throw new CommandRejectedError("Only the GM takes a token off the map during an encounter.");
         // A grappler drags what it holds (SRD Grappled: "Movable"), and a swallower carries what is inside it;
         // teleporting or being moved by force doesn't.
         const dragged =
@@ -670,7 +670,7 @@ export const mapCommands = [
     type: "actor.fall",
     operationId: "fallActor",
     description:
-      "Makes a creature fall (GM-grade only), SRD Falling: 1d6 Bludgeoning damage for every 10 feet, to a maximum of 20d6, rolled by the server, and the Prone condition unless it takes no damage. It falls from the height it is at unless `feet` says how far, and lands on the ground or at `landingAltitudeFeet`. With `intoWater` it may use its Reaction for a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check, which the server rolls with the better of the two, a success halving the damage. In a fight, a creature that can answer the fall with its Reaction (Feather Fall within range and sight, the faller's own Slow Fall) gets a `falls` prompt, and the fall waits for the answers. A creature that can't stay in the air falls this way by itself after any command.",
+      "Makes a creature fall (GM-grade only), SRD Falling: 1d6 Bludgeoning damage for every 10 feet, to a maximum of 20d6, rolled by the server, and the Prone condition unless it takes no damage. It falls from the height it is at unless `feet` says how far, and lands on the ground or at `landingAltitudeFeet`. With `intoWater` it may use its Reaction for a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check, which the server rolls with the better of the two, a success halving the damage. In an encounter, a creature that can answer the fall with its Reaction (Feather Fall within range and sight, the faller's own Slow Fall) gets a `falls` prompt, and the fall waits for the answers. A creature that can't stay in the air falls this way by itself after any command.",
     summary: "Make a creature fall; the server rolls the damage once any reaction to it is answered (GM).",
     schema: ActorFallSchema,
     malformed: "The fall is malformed.",
@@ -706,7 +706,7 @@ export const mapCommands = [
     type: "actor.mount",
     operationId: "mountActor",
     description:
-      "A creature climbs onto a mount (`mountId`) or gets off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat: the mount must be within 5 feet and at least one size larger (a flying or aquatic one wearing an Exotic Saddle), and either costs half the rider's Speed on its turn in a fight. The rider shares the mount's space and height, the mount's moves carry it, and it moves only by its mount until it dismounts; a dismounted rider stands in the nearest unoccupied space. A `controlled` mount (the default) takes the rider's Initiative, its turn right after the rider's, and only the Dash, Disengage and Dodge actions; an `independent` one keeps its own. A mount moved by force carries its rider, who makes a DC 10 Dexterity saving throw to stay on, and one that teleports leaves its rider behind, off it. A player may mount or dismount only their own character; the GM may `override` a movement rule.",
+      "A creature climbs onto a mount (`mountId`) or gets off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat: the mount must be within 5 feet and at least one size larger (a flying or aquatic one wearing an Exotic Saddle), and either costs half the rider's Speed on its turn in an encounter. The rider shares the mount's space and height, the mount's moves carry it, and it moves only by its mount until it dismounts; a dismounted rider stands in the nearest unoccupied space. A `controlled` mount (the default) takes the rider's Initiative, its turn right after the rider's, and only the Dash, Disengage and Dodge actions; an `independent` one keeps its own. A mount moved by force carries its rider, who makes a DC 10 Dexterity saving throw to stay on, and one that teleports leaves its rider behind, off it. A player may mount or dismount only their own character; the GM may `override` a movement rule.",
     summary: "Mount a creature or dismount; the mount's moves carry its rider.",
     schema: ActorMountSchema,
     malformed: "The mount request is malformed.",
@@ -714,7 +714,7 @@ export const mapCommands = [
       const { actorId, mountId } = request;
       if (request.override && !isGmGrade(principal))
         throw new GameAccessDeniedError("Only the GM can override movement rules.");
-      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before mounting a creature.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make an encounter live before mounting a creature.");
       const distance = await kit.creatureDistance();
       let mountName: string | null = null;
       let outcome: ReturnType<typeof mountOrDismount> = { warnings: [], overridden: null };
@@ -768,7 +768,7 @@ export const mapCommands = [
     malformed: "The spell-area command is malformed.",
     gmOnly: "Only the GM places a spell's area.",
     async run({ principal, request, execute }, kit) {
-      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before placing a spell's area.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make an encounter live before placing a spell's area.");
       if (!geometry.calibration) throw new CommandRejectedError("Calibrate this map before placing a spell's area.");
       const { commandId, zoneId, template } = request;
       await execute((state) => {
@@ -832,7 +832,7 @@ export const mapCommands = [
     schema: AnnotationAddSchema,
     malformed: "The annotation is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before adding to the map.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make an encounter live before adding to the map.");
       const { commandId, kind, shape, visibility, visibleToActorId, movableByOthers, color } = request;
       const { duplicate } = await execute((state) => {
         requireSameMap(state.combat.mapAssetId, mapAssetId);
@@ -867,7 +867,7 @@ export const mapCommands = [
     schema: AnnotationPingSchema,
     malformed: "The ping is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before pinging the map.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make an encounter live before pinging the map.");
       const { commandId, point, color } = request;
       const { duplicate } = await execute((state) => {
         requireSameMap(state.combat.mapAssetId, mapAssetId);
@@ -892,7 +892,7 @@ export const mapCommands = [
     schema: AnnotationMoveSchema,
     malformed: "The annotation update is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { geometry } = await liveMap(kit, "Make a scene live before editing the map.");
+      const { geometry } = await liveMap(kit, "Make an encounter live before editing the map.");
       const { id, geometry: moved } = request;
       const zoneEvents: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {

@@ -22,7 +22,7 @@ import {
 } from "./targeting";
 import { command, read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
-import { useRollPreference } from "../dice/roll-preference";
+import { typedDie, useRollPreference } from "../dice/roll-preference";
 import { useTableCalibration } from "../scene/tableGeometry";
 import { caughtByArea } from "../table/targetHints";
 import { foesFirst, pickableTargets, targetRows } from "../table/targetRows";
@@ -96,8 +96,8 @@ export function ActionRunner({
     setDamageEdit(null);
   }, [result]);
   // Confirming a hit applies its damage in the same step when no reaction can change it. With hand-rolled dice the
-  // GM types the damage first, so Apply stays.
-  const { rollMode } = useRollPreference();
+  // GM types the damage first, so Apply stays; so it does for a character played at the table, whose player reports it.
+  const { rollMode } = useRollPreference(actor.id);
   const previewedTarget = useRef<string | null>(null);
   const applyRef = useRef<(targetId: string, targetName: string, key: string) => void>(() => {});
   useEffect(() => {
@@ -290,8 +290,13 @@ export function ActionRunner({
           onMap
           busy={resolveBusy}
           onInvalidFace={onFeedback}
+          actorId={actor.id}
           onRoll={(face) =>
-            resolveTargeting(state.revision, onOutcome, face !== undefined ? { attackNatural: face } : {})
+            resolveTargeting(
+              state.revision,
+              onOutcome,
+              face !== undefined ? typedDie("attackNatural", face, actor.id) : {}
+            )
           }
           onMoveFirst={() => takeMoveFirst(onOutcome)}
         />

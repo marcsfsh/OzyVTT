@@ -247,7 +247,7 @@ describe("the sheet's checks", () => {
     expect(picker.closest("label")?.textContent).toContain("Who sees the roll");
   });
 
-  it("drops an initiative roll from the latest-roll line once its fight is over", async () => {
+  it("drops an initiative roll from the latest-roll line once its encounter is over", async () => {
     serve(derivedSheet());
     noteSheetRolls("i1", "c1");
     const initiative = { ...checkRoll("i1"), label: "Initiative", purpose: "manual", formula: "1d20 + 2", total: 14 };
@@ -519,7 +519,10 @@ describe("the sheet's Speed", () => {
   it("shows the Speed in force, with the base beside it when they differ", async () => {
     serve(derivedSheet({ speedFeet: 15 }));
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
-    await openTab(userEvent.setup(), "Checks");
+    const user = userEvent.setup();
+    await openTab(user, "Checks");
+    // The compact header keeps AC and HP; its HP box opens the other vitals, Speed among them.
+    await user.click(screen.getByRole("button", { name: /^Hit Points .*see the other vitals$/ }));
     const lowered = await screen.findByText("of 30 ft");
     expect(lowered.closest(".cs-stat")?.textContent).toContain("15");
     expect(lowered.closest(".cs-stat")?.classList.contains("is-caution")).toBe(true);

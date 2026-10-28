@@ -640,10 +640,10 @@ describe("CodexStore maps + markers", () => {
       iconId: "castle",
       iconColor: "#ff2e9a",
       pageIds: [keep.id, cellar.id],
-      sceneIds: [scene1, scene2]
+      encounterIds: [scene1, scene2]
     });
     expect(marker.pageIds).toEqual([keep.id, cellar.id]);
-    expect(marker.sceneIds).toEqual([scene1, scene2]);
+    expect(marker.encounterIds).toEqual([scene1, scene2]);
     expect(store.markerForScene(scene2)?.id).toBe(marker.id); // found by any linked scene
     expect(store.updateMarker(marker.id, { pageIds: [cellar.id] }).pageIds).toEqual([cellar.id]); // remove one
     store.deletePage(cellar.id);
@@ -672,7 +672,7 @@ describe("CodexStore map/marker viewer safety", () => {
       iconColor: "#2de2ff",
       revealedToPlayers: true,
       pageIds: [shown.id, secret.id],
-      sceneIds: ["33333333-3333-4333-8333-333333333333"]
+      encounterIds: ["33333333-3333-4333-8333-333333333333"]
     });
     const revealedPageIds = new Set(marker.pageIds.filter((id) => store.getPage(id)?.revealedToPlayers));
     const projected = projectPlayerMarker(marker, { revealedPageIds, subMapRevealed: false });
@@ -701,13 +701,13 @@ describe("CodexStore map/marker viewer safety", () => {
       iconId: "town",
       iconColor: "#a45cff",
       pageIds: [secret.id],
-      sceneIds: [ASSET],
+      encounterIds: [ASSET],
       actorId: ASSET,
       revealedToPlayers: true
     });
-    expect(projectGmMarker(marker)).toMatchObject({ sceneIds: [ASSET], actorId: ASSET, pageIds: [secret.id] });
+    expect(projectGmMarker(marker)).toMatchObject({ encounterIds: [ASSET], actorId: ASSET, pageIds: [secret.id] });
     const stripped = projectPlayerMarker(marker, { revealedPageIds: new Set<string>(), subMapRevealed: false })!;
-    expect(stripped).not.toHaveProperty("sceneIds");
+    expect(stripped).not.toHaveProperty("encounterIds");
     expect(stripped).not.toHaveProperty("actorId");
     expect(stripped.pageIds).toEqual([]); // secret page not revealed, so link hidden
     expect(
@@ -724,11 +724,17 @@ describe("CodexStore map/marker viewer safety", () => {
   it("a scene may sit on several markers; markerForScene resolves to one of them (none is cleared on relink)", () => {
     const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
     const scene = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-    const first = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff", sceneIds: [scene] });
+    const first = store.createMarker(map.id, {
+      x: 1,
+      y: 1,
+      iconId: "town",
+      iconColor: "#a45cff",
+      encounterIds: [scene]
+    });
     const second = store.createMarker(map.id, { x: 2, y: 2, iconId: "cave", iconColor: "#2de2ff" });
-    store.updateMarker(second.id, { sceneIds: [scene] });
-    expect(store.getMarker(first.id)!.sceneIds).toContain(scene); // first keeps the link (no clearing)
-    expect(store.getMarker(second.id)!.sceneIds).toContain(scene);
+    store.updateMarker(second.id, { encounterIds: [scene] });
+    expect(store.getMarker(first.id)!.encounterIds).toContain(scene); // first keeps the link (no clearing)
+    expect(store.getMarker(second.id)!.encounterIds).toContain(scene);
     expect([first.id, second.id]).toContain(store.markerForScene(scene)?.id);
   });
 });
@@ -1452,7 +1458,7 @@ describe("Codex page→marker reverse lookup: the store and projection layers, o
       iconColor: "#FF2E9A",
       label: "Burgomaster's house",
       pageIds: [shown.id, secret.id],
-      sceneIds: [crypto.randomUUID()],
+      encounterIds: [crypto.randomUUID()],
       actorId: crypto.randomUUID(),
       revealedToPlayers: true
     });
@@ -1464,7 +1470,7 @@ describe("Codex page→marker reverse lookup: the store and projection layers, o
       projectPlayerMarker(row, { revealedPageIds: new Set([shown.id]), subMapRevealed: false })
     );
     expect(projected.pageIds).toEqual([shown.id]); // the still-secret page link is filtered out
-    expect(projected).not.toHaveProperty("sceneIds");
+    expect(projected).not.toHaveProperty("encounterIds");
     expect(projected).not.toHaveProperty("actorId");
   });
 });

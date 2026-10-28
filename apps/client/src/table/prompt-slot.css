@@ -105,3 +105,38 @@
     padding: var(--space-3);
   }
 }
+
+/* A reaction's numbers: what the choice turns on, side by side in VT323. Their roll reads in the enemy's red, the AC
+   the reaction gives in cyan. */
+.prompt-card-numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+.prompt-card-numbers > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+}
+.prompt-card-numbers dd {
+  margin: 0;
+  color: var(--text);
+  font: 400 34px / 1 var(--font-numeric);
+}
+.prompt-card-numbers dt {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.prompt-card-numbers .is-hostile dd {
+  color: var(--danger-text);
+}
+.prompt-card-numbers .is-on {
+  border-color: var(--state-on-edge);
+}
+.prompt-card-numbers .is-on dd {
+  color: var(--cyan-hi);
+}

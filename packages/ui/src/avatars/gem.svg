@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Gem avatar"><title>Gem avatar</title><defs><radialGradient id="oz-gem-b" cx="0.5" cy="0.45" r="0.7"><stop offset="0" stop-color="#1a1450"></stop><stop offset="1" stop-color="#05040f"></stop></radialGradient></defs>
+<rect width="64" height="64" fill="url(#oz-gem-b)"></rect>
+<path d="M17 25L24 16H40L47 25Z" fill="#a6f3ff"></path>
+<path d="M17 25L32 52L28 25Z" fill="#2be4ff"></path><path d="M28 25L32 52L36 25Z" fill="#d8fbff"></path><path d="M36 25L32 52L47 25Z" fill="#b07cff"></path>
+<path d="M24 16L28 25L32 16L36 25L40 16" fill="none" stroke="#5c8dff" stroke-width="1"></path>
+<path d="M17 25L24 16H40L47 25L32 52ZM17 25H47" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linejoin="round"></path>
+<path d="M50 9l1.2 3.3 3.3 1.2-3.3 1.2L50 18l-1.2-3.3-3.3-1.2 3.3-1.2z" fill="#ffffff"></path>
+<path d="M13 40l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="#ff8cc0"></path></svg>

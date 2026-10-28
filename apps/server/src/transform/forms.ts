@@ -129,7 +129,7 @@ export function resizeTokens(
     return { ...token, sizeCells: cells, sizePx, position };
   };
   state.combat.tokens = state.combat.tokens.map(resize);
-  state.combat.scenes = state.combat.scenes.map((scene) =>
+  state.combat.encounters = state.combat.encounters.map((scene) =>
     scene.combat.tokens.some((token) => token.actorId === actorId)
       ? { ...scene, combat: { ...scene.combat, tokens: scene.combat.tokens.map(resize) } }
       : scene

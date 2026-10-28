@@ -1,7 +1,8 @@
-import type { ComponentType, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "./util";
-import { IconCheck, IconInfo, IconWarning, IconX } from "./icons";
+import { IconX } from "./icons";
+import { Tag, type TagTone } from "./Tag";
 import "./Toast.css";
 
 export type ToastTone = "success" | "error" | "info";
@@ -9,11 +10,14 @@ interface ToastOptions {
   tone?: ToastTone;
   /** Milliseconds before auto-dismiss; 0 keeps it until dismissed. */
   duration?: number;
+  /** Offers Undo, for an action that can be taken back. Undo runs this and closes the toast. */
+  undo?: () => void;
 }
 interface ToastRecord {
   id: number;
   message: ReactNode;
   tone: ToastTone;
+  undo?: () => void;
 }
 interface ToastApi {
   toast: (message: ReactNode, options?: ToastOptions) => void;
@@ -32,16 +36,24 @@ interface ToastStore {
 const MUTE_STORAGE_KEY = "vtt.notifications-muted";
 const ToastContext = createContext<ToastApi | null>(null);
 const ToastStoreContext = createContext<ToastStore | null>(null);
-/* Same system glyphs as Alert: one tone vocabulary, one set of shapes. */
-const TONE_ICON: Record<ToastTone, ComponentType<{ className?: string }>> = {
-  success: IconCheck,
-  error: IconWarning,
-  info: IconInfo
+/** The VT323 tag that names a toast's kind. */
+const TONE_TAG: Record<ToastTone, { word: string; tone: TagTone }> = {
+  success: { word: "DONE", tone: "done" },
+  error: { word: "ERROR", tone: "error" },
+  info: { word: "NOTE", tone: "status" }
 };
 
-/** One toast surface for results not visible on screen ("Encounter saved"). Names
-    the result, appears briefly, dismisses. Wrap the app once; call useToast(). */
-export function ToastProvider({ children, duration = 3200 }: { children: ReactNode; duration?: number }) {
+/** A toast's countdown, which hover or focus holds still. */
+interface Timer {
+  handle: number | null;
+  remaining: number;
+  startedAt: number;
+}
+
+/** One toast surface for results not visible on screen ("Encounter saved"). Names the result, stays 5 seconds (held
+    while the pointer or focus is on it), and offers Undo when the action can be undone. Wrap the app once; call
+    useToast(). */
+export function ToastProvider({ children, duration = 5000 }: { children: ReactNode; duration?: number }) {
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
   const idRef = useRef(0);
   const [muted, setMutedState] = useState(() => {
@@ -62,32 +74,56 @@ export function ToastProvider({ children, duration = 3200 }: { children: ReactNo
     }
   }, []);
 
-  const dismiss = useCallback((id: number) => setToasts((list) => list.filter((t) => t.id !== id)), []);
   // Pending dismiss timers, cleared on unmount so none fires into a provider that is gone.
-  const timers = useRef(new Set<number>());
+  const timers = useRef(new Map<number, Timer>());
+  const dismiss = useCallback((id: number) => {
+    const timer = timers.current.get(id);
+    if (timer?.handle != null) window.clearTimeout(timer.handle);
+    timers.current.delete(id);
+    setToasts((list) => list.filter((t) => t.id !== id));
+  }, []);
   useEffect(() => {
     const pending = timers.current;
     return () => {
-      for (const handle of pending) window.clearTimeout(handle);
+      for (const timer of pending.values()) if (timer.handle != null) window.clearTimeout(timer.handle);
       pending.clear();
     };
   }, []);
+  const run = useCallback(
+    (id: number, timer: Timer) => {
+      timer.startedAt = Date.now();
+      timer.handle = window.setTimeout(() => dismiss(id), timer.remaining);
+    },
+    [dismiss]
+  );
+  const hold = useCallback((id: number) => {
+    const timer = timers.current.get(id);
+    if (!timer || timer.handle == null) return;
+    window.clearTimeout(timer.handle);
+    timer.handle = null;
+    timer.remaining = Math.max(0, timer.remaining - (Date.now() - timer.startedAt));
+  }, []);
+  const release = useCallback(
+    (id: number) => {
+      const timer = timers.current.get(id);
+      if (timer && timer.handle == null) run(id, timer);
+    },
+    [run]
+  );
   const toast = useCallback(
     (message: ReactNode, options?: ToastOptions) => {
       if (mutedRef.current) return; // this viewer silenced notifications (client-local)
       const id = ++idRef.current;
       const tone = options?.tone ?? "info";
-      setToasts((list) => [...list, { id, message, tone }]);
+      setToasts((list) => [...list, { id, message, tone, undo: options?.undo }]);
       const ttl = options?.duration ?? duration;
       if (ttl > 0) {
-        const handle = window.setTimeout(() => {
-          timers.current.delete(handle);
-          dismiss(id);
-        }, ttl);
-        timers.current.add(handle);
+        const timer: Timer = { handle: null, remaining: ttl, startedAt: 0 };
+        timers.current.set(id, timer);
+        run(id, timer);
       }
     },
-    [dismiss, duration]
+    [duration, run]
   );
 
   const api = useMemo(() => ({ toast, muted, setMuted }), [toast, muted, setMuted]);
@@ -102,25 +138,45 @@ export function ToastProvider({ children, duration = 3200 }: { children: ReactNo
     <ToastContext.Provider value={api}>
       <ToastStoreContext.Provider value={store}>{children}</ToastStoreContext.Provider>
       <div className="nh-toast-viewport" role="region" aria-label="Notifications">
-        {(outlets > 0 ? [] : toasts).map((t) => {
-          const ToneIcon = TONE_ICON[t.tone];
-          return (
-            <div key={t.id} className={cx("nh-toast", `nh-toast--${t.tone}`, "anim-sheet")} role="status">
-              <span className="nh-toast-icon" aria-hidden="true">
-                <ToneIcon />
-              </span>
-              <span className="nh-toast-message">{t.message}</span>
+        {(outlets > 0 ? [] : toasts).map((t) => (
+          <div
+            key={t.id}
+            className={cx("nh-toast", `nh-toast--${t.tone}`, "anim-sheet")}
+            // A status is announced politely, after what the person is doing.
+            role="status"
+            onPointerEnter={() => hold(t.id)}
+            onPointerLeave={() => release(t.id)}
+            onFocus={() => hold(t.id)}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) release(t.id);
+            }}
+          >
+            <Tag tone={TONE_TAG[t.tone].tone} className="nh-toast-tag">
+              {TONE_TAG[t.tone].word}
+            </Tag>
+            <span className="nh-toast-message">{t.message}</span>
+            {t.undo && (
               <button
                 type="button"
-                className="nh-toast-close tap-target interactive"
-                aria-label="Dismiss"
-                onClick={() => dismiss(t.id)}
+                className="nh-toast-undo tap-target interactive"
+                onClick={() => {
+                  t.undo?.();
+                  dismiss(t.id);
+                }}
               >
-                <IconX />
+                Undo
               </button>
-            </div>
-          );
-        })}
+            )}
+            <button
+              type="button"
+              className="nh-toast-close tap-target interactive"
+              aria-label="Dismiss"
+              onClick={() => dismiss(t.id)}
+            >
+              <IconX />
+            </button>
+          </div>
+        ))}
       </div>
     </ToastContext.Provider>
   );
@@ -149,14 +205,13 @@ export function ToastOutlet({ fallback, className }: Readonly<{ fallback?: React
   const { claim } = store;
   useEffect(() => claim(), [claim]);
   const latest = store.toasts[store.toasts.length - 1];
-  const ToneIcon = latest ? TONE_ICON[latest.tone] : null;
   return (
     <span className={cx("nh-toast-outlet", latest && `nh-toast-outlet--${latest.tone}`, className)} role="status">
-      {latest && ToneIcon ? (
+      {latest ? (
         <>
-          <span className="nh-toast-icon" aria-hidden="true">
-            <ToneIcon />
-          </span>
+          <Tag tone={TONE_TAG[latest.tone].tone} size="sm">
+            {TONE_TAG[latest.tone].word}
+          </Tag>
           <span className="nh-toast-outlet-message">{latest.message}</span>
         </>
       ) : (

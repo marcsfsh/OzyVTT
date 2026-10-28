@@ -12,6 +12,7 @@ import { storedAbilityScores, type CharacterCreateRequestInput } from "./charact
 import { storedClassSequence } from "./character-offers.js";
 import { CommandRejectedError } from "./game-store.js";
 import { recordRoll } from "./roll-history.js";
+import { diceMode } from "./player-dice.js";
 
 /**
  * The dice a character create or rebuild carries, settled before the build: hit points the server is asked to
@@ -88,7 +89,7 @@ export function settleBuilderDice(
     sendsRecordedScores(request, ledger) ||
     (storedAbilityScores(ledger) === null && context.derivedScoresMatch?.(request) === true);
 
-  if (!context.gm && state.builderPolicy.typedRolls !== "open") {
+  if (!context.gm && diceMode(state, "d20") === "app") {
     if (!keepsRecordedScores) requireServerAbilityRoll(state, request, context);
     if (hp.mode === "entries")
       (hp.entries ?? []).forEach((entry, index) => {

@@ -92,11 +92,11 @@ function Transport({
 export function SoundBoard({
   gmToken,
   scenes,
-  activeSceneId
+  activeEncounterId
 }: Readonly<{
   gmToken: string;
   scenes: readonly Readonly<{ id: string; name: string }>[];
-  activeSceneId: string | null;
+  activeEncounterId: string | null;
 }>) {
   const view = useSoundBoard();
   const library = useSoundLibrary(gmToken);
@@ -111,11 +111,7 @@ export function SoundBoard({
   }, [missing, refresh]);
 
   return (
-    <section
-      className="sound-board pane-frame pane-scene scanlines frame-col anim-view"
-      aria-labelledby="sound-board-title"
-    >
-      <div className="pane-sky" aria-hidden="true" />
+    <section className="sound-board pane-frame pane-scene frame-col anim-view" aria-labelledby="sound-board-title">
       <header className="sound-board-heading neon-beam">
         <div className="sound-board-title">
           <Eyebrow>Shared display</Eyebrow>
@@ -138,7 +134,7 @@ export function SoundBoard({
               </div>
               <div className="sound-board-col">
                 <SoundLibraryPanel library={library} board={view.board} send={send} />
-                <SceneSounds board={view.board} scenes={scenes} activeSceneId={activeSceneId} send={send} />
+                <SceneSounds board={view.board} scenes={scenes} activeEncounterId={activeEncounterId} send={send} />
               </div>
             </div>
           </>

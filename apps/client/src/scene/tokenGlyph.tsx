@@ -18,8 +18,10 @@ export type TokenGlyphProps = Readonly<{
   /** A monster's number among its kind, drawn on a badge at the token's top left. */
   number?: number;
   active?: boolean;
-  /** Optional portrait; drawn clipped to the token circle. Missing or failed loads fall back to initials. */
+  /** Optional portrait; drawn clipped to the token circle. Missing or failed loads fall back to `fallbackUrl`. */
   imageUrl?: string | null;
+  /** The default picture to draw without token art; initials stand in where there is none. */
+  fallbackUrl?: string | null;
   turnClassName: string;
   bodyClassName: string;
   initialsClassName: string;
@@ -41,6 +43,7 @@ export function TokenGlyph({
   number,
   active,
   imageUrl,
+  fallbackUrl,
   turnClassName,
   bodyClassName,
   initialsClassName,
@@ -55,7 +58,9 @@ export function TokenGlyph({
     setFailed(false);
   }, [imageUrl]);
   const radius = sizePx / 2;
-  const showImage = imageUrl != null && imageUrl !== "" && !failed;
+  const art = imageUrl != null && imageUrl !== "" && !failed ? imageUrl : null;
+  const shown = art ?? fallbackUrl ?? null;
+  const showImage = shown !== null && shown !== "";
   return (
     <>
       {active && <circle className={turnClassName} r={sizePx * 0.64} />}
@@ -68,14 +73,16 @@ export function TokenGlyph({
             <circle r={radius} />
           </clipPath>
           <image
-            href={imageUrl ?? undefined}
+            href={shown ?? undefined}
             x={-radius}
             y={-radius}
             width={sizePx}
             height={sizePx}
             clipPath={`url(#${clipId})`}
             preserveAspectRatio="xMidYMid slice"
-            onError={() => setFailed(true)}
+            onError={() => {
+              if (art) setFailed(true);
+            }}
           />
           <circle className={bodyClassName} r={radius} style={{ fill: "none" }} />
         </>

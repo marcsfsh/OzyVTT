@@ -89,12 +89,12 @@ describe("a focus staff", () => {
   });
 });
 
-describe("armor in a fight", () => {
-  it("refuses to doff body armor in a fight, since it takes minutes", () => {
+describe("armor in an encounter", () => {
+  it("refuses to doff body armor in an encounter, since it takes minutes", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     fight(table, IDS.fighter);
     expect(() => write(table, IDS.fighter, edit(table, IDS.fighter, "chain-mail", { equipped: false }))).toThrow(
-      "Doffing Chain Mail takes 5 minutes, so it can't be done in a fight."
+      "Doffing Chain Mail takes 5 minutes, so it can't be done in an encounter."
     );
     write(table, IDS.fighter, edit(table, IDS.fighter, "chain-mail", { equipped: false }), "gm");
     expect(row(table, IDS.fighter, "chain-mail")?.equipped).toBe(false);

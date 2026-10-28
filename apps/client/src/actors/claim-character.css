@@ -1,71 +1,146 @@
-/* The player's pre-claim picker is a region (`.scroll-y` in the markup) at every width: above 980px
-   it keeps the picker from pushing the map down; below, it is the sheet's body while the map band
-   stays live. */
+/* Pick your character: a list of rows, one chosen with a cyan edge and tick, claimed ones dimmed with their tag, and
+   Play as under them. The picker is a region (`.scroll-y` in the markup) at every width. */
 .claim-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   min-height: 0;
-  margin-bottom: 1.2rem;
+  padding: var(--space-6) var(--space-5);
 }
 .claim-heading h2 {
-  font-size: var(--fs-h2);
+  margin: 0;
+  font: 400 30px / 1.1 var(--font-display);
+  text-transform: uppercase;
 }
-.claim-heading p {
-  margin: 0 0 var(--space-4);
-  font-size: 0.9rem;
+.claim-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
 }
-.claim-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-  gap: 0.8rem;
+.claim-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.claim-card {
+.claim-row-pick {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  text-align: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.claim-card-text {
+.claim-row-pick:hover:not(:disabled) {
+  border-color: var(--line-raised-hover);
+}
+.claim-row.is-chosen .claim-row-pick {
+  border-color: var(--state-on-edge);
+  box-shadow: var(--glow-cyan);
+}
+.claim-row.is-taken .claim-row-pick {
+  cursor: default;
+}
+.claim-row.is-taken .claim-row-name,
+.claim-row.is-taken .nh-portrait {
+  opacity: 0.6;
+}
+.claim-row-text {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-1);
-  align-items: center;
+  gap: 2px;
+  min-width: 0;
 }
-.claim-card-name {
-  margin: 0;
-  font: 400 1.05rem/1.2 var(--font-display);
+.claim-row-name {
+  font-size: 17px;
+  font-weight: 700;
 }
-.claim-card-line {
-  color: var(--text-dim);
-  font: 600 var(--fs-sm) / 1.3 var(--font-label);
-}
-.claim-card-action {
-  margin-top: auto;
-}
-/* A card someone else holds says what to do; a button there could not work. */
-.claim-card-taken {
-  margin: auto 0 0;
-  color: var(--text-dim);
+.claim-row-line,
+.claim-row-taken {
+  color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.claim-view > .nh-alert {
-  margin-bottom: var(--space-4);
+.claim-row-tick {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-raised);
 }
-/* On a phone the picker is the sheet row, edge to edge, so it keeps the 16px side gutter itself. */
-@media (max-width: 979px) {
-  .claim-view {
-    padding-inline: var(--space-4);
-  }
+.claim-row.is-chosen .claim-row-tick {
+  border-color: var(--state-on-edge);
+  background: var(--state-on);
+}
+.claim-row.is-chosen .claim-row-tick::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 4px;
+  width: 7px;
+  height: 13px;
+  border: solid var(--state-on-ink);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
 }
 .claim-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
-  margin-top: var(--space-4);
+  gap: var(--space-2);
+}
+.claim-play {
+  margin-top: var(--space-2);
+}
+
+/* As the whole screen: the title screen's sunset on the left half (a band on top on a phone), the picker beside. */
+.claim-screen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+.claim-art {
+  position: relative;
+  overflow: clip;
+}
+.claim-art-mark {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%) scale(2.4);
+}
+.claim-screen > .claim-view {
+  justify-content: center;
+  max-width: 34rem;
+  padding-inline: var(--space-8);
+  border-left: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+@media (max-width: 760px) {
+  .claim-screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 220px minmax(0, 1fr);
+  }
+  .claim-screen > .claim-view {
+    justify-content: flex-start;
+    max-width: none;
+    padding: var(--space-5) var(--space-4);
+    border-left: 0;
+  }
+  .claim-art-mark {
+    top: 18%;
+    transform: translateX(-50%) scale(1.6);
+  }
 }

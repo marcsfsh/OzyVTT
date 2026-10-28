@@ -161,7 +161,7 @@ describe("who sees whom, on the attack roll", () => {
     expect(plain.rollMode?.mode).toBe("disadvantage");
   });
 
-  it("leaves the conditions alone with the scene's vision off", () => {
+  it("leaves the conditions alone with the encounter's vision off", () => {
     const state = visionGame({
       enabled: false,
       ambient: "dark",

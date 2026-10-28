@@ -889,7 +889,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "actions[].underwaterOnly",
     types: ACTION_CARRIERS,
     reason:
-      "an action usable only in an underwater fight (a seahorse's Bubble Dash), read from the action's description as the catalog is built",
+      "an action usable only in an underwater encounter (a seahorse's Bubble Dash), read from the action's description as the catalog is built",
     status: "permanent: system-synthesised"
   },
   {

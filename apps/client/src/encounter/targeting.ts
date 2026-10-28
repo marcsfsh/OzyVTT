@@ -575,6 +575,8 @@ export type ResolveOptions = Readonly<{
   rollMode?: "advantage" | "disadvantage" | "normal";
   /** The face a physical d20 shows, used in place of the server's throw. */
   attackNatural?: number;
+  /** The attack's typed total, where the table asks for totals (ADR-0043). */
+  attackRolledTotal?: number;
   /** Throw the previewed d20 again: Heroic Inspiration for a player, free for the GM. */
   reroll?: boolean;
   /** How far Push mastery shoves on the confirmed hit (0 declines); absent pushes the full distance. */
@@ -654,6 +656,7 @@ export function resolveTargeting(
     ...(opts.override ? { override: opts.override } : {}),
     ...(opts.rollMode ? { rollMode: opts.rollMode } : {}),
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
+    ...(opts.attackRolledTotal !== undefined ? { attackRolledTotal: opts.attackRolledTotal } : {}),
     ...(opts.reroll ? { reroll: true } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
     ...(opts.mastery !== undefined ? { mastery: opts.mastery } : {}),
@@ -743,7 +746,12 @@ export function resolveTargeting(
       result = response.resolution;
       // A typed die stays typed until a reroll the server throws (the GM's) replaces it.
       if (response.resolution.preview)
-        typedPreview = opts.attackNatural !== undefined ? true : opts.reroll ? false : typedPreview;
+        typedPreview =
+          opts.attackNatural !== undefined || opts.attackRolledTotal !== undefined
+            ? true
+            : opts.reroll
+              ? false
+              : typedPreview;
       if (!response.resolution.preview) session = null;
     }
     // Overridable rejection: keep the session (same targets) and offer the audited override; the retry

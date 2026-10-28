@@ -46,8 +46,8 @@ export type GmCodexValue = Readonly<{
   actors: readonly WorkspaceActor[];
   /** The party's player characters, for every Who sees it control. */
   party: readonly CodexCharacter[];
-  activeSceneId: string | null;
-  onActivateScene: (sceneId: string) => void;
+  activeEncounterId: string | null;
+  onActivateScene: (encounterId: string) => void;
   onOpenReplay?: (archiveId: number) => void;
   /** The game clock (`rest.clockHours`), whose hour goes with the calendar's date. */
   gameHours: number | null;

@@ -349,7 +349,7 @@ describe("what a save's first roll can carry", () => {
     expect(actor(state, IDS.target).conditions).toEqual([{ id: "exhaustion", level: 1 }]);
   });
 
-  it("makes a successful target immune to that action for the fight", () => {
+  it("makes a successful target immune to that action for the encounter", () => {
     const state = game();
     const moan = {
       ability: "wis",

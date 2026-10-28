@@ -137,7 +137,7 @@ export function ScenePrepPanel({
     if (
       combatActive &&
       !(await confirm({
-        title: `Remove ${entry.name} from this fight?`,
+        title: `Remove ${entry.name} from this encounter?`,
         body: `${entry.name} stays on the roster.`,
         confirmLabel: "Remove"
       }))

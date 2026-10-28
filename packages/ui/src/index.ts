@@ -4,9 +4,23 @@
 */
 
 /* Theme */
-export { type Theme, THEMES, THEME_NAMES } from "./theme/theme";
+export { resolveTheme, type Theme, THEME_COLOURS, THEMES, THEME_NAMES } from "./theme/theme";
+export {
+  initTransparency,
+  setReduceTransparency,
+  transparencyReduced,
+  useReduceTransparency
+} from "./theme/transparency";
 export { ThemeSwitch, ThemeToggle } from "./theme/ThemeToggle";
-export { colourDistance, contrastRatio, parseColour, type Rgb } from "./theme/colour";
+export {
+  colourDistance,
+  composite,
+  contrastRatio,
+  parseColour,
+  parseColourAlpha,
+  type Rgb,
+  type Rgba
+} from "./theme/colour";
 
 /* Primitives */
 export { cx } from "./primitives/util";
@@ -22,6 +36,24 @@ export { Drawer } from "./primitives/Drawer";
 export { ToastProvider, ToastOutlet, useToast, useToastMute, type ToastTone } from "./primitives/Toast";
 export { Badge, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarPresence } from "./primitives/Avatar";
+/* The 80s elements, each with one job: tags, lamps, the life bar, the VCR counter and framed pictures. */
+export { Tag, type TagTone } from "./primitives/Tag";
+export { Lamp, MoveLamp, StatusLamp, type LampKind } from "./primitives/Lamp";
+export { LifeBar, type ExactHp, type HpBand } from "./primitives/LifeBar";
+export { VcrCounter } from "./primitives/VcrCounter";
+export { Picture, Portrait, type PictureSource, type PortraitFrame } from "./primitives/Portrait";
+export {
+  avatarHash,
+  avatarUrl,
+  classAvatarFor,
+  defaultAvatarFor,
+  generalAvatarFor,
+  CLASS_AVATARS,
+  GENERAL_AVATARS,
+  type AvatarId,
+  type ClassAvatar,
+  type GeneralAvatar
+} from "./avatars";
 export { Meter, type MeterTone } from "./primitives/Meter";
 export { Alert } from "./primitives/Alert";
 export { Switch } from "./primitives/Switch";
@@ -130,7 +162,7 @@ export { NameField } from "./primitives/NameField";
 export { FeatureList, type FeatureItem } from "./primitives/FeatureList";
 export { ReviewSummary, type ReviewSection } from "./primitives/ReviewSummary";
 
-/* The record surfaces' pieces (the Codex, the Compendium and the Scenes, Maps and Settings lists): who sees a record,
+/* The record surfaces' pieces (the Codex, the Compendium and the Encounters, Maps and Settings lists): who sees a record,
    and a list's filters, dropdowns and sort. They say Hidden, Everyone or the characters' names. */
 export {
   EVERYONE,

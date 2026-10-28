@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { CODEX_PATHS } from "@vtt/api-contract";
 import {
   Button,
@@ -20,11 +20,12 @@ import { useScenes } from "../scenes/context";
 import { MapThumb } from "../scenes/pieces";
 import { pathForMap, pathForScene, SCENES_PATHS } from "../scenes/routes";
 import { gridLine, gridStateOf, whenLabel } from "../scenes/sceneFacts";
-import { PaneDivider, useMomentShare } from "../table/PaneDivider";
+import { useScrollPast } from "../table/scrollPast";
 import { folderNamesOf, useMapActions } from "./mapActions";
 import { MAP_KIND_LABEL, MAP_KINDS } from "./map-lists";
 import type { MapKind } from "./map-catalog";
 import "../scenes/scene-page.css";
+import "../table/table-header.css";
 
 /** The library the map came from, folded into a flyout; a row opens that map. */
 function MapListFlyout({
@@ -98,8 +99,8 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
   const map = maps?.find((candidate) => candidate.id === mapId) ?? null;
   const [showGrid, setShowGrid] = useState(true);
   const [listOpen, setListOpen] = useState(false);
-  const splitRef = useRef<HTMLDivElement | null>(null);
-  const [mapShare, moveSplit] = useMomentShare(null);
+  // On a narrow screen the map scrolls away above the panel.
+  const column = useScrollPast(narrow);
   const actions = useMapActions(token, reloadMaps);
   const atlas = useAtlasUses(token, mapId);
   const kindId = useId();
@@ -116,7 +117,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
       </div>
     );
   const grid = gridStateOf(map);
-  const scenes = state.combat.scenes.filter((scene) => scene.mapAssetId === map.id);
+  const scenes = state.combat.encounters.filter((scene) => scene.mapAssetId === map.id);
   const folders = folderNamesOf(maps);
 
   const footer =
@@ -126,7 +127,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
       </Button>
     ) : map.kind === "battlemap" ? (
       <Button variant="primary" onClick={() => go(`${SCENES_PATHS.newScene}?map=${map.id}`)}>
-        <IconScene /> New scene on this map
+        <IconScene /> New encounter on this map
       </Button>
     ) : (
       <Button variant="primary" onClick={() => go(pathForMap(map.id, "grid"))}>
@@ -161,11 +162,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
           </MenuItem>
         </Menu>
       </header>
-      <div
-        className="table-bench-split"
-        ref={splitRef}
-        style={narrow ? ({ "--map-share": `${mapShare}%` } as React.CSSProperties) : undefined}
-      >
+      <div className={cx("table-bench-split", column.className)} ref={column.columnRef}>
         <div className="table-bench-map">
           <EncounterMap
             assetId={map.id}
@@ -181,7 +178,6 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
             showGrid={showGrid}
           />
         </div>
-        {narrow && <PaneDivider value={mapShare} onChange={moveSplit} container={() => splitRef.current} />}
         <div className="table-bench-panel">
           <section className="table-panel" aria-label={`About ${map.name}`}>
             <div className="table-panel-body scroll-y sc-meta">
@@ -244,7 +240,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
                   <h3>Where it is used</h3>
                 </header>
                 {scenes.length === 0 && atlas.length === 0 ? (
-                  <p className="sc-hint">No scene and no atlas map uses it yet.</p>
+                  <p className="sc-hint">No encounter and no atlas map uses it yet.</p>
                 ) : (
                   <ul className="sc-links">
                     {scenes.map((scene) => (
@@ -253,7 +249,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
                           <IconScene />
                           <b>{scene.name}</b>
                         </button>
-                        {scene.id === state.combat.activeSceneId && <span className="sc-state is-live">Live</span>}
+                        {scene.id === state.combat.activeEncounterId && <span className="sc-state is-live">Live</span>}
                       </li>
                     ))}
                     {atlas.map((name) => (

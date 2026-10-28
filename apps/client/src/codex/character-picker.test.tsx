@@ -81,7 +81,7 @@ const SESSION = {
   recapBody: "",
   revealedToPlayers: false,
   status: "planned",
-  sceneIds: [],
+  encounterIds: [],
   rev: 1,
   createdAt: "2026-07-01T00:00:00.000Z",
   updatedAt: "2026-07-01T00:00:00.000Z",

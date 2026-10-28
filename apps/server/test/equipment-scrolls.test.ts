@@ -78,7 +78,7 @@ describe("picking a scroll's spell", () => {
   });
 });
 
-describe("reading a scroll in a fight", () => {
+describe("reading a scroll in an encounter", () => {
   it("casts its spell with the scroll's DC, spends no slot, and crumbles", () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() });
     write(table, IDS.wizard, scrollOf("shatter"));
@@ -281,7 +281,7 @@ describe("Use Magic Device", () => {
   });
 });
 
-describe("reading a scroll outside a fight", () => {
+describe("reading a scroll outside an encounter", () => {
   const cleanups: Array<() => Promise<void>> = [];
   afterEach(async () => {
     for (const cleanup of cleanups.splice(0)) await cleanup();

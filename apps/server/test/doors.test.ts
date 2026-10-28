@@ -82,7 +82,7 @@ describe("Knock", () => {
     expect(heldShutAgainst(state, doorOf(state), HERO)).toBeNull();
   });
 
-  it("suppresses an Arcane Lock for 10 minutes, 100 rounds in a fight, and then it holds again", () => {
+  it("suppresses an Arcane Lock for 10 minutes, 100 rounds in an encounter, and then it holds again", () => {
     const { state, door, doorOf } = doorway(undefined);
     arcaneLock(state, door.id, FRIEND, []);
     knockOn(state, door.id);

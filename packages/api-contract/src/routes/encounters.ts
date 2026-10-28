@@ -27,14 +27,14 @@ const NOT_SHARED = "An archive the caller may not read is a 404, the same as one
 export const listEncounterArchives = defineRoute({
   method: "get",
   path: ENCOUNTER_ARCHIVE_PATHS.collection,
-  operationId: "listEncounterArchives",
-  tag: "Fight replays",
-  summary: "List the recorded fights",
+  operationId: "listReplays",
+  tag: "Replays",
+  summary: "List the recorded encounters",
   description:
-    "Every recorded fight, newest first. A GM-grade caller sees all of them; a player session sees only the ones the GM shared (`playerVisible`), each without the scene's name.",
+    "Every recorded encounter, newest first. A GM-grade caller sees all of them; a player session sees only the ones the GM shared (`playerVisible`), each without the encounter's name.",
   access: { gm: true, player: true, scope: "combat:read" },
   responses: {
-    200: ok(EncounterArchiveListSchema, "The recorded fights."),
+    200: ok(EncounterArchiveListSchema, "The recorded encounters."),
     401: refused(),
     403: refused()
   }
@@ -43,10 +43,10 @@ export const listEncounterArchives = defineRoute({
 export const getEncounterArchive = defineRoute({
   method: "get",
   path: ENCOUNTER_ARCHIVE_PATHS.byId,
-  operationId: "getEncounterArchive",
-  tag: "Fight replays",
-  summary: "Read one recorded fight",
-  description: `One archive, projected for the caller. A GM-grade caller receives the stored document (archiveSchemaVersion 3): the full state at each turn, the combat log, the command journal, the final state and the state after the fight, every die roll and the stat blocks used. A player session receives a replay built for players: each turn's player projection and the public rolls, with no journal, raw state, stat block or session id. ${NOT_SHARED}`,
+  operationId: "getReplay",
+  tag: "Replays",
+  summary: "Read one recorded encounter",
+  description: `One archive, projected for the caller. A GM-grade caller receives the stored document (archiveSchemaVersion 3): the full state at each turn, the combat log, the command journal, the final state and the state after the encounter, every die roll and the stat blocks used. A player session receives a replay built for players: each turn's player projection and the public rolls, with no journal, raw state, stat block or session id. ${NOT_SHARED}`,
   access: { gm: true, player: true, scope: "combat:read" },
   params: EncounterArchiveIdParamsSchema,
   responses: {
@@ -61,9 +61,9 @@ export const getEncounterArchive = defineRoute({
 export const deleteEncounterArchive = defineRoute({
   method: "delete",
   path: ENCOUNTER_ARCHIVE_PATHS.byId,
-  operationId: "deleteEncounterArchive",
-  tag: "Fight replays",
-  summary: "Delete a recorded fight",
+  operationId: "deleteReplay",
+  tag: "Replays",
+  summary: "Delete a recorded encounter",
   description: "Deletes one archive for good. A GM session, or a credential with the `admin` scope.",
   access: gmGrade("admin"),
   params: EncounterArchiveIdParamsSchema,
@@ -79,11 +79,11 @@ export const deleteEncounterArchive = defineRoute({
 export const setEncounterArchiveVisibility = defineRoute({
   method: "post",
   path: ENCOUNTER_ARCHIVE_PATHS.visibility,
-  operationId: "setEncounterArchiveVisibility",
-  tag: "Fight replays",
-  summary: "Share a recorded fight with players",
+  operationId: "setReplayVisibility",
+  tag: "Replays",
+  summary: "Share a recorded encounter with players",
   description:
-    "Shares one archive with players, or takes it back. An ended fight is the GM's record until the GM shares it. Sharing lists it in a player's `GET /encounters` and lets `GET /encounters/{id}` answer them with the player replay; taking it back removes both.",
+    "Shares one archive with players, or takes it back. An ended encounter is the GM's record until the GM shares it. Sharing lists it in a player's `GET /replays` and lets `GET /replays/{id}` answer them with the player replay; taking it back removes both.",
   access: gmGrade("combat:write"),
   params: EncounterArchiveIdParamsSchema,
   body: json(EncounterArchiveVisibilityRequestSchema, { example: { playerVisible: true } }),
@@ -99,11 +99,11 @@ export const setEncounterArchiveVisibility = defineRoute({
 export const renameEncounterArchive = defineRoute({
   method: "post",
   path: ENCOUNTER_ARCHIVE_PATHS.name,
-  operationId: "renameEncounterArchive",
-  tag: "Fight replays",
-  summary: "Name a recorded fight",
+  operationId: "renameReplay",
+  tag: "Replays",
+  summary: "Name a recorded encounter",
   description:
-    "Gives one archive the GM's own name, up to 80 characters. Null or an empty name takes it away, and the replay is called by its scene and date again. A player sees the name on a replay the GM shared, and never the scene's.",
+    "Gives one archive the GM's own name, up to 80 characters. Null or an empty name takes it away, and the replay is called by its encounter and date again. A player sees the name on a replay the GM shared, and never the encounter's.",
   access: gmGrade("combat:write"),
   params: EncounterArchiveIdParamsSchema,
   body: json(EncounterArchiveNameRequestSchema, { example: { name: "The bridge ambush" } }),

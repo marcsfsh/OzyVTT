@@ -185,7 +185,7 @@ describe("rebuilding a live character", () => {
     expect(state.definitions).toHaveLength(1);
   });
 
-  it("refuses mid-fight, in a paused scene's fight, and while reviewing history", () => {
+  it("refuses mid-encounter, in a parked encounter's combat, and while reviewing history", () => {
     const { state, definition } = tableWith();
     const built = buildCharacterDefinition(prefillFor(definition, 4, fighter()), library, policy);
 
@@ -193,19 +193,19 @@ describe("rebuilding a live character", () => {
     expect(() => rebuildActorDefinition(state, ACTOR_ID, built)).toThrow(/End the encounter/i);
 
     // Park that fight into a scene: it is paused and unfinished, and still owns this character's economy.
-    createScene(state, { sceneId: SCENE_ID, name: "Ambush", mapAssetId: MAP_ID, combatantIds: [] }, GEOMETRY);
+    createScene(state, { encounterId: SCENE_ID, name: "Ambush", mapAssetId: MAP_ID, combatantIds: [] }, GEOMETRY);
     state.combat = {
       ...state.combat,
-      scenes: state.combat.scenes.map((scene) => ({
+      encounters: state.combat.encounters.map((scene) => ({
         ...scene,
         combat: { ...scene.combat, active: true, initiative: [{ actorId: ACTOR_ID, score: 10, tieBreaker: 0 }] }
       })),
       active: false,
       initiative: []
     };
-    expect(() => rebuildActorDefinition(state, ACTOR_ID, built)).toThrow(/paused encounter/i);
+    expect(() => rebuildActorDefinition(state, ACTOR_ID, built)).toThrow(/parked combat/i);
 
-    state.combat = { ...state.combat, scenes: [], historyCursor: 3 };
+    state.combat = { ...state.combat, encounters: [], historyCursor: 3 };
     expect(() => rebuildActorDefinition(state, ACTOR_ID, built)).toThrow(/reviewing the combat history/i);
   });
 

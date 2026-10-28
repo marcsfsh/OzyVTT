@@ -193,7 +193,7 @@ describe("counting the options a character uses", () => {
     expect(t.actor(BORIN).optionUseCounts).toEqual({ "item-greatsword": 1 });
   });
 
-  it("counts a use outside a fight, and a reaction taken", async () => {
+  it("counts a use outside an encounter, and a reaction taken", async () => {
     const outside = await commandsFor(createInitialGameState());
     for (let use = 0; use < 2; use++)
       await outside.commands.dispatch("action.use", GM, {

@@ -23,11 +23,14 @@ While iterating, run the touched workspace's tests first: `npm test --workspace=
 The smoke suite checks layout rules but never shows you the page. After `npm run build`:
 
 ```
-node .claude/skills/verify/screens.mjs [--as gm|player] /table /codex ...
+node .claude/skills/verify/screens.mjs [--as gm|player] [--theme dusk|dawn|both] [--reduce-transparency] [--scenario table|fight] /table /codex ...
 ```
 
 It starts a throwaway server on a temporary data directory, signs in, and writes a phone
-(390x844, touch) and a laptop (1280x800) picture of each path to `e2e/test-results/screens/`.
+(390x844, touch) and a laptop (1280x800) picture of each path to `e2e/test-results/screens/`, in Dusk and Dawn
+unless `--theme` names one. `--reduce-transparency` turns on the device setting, for the solid surfaces. `--scenario table`
+makes an encounter live with the party and four goblins on a drawn map (one hidden from players), and `--scenario fight`
+also starts the encounter, so the table can be looked at before and during one.
 Read every picture. Check what the change was meant to do, then what `docs/DESIGN.md` asks of that
 surface. For a flow (a dialog, a drag, a second device), add a journey to `e2e/journeys.spec.ts`
 with the helpers in `e2e/smoke.ts`.

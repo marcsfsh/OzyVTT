@@ -340,6 +340,9 @@ export const PendingSaveSchema = z
       .optional(),
     /** Effect applied on a failed save, e.g. Grappled with its escape DC from an Unarmed Strike grapple. */
     onFailEffect: PendingSaveEffectSchema.optional(),
+    /** The caster's damage roll the save's damage waits for (`DamageRoll`, ADR-0043); it can't be confirmed until the
+     *  number is in. GM bookkeeping; a player is told only that it waits (`awaitingDamage`). */
+    damageRollId: z.uuid().optional(),
     /** What a success leaves instead (Heat Metal: holding on to the red-hot object brings Disadvantage). The same shape
      *  as `onFailEffect`. GM bookkeeping, never projected. */
     onSuccessEffect: PendingSaveEffectSchema.optional(),
@@ -1058,6 +1061,60 @@ export const PendingFallSchema = z
   .strict();
 export type PendingFall = z.infer<typeof PendingFallSchema>;
 
+/**
+ * A player's damage waiting for the number their dice came to (ADR-0043): the damage dice of a hit, or of an action
+ * whose targets save, while the table's damage mode asks players to type it. What waits on it applies once it is in.
+ */
+export const DamageRollSchema = z
+  .object({
+    id: z.uuid(),
+    sourceActorId: z.uuid(),
+    sourceName: z.string().min(1).max(120),
+    actionName: z.string().min(1).max(120),
+    /** The dice to roll, as they read ("2d6 + 3"). */
+    formula: z.string().min(1).max(200),
+    dice: z
+      .array(z.object({ count: z.number().int().min(1).max(100), sides: z.number().int().min(2).max(100) }).strict())
+      .min(1)
+      .max(20),
+    /** What the server adds to the dice: the formula's numbers and any flat damage effects add. */
+    fixed: z.number().int().min(-1000).max(1000),
+    mode: z.enum(["total", "die"]),
+    /** What waits on it: one damage proposal, or the saves the action opened. */
+    proposalId: z.uuid().optional(),
+    saveIds: z.array(z.uuid()).max(50).optional(),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type DamageRoll = z.infer<typeof DamageRollSchema>;
+
+/** Who picks the targets of a player's action in an encounter (ADR-0044): the player, or the GM, who is asked. */
+export const TargetingSchema = z.enum(["player", "gm"]);
+export type Targeting = z.infer<typeof TargetingSchema>;
+
+/**
+ * A player's action waiting for the GM to pick its targets, at a table where the GM picks them (ADR-0044): the action
+ * and how its player chose to cast it. The GM aims and resolves it; it goes when they do, when its player takes it
+ * back, or when the turn ends.
+ */
+export const TargetAskSchema = z
+  .object({
+    id: z.uuid(),
+    actorId: z.uuid(),
+    actorName: z.string().min(1).max(120),
+    actionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    actionName: z.string().min(1).max(120),
+    slotLevel: z.number().int().min(1).max(9).optional(),
+    darts: z.number().int().min(1).max(20).optional(),
+    shaping: z.array(CastShapingSchema).max(4).optional(),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type TargetAsk = z.infer<typeof TargetAskSchema>;
+
 /** A player's hit awaiting the GM's Apply (proposal mode, the default), so players never change HP on a creature
  * they don't own. GM-only: never projected to players or the viewer. */
 export const PendingDamageSchema = z
@@ -1081,6 +1138,10 @@ export const PendingDamageSchema = z
     damageSource: DamageSourceSchema.optional(),
     /** The attacker knocks the target out: a drop to 0 leaves it at 1 Hit Point and Unconscious (SRD). */
     nonlethal: z.literal(true).optional(),
+    /** The player's damage roll it waits for (`DamageRoll`); the GM may still apply it. */
+    awaitingRoll: z.uuid().optional(),
+    /** Applied as soon as the roll is in, at a table where players' hits apply directly. */
+    direct: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -1953,27 +2014,66 @@ const sceneCombatShape = {
   /** Combatants that rolled Initiative this fight and haven't ended their first turn: a feature that acts "when you
    *  roll Initiative" and is the creature's to choose (Persistent Rage) may be used until then. Engine bookkeeping,
    *  never projected. */
-  initiativeWindow: z.array(z.uuid()).max(200).default([])
+  initiativeWindow: z.array(z.uuid()).max(200).default([]),
+  /** Whether each party character the encounter started with is played at the table (true) or on its player's
+   *  device (false), chosen at the start (ADR-0042). Kept while the encounter runs or is parked; GM-only. */
+  atTable: z.record(z.uuid(), z.boolean()).optional(),
+  /** Players' damage waiting for their typed number (ADR-0043). A player sees their own characters'. */
+  damageRolls: z.array(DamageRollSchema).max(50).default([]),
+  /** Players' actions waiting for the GM to pick their targets (ADR-0044). A player sees their own characters'. */
+  targetAsks: z.array(TargetAskSchema).max(20).default([])
 };
 
 /** A parked scene's frozen combat: same fields and invariants as the live combat, minus the map (the Scene owns that). */
 export const SceneCombatSchema = z.object(sceneCombatShape).superRefine(refineCombatContext);
 export type SceneCombat = z.infer<typeof SceneCombatSchema>;
 
+/**
+ * How a player's dice are entered (ADR-0043): `total`, the final number with the bonus included; `die`, each die's
+ * face, the server adding every modifier; `app`, the server throws. The server checks every typed number.
+ */
+export const DiceModeSchema = z.enum(["total", "die", "app"]);
+export type DiceMode = z.infer<typeof DiceModeSchema>;
+/** The table's dice modes: `d20` for attacks, checks, saves, initiative and death saves (and the builder's rolled
+ *  scores and hit points), `damage` for damage and healing dice. */
+export const PlayerDiceSchema = z
+  .object({ d20: DiceModeSchema.default("die"), damage: DiceModeSchema.default("app") })
+  .strict();
+export type PlayerDice = z.infer<typeof PlayerDiceSchema>;
+/** An encounter's own dice modes; one left out uses the table's. */
+export const ScenePlayerDiceSchema = z
+  .object({ d20: DiceModeSchema.optional(), damage: DiceModeSchema.optional() })
+  .strict();
+export type ScenePlayerDice = z.infer<typeof ScenePlayerDiceSchema>;
+
 /** A prepared encounter the GM can switch to: its map plus a frozen combat context that resumes exactly when activated. */
+/** A scene's own starting choices for its fight: whether claimed characters roll their initiative and whether
+ *  identical monsters share one roll. An omitted field has no default. */
+export const SceneInitiativeDefaultsSchema = z
+  .object({ playersRollInitiative: z.boolean().optional(), groupMonsters: z.boolean().optional() })
+  .strict();
+export type SceneInitiativeDefaults = z.infer<typeof SceneInitiativeDefaultsSchema>;
 export const SceneSchema = z
   .object({
     id: z.uuid(),
     name: z.string().min(1).max(120),
     mapAssetId: z.uuid(),
     combat: SceneCombatSchema.prefault({}),
+    /** How this scene's fight starts when Start the fight leaves a choice out (ADR-0039). GM-only, as every scene is;
+     * a launched replay carries none. */
+    initiativeDefaults: SceneInitiativeDefaultsSchema.optional(),
+    /** The encounter's own dice modes (ADR-0043); absent or partial, the table's apply. GM-set; players read the
+     *  modes that apply, never this record. */
+    playerDice: ScenePlayerDiceSchema.optional(),
     /** When the GM prepared it, last changed its record and last made it live, in epoch ms. GM-only, as every scene
      * is; a scene saved before these existed has none. */
     createdAt: z.number().int().nonnegative().optional(),
     updatedAt: z.number().int().nonnegative().optional(),
     liveAt: z.number().int().nonnegative().optional(),
+    /** When a fight in this scene last ended, in epoch ms: Prep reads it as Completed. GM-only, as every scene is. */
+    endedAt: z.number().int().nonnegative().optional(),
     /** Set when this scene is a launched replay. Such scenes are disposable: `scenes.ts` drops the scene and its
-     * cloned combatants (`Actor.replaySceneId`) when the table leaves it. GM-only. */
+     * cloned combatants (`Actor.replayEncounterId`) when the table leaves it. GM-only. */
     replayOf: z
       .object({
         archiveId: z.number().int().nonnegative(),
@@ -1986,11 +2086,25 @@ export const SceneSchema = z
 export type Scene = z.infer<typeof SceneSchema>;
 
 /** The campaign roster every management surface lists, shared so server and client agree. Excludes a launched
- * replay's clones (`Actor.replaySceneId`), which fight on the map but are never claimable. */
-export function rosterActors<T extends { readonly replaySceneId?: string | undefined }>(
+ * replay's clones (`Actor.replayEncounterId`), which fight on the map but are never claimable. */
+/** The dice modes that apply now: the live encounter's own, where it chose, over the table's (ADR-0043). */
+export function effectivePlayerDice(
+  state: Readonly<{
+    playerDice: PlayerDice;
+    combat: Readonly<{
+      activeEncounterId: string | null;
+      encounters: readonly Readonly<{ id: string; playerDice?: ScenePlayerDice | undefined }>[];
+    }>;
+  }>
+): PlayerDice {
+  const live = state.combat.encounters.find((scene) => scene.id === state.combat.activeEncounterId)?.playerDice;
+  return { d20: live?.d20 ?? state.playerDice.d20, damage: live?.damage ?? state.playerDice.damage };
+}
+
+export function rosterActors<T extends { readonly replayEncounterId?: string | undefined }>(
   actors: readonly T[]
 ): readonly T[] {
-  return actors.filter((actor) => actor.replaySceneId === undefined);
+  return actors.filter((actor) => actor.replayEncounterId === undefined);
 }
 
 export const CombatStateSchema = z
@@ -1998,8 +2112,8 @@ export const CombatStateSchema = z
     ...sceneCombatShape,
     mapAssetId: z.uuid().nullable().default(null),
     /** Prepared scenes the GM parks and resumes. The active scene's own `combat` stays empty; its live copy is the top-level fields. */
-    scenes: z.array(SceneSchema).max(20).default([]),
-    activeSceneId: z.uuid().nullable().default(null),
+    encounters: z.array(SceneSchema).max(20).default([]),
+    activeEncounterId: z.uuid().nullable().default(null),
     /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
     pendingFalls: z.array(PendingFallSchema).max(20).default([]),
     /** A move stopped at the edge of the reach it leaves while the Opportunity Attacks it provoked are answered, or
@@ -2093,24 +2207,26 @@ export const CombatStateSchema = z
   })
   .superRefine((combat, context) => {
     refineCombatContext(combat, context);
-    const sceneIds = new Set<string>();
-    for (const [index, scene] of combat.scenes.entries()) {
-      if (sceneIds.has(scene.id))
+    const encounterIds = new Set<string>();
+    for (const [index, scene] of combat.encounters.entries()) {
+      if (encounterIds.has(scene.id))
         context.addIssue({
           code: "custom",
-          path: ["scenes", index, "id"],
-          message: "Scene IDs must be unique."
+          path: ["encounters", index, "id"],
+          message: "Encounter IDs must be unique."
         });
-      sceneIds.add(scene.id);
+      encounterIds.add(scene.id);
     }
-    if (combat.activeSceneId !== null && !sceneIds.has(combat.activeSceneId))
+    if (combat.activeEncounterId !== null && !encounterIds.has(combat.activeEncounterId))
       context.addIssue({
         code: "custom",
-        path: ["activeSceneId"],
-        message: "The active scene must be one of the prepared scenes."
+        path: ["activeEncounterId"],
+        message: "The active encounter must be one of the prepared encounters."
       });
     const active =
-      combat.activeSceneId === null ? undefined : combat.scenes.find((scene) => scene.id === combat.activeSceneId);
+      combat.activeEncounterId === null
+        ? undefined
+        : combat.encounters.find((scene) => scene.id === combat.activeEncounterId);
     if (
       active &&
       (active.combat.active ||
@@ -2140,8 +2256,8 @@ export const CombatStateSchema = z
     ) {
       context.addIssue({
         code: "custom",
-        path: ["scenes"],
-        message: "The active scene's stored combat must be empty, because its live copy is the top-level combat."
+        path: ["encounters"],
+        message: "The active encounter's stored combat must be empty, because its live copy is the top-level combat."
       });
     }
   });
@@ -2165,11 +2281,6 @@ export const BuilderPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).default("open"),
     /** Whether players may roll a random character; "gm-only" by default because it fills a roster slot in one tap. */
     playerRandom: z.enum(["open", "gm-only"]).default("gm-only"),
-    /** The table's one setting for typed dice (ADR-0012): whether players may type what their physical dice show, for
-     *  every roll (checks, saves, attacks, damage, death saves, initiative, and rolled scores and hit points in the
-     *  builder). Open by default, for tables that roll physical dice; "gm-only" refuses a player's typed faces and the
-     *  server throws them. The GM may always type. */
-    typedRolls: z.enum(["open", "gm-only"]).default("open"),
     /** A table rule raising a rolled hit-point level to the class average; "none" is the SRD (the roll stands). */
     hitPointRollFloor: z.enum(["none", "average"]).default("none")
   })
@@ -2346,6 +2457,11 @@ export const GameStateSchema = z.object({
   builderPolicy: BuilderPolicySchema.prefault({}),
   /** Standing rules policy every new fight starts from. GM-set, player-read. */
   rulesPolicy: RulesPolicySchema.prefault({}),
+  /** How players' dice are entered, the table's default (ADR-0043); an encounter may choose its own. GM-set,
+   *  player-read as the modes that apply (`effectivePlayerDice`). */
+  playerDice: PlayerDiceSchema.prefault({}),
+  /** Who picks the targets of a player's action in an encounter (ADR-0044). GM-set, player-read. */
+  targeting: TargetingSchema.default("player"),
   /** Table defaults for staging new combatants. GM-set, GM-read. */
   stagingDefaults: StagingDefaultsSchema.prefault({}),
   /** How much a player sees of another player's character (see PartyVisibilitySchema). GM-set; player-read via `PlayerView`. */

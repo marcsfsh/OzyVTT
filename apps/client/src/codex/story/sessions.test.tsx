@@ -111,7 +111,7 @@ const session = (id: string, sessionNumber: number, over: Partial<CodexSession> 
     prep: PREP,
     prepTemplateId: "t1",
     currentSceneId: null,
-    sceneIds: [],
+    encounterIds: [],
     rev: 3,
     createdAt: "2026-10-01T00:00:00.000Z",
     updatedAt: "2026-10-01T00:00:00.000Z",

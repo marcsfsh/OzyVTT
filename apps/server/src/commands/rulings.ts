@@ -95,7 +95,7 @@ export const rulingCommands = [
     async run({ request, execute, dispatch }, kit) {
       const { askId, allow, reason } = request;
       const ask = findRuleAsk(kit.read(), askId);
-      if (!ask) throw new CommandRejectedError("That question is no longer waiting. The fight moved on.");
+      if (!ask) throw new CommandRejectedError("That question is no longer waiting. The encounter moved on.");
       let ran: GameReply | undefined;
       let further: RulesBlockedError | undefined;
       if (allow) {

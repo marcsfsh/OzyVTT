@@ -18,7 +18,16 @@ import { useSoundBoard } from "../sound/sound-data";
 import { useScenes } from "./context";
 import { pathForScene, SCENES_PATHS } from "./routes";
 import { useSceneActions } from "./sceneActions";
-import { tokensLine, factsOf, lightLine, modifiedAt, STATE_LABEL, whenLabel, type SceneFacts } from "./sceneFacts";
+import {
+  tokensLine,
+  factsOf,
+  lightLine,
+  modifiedAt,
+  PROGRESS_LABEL,
+  STATE_LABEL,
+  whenLabel,
+  type SceneFacts
+} from "./sceneFacts";
 import {
   DEFAULT_SCENE_SORT,
   filterScenes,
@@ -40,7 +49,7 @@ import { MapThumb, StateChip } from "./pieces";
  */
 export function SceneList() {
   const { state, maps, links, go, phone } = useScenes();
-  const scenes = state.combat.scenes;
+  const scenes = state.combat.encounters;
   const board = useSoundBoard();
   // The filters and the sort live in the address, so a filtered list is a link and survives a refresh.
   const { query } = useRoute();
@@ -49,16 +58,16 @@ export function SceneList() {
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const actions = useSceneActions(scenes, {
     combatActive: state.combat.active,
-    onDuplicated: (sceneId) => go(pathForScene(sceneId))
+    onDuplicated: (encounterId) => go(pathForScene(encounterId))
   });
   const all = scenes.map((scene) => factsOf(state, scene, maps));
   const shown = sortScenes(
     filterScenes(all, filters, {
-      linked: (sceneId) => {
-        const link = links.get(sceneId);
+      linked: (encounterId) => {
+        const link = links.get(encounterId);
         return link !== undefined && link.sessions.length + link.pins.length > 0;
       },
-      hasSound: (sceneId) => Boolean(board?.board.presets.some((preset) => preset.sceneId === sceneId))
+      hasSound: (encounterId) => Boolean(board?.board.presets.some((preset) => preset.encounterId === encounterId))
     }),
     sort,
     scenes.map((scene) => scene.id)
@@ -79,7 +88,7 @@ export function SceneList() {
       const over = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-scene-id]") ?? [])].find((row) => {
         const rect = row.getBoundingClientRect();
         return event.clientY >= rect.top && event.clientY <= rect.bottom;
-      })?.dataset.sceneId;
+      })?.dataset.encounterId;
       if (!state || !over || over === state.id) return;
       const next = state.order.filter((id) => id !== state.id);
       next.splice(next.indexOf(over), 0, state.id);
@@ -102,12 +111,12 @@ export function SceneList() {
       window.removeEventListener("pointercancel", onUp);
     };
   }, [dragId, reorder]);
-  const beginDrag = (sceneId: string, event: React.PointerEvent) => {
+  const beginDrag = (encounterId: string, event: React.PointerEvent) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
     const order = scenes.map((scene) => scene.id);
-    drag.current = { id: sceneId, order, start: order.join() };
-    setDragId(sceneId);
+    drag.current = { id: encounterId, order, start: order.join() };
+    setDragId(encounterId);
     setDragOrder(order);
   };
   const rows = dragOrder ? dragOrder.flatMap((id) => shown.filter((row) => row.scene.id === id)) : shown;
@@ -146,7 +155,7 @@ export function SceneList() {
         )}
         {!row.live && (
           <MenuItem icon={<IconTrash />} tone="danger" onClick={() => void actions.remove(row.scene)}>
-            Delete scene
+            Delete encounter
           </MenuItem>
         )}
       </Menu>
@@ -164,8 +173,8 @@ export function SceneList() {
         <IconDrag />
       </button>
     ) : null;
-  const sessionLine = (sceneId: string) => {
-    const link = links.get(sceneId);
+  const sessionLine = (encounterId: string) => {
+    const link = links.get(encounterId);
     if (!link || link.sessions.length + link.pins.length === 0) return "None";
     const sessions = link.sessions.map((session) =>
       session.sessionNumber === null ? "A session" : `Session ${session.sessionNumber}`
@@ -178,7 +187,7 @@ export function SceneList() {
 
   return (
     <div className="sc-list frame-col">
-      {phone && <h2 className="sc-phone-title">Scenes</h2>}
+      {phone && <h2 className="sc-phone-title">Encounters</h2>}
       <SceneListToolbar
         filters={filters}
         onFilters={(next) => replaceQuery((params) => writeSceneFilters(params, next))}
@@ -201,13 +210,13 @@ export function SceneList() {
         <div className="sc-list-body scroll-y frame-fill">
           {scenes.length === 0 ? (
             <div className="sc-empty">
-              <p>No scenes yet. A scene is a map and who is on it, made live when the table is ready.</p>
+              <p>No encounters yet. An encounter is a map and who is on it, made live when the table is ready.</p>
               <Button variant="primary" onClick={() => go(SCENES_PATHS.newScene)}>
-                New scene
+                New encounter
               </Button>
             </div>
           ) : shown.length === 0 ? (
-            <p className="sc-hint sc-list-none">No scene matches. Change the filters to see more.</p>
+            <p className="sc-hint sc-list-none">No encounter matches. Change the filters to see more.</p>
           ) : phone ? (
             <ul className="sc-rows" ref={(element) => void (listRef.current = element)}>
               {rows.map((row) => (
@@ -221,7 +230,8 @@ export function SceneList() {
                     <span className="sc-row-main">
                       <strong>{row.scene.name}</strong>
                       <small>
-                        {STATE_LABEL[row.state]} · {row.map?.name ?? "Map not in the library"}
+                        {STATE_LABEL[row.state]} · {PROGRESS_LABEL[row.progress]} ·{" "}
+                        {row.map?.name ?? "Map not in the library"}
                       </small>
                     </span>
                   </button>
@@ -236,6 +246,7 @@ export function SceneList() {
                 <tr>
                   <th scope="col">Name</th>
                   <th scope="col">State</th>
+                  <th scope="col">Progress</th>
                   <th scope="col">Map</th>
                   <th scope="col">Tokens</th>
                   <th scope="col">Light</th>
@@ -265,6 +276,7 @@ export function SceneList() {
                     <td>
                       <StateChip facts={row} />
                     </td>
+                    <td>{PROGRESS_LABEL[row.progress]}</td>
                     <td>{row.map?.name ?? "Not in the library"}</td>
                     <td>{tokensLine(row)}</td>
                     <td>{lightLine(row)}</td>

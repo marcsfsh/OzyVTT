@@ -1,9 +1,17 @@
-import type { PlayerActor, PlayerPendingReaction, PlayerPendingSave, PlayerTurnSteps, PlayerView } from "@vtt/domain";
+import type {
+  PlayerActor,
+  PlayerDamageRoll,
+  PlayerPendingReaction,
+  PlayerPendingSave,
+  PlayerTurnSteps,
+  PlayerView
+} from "@vtt/domain";
 
 /**
  * What a player must answer, in the order it matters: their dying character's death save at the start of its turn,
- * what happens at once as their character's turn starts or ends, waiting for its order, a reaction an attack is waiting
- * on (never one of a character that can't react), a saving throw, and initiative to roll. The GM's calls for a roll
+ * what happens at once as their character's turn starts or ends, waiting for its order, the damage their character's
+ * hit or spell waits on them to roll (ADR-0043), a reaction an attack is waiting on (never one of a character that
+ * can't react), a saving throw, and initiative to roll. The GM's calls for a roll
  * join them from `useRollCallCards`. Each one takes the table's single prompt slot in turn.
  */
 export type PlayerPrompt =
@@ -11,7 +19,8 @@ export type PlayerPrompt =
   | Readonly<{ kind: "death-save"; key: string; actor: PlayerActor }>
   | Readonly<{ kind: "save"; key: string; save: PlayerPendingSave; actor: PlayerActor }>
   | Readonly<{ kind: "initiative"; key: string; actor: PlayerActor }>
-  | Readonly<{ kind: "order"; key: string; waiting: PlayerTurnSteps; actor: PlayerActor }>;
+  | Readonly<{ kind: "order"; key: string; waiting: PlayerTurnSteps; actor: PlayerActor }>
+  | Readonly<{ kind: "damage-roll"; key: string; roll: PlayerDamageRoll; actor: PlayerActor }>;
 
 export const ownCharacters = (state: PlayerView) =>
   state.actors.filter((actor) => actor.claimStatus === "mine" && actor.kind === "player-character");
@@ -46,6 +55,10 @@ export function playerPrompts(state: PlayerView): PlayerPrompt[] {
   const waiting = state.combat.turnSteps;
   const ordering = waiting ? state.actors.find((actor) => actor.id === waiting.actorId) : undefined;
   if (waiting && ordering) prompts.push({ kind: "order", key: waiting.id, waiting, actor: ordering });
+  for (const roll of state.combat.damageRolls ?? []) {
+    const actor = byId.get(roll.sourceActorId);
+    if (actor) prompts.push({ kind: "damage-roll", key: roll.id, roll, actor });
+  }
   // A character at 0 HP can't take a reaction; the server withdraws such a prompt, and the slot never shows one.
   for (const reaction of state.combat.pendingReactions) {
     const actor = byId.get(reaction.actorId);

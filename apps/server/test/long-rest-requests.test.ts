@@ -254,7 +254,7 @@ describe("the GM rests the party", () => {
       "Bryn rolled Initiative, which interrupts Bryn's Long Rest. After an hour of rest, Bryn gets a Short Rest's benefits."
     );
     expect(actor(state, BRYN).actionUses).toEqual({ rage: 2 });
-    expect(() => resumeLongRest(state, BRYN, GM)).toThrow("End the fight before Bryn rests again.");
+    expect(() => resumeLongRest(state, BRYN, GM)).toThrow("End the encounter before Bryn rests again.");
     state.combat = { ...state.combat, active: false, initiative: [], turnActorId: null };
     expect(() => resumeLongRest(state, BRYN, PLAYER)).toThrow(GameAccessDeniedError);
     expect(resumeLongRest(state, BRYN, { role: "player", sessionId: OTHER })).toBe(

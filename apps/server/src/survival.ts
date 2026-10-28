@@ -163,7 +163,7 @@ export function nourish(state: GameState, actorId: string, choice: Nourish, scop
   if (isDead(actor)) throw new CommandRejectedError(`${actor.name} is dead.`);
   const fighting = state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id);
   if (fighting) {
-    if (!berryOnly) throw new CommandRejectedError("Eat and drink between fights; a Goodberry is the exception.");
+    if (!berryOnly) throw new CommandRejectedError("Eat and drink between encounters; a Goodberry is the exception.");
     if (state.combat.turnActorId !== actor.id)
       throw new CommandRejectedError(`Eating a Goodberry takes ${actor.name}'s Bonus Action, on its own turn.`);
     if (state.combat.turn.bonusActionUsed)

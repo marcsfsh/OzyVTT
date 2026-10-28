@@ -958,7 +958,7 @@ describe("Codex migration 4 and older backups", () => {
         revealedToPlayers: true,
         status: "played",
         tags: [],
-        sceneIds: [],
+        encounterIds: [],
         rev: 1,
         createdAt: AT,
         updatedAt: AT
@@ -1112,7 +1112,7 @@ describe("Codex migration 4 and older backups", () => {
           version: number;
         }>
       ).map((row) => row.version)
-    ).toEqual([1, 2, 3, 4, 5]);
+    ).toEqual([1, 2, 3, 4, 5, 6]);
     applied.close();
   });
 

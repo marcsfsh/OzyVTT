@@ -1,0 +1,84 @@
+/* A lamp tile: the light on top, its name, then its value in VT323. Only a lit lamp glows. */
+.nh-lamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 4px 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  text-align: center;
+  white-space: nowrap;
+  --nh-lamp: var(--lamp-on);
+  --nh-lamp-glow: var(--glow-lamp-reaction);
+}
+.nh-lamp--action {
+  --nh-lamp: var(--lamp-action);
+  --nh-lamp-glow: var(--glow-lamp-action);
+}
+.nh-lamp--bonus {
+  --nh-lamp: var(--lamp-bonus);
+  --nh-lamp-glow: var(--glow-lamp-bonus);
+}
+.nh-lamp--reaction {
+  --nh-lamp: var(--lamp-reaction);
+  --nh-lamp-glow: var(--glow-lamp-reaction);
+}
+.nh-lamp-light {
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 1px solid var(--line-raised);
+  background: var(--surface-3);
+}
+.nh-lamp.is-lit .nh-lamp-light {
+  border-color: transparent;
+  background: var(--nh-lamp);
+  box-shadow: var(--nh-lamp-glow), var(--lamp-bevel);
+}
+.nh-lamp-label {
+  font: 600 11px / 1.2 var(--font-label);
+  color: var(--text-dim);
+}
+.nh-lamp-value {
+  font: 400 18px / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+.nh-lamp:not(.is-lit) .nh-lamp-value {
+  color: var(--text-muted);
+}
+
+/* The Move gauge: white squares in Dusk, ink squares in Dawn, one per 5 ft. */
+.nh-lamp-gauge {
+  display: grid;
+  gap: 2px;
+  width: 42px;
+  height: 18px;
+}
+.nh-lamp-square {
+  box-sizing: border-box;
+  border: 1px solid var(--line-raised);
+  background: var(--surface-3);
+}
+.nh-lamp-square.is-lit {
+  border-color: transparent;
+  background: var(--lamp-move);
+}
+
+/* The small status lamp beside a line of words. */
+.nh-status-lamp {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--line-raised);
+  background: var(--surface-3);
+}
+.nh-status-lamp.is-lit {
+  border-color: transparent;
+  background: var(--lamp-on);
+  box-shadow: var(--glow-lamp-reaction);
+}

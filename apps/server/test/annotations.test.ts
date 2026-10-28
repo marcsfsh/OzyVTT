@@ -61,7 +61,7 @@ describe("authoritative annotation geometry", () => {
         },
         geometry
       )
-    ).toThrow("Make a scene live");
+    ).toThrow("Make an encounter live");
     // A live scene's map takes a measurement before its fight starts.
     const beforeFight = activeState();
     beforeFight.combat = { ...beforeFight.combat, active: false, turnActorId: null };

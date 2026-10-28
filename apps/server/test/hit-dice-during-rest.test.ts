@@ -58,7 +58,7 @@ describe("Hit Point Dice are spent during a Short Rest", () => {
     expect(() => spendHitDice(state, HERO, [6], player, resolve(state))).toThrow(/spent during a Short Rest/);
   });
 
-  it("lets the GM spend a creature's dice outside a fight", () => {
+  it("lets the GM spend a creature's dice outside an encounter", () => {
     const state = game();
     spendHitDice(state, HERO, [6], { role: "gm" }, resolve(state));
     expect(state.actors[0].hitDice?.remaining).toBe(6);

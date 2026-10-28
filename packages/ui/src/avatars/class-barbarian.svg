@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Barbarian avatar"><title>Barbarian avatar</title><defs><radialGradient id="oz-class-barbarian-b" cx="0.5" cy="0.5" r="0.75"><stop offset="0" stop-color="#3a0a0a"></stop><stop offset="1" stop-color="#0a0306"></stop></radialGradient>
+<linearGradient id="oz-class-barbarian-c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f4fa"></stop><stop offset="0.5" stop-color="#b8b8cc"></stop><stop offset="1" stop-color="#5a5a78"></stop></linearGradient>
+<filter id="oz-class-barbarian-g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2"></feGaussianBlur></filter></defs>
+<rect width="64" height="64" fill="url(#oz-class-barbarian-b)"></rect>
+<circle cx="10" cy="50" r="0.9" fill="#ff8a1f"></circle><circle cx="54" cy="12" r="0.8" fill="#ff8a1f"></circle><circle cx="50" cy="52" r="0.7" fill="#ffd23f"></circle><circle cx="14" cy="10" r="0.7" fill="#ffd23f"></circle>
+<rect x="30.5" y="10" width="3" height="47" fill="#6a4f36"></rect><path d="M30.5 45h3v2h-3zM30.5 49h3v2h-3zM30.5 53h3v2h-3z" fill="#2a1f15"></path>
+<path d="M32 5L34.5 11H29.5Z" fill="#b8b8cc"></path>
+<path d="M30.5 15C22 13 13.5 17.5 10.5 26C13.5 30 15.5 34.5 14.5 41C19.5 37 25 35 30.5 35ZM33.5 15C42 13 50.5 17.5 53.5 26C50.5 30 48.5 34.5 49.5 41C44.5 37 39 35 33.5 35Z" fill="url(#oz-class-barbarian-c)" stroke="#2a1f15" stroke-width="0.8"></path>
+<path d="M10.5 26C13.5 30 15.5 34.5 14.5 41M53.5 26C50.5 30 48.5 34.5 49.5 41" stroke="#ff4b3e" stroke-width="4" fill="none" filter="url(#oz-class-barbarian-g)"></path><path d="M10.5 26C13.5 30 15.5 34.5 14.5 41M53.5 26C50.5 30 48.5 34.5 49.5 41" stroke="#ff8a1f" stroke-width="1.6" fill="none"></path>
+<rect x="29.5" y="14" width="5" height="22" fill="#3a3a52"></rect></svg>

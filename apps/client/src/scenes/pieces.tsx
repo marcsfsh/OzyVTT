@@ -49,9 +49,9 @@ export function SceneListFlyout({
 }: Readonly<{ open: boolean; onClose: () => void; currentId: string | null }>) {
   const { state, maps, go } = useScenes();
   return (
-    <Drawer open={open} onClose={onClose} side="left" title="Scenes" className="sc-flyout">
+    <Drawer open={open} onClose={onClose} side="left" title="Encounters" className="sc-flyout">
       <ul className="sc-rows">
-        {state.combat.scenes.map((scene) => {
+        {state.combat.encounters.map((scene) => {
           const facts = factsOf(state, scene, maps);
           return (
             <li key={scene.id}>
@@ -76,7 +76,7 @@ export function SceneListFlyout({
           );
         })}
       </ul>
-      <Button onClick={() => go(SCENES_PATHS.list)}>All scenes</Button>
+      <Button onClick={() => go(SCENES_PATHS.list)}>All encounters</Button>
     </Drawer>
   );
 }

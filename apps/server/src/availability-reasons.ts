@@ -28,7 +28,7 @@ export type ReasonFacts = Readonly<{
 const USES_COME_BACK = {
   turn: "this turn",
   "own-turn": "until your next turn",
-  encounter: "until the fight ends",
+  encounter: "until the encounter ends",
   "short-rest": "until a Short Rest",
   "long-rest": "until a Long Rest"
 } as const;

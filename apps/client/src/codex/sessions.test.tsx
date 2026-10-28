@@ -118,7 +118,7 @@ const SESSION = (over: Partial<CodexSession> & Readonly<{ prep?: unknown }> = {}
     recapBody: "The party crossed the mists.",
     revealedToPlayers: false,
     status: "planned",
-    sceneIds: [],
+    encounterIds: [],
     rev: 1,
     createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-07-01T00:00:00.000Z",

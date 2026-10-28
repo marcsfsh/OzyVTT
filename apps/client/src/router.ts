@@ -132,18 +132,21 @@ export function useRoute(): Route {
 
 // The app shell's address table
 
-export type GmTab = "scenes" | "table" | "roster" | "codex" | "compendium" | "viewer" | "replay" | "settings";
+/** The surface an address renders. Several surfaces share a section (the Prep pages); see `litGmSection`. */
+export type GmTab =
+  "scenes" | "table" | "roster" | "codex" | "compendium" | "viewer" | "replay" | "settings" | "tokens";
 
-/** One address per GM tab; the server reserves `GET /viewer`, hence `/viewer-controls`. */
+/** One address per surface; the server reserves `GET /viewer`, hence `/viewer-controls`. */
 const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
   table: "/table",
-  scenes: "/scenes",
+  scenes: "/encounters",
   roster: "/roster",
   codex: "/codex",
   compendium: "/compendium",
   viewer: "/viewer-controls",
   replay: "/replays",
-  settings: "/settings"
+  settings: "/settings",
+  tokens: "/prep/tokens"
 };
 
 export function pathForGmTab(tab: GmTab): string {
@@ -158,19 +161,33 @@ const RETIRED_PATHS: Readonly<Record<string, string>> = {
   "/encounter": "/table",
   "/setup": "/settings",
   // The Homebrew tab became the Compendium.
-  "/homebrew": "/compendium"
+  "/homebrew": "/compendium",
+  // Prep has no page of its own: its first page is Encounters.
+  "/prep": "/encounters"
 };
+
+/** Prep's scenes became encounters (ADR-0041): an old address lands on the same page under its new name. */
+function movedFromScenes(path: string, query: URLSearchParams): string | null {
+  if (path !== "/scenes" && !path.startsWith("/scenes/")) return null;
+  const moved = `/encounters${path.slice("/scenes".length)}`;
+  const search = query.toString();
+  return redirectForRetiredPath(moved, query) ?? `${moved}${search ? `?${search}` : ""}`;
+}
 
 /** Where a retired address goes, or null when the address is not retired. `?view=maps` moves too, and so does the
  *  map library's `?map=` for one map's grid. */
 export function redirectForRetiredPath(path: string, query: URLSearchParams): string | null {
-  if (path === "/scenes" && query.get("view") === "maps") return "/scenes/maps";
+  const moved = movedFromScenes(path, query);
+  if (moved) return moved;
+  if (path === "/encounters" && query.get("view") === "maps") return "/encounters/maps";
   return redirectForOldMapAddress(path, query) ?? RETIRED_PATHS[path] ?? null;
 }
 
 /** Which GM tab an address renders, or null when the address is not a GM tab at all. */
 export function gmTabForPath(path: string): GmTab | null {
-  const head = `/${path.split("/").filter(Boolean)[0] ?? ""}`;
+  const segments = path.split("/").filter(Boolean);
+  if (segments[0] === "prep") return segments.length === 2 && segments[1] === "tokens" ? "tokens" : null;
+  const head = `/${segments[0] ?? ""}`;
   const found = (Object.entries(GM_TAB_PATHS) as ReadonlyArray<[GmTab, string]>).find(([, value]) => value === head);
   return found ? found[0] : null;
 }
@@ -182,9 +199,76 @@ export function litGmTab(path: string): GmTab | null {
   return gmTabForPath(path);
 }
 
+/**
+ * The GM's four sections. Play is the table; Prep holds the pages that set a fight up; the table screen controls and
+ * Settings are utilities and light no section.
+ */
+export type GmSection = "play" | "prep" | "codex" | "compendium";
+export const GM_SECTIONS: ReadonlyArray<Readonly<{ id: GmSection; label: string; path: string }>> = [
+  { id: "play", label: "Play", path: "/table" },
+  { id: "prep", label: "Prep", path: "/encounters" },
+  { id: "codex", label: "Codex", path: "/codex" },
+  { id: "compendium", label: "Compendium", path: "/compendium" }
+];
+
+/** Prep's pages, in its section bar's order. Each keeps the address it had before Prep grouped it. */
+export type PrepPage = "scenes" | "party" | "maps" | "tokens" | "sound" | "replays";
+export const PREP_PAGES: ReadonlyArray<Readonly<{ id: PrepPage; label: string; path: string }>> = [
+  { id: "scenes", label: "Encounters", path: "/encounters" },
+  { id: "party", label: "Party", path: "/roster" },
+  { id: "maps", label: "Maps", path: "/encounters/maps" },
+  { id: "tokens", label: "Tokens", path: "/prep/tokens" },
+  { id: "sound", label: "Sound", path: "/viewer-controls/sound" },
+  { id: "replays", label: "Replays", path: "/replays" }
+];
+
+/** Which Prep page an address is, or null outside Prep. A sheet or the builder belongs to Party. */
+export function prepPageFor(path: string): PrepPage | null {
+  const segments = path.split("/").filter(Boolean);
+  switch (segments[0]) {
+    case "encounters":
+      return segments[1] === "maps" ? "maps" : "scenes";
+    case "roster":
+    case "characters":
+    case "builder":
+      return "party";
+    case "prep":
+      return segments[1] === "tokens" ? "tokens" : null;
+    case "viewer-controls":
+      return segments[1] === "sound" ? "sound" : null;
+    case "replays":
+      return "replays";
+    default:
+      return null;
+  }
+}
+
+/** Which section lights for an address. The table screen controls and Settings light none. */
+export function litGmSection(path: string): GmSection | null {
+  if (prepPageFor(path)) return "prep";
+  const head = path.split("/").filter(Boolean)[0] ?? "";
+  if (head === "codex") return "codex";
+  if (head === "compendium") return "compendium";
+  if (head === "table" || head === "") return "play";
+  return null;
+}
+
 /** The player's tabs, and which one lights for an address: the player's own sheet, its level page and the builder
  *  belong to My character; everything that is not My character, the Codex or Settings is the table. */
 export type PlayerTab = "mine" | "table" | "codex" | "settings";
+
+/** The player's sections: Table, Sheet and Codex on a laptop, and Log as a fourth tab on a phone. */
+export type PlayerSection = "table" | "sheet" | "codex" | "log";
+/** The player's log: the table with its Log panel open, on a laptop and a phone alike. */
+export const PLAYER_LOG_PATH = "/table?panel=log";
+export function litPlayerSection(route: Pick<Route, "path" | "query">): PlayerSection | null {
+  const tab = litPlayerTab(route.path);
+  if (tab === "mine") return "sheet";
+  if (tab === "codex") return "codex";
+  if (tab === "settings") return null;
+  if (route.path.split("/").filter(Boolean)[0] === "replays") return "table";
+  return route.query.get("panel") === "log" ? "log" : "table";
+}
 export function litPlayerTab(path: string): PlayerTab {
   const head = path.split("/").filter(Boolean)[0] ?? "";
   if (head === "me" || head === "characters" || head === "builder") return "mine";
@@ -199,6 +283,8 @@ export function litPlayerTab(path: string): PlayerTab {
  */
 export function isGmOnlyPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
+  // Prep's own addresses are the GM's; there is no player namespace under them.
+  if (segments[0] === "prep") return true;
   if (segments[0] === "codex") return GM_ONLY_SECTIONS.includes((segments[1] ?? "") as CodexAddress);
   // `/settings` and its Device section are shared; every other section, the API reference among them, is the GM's.
   if (segments[0] === "settings") return segments[1] !== undefined && segments[1] !== "device";
@@ -225,7 +311,7 @@ export function isKnownPath(path: string): boolean {
     if (segments.length === 2) return segments[1].length > 0;
     return segments.length === 3 && segments[2] === "level";
   }
-  if (segments[0] === "scenes") return scenesViewOf(segments, new URLSearchParams()) !== null;
+  if (segments[0] === "encounters") return scenesViewOf(segments, new URLSearchParams()) !== null;
   // The Compendium's views and each record's own address.
   if (segments[0] === "compendium") return compendiumViewOf(segments, new URLSearchParams()) !== null;
   // The player's own tab: one segment, nothing under it.
@@ -243,6 +329,8 @@ export function isKnownPath(path: string): boolean {
   // A replay id is the archive's integer row id, so a non-numeric second segment is genuinely unknown.
   if (segments[0] === "replays")
     return segments.length === 1 || (segments.length === 2 && /^[0-9]{1,12}$/.test(segments[1]));
+  // Prep's one address of its own, the token library. A bare `/prep` redirects to Scenes.
+  if (segments[0] === "prep") return segments.length === 1 || (segments.length === 2 && segments[1] === "tokens");
   return gmTabForPath(path) !== null && segments.length === 1;
 }
 
@@ -261,7 +349,7 @@ export function layerOf(path: string, query: URLSearchParams = new URLSearchPara
   }
   if (segments[0] === "builder" && segments.length === 1) return { kind: "builder" };
   if (segments[0] === "replays" && segments.length === 2) return { kind: "replay", archiveId: Number(segments[1]) };
-  if (segments[0] === "scenes" && segments.length >= 2) {
+  if (segments[0] === "encounters" && segments.length >= 2) {
     const view = scenesViewOf(segments, query);
     return view ? { kind: "scenes", view } : null;
   }
@@ -283,11 +371,29 @@ export function rememberLocation(role: "gm" | "player", href: string): void {
   try {
     localStorage.setItem(role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY, href);
     // Also remembered per tab, so returning to a tab reopens the record that was open there.
-    const head = headOf(href.split("?")[0] ?? "");
+    const path = href.split("?")[0] ?? "";
+    const head = headOf(path);
     if (head) localStorage.setItem(`${role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY}.${head}`, href);
+    // And per GM section, so Prep reopens the page that was open in it.
+    const section = role === "gm" ? litGmSection(path) : null;
+    if (section) localStorage.setItem(`${GM_LOCATION_KEY}.section.${section}`, href);
   } catch {
     /* private mode - fine */
   }
+}
+
+/** Where the GM last was inside a section, or null for the section's own address. Validated like `resumeTarget`. */
+export function lastLocationForSection(section: GmSection): string | null {
+  let stored: string | null;
+  try {
+    stored = localStorage.getItem(`${GM_LOCATION_KEY}.section.${section}`);
+  } catch {
+    return null;
+  }
+  if (!stored) return null;
+  const path = stored.split("?")[0] ?? "";
+  if (litGmSection(path) !== section || !isKnownPath(path)) return null;
+  return stored;
 }
 
 export function lastLocation(role: "gm" | "player"): string | null {

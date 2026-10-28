@@ -10,10 +10,12 @@ import type {
   ViewerInitiative,
   ViewerPresentationProjection
 } from "./viewer-presentation.js";
+import { ROLL_CARD_MS, type ViewerRollCard } from "./viewer-roll.js";
 import type { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
 /** What a table screen receives: the stored presentation, plus what the sound board is playing (ADR-0024). */
-export type ViewerFeedProjection = ViewerPresentationProjection & Readonly<{ sound: ViewerSoundProjection }>;
+export type ViewerFeedProjection = ViewerPresentationProjection &
+  Readonly<{ sound: ViewerSoundProjection; latestRoll: ViewerRollCard | null }>;
 type PresentationListener = (projection: ViewerFeedProjection) => void;
 type SoundReport = Readonly<{ sound: Exclude<ScreenSound, "unknown">; unplayable: readonly string[] }>;
 
@@ -54,6 +56,10 @@ export class ViewerCoordinator {
    *  when they reconnect. */
   private readonly soundReports = new Map<string, SoundReport>();
   private soundSource: (now: number) => ViewerSoundProjection = () => SILENT;
+  private rollSource: (since: number | undefined, now: number) => ViewerRollCard | null = () => null;
+  /** The card last sent, so a state change that leaves it as it was sends nothing. */
+  private sentRoll = "null";
+  private rollTimer: ReturnType<typeof setTimeout> | null = null;
   private screensChanged: () => void = () => {};
 
   constructor(
@@ -88,7 +94,29 @@ export class ViewerCoordinator {
 
   /** The presentation a screen is sent: the stored one with the sound board's current output. */
   project(now = this.now()): ViewerFeedProjection {
-    return { ...this.presentation.project(now), sound: this.soundSource(now) };
+    const presentation = this.presentation.project(now);
+    const latestRoll = presentation.enabled ? this.rollSource(this.presentation.snapshot.rollsSince, now) : null;
+    return { ...presentation, sound: this.soundSource(now), latestRoll };
+  }
+
+  /** Where the latest-roll card comes from: the game's rolls, read as the table screen's audience (ADR-0040). */
+  attachRolls(source: (since: number | undefined, now: number) => ViewerRollCard | null) {
+    this.rollSource = source;
+  }
+
+  /** After the game changed: send the screens a new card, or none, when the card changed; and come back when the
+   *  shown one expires, so it doesn't linger until the next change. */
+  refreshRoll() {
+    const card = this.presentation.snapshot.enabled
+      ? this.rollSource(this.presentation.snapshot.rollsSince, this.now())
+      : null;
+    if (JSON.stringify(card) !== this.sentRoll) this.broadcast();
+    if (this.rollTimer !== null) clearTimeout(this.rollTimer);
+    this.rollTimer = null;
+    if (card === null) return;
+    const left = Date.parse(card.at) + ROLL_CARD_MS - this.now();
+    this.rollTimer = setTimeout(() => this.refreshRoll(), Math.max(0, left) + 50);
+    this.rollTimer.unref?.();
   }
 
   /** Where the sound comes from, and who to tell when the screens' sound states change (the GM's board). */
@@ -163,6 +191,8 @@ export class ViewerCoordinator {
   dispose() {
     for (const timer of this.pingTimers) clearTimeout(timer);
     this.pingTimers.clear();
+    if (this.rollTimer !== null) clearTimeout(this.rollTimer);
+    this.rollTimer = null;
   }
 
   async synchronizeEncounter(
@@ -231,6 +261,7 @@ export class ViewerCoordinator {
 
   broadcast() {
     const projection = this.project();
+    this.sentRoll = JSON.stringify(projection.latestRoll);
     for (const [connectionId, subscriber] of this.subscribers) {
       try {
         this.access.verify(subscriber.token);

@@ -164,7 +164,7 @@ export function swapClassSpell(
 ): Readonly<{ added: string; removed: string }> {
   const { actor, definition } = characterOf(state, actorId);
   if (inFight(state, actorId))
-    throw new CommandRejectedError("Prepared spells change after a Long Rest, outside a fight.");
+    throw new CommandRejectedError("Prepared spells change after a Long Rest, outside an encounter.");
   if (role === "player") {
     if (actor.preparation === null)
       throw new CommandRejectedError("You change your prepared spells when you finish a Long Rest.");
@@ -265,7 +265,7 @@ export function addToSpellbook(
   const book = spellChoicesOf(actor, definition, deps.library, deps.policy)?.spellbook;
   if (!book) throw new CommandRejectedError(`${actor.name} has no spellbook to add to.`);
   if (inFight(state, actorId))
-    throw new CommandRejectedError("Adding a spell to a spellbook takes hours. Finish the fight first.");
+    throw new CommandRejectedError("Adding a spell to a spellbook takes hours. Finish the encounter first.");
   const spell = deps.library.spellRecord(input.spellId);
   if (!spell) throw new CommandRejectedError("That spell is not in the content catalog.");
   if (book.spellIds.includes(spell.id))

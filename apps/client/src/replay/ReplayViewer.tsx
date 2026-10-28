@@ -26,7 +26,7 @@ import {
 import { countOf } from "@vtt/domain";
 
 /** The launch refusals the panel can route somewhere; any other refusal is a toast. */
-const ROUTED_REFUSALS = ["scene_room_full", "history_review"] as const;
+const ROUTED_REFUSALS = ["encounter_room_full", "history_review"] as const;
 type RoutedRefusal = (typeof ROUTED_REFUSALS)[number];
 
 /** The replay's name from the list this viewer may read, the same name the list shows; "Replay" until it loads. */
@@ -82,7 +82,7 @@ function GmViewer({
   const launch = async () => {
     const ok = await confirm({
       title: "Launch from this moment?",
-      body: `The table becomes this fight at turn ${index + 1}. Your live scene is parked in Scenes. Resume it anytime.`,
+      body: `The table becomes this replay at turn ${index + 1}. Your live encounter is parked in Encounters. Resume it anytime.`,
       confirmLabel: "Launch"
     });
     if (!ok) return;
@@ -98,7 +98,7 @@ function GmViewer({
       else toast(message, { tone: "error" });
       return;
     }
-    toast("The table is live on that moment. Your previous scene is parked in Scenes.", { tone: "success" });
+    toast("The table is live on that moment. Your previous encounter is parked in Encounters.", { tone: "success" });
     onLaunched();
   };
 
@@ -134,13 +134,15 @@ function GmViewer({
         <Alert tone="warning" className="replay-refusal" title="That moment could not be launched">
           <p>{refused.message}</p>
           <div className="replay-refusal-actions">
-            {refused.code === "scene_room_full" && (
-              <Button variant="primary" size="sm" onClick={() => void navigate("/scenes")}>
-                Manage scenes
+            {refused.code === "encounter_room_full" && (
+              <Button variant="primary" size="sm" onClick={() => void navigate("/encounters")}>
+                Manage encounters
               </Button>
             )}
             {refused.code === "history_review" && (
-              <span>Step back to the live turn on the table first. The fight's history banner has the way out.</span>
+              <span>
+                Step back to the live turn on the table first. The encounter's history banner has the way out.
+              </span>
             )}
             <Button variant="ghost" size="sm" onClick={() => setRefused(null)}>
               Dismiss
@@ -281,7 +283,7 @@ function PlayerViewer({
         </Button>
         <div className="replay-header-text">
           <h2>{name}</h2>
-          <p className="replay-meta">You're watching this fight as the party saw it.</p>
+          <p className="replay-meta">You're watching this encounter as the party saw it.</p>
         </div>
       </div>
       <Transport

@@ -193,7 +193,7 @@ const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: str
   ["apps/client/src/actors/pdf-import.css", 5, "import-status hues (amber/red/violet) that never became tokens"],
   ["apps/client/src/maps/calibration.css", 11, "SVG paint: grid strokes and drop-shadows over image content"],
   ["apps/client/src/scene/annotation.css", 3, "SVG paint: annotation strokes over image content"],
-  ["apps/client/src/scene/encounter-map.css", 8, "SVG paint, and the black/white pair a token ring needs on any map"],
+  ["apps/client/src/scene/encounter-map.css", 6, "SVG paint, and the black/white pair a token ring needs on any map"],
   ["apps/client/src/styles.css", 2, "a two-stop black mask, read only for its alpha"],
   ["apps/client/src/viewer/viewer-controls.css", 1, "the white A/B measurement labels, over arbitrary map art"],
   ["apps/client/src/viewer/viewer.css", 6, "SVG paint and a scrim over the projected map"],
@@ -284,11 +284,11 @@ const VIEWPORT_UNIT = /\b\d+(?:\.\d+)?(?:d|s)?vh\b/g;
 /** Values that are not caps on in-flow content, with the reason. */
 const VIEWPORT_ALLOW: ReadonlyArray<readonly [file: string, values: readonly string[], why: string]> = [
   ["apps/client/src/encounter/pickers.css", ["52vh"], "the cap on a picker's list in its modal"],
-  ["apps/client/src/encounter/fight-menu.css", ["85vh"], "the cap on the fixed fight menu"],
+  ["apps/client/src/encounter/fight-menu.css", ["85vh"], "the cap on the fixed encounter menu"],
   ["apps/client/src/encounter/monster-browser.css", ["92vh"], "the cap on the monster browser modal"],
   ["apps/client/src/sheet/sheet.css", ["92dvh"], "the cap on the sheet's dialog"],
   ["apps/client/src/shell/landing.css", ["4vh", "3.5vh", "4.5vh"], "clamp() middle terms for the landing's spacing"],
-  ["apps/client/src/viewer/viewer.css", ["32vh"], "the shared screen's portrait initiative band"]
+  ["apps/client/src/viewer/screen-parts.css", ["32vh"], "the shared screen's portrait band under the map"]
 ];
 
 describe("(g) no viewport-fraction caps on in-flow content", () => {

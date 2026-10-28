@@ -42,7 +42,7 @@ describe("a built Warlock's Pact Magic", () => {
     expect(hero.pactSlots).toEqual({ level: 3, remaining: 2 });
   });
 
-  it("is spent outside a fight too", () => {
+  it("is spent outside an encounter too", () => {
     const { hero } = fight(warlock, { combat: false });
     const actions = effectiveActions(warlock, hero, catalog);
     spendLooseUses(

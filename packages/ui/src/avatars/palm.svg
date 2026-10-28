@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Palm avatar"><title>Palm avatar</title><defs><linearGradient id="oz-palm-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a0a52"></stop><stop offset="0.6" stop-color="#ff3d8b"></stop><stop offset="1" stop-color="#ff8a1f"></stop></linearGradient>
+<linearGradient id="oz-palm-u" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe14d"></stop><stop offset="1" stop-color="#ff8a1f"></stop></linearGradient></defs>
+<rect width="64" height="46" fill="url(#oz-palm-s)"></rect><circle cx="34" cy="40" r="14" fill="url(#oz-palm-u)"></circle>
+<rect y="46" width="64" height="18" fill="#140626"></rect>
+<path d="M14 49h36M18 53h28M23 57h18M27 61h10" stroke="#ff8a1f" stroke-width="1.6" opacity="0.8"></path>
+<path d="M27 47C27 38 25 30 21 22l2-1c4 8 7 17 7 26z" fill="#0b0414"></path>
+<path d="M22 21C16 15 9 15 5 19c6-1 11 0 15 3zM22 21c-2-7-8-11-14-10 5 2 9 5 12 9zM22 21c3-7 9-10 15-8-6 1-10 4-13 8zM22 21c6-3 13-2 17 3-6-2-11-2-15-1zM22 21c-3 5-3 11 0 15-1-5 0-10 2-14z" fill="#0b0414"></path></svg>

@@ -108,8 +108,8 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
     server.mapCatalog.register(tavern.metadata.id, "The tavern", "battlemap");
     await record(tavern.metadata.id);
 
-    const archives = (await (await fetch(`${base}/api/v1/encounters`, { headers: bearer(gmToken) })).json()).data
-      .encounters as ReadonlyArray<{ id: number }>;
+    const archives = (await (await fetch(`${base}/api/v1/replays`, { headers: bearer(gmToken) })).json()).data
+      .replays as ReadonlyArray<{ id: number }>;
     expect(archives).toHaveLength(3);
     // Newest first, so the first fight recorded (the shared map) is index 2.
     const sharedArchiveId = archives[2].id;
@@ -122,7 +122,7 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
 
     const setShared = async (id: number, playerVisible: boolean) =>
       (
-        await fetch(`${base}/api/v1/encounters/${id}/visibility`, {
+        await fetch(`${base}/api/v1/replays/${id}/visibility`, {
           method: "POST",
           headers: bearer(gmToken),
           body: JSON.stringify({ playerVisible })

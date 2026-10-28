@@ -44,13 +44,13 @@ import { defineCommand } from "./pipeline.js";
 // Dynamic vision (ADR-0023): the GM's walls, doors, windows and lights, the scene's ambient light and its switch, and
 // opening a door, which a player may do beside their own character.
 
-/** The geometry of the map an edit targets: the live table's, or the parked scene's with `sceneId`. */
-async function sceneGeometry(kit: Kit, sceneId: string | undefined) {
+/** The geometry of the map an edit targets: the live table's, or the parked scene's with `encounterId`. */
+async function sceneGeometry(kit: Kit, encounterId: string | undefined) {
   const combat = kit.read().combat;
   const mapAssetId =
-    sceneId === undefined
+    encounterId === undefined
       ? combat.mapAssetId
-      : (combat.scenes.find((scene) => scene.id === sceneId)?.mapAssetId ?? null);
+      : (combat.encounters.find((scene) => scene.id === encounterId)?.mapAssetId ?? null);
   if (!mapAssetId) throw new CommandRejectedError("Pick a map before setting up its vision.");
   return kit.context.tokenGeometryFor(mapAssetId);
 }
@@ -62,16 +62,16 @@ export const visionCommands = [
     type: "vision.set-enabled",
     operationId: "setVisionEnabled",
     description:
-      "Turns dynamic vision on or off for the live table or, with `sceneId`, a prepared scene (GM-grade only). With it on, walls, closed doors and windows block movement, walls and closed doors block sight and light, and each player receives only the creatures their own characters perceive. The map needs a calibrated grid or a saved scale.",
-    summary: "Turn dynamic vision on or off for the live table or a prepared scene (GM).",
+      "Turns dynamic vision on or off for the live table or, with `encounterId`, a prepared encounter (GM-grade only). With it on, walls, closed doors and windows block movement, walls and closed doors block sight and light, and each player receives only the creatures their own characters perceive. The map needs a calibrated grid or a saved scale.",
+    summary: "Turn dynamic vision on or off for the live table or a prepared encounter (GM).",
     schema: VisionSetEnabledSchema,
     malformed: "The vision command is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }, kit) {
-      const { enabled, sceneId } = request;
-      const geometry = await sceneGeometry(kit, sceneId);
-      const { duplicate } = await execute((state) => setVisionEnabled(state, sceneId, geometry, enabled));
-      if (!duplicate && sceneId === undefined)
+      const { enabled, encounterId } = request;
+      const geometry = await sceneGeometry(kit, encounterId);
+      const { duplicate } = await execute((state) => setVisionEnabled(state, encounterId, geometry, enabled));
+      if (!duplicate && encounterId === undefined)
         kit.context.appendLog({
           kind: "scene",
           text: enabled
@@ -86,15 +86,15 @@ export const visionCommands = [
     type: "vision.set-ambient",
     operationId: "setVisionAmbient",
     description:
-      "Sets the scene's ambient light (GM-grade only): `bright` (daylight), `dim` (twilight, a lit room's shadows) or `dark` (night, an unlit dungeon), where creatures see only by light, Darkvision and their other senses. `sceneId` targets a prepared scene.",
-    summary: "Set the scene's ambient light: bright, dim or dark (GM).",
+      "Sets the encounter's ambient light (GM-grade only): `bright` (daylight), `dim` (twilight, a lit room's shadows) or `dark` (night, an unlit dungeon), where creatures see only by light, Darkvision and their other senses. `encounterId` targets a prepared encounter.",
+    summary: "Set the encounter's ambient light: bright, dim or dark (GM).",
     schema: VisionSetAmbientSchema,
     malformed: "The ambient light is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }, kit) {
-      const { ambient, sunlight, sceneId } = request;
-      const geometry = await sceneGeometry(kit, sceneId);
-      await execute((state) => setVisionAmbient(state, sceneId, geometry, ambient, sunlight));
+      const { ambient, sunlight, encounterId } = request;
+      const geometry = await sceneGeometry(kit, encounterId);
+      await execute((state) => setVisionAmbient(state, encounterId, geometry, ambient, sunlight));
     }
   }),
 
@@ -102,17 +102,17 @@ export const visionCommands = [
     type: "vision.add-area",
     operationId: "addVisionArea",
     description:
-      "Paints an area of light or obscurement over the scene's ambient light (GM-grade only): `bright`, `dim` or `dark` set its light level (a lit room in a dark dungeon, a shadowed cellar in daylight; `sunlight` makes a bright one sunlit), `lightly-obscured` (patchy fog, moderate foliage) gives Disadvantage on Wisdom (Perception) checks that rely on sight, `heavily-obscured` (dense fog or foliage) blocks sight into and through it, and `magical-darkness` stays dark whatever light reaches it, seen into only by Blindsight, Truesight and Devil's Sight. A `rect` snaps to whole cells; fog and magical Darkness may be a `circle` of `radiusFeet` instead. `sceneId` targets a prepared scene. The area's id is the commandId.",
-    summary: "Paint an area of light, darkness or fog over the scene (GM).",
+      "Paints an area of light or obscurement over the encounter's ambient light (GM-grade only): `bright`, `dim` or `dark` set its light level (a lit room in a dark dungeon, a shadowed cellar in daylight; `sunlight` makes a bright one sunlit), `lightly-obscured` (patchy fog, moderate foliage) gives Disadvantage on Wisdom (Perception) checks that rely on sight, `heavily-obscured` (dense fog or foliage) blocks sight into and through it, and `magical-darkness` stays dark whatever light reaches it, seen into only by Blindsight, Truesight and Devil's Sight. A `rect` snaps to whole cells; fog and magical Darkness may be a `circle` of `radiusFeet` instead. `encounterId` targets a prepared encounter. The area's id is the commandId.",
+    summary: "Paint an area of light, darkness or fog over the encounter (GM).",
     schema: VisionAreaAddSchema,
     malformed: "The area is malformed.",
     issueMessage: true,
     gmOnly: GM_ONLY,
     async run({ request, execute }, kit) {
-      const { commandId, kind, sunlight, rect, circle, sceneId } = request;
-      const geometry = await sceneGeometry(kit, sceneId);
+      const { commandId, kind, sunlight, rect, circle, encounterId } = request;
+      const geometry = await sceneGeometry(kit, encounterId);
       await execute((state) =>
-        addVisionArea(state, sceneId, geometry, {
+        addVisionArea(state, encounterId, geometry, {
           id: commandId,
           kind,
           ...(sunlight !== undefined ? { sunlight } : {}),
@@ -127,13 +127,13 @@ export const visionCommands = [
     type: "vision.remove-area",
     operationId: "removeVisionArea",
     description:
-      "Removes an area of light, darkness or fog (GM-grade only), whether the GM painted it or a spell made it. `sceneId` targets a prepared scene.",
+      "Removes an area of light, darkness or fog (GM-grade only), whether the GM painted it or a spell made it. `encounterId` targets a prepared encounter.",
     summary: "Remove an area of light, darkness or fog (GM).",
     schema: VisionAreaRemoveSchema,
     malformed: "The area command is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }) {
-      await execute((state) => removeVisionArea(state, request.sceneId, request.areaId));
+      await execute((state) => removeVisionArea(state, request.encounterId, request.areaId));
     }
   }),
 
@@ -141,7 +141,7 @@ export const visionCommands = [
     type: "item.set-light",
     operationId: "setItemLight",
     description:
-      "Lights or puts out a light source a creature carries (a Torch, a Lamp, a Lantern, a Candle, a magic item that glows), lowers or raises a Hooded Lantern's hood, or aims a Bullseye Lantern's Cone (`facingDegrees`, from the right of the map, clockwise). Lighting a Candle, Lamp, Lantern or Torch needs a Tinderbox or another flame in hand, and a Lamp or Lantern burns a flask of Oil for 6 hours; a Torch or Candle burns for an hour, then is used up. Lighting one and moving a hood take the creature's Bonus Action on its turn in a fight. A lit light is held (equipped), and stowing it puts it out. GM-grade for any creature; a player session for their own claimed character.",
+      "Lights or puts out a light source a creature carries (a Torch, a Lamp, a Lantern, a Candle, a magic item that glows), lowers or raises a Hooded Lantern's hood, or aims a Bullseye Lantern's Cone (`facingDegrees`, from the right of the map, clockwise). Lighting a Candle, Lamp, Lantern or Torch needs a Tinderbox or another flame in hand, and a Lamp or Lantern burns a flask of Oil for 6 hours; a Torch or Candle burns for an hour, then is used up. Lighting one and moving a hood take the creature's Bonus Action on its turn in an encounter. A lit light is held (equipped), and stowing it puts it out. GM-grade for any creature; a player session for their own claimed character.",
     summary: "Light, put out, hood or aim a carried light source.",
     schema: ItemSetLightSchema,
     malformed: "The light command is malformed.",
@@ -172,7 +172,7 @@ export const visionCommands = [
     type: "item.set-form",
     operationId: "setItemForm",
     description:
-      "Puts a carried item in one of the forms its holder chooses (a Rod of Lordly Might's flame blade, a Quarterstaff of the Acrobat's pole), or back in its own form with a null `variantId`. The item must be held (equipped), and a form the item says takes a Bonus Action takes the creature's Bonus Action on its turn in a fight. The kinds the GM says a found item is (an Ioun Stone's) are set with character.set-inventory instead. GM-grade for any creature; a player session for their own claimed character.",
+      "Puts a carried item in one of the forms its holder chooses (a Rod of Lordly Might's flame blade, a Quarterstaff of the Acrobat's pole), or back in its own form with a null `variantId`. The item must be held (equipped), and a form the item says takes a Bonus Action takes the creature's Bonus Action on its turn in an encounter. The kinds the GM says a found item is (an Ioun Stone's) are set with character.set-inventory instead. GM-grade for any creature; a player session for their own claimed character.",
     summary: "Change the form of a carried item.",
     schema: ItemSetFormSchema,
     malformed: "The item form command is malformed.",
@@ -198,13 +198,13 @@ export const visionCommands = [
     type: "vision.reset-explored",
     operationId: "resetVisionExplored",
     description:
-      "Forgets what the party has seen of the scene, so only what its characters see now is shown (GM-grade only). `sceneId` targets a prepared scene.",
-    summary: "Forget what the party has seen of the scene (GM).",
+      "Forgets what the party has seen of the encounter, so only what its characters see now is shown (GM-grade only). `encounterId` targets a prepared encounter.",
+    summary: "Forget what the party has seen of the encounter (GM).",
     schema: VisionResetExploredSchema,
     malformed: "The vision command is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }) {
-      await execute((state) => resetExplored(state, request.sceneId));
+      await execute((state) => resetExplored(state, request.encounterId));
     }
   }),
 
@@ -212,17 +212,17 @@ export const visionCommands = [
     type: "wall.add",
     operationId: "addWalls",
     description:
-      "Draws a chain of walls, doors or windows through `points`, one segment per pair (GM-grade only). Ends snap to another wall's end or a grid corner nearby and are clamped to the map. A wall blocks sight, light and movement, a door does while closed (doors start closed), and a window blocks movement only. `sceneId` targets a prepared scene. Answers with the new segments' ids.",
+      "Draws a chain of walls, doors or windows through `points`, one segment per pair (GM-grade only). Ends snap to another wall's end or a grid corner nearby and are clamped to the map. A wall blocks sight, light and movement, a door does while closed (doors start closed), and a window blocks movement only. `encounterId` targets a prepared encounter. Answers with the new segments' ids.",
     summary: "Draw walls, doors or windows on the map (GM).",
     schema: WallAddSchema,
     malformed: "The wall is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }, kit) {
-      const { kind, points, sceneId } = request;
-      const geometry = await sceneGeometry(kit, sceneId);
+      const { kind, points, encounterId } = request;
+      const geometry = await sceneGeometry(kit, encounterId);
       let wallIds: string[] = [];
       await execute((state) => {
-        wallIds = addWalls(state, sceneId, geometry, { kind, points, newId: kit.context.newId });
+        wallIds = addWalls(state, encounterId, geometry, { kind, points, newId: kit.context.newId });
       });
       return { wallIds };
     }
@@ -237,22 +237,22 @@ export const visionCommands = [
     malformed: "The wall move is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }, kit) {
-      const { wallId, a, b, sceneId } = request;
-      const geometry = await sceneGeometry(kit, sceneId);
-      await execute((state) => moveWall(state, sceneId, geometry, { wallId, a, b }));
+      const { wallId, a, b, encounterId } = request;
+      const geometry = await sceneGeometry(kit, encounterId);
+      await execute((state) => moveWall(state, encounterId, geometry, { wallId, a, b }));
     }
   }),
 
   defineCommand({
     type: "wall.remove",
     operationId: "removeWall",
-    description: "Removes one wall, door or window (GM-grade only). `sceneId` targets a prepared scene.",
+    description: "Removes one wall, door or window (GM-grade only). `encounterId` targets a prepared encounter.",
     summary: "Remove a wall, door or window (GM).",
     schema: WallRemoveSchema,
     malformed: "The wall command is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }) {
-      await execute((state) => removeWall(state, request.sceneId, request.wallId));
+      await execute((state) => removeWall(state, request.encounterId, request.wallId));
     }
   }),
 
@@ -260,13 +260,13 @@ export const visionCommands = [
     type: "wall.clear",
     operationId: "clearWalls",
     description:
-      "Removes every wall, door and window from the scene (GM-grade only). `sceneId` targets a prepared scene.",
+      "Removes every wall, door and window from the encounter (GM-grade only). `encounterId` targets a prepared encounter.",
     summary: "Remove every wall, door and window (GM).",
     schema: WallClearSchema,
     malformed: "The wall command is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }) {
-      await execute((state) => clearWalls(state, request.sceneId));
+      await execute((state) => clearWalls(state, request.encounterId));
     }
   }),
 
@@ -274,14 +274,15 @@ export const visionCommands = [
     type: "door.set-open",
     operationId: "setDoorOpen",
     description:
-      "Opens or closes a door. The GM opens any door, on the live table or (with `sceneId`) a prepared scene; a player only one within 5 feet of their own character's token on the live table, with no wall between them. In a fight that is the character's one free object interaction on its turn, and a second takes the Utilize action.",
+      "Opens or closes a door. The GM opens any door, on the live table or (with `encounterId`) a prepared encounter; a player only one within 5 feet of their own character's token on the live table, with no wall between them. In an encounter that is the character's one free object interaction on its turn, and a second takes the Utilize action.",
     summary: "Open or close a door; a player, one beside their own character.",
     schema: DoorSetOpenSchema,
     malformed: "The door command is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { wallId, open, sceneId } = request;
+      const { wallId, open, encounterId } = request;
       const player = isGmGrade(principal) ? null : principal;
-      if (player && sceneId !== undefined) throw new GameAccessDeniedError("Only the GM can stage a prepared scene.");
+      if (player && encounterId !== undefined)
+        throw new GameAccessDeniedError("Only the GM can stage a prepared encounter.");
       let opener: string | null = null;
       const { duplicate } = await execute((state) => {
         if (player) {
@@ -305,7 +306,7 @@ export const visionCommands = [
           const actor = state.actors.find((candidate) => candidate.id === free)!;
           spendObjectInteraction(state, actor, { role: "player" }, `${open ? "Open" : "Close"} the door`);
         }
-        setDoorOpen(state, sceneId, wallId, open);
+        setDoorOpen(state, encounterId, wallId, open);
       });
       if (!duplicate && opener !== null)
         kit.context.appendLog({
@@ -320,17 +321,17 @@ export const visionCommands = [
     type: "light.add",
     operationId: "addLight",
     description:
-      "Places a light on the map at `position`, or gives one to a creature (`actorId`), which carries it as its token moves (GM-grade only). `brightFeet` is the Bright Light radius and `dimFeet` the Dim Light beyond it, as the SRD prints them (a Torch is 20 and 20). Lights matter where the ambient light is dark; walls and closed doors stop them. `sceneId` targets a prepared scene. Answers with the light's id, which is the commandId.",
+      "Places a light on the map at `position`, or gives one to a creature (`actorId`), which carries it as its token moves (GM-grade only). `brightFeet` is the Bright Light radius and `dimFeet` the Dim Light beyond it, as the SRD prints them (a Torch is 20 and 20). Lights matter where the ambient light is dark; walls and closed doors stop them. `encounterId` targets a prepared encounter. Answers with the light's id, which is the commandId.",
     summary: "Place a light on the map or give one to a creature (GM).",
     schema: LightAddSchema,
     malformed: "The light is malformed.",
     issueMessage: true,
     gmOnly: GM_ONLY,
     async run({ request, execute }, kit) {
-      const { commandId, position, actorId, brightFeet, dimFeet, sceneId } = request;
-      const geometry = await sceneGeometry(kit, sceneId);
+      const { commandId, position, actorId, brightFeet, dimFeet, encounterId } = request;
+      const geometry = await sceneGeometry(kit, encounterId);
       await execute((state) =>
-        addLight(state, sceneId, geometry, {
+        addLight(state, encounterId, geometry, {
           id: commandId,
           ...(position ? { position } : {}),
           ...(actorId ? { actorId } : {}),
@@ -345,28 +346,29 @@ export const visionCommands = [
   defineCommand({
     type: "light.move",
     operationId: "moveLight",
-    description: "Moves a light; a carried one is set down there (GM-grade only). `sceneId` targets a prepared scene.",
+    description:
+      "Moves a light; a carried one is set down there (GM-grade only). `encounterId` targets a prepared encounter.",
     summary: "Move a light (GM).",
     schema: LightMoveSchema,
     malformed: "The light move is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }, kit) {
-      const { lightId, position, sceneId } = request;
-      const geometry = await sceneGeometry(kit, sceneId);
-      await execute((state) => moveLight(state, sceneId, geometry, { lightId, position }));
+      const { lightId, position, encounterId } = request;
+      const geometry = await sceneGeometry(kit, encounterId);
+      await execute((state) => moveLight(state, encounterId, geometry, { lightId, position }));
     }
   }),
 
   defineCommand({
     type: "light.remove",
     operationId: "removeLight",
-    description: "Removes a light (GM-grade only). `sceneId` targets a prepared scene.",
+    description: "Removes a light (GM-grade only). `encounterId` targets a prepared encounter.",
     summary: "Remove a light (GM).",
     schema: LightRemoveSchema,
     malformed: "The light command is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }) {
-      await execute((state) => removeLight(state, request.sceneId, request.lightId));
+      await execute((state) => removeLight(state, request.encounterId, request.lightId));
     }
   })
 ];

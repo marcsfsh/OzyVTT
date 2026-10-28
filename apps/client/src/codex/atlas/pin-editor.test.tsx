@@ -46,7 +46,7 @@ const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
   revealedToPlayers: true,
   pageIds: [],
   subMapId: null,
-  sceneIds: [],
+  encounterIds: [],
   actorId: null,
   isParty: false,
   tags: ["dungeon"],
@@ -68,7 +68,7 @@ const renderEditor = (
       pages={[]}
       scenes={[]}
       actors={[]}
-      activeSceneId={null}
+      activeEncounterId={null}
       autosave={{ enabled: options.autosave ?? true, intervalSeconds: 1 }}
       onUpdated={vi.fn()}
       onDeleted={vi.fn()}

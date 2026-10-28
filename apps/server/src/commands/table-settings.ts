@@ -7,6 +7,8 @@ import {
   SetPlayerInitiativeModeSchema,
   SetRulesModeSchema,
   TableSetPartyVisibilitySchema,
+  TableSetPlayerDiceSchema,
+  TableSetTargetingSchema,
   TableSetStagingDefaultsSchema
 } from "@vtt/domain/commands";
 import { HOLDING_BREATH_TAG, startHoldingBreath } from "../breath.js";
@@ -42,7 +44,7 @@ export const tableSettingCommands = [
     description:
       "Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid structured actions with an overridable `error.details.blocked`, `assisted` allows them with logged warnings, `freeform` skips validation. Also settable at encounter start.",
     summary:
-      "Set the live fight's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).",
+      "Set the live encounter's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).",
     schema: SetRulesModeSchema,
     malformed: "The rules-mode command is malformed.",
     gmOnly: "Only the GM can change the rules mode.",
@@ -68,9 +70,9 @@ export const tableSettingCommands = [
     type: "rules.set-policy",
     operationId: "setRulesPolicy",
     description:
-      "Sets the table's standing rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy. The rules-mode command changes the fight in progress. Omitting `exceptions` keeps the stored ones. Every family follows the dial until the GM sets an exception for it.",
+      "Sets the table's standing rules policy (GM-grade only): the dial every new encounter starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy. The rules-mode command changes the encounter in progress. Omitting `exceptions` keeps the stored ones. Every family follows the dial until the GM sets an exception for it.",
     summary:
-      "Set the table's standing rules policy: the dial and per-family exceptions every new fight starts from (GM).",
+      "Set the table's standing rules policy: the dial and per-family exceptions every new encounter starts from (GM).",
     schema: RulesSetPolicySchema,
     malformed: "The rules-policy command is malformed.",
     gmOnly: "Only the GM can set the rules policy.",
@@ -110,6 +112,49 @@ export const tableSettingCommands = [
         kit,
         committed,
         `New combatants now stage as ${visibility === "gm-only" ? "GM only" : "shown to players"}.`
+      );
+    }
+  }),
+
+  defineCommand({
+    type: "table.set-player-dice",
+    operationId: "setPlayerDice",
+    description:
+      "Sets how players' dice are entered, the table's default (GM-grade only, ADR-0043): `d20` for attacks, checks, saves, initiative and death saves (and the builder's rolled scores and hit points), `damage` for damage and healing dice. Each is `total` (the player types the final number, the bonus included; the server checks it against what the roll can come to), `die` (the player types each die's face and the server adds every modifier) or `app` (the server throws). A kind left out keeps what is stored. An encounter may choose its own (`encounter.set-player-dice`). The GM may always type or roll. Players read the modes that apply.",
+    summary: "Set how players' dice are entered, for d20 rolls and for damage (GM).",
+    schema: TableSetPlayerDiceSchema,
+    malformed: "The dice-mode command is malformed.",
+    gmOnly: "Only the GM can set how players' dice are entered.",
+    async run({ request, execute }, kit) {
+      const committed = await execute((state) => {
+        state.playerDice = {
+          d20: request.d20 ?? state.playerDice.d20,
+          damage: request.damage ?? state.playerDice.damage
+        };
+      });
+      audit(kit, committed, "Players' dice modes changed.");
+    }
+  }),
+
+  defineCommand({
+    type: "table.set-targeting",
+    operationId: "setTargeting",
+    description:
+      "Sets who picks the targets of a player's action in an encounter (GM-grade only, ADR-0044): `player` (the default; the player aims on the map) or `gm` (the player's action waits in `combat.targetAsks` until the GM aims and resolves it; `action.resolve` refuses a player's own targets or area then). An action aimed at no one resolves at once either way, and outside an encounter the player aims as before. Players read the setting.",
+    summary: "Set who picks the targets of a player's action in an encounter (GM).",
+    schema: TableSetTargetingSchema,
+    malformed: "The targeting command is malformed.",
+    gmOnly: "Only the GM can set who picks targets.",
+    async run({ request, execute }, kit) {
+      const committed = await execute((state) => {
+        state.targeting = request.targeting;
+        // Asks left waiting when players pick again are theirs to aim now.
+        if (request.targeting === "player") state.combat = { ...state.combat, targetAsks: [] };
+      });
+      audit(
+        kit,
+        committed,
+        request.targeting === "gm" ? "The GM now picks players' targets." : "Players now pick their own targets."
       );
     }
   }),
@@ -236,8 +281,8 @@ export const tableSettingCommands = [
         kit,
         committed,
         underwater
-          ? "The fight is now underwater: melee has Disadvantage unless it deals piercing damage, ranged attacks miss beyond normal range, and everyone resists fire."
-          : "The fight is no longer underwater.",
+          ? "The encounter is now underwater: melee has Disadvantage unless it deals piercing damage, ranged attacks miss beyond normal range, and everyone resists fire."
+          : "The encounter is no longer underwater.",
         false
       );
       if (!committed.duplicate) kit.publishNarrations(events);

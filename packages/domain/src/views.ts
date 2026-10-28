@@ -1,8 +1,12 @@
 import { z } from "zod";
 import type { Actor, ActorDefinition, EffectInstance } from "@vtt/schemas";
 import type {
+  DamageRoll,
+  TargetAsk,
+  Targeting,
   Annotation,
   BuilderPolicy,
+  PlayerDice,
   CheckSubject,
   CraftingProject,
   CombatState,
@@ -102,7 +106,7 @@ export type CommandedOrders = Readonly<{
 
 export type PlayerActor = Pick<Actor, PlayerActorTableField> &
   Partial<Pick<Actor, PlayerActorPartyField>> & {
-    replaySceneId?: string;
+    replayEncounterId?: string;
     hp: PlayerHp;
     effects: PlayerEffect[];
     claimStatus: "available" | "mine" | "claimed";
@@ -202,6 +206,7 @@ export type PlayerPendingSave = Omit<
   | "disadvantageTypes"
   | "spell"
   | "confirmed"
+  | "damageRollId"
   | "spendsOnKill"
   | "damageSource"
 > & {
@@ -211,6 +216,8 @@ export type PlayerPendingSave = Omit<
   >;
   /** Confirmed, and waiting on another creature's answer to the roll; who may answer stays unnamed. */
   awaitingAnswer?: true;
+  /** Its damage waits for the caster's player to type their roll (ADR-0043); it can't be confirmed until then. */
+  awaitingDamage?: true;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. `attackRoll` is the held attack's total, present only when that roll
@@ -255,6 +262,14 @@ export type PlayerVision =
       /** Only in a player's own projection, never the table's. */
       sensed?: readonly PlayerSensedCreature[];
     }>;
+/** A damage roll as its own player receives it: what to roll and how to enter it, and nothing of what waits on it. */
+export type PlayerDamageRoll = Pick<
+  DamageRoll,
+  "id" | "sourceActorId" | "actionName" | "formula" | "dice" | "fixed" | "mode"
+>;
+
+export type PlayerTargetAsk = Pick<TargetAsk, "id" | "actorId" | "actionId" | "actionName">;
+
 export type PlayerCombatView = Readonly<{
   active: boolean;
   round: number;
@@ -281,6 +296,8 @@ export type PlayerCombatView = Readonly<{
   /** Lets the player runner label a hit "handed to the GM" or "applied"; the proposals themselves stay GM-only. */ playerDamageMode:
     "proposal" | "direct";
   /** Claimed-PC actorIds still owing an initiative roll; a player looks for their own id. */ pendingInitiative: readonly string[];
+  /** This player's own characters' damage waiting for the number their dice came to (ADR-0043). */ damageRolls?: readonly PlayerDamageRoll[];
+  /** This player's own characters' actions waiting for the GM to pick their targets (ADR-0044). */ targetAsks?: readonly PlayerTargetAsk[];
   /** Whether the table waits for all players' initiative rolls before turns begin (see CombatState.playerInitiativeMode). */ playerInitiativeMode:
     "immediate" | "wait";
   underwater: boolean;
@@ -372,6 +389,8 @@ export type PlayerView = Pick<GameState, "revision"> & {
   actors: PlayerActor[];
   rolls: PlayerRollRecord[];
   /** The GM's builder policy, verbatim (GM-set and player-read: a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy;
+  /** How this player's dice are entered now: the live encounter's modes over the table's (ADR-0043). */ playerDice: PlayerDice;
+  /** Who picks the targets of this player's actions in an encounter (ADR-0044). */ targeting: Targeting;
   /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[];
   /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;
@@ -408,7 +427,8 @@ export type CombatLogEntry = Readonly<{
     | "movement"
     | "effect"
     | "death-save"
-    | "override";
+    | "override"
+    | "chat";
   text: string;
   gmOnly: boolean;
   revision: number;
@@ -418,4 +438,10 @@ export type CombatLogEntry = Readonly<{
   roll?: PlayerRollRecord;
   /** True only on a `self-only` roll the recipient rolled. Computed per recipient; never stored. */
   private?: boolean;
+  /** Who said a `kind: "chat"` line: the GM, or a player as the character named (ADR-0038). */
+  author?: ChatAuthor;
+  /** A chat line whispered between the GM and this party character. It reaches only the GM and that character's
+   *  player. */
+  whisper?: Readonly<{ characterId: string; name: string }>;
 }>;
+export type ChatAuthor = Readonly<{ name: string; role: "gm" | "player"; actorId?: string }>;

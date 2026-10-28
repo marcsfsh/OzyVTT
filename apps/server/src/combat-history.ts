@@ -25,8 +25,8 @@ function restorableSlice(state: GameState): string {
   // Fog, terrain and vision (walls, doors, lights, what the party has seen) are scene dressing: editing them
   // mid-review must neither dirty the timeline nor be undone by a rewind.
   const {
-    scenes: _scenes,
-    activeSceneId: _activeSceneId,
+    encounters: _scenes,
+    activeEncounterId: _activeSceneId,
     historyCursor: _cursor,
     historyDirty: _dirty,
     fog: _fog,
@@ -101,8 +101,8 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
     initiative,
     turnActorId,
     tokens: snapshot.combat.tokens.filter((token) => currentActorIds.has(token.actorId)),
-    scenes: state.combat.scenes,
-    activeSceneId: state.combat.activeSceneId,
+    encounters: state.combat.encounters,
+    activeEncounterId: state.combat.activeEncounterId,
     // Live fog, terrain and vision survive the restore (excluded from the restorable slice for the same reason).
     fog: state.combat.fog,
     terrain: state.combat.terrain,
@@ -149,7 +149,7 @@ export function planPreviousTurn(state: GameState, timeline: TimelineOps, confir
     return { kind: "discarded", label: entry?.label ?? turnLabel(state) };
   }
   const prior = entries.filter((candidate) => candidate.index < cursor).at(-1);
-  if (!prior) throw new CommandRejectedError("You're at the beginning of the recorded fight.");
+  if (!prior) throw new CommandRejectedError("You're at the beginning of the recorded encounter.");
   const snapshot = timeline.read(prior.index);
   if (!snapshot) throw new CommandRejectedError("The timeline is out of sync. Try again.");
   applyTimelineRestore(state, snapshot, prior.index);

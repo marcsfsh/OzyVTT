@@ -237,7 +237,7 @@ function markerRow(overrides: Partial<CodexMarker> = {}): CodexMarker {
     tags: ["travel"],
     pageIds: [],
     subMapId: null,
-    sceneIds: ["77777777-7777-4777-8777-777777777777"],
+    encounterIds: ["77777777-7777-4777-8777-777777777777"],
     actorId: "88888888-8888-4888-8888-888888888888",
     isParty: false,
     createdAt: "2026-07-29T00:00:00.000Z",
@@ -304,11 +304,11 @@ describe("party marker projection: a flag and nothing else", () => {
 
     // The GM-only links the row carries are nowhere in the serialized party pin.
     const payload = JSON.stringify(party);
-    expect(payload).not.toContain("77777777-7777-4777-8777-777777777777"); // sceneIds
+    expect(payload).not.toContain("77777777-7777-4777-8777-777777777777"); // encounterIds
     expect(payload).not.toContain("88888888-8888-4888-8888-888888888888"); // actorId
     expect(payload).not.toContain("revealedToPlayers");
     expect(payload).not.toContain("createdAt");
-    expect(projectGmMarker(markerRow({ isParty: true })).sceneIds).toHaveLength(1);
+    expect(projectGmMarker(markerRow({ isParty: true })).encounterIds).toHaveLength(1);
   });
 
   it("keeps a HIDDEN party pin hidden, and a party pin on a hidden MAP hidden", () => {

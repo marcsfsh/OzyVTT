@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Button, IconEye, IconHome, IconList, IconPlus, Kbd, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
+import type { GmView } from "@vtt/domain";
+import { Button, IconPlus, Kbd, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
 import { CodexIcon } from "../codex/icons";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";
+import { RulesButton } from "../reference/RulesReference";
 import { navigate, replaceQuery, useRoute } from "../router";
 import {
   CompendiumContext,
+  CompendiumGameContext,
   PHONE_QUERY,
   WIDE_QUERY,
   type CompendiumContextValue,
@@ -24,9 +27,10 @@ import { TablesView } from "./TablesView";
 import "../codex/shell/shell.css";
 import "./compendium.css";
 
+/* Browse is the tables and Homebrew the overview of what you made; the addresses stay as they were. */
 const SECTIONS: ReadonlyArray<Readonly<{ id: CompendiumSection; label: string; path: string }>> = [
-  { id: "overview", label: "Overview", path: COMPENDIUM_PATHS.overview },
-  { id: "tables", label: "Tables", path: COMPENDIUM_PATHS.tables },
+  { id: "tables", label: "Browse", path: COMPENDIUM_PATHS.tables },
+  { id: "overview", label: "Homebrew", path: COMPENDIUM_PATHS.overview },
   { id: "sources", label: "Sources", path: COMPENDIUM_PATHS.sources },
   { id: "sharing", label: "Sharing", path: COMPENDIUM_PATHS.sharing }
 ];
@@ -34,12 +38,16 @@ const SECTIONS: ReadonlyArray<Readonly<{ id: CompendiumSection; label: string; p
 const TABLE_FLYOUT_ID = "cp-table-flyout";
 
 /**
- * The GM's Compendium: SRD 5.2.1 and the table's homebrew in one set of tables, with Overview, Tables, Sources and
+ * The GM's Compendium: SRD 5.2.1 and the table's homebrew in one set of tables, with Browse, Homebrew, Sources and
  * Sharing, the search (Ctrl K) and New homebrew. A record opens at its own address, docked beside its table on a wide
  * laptop; while it is edited, or on a narrower screen, it takes the width and the table folds into a flyout that
- * keeps its kind and filters. A phone gets the section's screen with the tab bar under the thumb.
+ * keeps its kind and filters. A phone gets the section's screen under a row of its sections and New.
  */
-export function CompendiumShell({ token, party }: Readonly<{ token: string; party: readonly PartyCharacter[] }>) {
+export function CompendiumShell({
+  token,
+  party,
+  game = null
+}: Readonly<{ token: string; party: readonly PartyCharacter[]; game?: GmView | null }>) {
   useCompendiumPing();
   const route = useRoute();
   const phone = useMediaQuery(PHONE_QUERY);
@@ -66,6 +74,13 @@ export function CompendiumShell({ token, party }: Readonly<{ token: string; part
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // The top bar's search launcher sends `openSearch=1` once: open the search and clear that one key.
+  useEffect(() => {
+    if (route.query.get("openSearch") !== "1") return;
+    setSearchOpen(true);
+    replaceQuery((query) => query.delete("openSearch"));
+  }, [route.query]);
 
   // A row picked in the folded table opens its record and puts the table away.
   const recordKey = view.view === "record" ? `${view.kind}:${view.id}` : null;
@@ -129,72 +144,74 @@ export function CompendiumShell({ token, party }: Readonly<{ token: string; part
 
   return (
     <CompendiumContext.Provider value={value}>
-      <div className={cx("cx-shell cp-shell", phone ? "is-phone" : "is-laptop")}>
-        {!phone && (
-          <div className="cx-bar cp-bar">
-            <h1 className="cp-bar-title">Compendium</h1>
-            <nav className="cx-bar-sections nh-tabs nh-tabs--horizontal" aria-label="Compendium sections">
-              {SECTIONS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={cx("nh-tab cx-bar-tab", section === item.id && "nh-tab--active")}
-                  aria-current={section === item.id ? "page" : undefined}
-                  onClick={() => go(item.path)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-            <button
-              type="button"
-              className="cx-searchbox cp-searchbox"
-              onClick={openSearch}
-              aria-keyshortcuts="Meta+K Control+K"
-            >
-              <CodexIcon iconId="search" className="cx-icon" />
-              <span className="cx-searchbox-label">Search the SRD and homebrew</span>
-              {shortcut && <Kbd>{shortcut}</Kbd>}
-            </button>
-            <span className="cx-grow" />
-            <Button variant="primary" onClick={() => openNew({ kind: kindInView })}>
-              <IconPlus /> New homebrew
-            </Button>
-          </div>
-        )}
-        <div className="cx-content cp-content">{body}</div>
-        {phone && (
-          <nav className="cx-tabbar" aria-label="Compendium sections">
-            {[
-              { id: "overview", label: "Overview", icon: <IconHome className="cx-icon" /> },
-              { id: "tables", label: "Tables", icon: <IconList className="cx-icon" /> },
-              { id: "new", label: "New", icon: <IconPlus className="cx-icon" /> },
-              { id: "sources", label: "Sources", icon: <CodexIcon iconId="archive" className="cx-icon" /> },
-              { id: "sharing", label: "Sharing", icon: <IconEye className="cx-icon" /> }
-            ].map((tab) => {
-              const on = tab.id === "new" ? newOptions !== null : section === tab.id && newOptions === null;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={cx("cx-tabbar-tab", on && "is-on")}
-                  aria-current={on && tab.id !== "new" ? "page" : undefined}
-                  onClick={() =>
-                    tab.id === "new"
-                      ? openNew({ kind: kindInView })
-                      : go(SECTIONS.find((item) => item.id === tab.id)!.path)
-                  }
-                >
-                  {tab.icon}
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        )}
-        {newOptions && <NewRecordDialog options={newOptions} onClose={() => setNewOptions(null)} />}
-        {searchOpen && <SearchDialog onClose={() => setSearchOpen(false)} />}
-      </div>
+      <CompendiumGameContext.Provider value={game}>
+        <div className={cx("cx-shell cp-shell", phone ? "is-phone" : "is-laptop")}>
+          {!phone && (
+            <div className="cx-bar cp-bar">
+              <h1 className="cp-bar-title">Compendium</h1>
+              <nav className="cx-bar-sections nh-tabs nh-tabs--horizontal" aria-label="Compendium sections">
+                {SECTIONS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={cx("nh-tab cx-bar-tab", section === item.id && "nh-tab--active")}
+                    aria-current={section === item.id ? "page" : undefined}
+                    onClick={() => go(item.path)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+              <button
+                type="button"
+                className="cx-searchbox cp-searchbox"
+                onClick={openSearch}
+                aria-keyshortcuts="Meta+K Control+K"
+              >
+                <CodexIcon iconId="search" className="cx-icon" />
+                <span className="cx-searchbox-label">Search the SRD and homebrew</span>
+                {shortcut && <Kbd>{shortcut}</Kbd>}
+              </button>
+              <RulesButton />
+              <span className="cx-grow" />
+              <Button variant="primary" onClick={() => openNew({ kind: kindInView })}>
+                <IconPlus /> New homebrew
+              </Button>
+            </div>
+          )}
+          {phone && (
+            <div className="cp-phone-sections">
+              <nav className="cx-tabbar cp-phone-tabs" aria-label="Compendium sections">
+                {SECTIONS.map((item) => {
+                  const on = section === item.id && newOptions === null;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={cx("cx-tabbar-tab", on && "is-on")}
+                      aria-current={on ? "page" : undefined}
+                      onClick={() => go(item.path)}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </nav>
+              <Button
+                variant="primary"
+                className="cp-phone-new"
+                aria-label="New homebrew"
+                onClick={() => openNew({ kind: kindInView })}
+              >
+                <IconPlus />
+              </Button>
+            </div>
+          )}
+          <div className="cx-content cp-content">{body}</div>
+          {newOptions && <NewRecordDialog options={newOptions} onClose={() => setNewOptions(null)} />}
+          {searchOpen && <SearchDialog onClose={() => setSearchOpen(false)} />}
+        </div>
+      </CompendiumGameContext.Provider>
     </CompendiumContext.Provider>
   );
 }

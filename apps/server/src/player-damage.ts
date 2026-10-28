@@ -200,9 +200,13 @@ export function resolvePendingDamage(
     const outcome = applyDamageDetailed(state, proposal.targetActorId, input, { role: "gm" }, damageDepsOf(deps));
     applied = { outcome, targetId: proposal.targetActorId, sourceActorId: proposal.sourceActorId, label };
   }
+  // Settled without waiting for the player's damage roll (ADR-0043): the roll goes with it.
   state.combat = {
     ...state.combat,
-    pendingDamage: state.combat.pendingDamage.filter((entry) => entry.id !== proposalId)
+    pendingDamage: state.combat.pendingDamage.filter((entry) => entry.id !== proposalId),
+    damageRolls: proposal.awaitingRoll
+      ? state.combat.damageRolls.filter((roll) => roll.id !== proposal.awaitingRoll)
+      : state.combat.damageRolls
   };
   return applied;
 }

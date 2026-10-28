@@ -38,13 +38,14 @@ export function EncounterBudgetLine({
   if (levels.length === 0)
     return (
       <p className="encounter-budget">
-        This fight is worth <strong>{totalXp.toLocaleString()}</strong> XP. Stage the characters to see how hard it is.
+        This encounter is worth <strong>{totalXp.toLocaleString()}</strong> XP. Stage the characters to see how hard it
+        is.
       </p>
     );
   const budget = encounterBudget(levels);
   return (
     <p className="encounter-budget">
-      This fight is worth <strong>{totalXp.toLocaleString()}</strong> XP:{" "}
+      This encounter is worth <strong>{totalXp.toLocaleString()}</strong> XP:{" "}
       {`${DIFFICULTY[encounterDifficulty(totalXp, budget)]} for ${levels.length} ${levels.length === 1 ? "character" : "characters"}`}
       <small>
         Low {budget.low.toLocaleString()} · Moderate {budget.moderate.toLocaleString()} · High{" "}

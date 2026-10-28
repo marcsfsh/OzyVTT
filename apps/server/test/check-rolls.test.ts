@@ -157,16 +157,31 @@ describe("a check roll", () => {
     expect(rollAbilityCheck(state, OWNER, check(), depsFor([6])).outcome.success).toBeNull();
   });
 
-  it("takes a player's typed d20 only while the table lets players type their dice; the GM always", () => {
+  it("takes what a player typed only as the d20 dice mode asks; the GM always", () => {
     const state = tableWith();
     const typed = rollAbilityCheck(state, OWNER, check({ face: 14 }), depsFor([]));
     expect(typed.outcome).toMatchObject({ natural: 14, total: 23, typed: true });
     expect(state.rolls.at(-1)).toMatchObject({ typed: true, total: 23 });
-    state.builderPolicy = { ...state.builderPolicy, typedRolls: "gm-only" };
+    expect(() => rollAbilityCheck(state, OWNER, check({ total: 23 }), depsFor([]))).toThrow(/type the die's face/);
+
+    // Totals: the server takes its bonus back off, so the typed total is the total, and checks its range.
+    state.playerDice = { ...state.playerDice, d20: "total" };
+    expect(rollAbilityCheck(state, OWNER, check({ total: 23 }), depsFor([])).outcome).toMatchObject({
+      natural: 14,
+      total: 23,
+      typed: true
+    });
+    expect(() => rollAbilityCheck(state, OWNER, check({ total: 30 }), depsFor([]))).toThrow(
+      "A d20 + 9 total is 10 to 29. Check the total you typed."
+    );
+    expect(() => rollAbilityCheck(state, OWNER, check({ face: 14 }), depsFor([]))).toThrow(/type the total/);
+
+    state.playerDice = { ...state.playerDice, d20: "app" };
     expect(() => rollAbilityCheck(state, OWNER, check({ face: 14 }), depsFor([]))).toThrow(
       /server rolls players' dice/
     );
     expect(rollAbilityCheck(state, GM, check({ face: 14 }), depsFor([])).outcome.total).toBe(23);
+    expect(rollAbilityCheck(state, GM, check({ total: 20 }), depsFor([])).outcome.natural).toBe(11);
   });
 
   it("ignores a player's roll mode, and names the GM's forced mode as the GM's", () => {

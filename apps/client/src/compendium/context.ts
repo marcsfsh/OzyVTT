@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { GmView } from "@vtt/domain";
 import type { PartyCharacter } from "@vtt/ui";
 import type { Kind } from "./kinds";
 import type { CompendiumView } from "./routes";
@@ -34,6 +35,13 @@ export type CompendiumContextValue = Readonly<{
   /** Opens the search (Ctrl K). */
   openSearch: () => void;
 }>;
+
+/**
+ * The GM's game, for Add to a scene on a monster. Its own context, so a change at the table re-renders only what reads
+ * it; null where the Compendium is shown without it.
+ */
+export const CompendiumGameContext = createContext<GmView | null>(null);
+export const useCompendiumGame = (): GmView | null => useContext(CompendiumGameContext);
 
 export const CompendiumContext = createContext<CompendiumContextValue | null>(null);
 

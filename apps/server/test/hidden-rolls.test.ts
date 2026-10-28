@@ -64,9 +64,9 @@ describe("rolls and the feed with a creature hidden by sight or the fog", () => 
     expect(await emit(table.gm, "initiative:next", {})).toMatchObject({ ok: true });
     expect(await emit(table.gm, "encounter:end", {})).toMatchObject({ ok: true });
     const archives = (await (await table.http(ENCOUNTER_ARCHIVE_PATHS.collection, table.gmToken)).json()) as {
-      data: { encounters: Array<{ id: number }> };
+      data: { replays: Array<{ id: number }> };
     };
-    const archiveId = String(archives.data.encounters[0]!.id);
+    const archiveId = String(archives.data.replays[0]!.id);
     const share = await table.http(ENCOUNTER_ARCHIVE_PATHS.visibility.replace("{id}", archiveId), table.gmToken, {
       method: "POST",
       body: JSON.stringify({ playerVisible: true })

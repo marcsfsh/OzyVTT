@@ -172,25 +172,25 @@ export function setActorVisibility(state: GameState, actorId: string, visibility
  *  scene. GM-only. */
 export function moveSceneToken(
   state: GameState,
-  sceneId: string,
+  encounterId: string,
   actorId: string,
   position: EncounterTokenPosition | null,
   geometry: TokenMapGeometry
 ) {
-  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
-  if (!scene) throw new CommandRejectedError("That scene no longer exists.");
-  if (state.combat.activeSceneId === sceneId)
-    throw new CommandRejectedError("This scene is live. Move its tokens on the fight's map.");
+  const scene = state.combat.encounters.find((candidate) => candidate.id === encounterId);
+  if (!scene) throw new CommandRejectedError("That encounter no longer exists.");
+  if (state.combat.activeEncounterId === encounterId)
+    throw new CommandRejectedError("This encounter is live. Move its tokens on the table.");
   const token = scene.combat.tokens.find((candidate) => candidate.actorId === actorId);
-  if (!token) throw new CommandRejectedError("That combatant is not staged in this scene.");
+  if (!token) throw new CommandRejectedError("That combatant is not staged in this encounter.");
   if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y)))
     throw new CommandRejectedError("Token position must contain finite coordinates.");
   const nextPosition =
     position === null ? null : snappedPosition(position, token.sizePx / 2, geometry, token.sizeCells);
   state.combat = {
     ...state.combat,
-    scenes: state.combat.scenes.map((candidate) =>
-      candidate.id === sceneId
+    encounters: state.combat.encounters.map((candidate) =>
+      candidate.id === encounterId
         ? {
             ...candidate,
             combat: {
@@ -213,7 +213,7 @@ export function moveEncounterToken(
 ) {
   // A live scene's tokens can be placed before its fight starts (they wait in the tray until then).
   if (!state.combat.active && !state.combat.mapAssetId)
-    throw new CommandRejectedError("Make a scene live before moving tokens.");
+    throw new CommandRejectedError("Make an encounter live before moving tokens.");
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!token) throw new CommandRejectedError("That combatant does not have a token in this encounter.");
   if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y)))

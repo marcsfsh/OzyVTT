@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import type { RollAnswerOffer, RollAnswered } from "@vtt/domain";
 import { Button, Input, IconX } from "@vtt/ui";
-import { useRollPreference } from "../dice/roll-preference";
+import { rollModeOf, useRollPreference, type TypeAs } from "../dice/roll-preference";
 
 export type DieMode = "advantage" | "disadvantage" | "normal";
 
@@ -131,6 +131,16 @@ export function readFace(entered: string, onInvalid?: (message: string) => void)
   return face;
 }
 
+/** A typed total, a whole number, or null with the reason said. The server checks the roll can come to it. */
+export function readTotal(entered: string, onInvalid?: (message: string) => void): number | null {
+  const total = Number(entered.trim());
+  if (entered.trim() === "" || !Number.isInteger(total) || total < -50 || total > 100) {
+    onInvalid?.("Type the total, a whole number.");
+    return null;
+  }
+  return total;
+}
+
 /** A field for the face a physical d20 shows, with the button that sends it. */
 export function FaceEntry({
   label,
@@ -138,34 +148,39 @@ export function FaceEntry({
   action = "Use",
   busy,
   onFace,
-  onInvalid
+  onInvalid,
+  typeAs = "face"
 }: Readonly<{
   label: string;
   placeholder?: string;
   action?: string;
   busy: boolean;
+  /** The typed number: the d20's face, or the roll's total when `typeAs` is "total". */
   onFace: (face: number) => void;
   onInvalid?: (message: string) => void;
+  /** What the field takes (ADR-0043): the face, or the total with the bonus included. */
+  typeAs?: TypeAs;
 }>) {
   const [entry, setEntry] = useState("");
+  const total = typeAs === "total";
   const submit = () => {
-    const face = readFace(entry, onInvalid);
-    if (face === null) return;
+    const typed = total ? readTotal(entry, onInvalid) : readFace(entry, onInvalid);
+    if (typed === null) return;
     setEntry("");
-    onFace(face);
+    onFace(typed);
   };
   return (
     <span className="save-prompt-manual">
       <Input
         type="text"
         inputMode="numeric"
-        pattern="[0-9]*"
-        maxLength={2}
-        placeholder={placeholder}
-        aria-label={label}
+        pattern={total ? "-?[0-9]*" : "[0-9]*"}
+        maxLength={total ? 3 : 2}
+        placeholder={total ? "or type your total" : placeholder}
+        aria-label={total ? label.replace(/d20$/, "total") : label}
         value={entry}
         disabled={busy}
-        onChange={(event) => setEntry(event.target.value.replace(/[^0-9]/g, ""))}
+        onChange={(event) => setEntry(event.target.value.replace(total ? /[^0-9-]/g : /[^0-9]/g, ""))}
         onKeyDown={(event) => {
           if (event.key === "Enter" && entry.trim() !== "") submit();
         }}
@@ -248,7 +263,8 @@ export function RollControls({
   answers,
   answered,
   onAnswer,
-  waiting
+  waiting,
+  actorId
 }: Readonly<{
   /** Drives whether the prompt rolls itself as soon as it appears. */
   rollMode: "auto" | "manual";
@@ -272,7 +288,7 @@ export function RollControls({
   /** What the roll button says ("Roll death save"); "Roll" when absent. */
   rollLabel?: ReactNode;
   onRoll: () => void;
-  /** A typed d20: the face a physical die shows. */
+  /** A typed d20: the face a physical die shows, or the total where the entry takes totals. */
   onTyped: (face: number) => void;
   onConfirm: () => void;
   /** Throws the shown die again; `face` is a typed reroll's. */
@@ -293,10 +309,15 @@ export function RollControls({
   onAnswer?: (choice: AnswerChoice) => void;
   /** What the roll waits on before it can be confirmed (another creature's answer); Confirm is held meanwhile. */
   waiting?: string;
+  /** Whose roll it is: one played at the table has the GM type its total (ADR-0042). */
+  actorId?: string;
 }>) {
-  const { mayType } = useRollPreference();
+  const entry = useRollPreference(actorId);
+  const { mayType, typeAs } = entry;
+  // Where the table or the character decides, its mode wins over the caller's device choice.
+  const mode = entry.chooses ? rollMode : rollModeOf(entry.rollInput);
   const autoRolled = useRef(false);
-  const shouldAutoRoll = autoRoll ?? rollMode === "auto";
+  const shouldAutoRoll = autoRoll ?? mode === "auto";
   // In auto mode roll as soon as the prompt appears (still a preview to confirm). One auto-roll per mount.
   const rollOnAppear = useEffectEvent(() => onRoll());
   useEffect(() => {
@@ -344,7 +365,9 @@ export function RollControls({
       <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => onRoll()}>
         {rollLabel}
       </button>
-      {mayType && <FaceEntry label={faceLabel} busy={busy} onFace={onTyped} onInvalid={onInvalidFace} />}
+      {mayType && (
+        <FaceEntry label={faceLabel} busy={busy} onFace={onTyped} onInvalid={onInvalidFace} typeAs={typeAs} />
+      )}
       {beforeRoll}
       {onDismiss && (
         <button

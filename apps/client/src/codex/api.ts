@@ -265,7 +265,7 @@ export type CodexMarkerInput = Readonly<{
   revealedToPlayers?: boolean;
   pageIds?: string[];
   subMapId?: string | null;
-  sceneIds?: string[];
+  encounterIds?: string[];
   actorId?: string | null;
   tags?: readonly string[];
 }>;

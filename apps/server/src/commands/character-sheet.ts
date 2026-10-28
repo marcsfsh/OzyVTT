@@ -95,7 +95,7 @@ export const characterSheetCommands = [
     type: "character.force-release",
     operationId: "forceReleaseCharacter",
     description:
-      "Force-releases a claimed character (GM-grade only): the recovery path for a lost player device. A character in the running fight is refused with code `in_fight` (409) unless the request carries `inFight: true`. The player who held it is told on their own devices.",
+      "Force-releases a claimed character (GM-grade only): the recovery path for a lost player device. A character in the running encounter is refused with code `in_encounter` (409) unless the request carries `inFight: true`. The player who held it is told on their own devices.",
     summary: "Force-release a claimed character (GM).",
     schema: CharacterForceReleaseSchema,
     malformed: "The force-release command is malformed.",
@@ -141,7 +141,7 @@ export const characterSheetCommands = [
     type: "character.set-prepared",
     operationId: "setPreparedSpell",
     description:
-      "Prepares or un-prepares one of a character's known spells (cantrips and always-prepared spells can't be toggled), within the sheet's prepared cap. A player session may target only their claimed character, and only in the prepare step a Long Rest opens for a Cleric, Druid, Wizard, Paladin or Ranger (Paladins and Rangers swap in one spell), never mid-fight; the GM may change it any time.",
+      "Prepares or un-prepares one of a character's known spells (cantrips and always-prepared spells can't be toggled), within the sheet's prepared cap. A player session may target only their claimed character, and only in the prepare step a Long Rest opens for a Cleric, Druid, Wizard, Paladin or Ranger (Paladins and Rangers swap in one spell), never mid-encounter; the GM may change it any time.",
     summary: "Prepare or un-prepare one of a character's known spells.",
     schema: CharacterSetPreparedSchema,
     malformed: "The prepared-spell command is malformed.",
@@ -181,7 +181,7 @@ export const characterSheetCommands = [
     type: "character.swap-spell",
     operationId: "swapSpell",
     description:
-      "Puts a spell on a character's prepared list in place of one its class chose (`replaces`), and rebuilds the sheet from its choices ledger (SRD Spell Preparation by Class): a Cleric, Druid, Paladin or Ranger takes another spell of its class's list for which it has slots, a Wizard another spell from its spellbook, and the Wizard's replaced spell stays in the book. A player session may target only their claimed character, in the prepare step a Long Rest opens (a Paladin or Ranger once); the GM any time. Never mid-fight, and only on a sheet built here (it records its choices ledger).",
+      "Puts a spell on a character's prepared list in place of one its class chose (`replaces`), and rebuilds the sheet from its choices ledger (SRD Spell Preparation by Class): a Cleric, Druid, Paladin or Ranger takes another spell of its class's list for which it has slots, a Wizard another spell from its spellbook, and the Wizard's replaced spell stays in the book. A player session may target only their claimed character, in the prepare step a Long Rest opens (a Paladin or Ranger once); the GM any time. Never mid-encounter, and only on a sheet built here (it records its choices ledger).",
     summary: "Swap a spell onto a prepared caster's list in place of one its class chose.",
     schema: CharacterSwapSpellSchema,
     malformed: "The swap-spell command is malformed.",
@@ -207,7 +207,7 @@ export const characterSheetCommands = [
     type: "character.add-to-spellbook",
     operationId: "addToSpellbook",
     description:
-      "Adds a Wizard spell of a level the Wizard can prepare to its spellbook. `from: \"level\"` is one of the spells the Wizard's levels give (six at level 1, two more each level after), free. `scroll` copies it from a Spell Scroll of that spell the character carries (`itemId`): 2 hours and 50 GP for each level of the spell, then an Intelligence (Arcana) check against DC 10 + its level, and the scroll is destroyed whether it succeeds or fails. `book` copies it from another spellbook for the same price, GM-grade only, since the GM knows what that book holds. The clock is the GM's to move. A player session may target only their claimed character; never mid-fight, and only on a sheet built here.",
+      "Adds a Wizard spell of a level the Wizard can prepare to its spellbook. `from: \"level\"` is one of the spells the Wizard's levels give (six at level 1, two more each level after), free. `scroll` copies it from a Spell Scroll of that spell the character carries (`itemId`): 2 hours and 50 GP for each level of the spell, then an Intelligence (Arcana) check against DC 10 + its level, and the scroll is destroyed whether it succeeds or fails. `book` copies it from another spellbook for the same price, GM-grade only, since the GM knows what that book holds. The clock is the GM's to move. A player session may target only their claimed character; never mid-encounter, and only on a sheet built here.",
     summary: "Add a spell to a Wizard's spellbook, free from its levels or copied from a scroll or another book.",
     schema: CharacterAddToSpellbookSchema,
     malformed: "The spellbook command is malformed.",
@@ -309,7 +309,7 @@ export const characterSheetCommands = [
     type: "character.study-item",
     operationId: "studyItem",
     description:
-      "Marks a carried manual or tome studied by the character carrying it (GM-grade only, since the hours of study are downtime the GM gives). SRD 5.2.1: \"If you spend 48 hours over a period of 6 days or fewer studying the book's contents and practicing its guidelines, your Constitution increases by 2, to a maximum of 30. The manual then loses its magic but regains it in a century.\" The increase is recorded in the character's choices ledger and the sheet is rebuilt from it, so the Hit Point maximum, modifiers, save DCs and every later rebuild follow; the copy studied is marked `dormant`, so no one else gains from it. Refused for an item with no study, a dormant copy, a score already at the most the book gives, a character in a fight, and a sheet that doesn't record how it was built. The game clock doesn't move: the GM passes the time.",
+      "Marks a carried manual or tome studied by the character carrying it (GM-grade only, since the hours of study are downtime the GM gives). SRD 5.2.1: \"If you spend 48 hours over a period of 6 days or fewer studying the book's contents and practicing its guidelines, your Constitution increases by 2, to a maximum of 30. The manual then loses its magic but regains it in a century.\" The increase is recorded in the character's choices ledger and the sheet is rebuilt from it, so the Hit Point maximum, modifiers, save DCs and every later rebuild follow; the copy studied is marked `dormant`, so no one else gains from it. Refused for an item with no study, a dormant copy, a score already at the most the book gives, a character in an encounter, and a sheet that doesn't record how it was built. The game clock doesn't move: the GM passes the time.",
     summary: "Mark a carried manual or tome studied: its score rises for good and the copy's magic is spent (GM).",
     schema: CharacterStudyItemSchema,
     malformed: "The study command is malformed.",
@@ -340,8 +340,8 @@ export const characterSheetCommands = [
     type: "character.recover-ammunition",
     operationId: "recoverAmmunition",
     description:
-      "Picks up the ammunition a character fired outside a fight: half the pieces fired from each row come back, rounded down, and the rest are lost (SRD Ammunition). A fight's pieces come back when the encounter ends, so this is refused while the character is in a running fight. Player sessions may target only their claimed character.",
-    summary: "Pick up half the ammunition a character fired outside a fight.",
+      "Picks up the ammunition a character fired outside an encounter: half the pieces fired from each row come back, rounded down, and the rest are lost (SRD Ammunition). An encounter's pieces come back when the encounter ends, so this is refused while the character is in a running encounter. Player sessions may target only their claimed character.",
+    summary: "Pick up half the ammunition a character fired outside an encounter.",
     schema: CharacterRecoverAmmunitionSchema,
     malformed: "The recover-ammunition command is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -350,7 +350,7 @@ export const characterSheetCommands = [
       const { duplicate } = await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "inventory");
         if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-          throw new CommandRejectedError("Ammunition is picked up after the fight.");
+          throw new CommandRejectedError("Ammunition is picked up after the encounter.");
         const actor = state.actors.find((candidate) => candidate.id === actorId);
         if (!actor) throw new CommandRejectedError("That character no longer exists.");
         if (!actor.inventory.some((row) => row.ammunitionFired !== undefined))

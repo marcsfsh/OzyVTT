@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { rosterActors, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
-import { Avatar, Button } from "@vtt/ui";
+import { Button } from "@vtt/ui";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { navigate } from "../router";
 import { CLAIM_WORD, claimStateOf, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { partyVisibilityOf } from "./MyCharacter";
 import "./party-strip.css";
+import { ActorAvatar } from "./ActorAvatar";
 
 /**
  * The party as one scrolling row of portraits, shown out of combat (in combat the turn order
@@ -67,7 +68,12 @@ export function PartyStrip(props: Props) {
             .join(", ");
           const body = (
             <>
-              <Avatar name={actor.name} size="sm" presence={actor.presence ? presenceDot(actor.presence) : undefined} />
+              <ActorAvatar
+                actor={actor}
+                name={actor.name}
+                size="sm"
+                presence={actor.presence ? presenceDot(actor.presence) : undefined}
+              />
               <span className="party-strip-name">{actor.name}</span>
               {detail && <span className={showsHp ? "party-strip-hp" : "party-strip-line"}>{detail}</span>}
               <span className={`party-strip-claim party-strip-claim--${claim}`} />

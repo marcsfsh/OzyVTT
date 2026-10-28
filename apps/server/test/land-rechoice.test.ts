@@ -166,7 +166,7 @@ describe("choosing a land on a Long Rest", () => {
     expect(alwaysPrepared(stored())).toContain("wall-of-stone");
   });
 
-  it("lets the GM choose any time, but not in a fight", async () => {
+  it("lets the GM choose any time, but not in an encounter", async () => {
     const { server, gmToken, post, close } = await bootServer(table(landDruid(5, "polar")));
     cleanups.push(close);
     const stored = () => server.store.snapshot.definitions[0]?.definition;
@@ -191,7 +191,7 @@ describe("choosing a land on a Long Rest", () => {
     ).toBe(200);
     const inFight = await rechoose("polar");
     expect(inFight.status).toBe(409);
-    expect((await inFight.json()).error.message).toMatch(/end the fight first/i);
+    expect((await inFight.json()).error.message).toMatch(/end the encounter first/i);
   });
 
   it("swaps the land of a Druid who multiclassed into the circle", async () => {

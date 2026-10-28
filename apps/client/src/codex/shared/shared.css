@@ -18,6 +18,10 @@
   border-left: 3px solid var(--cx-block-hue);
   background: color-mix(in srgb, var(--cx-block-hue) 10%, var(--surface-1));
 }
+/* A hidden block is a dashed violet frame: something players are owed, not yet theirs. A draft keeps its solid bar. */
+.cx-block.is-hidden:not(.is-draft) {
+  border: 1px dashed var(--cx-block-hue);
+}
 .cx-block.is-everyone {
   --cx-block-hue: var(--indigo);
   --cx-block-ink: var(--indigo-text);

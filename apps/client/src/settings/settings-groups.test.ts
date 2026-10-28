@@ -44,7 +44,7 @@ describe("Settings sections", () => {
 describe("the search over settings", () => {
   it("finds a player only the settings a player has", () => {
     const ids = settingsFor("player").map((setting) => setting.id);
-    expect(ids).toEqual(["theme", "rollInput", "pinchZoom", "leaveTable"]);
+    expect(ids).toEqual(["theme", "reduceTransparency", "rollInput", "pinchZoom", "leaveTable"]);
     expect(searchSettings(settingsFor("player"), "rules")).toEqual([]);
   });
 

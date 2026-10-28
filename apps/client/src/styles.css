@@ -11,37 +11,27 @@ body {
   height: 100dvh;
   overflow: hidden;
 }
-/* The frame: a viewport-high grid, rows [connection strip][tab bar][content pane]. Rows 1-2 size to
-   content and collapse when absent; the pane is `minmax(0, 1fr)` so it can shrink below its content.
-   Children have explicit grid rows so a stray in-flow child cannot reshape the frame.
+/* The frame: a viewport-high grid, rows [top bar][reconnecting bar][content pane][bottom tabs]. Rows 1, 2 and 4
+   size to content and collapse when absent; the pane is `minmax(0, 1fr)` so it can shrink below its content.
+   Children have explicit grid rows so a stray in-flow child cannot reshape the frame. The bottom tabs exist on a
+   phone alone, and `--bottom-tabs-h` tells a toast how high to sit above them.
    --pane-gutter centres a 1720px column as inline padding. */
 main {
   --pane-gutter: max(1rem, calc((100% - 1720px) / 2));
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr);
-  /* The role hue on the whole chrome, so a GM window and a player window side by side cannot be
-     confused. It is read from the tab bar's `.rim-*` class via `:has()` (the frame has no role class of
-     its own) and inherited by the chrome. A role hue is not a security boundary (projection is), and
-     every rimmed site still names its role in words. viewer.html never loads this file, so the public
-     screen gets no role hue. Falls back to the neutral --rim-color before auth. */
-  --role-hue: var(--rim-color);
-  /* The chrome rows sit on the night, a shade below the panels, faintly tinted by the role. */
-  --chrome-plate: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--role-hue) 9%, var(--void)) 0%,
-    color-mix(in srgb, var(--role-hue) 5%, var(--bg)) 100%
-  );
 }
-main:has(> .frame-tabbar.rim-gm) {
-  --role-hue: var(--rim-gm);
+main > .app-bar,
+main > .player-identity {
+  grid-row: 1;
 }
-main:has(> .frame-tabbar.rim-player) {
-  --role-hue: var(--rim-player);
+main > .app-bottom-tabs {
+  grid-row: 4;
 }
-:root {
-  --connection-banner-h: 2.5rem;
+main:has(> .app-bottom-tabs) {
+  --bottom-tabs-h: 65px;
 }
 /* Row 3, the content pane: always rendered; its one in-flow child fills it. Fixed and top-layer
    children (viewer preview, dialogs) take no box here. */
@@ -73,119 +63,12 @@ main:has(> .frame-tabbar.rim-player) {
   overscroll-behavior: contain;
   scroll-padding-block: var(--space-6);
 }
-/* The scene tier: content-light surfaces stand on a sky (all --sky-* tokens); the table never does.
-   The wash is this element's background; the rest is the `.pane-sky` child, which clips the floor's
-   perspective spill (here it would grow document.scrollHeight).
-   `isolation` layers the negative z-indexes without a containing block. Never add transform, filter,
+/* The scene tier: content-light surfaces stand on the app's ground (the body's --sky), with no plate of their own.
+   `isolation` layers any negative z-indexes inside without a containing block. Never add transform, filter,
    backdrop-filter, perspective, will-change or contain: paint here: fixed overlays would be trapped. */
 .pane-scene {
   position: relative;
   isolation: isolate;
-  background: var(--sky-wash);
-}
-.pane-scene.scanlines::after {
-  z-index: -1;
-}
-/* Scanlines on the outermost textured surface only: nested combs at different offsets cause moiré.
-   Structural, so a surface that stops being nested gets its texture back. */
-.scanlines .scanlines::after {
-  display: none;
-}
-/* The horizon band is reserved: everything bright lies within --sky-horizon-inset + --sky-sun-crown
-   of the bottom, so the region pads that band (inside the scroll, so every row stays reachable).
-   Ties `.pane-frame > .scroll-y` on specificity and wins on source order. */
-.pane-scene > .scroll-y {
-  padding-bottom: calc(var(--sky-horizon-inset) + var(--sky-sun-crown) + env(safe-area-inset-bottom));
-}
-/* The sky decoration: one aria-hidden, pointer-inert child. `overflow: clip` (not `hidden`, which
-   would make a scroll container) contains the floor's spill. Ten layers, topmost first: horizon beam,
-   its glow, seven stars, the bloom. The beam's bottom sits --sky-horizon-inset above the pane's. */
-.pane-sky {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  overflow: clip;
-  pointer-events: none;
-  background-image:
-    linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--sky-horizon-a) 22%,
-      var(--sky-horizon-b) 50%,
-      var(--sky-horizon-a) 78%,
-      transparent 100%
-    ),
-    var(--sky-horizon-glow), radial-gradient(1px 1px at 22px 31px, var(--sky-star) 50%, transparent 51%),
-    radial-gradient(1px 1px at 121px 87px, var(--sky-star-dim) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 193px 22px, var(--sky-star) 50%, transparent 51%),
-    radial-gradient(1px 1px at 71px 140px, var(--sky-star-dim) 50%, transparent 51%),
-    radial-gradient(1px 1px at 160px 171px, var(--sky-star) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 45px 213px, var(--sky-star-dim) 50%, transparent 51%),
-    radial-gradient(1px 1px at 227px 129px, var(--sky-star) 50%, transparent 51%), var(--sky-bloom);
-  background-size:
-    100% 2px,
-    100% 100%,
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    var(--sky-star-tile) var(--sky-star-tile),
-    100% 100%;
-  background-position:
-    0 calc(100% - var(--sky-horizon-inset)),
-    0 0,
-    0 0,
-    0 0,
-    0 0,
-    0 0,
-    0 0,
-    0 0,
-    0 0,
-    0 0;
-  background-repeat: no-repeat, no-repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, no-repeat;
-}
-/* The grid floor: `transform-origin: center top` pins the near edge at the horizon. The mask keeps the
-   lines quiet at the horizon and at the pane's bottom edge. */
-.pane-sky::before {
-  content: "";
-  position: absolute;
-  left: calc(-1 * var(--sky-grid-bleed));
-  right: calc(-1 * var(--sky-grid-bleed));
-  bottom: 0;
-  height: var(--sky-horizon-inset);
-  background-image:
-    repeating-linear-gradient(to right, var(--sky-grid-x) 0 2px, transparent 2px var(--sky-grid-col)),
-    repeating-linear-gradient(to bottom, var(--sky-grid-y) 0 2px, transparent 2px var(--sky-grid-row));
-  transform: perspective(var(--sky-grid-perspective)) rotateX(var(--sky-grid-tilt));
-  transform-origin: center top;
-  opacity: var(--sky-floor-opacity);
-  -webkit-mask-image: var(--sky-floor-mask);
-  mask-image: var(--sky-floor-mask);
-}
-/* The sun as a crest above the horizon: the mask cuts the box to the top of a --sky-sun-d circle
-   centred on the line. Diameter and crown must keep a 2:1 ratio (enforced in design-tokens.css) or
-   the cap flattens into a slab. */
-.pane-sky::after {
-  content: "";
-  position: absolute;
-  left: calc(50% - var(--sky-sun-d) / 2);
-  bottom: var(--sky-horizon-inset);
-  width: var(--sky-sun-d);
-  height: var(--sky-sun-crown);
-  background-image: var(--sky-sun);
-  opacity: var(--sky-sun-opacity);
-  -webkit-mask-image: var(--sky-sun-mask);
-  mask-image: var(--sky-sun-mask);
-}
-/* Reduced transparency drops the floor mesh and the sun's film (closest to the words) but keeps the
-   wash and horizon that distinguish the three hours. */
-@media (prefers-reduced-transparency: reduce) {
-  .pane-sky::before,
-  .pane-sky::after {
-    display: none;
-  }
 }
 .scene-empty {
   display: grid;
@@ -453,138 +336,24 @@ textarea:focus {
   padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
-/* The connection strip: an in-flow frame row that height-animates in (fixed height, since height is
-   animated) and vanishes instantly on reconnect. It shares the tab bar's plate but is status, not
-   navigation: an inverted plate, no hover/focus/press, non-focusable `<p role="status">`. The 3px
-   caution bar (an inset shadow) outranks the role hue. */
-.connection-banner {
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--connection-banner-h);
-  overflow: hidden;
-  margin: 0;
-  padding: 0 var(--space-4);
-  border: 0;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--caution) 9%, var(--surface-3)) 0%,
-    color-mix(in srgb, var(--role-hue) 7%, var(--surface-2)) 100%
-  );
-  box-shadow: inset 3px 0 0 0 var(--caution);
-  color: var(--text-dim);
-  font-size: 0.9rem;
-  text-align: center;
-  animation: connection-in var(--dur-base) var(--ease-settle);
-}
-/* With no tab bar after it (a full-page layer before the shell mounts), this row carries the chrome's
-   bottom edge itself. */
-.connection-banner:not(:has(~ .frame-tabbar)) {
-  border-bottom: var(--rim-w) solid var(--role-hue);
-}
-@keyframes connection-in {
-  from {
-    height: 0;
-    opacity: 0;
-  }
-  to {
-    height: var(--connection-banner-h);
-    opacity: 1;
-  }
-}
-
-/* Frame row 2, the app bar: the logo, then the tab track. The track scrolls and fades its own edges, so the
-   plate, the role edge (`.rim-gm` / `.rim-player`, a 3px inset bar) and the horizon rule along the bottom live
-   on this wrapper. Each bar's aria-label also names its role. */
-.frame-tabbar {
+/* The reconnecting bar, under the top bar while the connection is down or the table has not sent a fresh snapshot
+   since it came back. Reading the last snapshot still works; the bar says to wait before making changes. */
+.reconnect-bar {
   grid-row: 2;
-  position: relative;
-  min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-2) var(--pane-gutter) calc(var(--space-2) + 1px);
-  background-image: var(--chrome-plate);
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  margin: 0;
+  padding: var(--space-1) var(--space-5);
+  border-bottom: 1px solid var(--caution);
+  background: color-mix(in srgb, var(--caution) 10%, var(--surface-1));
+  color: var(--text);
+  font-size: var(--fs-sm);
 }
-.frame-tabbar::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background-image: var(--rule-beam);
-  box-shadow: var(--rule-beam-glow);
-  pointer-events: none;
-}
-.frame-tabbar .nh-tabs {
-  min-width: 0;
-}
-.app-logo {
-  flex: none;
-}
-/* The tabs, More and Rules sit in the bar's own row; their wrapper only measures them. */
-.app-tabs {
-  display: contents;
-}
-/* The theme switch closes the bar at its far end, on every page and for both roles. */
-.frame-tabbar .app-theme-switch {
-  margin-left: auto;
-}
-/* A phone spends the bar's width on the tabs: no logo, and the tabs share the track. */
-@media (max-width: 760px) {
-  .app-logo {
-    display: none;
-  }
-  /* Tighter steps, so three tabs, More and the theme switch share a 390px bar with nothing clipped. */
-  .frame-tabbar {
-    gap: var(--space-2);
-    padding-inline: var(--space-2);
-  }
-  .frame-tabbar .nh-tabs {
-    flex: 1;
-  }
-  .frame-tabbar .nh-tab,
-  .frame-tabbar .app-more .nh-menu-trigger {
-    padding-inline: var(--space-3);
-  }
-  .frame-tabbar .nh-tab {
-    flex: 1 0 auto;
-  }
-}
-
-/* Faint everyday CRT texture behind all panels; off in the light theme and with reduced transparency. */
-.app-texture {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) var(--scanline-gap)
-  );
-  opacity: 0.4;
-}
-.app-texture::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: var(--noise);
-  background-size: 140px 140px;
-  opacity: 0.035;
-  mix-blend-mode: screen;
-}
-:is([data-theme="light"], [data-theme="dawn"]) .app-texture {
-  display: none;
-}
-@media (prefers-reduced-transparency: reduce) {
-  .app-texture {
-    display: none;
-  }
+.reconnect-bar.is-back {
+  border-bottom-color: var(--state-on-edge);
+  background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1));
 }
 
 .home-hero {

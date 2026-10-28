@@ -20,6 +20,7 @@ import type {
   PresenceStatus,
   RollRecord
 } from "@vtt/domain";
+import { effectivePlayerDice } from "@vtt/domain";
 import { commandedBySession } from "./authorization.js";
 import type { RepeatSave } from "@vtt/schemas";
 import { actionPools } from "./effective-actions.js";
@@ -277,7 +278,9 @@ const PENDING_SAVE_FIELDS = {
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
   spell: "never",
   // Who was asked to answer it would name them; the player is told only that it waits (`awaitingAnswer`).
-  confirmed: "derived"
+  confirmed: "derived",
+  // The roll it waits on is the caster's; the player is told only that it waits (`awaitingDamage`).
+  damageRollId: "derived"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -508,6 +511,22 @@ export function projectPlayerCombat(
     playerDamageMode: state.combat.playerDamageMode,
     // Filtered to public actors; a player checks for their own id to show the "Roll initiative" prompt.
     pendingInitiative: state.combat.pendingInitiative.filter((actorId) => publicActorIds.has(actorId)),
+    // The player's own characters' damage rolls: what to roll, never the proposal or the saves waiting on it.
+    damageRolls: state.combat.damageRolls
+      .filter((roll) => ownedBy(state, roll.sourceActorId, playerSessionId))
+      .map((roll) => ({
+        id: roll.id,
+        sourceActorId: roll.sourceActorId,
+        actionName: roll.actionName,
+        formula: roll.formula,
+        dice: roll.dice.map((die) => ({ ...die })),
+        fixed: roll.fixed,
+        mode: roll.mode
+      })),
+    // The player's own characters' actions waiting for the GM's aim: their own choices, nothing of anyone else's.
+    targetAsks: state.combat.targetAsks
+      .filter((ask) => ownedBy(state, ask.actorId, playerSessionId))
+      .map((ask) => ({ id: ask.id, actorId: ask.actorId, actionId: ask.actionId, actionName: ask.actionName })),
     // An Initiative Swap offer names only the two characters in it, and reaches only their players.
     ...swapOffersFor(state, playerSessionId),
     playerInitiativeMode: state.combat.playerInitiativeMode,
@@ -550,6 +569,7 @@ export function projectPlayerCombat(
           actionName: hiddenSource ? withoutSourceName(entry.actionName, entry.sourceName) : entry.actionName,
           sourceName: hiddenSource ? HIDDEN_SOURCE : entry.sourceName,
           ...(entry.confirmed ? { awaitingAnswer: true as const } : {}),
+          ...(entry.damageRollId ? { awaitingDamage: true as const } : {}),
           ...(onFail
             ? {
                 onFailEffect: {
@@ -839,7 +859,7 @@ const PLAYER_ACTOR_FIELDS = {
   effects: "derived",
   ownerSessionId: "derived",
   healthDisplay: "derived",
-  replaySceneId: "derived",
+  replayEncounterId: "derived",
   actionUses: "derived",
   readyAt: "derived",
   heroicInspiration: "derived",
@@ -871,6 +891,7 @@ const PLAYER_ACTOR_FIELDS = {
   firstClaimedAt: "never",
   sample: "never",
   archived: "never",
+  playedAtTable: "never",
   sheetPreview: "never",
   // Who summoned a creature and what keeps it is the GM's; its commander's player is told only that it commands it.
   summon: "never",
@@ -947,7 +968,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | favouriteOptionIds, optionUseCounts     |  Y   |  -  |       -        |     -      |          -          |
  * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, firstClaimedAt, sample, archived,          |
- * | sheetPreview, lastLongRestAt: never, at any tier.                                                              |
+ * | playedAtTable, sheetPreview, lastLongRestAt: never, at any tier.                                               |
  *
  * `off` keeps the base entry: initiative and tokens still reference the ally, and the map renders
  * nothing for a token whose actor is missing. Rules for new fields: never gate `mine` on the tier;
@@ -994,10 +1015,14 @@ export function projectPlayerView(
       maxLevel: state.builderPolicy.maxLevel,
       playerBuilder: state.builderPolicy.playerBuilder,
       playerRandom: state.builderPolicy.playerRandom,
-      // Players need both to know whether they may type their dice and how a rolled level counts.
-      typedRolls: state.builderPolicy.typedRolls,
+      // Players need it to know how a rolled level counts.
       hitPointRollFloor: state.builderPolicy.hitPointRollFloor
     },
+    // The modes that apply now, a table rule players read: which box their rolls ask for. The encounter's own
+    // record stays the GM's.
+    playerDice: effectivePlayerDice(state),
+    // Who picks a player's targets, a table rule players read: whether a tap aims or asks the GM.
+    targeting: state.targeting,
     // Archived characters the GM shared: id + name only, and only ones that were public.
     archivedCharacters: state.actors
       .filter((actor) => actor.archived && actor.sheetPreview && actor.visibility === "public")
@@ -1029,7 +1054,7 @@ export function projectPlayerView(
           restStep,
           inventory,
           currency,
-          replaySceneId,
+          replayEncounterId,
           favouriteOptionIds,
           optionUseCounts
         } = source;
@@ -1090,7 +1115,7 @@ export function projectPlayerView(
           presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
           // Replay clone marker, copied explicitly. An opaque scene id that keeps clones out of the party strip
           // and claim screen; the entry stays so the map still renders the clone's token.
-          ...(replaySceneId !== undefined ? { replaySceneId } : {}),
+          ...(replayEncounterId !== undefined ? { replayEncounterId } : {}),
           ...(classLine !== null ? { classLine } : {}),
           ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),

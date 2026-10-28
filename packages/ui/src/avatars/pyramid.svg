@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Pyramid avatar"><title>Pyramid avatar</title><defs><linearGradient id="oz-pyramid-l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaf8ff"></stop><stop offset="1" stop-color="#7a6ad0"></stop></linearGradient>
+<linearGradient id="oz-pyramid-r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a3a9a"></stop><stop offset="1" stop-color="#1a0a3a"></stop></linearGradient>
+<linearGradient id="oz-pyramid-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05030c"></stop><stop offset="1" stop-color="#2a0a52"></stop></linearGradient></defs>
+<rect width="64" height="44" fill="url(#oz-pyramid-s)"></rect><rect y="44" width="64" height="20" fill="#07020f"></rect><path d="M0 45.2H64M0 47.2H64M0 50.4H64M0 55.2H64M0 64.0H64M32 44L-64 64M32 44L-48 64M32 44L-32 64M32 44L-16 64M32 44L0 64M32 44L16 64M32 44L32 64M32 44L48 64M32 44L64 64M32 44L80 64M32 44L96 64M32 44L112 64M32 44L128 64" stroke="#2be4ff" stroke-width="0.7" opacity="0.55" fill="none"></path>
+<path d="M32 10L14 44H34Z" fill="url(#oz-pyramid-l)"></path><path d="M32 10L34 44H50Z" fill="url(#oz-pyramid-r)"></path>
+<path d="M32 10L14 44H50ZM32 10L34 44" fill="none" stroke="#2be4ff" stroke-width="1.4" stroke-linejoin="round"></path>
+<circle cx="32" cy="10" r="2" fill="#ffe14d"></circle></svg>

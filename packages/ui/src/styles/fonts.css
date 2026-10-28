@@ -1,19 +1,19 @@
 /* Self-hosted fonts (no runtime CDN on a LAN): @fontsource bundles WOFF2 and Vite serves them. Family names match
    the --font-* tokens in design-tokens.css, and only the weights the tokens and primitives use are loaded. */
 
-/* Wordmark and display: Bungee (short, square signage letters; one weight) */
+/* Wordmark, titles and the primary button: Bungee (one weight) */
 @import "@fontsource/bungee/400.css";
 
-/* Labels: Bai Jamjuree (tabs, uppercase labels, chips, secondary buttons) */
+/* The wordmark's script: Mr Dafoe */
+@import "@fontsource/mr-dafoe/400.css";
+
+/* Everything else: Bai Jamjuree (labels, body, tabs, buttons and names) */
 @import "@fontsource/bai-jamjuree/500.css";
 @import "@fontsource/bai-jamjuree/600.css";
 @import "@fontsource/bai-jamjuree/700.css";
 
-/* Body and numbers: Tomorrow */
-@import "@fontsource/tomorrow/400.css";
-@import "@fontsource/tomorrow/500.css";
-@import "@fontsource/tomorrow/600.css";
-@import "@fontsource/tomorrow/700.css";
+/* Game numbers, the VCR counter and tags: VT323 (monospaced, so a live number keeps its width) */
+@import "@fontsource/vt323/400.css";
 
 /* Code only: Space Mono */
 @import "@fontsource/space-mono/400.css";

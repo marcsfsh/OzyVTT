@@ -1,4 +1,5 @@
 .nh-switch {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -26,53 +27,47 @@
   margin: 0;
   font: inherit;
 }
-/* Sibling to SegmentedControl, and a different control: they differ by shape (Switch = pill track and round
-   thumb; SegmentedControl = a square track with a raised, underlined option). The track keeps `--radius-pill`;
-   don't unify the shapes. */
+/* Sibling to SegmentedControl, and a different control: a square 46 by 26 track with a square knob, grey on the
+   left when off and cyan on the right with a cyan edge and glow when on. The button is at least 44px tall, so the
+   whole row (track and label) is the hit area. */
+.nh-switch {
+  min-height: var(--tap-min);
+  min-width: 46px;
+}
 .nh-switch-track {
   position: relative;
   flex: none;
-  width: 2.2rem;
-  height: 1.25rem;
-  border-radius: var(--radius-pill);
-  background: var(--surface-3);
-  border: 1px solid var(--line-strong);
-  transition:
-    background var(--dur-base) var(--ease-settle),
-    border-color var(--dur-base);
+  width: 46px;
+  height: 26px;
+  box-sizing: border-box;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+  transition: border-color var(--dur-base) ease-out;
 }
 /* `:active` says what `:hover` says, so touch users get feedback too. */
 .nh-switch:hover:not(:disabled) .nh-switch-track,
 .nh-switch:active:not(:disabled) .nh-switch-track {
-  border-color: var(--line-hover);
-}
-.nh-switch:active:not(:disabled) .nh-switch-thumb {
-  background: var(--text);
-}
-.nh-switch--on:active:not(:disabled) .nh-switch-thumb {
-  background: var(--text-on-neon);
+  border-color: var(--line-raised-hover);
 }
 .nh-switch-thumb {
   position: absolute;
-  top: 50%;
-  left: 2px;
-  width: 0.95rem;
-  height: 0.95rem;
-  border-radius: 50%;
-  background: var(--text-dim);
-  transform: translate(0, -50%);
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: var(--line-raised);
   transition:
-    transform var(--dur-base) var(--ease-settle),
-    background var(--dur-base);
+    transform var(--dur-base) ease-out,
+    background var(--dur-base) ease-out;
 }
-.nh-switch--on .nh-switch-track {
-  background: var(--primary);
-  border-color: transparent;
-  box-shadow: var(--glow-magenta);
+.nh-switch--on .nh-switch-track,
+.nh-switch--on:hover:not(:disabled) .nh-switch-track {
+  border-color: var(--state-on-edge);
 }
 .nh-switch--on .nh-switch-thumb {
-  transform: translate(0.95rem, -50%);
-  background: var(--text-on-neon);
+  transform: translateX(20px);
+  background: var(--state-on);
+  box-shadow: var(--glow-lamp-reaction);
 }
 .nh-switch:disabled {
   cursor: not-allowed;

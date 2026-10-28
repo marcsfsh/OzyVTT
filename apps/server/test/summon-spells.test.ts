@@ -368,7 +368,7 @@ describe("Class features that change a summoning spell", () => {
     expect(table.actor(CASTER)!.effects.some((effect) => effect.concentration)).toBe(true);
   });
 
-  it("Pact of the Chain's Magic action brings an Imp at once, mid-fight, on its own Initiative", async () => {
+  it("Pact of the Chain's Magic action brings an Imp at once, mid-encounter, on its own Initiative", async () => {
     const chain = freeCast("find-familiar", (cast) => ({
       activation: "action",
       castsAtOnce: true,

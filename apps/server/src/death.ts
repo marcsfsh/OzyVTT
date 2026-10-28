@@ -27,11 +27,11 @@ export const GENTLE_REPOSE_TAG = "gentle-repose";
 /** The game clock in rounds, ten to the minute. */
 export const clockRoundsOf = (state: GameState): number => clockMinutesOf(state) * ROUNDS_PER_MINUTE;
 
-/** The round of the fight in `sceneId` while that fight runs, live or parked; null once it has ended. */
-function fightRoundIn(state: GameState, sceneId: string | null): number | null {
-  if (state.combat.active && state.combat.activeSceneId === sceneId) return state.combat.round;
-  const parked = sceneId === null ? undefined : state.combat.scenes.find((scene) => scene.id === sceneId);
-  return parked && parked.id !== state.combat.activeSceneId && parked.combat.active ? parked.combat.round : null;
+/** The round of the fight in `encounterId` while that fight runs, live or parked; null once it has ended. */
+function fightRoundIn(state: GameState, encounterId: string | null): number | null {
+  if (state.combat.active && state.combat.activeEncounterId === encounterId) return state.combat.round;
+  const parked = encounterId === null ? undefined : state.combat.encounters.find((scene) => scene.id === encounterId);
+  return parked && parked.id !== state.combat.activeEncounterId && parked.combat.active ? parked.combat.round : null;
 }
 
 /** Stamps the time `actor` died, now, unless it has a stamp already; what killed it and whether its body is gone are
@@ -44,7 +44,7 @@ export function stampDeath(
   const fighting = state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id);
   const record: DeathRecord = actor.death ?? {
     clockRound: clockRoundsOf(state),
-    ...(fighting ? { fightRound: state.combat.round, sceneId: state.combat.activeSceneId } : {})
+    ...(fighting ? { fightRound: state.combat.round, encounterId: state.combat.activeEncounterId } : {})
   };
   actor.death = {
     ...record,
@@ -59,7 +59,7 @@ export function stampDeath(
 export function roundsDead(state: GameState, actor: Pick<Actor, "death">): number | null {
   const death = actor.death;
   if (!death) return null;
-  const fightNow = death.fightRound !== undefined ? fightRoundIn(state, death.sceneId ?? null) : null;
+  const fightNow = death.fightRound !== undefined ? fightRoundIn(state, death.encounterId ?? null) : null;
   const inFight = fightNow !== null ? Math.max(0, fightNow - death.fightRound!) : 0;
   return Math.max(0, clockRoundsOf(state) - death.clockRound + inFight - (death.reposedRounds ?? 0));
 }
@@ -94,7 +94,7 @@ export function limitWords(minutes: number): string {
 export function keepDeathRecords(state: GameState, before: GameState): void {
   const passed = clockRoundsOf(state) - clockRoundsOf(before);
   for (const actor of state.actors) {
-    if (actor.replaySceneId !== undefined) continue;
+    if (actor.replayEncounterId !== undefined) continue;
     if (!isDead(actor)) {
       if (actor.death) delete actor.death;
       continue;
@@ -106,9 +106,9 @@ export function keepDeathRecords(state: GameState, before: GameState): void {
         endEffectIfPresent(state, actor.id, effect.id);
     }
     const death = actor.death!;
-    if (death.fightRound !== undefined && fightRoundIn(state, death.sceneId ?? null) === null) {
-      const ended = fightRoundIn(before, death.sceneId ?? null);
-      const { fightRound, sceneId: _scene, ...rest } = death;
+    if (death.fightRound !== undefined && fightRoundIn(state, death.encounterId ?? null) === null) {
+      const ended = fightRoundIn(before, death.encounterId ?? null);
+      const { fightRound, encounterId: _scene, ...rest } = death;
       actor.death = { ...rest, clockRound: rest.clockRound - Math.max(0, (ended ?? fightRound) - fightRound) };
     }
     if (passed > 0) {

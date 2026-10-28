@@ -148,7 +148,7 @@ export function strikeObject(
   if (!found || (found.wall && isHiddenDoor(found.wall) && initiator.role === "player"))
     throw new CommandRejectedError("That object is no longer there.");
   if (state.combat.active && !state.combat.initiative.some((entry) => entry.actorId === attacker.id))
-    throw new CommandRejectedError(`${attacker.name} isn't in this fight.`);
+    throw new CommandRejectedError(`${attacker.name} isn't in this encounter.`);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const action = siblings.find((candidate) => candidate.id === input.actionId);
   if (!action?.attack) throw new CommandRejectedError("Choose one of the creature's attacks.");

@@ -650,6 +650,7 @@ export function retireSummoned(
       state.combat = {
         ...state.combat,
         turnActorId: next.actorId,
+        targetAsks: [],
         round: at + 1 >= order.length ? state.combat.round + 1 : state.combat.round,
         turn: {
           actionUsed: false,

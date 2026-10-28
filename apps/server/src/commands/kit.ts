@@ -1,6 +1,7 @@
 import type {
   ActionResolution,
   ActionTableNarration,
+  ChatAuthor,
   ClaimReleasedEvent,
   CombatLogEntry,
   GameState,
@@ -17,7 +18,7 @@ import { withMonsterSpells } from "../monster-spells.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import type { CharacterDraftStore } from "../character-drafts.js";
 import type { Initiator } from "../authorization.js";
-import type { CombatLogStore } from "../combat-log.js";
+import type { CombatLogStore, StoredFeedRow } from "../combat-log.js";
 import type { TimelineOutcome } from "../combat-history.js";
 import type { ContentAudience, ContentLibrary } from "../content-library.js";
 import type { EffectNarration } from "../effects.js";
@@ -103,6 +104,23 @@ export type CommandContext = Readonly<{
   /** The committed state for reads: frozen, and cloned once per revision, however many reads there are. */
   readState: () => GameState;
   combatLog: Pick<CombatLogStore, "list" | "exportSince">;
+  /** Table chat (ADR-0038): lines go into the feed and out to each reader as the feed's rows do. */
+  chat: Readonly<{
+    byCommand: (commandId: string) => StoredFeedRow | null;
+    /** Whether this session may send another line now, under the chat's rate limit. */
+    allow: (sessionId: string, gm: boolean) => boolean;
+    post: (
+      line: Readonly<{
+        commandId: string;
+        text: string;
+        author: ChatAuthor;
+        whisper?: Readonly<{ characterId: string; name: string }>;
+        sessionId: string;
+      }>
+    ) => StoredFeedRow;
+    find: (entryId: number, gm: boolean) => StoredFeedRow | null;
+    remove: (row: StoredFeedRow) => void;
+  }>;
   contentLibrary: ContentLibrary;
   mapCatalog: Readonly<{
     get: (
@@ -153,7 +171,7 @@ export type CommandContext = Readonly<{
   newId: () => string;
   /** Best-effort hook after an encounter is archived, for the codex's combat history. Must swallow its own errors. */
   onEncounterArchived?: (
-    info: Readonly<{ mapAssetId: string | null; sceneId: string | null; turnCount: number }>
+    info: Readonly<{ mapAssetId: string | null; encounterId: string | null; turnCount: number }>
   ) => void;
   /** Best-effort hook after game time passed (a rest, or Pass time), so the Codex calendar's date moves with it.
    *  Must swallow its own errors. */
@@ -175,7 +193,7 @@ export type SoundPort = Readonly<{
   durationOf: (assetId: string) => number | null;
   view: () => SoundBoardView;
   /** Starts a scene's saved sound when it goes live, unless the GM turned that off. Best-effort. */
-  sceneWentLive: (sceneId: string, sourceRevision: number) => Promise<void>;
+  sceneWentLive: (encounterId: string, sourceRevision: number) => Promise<void>;
 }>;
 
 export type Kit = ReturnType<typeof createKit>;

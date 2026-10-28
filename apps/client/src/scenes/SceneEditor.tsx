@@ -41,11 +41,11 @@ const STEP_SHORT: Readonly<Record<SceneStep, string>> = {
   review: "Review"
 };
 const STEP_ASK: Readonly<Record<SceneStep, string>> = {
-  map: "Pick the battle map the scene is played on.",
+  map: "Pick the battle map the encounter is played on.",
   tokens: "Put the party and the monsters on the map. Each one waits in the tray until you place it.",
   light: "Say whether sight matters here, and how bright it is. Walls and lights are drawn on the map with its tools.",
-  sound: "Save the music and ambience that start when the scene goes live.",
-  review: "Check what is left, then make the scene live or keep it for later."
+  sound: "Save the music and ambience that start when the encounter goes live.",
+  review: "Check what is left, then make the encounter live or keep it for later."
 };
 
 /** Which steps are answered: a step reads as unfinished while the scene still needs something it answers. */
@@ -77,7 +77,7 @@ function NewSceneMap({
   const nameId = useId();
   return (
     <div className="sc-q">
-      <Field label="Scene name" htmlFor={nameId} help="Optional. A scene with no name takes its map's name.">
+      <Field label="Encounter name" htmlFor={nameId} help="Optional. An encounter with no name takes its map's name.">
         <Input
           id={nameId}
           value={name}
@@ -111,12 +111,12 @@ function SceneName({ facts }: Readonly<{ facts: SceneFacts }>) {
   const save = () => {
     const next = name.trim().slice(0, 120);
     if (!next || next === facts.scene.name) return setName(facts.scene.name);
-    void command("scene:rename", { sceneId: facts.scene.id, name: next }).then((result) => {
-      if (!result.ok) toast(result.message ?? "The scene could not be renamed.", { tone: "error" });
+    void command("encounter:rename", { encounterId: facts.scene.id, name: next }).then((result) => {
+      if (!result.ok) toast(result.message ?? "The encounter could not be renamed.", { tone: "error" });
     });
   };
   return (
-    <Field label="Scene name" htmlFor={nameId}>
+    <Field label="Encounter name" htmlFor={nameId}>
       <Input
         id={nameId}
         value={name}
@@ -139,7 +139,7 @@ function Review({ facts }: Readonly<{ facts: SceneFacts }>) {
     <div className="sc-q">
       <SceneName facts={facts} />
       {needs.length === 0 ? (
-        <p className="sc-hint">Nothing is left. The scene is ready to go live.</p>
+        <p className="sc-hint">Nothing is left. The encounter is ready to go live.</p>
       ) : (
         <ul className="sc-meta-needs">
           {needs.map((need) => (
@@ -180,9 +180,11 @@ function Review({ facts }: Readonly<{ facts: SceneFacts }>) {
  * right, drawn and edited as the table draws it. Choosing the map makes the scene, privately, so every later step edits the real one.
  * On a phone the steps are a strip across the top and the map is a bar over the bottom tabs that opens full screen.
  */
-export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null; step: SceneStep }>) {
+export function SceneEditor({ encounterId, step }: Readonly<{ encounterId: string | null; step: SceneStep }>) {
   const { state, token, maps, go, narrow } = useScenes();
-  const scene = sceneId ? (state.combat.scenes.find((candidate) => candidate.id === sceneId) ?? null) : null;
+  const scene = encounterId
+    ? (state.combat.encounters.find((candidate) => candidate.id === encounterId) ?? null)
+    : null;
   const facts = scene ? factsOf(state, scene, maps) : null;
   const [picked, setPicked] = useState<PickerMap | null>(null);
   const [name, setName] = useState("");
@@ -190,12 +192,12 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
   const [mapOpen, setMapOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const { toast } = useToast();
-  const actions = useSceneActions(state.combat.scenes, { combatActive: state.combat.active });
+  const actions = useSceneActions(state.combat.encounters, { combatActive: state.combat.active });
   const autoArrange = useAutoArrange();
   // "New scene on this map" arrives with `?map=`, picked once the library has it.
   const wanted = useRoute().query.get("map");
   useEffect(() => {
-    if (sceneId || picked || !wanted) return;
+    if (encounterId || picked || !wanted) return;
     const map = maps?.find((candidate) => candidate.id === wanted);
     if (map)
       setPicked({
@@ -208,20 +210,20 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
         calibration: map.calibration,
         scale: map.scale
       });
-  }, [sceneId, picked, wanted, maps]);
+  }, [encounterId, picked, wanted, maps]);
   useEffect(() => {
     if (scene) arrivingScenes.delete(scene.id);
   }, [scene]);
 
-  if (sceneId && !scene)
-    return arrivingScenes.has(sceneId) ? (
+  if (encounterId && !scene)
+    return arrivingScenes.has(encounterId) ? (
       <p className="sc-missing" role="status">
-        Opening the scene…
+        Opening the encounter…
       </p>
     ) : (
       <div className="sc-missing">
-        <p role="status">That scene no longer exists. It may have been deleted.</p>
-        <Button onClick={() => go(SCENES_PATHS.list)}>All scenes</Button>
+        <p role="status">That encounter no longer exists. It may have been deleted.</p>
+        <Button onClick={() => go(SCENES_PATHS.list)}>All encounters</Button>
       </div>
     );
 
@@ -236,19 +238,19 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
       .filter((actor) => actor.kind === "player-character" && !actor.archived)
       .map((actor) => actor.id);
     setCreating(true);
-    void command("scene:create", {
+    void command("encounter:create", {
       name: (name.trim() || picked.name).slice(0, 120),
       mapAssetId: picked.id,
       combatantIds: party
     }).then((result) => {
       setCreating(false);
-      if (!result.ok || !result.sceneId) {
-        toast(result.message ?? "The scene could not be made.", { tone: "error" });
+      if (!result.ok || !result.encounterId) {
+        toast(result.message ?? "The encounter could not be made.", { tone: "error" });
         return;
       }
-      arrivingScenes.add(result.sceneId);
+      arrivingScenes.add(result.encounterId);
       // Settings can keep a new scene closed: it is then only listed, to arrange later.
-      void navigate(autoArrange ? pathForScene(result.sceneId, "tokens") : SCENES_PATHS.list, { replace: true });
+      void navigate(autoArrange ? pathForScene(result.encounterId, "tokens") : SCENES_PATHS.list, { replace: true });
     });
   };
 
@@ -274,8 +276,8 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
             <SceneName facts={facts} />
             <SceneMapFacts facts={facts} back={pathForScene(facts.scene.id, "map")} />
             <p className="sc-hint">
-              A scene keeps its map for life, since its tokens, walls and fog sit on that map. Prepare another scene to
-              use another map.
+              An encounter keeps its map for life, since its tokens, walls and fog sit on that map. Prepare another
+              encounter to use another map.
             </p>
           </div>
         );
@@ -293,7 +295,7 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
   const next = SCENE_STEPS[index + 1];
   const primary = !facts ? (
     <Button variant="primary" disabled={!picked || creating} onClick={create}>
-      {creating ? "Making the scene…" : "Continue"}
+      {creating ? "Making the encounter…" : "Continue"}
     </Button>
   ) : current === "review" ? (
     facts.live ? (
@@ -356,7 +358,7 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
   ) : (
     <p className="sc-preview-note">The map you pick shows here, as the table draws it.</p>
   );
-  const title = facts ? facts.scene.name : "New scene";
+  const title = facts ? facts.scene.name : "New encounter";
   const doneCount = facts ? SCENE_STEPS.filter((candidate) => states[candidate] === "done").length : 0;
 
   return (
@@ -370,14 +372,14 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={facts ? `Back to ${facts.scene.name}` : "Back to the scenes"}
+                aria-label={facts ? `Back to ${facts.scene.name}` : "Back to the encounters"}
                 onClick={() => go(facts ? pathForScene(facts.scene.id) : SCENES_PATHS.list)}
               >
                 <IconChevronLeft />
               </Button>
             ) : (
               <Button variant="ghost" size="sm" onClick={() => setListOpen(true)} aria-expanded={listOpen}>
-                <IconList /> Scenes
+                <IconList /> Encounters
               </Button>
             )}
             <span className="sc-ring tabular" aria-label={`${doneCount} of ${SCENE_STEPS.length} steps done`}>
@@ -387,7 +389,7 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
             <span className="sc-grow" />
             {facts && !narrow && (
               <Button variant="ghost" size="sm" onClick={() => go(pathForScene(facts.scene.id))}>
-                Open the scene
+                Open the encounter
               </Button>
             )}
           </>
@@ -421,7 +423,7 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
         mapOpen={mapOpen}
         onMapOpen={setMapOpen}
       />
-      {!narrow && <SceneListFlyout open={listOpen} onClose={() => setListOpen(false)} currentId={sceneId} />}
+      {!narrow && <SceneListFlyout open={listOpen} onClose={() => setListOpen(false)} currentId={encounterId} />}
       {actions.dialogs}
     </>
   );

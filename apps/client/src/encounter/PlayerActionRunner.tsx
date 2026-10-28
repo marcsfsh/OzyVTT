@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { typedDie, useTargetAsk } from "../dice/roll-preference";
 import {
   actionChoicesOf,
   choosesAbility,
@@ -22,6 +23,7 @@ import { AttackOutcome, AttackPreview } from "./AttackPreview";
 import { DamageLook } from "./DamageLook";
 import { CommonActionChips } from "./CommonActionChips";
 import { ReadyChooser, readyableSpells } from "./ReadyChooser";
+import { askTheGm, TargetAskNote } from "./TargetAsk";
 import { SpellPickChooser } from "./SpellPickChooser";
 import { damageBreakdown } from "./format";
 import { modeWords } from "./roll-mode-notes";
@@ -172,6 +174,9 @@ function useServerActionFacts(actorId: string, definition: ActorDefinition, effe
   return facts;
 }
 
+/** On the table the turn card's heading sits above the runner, in the turn's section: that top comes into view. */
+const turnTop = (root: HTMLElement | null) => root?.closest<HTMLElement>(".player-turn") ?? root;
+
 /**
  * A player's action console on their own turn, the counterpart of the GM's ActionRunner for their claimed
  * character: pick an action and targets, roll the d20 (or type the face a physical die shows), see why
@@ -201,7 +206,9 @@ export function PlayerActionRunner({
   round = null,
   acting = null,
   turnTitle,
-  pinnable = true
+  pinnable = true,
+  cardHead = true,
+  filter
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -240,6 +247,10 @@ export function PlayerActionRunner({
   turnTitle?: string;
   /** Whether the player may pin favourites on this card: only on their own character. */
   pinnable?: boolean;
+  /** Whether the turn card names whose turn it is; the table's own turn card already does. */
+  cardHead?: boolean;
+  /** The sheet's Actions subtab: which options it lists, and whether the generic actions show. */
+  filter?: Readonly<{ option: (option: TurnOption) => boolean; common: boolean }>;
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
@@ -275,6 +286,7 @@ export function PlayerActionRunner({
       }),
     [definition, actor, ownSummaries, extraActions, facts, spellIndex]
   );
+  const shownOptions = useMemo(() => (filter ? options.filter(filter.option) : options), [options, filter]);
   /** Every option the picker can be handed, the spells' later rows included. */
   const actions = useMemo(
     () => options.flatMap((option) => [option.summary, ...option.children.map((child) => child.summary)]),
@@ -306,6 +318,17 @@ export function PlayerActionRunner({
       action.damage.length === 0 &&
       action.usesLimit !== null
     );
+  };
+  // Where the GM picks targets, an aimed action asks the GM instead (ADR-0044).
+  const { gmPicks } = useTargetAsk(actorId);
+  const aim = (
+    action: ContentActionSummary,
+    slotLevel?: number,
+    darts?: number,
+    shaping: readonly CastShaping[] = []
+  ) => {
+    if (gmPicks) askTheGm(actorId, action.id, { slotLevel, darts, shaping }, onFeedback);
+    else beginTargeting(action, actorId, slotLevel, darts, shaping);
   };
   const session = useTargeting();
   const result = useTargetingResult();
@@ -351,7 +374,8 @@ export function PlayerActionRunner({
   useEffect(() => {
     if (castSeen.current === castingId) return;
     castSeen.current = castingId;
-    if (castPlace.kind === "inline") revealInRegion(rootRef.current, "nearest");
+    // Opening the cast brings its top (Back) into view; Back brings the whole turn card's top back.
+    if (castPlace.kind === "inline") revealInRegion(castingId ? rootRef.current : turnTop(rootRef.current), "nearest");
   }, [castingId, castPlace.kind]);
 
   if (actions.length === 0 && facts.common.length === 0) return null;
@@ -374,6 +398,7 @@ export function PlayerActionRunner({
         ...(slotLevel !== undefined ? { slotLevel } : {}),
         ...(shaping.length > 0 ? { shaping } : {})
       });
+    else if (gmPicks) askTheGm(actorId, action.id, { slotLevel, darts, shaping }, onFeedback);
     else beginTargeting(shaped, actorId, slotLevel, darts, shaping);
   };
   /** The ways a spell option can be cast now. The fight's own rules decide; the list only offers what it can. */
@@ -462,13 +487,15 @@ export function PlayerActionRunner({
       {!pickOnly && !picking && !result && casting && casting.spell && castPlace.kind === "inline" && castDetail}
       {!pickOnly && !picking && !result && (!casting || castPlace.kind !== "inline") && (
         <>
+          <TargetAskNote actorId={actorId} />
           {look === "card" ? (
             <TurnCard
-              options={options}
+              options={shownOptions}
               myTurn={myTurn}
               round={round}
               acting={acting}
               {...(turnTitle ? { title: turnTitle } : {})}
+              head={cardHead}
               busy={busy}
               {...(unavailable ? { unavailable } : {})}
               header={header}
@@ -481,7 +508,7 @@ export function PlayerActionRunner({
             <>
               {header}
               <ActionList
-                options={options}
+                options={shownOptions}
                 myTurn={myTurn}
                 busy={busy}
                 {...(unavailable ? { unavailable } : {})}
@@ -500,17 +527,19 @@ export function PlayerActionRunner({
               {castDetail}
             </SheetDetail>
           )}
-          <CommonActionChips
-            actions={facts.common}
-            busy={busy || unavailable !== undefined || !myTurn}
-            effectTags={effectTags}
-            onUse={(action, targetless) => {
-              setTargetingResult(null);
-              if (action.id === "ready" && readySpells.length > 0) setReadying(true);
-              else if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
-              else beginTargeting(action, actorId);
-            }}
-          />
+          {(filter?.common ?? true) && (
+            <CommonActionChips
+              actions={facts.common}
+              busy={busy || unavailable !== undefined || !myTurn}
+              effectTags={effectTags}
+              onUse={(action, targetless) => {
+                setTargetingResult(null);
+                if (action.id === "ready" && readySpells.length > 0) setReadying(true);
+                else if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
+                else aim(action);
+              }}
+            />
+          )}
         </>
       )}
       {choosing && (
@@ -573,7 +602,10 @@ export function PlayerActionRunner({
           carried={actor?.inventory ?? []}
           busy={busy}
           onInvalidFace={onFeedback}
-          onRoll={(face) => resolveTargeting(revision, onOutcome, face !== undefined ? { attackNatural: face } : {})}
+          actorId={actorId}
+          onRoll={(face) =>
+            resolveTargeting(revision, onOutcome, face !== undefined ? typedDie("attackNatural", face, actorId) : {})
+          }
           {...(picking.action.damageLook && picking.action.attackBonus === null
             ? { onLookAtDamage: () => resolveTargeting(revision, onOutcome, { damageLook: true }) }
             : {})}
@@ -708,7 +740,7 @@ export function PlayerActionRunner({
                     disabled={busy}
                     onClick={() => {
                       setTargetingResult(null);
-                      beginTargeting(swing, actorId);
+                      aim(swing);
                     }}
                   >
                     {result.opens!.actionName}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Moonrise avatar"><title>Moonrise avatar</title><defs><linearGradient id="oz-moonrise-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#030712"></stop><stop offset="1" stop-color="#1b1655"></stop></linearGradient>
+<mask id="oz-moonrise-c"><rect width="64" height="64" fill="#fff"></rect><circle cx="44" cy="17" r="10" fill="#000"></circle></mask></defs>
+<rect width="64" height="64" fill="url(#oz-moonrise-s)"></rect>
+<circle cx="12" cy="12" r="0.8" fill="#fff"></circle><circle cx="24" cy="7" r="0.6" fill="#fff"></circle><circle cx="18" cy="24" r="0.6" fill="#fff" opacity="0.7"></circle><circle cx="54" cy="34" r="0.6" fill="#fff" opacity="0.7"></circle>
+<circle cx="39" cy="20" r="11" fill="#d8fbff" mask="url(#oz-moonrise-c)"></circle>
+<path d="M2 46L14 32 22 40 32 26 42 38 50 30 62 46" fill="none" stroke="#ff2f92" stroke-width="2" stroke-linejoin="round" transform="translate(1 0)" opacity="0.8"></path>
+<path d="M2 46L14 32 22 40 32 26 42 38 50 30 62 46Z" fill="#0a0820" stroke="#2be4ff" stroke-width="2" stroke-linejoin="round"></path>
+<rect y="46" width="64" height="18" fill="#05040f"></rect><path d="M0 47.1H64M0 48.9H64M0 51.8H64M0 56.1H64M0 64.0H64M32 46L-64 64M32 46L-48 64M32 46L-32 64M32 46L-16 64M32 46L0 64M32 46L16 64M32 46L32 64M32 46L48 64M32 46L64 64M32 46L80 64M32 46L96 64M32 46L112 64M32 46L128 64" stroke="#2be4ff" stroke-width="0.7" opacity="0.6" fill="none"></path></svg>

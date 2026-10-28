@@ -47,7 +47,7 @@ export type SoundFired = z.infer<typeof SoundFiredSchema>;
 
 /** What a scene starts when it goes live, unless the GM turned that off. */
 export const SoundPresetSchema = z.strictObject({
-  sceneId: z.uuid(),
+  encounterId: z.uuid(),
   autoplay: z.boolean(),
   music: z.strictObject({ tracks: z.array(SoundSlotSchema).max(MAX_SOUND_TRACKS), shuffle: z.boolean() }).nullable(),
   ambient: z.array(SoundSlotSchema).max(MAX_SOUND_LAYERS)

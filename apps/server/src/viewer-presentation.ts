@@ -136,6 +136,9 @@ export type ViewerPresentationState = Readonly<{
   acceptedCommandIds: readonly string[];
   /** The GM paused the screen. It stays paused when a scene goes live; absent on a state saved before this. */
   pausedByGm?: boolean;
+  /** When the screen last changed what it shows (a map, a fight starting or ending), in epoch ms: the latest-roll card
+   *  shows only rolls made since (ADR-0040). Absent on a state saved before this. */
+  rollsSince?: number;
 }>;
 
 export type ViewerPresentationProjection = Readonly<{
@@ -469,7 +472,8 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
       },
       camera: camera(payload.camera),
       measurement: null,
-      pings: []
+      pings: [],
+      rollsSince: now
     };
   else if (payload.type === "viewer.map.set")
     next = {
@@ -480,7 +484,8 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
       },
       camera: camera(payload.camera),
       measurement: null,
-      pings: []
+      pings: [],
+      rollsSince: now
     };
   else if (payload.type === "viewer.camera.set") {
     if (!state.activeMap) throw new InvalidRequestError("Select a viewer map before moving its camera.");
@@ -517,7 +522,18 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
           altText: state.activeMap?.assetId === scene.mapAssetId ? state.activeMap.altText : "Battle map"
         }
       : state.activeMap;
-    next = { ...state, initiative: initiative(payload.initiative), encounter: scene, activeMap };
+    const nextInitiative = initiative(payload.initiative);
+    // A fight starting or ending, or the fight moving to another map, is a new thing on the screen: an older roll's
+    // card no longer belongs to it.
+    const changed =
+      nextInitiative.visible !== state.initiative.visible || scene.mapAssetId !== state.encounter.mapAssetId;
+    next = {
+      ...state,
+      initiative: nextInitiative,
+      encounter: scene,
+      activeMap,
+      ...(changed ? { rollsSince: now } : {})
+    };
   }
 
   next = {

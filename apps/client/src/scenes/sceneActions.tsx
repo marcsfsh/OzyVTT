@@ -11,8 +11,8 @@ export function useSceneActions(
   scenes: readonly Scene[],
   options: Readonly<{
     combatActive: boolean;
-    onDeleted?: (sceneId: string) => void;
-    onDuplicated?: (sceneId: string) => void;
+    onDeleted?: (encounterId: string) => void;
+    onDuplicated?: (encounterId: string) => void;
   }>
 ) {
   const { confirm, dialog } = useConfirm();
@@ -28,46 +28,48 @@ export function useSceneActions(
     if (
       options.combatActive &&
       !(await confirm({
-        title: "Make scene live?",
-        body: `Make "${scene.name}" live? Players and the shared screen switch now. The current fight is parked and resumes when you switch back.`,
+        title: "Make encounter live?",
+        body: `Make "${scene.name}" live? Players and the shared screen switch now. The current encounter is parked and resumes when you switch back.`,
         confirmLabel: "Make live"
       }))
     )
       return false;
-    return command("scene:activate", { sceneId: scene.id }).then(report("The scene could not be switched."));
+    return command("encounter:activate", { encounterId: scene.id }).then(
+      report("The encounter could not be switched.")
+    );
   };
   const rename = async (scene: Scene) => {
-    const next = await prompt({ title: "Rename scene", defaultValue: scene.name, confirmLabel: "Rename" });
+    const next = await prompt({ title: "Rename encounter", defaultValue: scene.name, confirmLabel: "Rename" });
     if (next && next.trim() && next !== scene.name)
-      void command("scene:rename", { sceneId: scene.id, name: next.trim().slice(0, 120) }).then(
-        report("The scene could not be renamed.")
+      void command("encounter:rename", { encounterId: scene.id, name: next.trim().slice(0, 120) }).then(
+        report("The encounter could not be renamed.")
       );
   };
   const duplicate = (scene: Scene) =>
-    void command("scene:duplicate", { sceneId: scene.id }).then((result) => {
-      if (report("The scene could not be duplicated.")(result) && result.sceneId)
-        options.onDuplicated?.(result.sceneId);
+    void command("encounter:duplicate", { encounterId: scene.id }).then((result) => {
+      if (report("The encounter could not be duplicated.")(result) && result.encounterId)
+        options.onDuplicated?.(result.encounterId);
     });
   // Permanent, so it is "Delete" and says so.
   const remove = async (scene: Scene) => {
     if (
       await confirm({
-        title: "Delete scene?",
+        title: "Delete encounter?",
         body: `Delete "${scene.name}"? Its staged tokens, fog, walls and lights go with it. This cannot be undone.`,
         confirmLabel: "Delete",
         danger: true
       })
     )
-      void command("scene:remove", { sceneId: scene.id }).then((result) => {
-        if (report("The scene could not be removed.")(result)) options.onDeleted?.(scene.id);
+      void command("encounter:remove", { encounterId: scene.id }).then((result) => {
+        if (report("The encounter could not be removed.")(result)) options.onDeleted?.(scene.id);
       });
   };
   /** The whole order goes up, which the server checks is every scene once. */
   const reorder = (order: readonly string[]) =>
-    void command("scene:reorder", { order: [...order] }).then(report("The scenes could not be reordered."));
-  const move = (sceneId: string, delta: -1 | 1) => {
+    void command("encounter:reorder", { order: [...order] }).then(report("The encounters could not be reordered."));
+  const move = (encounterId: string, delta: -1 | 1) => {
     const order = scenes.map((scene) => scene.id);
-    const index = order.indexOf(sceneId);
+    const index = order.indexOf(encounterId);
     const target = index + delta;
     if (index === -1 || target < 0 || target >= order.length) return;
     [order[index], order[target]] = [order[target]!, order[index]!];

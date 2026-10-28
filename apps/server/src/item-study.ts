@@ -35,7 +35,9 @@ export function studyItem(
   if (!study) throw new CommandRejectedError(`The ${row.name} isn't a book a reader studies.`);
   if (row.dormant) throw new CommandRejectedError(`The ${row.name} has lost its magic. It regains it in a century.`);
   if (fightHolding(state, actorId) !== null)
-    throw new CommandRejectedError(`The study takes ${study.hours} hours. End the fight ${actor.name} is in first.`);
+    throw new CommandRejectedError(
+      `The study takes ${study.hours} hours. End the encounter ${actor.name} is in first.`
+    );
   const definition = state.definitions.find((entry) => entry.id === actor.definitionId)?.definition;
   const choices = definition?.character?.choices;
   const request = definition && choices ? buildRequestOf(definition, deps.library) : null;

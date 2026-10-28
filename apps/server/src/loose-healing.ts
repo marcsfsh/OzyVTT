@@ -26,7 +26,7 @@ export function partyMember(target: Actor | undefined, sessionId: string): boole
     target.kind === "player-character" &&
     target.visibility === "public" &&
     !target.archived &&
-    target.replaySceneId === undefined
+    target.replayEncounterId === undefined
   );
 }
 

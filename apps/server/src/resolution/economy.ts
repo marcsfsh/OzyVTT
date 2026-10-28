@@ -258,7 +258,7 @@ export function evaluateActionEconomy(
   if (action.underwaterOnly && !(state.combat.active && state.combat.underwater))
     evaluation.violations.push({
       rule: "action.underwater-only",
-      message: `${action.name} can be used only underwater, and this fight isn't.`
+      message: `${action.name} can be used only underwater, and this encounter isn't.`
     });
   checkExtraAttackOpened(evaluation);
   checkHands(evaluation);

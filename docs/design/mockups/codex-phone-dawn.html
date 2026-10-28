@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Codex page, Dawn</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&amp;family=Bungee&amp;family=Mr+Dafoe&amp;family=VT323&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e3dee8}
+.oz{font-family:'Bai Jamjuree',system-ui,sans-serif;color:#2a2537}
+.oz *{box-sizing:border-box}
+.oz p,.oz h1,.oz h2,.oz h3,.oz ul,.oz ol{margin:0;padding:0}
+.oz ul,.oz ol{list-style:none}
+.oz button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+.oz input{font:inherit;color:inherit}
+.oz button:focus-visible,.oz input:focus-visible{outline:2px solid #2a8fa8;outline-offset:2px}
+.oz .vt{font-family:'VT323',ui-monospace,monospace;letter-spacing:.04em}
+.oz .lbl{font-size:12px;font-weight:600;color:#655d77;letter-spacing:.02em}
+.oz .dim{color:#4f4862}
+.oz .mute{color:#655d77}
+.oz .h1{font-family:'Bungee',system-ui,sans-serif;font-weight:400;font-size:24px;line-height:1.1}
+.oz .chrome{background:linear-gradient(180deg,#eaf8ff 0%,#9fdcff 42%,#ffffff 49%,#3b2163 51%,#ff5fae 75%,#ffd6ea 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.oz .scan{position:absolute;inset:0;pointer-events:none;z-index:40;opacity:.5;background:repeating-linear-gradient(180deg,rgba(0, 0, 0, .2) 0 1px,transparent 1px 3px)}
+.oz .navbtn{height:56px;padding:0 14px;font-size:15px;font-weight:600;color:#4f4862}
+.oz .navbtn[aria-current="page"]{color:#1d6a80;box-shadow:inset 0 -2px 0 #2a8fa8}
+.oz .subbtn{height:52px;padding:0 14px;font-size:14px;font-weight:600;color:#4f4862;display:flex;align-items:center;gap:8px}
+.oz .subbtn[aria-current="page"]{color:#2a2537;box-shadow:inset 0 -2px 0 #2a8fa8}
+.oz .btn{min-height:44px;padding:0 16px;border:1px solid #b9b0c8;background:#f7f5f9;font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.oz .btn:hover{border-color:#9c92ae}
+.oz .btn-primary{height:52px;padding:0 24px;background:#f0559b;color:#12020a;font-family:'Bungee',system-ui,sans-serif;font-size:16px;letter-spacing:.04em;box-shadow:0 5px 0 #b0306e;margin-bottom:5px;display:inline-flex;align-items:center;justify-content:center;gap:10px;white-space:nowrap}
+.oz .btn-primary.sm{height:42px;font-size:14px;padding:0 18px;box-shadow:0 4px 0 #b0306e;margin-bottom:4px}
+.oz .linkbtn{min-height:44px;font-size:14px;font-weight:600;color:#1d6a80;display:inline-flex;align-items:center;gap:6px}
+.oz .iconbtn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#4f4862;flex:none}
+.oz .port{display:flex;align-items:center;justify-content:center;font-weight:700;background:#f7f5f9;border:2px solid #4a72d9;flex:none}
+.oz .panel{background:#f3f0f5;border:1px solid #d3ccdc}
+.oz .tag{font-family:'VT323',ui-monospace,monospace;font-size:16px;line-height:1.25;padding:0 6px;letter-spacing:.04em;white-space:nowrap}
+.oz .chip{min-height:36px;padding:0 10px;border:1px solid #b9b0c8;background:#f7f5f9;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.oz .field{height:44px;border:1px solid #b9b0c8;background:#e3dee8;display:flex;align-items:center;gap:8px;padding:0 12px;color:#655d77;font-size:14px}
+.oz .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;align-items:center;width:100%;padding:8px 12px;min-height:52px;border-top:1px solid #e0dbe6}
+.oz .row:hover{background:#e8e3ee}
+.oz .navtab{flex:1;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:#4f4862}
+.oz .navtab[aria-current="page"]{color:#1d6a80;box-shadow:inset 0 2px 0 #2a8fa8}
+.oz .seg{display:flex;border:1px solid #b9b0c8;background:#e3dee8;padding:2px;gap:2px}
+.oz .seg button{flex:1;min-height:40px;padding:0 12px;font-size:14px;font-weight:600;color:#4f4862;white-space:nowrap}
+.oz .seg button[aria-pressed="true"]{background:#fbfafc;color:#2a2537;box-shadow:inset 0 -2px 0 #2a8fa8}
+.oz .switch{width:46px;height:26px;border:1px solid #b9b0c8;background:#e3dee8;padding:3px;display:flex;flex:none}
+.oz .switch span{width:18px;height:18px;background:#b9b0c8}
+.oz .switch[aria-checked="true"]{border-color:#2a8fa8;justify-content:flex-end}
+.oz .switch[aria-checked="true"] span{background:#2a8fa8;box-shadow:none}
+.oz .lamp{width:10px;height:10px;flex:none}
+.oz .tbl{width:100%;border-collapse:collapse;font-size:14px}
+.oz .tbl th{position:sticky;top:0;background:#ebe7ef;text-align:left;font-size:12px;font-weight:600;color:#655d77;padding:10px 12px;border-bottom:1px solid #d3ccdc;white-space:nowrap}
+.oz .tbl td{padding:0 12px;height:48px;border-bottom:1px solid #e0dbe6;white-space:nowrap}
+.oz .tbl tr:hover td{background:#e8e3ee}
+.oz .card{border:1px solid #d3ccdc;background:#f3f0f5;padding:12px}
+.oz.ph .chip{min-height:44px}
+.oz.ph .seg button{min-height:44px}
+.oz.ph .btn{min-height:44px}
+@media (max-width: 900px){
+.oz .lay{height:auto !important;min-height:0 !important}
+.oz .cols{display:flex !important;flex-direction:column}
+.oz .oz-nav{display:none !important}
+}
+
+.oz .scan{display:none !important}
+.oz .chrome{background:none !important;-webkit-background-clip:border-box !important;background-clip:border-box !important;color:#2a2537 !important;text-shadow:-1px 0 rgba(42, 143, 168,.35),1px 0 rgba(255,47,146,.35) !important}
+body{background:#ebe7ef}</style>
+</head>
+<body>
+<div class="oz ph" style="position: relative; width: 390px; height: 844px; display: flex; flex-direction: column; background: #ebe7ef; overflow: hidden">
+<header style="position: relative; display: flex; align-items: center; gap: 4px; padding: 0 8px; height: 56px; flex: none"><div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%); box-shadow:none"></div><button class="iconbtn" aria-label="Back to pages"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M12 4l-6 6 6 6"></path></svg></button><span class="lbl" style="flex: 1">Locations</span><button class="iconbtn" aria-label="See as players"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z"></path><circle cx="10" cy="10" r="2.5"></circle></svg></button><button class="iconbtn" aria-label="Search the Codex"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><circle cx="8.5" cy="8.5" r="5.5"></circle><path d="M13 13l4.5 4.5"></path></svg></button></header>
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 14px 16px 0; display: flex; flex-direction: column; gap: 14px">
+<h1 style="font-family: 'Bungee', system-ui, sans-serif; font-weight: 400; font-size: 26px; line-height: 1.05">THE GOBLIN WARREN</h1>
+<div style="display: flex; align-items: center; gap: 8px"><button class="chip"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z"></path><circle cx="10" cy="10" r="2.5"></circle></svg>Everyone<svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 8l5 5 5-5"></path></svg></button><span style="font-size: 12px; color: #655d77">Who sees this page</span></div>
+<div><div style="display: flex; align-items: center; gap: 12px; min-height: 48px; border-top: 1px solid #e0dbe6"><span class="lbl" style="width: 80px">Region</span><span style="flex: 1; font-size: 15px; font-weight: 600">Thornwood</span><button class="chip"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z"></path><circle cx="10" cy="10" r="2.5"></circle></svg>Everyone<svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 8l5 5 5-5"></path></svg></button></div><div style="display: flex; align-items: center; gap: 12px; min-height: 48px; border-top: 1px solid #e0dbe6"><span class="lbl" style="width: 80px">Danger</span><span style="flex: 1; font-size: 15px; font-weight: 600">Moderate</span><button class="chip" style="border-color: #8a62d6; color: #6a46b0; background: rgba(138, 98, 214, 0.08)"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z"></path><path d="M3 17L17 3"></path></svg>Hidden<svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 8l5 5 5-5"></path></svg></button></div></div>
+<p style="font-size: 15px; line-height: 1.6">A sinkhole in the <a href="#" style="color: #1d6a80; text-decoration: underline; text-decoration-color: rgba(42, 143, 168, 0.5); text-underline-offset: 3px">Thornwood</a> opens into a warren of low tunnels. The goblins have lined the main hall with stolen bedrolls and a long table taken from the <a href="#" style="color: #1d6a80; text-decoration: underline; text-decoration-color: rgba(42, 143, 168, 0.5); text-underline-offset: 3px">Hollins farm</a>.</p>
+<section aria-label="Hidden block" style="border: 1px dashed #8a62d6; background: rgba(138, 98, 214, 0.06); padding: 12px; display: flex; flex-direction: column; gap: 10px"><div style="display: flex; align-items: center; gap: 8px"><span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #6a46b0"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z"></path><path d="M3 17L17 3"></path></svg>Hidden</span><div style="flex: 1"></div><button class="btn" style="min-height: 36px; border-color: #8a62d6; color: #6a46b0"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z"></path><circle cx="10" cy="10" r="2.5"></circle></svg>Reveal</button></div><p style="font-size: 15px; line-height: 1.6">Grukk Twotooth keeps the Hollins reliquary under the bedrolls in the east chamber. A DC 13 Wisdom (Perception) check spots the loose stones.</p></section>
+<section aria-label="Revealed block" style="border: 1px solid #d3ccdc; background: #f3f0f5; padding: 12px; display: flex; flex-direction: column; gap: 10px"><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #4f4862"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z"></path><circle cx="10" cy="10" r="2.5"></circle></svg>Revealed to Lyra Emberwise</span><span class="vt" style="font-size: 16px; color: #655d77">SESSION 4</span><div style="flex: 1"></div><button class="btn" style="min-height: 36px">Hide again</button></div><p style="font-size: 15px; line-height: 1.6">Scratched into the west wall in Goblin: "Grukk takes the shiny things east."</p></section>
+</main>
+<div style="flex: none; border-top: 1px solid #d3ccdc"><button style="width: 100%; display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 16px"><span style="flex: 1; font-size: 14px; font-weight: 600">Links, scenes and history</span><span class="dim" style="font-size: 13px">3 links. Live in 1 scene.</span><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M5 12l5-5 5 5"></path></svg></button></div>
+<nav aria-label="Sections" style="display: flex; flex: none; background: #ebe7ef; border-top: 1px solid #d3ccdc"><button class="navtab"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><circle cx="10" cy="10" r="7.5"></circle><path d="M8.3 7l4.5 3-4.5 3z"></path></svg>Play</button><button class="navtab"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M10 3l7.5 4-7.5 4-7.5-4z"></path><path d="M2.5 11l7.5 4 7.5-4"></path></svg>Prep</button><button class="navtab" aria-current="page"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M3 4.5h5a2 2 0 0 1 2 2V17a2 2 0 0 0-2-2H3zM17 4.5h-5a2 2 0 0 0-2 2V17a2 2 0 0 1 2-2h5z"></path></svg>Codex</button><button class="navtab"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square" style="flex: none"><path d="M3 3h4v14H3zM8 3h4v14H8z"></path><path d="M13.5 3.6l3.4.9-3 12.9-3.4-.9z"></path></svg>Compendium</button></nav>
+<div class="scan"></div>
+</div>
+</body>
+</html>

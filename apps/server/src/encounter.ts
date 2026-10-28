@@ -63,6 +63,7 @@ import { summonTurnEnd, summonTurnStart, takesNoTurns } from "./summon-turns.js"
 import { checkSightFor } from "./vision/rules.js";
 import { rowRecord } from "./item-records.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import { startingAtTable } from "./played-at-table.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -75,6 +76,8 @@ type StartEncounterInput = Readonly<{
   playersRollInitiative?: boolean;
   /** SRD: one roll for each group of identical monsters (same stat block), so the group acts together. */
   groupMonsters?: boolean;
+  /** Which party characters are played at the table for this encounter (ADR-0042); one left out takes its mark. */
+  atTable?: Readonly<Record<string, boolean>>;
 }>;
 
 const EMPTY_TURN = {
@@ -244,7 +247,7 @@ function wakeNaturalSleepers(
     actor.conditions = actor.conditions.filter((condition) => condition.id !== "unconscious");
     events.push({
       kind: "condition",
-      text: `${alarm.bearer.name}'s ${alarm.name} wakes ${actor.name} as the fight begins.`,
+      text: `${alarm.bearer.name}'s ${alarm.name} wakes ${actor.name} as the encounter begins.`,
       actorId: actor.id
     });
   }
@@ -291,6 +294,14 @@ function rollUnderMode(rollD20: () => number, mode: RollMode): number {
   if (mode === "advantage") return Math.max(rollD20(), rollD20());
   if (mode === "disadvantage") return Math.min(rollD20(), rollD20());
   return rollD20();
+}
+
+/** A combatant's initiative bonus without the dice its riders add: what a typed total is the d20 plus (ADR-0043). */
+export function initiativeBonus(state: GameState, actorId: string, deps: InitiativeRollDeps = {}): number {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const surprised = state.combat.initiative.find((entry) => entry.actorId === actorId)?.surprised === true;
+  const { penalty, checkBonus } = initiativeRollFor(state, actorId, surprised, deps);
+  return (actor?.initiative ?? 0) + checkBonus + penalty;
 }
 
 /** One combatant's initiative: the d20 (rolled, or a hand-typed `natural`) plus its modifier, the dice its check
@@ -428,13 +439,19 @@ export function startEncounter(
   if (input.entries.length === 0 || input.entries.length > 200)
     throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
   // When a prepared scene is live, the encounter must run on that scene's map so park/resume stays coherent.
-  if (state.combat.activeSceneId !== null) {
-    const activeScene = state.combat.scenes.find((scene) => scene.id === state.combat.activeSceneId);
+  if (state.combat.activeEncounterId !== null) {
+    const activeScene = state.combat.encounters.find((scene) => scene.id === state.combat.activeEncounterId);
     if (activeScene && activeScene.mapAssetId !== input.mapAssetId)
       throw new CommandRejectedError(
-        "This scene uses a different map. Start on the scene's map, or switch scenes first."
+        "This encounter uses a different map. Start on the encounter's map, or switch encounters first."
       );
   }
+  // Before any die is rolled, so a refused choice rolls nothing.
+  const atTable = startingAtTable(
+    state,
+    input.entries.map((entry) => entry.actorId),
+    input.atTable
+  );
   // Preserve any positions already placed during scene prep (or a prior setup); new combatants start unplaced.
   const placedPositions = new Map(state.combat.tokens.map((token) => [token.actorId, token.position]));
   const actorIds = new Set<string>();
@@ -512,6 +529,7 @@ export function startEncounter(
     pendingRuleAsks: [],
     pendingInitiative,
     initiativeWindow: [],
+    atTable,
     secondTurn: null,
     secondTurnsTaken: [],
     initiativeSwapOffers: [],
@@ -551,9 +569,9 @@ export function removeCombatant(
   if (!actor || !state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("That combatant is not in this encounter.");
   if (state.combat.initiative.length === 1)
-    throw new CommandRejectedError("It is the last one in the fight. End the fight to take it out.");
+    throw new CommandRejectedError("It is the last one in the encounter. End the encounter to take it out.");
   if (state.combat.turnActorId === actorId)
-    throw new CommandRejectedError("Advance past its turn before taking it out of the fight.");
+    throw new CommandRejectedError("Advance past its turn before taking it out of the encounter.");
   const events: EffectNarration[] = [
     ...releaseSwallowedBy(state, actorId, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined),
     ...endEffectsSustainedBy(state, actorId),
@@ -685,10 +703,14 @@ export function endEncounter(state: GameState) {
     pendingRuleAsks: [],
     pendingInitiative: [],
     initiativeWindow: [],
+    damageRolls: [],
+    targetAsks: [],
     turnSteps: null,
     historyCursor: null,
     historyDirty: false
   };
+  // Who played at the table was this encounter's choice; the next start chooses again.
+  delete state.combat.atTable;
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number, tieBreaker?: number) {
@@ -724,14 +746,14 @@ export function orderTiedCharacters(state: GameState, scope: Initiator, actorId:
   const other = state.combat.initiative.find((entry) => entry.actorId === beforeActorId);
   const kindOf = (id: string) => state.actors.find((actor) => actor.id === id)?.kind;
   if (!own || !other || kindOf(actorId) !== "player-character" || kindOf(beforeActorId) !== "player-character")
-    throw new CommandRejectedError("Both must be characters in this fight.");
+    throw new CommandRejectedError("Both must be characters in this encounter.");
   if (own.score !== other.score)
     throw new CommandRejectedError("Only characters tied on the same score are ordered so.");
   const current = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   const acted = (id: string) =>
     state.combat.round > 1 || state.combat.initiative.findIndex((entry) => entry.actorId === id) < current;
   if (acted(actorId) || acted(beforeActorId))
-    throw new CommandRejectedError("Ties are settled before either character takes a turn in this fight.");
+    throw new CommandRejectedError("Ties are settled before either character takes a turn in this encounter.");
   setInitiativeScore(state, actorId, own.score, Math.min(1000, other.tieBreaker + 1));
 }
 
@@ -1117,6 +1139,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
+    // An action asked for on the turn that ended goes with it (ADR-0044).
+    targetAsks: [],
     secondTurn: second
       ? { ...second, resume: passesRound ? null : state.combat.initiative[currentIndex + steps]!.actorId }
       : null,

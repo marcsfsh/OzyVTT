@@ -93,8 +93,8 @@ function unplacedUnderFog(
 function stagedUnseen(state: GameState): Set<string> {
   const live = new Set(state.combat.initiative.map((entry) => entry.actorId));
   const staged = new Set<string>();
-  for (const scene of state.combat.scenes) {
-    if (scene.id === state.combat.activeSceneId) continue;
+  for (const scene of state.combat.encounters) {
+    if (scene.id === state.combat.activeEncounterId) continue;
     // A recording made before dynamic vision has none on its scenes either.
     const unseen =
       scene.combat.vision?.enabled === true

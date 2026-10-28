@@ -225,7 +225,7 @@ describe("Necklace of Fireballs", () => {
 });
 
 describe("the hour a hit's effect lasts", () => {
-  it("ends a Sword of Wounding's stopped healing an hour of game time after the fight", () => {
+  it("ends a Sword of Wounding's stopped healing an hour of game time after the encounter", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     write(table, IDS.fighter, catalogRow("sword-of-wounding", { attuned: true, baseId: "longsword" }), "gm");
     fight(table, IDS.fighter);
@@ -289,7 +289,7 @@ describe("Well of Many Worlds", () => {
     expect(table.actor(IDS.wizard).actionUses["item-well-of-many-worlds-open-portal"]).toBeUndefined();
   });
 
-  it("starts the wait when it is opened outside a fight", async () => {
+  it("starts the wait when it is opened outside an encounter", async () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
     write(table, IDS.wizard, catalogRow("well-of-many-worlds"));
     const served = await serve(table);

@@ -10,6 +10,8 @@ export function revealInRegion(
 ): void {
   const region = element?.parentElement?.closest<HTMLElement>(".scroll-y");
   if (!element || !region) return;
+  // Inside a closed disclosure there is nothing to bring into view, and Chromium still lays the content out.
+  if (element.closest("details:not([open])")) return;
   const box = element.getBoundingClientRect();
   const frame = region.getBoundingClientRect();
   const above = box.top - frame.top;

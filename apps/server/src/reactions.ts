@@ -93,6 +93,8 @@ export type OpportunityAttackOptions = Readonly<{
   rollMode?: "advantage" | "disadvantage" | "normal";
   /** A typed d20, already checked against the table's setting. */
   attackNatural?: number;
+  /** A typed attack total, turned into its face where the bonus is known (ADR-0043). */
+  attackRolledTotal?: number;
   /** Throw the held d20 again: Heroic Inspiration for a player, free for the GM. */
   reroll?: boolean;
   /** Push mastery's chosen distance on a hit (0 declines). */
@@ -629,7 +631,7 @@ function answerPursuit(
     : undefined;
   if (!quarry || !state.combat.initiative.some((entry) => entry.actorId === quarry.id)) {
     clearPrompt(false);
-    throw new CommandRejectedError(`${pending.sourceName} is no longer in the fight.`);
+    throw new CommandRejectedError(`${pending.sourceName} is no longer in the encounter.`);
   }
   const sibling = available.find((candidate) => candidate.id === usesAction);
   if (!sibling?.teleport) {
@@ -718,8 +720,8 @@ function answerStrike(
     clearPrompt(false);
     throw new CommandRejectedError(
       pending.kind === "leaves-reach"
-        ? "The mover is no longer in the fight."
-        : `${pending.sourceName} is no longer in the fight.`
+        ? "The mover is no longer in the encounter."
+        : `${pending.sourceName} is no longer in the encounter.`
     );
   }
   const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
@@ -771,6 +773,7 @@ function answerStrike(
       commit,
       attackNatural: options.attackNatural,
       ...(options.attackNatural !== undefined ? { typedFace: true } : {}),
+      ...(options.attackRolledTotal !== undefined ? { attackRolledTotal: options.attackRolledTotal } : {}),
       // The strike's d20 is held on its prompt between a preview and the confirm.
       holdKey: reactionHoldKey(pending.id),
       ...(options.reroll === true ? { reroll: true } : {}),

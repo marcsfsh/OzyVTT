@@ -172,7 +172,7 @@ describe("Lay on Hands", () => {
     expect(server.store.snapshot.combat.turn.bonusActionUsed).toBe(false);
   });
 
-  it("is spent on the loose route outside a fight, and by several uses from the sheet", async () => {
+  it("is spent on the loose route outside an encounter, and by several uses from the sheet", async () => {
     const { server, gmToken, post, close } = await bootServer(table());
     cleanups.push(close);
     const player = server.auth.issuePlayerSession();

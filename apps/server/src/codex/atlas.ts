@@ -37,7 +37,7 @@ export type CodexMarkerCreateInput = Readonly<{
   revealedToPlayers?: boolean;
   pageIds?: readonly string[];
   subMapId?: string | null;
-  sceneIds?: readonly string[];
+  encounterIds?: readonly string[];
   actorId?: string | null;
   tags?: readonly string[];
 }>;
@@ -109,7 +109,7 @@ function toMarker(row: MarkerRowRaw): CodexMarker {
     revealedToPlayers: row.revealed === 1,
     pageIds: parseStringArray(row.page_ids_json),
     subMapId: row.sub_map_id,
-    sceneIds: parseStringArray(row.scene_ids_json),
+    encounterIds: parseStringArray(row.scene_ids_json),
     actorId: row.actor_id,
     tags: parseStringArray(row.tags_json),
     isParty: row.is_party === 1,
@@ -163,7 +163,7 @@ export function insertMarker(db: CodexDb, marker: CodexMarker): void {
       marker.revealedToPlayers ? 1 : 0,
       JSON.stringify(marker.pageIds),
       marker.subMapId,
-      JSON.stringify(marker.sceneIds),
+      JSON.stringify(marker.encounterIds),
       marker.actorId,
       JSON.stringify(marker.tags),
       marker.isParty ? 1 : 0,
@@ -301,7 +301,7 @@ export function createMarker(db: CodexDb, mapId: string, input: CodexMarkerCreat
     revealedToPlayers: input.revealedToPlayers === true,
     pageIds: idArray(input.pageIds),
     subMapId: optionalId(input.subMapId),
-    sceneIds: idArray(input.sceneIds),
+    encounterIds: idArray(input.encounterIds),
     actorId: optionalId(input.actorId),
     tags: tags(input.tags),
     isParty: false,
@@ -325,7 +325,7 @@ export function updateMarker(db: CodexDb, markerId: string, input: CodexMarkerUp
     revealedToPlayers: input.revealedToPlayers ?? existing.revealedToPlayers,
     pageIds: input.pageIds === undefined ? existing.pageIds : idArray(input.pageIds),
     subMapId: input.subMapId === undefined ? existing.subMapId : optionalId(input.subMapId),
-    sceneIds: input.sceneIds === undefined ? existing.sceneIds : idArray(input.sceneIds),
+    encounterIds: input.encounterIds === undefined ? existing.encounterIds : idArray(input.encounterIds),
     actorId: input.actorId === undefined ? existing.actorId : optionalId(input.actorId),
     tags: input.tags === undefined ? existing.tags : tags(input.tags)
   };
@@ -343,7 +343,7 @@ export function updateMarker(db: CodexDb, markerId: string, input: CodexMarkerUp
         next.revealedToPlayers ? 1 : 0,
         JSON.stringify(next.pageIds),
         next.subMapId,
-        JSON.stringify(next.sceneIds),
+        JSON.stringify(next.encounterIds),
         next.actorId,
         JSON.stringify(next.tags),
         stamp(db),
@@ -418,13 +418,13 @@ export function markersForPage(db: CodexDb, pageId: string): CodexMarker[] {
 }
 
 /** The location pin linked to a prepared scene, if any: a logged fight is pinned there. */
-export function markerForScene(db: CodexDb, sceneId: string): CodexMarker | null {
-  if (!isId(sceneId)) return null;
+export function markerForScene(db: CodexDb, encounterId: string): CodexMarker | null {
+  if (!isId(encounterId)) return null;
   const row = db.database
     .prepare(
       `SELECT ${MARKER_COLUMNS} FROM codex_markers WHERE EXISTS (SELECT 1 FROM json_each(codex_markers.scene_ids_json) WHERE value = ?) ORDER BY updated_at DESC, created_at DESC LIMIT 1`
     )
-    .get(sceneId) as MarkerRowRaw | undefined;
+    .get(encounterId) as MarkerRowRaw | undefined;
   return row ? toMarker(row) : null;
 }
 
@@ -470,7 +470,7 @@ export function placeParty(db: CodexDb, input: CodexPartyPlaceInput): { marker: 
     revealedToPlayers: input.revealedToPlayers ?? map.revealed === 1,
     pageIds: [],
     subMapId: null,
-    sceneIds: [],
+    encounterIds: [],
     actorId: null,
     tags: [],
     isParty: true,

@@ -37,7 +37,7 @@ function concrete(path: string) {
   const assetId = "00000000-0000-5000-8000-000000000001";
   return path.replace(/:(\w+)/g, (_match, name: string) => {
     if (/map-assets|token-assets|sound-assets/.test(path) && name === "id") return assetId;
-    if (path.startsWith("/api/v1/encounters/")) return "1";
+    if (path.startsWith("/api/v1/replays/")) return "1";
     return "00000000-0000-4000-8000-000000000001";
   });
 }

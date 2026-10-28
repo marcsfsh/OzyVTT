@@ -3,15 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#0E0A1C" />
+    <meta name="theme-color" content="#151a2d" />
     <title>OZYVTT</title>
     <script>
-      try {
-        var t = localStorage.getItem("vtt.theme");
-        document.documentElement.setAttribute("data-theme", t === "dusk" || t === "dawn" || t === "light" ? t : "dark");
-      } catch (e) {
-        document.documentElement.setAttribute("data-theme", "dark");
-      }
+      (function () {
+        var root = document.documentElement;
+        var t = null;
+        try {
+          t = localStorage.getItem("vtt.theme");
+        } catch (e) {}
+        var retired = t === "dark" ? "dusk" : t === "light" ? "dawn" : null;
+        if (retired) {
+          t = retired;
+          try {
+            localStorage.setItem("vtt.theme", t);
+          } catch (e) {}
+        }
+        if (t !== "dusk" && t !== "dawn") {
+          try {
+            t = window.matchMedia("(prefers-color-scheme: light)").matches ? "dawn" : "dusk";
+          } catch (e) {
+            t = "dusk";
+          }
+        }
+        root.setAttribute("data-theme", t);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", t === "dawn" ? "#ebe7ef" : "#151a2d");
+        var reduce = false;
+        try {
+          reduce = localStorage.getItem("vtt.reduce-transparency") === "on";
+        } catch (e) {}
+        try {
+          reduce = reduce || window.matchMedia("(prefers-reduced-transparency: reduce)").matches;
+        } catch (e) {}
+        if (reduce) root.setAttribute("data-transparency", "reduced");
+      })();
     </script>
   </head>
   <body>

@@ -276,13 +276,13 @@ describe("Basic Poison", () => {
   });
 });
 
-describe("outside a fight", () => {
+describe("outside an encounter", () => {
   const cleanups: Array<() => Promise<void>> = [];
   afterEach(async () => {
     for (const cleanup of cleanups.splice(0)) await cleanup();
   });
 
-  it("Antitoxin drunk on the road lasts into the next fight, and a burning creature can roll the fire out", async () => {
+  it("Antitoxin drunk on the road lasts into the next encounter, and a burning creature can roll the fire out", async () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() }, false);
     write(table, IDS.fighter, catalogRow("antitoxin", { equipped: false }));
     addEffect(

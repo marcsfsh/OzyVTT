@@ -180,7 +180,7 @@ describe("a thrown flask in the Attack action", () => {
   });
 });
 
-describe("a potion outside a fight", () => {
+describe("a potion outside an encounter", () => {
   const cleanups: Array<() => Promise<void>> = [];
   afterEach(async () => {
     for (const cleanup of cleanups.splice(0)) await cleanup();

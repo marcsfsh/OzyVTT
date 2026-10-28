@@ -109,8 +109,8 @@ export function MapFiltersFlyout({
       <OneChoice
         label="Used in"
         options={[
-          { value: "used", label: "In a scene" },
-          { value: "unused", label: "In no scene" }
+          { value: "used", label: "In an encounter" },
+          { value: "unused", label: "In no encounter" }
         ]}
         value={filters.used === "any" ? null : filters.used}
         onChange={(used) => set({ used: used ?? "any" })}

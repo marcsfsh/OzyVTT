@@ -56,3 +56,27 @@
   place-content: safe center;
   padding: var(--space-4);
 }
+
+/* One line in the strip above the map: a plate holding the label, the address and Copy. */
+.join-address--strip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+}
+.join-address--strip .join-address-label {
+  font: 500 var(--fs-sm) / 1.2 var(--font-body);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.join-address--strip .join-address-url {
+  font: 400 20px / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}

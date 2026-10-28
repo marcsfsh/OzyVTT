@@ -1,7 +1,7 @@
-/* OzyVTT design tokens (retrowave, magenta to blue). Import once at the app root and reference these
-   variables; never hardcode hex values elsewhere. See docs/DESIGN.md.
-   Themes: data-theme="dark|dusk|dawn|light" on <html>, read as Night, Dusk, Dawn and Day; dark is the :root
-   default. Dawn and Day are the light pair: a rule that changes for a pale ground names both. */
+/* OzyVTT design tokens: an arcade cabinet at dusk and at dawn. Import once at the app root and reference these
+   variables; never hardcode a colour elsewhere. See docs/DESIGN.md.
+   Themes: data-theme="dusk|dawn" on <html>. Dusk is :root, so it renders before anything is chosen; the Dawn block
+   overrides only values. <html data-transparency="reduced"> makes the glass solid and drops scanlines and glows. */
 
 :root {
   /* Native controls (date fields, scrollbars, checkboxes) follow the theme's ground. */
@@ -9,36 +9,72 @@
   /* ---- Brand ---- */
   --brand-name: "OzyVTT";
 
-  /* ---- Theme: dark (default), deep indigo, lighter than black ---- */
+  /* ---- Dusk: tinted glass over a blue-hour sky with a rose afterglow ---- */
 
-  /* Surfaces: --surface-1 is a panel, --surface-2 a row or the foot of a raised control, --surface-3 its top. */
-  --void: #07031a;
-  --bg: #0b0624;
-  --surface-1: #1a1240;
-  --surface-2: #221a55;
-  --surface-3: #2f2470;
-  --overlay: rgba(7, 3, 26, 0.72);
+  /* The app's ground. Pages paint it once, on the body; panels sit over it. */
+  --sky:
+    radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%),
+    linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%);
 
-  /* Lines: --line edges a row, --line-strong a panel, --line-raised a control you press. */
-  --line: #33287a;
-  --line-strong: #463a8a;
-  --line-raised: #5c4fae;
+  /* Surfaces, solid: --void is a well or input, --bg a bar, --surface-1 a panel, --surface-2 a control or card at
+     rest, --surface-3 its hover. Every text check runs on these. */
+  --void: #131524;
+  --bg: #151728;
+  --surface-1: #1b1e31;
+  --surface-2: #25283f;
+  --surface-3: #2b2f49;
+  --overlay: rgba(8, 9, 16, 0.72);
+
+  /* The same surfaces as glass. Only a bounded outer plate (a bar, a sidebar, a dialog) takes the blur; what sits on
+     it uses the solid tokens. Dawn and reduced transparency alias each one to its solid. */
+  --glass-bg: rgba(18, 20, 34, 0.7);
+  --glass-void: rgba(10, 12, 22, 0.55);
+  --glass-surface-1: rgba(26, 29, 46, 0.62);
+  --glass-surface-2: rgba(44, 48, 72, 0.5);
+  --glass-surface-3: rgba(60, 66, 96, 0.45);
+  --glass-blur: blur(16px) saturate(1.15);
+
+  /* Lines: --line divides rows, --line-strong edges a panel, --line-raised edges a control you press. */
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-raised: rgba(255, 255, 255, 0.2);
+  /* A control's edge under the pointer: a step lighter, with no hue (cyan means selected). */
+  --line-raised-hover: rgba(255, 255, 255, 0.32);
   --line-hover: color-mix(in srgb, var(--cyan) 55%, transparent); /* adapts per theme via --cyan */
 
-  /* Neon accents: the sun leads, cyan marks selection */
+  /* One meaning per hue (DESIGN.md, Colour and themes). Each hue has an ink for words where the hue itself, meant
+     for fills and edges, may not clear 4.5:1. */
+  /* Press this: the primary and the Action lamp. */
   --magenta: #ff2f92;
   --magenta-hi: #ff6bb0;
-  --cyan: #2be4ff;
-  --cyan-hi: #a6f3ff;
-  --violet: #9a5cff;
-  --violet-hi: #d2b8ff; /* readable violet for text on dark surfaces */
-  --indigo: #5b6ef5;
+  --magenta-text: #ff8cc0;
+  /* Selection, focus, targeting, active effects and the Reaction lamp. */
+  --cyan: #4fe3ff;
+  --cyan-hi: #6fe8ff;
+  /* GM-only. */
+  --violet: #bb90ff;
+  --violet-hi: #d9c2ff;
+  /* The party: token rings, portrait edges, spell slot pips. */
+  --party: #7aa2ff;
+  --indigo: var(--party);
+  --indigo-text: #a8c2ff;
+  /* Enemies: token rings and portrait edges. */
+  --hostile: #ff5d50;
+  --danger: var(--hostile);
+  --danger-hi: #ff8a80;
+  --danger-text: #ff9d94;
+  /* Hit points left and the Bonus lamp share a value and not a meaning, so they stay two tokens. */
+  --hp: #ffd54d;
+  --lamp-bonus: #ffd54d;
+  --hp-text: #ffd54d;
+  --hp-lost: rgba(120, 30, 50, 0.6);
+  /* Waiting, caution and a choice still owed. */
+  --caution: #ffb733;
+  --caution-hi: #ffcb7a;
 
-  /* Codex entity-kind accent: one hue for all eight kinds; the entity icon carries the distinction.
-     Every other accent already means something (magenta = action, cyan = focus/selection,
-     violet = GM-only content, --caution, --state-on), so --indigo is the only free one.
-     Accent only (badge rim and glyph, list-row rule); nothing sits behind text. The eight names stay
-     so a future palette can re-split them. */
+  /* Codex entity-kind accent: one hue for all eight kinds; the entity icon carries the distinction. Accent only
+     (badge rim and glyph, list-row rule); nothing sits behind text. The eight names stay so a future palette can
+     re-split them. */
   --codex-type: var(--indigo);
   --codex-type-note: var(--codex-type);
   --codex-type-character: var(--codex-type);
@@ -60,99 +96,137 @@
   --pin-7: #e8ecf4;
   --pin-8: #94a3b8;
 
-  /* Semantic (hue is a hint; always pair with icon + label) */
+  /* Semantic aliases (hue is a hint; always pair with icon + label) */
   --primary: var(--magenta);
   --success: var(--cyan);
-  /* Caution is warm orange because violet is reserved for GM-only content. */
-  --caution: #ff9a3d;
-  /* Caution as text: --caution for edges and fills, --caution-hi for words. */
-  --caution-hi: #ffcb9c;
-  --danger: #ff2d55;
-  --danger-hi: #ff6b8a;
   --info: var(--indigo);
-  /* Each hue as words: the ink that clears 4.5:1 on this theme's surfaces, where the hue itself (for edges
-     and fills) or its -hi twin (for glows) may not. */
-  --magenta-text: #ffb8da;
-  --indigo-text: #a9b4ff;
-  --danger-text: #ff94aa;
 
   /* ---- State: on ----
-     The segmented control's on fill; each theme defines its own value. Literals with no aliases, so
-     retuning --caution never moves a state colour. Hue collisions with other accents are resolved by
-     shape in SegmentedControl.css, outside this file. Fill must reach 3:1 against the surfaces and the label
-     4.5:1 against the fill. Night uses the --magenta hue. */
-  --state-on: #ff2f92;
-  /* The label on the fill; --text-on-neon clears 4.5:1 on all three themes' values. */
+     Selected and on: a cyan fill with dark ink. An essential outline (the selected fill's edge, the focus ring) uses
+     --state-on-edge or --focus-ring, which Dawn deepens because its cyan fill is too pale for an edge. */
+  --state-on: var(--cyan);
   --state-on-ink: var(--text-on-neon);
+  --state-on-edge: var(--cyan);
+  --focus-ring: var(--cyan);
 
   /* Text */
-  --text: #f2eeff;
-  --text-dim: #c0b7e8;
-  /* Raised to pass AA on all three surfaces in every theme. */
-  --text-muted: #9d94cc;
-  --text-on-neon: #04141c; /* dark ink on bright neon fills */
+  --text: #eef0f8;
+  --text-dim: #c3c7d9;
+  --text-muted: #b0b4ca;
+  --text-on-neon: #04141c; /* dark ink on a cyan fill */
   /* A QR code is dark ink on a light ground in every theme, because phone cameras look for that. */
   --qr-ink: #04141c;
   --qr-paper: #ffffff;
 
-  /* Glows: bloom in dark/dusk. State only, never resting elevation.
-     Glow switches on/off smoothly and never pulses. */
+  /* Glows belong to the sun frame, a lit lamp, the selected item and the primary button. Resting surfaces never
+     glow, and nothing pulses. Reduced transparency keeps the 1px rings and drops the blooms. */
   --glow-magenta: 0 0 0 1px rgba(255, 47, 146, 0.55), 0 0 16px 2px rgba(255, 47, 146, 0.35);
   --glow-magenta-strong: 0 0 0 1.5px rgba(255, 47, 146, 0.7), 0 0 26px 4px rgba(255, 47, 146, 0.5);
   --glow-cyan: 0 0 0 1px rgba(43, 228, 255, 0.55), 0 0 16px 2px rgba(43, 228, 255, 0.32);
-  --glow-violet: 0 0 0 1px rgba(154, 92, 255, 0.55), 0 0 16px 2px rgba(154, 92, 255, 0.32);
-  --glow-danger: 0 0 0 1px rgba(255, 45, 85, 0.55), 0 0 16px 2px rgba(255, 45, 85, 0.32);
+  --glow-violet: 0 0 0 1px rgba(187, 144, 255, 0.55), 0 0 16px 2px rgba(187, 144, 255, 0.32);
+  --glow-danger: 0 0 0 1px rgba(255, 93, 80, 0.55), 0 0 16px 2px rgba(255, 93, 80, 0.32);
+  --glow-primary: 0 0 18px rgba(255, 47, 146, 0.45);
 
   /* Filter twins of the glows, for layers that glow through `filter` (backing layers, SVG). */
   --glow-drop-magenta: drop-shadow(0 0 6px rgba(255, 47, 146, 0.55)) drop-shadow(0 0 18px rgba(255, 47, 146, 0.33));
   --glow-drop-magenta-strong: drop-shadow(0 0 8px rgba(255, 47, 146, 0.85))
     drop-shadow(0 0 30px rgba(255, 47, 146, 0.5));
   --glow-drop-cyan: drop-shadow(0 0 6px rgba(43, 228, 255, 0.55)) drop-shadow(0 0 18px rgba(43, 228, 255, 0.3));
-  --glow-drop-violet: drop-shadow(0 0 6px rgba(154, 92, 255, 0.55)) drop-shadow(0 0 18px rgba(154, 92, 255, 0.3));
-  --glow-drop-danger: drop-shadow(0 0 6px rgba(255, 45, 85, 0.55)) drop-shadow(0 0 18px rgba(255, 45, 85, 0.3));
+  --glow-drop-violet: drop-shadow(0 0 6px rgba(187, 144, 255, 0.55)) drop-shadow(0 0 18px rgba(187, 144, 255, 0.3));
+  --glow-drop-danger: drop-shadow(0 0 6px rgba(255, 93, 80, 0.55)) drop-shadow(0 0 18px rgba(255, 93, 80, 0.3));
 
-  /* ---- The sun ----
-     The one warm thing in the interface, and so the "press this" and "this is now" signal: the primary
-     button's frame, the current turn, the small glyph beside the current name. Never decoration on a resting
-     surface, and never a fill behind words (white on its yellow end fails contrast). */
-  --grad-sun: linear-gradient(180deg, #ffe66b 0%, #ff8a3d 35%, #ff2f92 70%, #9a5cff 100%);
-  /* Left to right, for frames and rules; it starts at gold, past pale yellow, so a thin line keeps its hue. */
-  --grad-sun-x: linear-gradient(90deg, #ffd25c 0%, #ff8a3d 30%, #ff2f92 65%, #9a5cff 100%);
-  /* The glyph stops at magenta so a 10px sun still reads as a sun. */
-  --grad-sun-glyph: linear-gradient(180deg, #ffe66b 0%, #ff8a3d 45%, #ff2f92 100%);
+  /* ---- The 80s elements, each with one job ---- */
+
+  /* The sun frame means now: who is acting. Never decoration on a resting surface, and never a fill behind words. */
+  --grad-sun: linear-gradient(180deg, #ffe14d 0%, #ff8a1f 50%, var(--magenta) 100%);
+  /* Left to right, for frames and rules. */
+  --grad-sun-x: linear-gradient(90deg, #ffe14d 0%, #ff8a1f 50%, var(--magenta) 100%);
+  --grad-sun-glyph: var(--grad-sun);
   /* The glyph's two dark slats, cut as a mask so the glyph sits on any surface. */
   --sun-slats: linear-gradient(180deg, #000 0 55%, transparent 55% 65%, #000 65% 78%, transparent 78% 86%, #000 86%);
-  --glow-sun: 0 0 18px rgba(255, 47, 146, 0.4);
-  /* The current turn: a warm wash from the leading edge, a 4px magenta edge and a soft bloom. */
-  --turn-wash: linear-gradient(90deg, rgba(255, 154, 61, 0.18) 0%, rgba(255, 47, 146, 0.1) 45%, transparent 100%);
+  /* The sun frame keeps its warm glow in both themes. */
+  --glow-sun: 0 0 16px rgba(255, 110, 60, 0.5);
+  /* The current turn on a row: a warm wash from the leading edge and a magenta edge. */
+  --turn-wash: linear-gradient(90deg, rgba(255, 138, 31, 0.18) 0%, rgba(255, 47, 146, 0.1) 45%, transparent 100%);
   --turn-edge: var(--magenta);
   --turn-glow: 0 0 18px rgba(255, 47, 146, 0.2);
 
-  /* ---- Surfaces you can read the edges of ----
-     The chrome lip is a 2px highlight along a panel's top edge; it is what separates a panel from the night
-     behind it, so it goes on panels, never on rows or controls. */
-  --lip: linear-gradient(90deg, #ff8fd0, #ffffff 50%, #7fe9ff);
-  --lip-h: 2px;
-  /* A raised control: a two-step fill, a lighter edge and a 1px top highlight. */
-  --raised: linear-gradient(180deg, var(--surface-3) 0%, var(--surface-2) 100%);
-  --raised-hover: linear-gradient(180deg, #3b2e88 0%, #2a2066 100%);
-  --raised-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  /* A track: the sunken strip a tab bar or segmented control sits in. */
-  --track: var(--bg);
-  --track-edge: #2f2466;
-  /* The chosen tab: raised a step further than a control, with a cyan underline (cyan is selection). */
-  --tab-on: linear-gradient(180deg, #382a80 0%, #241858 100%);
-  --tab-on-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  /* The primary button: a dark warm-tinted fill inside the sun frame, so the label is white on dark. */
-  --primary-tint: linear-gradient(180deg, rgba(255, 138, 61, 0.22) 0%, rgba(255, 47, 146, 0.14) 100%);
-  --primary-tint-hover: linear-gradient(180deg, rgba(255, 138, 61, 0.34) 0%, rgba(255, 47, 146, 0.24) 100%);
-  --primary-base: #1f1550;
-  --primary-ink: #ffffff;
-  --primary-ink-shadow: 0 2px 0 #07031a;
+  /* The horizon line: the bottom edge of every top bar, 2px. */
+  --grad-horizon: linear-gradient(90deg, #4fe3ff 0%, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d 100%);
+  --glow-horizon: 0 0 12px rgba(255, 47, 146, 0.6);
 
-  /* Headings: solid Bungee with a hard offset shadow. The chrome fill belongs to the title screen alone. */
-  --heading-ink: #fff4fb;
-  --heading-shadow: 2px 2px 0 #07031a;
+  /* Chrome lettering means who is acting: the wordmark, the acting creature's name and YOUR TURN. Dusk prints it as
+     chrome with a pink and cyan split; Dawn as solid ink with the same split, gentler. */
+  --grad-chrome: linear-gradient(180deg, #eaf8ff 0%, #9fdcff 42%, #ffffff 49%, #3b2163 51%, #ff5fae 75%, #ffd6ea 100%);
+  --chrome-split: -1.5px 0 rgba(43, 228, 255, 0.55), 1.5px 0 rgba(255, 47, 146, 0.55);
+  /* The wordmark's neon script. */
+  --script-ink: #ff4fa3;
+  --script-glow: 0 0 8px rgba(255, 47, 146, 0.9), 0 0 18px rgba(255, 47, 146, 0.5);
+
+  /* The arcade button: the one primary action in a view. A magenta face over a pressed edge, with a soft glow. */
+  --primary-base: var(--magenta);
+  --primary-ink: #12020a;
+  --primary-edge: #8a0f4d;
+  --primary-ink-shadow: none;
+  --primary-tint: linear-gradient(transparent, transparent);
+  --primary-tint-hover: linear-gradient(rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.14));
+
+  /* Cabinet lamps: available, or on. A lit lamp glows in its colour; an unlit one is --surface-3 with a 1px edge. */
+  --lamp-action: var(--magenta);
+  --lamp-reaction: var(--cyan);
+  --lamp-on: var(--cyan);
+  --lamp-move: var(--text);
+  --lamp-bevel: inset 0 -3px 0 rgba(0, 0, 0, 0.3);
+  --glow-lamp-action: 0 0 10px rgba(255, 47, 146, 0.85);
+  --glow-lamp-bonus: 0 0 10px rgba(255, 210, 63, 0.8);
+  --glow-lamp-reaction: 0 0 10px rgba(43, 228, 255, 0.8);
+
+  /* The lit section's words glow faintly in Dusk. */
+  --glow-tab-text: 0 0 10px rgba(43, 228, 255, 0.7);
+
+  /* The VCR counter's phosphor. */
+  --vcr-glow: 0 0 6px rgba(255, 255, 255, 0.45);
+
+  /* Tags: VT323 words on a fill. */
+  --tag-next-bg: #eef0f8;
+  --tag-next-ink: #08080e;
+  --tag-wait-bg: var(--caution);
+  --tag-wait-ink: #12020a;
+  --tag-hit-bg: var(--hp);
+  --tag-hit-ink: #12020a;
+  --tag-miss-bg: rgba(255, 255, 255, 0.12);
+  --tag-miss-ink: var(--text);
+
+  /* The map: the grid drawn over a map image, the surround it sits on, and the plate under a token's name. The map
+     and its plates look the same in both themes, because the art keeps its own colours. */
+  --grid-neon: rgba(43, 228, 255, 0.24);
+  --map-surround: #141312;
+  --plate-bg: rgba(5, 5, 8, 0.88);
+  --plate-ink: #f4f4fa;
+  --plate-ink-hidden: #d4b8ff;
+
+  /* Scanlines: one overlay over the whole app, in Dusk only. */
+  --scanline-color: rgba(0, 0, 0, 0.2);
+  --scanline-opacity: 0.25;
+
+  /* ---- Surfaces you can read the edges of ----
+     A panel is a flat plate with a 1px edge. The chrome lip and the two-step raised fill are retired; their names
+     stay as flat values so a caller that still uses them paints the new look. */
+  --lip: none;
+  --lip-h: 0px;
+  --raised: linear-gradient(var(--surface-2), var(--surface-2));
+  --raised-hover: linear-gradient(var(--surface-3), var(--surface-3));
+  --raised-sheen: 0 0 #0000;
+  /* A track: the sunken well a tab bar or segmented control sits in. */
+  --track: var(--void);
+  --track-edge: var(--line-raised);
+  /* The chosen option: raised a step, with a cyan underline (cyan is selection). */
+  --tab-on: linear-gradient(#353a55, #353a55);
+  --tab-on-sheen: 0 0 #0000;
+
+  /* Headings are solid ink with no shadow. */
+  --heading-ink: #eef0f8;
+  --heading-shadow: none;
 
   /* Ambient shadows (dark, for resting elevation) */
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -161,51 +235,29 @@
      the Gaussian sigma and box-shadow's is twice it. */
   --shadow-drop-2: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
 
-  /* Texture (retro screen surface) */
-  --grid-line: rgba(255, 46, 154, 0.16);
-  --scanline-color: rgba(0, 0, 0, 0.22);
+  /* Decorative grid lines (the `.grid-floor` utility) use the map grid's neon. */
+  --grid-line: var(--grid-neon);
 
-  /* ---- Shared across all themes (structure, with no color) ---- */
-
-  /* Signature color ramp (a color and a light source, with no sun) */
+  /* A colour ramp with no sun, for decorative blooms. */
   --grad-bloom: linear-gradient(180deg, #ff2f92 0%, #9a5cff 48%, #2be4ff 100%);
-  --grad-horizon: linear-gradient(180deg, #ff2f92 0%, #5b6ef5 100%);
-  /* Chrome for the title screen's wordmark: white sky, a hard dark horizon at the midline, sunset below. */
-  --grad-chrome: linear-gradient(
-    180deg,
-    #ffffff 0%,
-    #e6ecff 30%,
-    #9fb2ff 48%,
-    #2a1a6e 50%,
-    #6a3fb8 62%,
-    #ff8fd0 85%,
-    #ffe0f2 100%
-  );
 
-  /* ---- The landing scene ----
-     The title screen's palette. The [data-theme] blocks at the end of this file override exactly these
-     tokens: dark is Night, then Dusk, Dawn and Day (light). Base values are Night. */
-  /* Night's sky warms to magenta at the horizon (64%), so the mountains stand out against it, and the ground
-     below the line starts dark again under the grid. */
-  --landing-sky:
-    radial-gradient(130% 80% at 50% 112%, rgba(154, 92, 255, 0.34) 0%, transparent 56%),
-    linear-gradient(
-      180deg,
-      #030210 0%,
-      #070417 18%,
-      #0d0729 34%,
-      #1c0c44 48%,
-      #3c1260 58%,
-      #5a1468 64%,
-      #241448 64%,
-      #301a5e 82%,
-      #3a1b72 100%
-    );
-  --landing-star: rgba(255, 255, 255, 1);
-  --landing-star-dim: rgba(199, 155, 255, 0.6);
-  /* The sun: pale gold at its crown to violet at the horizon. Its glow is a filter because the slats are a mask. */
-  --landing-sun: linear-gradient(180deg, #fff3a6 0%, #ffd25c 18%, #ff8a3d 38%, #ff2f92 58%, #9a5cff 80%);
-  --landing-sun-glow: drop-shadow(0 0 30px rgba(255, 47, 146, 0.55)) drop-shadow(0 0 80px rgba(154, 92, 255, 0.3));
+  /* ---- The sunset scene ----
+     Arrival only: the title and join screens. Dusk paints it at night; Dawn paints it as daybreak. The sky above the
+     horizon (64%) and the ground below it are one wash; the sun, the mountains and the grid sit on it. */
+  --landing-sky: linear-gradient(
+    180deg,
+    #05010c 0%,
+    #1e0840 35%,
+    #7a1268 54%,
+    #ff3d8b 64%,
+    #07020f 64%,
+    #07020f 82%,
+    #050209 100%
+  );
+  --landing-star: rgba(255, 255, 255, 0.85);
+  --landing-star-dim: rgba(255, 255, 255, 0.45);
+  --landing-sun: var(--grad-sun);
+  --landing-sun-glow: drop-shadow(0 0 30px rgba(255, 90, 110, 0.45));
   /* The slats, a mask in fractions of the disc (72% shows above the horizon): they widen toward the line so
      the sky shows through. Shape alone, with no colour, so no theme overrides it. */
   --landing-slats: linear-gradient(
@@ -223,85 +275,20 @@
   --landing-horizon: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(43, 228, 255, 0.9) 15%,
-    rgba(255, 255, 255, 0.95) 50%,
-    rgba(43, 228, 255, 0.9) 85%,
+    rgba(255, 47, 146, 0.85) 15%,
+    rgba(255, 47, 146, 0.85) 85%,
     transparent 100%
   );
-  --landing-horizon-glow: 0 0 12px 2px rgba(255, 47, 146, 0.75), 0 0 40px 6px rgba(43, 228, 255, 0.35);
-  --landing-grid-x: rgba(43, 228, 255, 0.6);
-  --landing-grid-y: rgba(255, 47, 146, 0.75);
+  --landing-horizon-glow: 0 0 12px 2px rgba(255, 47, 146, 0.6);
+  --landing-grid-x: rgba(255, 47, 146, 0.85);
+  --landing-grid-y: rgba(255, 47, 146, 0.85);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 58%, rgba(2, 1, 8, 0.5) 100%);
   --landing-noise-opacity: 0.04;
-  /* The mountains: a dark silhouette on the horizon with a sunset rim along the ridge. */
-  --landing-mountain: #0c0630;
-  --landing-mountain-rim: linear-gradient(180deg, rgba(255, 47, 146, 0.9), rgba(43, 228, 255, 0.6));
+  /* The mountains: a dark silhouette on the horizon with a cyan rim along the ridge. */
+  --landing-mountain: #10031f;
+  --landing-mountain-rim: linear-gradient(180deg, rgba(43, 228, 255, 0.7), rgba(43, 228, 255, 0.7));
   /* Larger than the app texture's 34px cell so the drive reads as a road and never a mesh. */
   --landing-grid-cell: 56px;
-
-  /* ---- The work-screen sky ----
-     The landing's drive adapted for panes with content on them:
-       1. The horizon is a fixed inset from the pane bottom, never a percentage, so it never drifts into
-          content as the pane grows; every other layer is expressed against it.
-       2. The sun is a crest: its box is the crown above the horizon, masked to the top of a circle
-          centred on the horizon, brightest at the line and fading upward where text sits.
-       3. --sky-floor-opacity and --sky-sun-opacity are per-theme legibility ceilings, set for reading.
-     --sky-horizon-a/b and --sky-grid-x/y derive from --cyan/--magenta, so only dusk overrides them.
-     --sky-wash must stay a single background layer: `.pane-sky`'s size/repeat lists assume exactly ten
-     layers, and a two-layer wash would re-tile into bands (why it is not an alias of --landing-sky). */
-  --sky-horizon-inset: 7rem;
-  /* Night: the whole ramp clears AA for --text-dim/--text-muted/--text without truncation.
-     Every stop is a fraction of `100% - inset` so the list stays monotonic at any height; percentage
-     stops cross the knee on short panes and collapse into a hard band. */
-  --sky-wash: linear-gradient(
-    180deg,
-    #030210 0%,
-    #070417 calc((100% - var(--sky-horizon-inset)) * 0.27),
-    #0b0722 calc((100% - var(--sky-horizon-inset)) * 0.52),
-    #150e33 calc((100% - var(--sky-horizon-inset)) * 0.76),
-    #241448 calc(100% - var(--sky-horizon-inset)),
-    #301a5e calc(100% - var(--sky-horizon-inset) * 0.5),
-    #3a1b72 100%
-  );
-  /* One flat tile of stars. Day and Dawn hide them by making the ink transparent, so the layer list never changes. */
-  --sky-star: rgba(236, 234, 251, 0.8);
-  --sky-star-dim: rgba(164, 92, 255, 0.45);
-  --sky-star-tile: 251px;
-  /* The crown is exactly half the disc so the visible part is a hemisphere; the diameter derives from
-     the crown so the ratio can't break. The crown is also the space the scene keeps clear of text. */
-  --sky-sun-crown: 4rem;
-  --sky-sun-d: calc(var(--sky-sun-crown) * 2);
-  --sky-sun: linear-gradient(
-    180deg,
-    rgba(255, 231, 246, 0) 0%,
-    rgba(255, 92, 184, 0.42) 52%,
-    rgba(255, 46, 154, 0.86) 100%
-  );
-  --sky-sun-mask: radial-gradient(circle calc(var(--sky-sun-d) / 2) at 50% 100%, #000 97%, rgba(0, 0, 0, 0) 100%);
-  --sky-sun-opacity: 0.5;
-  /* The horizon beam; the same pair drives the `.neon-beam` divider. */
-  --sky-horizon-a: color-mix(in srgb, var(--cyan) 85%, transparent);
-  --sky-horizon-b: color-mix(in srgb, var(--magenta) 92%, transparent);
-  --sky-horizon-glow: radial-gradient(
-    46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(255, 46, 154, 0.3) 0%,
-    rgba(45, 226, 255, 0.12) 46%,
-    transparent 74%
-  );
-  /* Night's bloom; 0.20 stays under its AA ceiling for --text-dim. */
-  --sky-bloom: radial-gradient(120% 62% at 50% 0%, rgba(164, 92, 255, 0.2) 0%, transparent 68%);
-  /* The floor: a shallow strip, smaller than the landing's highway. Rows are denser than columns to sell the recession. */
-  --sky-grid-x: color-mix(in srgb, var(--magenta) 50%, transparent);
-  --sky-grid-y: color-mix(in srgb, var(--cyan) 45%, transparent);
-  --sky-grid-col: 56px;
-  --sky-grid-row: 44px;
-  --sky-grid-perspective: 260px;
-  --sky-grid-tilt: 58deg;
-  --sky-grid-bleed: 12%;
-  /* Ceiling for --text-dim over a grid line on this theme's floor band. */
-  --sky-floor-opacity: 0.28;
-  /* Densest mid-band and quiet at both edges, where a region's last row lands. */
-  --sky-floor-mask: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, #000 30%, #000 62%, rgba(0, 0, 0, 0) 100%);
 
   /* ---- Neon linework ----
      The horizon's line reused as a structural rule (chrome row against region, dock against map). It is
@@ -325,40 +312,38 @@
   );
   --rule-beam-glow: 0 0 10px color-mix(in srgb, var(--magenta) 18%, transparent);
 
-  /* ---- Role rims ----
-     Magenta for the player's door, violet for the GM's, applied to the GM-secret treatment (3px
-     inline-start edge plus a faint wash). The hue alone does not mean GM (violet has other meanings),
-     and a rim is never the only signal: every site also names its role in text. Lifted above
-     --magenta/--violet because an edge needs more contrast than a fill. */
-  --rim-player: #ff3fa4;
-  --rim-gm: #9f6bff;
+  /* ---- Role hues ----
+     The shell tints its chrome by role. They alias the role's meaning colours: party blue for a player's window and
+     violet for the GM's. A hue is never the only signal: every site also names its role in words. */
+  --rim-player: var(--party);
+  --rim-gm: var(--violet);
   --rim-player-wash: color-mix(in srgb, var(--rim-player) 7%, transparent);
   --rim-gm-wash: color-mix(in srgb, var(--rim-gm) 7%, transparent);
-  --rim-player-glow: drop-shadow(0 0 6px rgba(255, 63, 164, 0.55)) drop-shadow(0 0 18px rgba(255, 63, 164, 0.33));
-  --rim-gm-glow: drop-shadow(0 0 6px rgba(159, 107, 255, 0.55)) drop-shadow(0 0 18px rgba(159, 107, 255, 0.33));
+  --rim-player-glow: drop-shadow(0 0 0 transparent);
+  --rim-gm-glow: drop-shadow(0 0 0 transparent);
 
-  /* Texture sizing and noise tile. --noise-opacity is per theme. */
+  /* Texture sizing and noise tile. */
   --grid-cell: 34px;
   --scanline-gap: 3px;
   --noise-opacity: 0.045;
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
-  /* Typography, three faces with one job each:
-       Bungee        the wordmark, headings, the primary button's label and big stat values
-       Bai Jamjuree  the interface's own words: tabs, uppercase labels, chips, secondary buttons
-       Tomorrow      everything you read: names, descriptions, paragraphs and every number
-     Bungee and Bai Jamjuree are short and square, so Tomorrow is the squared body face that holds up at 13px.
+  /* Typography (DESIGN.md, Type):
+       Bungee        the wordmark, record and page titles, and the primary button
+       Mr Dafoe      the wordmark's script, and nothing else
+       Bai Jamjuree  everything else: labels, body, tabs, buttons and names
+       VT323         every game number at 15px or more, the VCR counter and tags; monospaced, so a live number keeps
+                     its width
      Space Mono stays for code alone (API reference, `code`, `kbd`). */
   --font-wordmark: "Bungee", system-ui, sans-serif;
+  --font-script: "Mr Dafoe", cursive;
   --font-display: "Bungee", system-ui, sans-serif;
   --font-label: "Bai Jamjuree", system-ui, sans-serif;
-  --font-body: "Tomorrow", system-ui, sans-serif;
+  --font-body: "Bai Jamjuree", system-ui, sans-serif;
   --font-mono: "Space Mono", ui-monospace, "Courier New", monospace;
-  /* Game numbers (HP, AC, initiative, dice totals). Tomorrow's digits are proportional (it ships no `tnum`),
-     so a live number reserves its widest value with `min-width` in `ch` and aligns to the end; `1ch` is the
-     zero, the widest digit. */
-  --font-numeric: "Tomorrow", system-ui, sans-serif;
-  --fw-numeric: 700;
+  --font-numeric: "VT323", ui-monospace, monospace;
+  /* VT323 ships one weight; a synthesized bold smears it. */
+  --fw-numeric: 400;
 
   --fs-display: 34px;
   --fs-h1: 26px;
@@ -390,8 +375,8 @@
   --space-12: 38px;
   --space-16: 50px;
 
-  /* Radius: every surface is square, from panels and controls to tags and chips. --radius-pill is only for
-     things whose roundness is the meaning: gauges, token rings, dots, swatches, avatars, the remove ✕. */
+  /* Radius: every surface is square, from panels and controls to tags and chips. --radius-pill is for tokens,
+     presence dots and swatches, where roundness is the meaning. */
   --radius-sm: 0px;
   --radius-md: 0px;
   --radius-lg: 0px;
@@ -401,13 +386,12 @@
      Most panels are hand-written, so these tokens carry the look to all of them: a flat plate, a 1px edge,
      no texture. */
   --rim-w: 1px;
-  /* A panel's edge; raised controls use --line-raised. Day and Dawn override both rim colours. */
+  /* A panel's edge; raised controls use --line-raised. */
   --rim-color: var(--line-strong);
   /* The edge brightens toward cyan on :hover, :focus-visible and :active (many devices have no hover). */
   --rim-color-hi: color-mix(in srgb, var(--cyan) 45%, var(--line-raised));
-  /* The rest glow for hero surfaces, derived from the rim so a repainted rim glows in its own hue. */
-  --rim-glow: drop-shadow(0 0 6px color-mix(in srgb, var(--rim-color) 62%, transparent))
-    drop-shadow(0 0 18px color-mix(in srgb, var(--rim-color) 34%, transparent));
+  /* Resting surfaces never glow; the name stays for its callers. */
+  --rim-glow: drop-shadow(0 0 0 transparent);
   /* The bezel was a second outline inside the rim; the edge alone now defines a surface, so it is clear. Kept
      as a token so panels that draw it need no change. */
   --bezel-color: transparent;
@@ -420,11 +404,11 @@
   --cue-inset: 0.95rem;
   --cue-mark: conic-gradient(from 225deg at 100% 50%, currentColor 0 90deg, transparent 0);
   /* The fill: consumers set --material-fill (inherited) and paint it with the `background` shorthand.
-     --material-plate is the flat panel fill; a top-level panel puts --material-lip over it
-     (`var(--material-lip), var(--material-plate)`) and a nested one takes the plate alone. */
+     --material-plate is the flat panel fill. --material-lip is the retired lip, an empty layer so
+     `var(--material-lip), var(--material-plate)` still paints the plate alone. */
   --material-fill: transparent;
   --material-plate: linear-gradient(var(--surface-1), var(--surface-1));
-  --material-lip: var(--lip) top / 100% var(--lip-h) no-repeat;
+  --material-lip: none;
 
   /* ---- Scrollbars ----
      A thin, always-visible neon track so scrollable regions are discoverable. Style the native scroller,
@@ -449,218 +433,67 @@
      keep their visual weight and grow the area with `.tap-target`. */
   --tap-min: 44px;
 
-  /* Motion (between snappy and glidey) */
+  /* Motion: quick and one-shot, 120 to 200 ms, ease-out. Nothing loops, pulses or waits on an animation, and under
+     prefers-reduced-motion every one of these is instant. */
   --ease-settle: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-drawer: cubic-bezier(0.4, 0, 0.2, 1);
-  --dur-press: 100ms; /* transform on press               */
+  --dur-press: 120ms; /* transform on press                   */
   --dur-hover: 140ms; /* color/bg/border/shadow, glow on-off */
-  --dur-base: 200ms; /* panels, tabs, popovers, combat tint */
-  --dur-enter: 260ms; /* full view entrances               */
-  --dur-reveal: 560ms; /* one-time data reveals             */
-  --dur-theme: 400ms; /* the theme-switch sky moment       */
+  --dur-base: 200ms; /* popovers, the sun frame's slide      */
+  --dur-enter: 120ms; /* tabs and panels fading in           */
+  --dur-count: 300ms; /* the table screen's roll count-up    */
 
-  /* Focus ring */
-  --focus-ring-color: var(--cyan);
+  /* Focus ring: the --focus-ring colour, under the name its callers use. */
+  --focus-ring-color: var(--focus-ring);
 }
 
-/* ---- Theme: dusk, the sunset hour: deeper, warmer, more saturated twilight purple ---- */
-[data-theme="dusk"] {
-  --void: #1c1238;
-  --bg: #251a4e;
-  --surface-1: #2e2160;
-  --surface-2: #382970;
-  --surface-3: #443381;
-  --overlay: rgba(18, 12, 40, 0.6);
-
-  --line: #5a4a9a;
-  --line-strong: #7d6bc0;
-  --line-raised: #9584d6;
-
-  --raised-hover: linear-gradient(180deg, #4e3c92 0%, #3f2f7c 100%);
-  --track-edge: #4a3c88;
-  --tab-on: linear-gradient(180deg, #54409a 0%, #3c2c80 100%);
-  --primary-base: #2c1a5c;
-  --turn-wash: linear-gradient(90deg, rgba(255, 154, 61, 0.24) 0%, rgba(255, 47, 146, 0.14) 45%, transparent 100%);
-
-  /* Dusk inherits the dark theme's caution pair, which clears AA on these surfaces. */
-
-  /* State on: sunset orange. Its own literal, kept apart from var(--caution), so a caution retune can't move it. */
-  --state-on: #ff9e4a;
-
-  --text: #f0eefb;
-  --text-dim: #c4bee2;
-  --text-muted: #c2bbe0;
-  --text-on-neon: #16132c;
-
-  --violet-hi: #d3aeff;
-  /* Lifted so --indigo (and --info, which aliases it) clears AA on dusk's surfaces. */
-  --indigo: #93a4ff;
-  --magenta-text: #ff8fd0;
-  --indigo-text: #b3bfff;
-  --danger-text: #ff97ad;
-
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.34);
-  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.42);
-  --shadow-drop-2: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.42));
-
-  --grid-line: rgba(255, 46, 154, 0.16);
-  --scanline-color: rgba(0, 0, 0, 0.14);
-}
-
-/* ---- Theme: light, read as Day. Accessibility first: soft cool off-white, deep indigo ink, deepened neon, glow
-   becomes a ring, texture off. Legibility outranks aesthetic. ---- */
-[data-theme="light"] {
-  color-scheme: light;
-  --void: #e7e6f2;
-  --bg: #f1f0f8;
-  --surface-1: #fcfbff;
-  --surface-2: #f4f3fb;
-  --surface-3: #ecebf6;
-  --overlay: rgba(23, 19, 46, 0.28);
-
-  --line: #d6d3e6;
-  --line-strong: #bcb8d4;
-  --line-raised: #a9a4c8;
-
-  /* Daylight surfaces: raised controls are white with a soft grounding shadow, the track is the void tint,
-     the primary is a pale warm tint with deep ink inside the same sun frame, and headings drop the shadow. */
-  --raised: linear-gradient(180deg, #ffffff 0%, #eeedf7 100%);
-  --raised-hover: linear-gradient(180deg, #ffffff 0%, #e6e4f3 100%);
-  --raised-sheen: 0 1px 2px rgba(23, 19, 46, 0.1);
-  --track: #e7e6f2;
-  --track-edge: #d6d3e6;
-  --tab-on: linear-gradient(180deg, #ffffff 0%, #f1f0f9 100%);
-  --tab-on-sheen: 0 1px 2px rgba(23, 19, 46, 0.14);
-  --primary-tint: linear-gradient(180deg, rgba(255, 138, 61, 0.16) 0%, rgba(255, 47, 146, 0.1) 100%);
-  --primary-tint-hover: linear-gradient(180deg, rgba(255, 138, 61, 0.28) 0%, rgba(255, 47, 146, 0.18) 100%);
-  --primary-base: #ffffff;
-  --primary-ink: #17132e;
-  --primary-ink-shadow: none;
-  --lip: linear-gradient(90deg, #e24c9c, #7a3fd0 50%, #0f7fc0);
-  --heading-ink: #17132e;
-  --heading-shadow: none;
-  --glow-sun: 0 2px 10px rgba(200, 29, 128, 0.22);
-  --turn-wash: linear-gradient(90deg, rgba(255, 154, 61, 0.22) 0%, rgba(255, 47, 146, 0.1) 45%, transparent 100%);
-  --turn-glow: 0 2px 8px rgba(200, 29, 128, 0.16);
-
-  /* Deepened neon so accents keep contrast on light */
-  --magenta: #c81d80;
-  --magenta-hi: #e24c9c;
-  --cyan: #0f7fc0; /* blue-leaning cyan, never teal */
-  /* On light the readable `-hi` twin is the deeper one (on dark it is the lighter one). */
-  --cyan-hi: #0b6497;
-  --violet: #7a3fd0;
-  --violet-hi: #7a3fd0; /* keep deep for text contrast on light */
-  --indigo: #3d50d6;
-
-  --primary: var(--magenta);
-  --success: var(--cyan);
-  /* Darkened pins so markers stay legible on a pale map. */
-  --pin-1: #c81d80;
-  --pin-2: #0f7fc0;
-  --pin-3: #7a3fd0;
-  --pin-4: #c8143e;
-  --pin-5: #9a6100;
-  --pin-6: #0e7a55;
-  --pin-7: #4a4568;
-  --pin-8: #5a6472;
-  /* --caution is the edge/fill; --caution-hi is for text. */
-  --caution: #b4560a;
-  --caution-hi: #8f4406;
-  --danger: #c8143e;
-  --danger-hi: #e24c6c;
-  --info: var(--indigo);
-  --magenta-text: #b3186f;
-  --indigo-text: var(--indigo);
-  --danger-text: #b52a4a;
-
-  /* State on: a deepened cyan, because no ink reaches 4.5:1 on --cyan itself. */
-  --state-on: #0b6497;
-
-  /* The material in daylight: the rim is a hard dark line (an inverted neon would vanish on a pale ground),
-     interaction changes chroma and keeps lightness, the glow grounds and doesn't bloom, and the bezel
-     firms up because currentColor is deep ink here. */
-  --rim-color: #3b547e;
-  --rim-color-hi: var(--cyan);
-  --rim-glow: drop-shadow(0 1px 4px color-mix(in srgb, var(--rim-color) 34%, transparent));
-  --bezel-color: color-mix(in srgb, currentColor 30%, transparent);
-  --scrollbar-thumb: #3b547e;
-  --scrollbar-thumb-hi: var(--cyan);
-
-  --text: #17132e; /* deep indigo ink */
-  --text-dim: #4a4568;
-  --text-muted: #5b5578;
-  --text-on-neon: #ffffff;
-
-  /* Glow becomes a solid accent ring plus a faint soft shadow */
-  --glow-magenta: 0 0 0 2px rgba(200, 29, 128, 0.9), 0 2px 6px rgba(200, 29, 128, 0.2);
-  --glow-magenta-strong: 0 0 0 2.5px rgba(200, 29, 128, 1), 0 2px 10px rgba(200, 29, 128, 0.28);
-  --glow-cyan: 0 0 0 2px rgba(15, 127, 192, 0.9), 0 2px 6px rgba(15, 127, 192, 0.2);
-  --glow-violet: 0 0 0 2px rgba(122, 63, 208, 0.9), 0 2px 6px rgba(122, 63, 208, 0.2);
-  --glow-danger: 0 0 0 2px rgba(200, 20, 62, 0.9), 0 2px 6px rgba(200, 20, 62, 0.2);
-
-  /* A filter can't draw the solid ring, so the filter twins get a tight low shadow in place of a bloom. */
-  --glow-drop-magenta: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.3));
-  --glow-drop-magenta-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
-  --glow-drop-cyan: drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
-  --glow-drop-violet: drop-shadow(0 1px 4px rgba(122, 63, 208, 0.28));
-  --glow-drop-danger: drop-shadow(0 1px 4px rgba(200, 20, 62, 0.3));
-
-  --shadow-1: 0 1px 2px rgba(23, 19, 46, 0.08);
-  --shadow-2: 0 10px 30px rgba(23, 19, 46, 0.12);
-  --shadow-drop-2: drop-shadow(0 10px 15px rgba(23, 19, 46, 0.12));
-
-  --grid-line: rgba(200, 29, 128, 0.14);
-  --scanline-color: rgba(23, 19, 46, 0.05);
-}
-
-/* ---- Theme: dawn, the first light. Day's rules on a warm ground: apricot and cream surfaces, deep plum ink, a
-   rose and gold lip. The accents keep their meanings and stay apart from one another: rose for the primary, blue
-   for selection, violet for the GM, amber for caution and red for danger. ---- */
+/* ---- Dawn: soft lilac-grey paper, plum-grey ink, gentler edges and slightly muted accents. No pure white and no
+   harsh black. No scanlines and no coloured glow: the sun frame keeps its warm glow and the primary its pressed
+   edge. ---- */
 [data-theme="dawn"] {
   color-scheme: light;
-  --void: #f3e3d8;
-  --bg: #f8ece3;
-  --surface-1: #fff8f1;
-  --surface-2: #fcf2ea;
-  --surface-3: #f7e8de;
-  --overlay: rgba(46, 20, 38, 0.28);
+  --sky: var(--bg);
 
-  --line: #ecd5c7;
-  --line-strong: #dbbaa8;
-  --line-raised: #c9a08e;
+  --void: #e3dee8;
+  --bg: #ebe7ef;
+  --surface-1: #f3f0f5;
+  --surface-2: #f7f5f9;
+  --surface-3: #e8e3ee;
+  --overlay: rgba(42, 37, 55, 0.28);
 
-  --raised: linear-gradient(180deg, #fffdfb 0%, #f8ece3 100%);
-  --raised-hover: linear-gradient(180deg, #fffdfb 0%, #f3e1d4 100%);
-  --raised-sheen: 0 1px 2px rgba(46, 20, 38, 0.1);
-  --track: #f3e3d8;
-  --track-edge: #ecd5c7;
-  --tab-on: linear-gradient(180deg, #ffffff 0%, #fdf3ec 100%);
-  --tab-on-sheen: 0 1px 2px rgba(46, 20, 38, 0.14);
-  --primary-tint: linear-gradient(180deg, rgba(255, 170, 70, 0.2) 0%, rgba(230, 60, 120, 0.1) 100%);
-  --primary-tint-hover: linear-gradient(180deg, rgba(255, 170, 70, 0.32) 0%, rgba(230, 60, 120, 0.18) 100%);
-  --primary-base: #fff8f1;
-  --primary-ink: #2e1426;
-  --primary-ink-shadow: none;
-  --lip: linear-gradient(90deg, #e04f86, #f0a040 50%, #c01a6e);
-  --heading-ink: #2e1426;
-  --heading-shadow: none;
-  --glow-sun: 0 2px 10px rgba(192, 26, 110, 0.2);
-  --turn-wash: linear-gradient(90deg, rgba(255, 170, 70, 0.26) 0%, rgba(230, 60, 120, 0.1) 45%, transparent 100%);
-  --turn-glow: 0 2px 8px rgba(192, 26, 110, 0.16);
+  /* Paper has no glass: each glass token is its solid. */
+  --glass-bg: var(--bg);
+  --glass-void: var(--void);
+  --glass-surface-1: var(--surface-1);
+  --glass-surface-2: var(--surface-2);
+  --glass-surface-3: var(--surface-3);
+  --glass-blur: none;
 
-  /* Deepened for a pale ground, and spread apart in hue so each still means one thing. */
-  --magenta: #c01a6e;
-  --magenta-hi: #e04f86;
-  --cyan: #12609e; /* selection is a deep morning blue, never teal */
-  --cyan-hi: #0d4f84;
-  --violet: #7a3dc8;
-  --violet-hi: #6930b5;
-  --indigo: #4246c2;
+  --line: #e0dbe6;
+  --line-strong: #d3ccdc;
+  --line-raised: #b9b0c8;
+  --line-raised-hover: #9c92ae;
 
-  --primary: var(--magenta);
-  --success: var(--cyan);
-  /* Day's darkened pins, so markers stay legible on a pale map. */
+  --magenta: #f0559b;
+  --magenta-hi: #f27aae;
+  --magenta-text: #b0306e;
+  --cyan: #2a8fa8;
+  --cyan-hi: #1d6a80;
+  --violet: #8a62d6;
+  --violet-hi: #6a46b0;
+  --party: #4a72d9;
+  --indigo-text: #3a5aa8;
+  --hostile: #d9493f;
+  --danger-hi: #e4706a;
+  --danger-text: #a8352c;
+  --hp: #d9a43a;
+  --lamp-bonus: #d9a43a;
+  --hp-text: #7a5718;
+  --hp-lost: #ecd6dc;
+  --caution: #d08a2a;
+  --caution-hi: #8a5612;
+
+  /* Darkened pins, so markers stay legible on a pale map. */
   --pin-1: #c81d80;
   --pin-2: #0f7fc0;
   --pin-3: #7a3fd0;
@@ -669,74 +502,169 @@
   --pin-6: #0e7a55;
   --pin-7: #4a4568;
   --pin-8: #5a6472;
-  --caution: #a85e00;
-  --caution-hi: #864300;
-  --danger: #c01420;
-  --danger-hi: #e04a5c;
-  --info: var(--indigo);
-  --magenta-text: #a3165c;
-  --indigo-text: var(--indigo);
-  --danger-text: #ab1a26;
 
-  /* State on: a deep rose, with white on it. */
-  --state-on: #a3165c;
+  /* Dawn's cyan fill is too pale for an essential edge on paper, so outlines use the deeper cyan. */
+  --state-on-edge: var(--cyan-hi);
+  --focus-ring: var(--cyan-hi);
 
-  /* A hard warm line for the rim, as Day's is a hard cool one. */
-  --rim-color: #6e3f52;
-  --rim-color-hi: var(--cyan);
-  --rim-glow: drop-shadow(0 1px 4px color-mix(in srgb, var(--rim-color) 34%, transparent));
-  --bezel-color: color-mix(in srgb, currentColor 30%, transparent);
-  --scrollbar-thumb: #8a5a6c;
-  --scrollbar-thumb-hi: var(--cyan);
+  --text: #2a2537;
+  --text-dim: #4f4862;
+  --text-muted: #655d77;
+  --heading-ink: #2a2537;
 
-  --text: #2e1426; /* deep plum ink */
-  --text-dim: #5a3448;
-  --text-muted: #6c4457;
-  --text-on-neon: #ffffff;
+  /* Glow becomes a solid ring. */
+  --glow-magenta: 0 0 0 2px var(--magenta);
+  --glow-magenta-strong: 0 0 0 2.5px var(--magenta);
+  --glow-cyan: 0 0 0 2px var(--state-on-edge);
+  --glow-violet: 0 0 0 2px var(--violet);
+  --glow-danger: 0 0 0 2px var(--hostile);
+  --glow-primary: 0 0 #0000;
+  --glow-drop-magenta: drop-shadow(0 0 0 transparent);
+  --glow-drop-magenta-strong: drop-shadow(0 0 0 transparent);
+  --glow-drop-cyan: drop-shadow(0 0 0 transparent);
+  --glow-drop-violet: drop-shadow(0 0 0 transparent);
+  --glow-drop-danger: drop-shadow(0 0 0 transparent);
+  --turn-wash: linear-gradient(90deg, rgba(255, 138, 31, 0.2) 0%, rgba(240, 85, 155, 0.1) 45%, transparent 100%);
+  --turn-glow: 0 0 #0000;
 
-  --glow-magenta: 0 0 0 2px rgba(192, 26, 110, 0.9), 0 2px 6px rgba(192, 26, 110, 0.2);
-  --glow-magenta-strong: 0 0 0 2.5px rgba(192, 26, 110, 1), 0 2px 10px rgba(192, 26, 110, 0.28);
-  --glow-cyan: 0 0 0 2px rgba(18, 96, 158, 0.9), 0 2px 6px rgba(18, 96, 158, 0.2);
-  --glow-violet: 0 0 0 2px rgba(122, 61, 200, 0.9), 0 2px 6px rgba(122, 61, 200, 0.2);
-  --glow-danger: 0 0 0 2px rgba(192, 20, 32, 0.9), 0 2px 6px rgba(192, 20, 32, 0.2);
+  --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+  --glow-horizon: 0 0 #0000;
+  /* A gradient of one ink, so lettering clipped to it reads as solid ink. */
+  --grad-chrome: linear-gradient(#2a2537, #2a2537);
+  --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+  --script-ink: #c23b7e;
+  --script-glow: 0 0 #0000;
 
-  --glow-drop-magenta: drop-shadow(0 1px 4px rgba(192, 26, 110, 0.3));
-  --glow-drop-magenta-strong: drop-shadow(0 2px 8px rgba(192, 26, 110, 0.45));
-  --glow-drop-cyan: drop-shadow(0 1px 4px rgba(18, 96, 158, 0.28));
-  --glow-drop-violet: drop-shadow(0 1px 4px rgba(122, 61, 200, 0.28));
-  --glow-drop-danger: drop-shadow(0 1px 4px rgba(192, 20, 32, 0.3));
+  --primary-edge: #b0306e;
 
-  --shadow-1: 0 1px 2px rgba(46, 20, 38, 0.08);
-  --shadow-2: 0 10px 30px rgba(46, 20, 38, 0.12);
-  --shadow-drop-2: drop-shadow(0 10px 15px rgba(46, 20, 38, 0.12));
+  --tag-next-bg: #2a2537;
+  --tag-next-ink: #ebe7ef;
+  --tag-miss-bg: #d3ccdc;
 
-  --grid-line: rgba(192, 26, 110, 0.14);
-  --scanline-color: rgba(46, 20, 38, 0.05);
+  --scanline-opacity: 0;
+
+  --glow-lamp-action: 0 0 #0000;
+  --glow-lamp-bonus: 0 0 #0000;
+  --glow-lamp-reaction: 0 0 #0000;
+  --vcr-glow: 0 0 #0000;
+  --glow-tab-text: 0 0 #0000;
+
+  --track-edge: var(--line-raised);
+  --tab-on: linear-gradient(#fbfafc, #fbfafc);
+
+  --shadow-1: 0 1px 2px rgba(42, 37, 55, 0.08);
+  --shadow-2: 0 10px 30px rgba(42, 37, 55, 0.12);
+  --shadow-drop-2: drop-shadow(0 10px 15px rgba(42, 37, 55, 0.12));
+
+  /* Daybreak: pale lilac to peach to pink over a pink grid, mountains with a teal rim, and no stars. */
+  --landing-sky: linear-gradient(
+    180deg,
+    #f3e9f4 0%,
+    #ffdccb 32%,
+    #ffb8c6 54%,
+    #ff8fb3 64%,
+    #f1e4ee 64%,
+    #f1e4ee 82%,
+    #ece5ee 100%
+  );
+  --landing-star: rgba(255, 255, 255, 0);
+  --landing-star-dim: rgba(255, 255, 255, 0);
+  --landing-horizon: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(240, 106, 164, 0.85) 15%,
+    rgba(240, 106, 164, 0.85) 85%,
+    transparent 100%
+  );
+  --landing-horizon-glow: 0 0 #0000;
+  --landing-grid-x: rgba(240, 106, 164, 0.85);
+  --landing-grid-y: rgba(240, 106, 164, 0.85);
+  --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.2) 100%);
+  --landing-noise-opacity: 0.02;
+  --landing-mountain: #d9b8d0;
+  --landing-mountain-rim: linear-gradient(180deg, rgba(42, 143, 168, 0.7), rgba(42, 143, 168, 0.7));
+}
+
+/* ---- Reduced transparency: the device setting or the system's request (theme/transparency.ts sets the
+   attribute). The glass turns solid, the blur and scanlines go, and every glow drops to its ring. It outranks
+   either theme's block. ---- */
+:root[data-transparency="reduced"] {
+  --glass-bg: var(--bg);
+  --glass-void: var(--void);
+  --glass-surface-1: var(--surface-1);
+  --glass-surface-2: var(--surface-2);
+  --glass-surface-3: var(--surface-3);
+  --glass-blur: none;
+  --scanline-opacity: 0;
+  --glow-magenta: 0 0 0 1px var(--magenta);
+  --glow-magenta-strong: 0 0 0 2px var(--magenta);
+  --glow-cyan: 0 0 0 1px var(--state-on-edge);
+  --glow-violet: 0 0 0 1px var(--violet);
+  --glow-danger: 0 0 0 1px var(--hostile);
+  --glow-primary: 0 0 #0000;
+  --glow-drop-magenta: drop-shadow(0 0 0 transparent);
+  --glow-drop-magenta-strong: drop-shadow(0 0 0 transparent);
+  --glow-drop-cyan: drop-shadow(0 0 0 transparent);
+  --glow-drop-violet: drop-shadow(0 0 0 transparent);
+  --glow-drop-danger: drop-shadow(0 0 0 transparent);
+  --glow-sun: 0 0 #0000;
+  --glow-horizon: 0 0 #0000;
+  --turn-glow: 0 0 #0000;
+  --script-glow: 0 0 #0000;
+  --glow-lamp-action: 0 0 #0000;
+  --glow-lamp-bonus: 0 0 #0000;
+  --glow-lamp-reaction: 0 0 #0000;
+  --vcr-glow: 0 0 #0000;
+  --glow-tab-text: 0 0 #0000;
+}
+
+/* A browser that can't blur what is behind a panel gets the solid surfaces too. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-bg: var(--bg);
+    --glass-void: var(--void);
+    --glass-surface-1: var(--surface-1);
+    --glass-surface-2: var(--surface-2);
+    --glass-surface-3: var(--surface-3);
+    --glass-blur: none;
+  }
 }
 
 /* ---- Base and utilities ---- */
 
 body {
-  background: var(--bg);
+  /* The shorthand takes Dusk's gradients and Dawn's plain colour alike; the solid ground sits under both. */
+  background: var(--sky);
+  background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
-  /* Bungee ships one weight; a synthesized bold smears it. Every other face ships the weights it is used at. */
+  /* Bungee and VT323 ship one weight; a synthesized bold smears them. Bai Jamjuree ships the weights it is used at. */
   font-synthesis-weight: none;
 }
 
-/* Numbers that update live (HP, initiative, totals). `tabular-nums` is kept for any fallback face that has it;
-   Tomorrow's digits are proportional, so see `.numeric` for holding the row still. */
+/* Scanlines: one noninteractive overlay over the whole app, in Dusk only, so nothing nests a second comb. Its opacity
+   is a token that Dawn and reduced transparency set to zero. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, var(--scanline-color) 0 1px, transparent 1px var(--scanline-gap));
+  opacity: var(--scanline-opacity);
+}
+
+/* Numbers that update live (HP, initiative, totals). VT323 is monospaced; `tabular-nums` covers a fallback face. */
 .tabular {
   font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
 }
 
-/* Game numbers (HP, AC, initiative, dice totals); see --font-numeric. The digits are proportional, so a
-   changing value would move its row: reserve the widest value the field can hold (`min-width: 3ch` for HP,
-   `2ch` for AC; `1ch` is the zero, the widest digit) and align the number to the end of that box. */
+/* Game numbers (HP, AC, initiative, dice totals); see --font-numeric. VT323's digits share one width, so a
+   changing value keeps its row; a field that holds a varying count of digits still reserves its widest in `ch`. */
 .numeric {
   font-family: var(--font-numeric);
   font-weight: var(--fw-numeric);
@@ -757,14 +685,12 @@ body {
   border: 0;
 }
 
-/* Visible keyboard focus in the theme accent. `summary` is included because disclosures (Menu, FeatureList)
-   are <summary> elements. `:where()` adds no specificity, so primitives' own focus styles win. */
+/* Visible keyboard focus: a 2px --focus-ring outline 2px out, on every control. `summary` is included because
+   disclosures (Menu, FeatureList) are <summary> elements. An outline adds no layout and survives a control's own
+   box-shadow. `:where()` adds no specificity; a field keeps its own focus edge. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--bg),
-    0 0 0 4px var(--focus-ring-color);
-  border-radius: var(--radius-sm);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* ---- Interaction defaults ---- */
@@ -861,18 +787,19 @@ a:focus-visible .nav-arrow {
   transform: translateX(2px);
 }
 
-/* Frosted floating/sticky surfaces (the chrome glass tier). Keep panels mostly opaque. */
+/* Glass for a bounded outer plate that floats or sticks over content (a popover, a sticky bar). Dawn, reduced
+   transparency and a browser without backdrop blur get the solid surface from the tokens. */
 .surface-frost {
-  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  background: var(--glass-surface-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
-/* Scene-tier glass for panels on a canvas (a live map, a sky). Two glass tiers only; don't add a third. */
+/* Glass for a panel over a canvas (a live map, the sky). Two glass tiers only; don't add a third. */
 .surface-glass {
-  background: color-mix(in srgb, var(--surface-1) 72%, transparent);
-  backdrop-filter: blur(8px) saturate(1.15);
-  -webkit-backdrop-filter: blur(8px) saturate(1.15);
+  background: var(--glass-surface-1);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 /* Role rims: a 3px start-edge bar for chrome that belongs to a role. Never on selection state (that axis
@@ -975,8 +902,8 @@ a:focus-visible .nav-arrow {
   filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.7)) drop-shadow(0.04em 0.04em 0 #07031a)
     drop-shadow(0 0 0.2em rgba(255, 47, 146, 0.45));
 }
-/* Day and Dawn keep the chrome but swap the halo for a grounding shadow, since a glow is lost on a pale sky. */
-:is([data-theme="light"], [data-theme="dawn"]) .wordmark-name {
+/* Dawn's chrome is solid ink, so the halo becomes a grounding shadow. */
+[data-theme="dawn"] .wordmark-name {
   filter: drop-shadow(0.03em 0.03em 0 rgba(23, 19, 46, 0.55));
 }
 .wordmark-solid {
@@ -998,25 +925,14 @@ a:focus-visible .nav-arrow {
   pointer-events: none;
 }
 
-/* Faint CRT scanlines on a positioned container. A one-gap tile, because one large repeating gradient
-   rasterizes unevenly over large layers. */
-.scanlines {
-  position: relative;
-}
-.scanlines::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) var(--scanline-gap)
-  );
-  background-size: 100% var(--scanline-gap);
-  opacity: 0.5;
+/* Chrome lettering, for who is acting alone: the acting creature's name and YOUR TURN. Dusk clips the chrome to the
+   letters; Dawn's chrome token is one ink, so the same rule prints solid ink. Both carry the pink and cyan split. */
+.chrome {
+  background: var(--grad-chrome);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: var(--chrome-split);
 }
 
 /* Subtle magenta/cyan fringing, app wordmark only; optional garnish on top of the chrome fill. */
@@ -1026,12 +942,11 @@ a:focus-visible .nav-arrow {
     1px 0 rgba(45, 226, 255, 0.55);
 }
 
-/* Day and Dawn: texture off, wordmark fringing off */
-:is([data-theme="light"], [data-theme="dawn"]) .grid-floor,
-:is([data-theme="light"], [data-theme="dawn"]) .scanlines::after {
+/* Dawn: texture off, wordmark fringing off */
+[data-theme="dawn"] .grid-floor {
   display: none;
 }
-:is([data-theme="light"], [data-theme="dawn"]) .chromatic {
+[data-theme="dawn"] .chromatic {
   text-shadow: none;
 }
 
@@ -1065,11 +980,9 @@ a:focus-visible .nav-arrow {
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(7px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 @keyframes popover-in {
@@ -1157,23 +1070,6 @@ a:focus-visible .nav-arrow {
 
 /* ---- Accessibility fallbacks ---- */
 
-/* Reduced transparency: drop blur and texture for a solid surface */
-@media (prefers-reduced-transparency: reduce) {
-  .surface-frost {
-    background: var(--surface-2);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-  .surface-glass {
-    background: var(--surface-1);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-  .scanlines::after {
-    display: none;
-  }
-}
-
 /* Reduced motion: collapse all motion, keep end states */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1183,260 +1079,4 @@ a:focus-visible .nav-arrow {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-}
-
-/* ---- The landing scene per theme: these blocks override only --landing-* tokens.
-   Dark (base, above) is Night; then Dusk, Day (`light`) and Dawn. ---- */
-[data-theme="dusk"] {
-  --landing-sky:
-    radial-gradient(120% 70% at 50% 108%, rgba(255, 120, 60, 0.28) 0%, transparent 55%),
-    linear-gradient(
-      180deg,
-      #140a2e 0%,
-      #1f0c44 20%,
-      #2a1055 36%,
-      #4a1560 52%,
-      #6e1b66 64%,
-      #92285f 74%,
-      #b23a62 84%,
-      #d0623f 93%,
-      #e88a4a 100%
-    );
-  --landing-star: rgba(255, 235, 220, 0.85);
-  --landing-star-dim: rgba(255, 170, 190, 0.5);
-  --landing-sun: linear-gradient(180deg, #fff3c9 0%, #ffc15c 26%, #ff7bab 55%, #ff2e9a 78%, #a45cff 100%);
-  --landing-sun-glow: drop-shadow(0 0 34px rgba(255, 150, 80, 0.55)) drop-shadow(0 0 90px rgba(255, 46, 154, 0.35));
-  --landing-horizon: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 193, 92, 0.95) 22%,
-    rgba(255, 92, 184, 0.95) 50%,
-    rgba(255, 193, 92, 0.95) 78%,
-    transparent 100%
-  );
-  --landing-horizon-glow: 0 0 14px 3px rgba(255, 193, 92, 0.8), 0 0 52px 14px rgba(255, 46, 154, 0.55);
-  --landing-grid-x: rgba(255, 140, 90, 0.55);
-  --landing-grid-y: rgba(255, 46, 154, 0.5);
-  --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 55%, rgba(16, 4, 20, 0.55) 100%);
-  --landing-mountain: #2a0d3c;
-  --landing-mountain-rim: linear-gradient(180deg, rgba(255, 193, 92, 0.95), rgba(255, 46, 154, 0.7));
-}
-[data-theme="light"] {
-  --landing-sky: linear-gradient(
-    180deg,
-    #dce6fb 0%,
-    #e6e2f9 24%,
-    #efdff6 42%,
-    #f6daec 56%,
-    #fbd9e4 68%,
-    #fdd8ce 84%,
-    #ffd6b4 100%
-  );
-  /* Day: no stars. Transparent star inks keep the layers (and their markup) inert. */
-  --landing-star: rgba(255, 255, 255, 0);
-  --landing-star-dim: rgba(255, 255, 255, 0);
-  --landing-sun: linear-gradient(180deg, #fffbea 0%, #ffd98f 30%, #ff8fc0 62%, #e24c9c 88%, #a45cff 100%);
-  --landing-sun-glow: drop-shadow(0 0 28px rgba(255, 150, 150, 0.5)) drop-shadow(0 0 70px rgba(255, 190, 120, 0.4));
-  --landing-horizon: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(15, 127, 192, 0.85) 22%,
-    rgba(200, 29, 128, 0.9) 50%,
-    rgba(15, 127, 192, 0.85) 78%,
-    transparent 100%
-  );
-  --landing-horizon-glow: 0 0 10px 2px rgba(200, 29, 128, 0.35), 0 0 36px 10px rgba(255, 150, 120, 0.35);
-  --landing-grid-x: rgba(200, 29, 128, 0.4);
-  --landing-grid-y: rgba(15, 127, 192, 0.35);
-  --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.28) 100%);
-  --landing-noise-opacity: 0.02;
-  --landing-mountain: #bba6dc;
-  --landing-mountain-rim: linear-gradient(180deg, #c81d80, #0f7fc0);
-  /* Day's chrome is a darker metal, so the wordmark holds against a pale sky. */
-  --grad-chrome: linear-gradient(
-    180deg,
-    #8fa0ec 0%,
-    #5466cf 30%,
-    #2a2f8a 48%,
-    #170f45 50%,
-    #4a2a99 62%,
-    #c81d80 85%,
-    #e85aa5 100%
-  );
-}
-/* Dawn: the sky still lilac overhead, warming through rose to gold where the sun comes up, and the last stars
-   fading. The ground below the line is warm sand. */
-[data-theme="dawn"] {
-  --landing-sky:
-    radial-gradient(110% 46% at 50% 64%, rgba(255, 196, 110, 0.5) 0%, transparent 60%),
-    linear-gradient(
-      180deg,
-      #d6cdee 0%,
-      #e4d0ea 20%,
-      #f2d2e0 38%,
-      #fad5cf 50%,
-      #ffdcb6 58%,
-      #ffe4a4 64%,
-      #f6d6c0 64%,
-      #f1cdb8 82%,
-      #ecc4b0 100%
-    );
-  --landing-star: rgba(255, 255, 255, 0.7);
-  --landing-star-dim: rgba(255, 244, 236, 0.45);
-  --landing-sun: linear-gradient(180deg, #fffbe6 0%, #ffe49a 28%, #ffb45c 55%, #ff7f6a 80%, #e04f86 100%);
-  --landing-sun-glow: drop-shadow(0 0 30px rgba(255, 180, 90, 0.6)) drop-shadow(0 0 80px rgba(255, 140, 120, 0.4));
-  --landing-horizon: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(240, 150, 60, 0.9) 22%,
-    rgba(192, 26, 110, 0.85) 50%,
-    rgba(240, 150, 60, 0.9) 78%,
-    transparent 100%
-  );
-  --landing-horizon-glow: 0 0 12px 2px rgba(255, 160, 80, 0.45), 0 0 40px 10px rgba(255, 120, 120, 0.3);
-  --landing-grid-x: rgba(192, 26, 110, 0.36);
-  --landing-grid-y: rgba(200, 110, 20, 0.42);
-  --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 70, 90, 0.25) 100%);
-  --landing-noise-opacity: 0.02;
-  --landing-mountain: #c9a0b4;
-  --landing-mountain-rim: linear-gradient(180deg, #f0904c, #c01a6e);
-  /* A warm dark metal, so the wordmark holds against the pale sky and reads as morning beside Day's. */
-  --grad-chrome: linear-gradient(
-    180deg,
-    #b48ad8 0%,
-    #7f52b8 30%,
-    #4a2272 48%,
-    #2e1426 50%,
-    #7a2e64 62%,
-    #c01a6e 85%,
-    #f0904c 100%
-  );
-}
-
-/* ---- The work-screen sky per theme, separate from the landing's blocks. Only --sky-* appears here;
-   --sky-horizon-a/b and --sky-grid-x/y need no Day override because they derive from --cyan/--magenta. ---- */
-
-/* Dusk: the landing's ember end fails AA against text, so the wash stops at #6E1B66 and the ember lives
-   in the beam and a bloom confined below the horizon. */
-[data-theme="dusk"] {
-  --sky-wash: linear-gradient(180deg, #140a2e 0%, #1f0c44 24%, #2a1055 44%, #4a1560 68%, #6e1b66 100%);
-  --sky-star: rgba(255, 235, 220, 0.85);
-  --sky-star-dim: rgba(255, 170, 190, 0.5);
-  /* An amber-gold sun on the gold (--caution-hi) beam; no rose. */
-  --sky-sun: linear-gradient(
-    180deg,
-    rgba(255, 243, 201, 0) 0%,
-    rgba(255, 206, 122, 0.5) 46%,
-    rgba(255, 168, 66, 0.9) 100%
-  );
-  --sky-horizon-a: color-mix(in srgb, var(--caution-hi) 90%, transparent);
-  --sky-horizon-glow: radial-gradient(
-    46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(255, 150, 80, 0.34) 0%,
-    rgba(255, 46, 154, 0.14) 46%,
-    transparent 74%
-  );
-  /* The bloom's vertical radius is the horizon inset, so the ember stops at the line and never reaches text. */
-  --sky-bloom: radial-gradient(
-    110% var(--sky-horizon-inset) at 50% 100%,
-    rgba(255, 120, 60, 0.16) 0%,
-    rgba(255, 46, 154, 0.07) 46%,
-    transparent 72%
-  );
-  --sky-grid-x: color-mix(in srgb, var(--caution) 55%, transparent);
-  --sky-grid-y: color-mix(in srgb, var(--magenta) 50%, transparent);
-  /* Stays under the tighter (column) AA ceiling on #6E1B66. */
-  --sky-floor-opacity: 0.28;
-}
-
-/* Day: the wash clears AA everywhere; the hazards are line inks. Never put --cyan small text on this sky
-   (use --text-dim). Stars are transparent and there is no bloom, but the grid stays, which is why it is a
-   sky layer and not the theme-gated `.grid-floor` utility. */
-[data-theme="light"] {
-  /* Horizon-relative stops, as for night. */
-  --sky-wash: linear-gradient(
-    180deg,
-    #dce6fb 0%,
-    #e6e2f9 calc((100% - var(--sky-horizon-inset)) * 0.27),
-    #efdff6 calc((100% - var(--sky-horizon-inset)) * 0.47),
-    #f6daec calc((100% - var(--sky-horizon-inset)) * 0.63),
-    #fbd9e4 calc(100% - var(--sky-horizon-inset)),
-    #fdd8ce calc(100% - var(--sky-horizon-inset) * 0.4),
-    #ffd6b4 100%
-  );
-  --sky-star: rgba(255, 255, 255, 0);
-  --sky-star-dim: rgba(255, 255, 255, 0);
-  --sky-sun: linear-gradient(
-    180deg,
-    rgba(255, 251, 234, 0) 0%,
-    rgba(255, 217, 143, 0.5) 52%,
-    rgba(255, 143, 192, 0.72) 100%
-  );
-  --sky-sun-opacity: 0.4;
-  --sky-horizon-glow: radial-gradient(
-    46% 3.25rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(200, 29, 128, 0.16) 0%,
-    rgba(255, 150, 120, 0.14) 48%,
-    transparent 76%
-  );
-  --sky-bloom: none;
-  /* Below the AA ceilings for grid lines on #FBD9E4. */
-  --sky-floor-opacity: 0.55;
-}
-
-/* Dawn: a pale warm wash that clears AA for every text ink, a gold crest, and an amber and rose beam and floor in
-   place of Day's blue. */
-[data-theme="dawn"] {
-  --sky-wash: linear-gradient(
-    180deg,
-    #f1e6f1 0%,
-    #f6e6ec calc((100% - var(--sky-horizon-inset)) * 0.3),
-    #fae8e3 calc((100% - var(--sky-horizon-inset)) * 0.6),
-    #fde9da calc(100% - var(--sky-horizon-inset)),
-    #fde3cc calc(100% - var(--sky-horizon-inset) * 0.4),
-    #fbdcc0 100%
-  );
-  --sky-star: rgba(255, 255, 255, 0);
-  --sky-star-dim: rgba(255, 255, 255, 0);
-  --sky-sun: linear-gradient(
-    180deg,
-    rgba(255, 250, 232, 0) 0%,
-    rgba(255, 214, 130, 0.55) 50%,
-    rgba(255, 160, 90, 0.75) 100%
-  );
-  --sky-sun-opacity: 0.45;
-  --sky-horizon-a: color-mix(in srgb, var(--caution) 80%, transparent);
-  --sky-horizon-glow: radial-gradient(
-    46% 3.25rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(255, 150, 70, 0.2) 0%,
-    rgba(230, 60, 120, 0.1) 48%,
-    transparent 76%
-  );
-  --sky-bloom: none;
-  --sky-grid-x: color-mix(in srgb, var(--magenta) 45%, transparent);
-  --sky-grid-y: color-mix(in srgb, var(--caution) 45%, transparent);
-  --sky-floor-opacity: 0.5;
-}
-
-/* On phones the horizon is most of the visible sky, so step the inset down (it also keeps the grid clear of
-   the iOS home indicator). Only the crown steps; the diameter follows, so the sun stays a hemisphere. */
-@media (max-width: 760px) {
-  :root {
-    --sky-horizon-inset: 5.75rem;
-    --sky-sun-crown: 3.25rem;
-  }
-}
-
-/* ---- Role rims per theme. Night and Dusk share them; Day and Dawn deepen them and ground the glow. ---- */
-[data-theme="light"] {
-  --rim-player: #c81d80;
-  --rim-gm: #6c3fd4;
-  --rim-player-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.3));
-  --rim-gm-glow: drop-shadow(0 1px 4px rgba(108, 63, 212, 0.28));
-}
-[data-theme="dawn"] {
-  --rim-player: #c01a6e;
-  --rim-gm: #6c35c8;
-  --rim-player-glow: drop-shadow(0 1px 4px rgba(192, 26, 110, 0.3));
-  --rim-gm-glow: drop-shadow(0 1px 4px rgba(108, 53, 200, 0.28));
 }

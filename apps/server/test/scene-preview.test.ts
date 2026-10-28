@@ -9,7 +9,7 @@ import { GAME_PATHS } from "@vtt/api-contract";
 import { createServer } from "../src/server.js";
 import { png } from "./image-fixtures.js";
 
-// The GM's preview of a scene (`scene:preview`): what the shared screen or one character's player would receive if
+// The GM's preview of a scene (`encounter:preview`): what the shared screen or one character's player would receive if
 // the scene went live now, from the real projections over a copy. It changes nothing and reaches no player.
 
 const HERO = "10000000-0000-4000-8000-000000000001";
@@ -24,7 +24,7 @@ const initialState = (mapAssetId: string) =>
   GameStateSchema.parse({
     schemaVersion: 1,
     combat: {
-      scenes: [
+      encounters: [
         {
           id: SCENE,
           name: "Crypt",
@@ -125,14 +125,14 @@ async function table() {
 }
 
 const previewPath = (actorId?: string) =>
-  `${GAME_PATHS.scenePreview.replace("{sceneId}", SCENE)}${actorId ? `?actorId=${actorId}` : ""}`;
+  `${GAME_PATHS.scenePreview.replace("{encounterId}", SCENE)}${actorId ? `?actorId=${actorId}` : ""}`;
 type Preview = {
   live: boolean;
   screen: { encounter: { tokens: Array<{ actorId: string }>; vision?: unknown } } | null;
   player: { combat: { tokens: Array<{ actorId: string }> }; actors: Array<{ id: string; name: string }> } | null;
 };
 
-describe("previewing a scene", () => {
+describe("previewing an encounter", () => {
   it("shows the GM what the table screen would show, through the party's eyes, and changes nothing", async () => {
     const { server, http, gmToken } = await table();
     const before = server.store.snapshot;
@@ -146,8 +146,8 @@ describe("previewing a scene", () => {
     expect(preview.player).toBeNull();
     // Nothing moved: the scene is still prepared and the revision is the same.
     expect(server.store.snapshot.revision).toBe(before.revision);
-    expect(server.store.snapshot.combat.activeSceneId).toBeNull();
-    expect(server.store.snapshot.combat.scenes[0]!.combat.tokens).toHaveLength(3);
+    expect(server.store.snapshot.combat.activeEncounterId).toBeNull();
+    expect(server.store.snapshot.combat.encounters[0]!.combat.tokens).toHaveLength(3);
   });
 
   it("shows what one character's player would receive, and the screen preview matches the screen once live", async () => {
@@ -160,7 +160,7 @@ describe("previewing a scene", () => {
     expect(server.store.snapshot.actors.find((actor) => actor.id === HERO)!.ownerSessionId).toBeNull();
 
     const screen = ((await (await http(previewPath(), gmToken)).json()) as { data: Preview }).data;
-    expect(await emit(gm, "scene:activate", { sceneId: SCENE })).toMatchObject({ ok: true });
+    expect(await emit(gm, "encounter:activate", { encounterId: SCENE })).toMatchObject({ ok: true });
     const live = server.viewerPresentation.snapshot.encounter.tokens.map((token) => token.actorId);
     expect(screen.screen!.encounter.tokens.map((token) => token.actorId)).toEqual(live);
     const again = ((await (await http(previewPath(), gmToken)).json()) as { data: Preview }).data;
@@ -168,12 +168,12 @@ describe("previewing a scene", () => {
     expect(again.screen!.encounter.tokens.map((token) => token.actorId)).toEqual(live);
   });
 
-  it("answers only the GM, and names a missing scene or a creature outside the party as not found", async () => {
+  it("answers only the GM, and names a missing encounter or a creature outside the party as not found", async () => {
     const { player, http, gmToken, playerToken } = await table();
     expect((await http(previewPath(), playerToken)).status).toBe(403);
-    expect(await emit(player, "scene:preview", { sceneId: SCENE })).toMatchObject({ ok: false });
+    expect(await emit(player, "encounter:preview", { encounterId: SCENE })).toMatchObject({ ok: false });
     expect((await http(previewPath(GOBLIN), gmToken)).status).toBe(404);
-    const missing = GAME_PATHS.scenePreview.replace("{sceneId}", "60000000-0000-4000-8000-0000000000ff");
+    const missing = GAME_PATHS.scenePreview.replace("{encounterId}", "60000000-0000-4000-8000-0000000000ff");
     expect((await http(missing, gmToken)).status).toBe(404);
   });
 });

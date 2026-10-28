@@ -86,7 +86,7 @@ const snapshot = async (base: string, token: string, view?: "player") =>
     .data.game;
 
 describe("standing rules policy", () => {
-  it("is GM-only, stores per-family exceptions, and does NOT retune the fight in progress", async () => {
+  it("is GM-only, stores per-family exceptions, and does NOT retune the encounter in progress", async () => {
     const { base, gmToken, server, mapAssetId } = await boot();
     const playerToken = server.auth.issuePlayerSession();
 
@@ -124,7 +124,7 @@ describe("standing rules policy", () => {
     });
   });
 
-  it("seeds each new fight from the policy, and lets the start command override it per fight", async () => {
+  it("seeds each new encounter from the policy, and lets the start command override it per encounter", async () => {
     const { base, gmToken, mapAssetId } = await boot();
     await post(base, GAME_PATHS.rulesPolicy, gmToken, { dial: "assisted", exceptions: { movement: "freeform" } });
 
@@ -145,7 +145,7 @@ describe("standing rules policy", () => {
     expect(overridden.combat.ruleExceptions).toEqual({ slots: "strict" });
   });
 
-  it("changes the live fight through the rules-mode command, leaving exceptions alone when omitted", async () => {
+  it("changes the live encounter through the rules-mode command, leaving exceptions alone when omitted", async () => {
     const { base, gmToken, mapAssetId } = await boot();
     await post(base, GAME_PATHS.encounterStart, gmToken, { mapAssetId, entries: [{ actorId: HERO_ID, score: 10 }] });
     await post(base, GAME_PATHS.rulesMode, gmToken, { mode: "assisted", exceptions: { economy: "freeform" } });
@@ -169,7 +169,7 @@ describe("standing rules policy", () => {
   });
 });
 
-describe("staging defaults and the one-command mid-fight add", () => {
+describe("staging defaults and the one-command mid-encounter add", () => {
   it("stores the table's staging default and refuses a player", async () => {
     const { base, gmToken, server } = await boot();
     const playerToken = server.auth.issuePlayerSession();
@@ -181,7 +181,7 @@ describe("staging defaults and the one-command mid-fight add", () => {
     expect((await snapshot(base, server.auth.issuePlayerSession(), "player")).stagingDefaults).toBeUndefined();
   });
 
-  it("lands a mid-fight add on the roster AND in the fight in one command and one revision", async () => {
+  it("lands a mid-encounter add on the roster AND in the encounter in one command and one revision", async () => {
     const { base, gmToken, mapAssetId } = await boot();
     await post(base, GAME_PATHS.encounterStart, gmToken, { mapAssetId, entries: [{ actorId: HERO_ID, score: 10 }] });
     const before = (await snapshot(base, gmToken)).revision;
@@ -205,7 +205,7 @@ describe("staging defaults and the one-command mid-fight add", () => {
     expect(game.combat.tokens.map((token: { actorId: string }) => token.actorId)).toContain(commandId);
   });
 
-  it("ignores joinEncounter when no fight is running (the roster add is the whole intent)", async () => {
+  it("ignores joinEncounter when no encounter is running (the roster add is the whole intent)", async () => {
     const { base, gmToken } = await boot();
     const commandId = randomUUID();
     expect(
@@ -223,14 +223,14 @@ describe("staging defaults and the one-command mid-fight add", () => {
   });
 });
 
-describe("the two doors into a fight", () => {
+describe("the two doors into an encounter", () => {
   it("prepares and goes live in one command", async () => {
     const { base, gmToken, mapAssetId } = await boot();
-    const sceneId = randomUUID();
+    const encounterId = randomUUID();
     expect(
       (
         await post(base, GAME_PATHS.scenes, gmToken, {
-          commandId: sceneId,
+          commandId: encounterId,
           name: "Ambush",
           mapAssetId,
           combatantIds: [HERO_ID],
@@ -239,31 +239,33 @@ describe("the two doors into a fight", () => {
       ).status
     ).toBe(200);
     const game = await snapshot(base, gmToken);
-    expect(game.combat.activeSceneId).toBe(sceneId);
+    expect(game.combat.activeEncounterId).toBe(encounterId);
     expect(game.combat.initiative.map((entry: { actorId: string }) => entry.actorId)).toEqual([HERO_ID]);
     // The active scene's own slot stays empty; its live copy is the top-level combat.
-    expect(game.combat.scenes.find((scene: { id: string }) => scene.id === sceneId).combat.initiative).toEqual([]);
+    expect(game.combat.encounters.find((scene: { id: string }) => scene.id === encounterId).combat.initiative).toEqual(
+      []
+    );
   });
 
   it("still only prepares when activate is absent", async () => {
     const { base, gmToken, mapAssetId } = await boot();
-    const sceneId = randomUUID();
+    const encounterId = randomUUID();
     await post(base, GAME_PATHS.scenes, gmToken, {
-      commandId: sceneId,
+      commandId: encounterId,
       name: "Later",
       mapAssetId,
       combatantIds: [HERO_ID]
     });
     const game = await snapshot(base, gmToken);
-    expect(game.combat.activeSceneId).toBeNull();
+    expect(game.combat.activeEncounterId).toBeNull();
     expect(game.combat.initiative).toEqual([]);
   });
 
-  it("starts on the live scene's staged list when the request omits the combatants", async () => {
+  it("starts on the live encounter's staged list when the request omits the combatants", async () => {
     const { base, gmToken, mapAssetId } = await boot();
-    const sceneId = randomUUID();
+    const encounterId = randomUUID();
     await post(base, GAME_PATHS.scenes, gmToken, {
-      commandId: sceneId,
+      commandId: encounterId,
       name: "Ambush",
       mapAssetId,
       combatantIds: [HERO_ID, SECOND_ID],
@@ -284,7 +286,7 @@ describe("the two doors into a fight", () => {
     expect((await response.json()).error.message).toMatch(/Choose 1 to 200 combatants/);
   });
 
-  it("keeps the right refusal when a fight is already running (derivation must not mask it)", async () => {
+  it("keeps the right refusal when an encounter is already running (derivation must not mask it)", async () => {
     const { base, gmToken, mapAssetId } = await boot();
     await post(base, GAME_PATHS.encounterStart, gmToken, { mapAssetId, entries: [{ actorId: HERO_ID, score: 10 }] });
     const response = await post(base, GAME_PATHS.encounterStart, gmToken, { mapAssetId });
@@ -353,7 +355,7 @@ describe("per-replay sharing", () => {
     await post(base, GAME_PATHS.encounterEnd, gmToken, {});
 
     const listed = (await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(gmToken) })).json())
-      .data.encounters;
+      .data.replays;
     expect(listed).toHaveLength(1);
     // Hidden until shared: an ended fight is the GM's record until the GM says otherwise.
     expect(listed[0].playerVisible).toBe(false);
@@ -362,7 +364,7 @@ describe("per-replay sharing", () => {
     expect((await post(base, path, gmToken, { playerVisible: true })).status).toBe(200);
     expect(
       (await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(gmToken) })).json()).data
-        .encounters[0].playerVisible
+        .replays[0].playerVisible
     ).toBe(true);
 
     expect(

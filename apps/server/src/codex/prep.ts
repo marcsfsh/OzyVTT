@@ -83,7 +83,7 @@ export type PrepSectionInput = Readonly<{
   scenes?: readonly PrepSceneInput[];
   deadlineIds?: readonly string[];
   questIds?: readonly string[];
-  sceneIds?: readonly string[];
+  encounterIds?: readonly string[];
 }>;
 
 // ----- Field checks -----
@@ -277,7 +277,7 @@ export function prepSections(value: readonly PrepSectionInput[] | undefined, mod
         return {
           ...base,
           type: "encounters",
-          sceneIds: idList(section.sceneIds, CODEX_PREP_LIMITS.encounters, "An Encounters section")
+          encounterIds: idList(section.encounterIds, CODEX_PREP_LIMITS.encounters, "An Encounters section")
         };
     }
   });
@@ -326,7 +326,7 @@ function hasContent(section: CodexPrepSection): boolean {
     case "quests":
       return section.questIds.length > 0;
     case "encounters":
-      return section.sceneIds.length > 0;
+      return section.encounterIds.length > 0;
   }
 }
 
@@ -352,7 +352,7 @@ function emptySection(templateSection: CodexPrepTemplateSection, sectionId: stri
     case "quests":
       return { ...base, type: "quests", questIds: [] };
     case "encounters":
-      return { ...base, type: "encounters", sceneIds: [] };
+      return { ...base, type: "encounters", encounterIds: [] };
   }
 }
 

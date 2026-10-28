@@ -115,6 +115,9 @@ describe("the player's prompt slot", () => {
         "The roll is 16 against your AC 15. Shield gives you +5 AC until the start of your next turn, so this hit becomes a miss."
       )
     ).toBeTruthy();
+    // The numbers the choice turns on: the roll the player saw, their AC, and their AC with Shield.
+    const numbers = [...document.querySelectorAll(".prompt-card-numbers > div")].map((cell) => cell.textContent);
+    expect(numbers).toEqual(["16Their roll", "15Your AC", "20With Shield"]);
     expect(screen.getByRole("button", { name: "Take the hit" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cast Shield" }).className).toContain("encounter-primary");
     expect(screen.getByText("1 more after this: DC 15 Dexterity saving throw")).toBeTruthy();

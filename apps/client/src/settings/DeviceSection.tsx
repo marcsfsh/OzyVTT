@@ -1,5 +1,5 @@
-import { Button, SegmentedControl, Switch, ThemeToggle } from "@vtt/ui";
-import { useRollPreference } from "../dice/roll-preference";
+import { Button, SegmentedControl, setReduceTransparency, Switch, ThemeToggle, useReduceTransparency } from "@vtt/ui";
+import { tableDiceLine, useRollPreference } from "../dice/roll-preference";
 import { setAutoArrange, setPinchZoom, useAutoArrange, usePinchZoom } from "./preferences";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
@@ -16,16 +16,30 @@ export function DeviceSection({
   /** A player leaving the table; asks first. */
   onLeave?: () => void;
 }>) {
-  const { rollInput, mayType, setRollInput } = useRollPreference();
+  const dice = useRollPreference();
+  const { rollInput, setRollInput } = dice;
   const autoArrange = useAutoArrange();
   const pinchZoom = usePinchZoom();
+  const transparency = useReduceTransparency();
   return (
     <SettingsSection id="device" gmOnly={false}>
       <SettingRow setting={SETTING.theme} stacked>
         <ThemeToggle />
       </SettingRow>
-      {/* The GM's table setting outranks this device's choice, so the reason replaces the control. */}
-      {mayType ? (
+      {/* A system request for reduction outranks this device's choice, so the switch shows it on and says why. */}
+      <SettingRow
+        setting={SETTING.reduceTransparency}
+        hint={transparency.system ? "Your system asks for reduced transparency, so panels stay solid." : undefined}
+      >
+        <Switch
+          checked={transparency.setting || transparency.system}
+          disabled={transparency.system}
+          onChange={setReduceTransparency}
+          label="Reduce transparency"
+        />
+      </SettingRow>
+      {/* A player's dice follow the table's mode, so the rule replaces the control. */}
+      {dice.chooses ? (
         <SettingRow setting={SETTING.rollInput}>
           <SegmentedControl
             ariaLabel="How you roll"
@@ -38,17 +52,14 @@ export function DeviceSection({
           />
         </SettingRow>
       ) : (
-        <SettingRow
-          setting={SETTING.rollInput}
-          hint="At this table the server rolls players' dice, and only the GM can change that."
-        />
+        <SettingRow setting={SETTING.rollInput} hint={tableDiceLine(dice)} />
       )}
       <SettingRow setting={SETTING.pinchZoom}>
         <Switch checked={pinchZoom} onChange={setPinchZoom} label="Let pinch zoom the page" />
       </SettingRow>
       {role === "gm" && (
         <SettingRow setting={SETTING.arrangeScenes} gmOnly>
-          <Switch checked={autoArrange} onChange={setAutoArrange} label="Open new scenes for arranging" />
+          <Switch checked={autoArrange} onChange={setAutoArrange} label="Open new encounters for arranging" />
         </SettingRow>
       )}
       {role === "player" && onLeave && (

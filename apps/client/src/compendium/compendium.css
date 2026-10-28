@@ -549,6 +549,32 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3) 0;
 }
+/* A phone record's actions under its card: Add to a scene above the homebrew copy, each a full row. */
+.cp-rec-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cp-rec-actions > .nh-btn {
+  width: 100%;
+}
+.cp-add-scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-add-scene-list .cp-hint {
+  margin: var(--space-1) 0 0;
+}
+.cp-add-scene-none {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
 .cp-rec-notices {
   display: flex;
   flex-direction: column;
@@ -1262,4 +1288,28 @@
   .cp-search-form {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+.cp-add-scene-list .cp-hint.is-caution {
+  color: var(--caution-hi);
+}
+/* A phone's Compendium sections, with New beside them: the row the drawn header shows. */
+.cp-phone-sections {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--line-strong);
+}
+.cp-phone-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: 0;
+}
+.cp-phone-new {
+  flex: none;
+  align-self: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  margin: 0 var(--space-2);
+  padding: 0;
 }

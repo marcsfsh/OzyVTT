@@ -61,7 +61,7 @@ export const saveCommands = [
     malformed: "The saving throw is malformed.",
     issueMessage: true,
     async run({ principal, request, dispatch, execute }, kit) {
-      const { commandId, actorId, ability, rollMode, face, total, reroll, expectedRevision } = request;
+      const { commandId, actorId, ability, rollMode, face, rolledTotal, total, reroll, expectedRevision } = request;
       const initiator = initiatorOf(principal);
       const snapshot = kit.read();
       requireActorAccess(initiator, snapshot, actorId, "save");
@@ -79,6 +79,7 @@ export const saveCommands = [
           method: total === undefined ? "roll" : "manual",
           ...(total === undefined ? {} : { total }),
           ...(face === undefined ? {} : { face }),
+          ...(rolledTotal === undefined ? {} : { rolledTotal }),
           ...(rollMode ? { rollMode } : {}),
           commit: true,
           ...(expectedRevision === undefined ? {} : { expectedRevision })
@@ -152,7 +153,11 @@ export const saveCommands = [
           forced ?? aggregated.mode,
           saveTotalFor(definition, live, ability, derivation) + aura,
           saveRiderDiceTerms(derivation, ability),
-          { ...(face === undefined ? {} : { face }), ...(reroll === true ? { reroll: true } : {}) },
+          {
+            ...(face === undefined ? {} : { face }),
+            ...(rolledTotal === undefined ? {} : { total: rolledTotal }),
+            ...(reroll === true ? { reroll: true } : {})
+          },
           (sides) => kit.context.random(sides)
         );
         holdRoll(draft, {
@@ -256,6 +261,7 @@ export const saveCommands = [
           damageOverride,
           {
             ...(face !== undefined ? { face } : {}),
+            ...(request.rolledTotal !== undefined ? { total: request.rolledTotal } : {}),
             ...(reroll === true ? { reroll: true } : {}),
             ...(request.answer ? { answer: request.answer } : {})
           }
@@ -299,7 +305,7 @@ export const saveCommands = [
     type: "death-save.roll",
     operationId: "rollDeathSave",
     description:
-      "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, a total of 10+ (after Exhaustion, save bonuses, Bless's d4 and an ally Paladin's aura) succeeds (three stabilize), otherwise a failure (three kill). In a fight a player commits one per turn, on the character's own turn. Default applies in one step; pass `commit: false` to preview the projected pips first: the server holds the previewed die, so another preview shows the same one and the confirm (`commit: true`) uses it, and `reroll` throws it again (a player spends Heroic Inspiration, the GM throws afresh). `naturalRoll` is a typed d20 (a player only while the table lets players type their dice, and never over a die the server already threw). Riders on every saving throw give Advantage or Disadvantage; a player's `rollMode` is ignored. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
+      "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, a total of 10+ (after Exhaustion, save bonuses, Bless's d4 and an ally Paladin's aura) succeeds (three stabilize), otherwise a failure (three kill). In an encounter a player commits one per turn, on the character's own turn. Default applies in one step; pass `commit: false` to preview the projected pips first: the server holds the previewed die, so another preview shows the same one and the confirm (`commit: true`) uses it, and `reroll` throws it again (a player spends Heroic Inspiration, the GM throws afresh). `naturalRoll` is a typed d20 (a player only while the table lets players type their dice, and never over a die the server already threw). Riders on every saving throw give Advantage or Disadvantage; a player's `rollMode` is ignored. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
     summary: "Roll a death saving throw for a dying character (GM anyone; a player their claimed character).",
     schema: DeathSaveRollSchema,
     malformed: "The death save is malformed.",
@@ -346,12 +352,15 @@ export const saveCommands = [
         const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
         const forced = initiator.role === "gm" ? rollMode : undefined;
         const key = `death-save:${actorId}`;
-        if (request.answer && (commit || reroll === true || naturalRoll !== undefined))
+        if (
+          request.answer &&
+          (commit || reroll === true || naturalRoll !== undefined || request.rolledTotal !== undefined)
+        )
           throw new CommandRejectedError("Answer the death save on a look of its own, before you confirm it.");
         if (request.answer && !heldRollFor(draft, key))
           throw new CommandRejectedError("Roll first: an answer meets a roll that was made.");
         const mode = forced ?? aggregated.mode;
-        const throwDeathSave = (choice: Readonly<{ face?: number; reroll?: boolean }>) =>
+        const throwDeathSave = (choice: Readonly<{ face?: number; total?: number; reroll?: boolean }>) =>
           rollHeldTest(
             draft,
             key,
@@ -368,6 +377,7 @@ export const saveCommands = [
             ? {}
             : {
                 ...(naturalRoll !== undefined ? { face: naturalRoll } : {}),
+                ...(request.rolledTotal !== undefined ? { total: request.rolledTotal } : {}),
                 ...(reroll === true ? { reroll: true } : {})
               }
         );
@@ -494,7 +504,7 @@ export const saveCommands = [
     type: "actor.stabilize",
     operationId: "stabilizeActor",
     description:
-      'Stabilizes a creature at 0 hit points (SRD Stabilizing a Character), or wakes one knocked out, by the aid `helperId` gives. `method` "medicine" is the Help action\'s first aid: the server rolls the helper\'s Wisdom (Medicine) check (its sheet bonus, Exhaustion, check riders) against DC 10, and a knocked-out creature wakes on a success. "healers-kit" spends one from the helper\'s Healer\'s Kit stack, "spare-the-dying" needs the helper to know the cantrip; neither checks. "gm" is the GM\'s own ruling, with no helper. A Stable creature keeps its Unconscious and stops making death saves. In a fight the aid is the helper\'s action on its own turn, within reach (Spare the Dying: its range), through the rules ladder (`override` is the GM\'s). The response carries `stabilize`. GM-grade with any helper; a player only with their own claimed character, on a creature they can see.',
+      'Stabilizes a creature at 0 hit points (SRD Stabilizing a Character), or wakes one knocked out, by the aid `helperId` gives. `method` "medicine" is the Help action\'s first aid: the server rolls the helper\'s Wisdom (Medicine) check (its sheet bonus, Exhaustion, check riders) against DC 10, and a knocked-out creature wakes on a success. "healers-kit" spends one from the helper\'s Healer\'s Kit stack, "spare-the-dying" needs the helper to know the cantrip; neither checks. "gm" is the GM\'s own ruling, with no helper. A Stable creature keeps its Unconscious and stops making death saves. In an encounter the aid is the helper\'s action on its own turn, within reach (Spare the Dying: its range), through the rules ladder (`override` is the GM\'s). The response carries `stabilize`. GM-grade with any helper; a player only with their own claimed character, on a creature they can see.',
     summary: "Stabilize a creature at 0 hit points with first aid, a Healer's Kit or Spare the Dying.",
     schema: ActorStabilizeSchema,
     malformed: "The stabilize command is malformed.",

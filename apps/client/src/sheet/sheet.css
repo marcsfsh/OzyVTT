@@ -236,10 +236,12 @@
   color: var(--text);
 }
 /* A number read at a glance. */
+/* A number box: the value in VT323 over its label, as the drawn header boxes read. */
 .cs-stat {
-  display: grid;
-  justify-items: center;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 2px;
   min-width: 3.25rem;
   min-height: 3.25rem;
@@ -249,15 +251,17 @@
   text-align: center;
 }
 .cs-stat-k {
-  font: 700 var(--fs-2xs) / 1.1 var(--font-label);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
+  order: 2;
+  font: 600 11px / 1.1 var(--font-label);
   color: var(--text-muted);
 }
 .cs-stat-v {
-  font: 400 1.2rem/1 var(--font-display);
+  order: 1;
+  font: 400 26px / 1 var(--font-numeric);
   color: var(--text);
-  font-variant-numeric: tabular-nums;
+}
+.cs-stat-n {
+  order: 3;
 }
 .cs-stat-n {
   font: 500 var(--fs-2xs) / 1.15 var(--font-body);
@@ -449,23 +453,80 @@
   flex: 1 1 0;
   min-width: 0;
 }
+/* The compact header's HP box: a number box that opens the hit points with the other vitals. */
 .cs-tile-hp {
-  flex: 2.2 1 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: center;
-  gap: 3px;
-  min-width: 0;
+  flex: none;
+  min-width: 4.5rem;
   min-height: var(--tap-min);
-  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--line-raised);
-  background: var(--raised);
-  box-shadow: var(--raised-sheen);
+  background: var(--surface-2);
   color: var(--text);
   font: inherit;
-  text-align: left;
   cursor: pointer;
+}
+.cs-tile-hp:hover {
+  border-color: var(--line-raised-hover);
+}
+.cs-id > .cs-stat {
+  flex: none;
+}
+.cs-id > .cs-id-text {
+  flex: 1 1 auto;
+}
+.cs--narrow .cs-name {
+  font: 700 17px / 1.2 var(--font-body);
+  color: var(--text);
+  text-shadow: none;
+  text-transform: none;
+}
+.cs--narrow .cs-idline {
+  font: 500 var(--fs-sm) / 1.25 var(--font-body);
+  color: var(--text-muted);
+}
+.cs-head {
+  background:
+    var(--grad-horizon) bottom / 100% 2px no-repeat,
+    var(--surface-1);
+  border-bottom: 0;
+}
+.cs-vitals-strip {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.cs-vitals-strip > .cs-stat {
+  flex: 1 1 0;
+}
+/* The phone's abilities sit 3 by 2, and the saves 3 by 2 with their short names. */
+.cs--narrow .cs-abilities {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cs--narrow .cs-saves {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+.cs--narrow .cs-save {
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+}
+.cs--narrow .cs-save-long {
+  display: none;
+}
+.cs--narrow .cs-save-short {
+  display: inline;
+}
+/* The laptop band's life bar and Change HP, beside the number boxes. */
+.cs-band-life {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1 1 14rem;
+  min-width: 12rem;
+}
+.cs-band-life > .nh-lifebar {
+  flex: 1 1 auto;
 }
 .cs-tile-hp-row {
   display: flex;
@@ -482,8 +543,10 @@
 .cs-menu-trigger {
   flex: none;
 }
+/* The sheet's close sits in its window's top-right corner, however tall the band beside it grows. */
 .cs-close {
   flex: none;
+  align-self: flex-start;
 }
 
 /* ---- The laptop's band ---- */
@@ -733,34 +796,90 @@ button.cs-lastroll-open {
 
 /* ---- Checks ---- */
 /* Three to a row where each box fits its two 44px buttons side by side, else fewer (the laptop's left column). */
+/* Abilities: tiles that roll the check, the name over the modifier large in VT323 and the score under it. */
 .cs-abilities {
   display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(max(calc(2 * var(--tap-min) + 3 * var(--space-1) + 2px), calc((100% - 2 * var(--space-1)) / 3)), 1fr)
-  );
-  gap: var(--space-1);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
 }
 .cs-ability {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border: 1px solid var(--line-strong);
-  background: var(--surface-1);
-}
-.cs-ability-head {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-1);
+  gap: 2px;
+  min-height: 82px;
+  padding: var(--space-2) var(--space-1);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.cs-ability:hover:not(:disabled) {
+  border-color: var(--line-raised-hover);
+  background: var(--surface-3);
+}
+.cs-ability:disabled {
+  cursor: default;
+}
+.cs-ability-name {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.cs-ability-mod {
+  font: 400 34px / 1 var(--font-numeric);
 }
 .cs-ability-score {
-  font: 400 1.1rem/1 var(--font-display);
+  color: var(--text-muted);
+  font: 400 15px / 1 var(--font-numeric);
 }
-.cs-ability-rolls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-1);
+.cs-ability .roll-mode-tag {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+/* Saving throws: a row each, the cyan square where the character is proficient. */
+.cs-saves {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-save {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cs-save:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.cs-save.is-failing {
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+.cs-save-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cs-save.is-proficient .cs-save-name {
+  font-weight: 700;
+}
+.cs-save-short {
+  display: none;
+}
+.cs-save-bonus {
+  font: 400 20px / 1 var(--font-numeric);
 }
 /* A roll button: its bonus, and its label above it when stacked. */
 .cs-roll {
@@ -811,10 +930,10 @@ button.cs-lastroll-open {
   color: var(--text-muted);
   cursor: default;
 }
+/* Skills: one list, a cyan square for proficiency, the ability in small caps and the bonus at the right. */
 .cs-skills {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px var(--space-3);
+  display: flex;
+  flex-direction: column;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -822,8 +941,10 @@ button.cs-lastroll-open {
 .cs-skill {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-3);
   min-width: 0;
+  padding: 0 0 0 var(--space-3);
+  border-bottom: 1px solid var(--line);
 }
 .cs-skill-name {
   flex: 1 1 auto;
@@ -831,37 +952,42 @@ button.cs-lastroll-open {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
 }
 .cs-skill-name em {
-  margin-left: var(--space-1);
+  float: right;
+  margin-left: var(--space-2);
   font-style: normal;
   color: var(--text-muted);
-  font-size: var(--fs-2xs);
+  font: 600 11px / 1.6 var(--font-label);
 }
 .cs-skill .cs-roll {
-  min-width: 2.75rem;
+  min-width: 3rem;
   padding-inline: var(--space-1);
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
 }
+.cs-skill .cs-roll strong {
+  font-size: 20px;
+}
+/* The proficiency square: empty, cyan for proficient, cyan with a second ring for expertise. */
 .cs-tier {
-  display: inline-grid;
-  place-items: center;
   flex: none;
-  width: 1.05rem;
-  height: 1.05rem;
-  border-radius: var(--radius-pill);
-  border: 2px solid var(--line-raised);
-  font: 800 var(--fs-2xs) / 1 var(--font-label);
-  color: var(--text-on-neon);
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--line-raised);
 }
 .cs-tier.is-proficient {
-  border-color: var(--cyan);
-  background: var(--cyan);
+  border-color: var(--state-on-edge);
+  background: var(--state-on);
 }
 .cs-tier.is-expertise {
-  border-color: var(--magenta);
-  background: var(--magenta);
-  color: var(--primary-ink);
+  border-color: var(--state-on-edge);
+  background: var(--state-on);
+  box-shadow:
+    0 0 0 2px var(--surface-1),
+    0 0 0 3px var(--state-on-edge);
 }
 .cs-editor {
   display: flex;
@@ -2168,4 +2294,13 @@ button.cs-circle::after {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+/* The GM tab on the phone's strip keeps the violet of GM-only things. */
+.cs-strip .nh-tab.is-gm {
+  color: var(--violet-hi);
+}
+.cs-band .cs-idline {
+  font: 500 var(--fs-sm) / 1.25 var(--font-body);
+  color: var(--text-dim);
 }

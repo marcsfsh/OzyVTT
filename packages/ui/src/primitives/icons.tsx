@@ -482,16 +482,8 @@ export function IconSparkle({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/* The theme marks, one hour each: the moon for Night, the slatted sun going down for Dusk, the sun rising with
-   its rays for Dawn and the full sun for Day. Dusk and Dawn share the horizon line and differ by slat and rays. */
-export function IconThemeNight({ className }: Readonly<{ className?: string }>) {
-  return (
-    <Glyph className={className}>
-      <path d="M11.12 2.84A9.2 9.2 0 1 0 20.98 13.99A7.6 7.6 0 0 1 11.12 2.84z" />
-    </Glyph>
-  );
-}
-
+/* The theme marks: the slatted sun going down for Dusk and the sun rising with its rays for Dawn. They share the
+   horizon line and differ by slat and rays. */
 export function IconThemeDusk({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -507,15 +499,6 @@ export function IconThemeDawn({ className }: Readonly<{ className?: string }>) {
     <Glyph className={className}>
       <path d="M6.4 17a5.6 5.6 0 0 1 11.2 0z" />
       <Stroke d="M12 9.2V7.1M17.52 11.48 19 10M6.48 11.48 5 10M19.68 15.65l2.07-.37M4.32 15.65l-2.07-.37M2.5 20.4h19" />
-    </Glyph>
-  );
-}
-
-export function IconThemeDay({ className }: Readonly<{ className?: string }>) {
-  return (
-    <Glyph className={className}>
-      <circle cx="12" cy="12" r="4.6" />
-      <Stroke d="M19.4 12h2.5M17.23 6.77 19 5M12 4.6V2.1M6.77 6.77 5 5M4.6 12H2.1M6.77 17.23 5 19M12 19.4v2.5M17.23 17.23 19 19" />
     </Glyph>
   );
 }
@@ -677,7 +660,8 @@ export function IconCode({ className }: Readonly<{ className?: string }>) {
 export function IconCog({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <Stroke d="M12 8.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+      {/* A toothed wheel with its hub: the rayed circle it replaced read as a sun, which is the theme's mark. */}
+      <Stroke d="M19.08 9.85 21.47 10.42 21.47 13.58 19.08 14.15 18.53 15.49 19.81 17.58 17.58 19.81 15.49 18.53 14.15 19.08 13.58 21.47 10.42 21.47 9.85 19.08 8.51 18.53 6.42 19.81 4.19 17.58 5.47 15.49 4.92 14.15 2.53 13.58 2.53 10.42 4.92 9.85 5.47 8.51 4.19 6.42 6.42 4.19 8.51 5.47 9.85 4.92 10.42 2.53 13.58 2.53 14.15 4.92 15.49 5.47 17.58 4.19 19.81 6.42 18.53 8.51ZM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
     </Glyph>
   );
 }

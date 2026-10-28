@@ -16,6 +16,8 @@ interface WizardShellProps {
   onStepSelect?: (index: number) => void;
   /** Highest step index the indicator may jump to (inclusive); see `Steps.maxSelectable`. */
   maxSelectable?: number;
+  /** Where the steps sit above 760px: a rail under the title (default), or a column beside the step. */
+  stepsPlacement?: "rail" | "side";
 
   children: ReactNode;
 
@@ -66,6 +68,7 @@ export function WizardShell({
   current,
   onStepSelect,
   maxSelectable,
+  stepsPlacement = "rail",
   children,
   onBack,
   footerSecondary,
@@ -90,10 +93,20 @@ export function WizardShell({
 }: WizardShellProps) {
   const reasonId = useId();
   const blocked = blockedReason != null;
+  const progress = (
+    <Steps
+      steps={steps}
+      current={current}
+      onStepSelect={onStepSelect}
+      maxSelectable={maxSelectable}
+      orientation={stepsPlacement === "side" ? "vertical" : "horizontal"}
+      ariaLabel={`${typeof title === "string" ? title : "Wizard"} progress`}
+    />
+  );
 
   return (
     <section
-      className={cx("nh-wizard", className)}
+      className={cx("nh-wizard", stepsPlacement === "side" && "nh-wizard--side", className)}
       aria-label={ariaLabel ?? (typeof title === "string" ? title : undefined)}
     >
       <header className="nh-wizard-head">
@@ -108,16 +121,9 @@ export function WizardShell({
             </Button>
           </div>
         )}
-        <div className="nh-wizard-progress">
-          <Steps
-            steps={steps}
-            current={current}
-            onStepSelect={onStepSelect}
-            maxSelectable={maxSelectable}
-            ariaLabel={`${typeof title === "string" ? title : "Wizard"} progress`}
-          />
-        </div>
+        {stepsPlacement === "rail" && <div className="nh-wizard-progress">{progress}</div>}
       </header>
+      {stepsPlacement === "side" && <nav className="nh-wizard-side scroll-y">{progress}</nav>}
 
       {resume != null && <div className="nh-wizard-resume">{resume}</div>}
 

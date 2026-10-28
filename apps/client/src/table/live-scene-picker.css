@@ -1,0 +1,37 @@
+/* The live scene picker: a quiet "Scene" label and the scene's name, flat in the bar it sits in. */
+.live-scene-trigger.nh-menu-trigger {
+  min-width: 0;
+  max-width: 22rem;
+  padding: 0 var(--space-3);
+}
+.live-scene-trigger.nh-menu-trigger::before {
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+.live-scene-trigger.nh-menu-trigger:hover::before {
+  background: var(--surface-2);
+}
+.live-scene-trigger .nh-menu-trigger-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.live-scene-word {
+  color: var(--text-muted);
+  font: 500 14px / 1 var(--font-body);
+}
+.live-scene-name {
+  overflow: hidden;
+  color: var(--text);
+  font: 600 15px / 1.2 var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-scene.is-compact {
+  min-width: 0;
+}
+.live-scene.is-compact .live-scene-trigger.nh-menu-trigger {
+  max-width: 100%;
+}

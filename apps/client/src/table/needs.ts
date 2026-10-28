@@ -1,16 +1,18 @@
 import type {
+  DamageRoll,
   GmActor,
   GmView,
   PendingDamage,
   PendingReaction,
   PendingRuleAsk,
   PendingSave,
+  TargetAsk,
   TurnSteps
 } from "@vtt/domain";
 
 /**
  * Every decision the GM owes, in one queue: what happens at once as a turn starts or ends, waiting for its order, a
- * held attack waiting on a reaction, a saving throw, a player's hit to apply, a dying creature, a rules question,
+ * held attack waiting on a reaction, a saving throw, a player's action to aim, a player's hit to apply, a dying creature, a rules question,
  * initiative still to roll and a rest someone asked for. A prompt a
  * player answers on their own device is listed as waiting on them, with a way for the GM to answer it instead.
  */
@@ -18,7 +20,9 @@ export type NeedsItem =
   | Readonly<{ kind: "order"; key: string; steps: TurnSteps; actor: GmActor; waiting: boolean }>
   | Readonly<{ kind: "reaction"; key: string; reaction: PendingReaction; actor: GmActor; waiting: boolean }>
   | Readonly<{ kind: "save"; key: string; save: PendingSave; actor: GmActor; waiting: boolean }>
-  | Readonly<{ kind: "damage"; key: string; proposal: PendingDamage }>
+  | Readonly<{ kind: "damage"; key: string; proposal: PendingDamage; roll?: DamageRoll }>
+  | Readonly<{ kind: "damage-roll"; key: string; roll: DamageRoll }>
+  | Readonly<{ kind: "target"; key: string; ask: TargetAsk }>
   | Readonly<{ kind: "dying"; key: string; actor: GmActor; ownTurn: boolean }>
   | Readonly<{ kind: "ask"; key: string; ask: PendingRuleAsk; actor: GmActor | undefined }>
   | Readonly<{ kind: "initiative"; key: string; actors: readonly GmActor[] }>
@@ -57,7 +61,16 @@ export function needsItems(state: GmView): NeedsItem[] {
     if (actor && save.callId === undefined)
       items.push({ kind: "save", key: save.id, save, actor, waiting: answeredByPlayer(actor) });
   }
-  for (const proposal of state.combat.pendingDamage ?? []) items.push({ kind: "damage", key: proposal.id, proposal });
+  // A player's action waiting for the GM to pick its targets (ADR-0044).
+  for (const ask of state.combat.targetAsks ?? []) items.push({ kind: "target", key: ask.id, ask });
+  // A player's damage waiting for their typed roll (ADR-0043): a hit's on its proposal, a spell's saves on its own.
+  const rolls = new Map((state.combat.damageRolls ?? []).map((roll) => [roll.id, roll]));
+  for (const proposal of state.combat.pendingDamage ?? []) {
+    const roll = proposal.awaitingRoll ? rolls.get(proposal.awaitingRoll) : undefined;
+    items.push({ kind: "damage", key: proposal.id, proposal, ...(roll ? { roll } : {}) });
+  }
+  for (const roll of rolls.values())
+    if (roll.proposalId === undefined) items.push({ kind: "damage-roll", key: roll.id, roll });
   if (state.combat.active)
     for (const actor of state.actors)
       if (inFight.has(actor.id) && isDying(actor))
@@ -106,7 +119,13 @@ export function needsTitle(item: NeedsItem, state: GmView): string {
       return item.waiting ? `Waiting on ${item.actor.name} · ${what}` : `${item.actor.name} makes a ${what}`;
     }
     case "damage":
-      return `${item.proposal.sourceName}'s ${item.proposal.actionName} hit ${item.proposal.targetName}`;
+      return item.roll
+        ? `Waiting on ${item.proposal.sourceName} · damage for ${item.proposal.actionName}`
+        : `${item.proposal.sourceName}'s ${item.proposal.actionName} hit ${item.proposal.targetName}`;
+    case "damage-roll":
+      return `Waiting on ${item.roll.sourceName} · damage for ${item.roll.actionName}`;
+    case "target":
+      return `${item.ask.actorName} uses ${item.ask.actionName} · choose a target`;
     case "dying": {
       const saves = item.actor.deathSaves!;
       return `${item.actor.name} is dying · ${saves.successes} ${saves.successes === 1 ? "success" : "successes"} · ${saves.failures} ${saves.failures === 1 ? "failure" : "failures"}`;

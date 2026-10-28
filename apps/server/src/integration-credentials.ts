@@ -8,6 +8,7 @@ import {
 } from "@vtt/api-contract";
 import { z } from "zod";
 import { migrate, openDatabase, transaction, type Migration } from "./database.js";
+import { renameEncounterScope } from "./encounter-rename.js";
 import { InvalidRequestError } from "./invalid-request.js";
 
 const TOKEN_PREFIX = "vtt_int_";
@@ -55,6 +56,21 @@ const MIGRATIONS: readonly Migration[] = [
         ) STRICT;
         CREATE INDEX integration_credential_audit_credential_id ON integration_credential_audit(credential_id, id);
       `)
+  },
+  {
+    // The scene scopes are the encounter scopes now (ADR-0041), so a saved credential keeps what it could do.
+    version: 2,
+    up: (database) => {
+      const rows = database.prepare("SELECT id, scopes_json FROM integration_credentials").all() as {
+        id: string;
+        scopes_json: string;
+      }[];
+      const update = database.prepare("UPDATE integration_credentials SET scopes_json = ? WHERE id = ?");
+      for (const row of rows) {
+        const scopes = (JSON.parse(row.scopes_json) as string[]).map(renameEncounterScope);
+        update.run(JSON.stringify(scopes), row.id);
+      }
+    }
   }
 ];
 

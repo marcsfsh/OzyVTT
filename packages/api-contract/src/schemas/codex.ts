@@ -300,7 +300,7 @@ const IconId = z
 const MarkerLinks = {
   pageIds: z.array(z.uuid()).max(24).optional(),
   subMapId: z.uuid().nullable().optional(),
-  sceneIds: z.array(z.uuid()).max(24).optional(),
+  encounterIds: z.array(z.uuid()).max(24).optional(),
   actorId: z.uuid().nullable().optional()
 };
 export const MarkerCreateSchema = z
@@ -563,7 +563,7 @@ export const PrepSectionInputSchema = z.discriminatedUnion("type", [
     .object({
       ...prepSectionBase,
       type: z.literal("encounters"),
-      sceneIds: PrepIdsSchema(CODEX_PREP_LIMITS.encounters)
+      encounterIds: PrepIdsSchema(CODEX_PREP_LIMITS.encounters)
     })
     .strict()
 ]);
@@ -590,7 +590,7 @@ export const SessionCreateSchema = z
       "Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present."
     ),
     /** Scenes staged for this session; the store re-applies the cap. */
-    sceneIds: SessionSceneIdsSchema.optional().describe(
+    encounterIds: SessionSceneIdsSchema.optional().describe(
       "Prepared scenes staged for this session. Capped at the table's scene cap."
     ),
     commandId: CommandIdSchema
@@ -612,7 +612,7 @@ export const SessionUpdateSchema = z
     tags: TagsSchema.optional().describe(
       "Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present."
     ),
-    sceneIds: SessionSceneIdsSchema.optional().describe(
+    encounterIds: SessionSceneIdsSchema.optional().describe(
       "Prepared scenes staged for this session; replaces the stored list."
     ),
     expectedRev: z

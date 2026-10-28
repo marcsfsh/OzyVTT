@@ -95,14 +95,14 @@ describe("the Table tab's sound control", () => {
 });
 
 describe("the sound board", () => {
-  it("puts a library sound on the board and saves the mix as a scene's sound", async () => {
+  it("puts a library sound on the board and saves the mix as an encounter's sound", async () => {
     const user = userEvent.setup();
     board = view({ ambient: [{ assetId: RAIN, volume: 0.5, durationMs: 30_000, playing: null }] }, [
       { connectionId: "p", name: "GM preview", sound: "muted", unplayable: [] }
     ]);
     render(
       <ToastProvider>
-        <SoundBoard gmToken="gm" scenes={[{ id: SCENE, name: "Crypt" }]} activeSceneId={null} />
+        <SoundBoard gmToken="gm" scenes={[{ id: SCENE, name: "Crypt" }]} activeEncounterId={null} />
       </ToastProvider>
     );
     // The GM's own silent preview is not a table screen.
@@ -118,8 +118,8 @@ describe("the sound board", () => {
     expect(sent).toContainEqual(["sound:play", expect.objectContaining({ target: "ambient", assetId: RAIN })]);
     await user.click(screen.getByRole("button", { name: "Save current sound" }));
     expect(sent).toContainEqual([
-      "sound:set-scene-preset",
-      expect.objectContaining({ sceneId: SCENE, preset: "save-current" })
+      "sound:set-encounter-preset",
+      expect.objectContaining({ encounterId: SCENE, preset: "save-current" })
     ]);
   });
 });

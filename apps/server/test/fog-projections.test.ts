@@ -108,7 +108,7 @@ describe("manual fog in the projections", () => {
     expect(canPlayerTarget(state, ORC, unseen)).toBe(true);
   });
 
-  it("keeps creatures staged under a prepared scene's fog a secret until it goes live", () => {
+  it("keeps creatures staged under a prepared encounter's fog a secret until it goes live", () => {
     const hp = { current: 10, maximum: 10 };
     const state = frozen(
       GameStateSchema.parse({
@@ -119,7 +119,7 @@ describe("manual fog in the projections", () => {
           { id: ORC, name: "Orc", kind: "monster", visibility: "public", hp }
         ],
         combat: {
-          scenes: [
+          encounters: [
             {
               id: "60000000-0000-4000-8000-000000000009",
               name: "Ambush",

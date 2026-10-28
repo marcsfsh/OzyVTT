@@ -7,7 +7,6 @@ export type BuilderChange = Partial<{
   customFormula: string | null;
   maxLevel: number;
   playerBuilder: "open" | "gm-only";
-  typedRolls: "open" | "gm-only";
   hitPointRollFloor: "none" | "average";
   playerRandom: "open" | "gm-only";
 }>;

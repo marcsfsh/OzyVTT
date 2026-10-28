@@ -126,7 +126,7 @@ export const CodexPrepSectionSchema = z.discriminatedUnion("type", [
   }),
   z.strictObject({ ...sectionBase, type: z.literal("clocks"), deadlineIds: ids(CODEX_PREP_LIMITS.deadlines) }),
   z.strictObject({ ...sectionBase, type: z.literal("quests"), questIds: ids(CODEX_PREP_LIMITS.quests) }),
-  z.strictObject({ ...sectionBase, type: z.literal("encounters"), sceneIds: ids(CODEX_PREP_LIMITS.encounters) })
+  z.strictObject({ ...sectionBase, type: z.literal("encounters"), encounterIds: ids(CODEX_PREP_LIMITS.encounters) })
 ]);
 export type CodexPrepSection = Wire<z.infer<typeof CodexPrepSectionSchema>>;
 /** One section of each type, by its type. */
@@ -157,7 +157,7 @@ export type CodexPrepSectionInput =
   | (CodexPrepSectionInputBase & Readonly<{ type: "scenes"; scenes?: readonly CodexPrepSceneInput[] }>)
   | (CodexPrepSectionInputBase & Readonly<{ type: "clocks"; deadlineIds?: readonly string[] }>)
   | (CodexPrepSectionInputBase & Readonly<{ type: "quests"; questIds?: readonly string[] }>)
-  | (CodexPrepSectionInputBase & Readonly<{ type: "encounters"; sceneIds?: readonly string[] }>);
+  | (CodexPrepSectionInputBase & Readonly<{ type: "encounters"; encounterIds?: readonly string[] }>);
 /** A template section as a write sends it. */
 export type CodexPrepTemplateSectionInput = Readonly<{
   id?: string;

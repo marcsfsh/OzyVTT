@@ -35,7 +35,7 @@ describe("a casting time in minutes or hours", () => {
   });
 });
 
-describe("a long cast in a fight", () => {
+describe("a long cast in an encounter", () => {
   it("takes the action on each turn, holds Concentration, and spends its slot only when it completes", () => {
     const { state, hero, resolve } = fight(wizard);
     const before = slotsOf(hero, 1)!;
@@ -103,7 +103,7 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 
-describe("a long cast outside a fight", () => {
+describe("a long cast outside an encounter", () => {
   it("completes at once and moves the game clock by its whole hours", async () => {
     const state = GameStateSchema.parse({ schemaVersion: 1 });
     importActorDefinition(state, wizard, HERO, "public", catalog);

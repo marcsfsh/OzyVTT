@@ -110,7 +110,7 @@ export function shortDuration(effect: DurationOf): string | null {
     case "until-source-turn-end":
       return "until a turn ends";
     case "encounter":
-      return "this fight";
+      return "this encounter";
     case "manual":
       return null;
   }

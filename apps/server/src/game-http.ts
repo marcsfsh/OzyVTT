@@ -221,15 +221,15 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
    *  unshared archive is a 404 for a player. Never 403, which would confirm the recording exists. */
   mount(router, encounterRoutes.listEncounterArchives, authorize("combat:read"), (_req, res) => {
     const principal = res.locals.principal as GamePrincipal;
-    // A player's view of the table never names scenes, so a shared replay goes without its scene's name.
+    // A player's view of the table never names prepared encounters, so a shared replay goes without its name.
     if (!isGmGrade(principal))
       return sendData(res, 200, {
-        encounters: options.archives
+        replays: options.archives
           .list()
           .filter((entry) => entry.playerVisible)
           .map(projectPlayerArchiveSummary)
       });
-    return sendData(res, 200, { encounters: options.archives.list() });
+    return sendData(res, 200, { replays: options.archives.list() });
   });
 
   mount(router, encounterRoutes.getEncounterArchive, authorize("combat:read"), (req, res) => {

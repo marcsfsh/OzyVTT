@@ -79,7 +79,7 @@ describe("the rules assistant's checks", () => {
 });
 
 describe("one name for one setting", () => {
-  it("names the health display, players' hits and players' initiative as the fight's options do", async () => {
+  it("names the health display, players' hits and players' initiative as the encounter's options do", async () => {
     const state = gmView((view) => {
       view.combat.healthDisplay = { style: "band", audience: "all" };
     });
@@ -112,13 +112,26 @@ describe("one name for one setting", () => {
       />
     );
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /Fight options/ }));
-    const menu = within(screen.getByRole("menu", { name: "Fight options" }));
+    await user.click(screen.getByRole("button", { name: /Encounter options/ }));
+    const menu = within(screen.getByRole("menu", { name: "Encounter options" }));
     expect(menu.getByRole("option", { name: "Applied by the GM" })).toBeTruthy();
     expect(menu.getByRole("option", { name: "Wait until everyone has rolled" })).toBeTruthy();
     expect(menu.getByRole("option", { name: "Status badge" })).toBeTruthy();
     expect(menu.getByRole("combobox", { name: "Health is" })).toBeDisabled();
     expect(menu.getByText("A status badge shows to everyone, so it has no GM-only setting.")).toBeTruthy();
     expect(menu.queryByText(/GM confirms|Direct - players/)).toBeNull();
+  });
+});
+
+describe("who picks targets (ADR-0044)", () => {
+  beforeEach(() => command.mockClear());
+
+  it("starts with the player, says what each choice does, and hands the choice to the GM", async () => {
+    renderSettings(gmView());
+    const choice = screen.getByRole("group", { name: "Who picks targets" });
+    expect(within(choice).getByRole("button", { name: "The player" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Players tap an action and pick its target on the map.")).toBeTruthy();
+    await userEvent.setup().click(within(choice).getByRole("button", { name: "The GM" }));
+    expect(command).toHaveBeenLastCalledWith("table:set-targeting", { targeting: "gm" });
   });
 });

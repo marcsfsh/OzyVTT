@@ -117,7 +117,7 @@ const state = {
   }
 } as unknown as PlayerView;
 
-describe("a spell cast from the sheet in a fight", () => {
+describe("a spell cast from the sheet in an encounter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearTargeting();

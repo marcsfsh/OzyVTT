@@ -88,7 +88,7 @@ describe("the table's lines about a creature hidden by sight or the fog", () => 
     expect(sent.some((line) => line.includes("Grappled by A hidden threat ended on Borin."))).toBe(true);
   });
 
-  it("keeps a hidden creature out of the roster and the feed when the GM takes it out of the fight", async () => {
+  it("keeps a hidden creature out of the roster and the feed when the GM takes it out of the encounter", async () => {
     const table = await hiddenTable({
       order: [HERO, GOBLIN],
       positions: { [HERO]: { x: 75, y: 275 }, [GOBLIN]: { x: 425, y: 275 } },
@@ -100,11 +100,11 @@ describe("the table's lines about a creature hidden by sight or the fog", () => 
     await settle();
     expect(sentSince(table.received, mark).filter(mentionsGoblin)).toEqual([]);
     // The GM still reads it, and the goblin is the GM's alone from now on.
-    expect(JSON.stringify(table.gmLog)).toContain(`${GOBLIN_NAME} left the fight.`);
+    expect(JSON.stringify(table.gmLog)).toContain(`${GOBLIN_NAME} left the encounter.`);
     expect(table.server.store.snapshot.actors.find((actor) => actor.id === GOBLIN)?.visibility).toBe("gm-only");
   });
 
-  it("keeps a hidden creature unknown when a new fight leaves it out", async () => {
+  it("keeps a hidden creature unknown when a new encounter leaves it out", async () => {
     const table = await hiddenTable({
       order: [HERO, GOBLIN],
       positions: { [HERO]: { x: 75, y: 275 }, [GOBLIN]: { x: 425, y: 275 } },
