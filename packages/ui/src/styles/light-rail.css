@@ -152,6 +152,15 @@
   background: var(--text-muted);
 }
 
+/* A chip's bottom edge, in its own tone, draining as the chip comes apart. */
+.lr-chip-edge {
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--nh-chip-tone, var(--violet));
+}
+
 /* A part that briefly covers a whole surface: the white flash of a critical hit or a natural 20. */
 .lr-flash {
   inset: 0;

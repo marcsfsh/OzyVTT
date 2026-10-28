@@ -1219,6 +1219,13 @@ back to the VCR counter, an encounter starting or ending runs it from or to the 
 slides the rows with `flipFrom`. The table strip, the GM's order and the player's order each run it; only the strip
 lights the turn's lamps. `Roll` in `@vtt/ui` rolls a value over like a tape counter (the VCR counter's word and round,
 the legendary count), and `Lamp` warms as it lights and cools through `--nh-lamp-afterglow` when it is spent.
+A life bar is a rail too: `LifeBar` runs light along its top edge from the old value to the new, red as hit points fall
+and gold as they rise, with the fill and the number following it, and temporary hit points draw a cyan line along that
+edge. A band moves the same way with no number, and `Meter`'s `light` does it for the sheet's hit points. `Portrait`'s
+`down` greys a creature at 0. `encounter/saveLight.ts` pops each death save into its pip. A chip strip that calls
+`useChipStrip` settles a new chip in with the chroma split and slides the others to their new places. A chip with
+`leave="split"` (Concentration) leaves an inert copy that comes apart, through `ghostOut`, when it leaves a strip that
+stays.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map

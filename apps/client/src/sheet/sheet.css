@@ -1201,6 +1201,7 @@ button.cs-lastroll-open {
   gap: var(--space-2);
 }
 .cs-death {
+  position: relative;
   border-color: var(--danger);
   box-shadow: var(--glow-danger);
 }

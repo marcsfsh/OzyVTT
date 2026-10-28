@@ -4,7 +4,7 @@
  * never held open for the light: an overlay that closes leaves an inert copy of itself behind for the fade, so focus,
  * Escape and the backdrop behave exactly as they would with no motion.
  */
-import { burst, canMove, comet, drain, EASE, fill, lightTiming, px } from "./lightRail";
+import { burst, canMove, comet, drain, EASE, fill, lightTiming, px, splitOut } from "./lightRail";
 
 /** The element a person last pressed. Safari doesn't focus a button it taps, so focus alone can't name the opener. */
 let pressed: { el: Element; at: number } | null = null;
@@ -65,14 +65,19 @@ export function edgeIn(surface: HTMLElement, edge: HTMLElement, entry: EdgeEntry
 export interface GhostOptions {
   /** Where the copy's top edge drains back to, from `edgeIn`. */
   origin?: string;
-  /** How the surface leaves: it fades, it drops off the bottom of the screen, or it fades as it sinks a little. */
-  leave: "fade" | "drop" | "sink";
+  /**
+   * How the surface leaves: it fades, it drops off the bottom of the screen, it fades as it sinks a little, or (a
+   * chip) its bottom edge drains and it comes apart in the chroma split as it fades.
+   */
+  leave: "fade" | "drop" | "sink" | "split";
   /** Fades a scrim with it, for a modal's backdrop. */
   scrim?: boolean;
   /** Classes the copy's frame carries, so styles keyed on the overlay's own element still apply. */
   frame?: string;
   /** Shows the copy only once the surface has left the page: React's StrictMode remounts a surface it never removed. */
   whenGone?: boolean;
+  /** Shows the copy only while this is still on the page: a chip leaving its strip, and not the strip leaving. */
+  within?: Element | null;
 }
 
 /**
@@ -112,30 +117,33 @@ export function ghostOut(surface: HTMLElement, o: GhostOptions): void {
 
   const show = () => {
     if (o.whenGone && surface.isConnected) return;
+    if (o.within && !o.within.isConnected) return;
     if (scrim) doc.body.append(scrim);
     doc.body.append(frame);
     const edge = copy.querySelector<HTMLElement>(".nh-overlay-edge");
     if (edge) drain(edge, { origin: o.origin ?? "50%", fill: "forwards", dur: lightTiming(edge).drain });
     const leaving =
-      o.leave === "drop"
-        ? frame.animate([{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], {
-            duration: 180,
-            delay: 60,
-            easing: EASE.in,
-            fill: "forwards"
-          })
-        : frame.animate(
-            [
-              { opacity: 1, transform: "translateY(0)" },
-              { opacity: 0, transform: o.leave === "sink" ? "translateY(8px)" : "translateY(0)" }
-            ],
-            {
-              duration: o.leave === "sink" ? 160 : 140,
-              delay: o.leave === "sink" ? 120 : 60,
+      o.leave === "split"
+        ? splitAway(copy, frame)
+        : o.leave === "drop"
+          ? frame.animate([{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], {
+              duration: 180,
+              delay: 60,
               easing: EASE.in,
               fill: "forwards"
-            }
-          );
+            })
+          : frame.animate(
+              [
+                { opacity: 1, transform: "translateY(0)" },
+                { opacity: 0, transform: o.leave === "sink" ? "translateY(8px)" : "translateY(0)" }
+              ],
+              {
+                duration: o.leave === "sink" ? 160 : 140,
+                delay: o.leave === "sink" ? 120 : 60,
+                easing: EASE.in,
+                fill: "forwards"
+              }
+            );
     const fading = scrim?.animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: 160,
       delay: 60,
@@ -154,4 +162,17 @@ export function ghostOut(surface: HTMLElement, o: GhostOptions): void {
   };
   if (o.whenGone) queueMicrotask(show);
   else show();
+}
+
+/** A chip coming apart (ADR-0045, group 5): a line along its bottom edge drains, then the split pulls it apart. */
+function splitAway(copy: HTMLElement, frame: HTMLElement): Animation {
+  const line = copy.ownerDocument.createElement("span");
+  line.className = "lr-part lr-chip-edge";
+  line.setAttribute("aria-hidden", "true");
+  copy.append(line);
+  drain(line, { origin: "0%", fill: "forwards", dur: 160 });
+  return (
+    splitOut(frame, { delay: 100, dur: 220 }) ??
+    frame.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, delay: 100, fill: "forwards" })
+  );
 }

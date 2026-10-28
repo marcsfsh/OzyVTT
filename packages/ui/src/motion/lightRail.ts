@@ -417,11 +417,14 @@ export function countUp(
     return Promise.resolve();
   }
   const dur = o.dur ?? lightTiming(el).count;
-  const start = performance.now() + (o.delay ?? 0);
   el.textContent = format(from);
+  // Timed from the first frame's own clock: a slowed animation clock (DevTools at 10%) runs frames behind
+  // performance.now(), and a start taken from it would never come.
+  let start: number | null = null;
   return new Promise((resolve) => {
     const step = (now: number) => {
       if (counting.get(el) !== run) return resolve();
+      start ??= now + (o.delay ?? 0);
       if (now < start) {
         requestAnimationFrame(step);
         return;

@@ -1,6 +1,7 @@
 import type { GmView, PlayerView } from "@vtt/domain";
 import { IconEyeOff, cx } from "@vtt/ui";
 import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
+import { healthBandFor } from "../encounter/conditions";
 import { focusTokenOnMap } from "../scene/tableGeometry";
 import "./turn-tiles.css";
 
@@ -93,6 +94,7 @@ export function TurnTiles(
                     frame={tile.hidden ? "hidden" : frameOf(actor, props.role)}
                     now={tile.acting}
                     dim={tile.acted}
+                    down={healthBandFor(actor.hp) === "down"}
                     size="sm"
                   />
                 )}

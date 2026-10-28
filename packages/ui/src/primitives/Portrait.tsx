@@ -1,5 +1,7 @@
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { avatarUrl, type AvatarId } from "../avatars";
+import { useOnChange } from "../motion/hooks";
+import { canMove, EASE } from "../motion/lightRail";
 import { cx } from "./util";
 import "./Portrait.css";
 
@@ -39,7 +41,8 @@ const SIZES = { xs: 28, sm: 32, md: 48, lg: 60, xl: 112 } as const;
 
 /**
  * A creature's picture in its frame. `now` puts it in the sun frame, which means it is acting. A `badge` (initials)
- * tells apart two visible creatures that share a picture. `dim` fades the decoration of one that has acted.
+ * tells apart two visible creatures that share a picture. `dim` fades the decoration of one that has acted. `down`
+ * greys and fades a creature at 0 hit points, and it dims as the creature drops (ADR-0045).
  */
 export function Portrait({
   picture,
@@ -50,6 +53,7 @@ export function Portrait({
   shape = "square",
   badge,
   dim = false,
+  down = false,
   className
 }: Readonly<{
   picture: PictureSource;
@@ -61,16 +65,28 @@ export function Portrait({
   shape?: "square" | "round";
   badge?: string;
   dim?: boolean;
+  down?: boolean;
   className?: string;
 }>) {
+  const self = useRef<HTMLSpanElement>(null);
+  useOnChange(down, (_was, now) => {
+    const el = self.current;
+    if (!now || !el || !canMove()) return;
+    // Only a start keyframe: each runs to what the stylesheet paints a portrait that is down with.
+    const timing = { duration: 260, delay: 140, easing: EASE.settle, fill: "backwards" as const };
+    el.animate([{ offset: 0, opacity: 1 }], timing);
+    el.querySelector(".nh-picture")?.animate([{ offset: 0, filter: "grayscale(0)" }], timing);
+  });
   return (
     <span
+      ref={self}
       className={cx(
         "nh-portrait",
         `nh-portrait--${frame}`,
         shape === "round" && "nh-portrait--round",
         now && "is-now",
         dim && "is-dim",
+        down && "is-down",
         className
       )}
       style={{ "--nh-portrait": `${SIZES[size]}px` } as CSSProperties}

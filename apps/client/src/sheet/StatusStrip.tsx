@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Chip, IconConcentration, IconPlus, IconStar } from "@vtt/ui";
+import { useRef, useState } from "react";
+import { Chip, IconConcentration, IconPlus, IconStar, useChipStrip } from "@vtt/ui";
 import {
   ConditionDetail,
   ConditionPicker,
@@ -54,6 +54,8 @@ export function StatusStrip({
 }>) {
   const reference = useConditionReference();
   const [picked, setPicked] = useState<Shown>(null);
+  const strip = useRef<HTMLDivElement>(null);
+  useChipStrip(strip);
   // With the states off the row, nothing of theirs stays open under it.
   const shown = states ? picked : null;
   const commands = useConditionCommands(actor.id, onFeedback, (conditionId) => {
@@ -81,6 +83,7 @@ export function StatusStrip({
         key={effect.id}
         tone="info"
         icon={concentrating ? <IconConcentration /> : undefined}
+        leave={concentrating ? "split" : undefined}
         pressed={isShown("effect", effect.id)}
         aria-expanded={isShown("effect", effect.id)}
         aria-label={`${concentrating ? `Concentration on ${concentrationSpell(effect.name)}` : effect.name}${time ? `, ${time} left` : ""}`}
@@ -93,7 +96,7 @@ export function StatusStrip({
   };
   return (
     <div className="cs-status-block">
-      <div className="cs-status" role="group" aria-label="Live states">
+      <div ref={strip} className="cs-status" role="group" aria-label="Live states">
         {leading}
         {states &&
           concentration &&

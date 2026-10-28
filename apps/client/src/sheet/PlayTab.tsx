@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { ActorDefinition, ActorDerivedSheet, DeathSaves, PendingSave, PlayerPendingSave } from "@vtt/domain";
 import { Button, IconCheck, IconMoon, IconX, Menu, MenuItem } from "@vtt/ui";
 import { abilityModifier } from "@vtt/rules-5e";
 import { rollModeOf, useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "../encounter/DyingTracker";
+import { useSaveLight } from "../encounter/saveLight";
 import { signed } from "../encounter/format";
 import { SavePrompt } from "../encounter/SavePrompt";
 import type { SrdExtension } from "../encounter/sheet-extension";
@@ -289,6 +290,12 @@ function SlotsLeft({ definition, actor }: Readonly<{ definition: ActorDefinition
   );
 }
 
+const DEATH_BOXES = {
+  success: ".cs-death-box.is-success",
+  failure: ".cs-death-box.is-failure",
+  word: ".cs-death-title"
+} as const;
+
 /** The Death Saving Throws: three success boxes and three failure boxes with their marks, and the roll. */
 export function DeathSavesCard({
   actor,
@@ -307,6 +314,8 @@ export function DeathSavesCard({
   onFeedback: (text: string) => void;
 }>) {
   const { rollInput } = useRollPreference();
+  const card = useRef<HTMLElement>(null);
+  useSaveLight(card, deathSaves, DEATH_BOXES);
   const dead = deathSaves.failures >= 3;
   const inspired = heroicInspirationOf(actor) === true;
   const box = (kind: "success" | "failure", index: number) => {
@@ -318,7 +327,7 @@ export function DeathSavesCard({
     );
   };
   return (
-    <section className="cs-card cs-death" aria-label="Death Saving Throws">
+    <section ref={card} className="cs-card cs-death" aria-label="Death Saving Throws">
       <span className="cs-eyebrow is-danger">Death Saving Throws</span>
       <strong className="cs-death-title">
         {dead ? `${actor.name} is dead` : deathSaves.stable ? `${actor.name} is stable` : `${actor.name} is dying`}

@@ -19,6 +19,7 @@
 }
 /* A gauge sits in the track tint with a 2px inset, so the fill reads as a lit bar inside a slot. */
 .nh-meter-track {
+  position: relative;
   height: 0.65rem;
   box-sizing: border-box;
   padding: 2px;
