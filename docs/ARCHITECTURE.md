@@ -1209,6 +1209,10 @@ top bar's sections hand their trip to `shell/pageLight.ts`, which runs it along 
 `data-horizon`), washes the pane and fades the page in; the scanline wipe is gone. `shell/recordLight.ts` lights
 opening a record from a list and going back to it, for the Codex's pages and the Compendium's tables, whose rows carry
 `data-record-key`.
+Overlays (`Modal`, `Menu`, `Drawer`, `Toast`) carry an `OverlayEdge` along their top, which `motion/overlay.ts` lights
+outward from the control last pressed or focused. Closing never waits on it: the overlay closes at once and an inert,
+id-free copy of its surface drains the edge and fades where it was (`ghostOut`), so focus return, Escape and the
+backdrop behave as they would with no motion.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map

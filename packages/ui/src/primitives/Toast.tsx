@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { edgeIn, ghostOut } from "../motion/overlay";
 import { cx } from "./util";
 import { IconX } from "./icons";
+import { OverlayEdge } from "./OverlayEdge";
 import { Tag, type TagTone } from "./Tag";
 import "./Toast.css";
 
@@ -139,46 +141,76 @@ export function ToastProvider({ children, duration = 5000 }: { children: ReactNo
       <ToastStoreContext.Provider value={store}>{children}</ToastStoreContext.Provider>
       <div className="nh-toast-viewport" role="region" aria-label="Notifications">
         {(outlets > 0 ? [] : toasts).map((t) => (
-          <div
+          <ToastCard
             key={t.id}
-            className={cx("nh-toast", `nh-toast--${t.tone}`, "anim-sheet")}
-            // A status is announced politely, after what the person is doing.
-            role="status"
-            onPointerEnter={() => hold(t.id)}
-            onPointerLeave={() => release(t.id)}
-            onFocus={() => hold(t.id)}
-            onBlur={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) release(t.id);
-            }}
-          >
-            <Tag tone={TONE_TAG[t.tone].tone} className="nh-toast-tag">
-              {TONE_TAG[t.tone].word}
-            </Tag>
-            <span className="nh-toast-message">{t.message}</span>
-            {t.undo && (
-              <button
-                type="button"
-                className="nh-toast-undo tap-target interactive"
-                onClick={() => {
-                  t.undo?.();
-                  dismiss(t.id);
-                }}
-              >
-                Undo
-              </button>
-            )}
-            <button
-              type="button"
-              className="nh-toast-close tap-target interactive"
-              aria-label="Dismiss"
-              onClick={() => dismiss(t.id)}
-            >
-              <IconX />
-            </button>
-          </div>
+            toast={t}
+            onHold={() => hold(t.id)}
+            onRelease={() => release(t.id)}
+            onDismiss={() => dismiss(t.id)}
+          />
         ))}
       </div>
     </ToastContext.Provider>
+  );
+}
+
+/**
+ * One toast. It rises with a comet along its top edge, left to right, and the edge fills behind it. When it goes, an
+ * inert copy drains the edge back to where the light started and sinks away (ADR-0045).
+ */
+function ToastCard({
+  toast,
+  onHold,
+  onRelease,
+  onDismiss
+}: Readonly<{ toast: ToastRecord; onHold: () => void; onRelease: () => void; onDismiss: () => void }>) {
+  // The card and its edge, kept in a box so the unmount cleanup reads the nodes it is leaving.
+  const [nodes] = useState(() => ({ card: null as HTMLDivElement | null, edge: null as HTMLSpanElement | null }));
+  useLayoutEffect(() => {
+    const origin = nodes.card && nodes.edge ? edgeIn(nodes.card, nodes.edge, { sweep: "right" }) : "0%";
+    return () => {
+      if (nodes.card) ghostOut(nodes.card, { origin, leave: "sink", whenGone: true });
+    };
+  }, [nodes]);
+  return (
+    <div
+      ref={(card) => {
+        nodes.card = card;
+      }}
+      className={cx("nh-toast", `nh-toast--${toast.tone}`, "anim-sheet")}
+      role="status"
+      onPointerEnter={onHold}
+      onPointerLeave={onRelease}
+      onFocus={onHold}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onRelease();
+      }}
+    >
+      <OverlayEdge
+        ref={(edge) => {
+          nodes.edge = edge;
+        }}
+      />
+      <Tag tone={TONE_TAG[toast.tone].tone} className="nh-toast-tag">
+        {TONE_TAG[toast.tone].word}
+      </Tag>
+      <span className="nh-toast-message">{toast.message}</span>
+      {toast.undo && (
+        <button
+          type="button"
+          className="nh-toast-undo tap-target interactive"
+          onClick={() => {
+            toast.undo?.();
+            onDismiss();
+          }}
+        >
+          Undo
+        </button>
+      )}
+      <button type="button" className="nh-toast-close tap-target interactive" aria-label="Dismiss" onClick={onDismiss}>
+        <IconX />
+      </button>
+    </div>
   );
 }
 

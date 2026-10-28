@@ -922,7 +922,8 @@ test("a player packs a thing into a container from the Gear tab and sees what it
 
 test("the light runs as the GM changes sections and tabs, opens a record and goes back, and leaves nothing behind", async ({
   open,
-  request
+  request,
+  hasTouch
 }) => {
   await ensureGmPassword(request);
   const gm = await open("/");
@@ -962,6 +963,16 @@ test("the light runs as the GM changes sections and tabs, opens a record and goe
   for (const name of ["Log", "Party", "Notes", "Encounter"]) {
     await press(panel.getByRole("tab", { name, exact: true }));
     await expect(panel.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true");
+  }
+
+  // A dialog opens with its edge lit from the button and closes on Escape with focus back on that button.
+  const search = gm.getByRole("button", { name: "Search, Ctrl K" });
+  if (await search.isVisible()) {
+    await press(search);
+    await expect(gm.getByRole("dialog", { name: "Search" })).toBeVisible();
+    await gm.keyboard.press("Escape");
+    await expect(gm.getByRole("dialog", { name: "Search" })).toBeHidden();
+    if (!hasTouch) await expect(search).toBeFocused();
   }
 
   // Open a record from the Compendium's table and come back to it.

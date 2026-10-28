@@ -1,0 +1,12 @@
+/* An overlay's top edge (OverlayEdge.tsx): the horizon's colours, or the accent a surface sets with --nh-edge. */
+.nh-overlay-edge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 2px;
+  background: var(--nh-edge, var(--grad-horizon));
+  box-shadow: var(--nh-edge-glow, var(--glow-horizon));
+  pointer-events: none;
+}

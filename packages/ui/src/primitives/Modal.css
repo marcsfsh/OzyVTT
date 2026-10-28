@@ -50,26 +50,14 @@
   background: var(--material-lip), var(--material-plate);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--void) 60%, transparent);
 }
-/* An accent bar replaces the lip. It uses `::after`: `::before` on the same element is the backing layer, and
-   styling it here would collapse the plate and clear its background (leaving the dialog transparent). */
-.nh-modal--accent-magenta::after,
-.nh-modal--accent-cyan::after,
-.nh-modal--accent-violet::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  z-index: 1;
-  pointer-events: none;
+/* The top edge is an OverlayEdge: the horizon's colours, or the accent's own colour. */
+.nh-modal--accent-cyan {
+  --nh-edge: var(--cyan);
+  --nh-edge-glow: none;
 }
-.nh-modal--accent-magenta::after {
-  background: var(--magenta);
-}
-.nh-modal--accent-cyan::after {
-  background: var(--cyan);
-}
-.nh-modal--accent-violet::after {
-  background: var(--violet);
+.nh-modal--accent-violet {
+  --nh-edge: var(--violet);
+  --nh-edge-glow: none;
 }
 
 .nh-modal-head {

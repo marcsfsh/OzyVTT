@@ -1,7 +1,9 @@
 import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from "react";
 import { useEffect, useRef } from "react";
+import { edgeIn, ghostOut, openerX } from "../motion/overlay";
 import { cx } from "./util";
 import { IconChevron } from "./icons";
+import { OverlayEdge } from "./OverlayEdge";
 import "./Menu.css";
 
 interface MenuProps {
@@ -20,7 +22,8 @@ interface MenuProps {
 }
 
 /** Disclosure menu on native <details>/<summary>: the caret rotates on open, the popover eases in, and it closes
-    on Escape, outside click or item activation. */
+    on Escape, outside click or item activation. Its top edge lights from the trigger, and closing leaves an inert
+    copy that drains the edge and fades (ADR-0045). */
 export function Menu({
   trigger,
   children,
@@ -33,18 +36,35 @@ export function Menu({
 }: MenuProps) {
   const ref = useRef<HTMLDetailsElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const edgeRef = useRef<HTMLSpanElement>(null);
+  /** Where the edge lit from, so it drains back there. */
+  const origin = useRef("50%");
+  /** Closes the menu, leaving a copy of the popover to fade where it was. */
+  const close = () => {
+    const el = ref.current;
+    if (!el?.open) return;
+    if (popoverRef.current) ghostOut(popoverRef.current, { origin: origin.current, leave: "fade" });
+    el.open = false;
+  };
+  const closeRef = useRef(close);
+  closeRef.current = close;
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (el.open && !el.contains(event.target as Node)) el.open = false;
+      if (el.open && !el.contains(event.target as Node)) closeRef.current();
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && el.open) {
-        el.open = false;
+        closeRef.current();
         el.querySelector<HTMLElement>("summary")?.focus();
       }
+    };
+    // The trigger closes an open menu natively; the copy is taken first, while the popover still shows.
+    const summary = el.querySelector("summary");
+    const onTriggerClick = () => {
+      if (el.open && popoverRef.current) ghostOut(popoverRef.current, { origin: origin.current, leave: "fade" });
     };
     /* The popover is `position: fixed`, placed from the trigger on open and on resize, rotate or scroll, so a
        scrolling ancestor can't clip it (a menu in a scrolled list would otherwise lose its lower items to the page
@@ -70,16 +90,26 @@ export function Menu({
       pop.style.left = `${Math.round(Math.max(gutter, Math.min(start, viewportWidth - gutter - width)))}px`;
       pop.style.top = `${Math.round(up ? rect.top - gap - height : rect.bottom + gap)}px`;
     };
+    const onToggle = () => {
+      place();
+      const pop = popoverRef.current;
+      const edge = edgeRef.current;
+      if (!el.open || !pop || !edge) return;
+      const at = openerX(pop, summary);
+      origin.current = edgeIn(pop, edge, at === null ? { sweep: "right" } : { at, delay: 20, dur: 160, burstW: 70 });
+    };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
-    el.addEventListener("toggle", place);
+    summary?.addEventListener("click", onTriggerClick);
+    el.addEventListener("toggle", onToggle);
     window.addEventListener("resize", place);
     // Capture, because the list the menu sits in scrolls and the window doesn't.
     window.addEventListener("scroll", place, true);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
-      el.removeEventListener("toggle", place);
+      summary?.removeEventListener("click", onTriggerClick);
+      el.removeEventListener("toggle", onToggle);
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
     };
@@ -87,7 +117,7 @@ export function Menu({
 
   const closeAfterItem = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
-    if (target.closest("[role='menuitem'], a, button") && ref.current) ref.current.open = false;
+    if (target.closest("[role='menuitem'], a, button")) close();
   };
 
   return (
@@ -106,6 +136,7 @@ export function Menu({
       </summary>
       <div ref={popoverRef} className="nh-menu-popover anim-popover" role="menu" onClick={closeAfterItem}>
         {children}
+        <OverlayEdge ref={edgeRef} />
       </div>
     </details>
   );

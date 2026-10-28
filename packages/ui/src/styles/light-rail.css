@@ -129,3 +129,16 @@
   inset: 0;
   background: var(--flash);
 }
+
+/* An overlay leaving (motion/overlay.ts): an inert copy fades where the overlay was. It sits over the app and every
+   overlay, under a modal still open in the top layer. */
+.lr-ghost {
+  position: fixed;
+  z-index: 2147483000;
+  margin: 0;
+  pointer-events: none;
+}
+.lr-ghost-scrim {
+  inset: 0;
+  background: var(--overlay);
+}

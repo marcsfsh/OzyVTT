@@ -63,6 +63,7 @@ export {
   type Tone
 } from "./motion/lightRail";
 export { holdMotion, motionReleased, releaseMotion } from "./motion/gate";
+export { edgeIn, ghostOut, openerNow, openerX, type EdgeEntry, type GhostOptions } from "./motion/overlay";
 export { useOnChange, usePrevious } from "./motion/hooks";
 
 /* Primitives */
@@ -74,6 +75,7 @@ export { Wordmark, Eyebrow, SunMark } from "./primitives/Wordmark";
 export { Chip, type ChipTone } from "./primitives/Chip";
 export { Tabs } from "./primitives/Tabs";
 export { StripInk, type InkEdge } from "./primitives/StripInk";
+export { OverlayEdge } from "./primitives/OverlayEdge";
 export { Menu, MenuItem } from "./primitives/Menu";
 export { Modal } from "./primitives/Modal";
 export { Drawer } from "./primitives/Drawer";

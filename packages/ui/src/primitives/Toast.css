@@ -26,6 +26,8 @@
 }
 /* A plate in --surface-2 with a 1px edge: the VT323 tag names its kind, one line says what happened. */
 .nh-toast {
+  /* Positioned for its top edge's light (OverlayEdge). */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);

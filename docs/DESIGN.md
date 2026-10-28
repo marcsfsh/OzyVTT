@@ -35,18 +35,18 @@ An arcade cabinet at dusk and at dawn. There are two themes and nothing else:
 
 Neon appears only where it means something, and each 80s element has one job.
 
-| Element                                  | Its job            | Where it appears                                                                                                                                   |
-| ---------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sun frame (`--grad-sun`, 3px, with glow) | Now: who is acting | The acting tile in the turn order, the acting creature's portrait in the sidebar or turn card, its token ring, and the "is acting" line on a phone |
-| Sunset scene                             | Arrival            | The title and join screens only. Dusk paints it at night; Dawn paints it as daybreak.                                                              |
-| Horizon line (`--grad-horizon`, 2px)     | The top of the app | The bottom edge of every top bar, laptop and phone                                                                                                 |
-| Chrome lettering (`.chrome`)             | Who is acting      | The wordmark, the acting creature's name and YOUR TURN. Nowhere else. Dawn prints it as solid ink with the same pink and cyan split.               |
-| Cabinet lamp                             | Available, or on   | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live encounter                                                      |
-| Life bar                                 | Hit points         | Every hit point readout                                                                                                                            |
-| VCR counter                              | The round          | PLAY and RND 03 during an encounter, STOP and RND -- between encounters, at the start of the turn order and beside YOUR TURN                       |
-| Arcade button                            | Press this         | The one primary action in a view                                                                                                                   |
-| Neon grid (`--grid-neon`)                | Map squares        | The grid drawn over a map image                                                                                                                    |
-| Reticle                                  | The target         | The creature an attack or spell is aimed at                                                                                                        |
+| Element                                  | Its job                                        | Where it appears                                                                                                                                      |
+| ---------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sun frame (`--grad-sun`, 3px, with glow) | Now: who is acting                             | The acting tile in the turn order, the acting creature's portrait in the sidebar or turn card, its token ring, and the "is acting" line on a phone    |
+| Sunset scene                             | Arrival                                        | The title and join screens only. Dusk paints it at night; Dawn paints it as daybreak.                                                                 |
+| Horizon line (`--grad-horizon`, 2px)     | The top of the app, and of what opens above it | The bottom edge of every top bar, laptop and phone, and the top edge of a dialog, menu, drawer or toast, which lights from the control that opened it |
+| Chrome lettering (`.chrome`)             | Who is acting                                  | The wordmark, the acting creature's name and YOUR TURN. Nowhere else. Dawn prints it as solid ink with the same pink and cyan split.                  |
+| Cabinet lamp                             | Available, or on                               | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live encounter                                                         |
+| Life bar                                 | Hit points                                     | Every hit point readout                                                                                                                               |
+| VCR counter                              | The round                                      | PLAY and RND 03 during an encounter, STOP and RND -- between encounters, at the start of the turn order and beside YOUR TURN                          |
+| Arcade button                            | Press this                                     | The one primary action in a view                                                                                                                      |
+| Neon grid (`--grid-neon`)                | Map squares                                    | The grid drawn over a map image                                                                                                                       |
+| Reticle                                  | The target                                     | The creature an attack or spell is aimed at                                                                                                           |
 
 - Nothing pulses or loops. One-shot cues (a crit flash, a bar filling) are fine.
 - No scanlines or other CRT texture over text or surfaces (ADR-0045). A surface is plain glass in Dusk and plain
@@ -310,7 +310,7 @@ from the mockups.
   again.
 - Focus: every control shows a 2px `--focus-ring` outline with a 2px offset on keyboard focus (`:focus-visible`). It is never
   removed or hidden.
-- Toast: bottom right on a laptop, just above the bottom tabs on a phone. A `--surface-2` plate with a 1px
+- Toast: bottom right on a laptop, just above the bottom tabs on a phone, with a horizon line along its top. A `--surface-2` plate with a 1px
   `--line-raised` edge, a VT323 tag for its kind (DONE, or ERROR in `--danger-text`), one line of text, and Undo when the
   action can be undone. It stays 5 seconds, pauses on hover or focus, and is announced politely (`aria-live="polite"`).
   Destructive actions are labelled and confirmed.
