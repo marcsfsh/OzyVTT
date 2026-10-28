@@ -100,52 +100,15 @@ main:has(> .app-bottom-tabs) {
     opacity: 1;
   }
 }
-/* The scanline wipe, on tab and page transitions only (≤180ms, one band, one pass). The pane's one
-   child is a new element on every address change, so it fires once; do not add it elsewhere.
-   A mask, and no overlay (no pseudo is free); in Chromium `mask-image` creates no containing block
-   for fixed descendants, and `fill-mode: none` drops it after. The band dims and stays visible.
-   The tile is 200% of the box with the band at 47-50% of it; `mask-position` percentages resolve
-   against (box - image) = -100%, so 100% -> 0% sweeps the band once from top to bottom. */
+/* The content part of a page change (ADR-0045): the pane's one child is a new element on every address change, so it
+   fades in once, starting at --delay-content. The light around it is drawn in the bars (shell/pageLight.ts); the pane
+   gets only a wash, which animates opacity too. */
 .app-pane > .anim-view {
-  animation-name: pane-in, pane-wipe;
-  animation-duration: var(--dur-enter), 180ms;
-  animation-timing-function: var(--ease-settle), linear;
-  animation-fill-mode: both, none;
-  -webkit-mask-size: 100% 200%;
-  mask-size: 100% 200%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-}
-@keyframes pane-wipe {
-  from {
-    -webkit-mask-image: var(--pane-wipe-band);
-    mask-image: var(--pane-wipe-band);
-    -webkit-mask-position: 0 100%;
-    mask-position: 0 100%;
-  }
-  to {
-    -webkit-mask-image: var(--pane-wipe-band);
-    mask-image: var(--pane-wipe-band);
-    -webkit-mask-position: 0 0%;
-    mask-position: 0 0%;
-  }
-}
-/* Only the gradient's alpha is read, but it still goes through a token (check (d) allows no colour
-   literals). */
-:root {
-  --pane-wipe-band: linear-gradient(
-    to bottom,
-    var(--void) 0 45%,
-    color-mix(in srgb, var(--void) 34%, transparent) 47.4%,
-    color-mix(in srgb, var(--void) 34%, transparent) 49%,
-    var(--void) 51.4% 100%
-  );
+  animation: pane-in var(--dur-content) var(--ease-settle) var(--delay-content) both;
 }
 @media (prefers-reduced-motion: reduce) {
   .app-pane > .anim-view {
-    animation-name: pane-in;
-    -webkit-mask-image: none;
-    mask-image: none;
+    animation: none;
   }
 }
 /* The settle phase must not re-reveal the app: by then the curtain has already faded and the chrome

@@ -42,6 +42,8 @@
 /* A GM's phone: the strip is Play's header, with the counter, the live scene picker centred, and Join. The horizon
    line closes it the way it closes every top bar. */
 .table-strip.is-header {
+  /* Positioned: a change of section lights its horizon (shell/pageLight.ts). */
+  position: relative;
   border-bottom: 0;
   background:
     var(--grad-horizon) bottom / 100% 2px no-repeat,

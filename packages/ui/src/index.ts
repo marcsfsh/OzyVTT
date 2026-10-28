@@ -73,6 +73,7 @@ export { Panel, PanelHeader } from "./primitives/Panel";
 export { Wordmark, Eyebrow, SunMark } from "./primitives/Wordmark";
 export { Chip, type ChipTone } from "./primitives/Chip";
 export { Tabs } from "./primitives/Tabs";
+export { StripInk, type InkEdge } from "./primitives/StripInk";
 export { Menu, MenuItem } from "./primitives/Menu";
 export { Modal } from "./primitives/Modal";
 export { Drawer } from "./primitives/Drawer";

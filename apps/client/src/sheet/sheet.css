@@ -706,6 +706,7 @@ button.cs-lastroll-open {
 
 /* ---- Tabs ---- */
 .cs-tabbar {
+  position: relative;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
@@ -732,10 +733,13 @@ button.cs-lastroll-open {
   font-size: 1.2rem;
   line-height: 1;
 }
+/* The chosen tab is raised, and the bar's ink (StripInk) lights its top edge. */
 .cs-tabbar-tab.is-on {
   background: var(--tab-on);
-  box-shadow: inset 0 3px 0 var(--cyan);
   color: var(--text);
+}
+.cs-tabbar > .nh-tabs-ink {
+  height: 3px;
 }
 .cs-tabbar-tab.is-on .cs-tabbar-icon {
   color: var(--cyan-hi);

@@ -225,6 +225,7 @@ export function CompendiumTable(props: CompendiumTableProps) {
                 type="button"
                 className={cx("cp-row", row.id === selectedId && "is-selected")}
                 aria-current={row.id === selectedId ? "true" : undefined}
+                data-record-key={`${row.kind}:${row.id}`}
                 onClick={() => props.onOpen(row)}
               >
                 <KindIcon kind={row.kind} />
@@ -276,6 +277,7 @@ export function CompendiumTable(props: CompendiumTableProps) {
             <tr
               key={row.id}
               className={cx(row.id === selectedId && "is-selected", row.archived && "is-archived")}
+              data-record-key={`${row.kind}:${row.id}`}
               onClick={() => props.onOpen(row)}
             >
               <td>

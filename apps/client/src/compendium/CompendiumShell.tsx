@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GmView } from "@vtt/domain";
-import { Button, IconPlus, Kbd, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
+import { Button, IconPlus, Kbd, StripInk, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
 import { CodexIcon } from "../codex/icons";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { RulesButton } from "../reference/RulesReference";
 import { navigate, replaceQuery, useRoute } from "../router";
+import { useRecordLight } from "../shell/recordLight";
 import {
   CompendiumContext,
   CompendiumGameContext,
@@ -94,6 +95,12 @@ export function CompendiumShell({
   );
   const shortcut = useMemo(() => shortcutLabel("K", currentDevice()), []);
   const kindInView: Kind | null = view.view === "tables" || view.view === "record" ? view.kind : null;
+  const shell = useRef<HTMLDivElement>(null);
+  useRecordLight(shell, recordKey, {
+    content: ":scope > .cx-content",
+    // Beside a docked table only the record fades; elsewhere the record is the whole content.
+    record: ".cp-recordlayout.is-docked > :not(.cp-dock-table)"
+  });
 
   const body = ((): ReactNode => {
     switch (view.view) {
@@ -145,7 +152,7 @@ export function CompendiumShell({
   return (
     <CompendiumContext.Provider value={value}>
       <CompendiumGameContext.Provider value={game}>
-        <div className={cx("cx-shell cp-shell", phone ? "is-phone" : "is-laptop")}>
+        <div ref={shell} className={cx("cx-shell cp-shell", phone ? "is-phone" : "is-laptop")}>
           {!phone && (
             <div className="cx-bar cp-bar">
               <h1 className="cp-bar-title">Compendium</h1>
@@ -161,6 +168,7 @@ export function CompendiumShell({
                     {item.label}
                   </button>
                 ))}
+                <StripInk active={section ?? ""} panel={() => shell.current?.querySelector(":scope > .cx-content")} />
               </nav>
               <button
                 type="button"
@@ -196,6 +204,11 @@ export function CompendiumShell({
                     </button>
                   );
                 })}
+                <StripInk
+                  active={newOptions === null ? (section ?? "") : ""}
+                  selector=".is-on"
+                  panel={() => shell.current?.querySelector(":scope > .cx-content")}
+                />
               </nav>
               <Button
                 variant="primary"

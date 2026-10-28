@@ -1,5 +1,16 @@
 import { useRef, type KeyboardEvent, type ReactNode } from "react";
-import { IconBag, IconBolt, IconDie, IconEye, IconPage, IconSparkle, IconStar, IconTarget, Tabs } from "@vtt/ui";
+import {
+  IconBag,
+  IconBolt,
+  IconDie,
+  IconEye,
+  IconPage,
+  IconSparkle,
+  IconStar,
+  IconTarget,
+  StripInk,
+  Tabs
+} from "@vtt/ui";
 
 export type SheetTabId = "play" | "actions" | "checks" | "spells" | "gear" | "features" | "notes" | "gm";
 
@@ -41,7 +52,7 @@ export const tabIds = (idBase: string, id: SheetTabId) => ({
   panel: `${idBase}-panel-${id}`
 });
 
-/** The phone's tab bar under the thumb: an icon over each label, the chosen one raised with a cyan edge. */
+/** The phone's tab bar under the thumb: an icon over each label, the chosen one raised with the ink along its top. */
 export function SheetTabBar({
   tabs,
   active,
@@ -86,6 +97,12 @@ export function SheetTabBar({
           </button>
         );
       })}
+      <StripInk
+        active={active}
+        selector=".is-on"
+        edge="top"
+        panel={() => document.getElementById(tabIds(idBase, active).panel)}
+      />
     </div>
   );
 }

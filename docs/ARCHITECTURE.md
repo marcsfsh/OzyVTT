@@ -1202,6 +1202,14 @@ page is hidden and while the motion gate is held. `useSession` holds the gate fr
 frame after the first snapshot has rendered, across a switch of encounter or map, and for a frame when the tab comes
 back; the sheet window holds it on connect the same way.
 
+A tab strip's underline is its ink (`StripInk` in `@vtt/ui`), one line that `Tabs` and the link bars (the Codex,
+Compendium and Settings section bars, their phone tab bars and the sheet's) carry as their last child. A change of
+tab drains it, runs a comet along the strip and fills it under the new tab, and fades in the panel the strip names. The
+top bar's sections hand their trip to `shell/pageLight.ts`, which runs it along the horizon (the first bar marked
+`data-horizon`), washes the pane and fades the page in; the scanline wipe is gone. `shell/recordLight.ts` lights
+opening a record from a list and going back to it, for the Codex's pages and the Compendium's tables, whose rows carry
+`data-record-key`.
+
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map
 library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets

@@ -14,7 +14,7 @@ export function PlayerIdentity({ state, token }: Readonly<{ state: PlayerView; t
   const hp = actor.hp.kind === "exact" ? actor.hp : null;
   const armorClass = armorClassOf(actor);
   return (
-    <header className="player-identity" aria-label={`Playing ${actor.name}`}>
+    <header className="player-identity" aria-label={`Playing ${actor.name}`} data-horizon="">
       <ActorPortrait actor={actor} token={token} frame="party" size="sm" />
       <div className="player-identity-who">
         <b className="player-identity-name">{actor.name}</b>

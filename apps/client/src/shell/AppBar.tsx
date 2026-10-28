@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { GmView, PlayerView } from "@vtt/domain";
 import {
@@ -36,6 +36,7 @@ import {
 import { LiveScenePicker } from "../table/LiveScenePicker";
 import { PlayerIdentity } from "../table/PlayerIdentity";
 import { TvControl } from "../table/TvControl";
+import { pageLight } from "./pageLight";
 import { SearchLauncher } from "./SearchLauncher";
 import "./app-bar.css";
 
@@ -60,7 +61,10 @@ function openGmSection(section: GmSection, current: GmSection | null) {
   void navigate(lastLocationForSection(section) ?? home);
 }
 
-/** The sections as a tab bar: the top bar's on a laptop, the bottom tabs on a phone. One name, so each is "the" bar. */
+/**
+ * The sections as a tab bar: the top bar's on a laptop, the bottom tabs on a phone. One name, so each is "the" bar.
+ * A change of section runs its light along the horizon (`pageLight`); a phone's bottom tabs carry their ink on top.
+ */
 function SectionTabs({
   ariaLabel,
   tabs,
@@ -81,6 +85,8 @@ function SectionTabs({
       // No tab lights for a utility page (Settings, the table screen controls): `activeId` names none of them.
       activeId={activeId ?? ""}
       onChange={onChange}
+      inkEdge={bottom ? "top" : "bottom"}
+      onTravel={pageLight}
       tabs={tabs.map((tab) => ({
         id: tab.id,
         label: bottom ? (
@@ -101,7 +107,7 @@ function SectionTabs({
 /** The top bar's frame: the wordmark, what goes in it, and the horizon line along its bottom edge. */
 function TopBar({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
   return (
-    <header className={cx("app-bar", className)}>
+    <header className={cx("app-bar", className)} data-horizon="">
       <Wordmark variant="cabinet" className="app-bar-mark" />
       {children}
     </header>
@@ -317,6 +323,7 @@ export function PrepFrame({ children }: Readonly<{ children: ReactNode }>) {
   const route = useRoute();
   const page = prepPageFor(route.path);
   const [end, setEnd] = useState<HTMLElement | null>(null);
+  const shown = useRef<HTMLDivElement>(null);
   return (
     <div className="prep-frame frame-col">
       <div className="section-bar">
@@ -326,12 +333,15 @@ export function PrepFrame({ children }: Readonly<{ children: ReactNode }>) {
           activeId={page ?? ""}
           onChange={(id) => void navigate(PREP_PAGES.find((entry) => entry.id === id)!.path)}
           tabs={PREP_PAGES.map((entry) => ({ id: entry.id, label: entry.label }))}
+          panel={() => shown.current}
         />
         <span className="app-bar-grow" />
         <div className="section-bar-end" ref={setEnd} />
       </div>
       <PrepBarEnd.Provider value={end}>
-        <div className="prep-frame-page frame-col frame-fill">{children}</div>
+        <div ref={shown} className="prep-frame-page frame-col frame-fill">
+          {children}
+        </div>
       </PrepBarEnd.Provider>
     </div>
   );

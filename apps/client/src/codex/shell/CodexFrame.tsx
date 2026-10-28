@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { IconButton, Kbd } from "@vtt/ui";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { IconButton, Kbd, StripInk } from "@vtt/ui";
 import { currentDevice, shortcutLabel } from "../../lib/shortcut";
 import { CodexIcon } from "../icons";
 import {
@@ -16,6 +16,7 @@ import {
   type CodexSection
 } from "../routes";
 import { replaceQuery, useRoute } from "../../router";
+import { useRecordLight } from "../../shell/recordLight";
 import { PhoneBarContext, type PhoneBarSlot } from "./PhoneBar";
 import "./shell.css";
 
@@ -29,6 +30,7 @@ const CAMPAIGN_KEY = "codex-campaign-part";
  */
 export function CodexFrame({
   section,
+  recordId = null,
   phone,
   embedded = false,
   className,
@@ -43,6 +45,8 @@ export function CodexFrame({
 }: Readonly<{
   /** Null for an address that names nothing, which lights no section. */
   section: CodexSection | null;
+  /** The record the address opens, or null on a list: opening and leaving one runs its light. */
+  recordId?: string | null;
   phone: boolean;
   /** The player preview inside the GM's dialog: no shortcut of its own, and the dialog is the frame. */
   embedded?: boolean;
@@ -81,6 +85,9 @@ export function CodexFrame({
     onPaletteChange(true);
     replaceQuery((query) => query.delete("openSearch"));
   }, [embedded, route.query, onPaletteChange]);
+
+  const shell = useRef<HTMLDivElement>(null);
+  useRecordLight(shell, recordId, { content: ":scope > .cx-content" });
 
   const litBar = section ? barItemOf(section) : null;
   const litTab = section ? phoneTabOf(section) : null;
@@ -148,6 +155,7 @@ export function CodexFrame({
   return (
     <PhoneBarContext.Provider value={slot}>
       <div
+        ref={shell}
         className={`codex-root cx-shell${phone ? " is-phone" : " is-laptop"}${embedded ? " is-embedded" : ""}${className ? ` ${className}` : ""}`}
       >
         {phone ? (
@@ -175,6 +183,7 @@ export function CodexFrame({
                   {item.label}
                 </button>
               ))}
+              <StripInk active={litBar ?? ""} panel={() => shell.current?.querySelector(":scope > .cx-content")} />
             </nav>
             <span className="cx-grow" />
             {searchBox}
@@ -196,6 +205,11 @@ export function CodexFrame({
                 <span>{tab.label}</span>
               </button>
             ))}
+            <StripInk
+              active={litTab ?? ""}
+              selector=".is-on"
+              panel={() => shell.current?.querySelector(":scope > .cx-content")}
+            />
           </nav>
         )}
         {phone && part && (

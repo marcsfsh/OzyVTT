@@ -1,5 +1,5 @@
-/* A scanline sweep with no shimmer: a band of scanlines travels down the box while data loads. Distinct from the
-   page wipe (navigation, once, fast): this one loops, is slower and stays in this component. */
+/* A scanline sweep with no shimmer: a band of scanlines travels down the box while data loads. It loops, the one
+   loop left; Light rail (ADR-0045) replaces it with one comet. */
 .nh-skeleton {
   display: block;
   position: relative;

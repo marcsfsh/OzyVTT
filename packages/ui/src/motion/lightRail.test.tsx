@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { restoreAnimate, stubAnimate } from "../../test/animate";
 import { holdMotion, motionReleased, releaseMotion } from "./gate";
 import { useOnChange } from "./hooks";
 import {
@@ -24,45 +25,10 @@ const tokens = readFileSync(`${process.cwd()}/src/styles/design-tokens.css`, "ut
 /** A token's value in `:root`, the first declaration in the file. */
 const rootToken = (name: string) => new RegExp(`${name}:\\s*([^;]+);`).exec(tokens)?.[1].trim();
 
-interface Played {
-  el: Element;
-  frames: Keyframe[];
-  options: KeyframeAnimationOptions;
-  cancel: () => void;
-  finish: () => void;
-}
-
-/** jsdom has no Web Animations API: a stand-in that records each call and settles when told. */
-function stubAnimate(): Played[] {
-  const played: Played[] = [];
-  const byElement = new Map<Element, Animation[]>();
-  Object.defineProperty(Element.prototype, "animate", {
-    configurable: true,
-    value(this: Element, frames: Keyframe[], options: KeyframeAnimationOptions) {
-      let settle: (done: boolean) => void = () => {};
-      const finished = new Promise<Animation>((resolve, reject) => {
-        settle = (done) => (done ? resolve(animation) : reject(new DOMException("Cancelled", "AbortError")));
-      });
-      const animation = { finished, cancel: () => settle(false), finish: () => settle(true) } as unknown as Animation;
-      played.push({ el: this, frames, options, cancel: () => settle(false), finish: () => settle(true) });
-      byElement.set(this, [...(byElement.get(this) ?? []), animation]);
-      return animation;
-    }
-  });
-  Object.defineProperty(Element.prototype, "getAnimations", {
-    configurable: true,
-    value(this: Element) {
-      return byElement.get(this) ?? [];
-    }
-  });
-  return played;
-}
-
 const box = (x: number, w: number): Box => ({ x, y: 0, w, h: 44, cx: x + w / 2, cy: 22, r: x + w, b: 44 });
 
 afterEach(() => {
-  delete (Element.prototype as { animate?: unknown }).animate;
-  delete (Element.prototype as { getAnimations?: unknown }).getAnimations;
+  restoreAnimate();
   releaseMotion();
 });
 

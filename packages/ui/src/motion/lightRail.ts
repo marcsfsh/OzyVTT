@@ -642,6 +642,7 @@ export function stripSwitch(host: Element, o: StripSwitchOptions): Animation | n
   const to = axis === "x" ? o.to.cx : o.to.cy;
   const dir = to >= from ? 1 : -1;
   clearLight(host);
+  for (const running of o.ink.getAnimations?.() ?? []) running.cancel();
   const ghost = o.ink.cloneNode(false) as HTMLElement;
   ghost.classList.add("lr-part", "lr-ink-ghost");
   ghost.setAttribute("aria-hidden", "true");

@@ -45,7 +45,11 @@ export function TableStrip(props: StripProps) {
 
   if (props.role === "gm" && phone)
     return (
-      <header className={`table-strip is-header${fighting ? " is-fighting" : ""}`} aria-label="The table">
+      <header
+        className={`table-strip is-header${fighting ? " is-fighting" : ""}`}
+        aria-label="The table"
+        data-horizon=""
+      >
         <div className="table-strip-row">
           {counter}
           <LiveScenePicker state={props.state} compact />

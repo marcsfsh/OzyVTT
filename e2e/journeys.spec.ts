@@ -920,7 +920,10 @@ test("a player packs a thing into a container from the Gear tab and sees what it
   await expect(sheet.getByRole("list", { name: "In the Old Backpack" })).toBeHidden();
 });
 
-test("the light runs as the GM changes sections and tabs, and leaves nothing behind", async ({ open, request }) => {
+test("the light runs as the GM changes sections and tabs, opens a record and goes back, and leaves nothing behind", async ({
+  open,
+  request
+}) => {
   await ensureGmPassword(request);
   const gm = await open("/");
   // Motion on, whatever the machine running the suite prefers: this journey is about the light.
@@ -930,10 +933,28 @@ test("the light runs as the GM changes sections and tabs, and leaves nothing beh
     if (message.type() === "error") errors.push(message.text());
   });
   await signInAsGm(gm);
+  // The arrival curtain owns its own motion; the pages are checked once it has gone.
+  await expect(gm.locator(".landing")).toHaveCount(0);
 
   for (const name of ["Prep", "Codex", "Compendium", "Play"] as const) {
     await press(gmSection(gm, name));
     await expect(gmSection(gm, name)).toHaveAttribute("aria-selected", "true");
+    // While the light runs, the pane and the page in it only fade, so no fixed overlay is trapped or moved.
+    const trapping = await gm.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>(".app-pane, .app-pane > :not(.lr-part)")]
+        .filter((element) => {
+          const style = getComputedStyle(element);
+          return (
+            style.transform !== "none" ||
+            style.filter !== "none" ||
+            style.maskImage !== "none" ||
+            style.perspective !== "none" ||
+            style.willChange !== "auto"
+          );
+        })
+        .map((element) => element.className)
+    );
+    expect(trapping, `the pane during the change to ${name}`).toEqual([]);
   }
   for (const name of ["Party", "Maps", "Encounters"]) await openGmSection(gm, name);
   await press(gmSection(gm, "Play"));
@@ -943,7 +964,37 @@ test("the light runs as the GM changes sections and tabs, and leaves nothing beh
     await expect(panel.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true");
   }
 
+  // Open a record from the Compendium's table and come back to it.
+  await press(gmSection(gm, "Compendium"));
+  await press(gm.getByRole("navigation", { name: "Compendium sections" }).getByRole("button", { name: "Browse" }));
+  const row = gm.locator("[data-record-key]").first();
+  const key = await row.getAttribute("data-record-key");
+  await press(row);
+  await expect(gm.locator(".cp-record")).toBeVisible();
+  await gm.goBack();
+  await expect(gm.locator(`[data-record-key="${key}"]`)).toBeVisible();
+
   await settleLight(gm);
   expect(await gm.locator('[class^="lr-"], [class*=" lr-"]').count(), "Light rail parts left on the page").toBe(0);
   expect(errors, "console errors").toEqual([]);
+});
+
+test("under reduced motion the sections and tabs change with no light", async ({ open, request }) => {
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await gm.emulateMedia({ reducedMotion: "reduce" });
+  await signInAsGm(gm);
+  await gm.evaluate(() => {
+    const seen = { parts: 0 };
+    (window as unknown as { lightSeen: typeof seen }).lightSeen = seen;
+    new MutationObserver((records) => {
+      for (const record of records)
+        for (const node of record.addedNodes) if (node instanceof Element && node.matches(".lr-part")) seen.parts++;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  for (const name of ["Prep", "Codex", "Play"] as const) await press(gmSection(gm, name));
+  const panel = gm.getByRole("tablist", { name: "The table" });
+  for (const name of ["Log", "Encounter"]) await press(panel.getByRole("tab", { name, exact: true }));
+  const seen = await gm.evaluate(() => (window as unknown as { lightSeen: { parts: number } }).lightSeen.parts);
+  expect(seen, "Light rail parts drawn under reduced motion").toBe(0);
 });

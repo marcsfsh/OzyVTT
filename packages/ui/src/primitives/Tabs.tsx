@@ -1,5 +1,6 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { StripInk } from "./StripInk";
 import { cx } from "./util";
 import "./Tabs.css";
 
@@ -20,11 +21,18 @@ interface TabsProps {
   className?: string;
   /** Ties each tab to its panel: tab `${idBase}-tab-${id}` controls panel `${idBase}-panel-${id}`. */
   idBase?: string;
+  /** Which edge of a horizontal tab carries the ink: a phone's bottom tabs light along their top. */
+  inkEdge?: "bottom" | "top";
+  /** Draws the trip between two tabs elsewhere (the top bar's sections light the horizon); the ink still moves. */
+  onTravel?: (from: HTMLElement, to: HTMLElement) => void;
+  /** What the chosen tab shows, to fade in on a change; the panel `idBase` names unless given. */
+  panel?: () => Element | null | undefined;
 }
 
 /** The one tab bar: a sunken track whose chosen tab is raised and underlined in cyan (a left bar when vertical).
     Full keyboard control. An overflowing horizontal bar hides its scrollbar, keeps the active tab in view
-    and fades whichever edge has more content (no fade when everything fits). */
+    and fades whichever edge has more content (no fade when everything fits). The underline is the strip's ink, and
+    a change of tab runs light along the strip to the new one (ADR-0045). */
 export function Tabs({
   tabs,
   activeId,
@@ -32,7 +40,10 @@ export function Tabs({
   orientation = "horizontal",
   ariaLabel,
   className,
-  idBase
+  idBase,
+  inkEdge = "bottom",
+  onTravel,
+  panel
 }: TabsProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const barRef = useRef<HTMLDivElement>(null);
@@ -155,6 +166,12 @@ export function Tabs({
           </button>
         );
       })}
+      <StripInk
+        active={activeId}
+        edge={horizontal ? inkEdge : "start"}
+        onTravel={onTravel}
+        panel={panel ?? (idBase ? () => document.getElementById(`${idBase}-panel-${activeId}`) : undefined)}
+      />
     </div>
   );
 }
