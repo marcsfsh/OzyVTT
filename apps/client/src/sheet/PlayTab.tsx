@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { ActorDefinition, ActorDerivedSheet, DeathSaves, PendingSave, PlayerPendingSave } from "@vtt/domain";
-import { Button, IconCheck, IconMoon, IconX, Menu, MenuItem } from "@vtt/ui";
+import { Button, IconCheck, IconMoon, IconX, Menu, MenuItem, Roll, burst, canMove, comet, useOnChange } from "@vtt/ui";
 import { abilityModifier } from "@vtt/rules-5e";
 import { rollModeOf, useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "../encounter/DyingTracker";
+import { useSaveLight } from "../encounter/saveLight";
 import { signed } from "../encounter/format";
 import { SavePrompt } from "../encounter/SavePrompt";
 import type { SrdExtension } from "../encounter/sheet-extension";
@@ -26,6 +27,7 @@ import { slotPools } from "./spell-model";
 import { StatusStrip } from "./StatusStrip";
 import { UseBoxes, UseList, type Pool } from "./Uses";
 import type { SheetRolls } from "./useSheetRolls";
+import { PipRow } from "./PipRow";
 
 /** A number read at a glance: AC, Speed, Initiative, Passive Perception. `note` names a lowered value's base. */
 export function StatTile({
@@ -277,15 +279,44 @@ function SlotsLeft({ definition, actor }: Readonly<{ definition: ActorDefinition
             <span className="cs-slot-n" aria-hidden="true">
               {pool.level}
             </span>
-            <span className="cs-pips" aria-hidden="true">
+            <PipRow lit={pool.remaining} className="cs-pips" aria-hidden>
               {Array.from({ length: pool.max }, (_, index) => (
                 <i key={index} className={index < pool.remaining ? "is-on" : undefined} />
               ))}
-            </span>
+            </PipRow>
           </span>
         ))}
       </div>
     </section>
+  );
+}
+
+const DEATH_BOXES = {
+  success: ".cs-death-box.is-success",
+  failure: ".cs-death-box.is-failure",
+  word: ".cs-death-title"
+} as const;
+
+/**
+ * Heroic Inspiration held or not. Gaining it runs a gold comet along the line's bottom edge with a burst at its end, and
+ * the word rolls over to Held (ADR-0045).
+ */
+function InspirationLine({ inspired }: Readonly<{ inspired: boolean }>) {
+  const line = useRef<HTMLDivElement>(null);
+  useOnChange(inspired, (_was, now) => {
+    const el = line.current;
+    if (!now || !el || !canMove()) return;
+    const bottom = el.clientHeight - 1;
+    comet(el, { from: 0, to: el.clientWidth, line: bottom, thick: 2, tone: "gold", delay: 0, dur: 300 });
+    burst(el, { at: el.clientWidth, line: bottom, delay: 280, w: 70, tone: "gold" });
+  });
+  return (
+    <div ref={line} className="cs-vital-line">
+      <span className="cs-eyebrow">Heroic Inspiration</span>
+      <span className={inspired ? "cs-held" : "cs-sub"}>
+        <Roll value={inspired ? "Held" : "None"} />
+      </span>
+    </div>
   );
 }
 
@@ -307,6 +338,8 @@ export function DeathSavesCard({
   onFeedback: (text: string) => void;
 }>) {
   const { rollInput } = useRollPreference();
+  const card = useRef<HTMLElement>(null);
+  useSaveLight(card, deathSaves, DEATH_BOXES);
   const dead = deathSaves.failures >= 3;
   const inspired = heroicInspirationOf(actor) === true;
   const box = (kind: "success" | "failure", index: number) => {
@@ -318,7 +351,7 @@ export function DeathSavesCard({
     );
   };
   return (
-    <section className="cs-card cs-death" aria-label="Death Saving Throws">
+    <section ref={card} className="cs-card cs-death" aria-label="Death Saving Throws">
       <span className="cs-eyebrow is-danger">Death Saving Throws</span>
       <strong className="cs-death-title">
         {dead ? `${actor.name} is dead` : deathSaves.stable ? `${actor.name} is stable` : `${actor.name} is dying`}
@@ -493,19 +526,20 @@ function Vitals({
         />
       )}
       <div className="cs-vitals-pair">
-        {inspired !== undefined && (
-          <div className="cs-vital-line">
-            <span className="cs-eyebrow">Heroic Inspiration</span>
-            <span className={inspired ? "cs-held" : "cs-sub"}>{inspired ? "Held" : "None"}</span>
-          </div>
-        )}
+        {inspired !== undefined && <InspirationLine inspired={inspired} />}
         <div className="cs-vital-line">
           <span className="cs-eyebrow">Exhaustion</span>
-          <span className="cs-boxes is-caution" role="img" aria-label={`Exhaustion ${exhaustion} of 6`}>
+          <PipRow
+            lit={exhaustion}
+            tone="red"
+            className="cs-boxes is-caution"
+            role="img"
+            aria-label={`Exhaustion ${exhaustion} of 6`}
+          >
             {Array.from({ length: 6 }, (_, index) => (
               <i key={index} className={index < exhaustion ? "is-on" : undefined} />
             ))}
-          </span>
+          </PipRow>
         </div>
       </div>
       <div className="cs-group">

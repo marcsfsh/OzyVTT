@@ -20,6 +20,7 @@
 }
 /* The sidebar's tabs read like a section bar: names across the top, the chosen one in cyan with a bar under it. */
 .table-panel-tabs.nh-tabs--horizontal {
+  --nh-ink: var(--state-on-edge);
   flex: none;
   margin: 0;
   padding: 0;
@@ -41,7 +42,7 @@
 .table-panel-tabs .nh-tab--active:hover {
   background: none;
   color: var(--cyan-hi);
-  box-shadow: inset 0 -2px 0 var(--state-on-edge);
+  box-shadow: none;
   text-shadow: var(--glow-tab-text);
 }
 .table-panel-tabs .nh-tab--active::after {

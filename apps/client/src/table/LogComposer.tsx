@@ -3,6 +3,7 @@ import { Button, IconArrow, IconButton, Input, Modal, Select, useToast } from "@
 import { command } from "../lib/command";
 import { ROLL_VISIBILITY_WORD } from "../dice/DicePanel";
 import { useRollVisibility } from "../dice/roll-visibility";
+import { noteChatSent } from "../encounter/logArrivals";
 import "./log-composer.css";
 
 const QUICK_DICE = [4, 6, 8, 10, 12, 20] as const;
@@ -58,6 +59,7 @@ export function LogComposer({ options, talk }: Readonly<{ options?: ReactNode; t
       toast("Claim a character to talk at the table.", { tone: "error" });
       return false;
     }
+    noteChatSent();
     const result = await command("chat:send", {
       text: line,
       ...(talk.role === "player" && talk.speaker ? { actorId: talk.speaker.id } : {}),

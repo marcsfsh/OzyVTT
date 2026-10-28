@@ -219,7 +219,12 @@ export function PagesIndex() {
           <ul className="cx-pagelist">
             {listed.map((row) => (
               <li key={row.id}>
-                <button type="button" className="cx-pagerow" onClick={() => go(pagePath(row.id))}>
+                <button
+                  type="button"
+                  className="cx-pagerow"
+                  data-record-key={row.id}
+                  onClick={() => go(pagePath(row.id))}
+                >
                   <EntityIcon type={row.entityType} />
                   <span className="cx-pagerow-text">
                     <span className="cx-pagerow-title">{row.title}</span>

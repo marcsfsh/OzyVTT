@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { AbilityId, GmView, RollCall } from "@vtt/domain";
 import { Button, Input, RevealSwitch, SegmentedControl, Select, useToast } from "@vtt/ui";
 import { useSkillCatalog } from "../content/catalogs";
 import { command } from "../lib/command";
+import { useCallLight } from "./callLight";
 import { ABILITY_WORDS, callLabel, resultWords } from "./roll-call-words";
 import { CallSituations, toggled } from "./CallSituations";
 import "./roll-calls.css";
@@ -104,6 +105,22 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
     setBusy(false);
     if (!result.ok) toast(result.message ?? "The call could not be closed.", { tone: "error" });
   };
+
+  const openList = useRef<HTMLUListElement>(null);
+  const seen = useMemo(
+    () =>
+      state.rollCalls.map((open) => ({
+        id: open.id,
+        total: open.entries.length,
+        answers: new Map(
+          open.entries.flatMap((entry) =>
+            entry.result ? [[entry.actorId, entry.result.success ?? null] as const] : []
+          )
+        )
+      })),
+    [state.rollCalls]
+  );
+  useCallLight(openList, seen);
 
   return (
     <>
@@ -218,14 +235,15 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
         </div>
       </section>
       {state.rollCalls.length > 0 && (
-        <ul className="roll-call-open" aria-label="Open calls">
+        <ul ref={openList} className="roll-call-open" aria-label="Open calls">
           {state.rollCalls.map((open) => (
-            <li key={open.id} className="roll-call-card">
+            <li key={open.id} className="roll-call-card" data-call={open.id}>
               <div className="roll-call-card-head">
                 <strong>{callLabel(open, skillName)}</strong>
                 <span className="roll-call-meta">
                   {open.dc !== null ? `DC ${open.dc}` : "No DC"}
                   {open.blind ? " · Hidden from players" : ""}
+                  {open.entries.length > 0 && open.entries.every((entry) => entry.result) ? " · All in" : ""}
                 </span>
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => void close(open.id)}>
                   Close
@@ -233,7 +251,7 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
               </div>
               <ul className="roll-call-entries">
                 {open.entries.map((entry) => (
-                  <li key={entry.actorId}>
+                  <li key={entry.actorId} data-actor={entry.actorId}>
                     <span>{nameOf(entry.actorId)}</span>
                     {entry.result ? (
                       <span

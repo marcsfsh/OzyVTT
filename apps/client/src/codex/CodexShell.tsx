@@ -201,6 +201,7 @@ export function CodexShell({
     <GmCodexContext.Provider value={gm}>
       <CodexFrame
         section={section}
+        recordId={recordId}
         phone={phone}
         go={go}
         paletteOpen={paletteOpen}

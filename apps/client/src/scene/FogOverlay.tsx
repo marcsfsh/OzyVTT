@@ -1,4 +1,6 @@
-import { useId } from "react";
+import { useId, useRef } from "react";
+import { useOnChange } from "@vtt/ui";
+import { revealArea } from "./mapLight";
 
 type Rect = Readonly<{ x: number; y: number; width: number; height: number }>;
 
@@ -58,6 +60,22 @@ export function FogOverlay({
     ? `${fog.shapes.length}-${fog.shapes.map((shape) => `${shape.op[0]}${Math.round(shape.x)}.${Math.round(shape.y)}.${Math.round(shape.width)}.${Math.round(shape.height)}`).join("_")}`
     : "";
   const fogMask = `${base}f${fogSignature}`;
+  // A reveal opens behind an edge of light (ADR-0045). The mask itself can't animate, so a cover over the new area
+  // clears away instead.
+  const lightLayer = useRef<SVGGElement>(null);
+  // Null while the fog is off: turning it on shows what is revealed at once, with no light.
+  const reveals = fog?.enabled ? fog.shapes.filter((shape) => shape.op === "reveal") : null;
+  useOnChange(
+    reveals,
+    (before, now) => {
+      const layer = lightLayer.current;
+      if (!layer || !before || !now) return;
+      for (const shape of now)
+        if (!before.some((was) => was.id === shape.id)) revealArea(layer, shape, `fog-overlay fog-overlay-${variant}`);
+    },
+    (a, b) =>
+      a === b || (a !== null && b !== null && a.length === b.length && a.every((shape, i) => shape.id === b[i]?.id))
+  );
   const visionMask = `${base}v${vision ? signatureOf(vision) : ""}`;
   return (
     <>
@@ -87,6 +105,7 @@ export function FogOverlay({
             mask={`url(#${fogMask})`}
             pointerEvents="none"
           />
+          <g ref={lightLayer} pointerEvents="none" />
         </>
       )}
       {vision && (

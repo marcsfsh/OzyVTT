@@ -73,6 +73,8 @@ describe("the scans read the tree", () => {
     ["primitives", scannedTsx, "packages/ui/src/primitives/Button.tsx"],
     ["every source", allTsx, "apps/client/src/codex/CodexShell.tsx"],
     ["stylesheets", stylesheets, "packages/ui/src/styles/design-tokens.css"],
+    // The light's parts are drawn from tokens alone, so check (d) reads them too.
+    ["the light's stylesheet", stylesheets, "packages/ui/src/styles/light-rail.css"],
     ["app stylesheets", appStylesheets, "apps/client/src/styles.css"]
   ])("%s include %s", (_name, scan, anchor) => {
     expect(scan().map((source) => source.path)).toContain(anchor);

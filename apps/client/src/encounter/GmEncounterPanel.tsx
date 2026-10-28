@@ -12,6 +12,7 @@ import { ConfirmRow } from "./ConfirmRow";
 import { FightMenu } from "./FightMenu";
 import { ActingConsole } from "./ActingConsole";
 import { GmInitiativeRow } from "./GmInitiativeRow";
+import { useOrderLight } from "../table/orderLight";
 import { SpellAreas } from "./SpellAreas";
 import { useTargeting, useTargetingResult } from "./targeting";
 import { holdsTheTurn } from "../table/NeedsYou";
@@ -138,6 +139,19 @@ export function GmEncounterPanel({
   const [hpDamageType, setHpDamageType] = useState<string | null>(null);
   const knownActorIdsRef = useRef<ReadonlySet<string>>(new Set(state.actors.map((actor) => actor.id)));
   const actorsById = useMemo(() => new Map(state.actors.map((actor) => [actor.id, actor])), [state.actors]);
+  // The order's light runs down the rows' leading edge, where the acting row's edge sits (ADR-0045).
+  const orderList = useRef<HTMLOListElement>(null);
+  const orderRow = (key: string) =>
+    orderList.current?.querySelector<HTMLElement>(`:scope > li[data-key="${CSS.escape(key)}"]`) ?? null;
+  useOrderLight(orderList, {
+    keys: state.combat.active ? state.combat.initiative.map((entry) => entry.actorId) : [],
+    acting: state.combat.active ? state.combat.turnActorId : null,
+    round: state.combat.active ? state.combat.round : null,
+    item: orderRow,
+    point: (key) => orderRow(key)?.querySelector<HTMLElement>(".initiative-row-main") ?? null,
+    axis: "y",
+    rail: () => 2
+  });
   // Scroll the newly active combatant's row into view on each real turn change.
   const activeRowRef = useRef<HTMLLIElement | null>(null);
   useEffect(() => {
@@ -481,7 +495,7 @@ export function GmEncounterPanel({
         {/* The spell areas the server runs on the map; one a player cast waits here to be placed. They scroll with
             the order, so a few of them never crowd the order out of its section. */}
         <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
-        <ol className="initiative-list gm">
+        <ol ref={orderList} className="initiative-list gm">
           {state.combat.initiative.map((entry) => {
             const active = state.combat.turnActorId === entry.actorId;
             return (

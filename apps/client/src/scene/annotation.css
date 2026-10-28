@@ -89,7 +89,8 @@
   vector-effect: non-scaling-stroke;
   transform-box: fill-box;
   transform-origin: center;
-  animation: annotation-ping-pulse 1.3s ease-out infinite;
+  /* One ring spreads and fades, once (ADR-0045): a ping never loops. */
+  animation: annotation-ping-pulse 600ms ease-out 1 both;
 }
 .annotation-ping-core {
   fill: currentcolor;

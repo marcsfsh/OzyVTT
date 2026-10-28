@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HOST_PATHS } from "@vtt/api-contract";
-import { Button, IconButton, IconCopy, QrCode, Select, useToast } from "@vtt/ui";
+import { Button, IconButton, IconCopy, QrCode, Roll, Select, canMove, comet, useToast } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import "./join-address.css";
@@ -56,6 +56,13 @@ export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string;
   const [qrToggled, setQrToggled] = useState(false);
   const qrOpen = shownAtOnce || qrToggled;
   const { toast } = useToast();
+  const section = useRef<HTMLElement>(null);
+  const [justCopied, setJustCopied] = useState(false);
+  useEffect(() => {
+    if (!justCopied) return;
+    const timer = window.setTimeout(() => setJustCopied(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [justCopied]);
   useEffect(() => {
     let cancelled = false;
     apiRequest<JoinUrls>(HOST_PATHS.joinUrls, { token })
@@ -85,6 +92,11 @@ export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string;
     toast(copied ? "Join address copied." : "Copying didn't work in this browser. Select the address and copy it.", {
       tone: copied ? "success" : "error"
     });
+    if (!copied) return;
+    // A comet runs along the address, and Copy rolls over to Copied for two seconds (ADR-0045).
+    const field = section.current?.querySelector<HTMLElement>(".join-address-url, select");
+    if (field && canMove()) comet(field.parentElement ?? field, lineUnder(field));
+    setJustCopied(true);
   };
   const choice =
     urls.length > 1 ? (
@@ -100,7 +112,7 @@ export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string;
     );
   if (layout === "strip")
     return (
-      <section className="join-address join-address--strip" aria-label="Join address">
+      <section ref={section} className="join-address join-address--strip" aria-label="Join address">
         <span className="join-address-label">Players join at</span>
         {choice}
         <IconButton label="Copy the join address" size="sm" onClick={() => void copy()}>
@@ -109,13 +121,13 @@ export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string;
       </section>
     );
   return (
-    <section className={`join-address join-address--${layout}`} aria-label="Join address">
+    <section ref={section} className={`join-address join-address--${layout}`} aria-label="Join address">
       <div className="join-address-text">
         <span className="join-address-label">Players join at</span>
         {choice}
         <div className="join-address-actions">
           <Button variant="secondary" onClick={() => void copy()}>
-            Copy
+            <Roll value={justCopied ? "Copied" : "Copy"} />
           </Button>
           {!shownAtOnce && (
             <Button variant="secondary" aria-expanded={qrOpen} onClick={() => setQrToggled((open) => !open)}>
@@ -132,4 +144,16 @@ export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string;
       )}
     </section>
   );
+}
+
+/** A trip along the bottom edge of `field`, in its parent's coordinates. */
+function lineUnder(field: HTMLElement) {
+  return {
+    from: field.offsetLeft,
+    to: field.offsetLeft + field.offsetWidth,
+    line: field.offsetTop + field.offsetHeight,
+    thick: 2,
+    delay: 0,
+    dur: 300
+  };
 }

@@ -1,5 +1,7 @@
 /* A lamp tile: the light on top, its name, then its value in VT323. Only a lit lamp glows. */
 .nh-lamp {
+  /* Positioned for the burst when it lights (ADR-0045). */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -12,18 +14,23 @@
   white-space: nowrap;
   --nh-lamp: var(--lamp-on);
   --nh-lamp-glow: var(--glow-lamp-reaction);
+  /* What a lamp holds for a moment as it cools. */
+  --nh-lamp-afterglow: var(--use-afterglow);
 }
 .nh-lamp--action {
   --nh-lamp: var(--lamp-action);
   --nh-lamp-glow: var(--glow-lamp-action);
+  --nh-lamp-afterglow: var(--lamp-afterglow);
 }
 .nh-lamp--bonus {
   --nh-lamp: var(--lamp-bonus);
   --nh-lamp-glow: var(--glow-lamp-bonus);
+  --nh-lamp-afterglow: var(--bonus-afterglow);
 }
 .nh-lamp--reaction {
   --nh-lamp: var(--lamp-reaction);
   --nh-lamp-glow: var(--glow-lamp-reaction);
+  --nh-lamp-afterglow: var(--use-afterglow);
 }
 .nh-lamp-light {
   width: 18px;

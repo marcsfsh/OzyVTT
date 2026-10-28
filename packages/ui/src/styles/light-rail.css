@@ -1,0 +1,206 @@
+/* Light rail (ADR-0045): how each part of the light looks. `motion/lightRail.ts` places the parts and drives them with
+   the Web Animations API. Every part is a throwaway element removed when its animation ends, so nothing here is
+   ever at rest on screen. Colours are tokens only; Dawn and reduced transparency change the tokens. */
+
+/* Above the content of the host it is drawn in, and below menus (40), tooltips, drawers and toasts. */
+.lr-part {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* Comet: a bright head on one end and a tapered tail. `lr-face-r` has its head on the right. */
+.lr-comet {
+  --lr-head: var(--spark);
+  --lr-tail: var(--spark-tail);
+  height: 4px;
+  filter: var(--spark-glow);
+}
+.lr-comet.lr-face-r {
+  transform-origin: 100% 50%;
+  background: linear-gradient(90deg, transparent, var(--lr-tail) 65%, var(--lr-head));
+}
+.lr-comet.lr-face-l {
+  transform-origin: 0 50%;
+  background: linear-gradient(270deg, transparent, var(--lr-tail) 65%, var(--lr-head));
+}
+/* A comet that runs up or down a vertical strip: the same tail, turned. */
+.lr-comet.lr-face-d {
+  transform-origin: 50% 100%;
+  background: linear-gradient(180deg, transparent, var(--lr-tail) 65%, var(--lr-head));
+}
+.lr-comet.lr-face-u {
+  transform-origin: 50% 0;
+  background: linear-gradient(0deg, transparent, var(--lr-tail) 65%, var(--lr-head));
+}
+.lr-comet.lr-gold {
+  --lr-head: var(--gold-head);
+  --lr-tail: var(--gold-tail);
+}
+.lr-comet.lr-cyan {
+  --lr-head: var(--cyan-head);
+  --lr-tail: var(--cyan-tail);
+}
+.lr-comet.lr-red {
+  --lr-head: var(--red-head);
+  --lr-tail: var(--red-tail);
+}
+
+/* Burst: a short flash on a line. Pop: the round version, for pips, tokens and points on the map. */
+.lr-burst,
+.lr-pop {
+  background: radial-gradient(closest-side, var(--lr-burst, var(--spark)), transparent);
+  filter: var(--spark-glow);
+}
+.lr-pop {
+  border-radius: 50%;
+}
+.lr-burst.lr-gold,
+.lr-pop.lr-gold {
+  --lr-burst: var(--gold-head);
+}
+.lr-burst.lr-cyan,
+.lr-pop.lr-cyan {
+  --lr-burst: var(--cyan-head);
+}
+.lr-burst.lr-red,
+.lr-pop.lr-red {
+  --lr-burst: var(--red-head);
+}
+
+/* Wash: the line's own colours falling onto what changed, strongest under where the light landed. It animates
+   opacity alone, so it can sit inside the pane. */
+.lr-wash {
+  background: var(--grad-horizon);
+  mix-blend-mode: var(--wash-blend);
+  -webkit-mask-image: radial-gradient(
+    52% 100% at var(--lr-at, 50%) 0,
+    var(--wash-mask-core) 0%,
+    var(--wash-mask-mid) 32%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    52% 100% at var(--lr-at, 50%) 0,
+    var(--wash-mask-core) 0%,
+    var(--wash-mask-mid) 32%,
+    transparent 100%
+  );
+}
+
+/* A thin vertical edge of light, for reveals that sweep across the map. */
+.lr-edge-v {
+  width: 3px;
+  background: linear-gradient(180deg, transparent, var(--spark) 20%, var(--spark) 80%, transparent);
+  filter: var(--spark-glow);
+}
+
+/* Chrome catch: one sweep of the horizon's colours, laid over an element's own lettering as a copy of its text. The
+   copy is clear outside the band, so the lettering underneath shows through. */
+.lr-sheen {
+  inset: 0;
+  z-index: 1;
+  white-space: nowrap;
+  background-image: linear-gradient(
+    105deg,
+    transparent 0 36%,
+    var(--sheen-a) 42%,
+    var(--sheen-b) 47%,
+    var(--sheen-c) 53%,
+    var(--sheen-d) 58%,
+    transparent 64% 100%
+  );
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  text-shadow: none;
+}
+
+/* Text that rises from a point and fades (a damage number, MISS). The caller's class sets its face. */
+.lr-float {
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* A tape counter's old value leaving upward over the new one (Roll, rollTo). */
+.lr-roll-out {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The sun frame on the move as a turn passes: the sun's colours cut to a 3px frame. */
+.lr-sunframe {
+  box-sizing: border-box;
+  padding: 3px;
+  background: var(--grad-sun);
+  -webkit-mask:
+    linear-gradient(var(--mask-solid) 0 0) content-box,
+    linear-gradient(var(--mask-solid) 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(var(--mask-solid) 0 0) content-box exclude,
+    linear-gradient(var(--mask-solid) 0 0);
+}
+
+/* A creature's stretch of the turn order's rail, draining as it leaves the order. */
+.lr-drop-mark {
+  background: var(--text-muted);
+}
+
+/* A chip's bottom edge, in its own tone, draining as the chip comes apart. */
+.lr-chip-edge {
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--nh-chip-tone, var(--violet));
+}
+
+/* A part that briefly covers a whole surface: the white flash of a critical hit or a natural 20. */
+.lr-flash {
+  inset: 0;
+  background: var(--flash);
+}
+
+/* An overlay leaving (motion/overlay.ts): an inert copy fades where the overlay was. It sits over the app and every
+   overlay, under a modal still open in the top layer. */
+.lr-ghost {
+  position: fixed;
+  z-index: 2147483000;
+  margin: 0;
+  pointer-events: none;
+}
+.lr-ghost-scrim {
+  inset: 0;
+  background: var(--overlay);
+}
+
+/* A comet's track between two points at any angle (cometTo): turned to face the target from its start. */
+.lr-track {
+  transform-origin: 0 0;
+}
+
+/* Damage rising from a token (floatText): gold numerals over a dark shadow, larger for a critical hit. The number only
+   reaches a viewer who already holds the creature's exact hit points. */
+.lr-damage {
+  color: var(--hp-text);
+  font: 400 32px / 1 var(--font-numeric);
+  text-shadow:
+    0 2px 0 var(--void),
+    0 0 8px var(--void);
+}
+.lr-damage.is-critical {
+  font-size: 46px;
+}
+/* MISS where an attack ran out of light. */
+.lr-miss {
+  color: var(--text-muted);
+  font: 400 26px / 1 var(--font-numeric);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 6px var(--void);
+}

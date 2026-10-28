@@ -18,6 +18,7 @@ import {
   IconX,
   LifeBar,
   Modal,
+  Roll,
   ToastOutlet,
   useDragSurface,
   useToast
@@ -624,7 +625,9 @@ export function CharacterSheet({
             {(derived?.passivePerception ?? extension.passivePerception) != null && (
               <StatTile label="Passive Perception" value={derived?.passivePerception ?? extension.passivePerception} />
             )}
-            {inspired !== undefined && <StatTile label="Heroic Inspiration" value={inspired ? "Held" : "None"} />}
+            {inspired !== undefined && (
+              <StatTile label="Heroic Inspiration" value={<Roll value={inspired ? "Held" : "None"} />} />
+            )}
           </div>
           {hp && (
             <div className="cs-band-life">

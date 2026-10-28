@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { useOnChange } from "../motion/hooks";
+import { burst, canMove, comet, rel } from "../motion/lightRail";
 import { cx } from "./util";
 import { IconCheck, IconWarning } from "./icons";
 import "./Steps.css";
@@ -47,9 +49,32 @@ export function Steps({
   const active = steps[index];
   const activeName = active?.shortLabel ?? active?.label;
   const percent = ((index + 1) / total) * 100;
+  // A step change is a tab change on the rail (ADR-0045): light runs from the step left to the step reached, with a
+  // burst there. On a phone it runs along the progress bar to its new end.
+  const wrap = useRef<HTMLDivElement>(null);
+  useOnChange(index, (before, now) => {
+    const el = wrap.current;
+    if (!el || !canMove()) return;
+    const rail = el.querySelector<HTMLElement>(".nh-steps");
+    const bar = el.querySelector<HTMLElement>(".nh-steps-bar");
+    if (rail && rail.offsetParent !== null && orientation === "horizontal") {
+      const steps = [...rail.children];
+      const from = steps[before];
+      const to = steps[now];
+      if (!from || !to) return;
+      const line = rel(rail, el).b - 1;
+      comet(el, { from: rel(from, el).cx, to: rel(to, el).cx, line, thick: 3, delay: 0, dur: 240 });
+      burst(el, { at: rel(to, el).cx, line, delay: 220, w: 80, h: 8 });
+    } else if (bar && bar.offsetParent !== null) {
+      const box = rel(bar, el);
+      const at = (step: number) => box.x + (box.w * (step + 1)) / total;
+      comet(el, { from: at(before), to: at(now), line: box.cy, thick: 3, delay: 0, dur: 240 });
+      burst(el, { at: at(now), line: box.cy, delay: 220, w: 50, h: 8 });
+    }
+  });
 
   return (
-    <div className={cx("nh-steps-wrap", className)}>
+    <div ref={wrap} className={cx("nh-steps-wrap", className)}>
       <div className="nh-steps-compact">
         <div className="nh-steps-compact-head">
           <span className="nh-steps-count tabular">

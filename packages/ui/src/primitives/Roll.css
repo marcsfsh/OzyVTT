@@ -1,0 +1,10 @@
+/* A tape counter's value (Roll.tsx). The old value leaves as a throwaway part over the new one, so the box is positioned;
+   it clips only while a roll runs. */
+.nh-roll {
+  position: relative;
+  display: inline-block;
+  vertical-align: baseline;
+}
+.nh-roll-now {
+  display: inline-block;
+}

@@ -208,19 +208,13 @@
   color: var(--text-dim);
   font: 400 clamp(20px, 1.4vw, 28px) / 1 var(--font-numeric);
 }
-/* A new card lands with one flash of the edge; reduced motion shows it without. */
-.screen-roll.is-rolled {
-  animation: screen-roll-land 0.6s ease-out 1;
+/* A new roll's light runs along the card's top edge to its total (ADR-0045). */
+.screen-roll {
+  position: relative;
 }
-@keyframes screen-roll-land {
-  from {
-    border-color: var(--cyan);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .screen-roll.is-rolled {
-    animation: none;
-  }
+.screen-roll-nat {
+  margin-left: var(--space-2);
+  vertical-align: middle;
 }
 .screen-roll-empty {
   margin: 0;

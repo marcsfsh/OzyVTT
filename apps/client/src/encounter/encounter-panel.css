@@ -254,6 +254,8 @@
   cursor: not-allowed;
 }
 .initiative-list {
+  /* Positioned: the turn's light runs down the rows' leading edge (table/orderLight.ts). */
+  position: relative;
   list-style: none;
   margin: var(--space-4) 0 0;
   padding: 0;

@@ -1,6 +1,8 @@
 /* The character a player plays, as a phone's header on the table: the portrait, name and class, AC and HP in VT323
    boxes, the life bar under them, and the horizon line closing it like every top bar. */
 .player-identity {
+  /* Positioned: a change of section lights its horizon (shell/pageLight.ts). */
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;

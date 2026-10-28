@@ -3,6 +3,7 @@ import type { ContentActionSummary } from "@vtt/domain";
 import { Button, GmOnlyTag, Stepper, useToast } from "@vtt/ui";
 import { afterWords } from "../encounter/action-summary";
 import { command } from "../lib/command";
+import { PipRow } from "./PipRow";
 
 /** One limited-use pool as the server counts it: its key, its name, its largest limit and when it comes back. */
 export type Pool = Readonly<{ id: string; name: string; limit: number; per: string; afterHours?: string }>;
@@ -66,11 +67,11 @@ export function UseBoxes({ left, limit, label }: Readonly<{ left: number; limit:
       </span>
     );
   return (
-    <span className="cs-boxes" role="img" aria-label={label ?? `${left} of ${limit} left`}>
+    <PipRow lit={left} className="cs-boxes" role="img" aria-label={label ?? `${left} of ${limit} left`}>
       {Array.from({ length: limit }, (_, index) => (
         <i key={index} className={index < left ? "is-on" : undefined} />
       ))}
-    </span>
+    </PipRow>
   );
 }
 

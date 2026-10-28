@@ -1,7 +1,8 @@
 /* OzyVTT design tokens: an arcade cabinet at dusk and at dawn. Import once at the app root and reference these
    variables; never hardcode a colour elsewhere. See docs/DESIGN.md.
    Themes: data-theme="dusk|dawn" on <html>. Dusk is :root, so it renders before anything is chosen; the Dawn block
-   overrides only values. <html data-transparency="reduced"> makes the glass solid and drops scanlines and glows. */
+   overrides only values. <html data-transparency="reduced"> makes the glass solid and drops the glows. There are no
+   scanlines (ADR-0045): surfaces are plain glass and paper. */
 
 :root {
   /* Native controls (date fields, scrollbars, checkboxes) follow the theme's ground. */
@@ -205,10 +206,6 @@
   --plate-ink: #f4f4fa;
   --plate-ink-hidden: #d4b8ff;
 
-  /* Scanlines: one overlay over the whole app, in Dusk only. */
-  --scanline-color: rgba(0, 0, 0, 0.2);
-  --scanline-opacity: 0.25;
-
   /* ---- Surfaces you can read the edges of ----
      A panel is a flat plate with a 1px edge. The chrome lip and the two-step raised fill are retired; their names
      stay as flat values so a caller that still uses them paints the new look. */
@@ -324,7 +321,6 @@
 
   /* Texture sizing and noise tile. */
   --grid-cell: 34px;
-  --scanline-gap: 3px;
   --noise-opacity: 0.045;
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
@@ -433,22 +429,73 @@
      keep their visual weight and grow the area with `.tap-target`. */
   --tap-min: 44px;
 
-  /* Motion: quick and one-shot, 120 to 200 ms, ease-out. Nothing loops, pulses or waits on an animation, and under
-     prefers-reduced-motion every one of these is instant. */
+  /* Motion (Light rail, ADR-0045): content starts fading in within 60 ms and is complete within 300 ms; the light
+     around it ends within 500 ms, or 700 ms for a sequence that lights several things in order. Nothing loops,
+     pulses or waits on an animation, and under prefers-reduced-motion every one of these is instant. */
   --ease-settle: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-drawer: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-travel: cubic-bezier(0.45, 0, 0.25, 1); /* the comet: slow to start, slow to stop */
   --dur-press: 120ms; /* transform on press                   */
   --dur-hover: 140ms; /* color/bg/border/shadow, glow on-off */
   --dur-base: 200ms; /* popovers, the sun frame's slide      */
-  --dur-enter: 120ms; /* tabs and panels fading in           */
-  --dur-count: 300ms; /* the table screen's roll count-up    */
+  --dur-enter: 120ms; /* panels and popovers fading in       */
+  --dur-count: 300ms; /* a roll's total counting up          */
+  --dur-drain: 130ms; /* the old place letting go            */
+  --dur-comet: 230ms; /* the trip, whatever the distance     */
+  --dur-fill: 140ms; /* the new place lighting              */
+  --dur-burst: 200ms; /* the flash on arrival                */
+  --dur-wash: 260ms; /* light falling onto what changed     */
+  --dur-content: 200ms; /* the content fade                    */
+  --delay-content: 60ms; /* when the content fade starts        */
+  --delay-fill: 170ms; /* when the new place starts to fill   */
+  --delay-burst: 210ms; /* when the burst lands                */
+  --delay-wash: 200ms; /* when the wash starts                */
+
+  /* The light (styles/light-rail.css draws it). Dusk lights with white over dark lines. The wash is the horizon's
+     colours falling onto what changed, screened over the glass. */
+  --spark: #ffffff;
+  --spark-tail: rgba(255, 214, 234, 0.55);
+  --spark-glow: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 10px rgba(255, 47, 146, 0.65));
+  --gold-head: #fff4c2;
+  --gold-tail: rgba(255, 213, 77, 0.65);
+  --cyan-head: #e6fbff;
+  --cyan-tail: rgba(79, 227, 255, 0.6);
+  --red-head: #ffe1de;
+  --red-tail: rgba(255, 93, 80, 0.6);
+  --wash-strength: 0.24;
+  --wash-blend: screen;
+  /* The wash's mask stops: read only for their alpha, the same in both themes. */
+  --wash-mask-core: #000;
+  --wash-mask-mid: rgba(0, 0, 0, 0.45);
+  /* A mask's solid stop, for a part cut to a frame. */
+  --mask-solid: #000;
+  --flash: #ffffff;
+  /* A line that waits on someone: grey and unlit until it resolves. */
+  --unlit: rgba(255, 255, 255, 0.16);
+  /* The ink under a chosen tab. */
+  --ink-glow: 0 0 8px rgba(43, 228, 255, 0.7);
+  /* Chroma settle: a condition chip arrives on a pink and cyan split that settles; the -0 twins are its rest. */
+  --split-cyan: rgba(43, 228, 255, 0.6);
+  --split-pink: rgba(255, 47, 146, 0.6);
+  --split-cyan-0: rgba(43, 228, 255, 0);
+  --split-pink-0: rgba(255, 47, 146, 0);
+  /* Chrome catch: one sweep of the horizon's colours across YOUR TURN. */
+  --sheen-a: #4fe3ff;
+  --sheen-b: #bb90ff;
+  --sheen-c: #ff5fae;
+  --sheen-d: #ffb35c;
+  /* A lamp, pip or use holding its colour for a moment as it cools. */
+  --lamp-afterglow: 0 0 18px 4px rgba(255, 47, 146, 0.9);
+  --pip-afterglow: 0 0 14px 3px rgba(122, 162, 255, 0.85);
+  --use-afterglow: 0 0 14px 3px rgba(79, 227, 255, 0.8);
+  --bonus-afterglow: 0 0 14px 3px rgba(255, 213, 77, 0.8);
 
   /* Focus ring: the --focus-ring colour, under the name its callers use. */
   --focus-ring-color: var(--focus-ring);
 }
 
 /* ---- Dawn: soft lilac-grey paper, plum-grey ink, gentler edges and slightly muted accents. No pure white and no
-   harsh black. No scanlines and no coloured glow: the sun frame keeps its warm glow and the primary its pressed
+   harsh black. No coloured glow: the sun frame keeps its warm glow and the primary its pressed
    edge. ---- */
 [data-theme="dawn"] {
   color-scheme: light;
@@ -541,13 +588,39 @@
   --tag-next-ink: #ebe7ef;
   --tag-miss-bg: #d3ccdc;
 
-  --scanline-opacity: 0;
-
   --glow-lamp-action: 0 0 #0000;
   --glow-lamp-bonus: 0 0 #0000;
   --glow-lamp-reaction: 0 0 #0000;
   --vcr-glow: 0 0 #0000;
   --glow-tab-text: 0 0 #0000;
+
+  /* The light on paper: no glow, a saturated comet head that reads on pale surfaces, and a wash half as strong that
+     multiplies. */
+  --spark: #e0408a;
+  --spark-tail: rgba(154, 92, 255, 0.5);
+  --spark-glow: drop-shadow(0 0 0 transparent);
+  --gold-head: #b86a12;
+  --gold-tail: rgba(217, 164, 58, 0.6);
+  --cyan-head: #1d6a80;
+  --cyan-tail: rgba(42, 143, 168, 0.55);
+  --red-head: #b8263a;
+  --red-tail: rgba(217, 73, 63, 0.55);
+  --wash-strength: 0.14;
+  --wash-blend: multiply;
+  --unlit: #d3ccdc;
+  --ink-glow: 0 0 #0000;
+  --split-cyan: rgba(42, 143, 168, 0.45);
+  --split-pink: rgba(240, 85, 155, 0.45);
+  --split-cyan-0: rgba(42, 143, 168, 0);
+  --split-pink-0: rgba(240, 85, 155, 0);
+  --sheen-a: #2a8fa8;
+  --sheen-b: #8a62d6;
+  --sheen-c: #e0408a;
+  --sheen-d: #d07a1f;
+  --lamp-afterglow: 0 0 0 3px rgba(240, 85, 155, 0.45);
+  --pip-afterglow: 0 0 0 3px rgba(74, 114, 217, 0.4);
+  --use-afterglow: 0 0 0 3px rgba(42, 143, 168, 0.4);
+  --bonus-afterglow: 0 0 0 3px rgba(217, 164, 58, 0.45);
 
   --track-edge: var(--line-raised);
   --tab-on: linear-gradient(#fbfafc, #fbfafc);
@@ -586,7 +659,7 @@
 }
 
 /* ---- Reduced transparency: the device setting or the system's request (theme/transparency.ts sets the
-   attribute). The glass turns solid, the blur and scanlines go, and every glow drops to its ring. It outranks
+   attribute). The glass turns solid, the blur goes, and every glow drops to its ring. It outranks
    either theme's block. ---- */
 :root[data-transparency="reduced"] {
   --glass-bg: var(--bg);
@@ -595,7 +668,6 @@
   --glass-surface-2: var(--surface-2);
   --glass-surface-3: var(--surface-3);
   --glass-blur: none;
-  --scanline-opacity: 0;
   --glow-magenta: 0 0 0 1px var(--magenta);
   --glow-magenta-strong: 0 0 0 2px var(--magenta);
   --glow-cyan: 0 0 0 1px var(--state-on-edge);
@@ -616,6 +688,14 @@
   --glow-lamp-reaction: 0 0 #0000;
   --vcr-glow: 0 0 #0000;
   --glow-tab-text: 0 0 #0000;
+  /* The light keeps its flat colour: no glow around a comet or burst, and no wash. An afterglow is a ring. */
+  --lamp-afterglow: 0 0 0 2px var(--lamp-action);
+  --pip-afterglow: 0 0 0 2px var(--party);
+  --use-afterglow: 0 0 0 2px var(--cyan);
+  --bonus-afterglow: 0 0 0 2px var(--lamp-bonus);
+  --spark-glow: drop-shadow(0 0 0 transparent);
+  --wash-strength: 0;
+  --ink-glow: 0 0 #0000;
 }
 
 /* A browser that can't blur what is behind a panel gets the solid surfaces too. */
@@ -643,18 +723,6 @@ body {
   -webkit-font-smoothing: antialiased;
   /* Bungee and VT323 ship one weight; a synthesized bold smears them. Bai Jamjuree ships the weights it is used at. */
   font-synthesis-weight: none;
-}
-
-/* Scanlines: one noninteractive overlay over the whole app, in Dusk only, so nothing nests a second comb. Its opacity
-   is a token that Dawn and reduced transparency set to zero. */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 2147483000;
-  pointer-events: none;
-  background: repeating-linear-gradient(180deg, var(--scanline-color) 0 1px, transparent 1px var(--scanline-gap));
-  opacity: var(--scanline-opacity);
 }
 
 /* Numbers that update live (HP, initiative, totals). VT323 is monospaced; `tabular-nums` covers a fallback face. */
@@ -935,19 +1003,9 @@ a:focus-visible .nav-arrow {
   text-shadow: var(--chrome-split);
 }
 
-/* Subtle magenta/cyan fringing, app wordmark only; optional garnish on top of the chrome fill. */
-.chromatic {
-  text-shadow:
-    -1px 0 rgba(255, 46, 154, 0.55),
-    1px 0 rgba(45, 226, 255, 0.55);
-}
-
-/* Dawn: texture off, wordmark fringing off */
+/* Dawn: texture off */
 [data-theme="dawn"] .grid-floor {
   display: none;
-}
-[data-theme="dawn"] .chromatic {
-  text-shadow: none;
 }
 
 /* ---- State treatments ---- */

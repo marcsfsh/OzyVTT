@@ -1,12 +1,15 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { type DeathSaveResult, type DeathSaves } from "@vtt/domain";
 import { command } from "../lib/command";
 import { RollControls, type AnswerChoice, type DieMode } from "./RollControls";
 import { modeWords } from "./roll-mode-notes";
 import { rollModeOf, typedDie, useRollPreference } from "../dice/roll-preference";
+import { useSaveLight, useSavesArrive } from "./saveLight";
 import "./dying-tracker.css";
 
 type DeathPreview = NonNullable<DeathSaveResult["deathSave"]>;
+
+const PIPS = { success: ".pip.success", failure: ".pip.failure", word: ".dying-label" } as const;
 
 /**
  * A dying character's death-save tracker (ADR-0020): success/failure pips plus the roll, via the
@@ -47,6 +50,9 @@ export function DyingTracker({
   showPips?: boolean;
 }>) {
   const [busy, setBusy] = useState(false);
+  const tracker = useRef<HTMLDivElement>(null);
+  useSaveLight(tracker, deathSaves, PIPS);
+  useSavesArrive(showPips ? tracker : null);
   // A rolled-but-unapplied preview; Confirm applies the pips.
   const [rolled, setRolled] = useState<DeathPreview | null>(null);
   // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
@@ -108,7 +114,7 @@ export function DyingTracker({
   // The total shows only when something added to the die (Bless, an aura).
   const total = rolled && rolled.total !== undefined && rolled.total !== rolled.naturalRoll ? rolled.total : null;
   return (
-    <div className="dying-tracker" role="group" aria-label={`Death saves for ${name}`}>
+    <div ref={tracker} className="dying-tracker" role="group" aria-label={`Death saves for ${name}`}>
       {showPips && (
         <>
           <span className={`dying-label${dead ? " dead" : ""}`}>

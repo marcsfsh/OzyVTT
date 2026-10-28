@@ -1,0 +1,19 @@
+/* The chosen tab's ink (StripInk.tsx): one cyan line that the light drains and fills (ADR-0045). A strip that carries it
+   is positioned, and may set --nh-ink for its colour. Selection glows faintly in Dusk. */
+.nh-tabs-ink {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--nh-ink, var(--cyan));
+  box-shadow: var(--ink-glow);
+  pointer-events: none;
+}
+.nh-tabs-ink[data-edge="start"] {
+  width: 3px;
+  height: 0;
+}
+.nh-tabs-ink[hidden] {
+  display: none;
+}

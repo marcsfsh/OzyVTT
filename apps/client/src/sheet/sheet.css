@@ -276,6 +276,7 @@
 /* Boxes and pips: uses, Hit Point Dice, slots. Filled is what is left to spend. */
 .cs-boxes,
 .cs-pips {
+  position: relative;
   display: inline-flex;
   flex-wrap: wrap;
   gap: 3px;
@@ -706,6 +707,7 @@ button.cs-lastroll-open {
 
 /* ---- Tabs ---- */
 .cs-tabbar {
+  position: relative;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
@@ -732,10 +734,13 @@ button.cs-lastroll-open {
   font-size: 1.2rem;
   line-height: 1;
 }
+/* The chosen tab is raised, and the bar's ink (StripInk) lights its top edge. */
 .cs-tabbar-tab.is-on {
   background: var(--tab-on);
-  box-shadow: inset 0 3px 0 var(--cyan);
   color: var(--text);
+}
+.cs-tabbar > .nh-tabs-ink {
+  height: 3px;
 }
 .cs-tabbar-tab.is-on .cs-tabbar-icon {
   color: var(--cyan-hi);
@@ -1140,8 +1145,10 @@ button.cs-lastroll-open {
   align-items: center;
   gap: var(--space-2);
 }
+/* A rest button is never narrower than its label, so on a narrow phone the two stack. */
 .cs-rest > .nh-btn {
   flex: 1 1 9rem;
+  min-width: max-content;
 }
 .cs-slots-left {
   display: flex;
@@ -1197,6 +1204,7 @@ button.cs-lastroll-open {
   gap: var(--space-2);
 }
 .cs-death {
+  position: relative;
   border-color: var(--danger);
   box-shadow: var(--glow-danger);
 }
@@ -1309,6 +1317,7 @@ button.cs-lastroll-open {
   gap: var(--space-1);
 }
 .cs-vital-line {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -1503,6 +1512,7 @@ button.cs-lastroll-open {
   flex: none;
 }
 .cs-level {
+  position: relative;
   display: grid;
   justify-items: center;
   align-content: center;
@@ -1693,6 +1703,7 @@ button.cs-lastroll-open {
   border-bottom: 1px solid var(--line-strong);
 }
 .cs-slotpips {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 2px;

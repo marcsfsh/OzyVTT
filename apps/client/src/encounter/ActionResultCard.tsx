@@ -3,6 +3,7 @@ import type { ActionResolution, ContentActionSummary, GmActor, GmView } from "@v
 import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
 import { DamageLook } from "./DamageLook";
+import { WaitNote } from "./WaitNote";
 import { componentLabel } from "./action-summary";
 import { damageBreakdown } from "./format";
 import type { ResolveOptions } from "./targeting";
@@ -82,7 +83,13 @@ export function ActionResultCard({
           : {[...result.rollMode.advantage, ...result.rollMode.disadvantage].join(", ")}
         </p>
       )}
-      {result.attack && <AttackOutcome attack={result.attack} audience="gm" />}
+      {result.attack && (
+        <AttackOutcome
+          attack={result.attack}
+          audience="gm"
+          attackerId={result.preview || result.waitingOnReaction ? undefined : actor.id}
+        />
+      )}
       {result.check && <CheckOutcome check={result.check} />}
       {result.waitingOnReaction &&
         result.attack &&
@@ -95,16 +102,15 @@ export function ActionResultCard({
               (reaction.kind === "attack-would-hit" || reaction.kind === "roll-answer") &&
               reaction.sourceActorId === actor.id
           );
-          return waiting ? (
-            <p className="action-save-note">
+          return (
+            <WaitNote
+              waiting={waiting}
+              done={<>{prompt?.actionName ?? "The reaction"} answered. The attack finished in Needs you.</>}
+            >
               Waiting on {prompt?.actorName ?? result.attack.targetName}'s{" "}
               <strong>{prompt?.actionName ?? "reaction"}</strong>. Answer it in Needs you, and the attack finishes
               there.
-            </p>
-          ) : (
-            <p className="action-applied">
-              {prompt?.actionName ?? "The reaction"} answered. The attack finished in Needs you.
-            </p>
+            </WaitNote>
           );
         })()}
       {result.preview && result.attack && (

@@ -1,7 +1,8 @@
-import type { KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import type { EncounterToken, EncounterTokenPosition, GmActor, GmView, HealthDisplay, PlayerActor } from "@vtt/domain";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
-import { avatarUrl } from "@vtt/ui";
+import { avatarUrl, useOnChange } from "@vtt/ui";
+import { glideToken } from "./mapLight";
 import { pictureOf } from "../actors/actor-picture";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { hpFillFraction, TokenAltitudeBadge, TokenHealthAura, TokenStatusBadges } from "./tokenGlyph";
@@ -56,8 +57,10 @@ export function MapToken({
   const altitude = encounterToken.altitudeFeet ?? 0;
   // On the Border Ethereal (Etherealness, Blink): drawn faint for whoever may see it there.
   const ethereal = actor.effects.some((effect) => effect.tags.includes("ethereal"));
+  const glide = useTokenGlide(encounterToken.position, dragging, encounterToken.sizePx, TONE[actor.kind]);
   return (
     <g
+      ref={glide}
       data-token-id={actor.id}
       transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`}
       className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}${ethereal ? " ethereal" : ""}`}
@@ -101,4 +104,35 @@ export function MapToken({
       <TokenAltitudeBadge sizePx={encounterToken.sizePx} {...(altitude > 0 ? { altitudeFeet: altitude } : {})} />
     </g>
   );
+}
+
+const TONE: Readonly<Record<(GmActor | PlayerActor)["kind"], string>> = {
+  "player-character": "lr-tone-party",
+  monster: "lr-tone-hostile",
+  npc: "lr-tone-neutral"
+};
+/** How long after a drag ends its move still counts as the dragger's own, which they have already watched land. */
+const DRAG_SETTLE_MS = 2000;
+
+/**
+ * A token gliding to where it moved (ADR-0045, group 6), with its trail. The token being dragged here, and the move
+ * that drag makes, never glide: this device has already shown it there.
+ */
+function useTokenGlide(position: EncounterTokenPosition, dragging: boolean, size: number, tone: string) {
+  const token = useRef<SVGGElement>(null);
+  const dragged = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (dragging) dragged.current = performance.now();
+  });
+  useOnChange(
+    position,
+    (from, to) => {
+      const el = token.current;
+      const recent = dragged.current !== null && performance.now() - dragged.current < DRAG_SETTLE_MS;
+      if (!el || dragging || recent) return;
+      glideToken(el, from, to, size, tone);
+    },
+    (a, b) => a.x === b.x && a.y === b.y
+  );
+  return token;
 }

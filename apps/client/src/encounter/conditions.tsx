@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Actor, ContentConditionSummary } from "@vtt/domain";
-import { Button, Chip, Select, Stepper, type ChipTone } from "@vtt/ui";
+import { Button, Chip, Select, Stepper, useChipStrip, type ChipTone } from "@vtt/ui";
 import { command, read } from "../lib/command";
 import { newId } from "../lib/ids";
 import { CONDITION_GLYPHS } from "../scene/tokenGlyph";
@@ -253,9 +253,12 @@ export function ConditionEditor({
     if (conditionId === shown) setShown(null);
   });
 
+  const strip = useRef<HTMLSpanElement>(null);
+  useChipStrip(strip);
+
   return (
     <div className="condition-editor">
-      <span className="condition-chips">
+      <span ref={strip} className="condition-chips">
         {conditions.map((instance) => (
           <Chip
             key={instance.id}

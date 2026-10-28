@@ -22,6 +22,58 @@ export {
   type Rgba
 } from "./theme/colour";
 
+/* Motion: Light rail (ADR-0045), its gate and the hooks that run it after a change */
+export {
+  COMET_MAX,
+  COMET_MAX_SCREEN,
+  EASE,
+  LIGHT_TIMING,
+  TIMING_TOKENS,
+  burst,
+  canMove,
+  clearLight,
+  comet,
+  cometPath,
+  cometTo,
+  cool,
+  countUp,
+  drain,
+  fadeIn,
+  fadeOut,
+  fill,
+  flash,
+  flip,
+  flipDelta,
+  flipFrom,
+  floatText,
+  lightLamps,
+  lightLine,
+  lightTiming,
+  parseDuration,
+  pop,
+  px,
+  rel,
+  rollOver,
+  rollTo,
+  sheen,
+  splitIn,
+  splitOut,
+  stripSwitch,
+  sunFrame,
+  warm,
+  wash,
+  type Axis,
+  type Box,
+  type LightTiming,
+  type PointTrip,
+  type Tone
+} from "./motion/lightRail";
+export { holdMotion, motionReleased, releaseMotion } from "./motion/gate";
+export { edgeIn, ghostOut, openerNow, openerX, type EdgeEntry, type GhostOptions } from "./motion/overlay";
+export { useOnChange, usePrevious } from "./motion/hooks";
+export { useChipStrip } from "./motion/chips";
+export { usePipLight } from "./motion/pips";
+
 /* Primitives */
 export { cx } from "./primitives/util";
 export { Button, IconButton } from "./primitives/Button";
@@ -30,6 +82,8 @@ export { Panel, PanelHeader } from "./primitives/Panel";
 export { Wordmark, Eyebrow, SunMark } from "./primitives/Wordmark";
 export { Chip, type ChipTone } from "./primitives/Chip";
 export { Tabs } from "./primitives/Tabs";
+export { StripInk, type InkEdge } from "./primitives/StripInk";
+export { OverlayEdge } from "./primitives/OverlayEdge";
 export { Menu, MenuItem } from "./primitives/Menu";
 export { Modal } from "./primitives/Modal";
 export { Drawer } from "./primitives/Drawer";
@@ -41,6 +95,7 @@ export { Tag, type TagTone } from "./primitives/Tag";
 export { Lamp, MoveLamp, StatusLamp, type LampKind } from "./primitives/Lamp";
 export { LifeBar, type ExactHp, type HpBand } from "./primitives/LifeBar";
 export { VcrCounter } from "./primitives/VcrCounter";
+export { Roll } from "./primitives/Roll";
 export { Picture, Portrait, type PictureSource, type PortraitFrame } from "./primitives/Portrait";
 export {
   avatarHash,

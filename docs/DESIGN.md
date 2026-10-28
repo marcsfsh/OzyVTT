@@ -35,26 +35,27 @@ An arcade cabinet at dusk and at dawn. There are two themes and nothing else:
 
 Neon appears only where it means something, and each 80s element has one job.
 
-| Element                                  | Its job            | Where it appears                                                                                                                                   |
-| ---------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sun frame (`--grad-sun`, 3px, with glow) | Now: who is acting | The acting tile in the turn order, the acting creature's portrait in the sidebar or turn card, its token ring, and the "is acting" line on a phone |
-| Sunset scene                             | Arrival            | The title and join screens only. Dusk paints it at night; Dawn paints it as daybreak.                                                              |
-| Horizon line (`--grad-horizon`, 2px)     | The top of the app | The bottom edge of every top bar, laptop and phone                                                                                                 |
-| Chrome lettering (`.chrome`)             | Who is acting      | The wordmark, the acting creature's name and YOUR TURN. Nowhere else. Dawn prints it as solid ink with the same pink and cyan split.               |
-| Cabinet lamp                             | Available, or on   | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live encounter                                                      |
-| Life bar                                 | Hit points         | Every hit point readout                                                                                                                            |
-| VCR counter                              | The round          | PLAY and RND 03 during an encounter, STOP and RND -- between encounters, at the start of the turn order and beside YOUR TURN                       |
-| Arcade button                            | Press this         | The one primary action in a view                                                                                                                   |
-| Neon grid (`--grid-neon`)                | Map squares        | The grid drawn over a map image                                                                                                                    |
-| Reticle                                  | The target         | The creature an attack or spell is aimed at                                                                                                        |
-| Scanlines                                | The CRT            | One overlay over the whole app at 25%, in Dusk only                                                                                                |
+| Element                                  | Its job                                        | Where it appears                                                                                                                                      |
+| ---------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sun frame (`--grad-sun`, 3px, with glow) | Now: who is acting                             | The acting tile in the turn order, the acting creature's portrait in the sidebar or turn card, its token ring, and the "is acting" line on a phone    |
+| Sunset scene                             | Arrival                                        | The title and join screens only. Dusk paints it at night; Dawn paints it as daybreak.                                                                 |
+| Horizon line (`--grad-horizon`, 2px)     | The top of the app, and of what opens above it | The bottom edge of every top bar, laptop and phone, and the top edge of a dialog, menu, drawer or toast, which lights from the control that opened it |
+| Chrome lettering (`.chrome`)             | Who is acting                                  | The wordmark, the acting creature's name and YOUR TURN. Nowhere else. Dawn prints it as solid ink with the same pink and cyan split.                  |
+| Cabinet lamp                             | Available, or on                               | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live encounter                                                         |
+| Life bar                                 | Hit points                                     | Every hit point readout                                                                                                                               |
+| VCR counter                              | The round                                      | PLAY and RND 03 during an encounter, STOP and RND -- between encounters, at the start of the turn order and beside YOUR TURN                          |
+| Arcade button                            | Press this                                     | The one primary action in a view                                                                                                                      |
+| Neon grid (`--grid-neon`)                | Map squares                                    | The grid drawn over a map image                                                                                                                       |
+| Reticle                                  | The target                                     | The creature an attack or spell is aimed at                                                                                                           |
 
 - Nothing pulses or loops. One-shot cues (a crit flash, a bar filling) are fine.
+- No scanlines or other CRT texture over text or surfaces (ADR-0045). A surface is plain glass in Dusk and plain
+  paper in Dawn; the light that moves across them on a change is all the cabinet's shimmer.
 - Glow belongs to four things: the sun frame, a lit lamp, the selected item and the primary button. Resting surfaces
   never glow. Dawn keeps only the sun frame's glow and the primary's pressed edge.
 - Every surface is square. `--radius-pill` is for tokens, presence dots and swatches.
 - A panel is a flat plate with a 1px edge. There is no chrome lip and no rim.
-- Legibility wins every conflict with mood. Reduced transparency turns Dusk's glass solid and drops scanlines and glows.
+- Legibility wins every conflict with mood. Reduced transparency turns Dusk's glass solid and drops the glows.
 
 ## Colour and themes
 
@@ -84,7 +85,7 @@ linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%)`.
 
 Dawn:
 
-- No scanlines and no coloured glow; the sun frame keeps its warm glow and the primary its pressed edge.
+- No coloured glow; the sun frame keeps its warm glow and the primary its pressed edge.
 - Chrome lettering is solid ink with a 1px pink and cyan split at 35%.
 - The join screen's sunset becomes daybreak: pale lilac to peach to pink over a pink grid, mountains with a teal rim.
 
@@ -174,7 +175,7 @@ The shells:
   small map with Open map.
 
 Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. Its front
-page pins New map and New encounter side by side at the top, then the Maps and Encounters tabs, each a sortable table. The table screen's controls open from the
+page pins New map and New encounter at the top, side by side when both labels fit, then the Maps and Encounters tabs, each a sortable table. The table screen's controls open from the
 table screen button in the top bar. The rules reference opens from search and from the Compendium. Settings is the gear.
 
 The table (Play), as a docked workbench (ADR-0025):
@@ -309,15 +310,16 @@ from the mockups.
   again.
 - Focus: every control shows a 2px `--focus-ring` outline with a 2px offset on keyboard focus (`:focus-visible`). It is never
   removed or hidden.
-- Toast: bottom right on a laptop, just above the bottom tabs on a phone. A `--surface-2` plate with a 1px
+- Toast: bottom right on a laptop, just above the bottom tabs on a phone, with a horizon line along its top. A `--surface-2` plate with a 1px
   `--line-raised` edge, a VT323 tag for its kind (DONE, or ERROR in `--danger-text`), one line of text, and Undo when the
   action can be undone. It stays 5 seconds, pauses on hover or focus, and is announced politely (`aria-live="polite"`).
   Destructive actions are labelled and confirmed.
 - Reconnecting: when the connection drops, show a bar under the top bar with a WAIT tag and "Reconnecting. Wait before
   making changes." Controls that need the server are disabled with that reason; reading the last snapshot still
   works. Preserve unsent text as a local draft. Existing in-flight commands may time out; do not automatically
-  replay them with new command IDs or announce success before an acknowledgement. When
-  the connection returns the bar says "Back at the table" for 2 seconds, then goes.
+  replay them with new command IDs or announce success before an acknowledgement. The bar's own line is grey and
+  unlit while it waits. When the connection returns a comet lights that line in the horizon's colours and the bar
+  says "Back at the table" for 2 seconds, then goes.
 - Empty states: one line saying what is missing and one button that fixes it, in the space the content would fill. For
   example, the log says "No rolls yet." above the dice, and an encounter without a map says "No map yet." with Pick a map.
   No illustrations; the sunset belongs to arrival screens.
@@ -325,12 +327,53 @@ from the mockups.
 
 ## Motion
 
-- Changes are quick and one-shot: 120 to 200 ms, ease-out. Nothing loops, pulses or waits on an animation.
-- Tabs and panels fade in over 120 ms.
-- On a new turn the sun frame slides to the next tile over 200 ms, and the turn order scrolls it into view.
-- A life bar's lost segments flash white once (two frames) when damage lands.
-- On the table screen only, a roll's total counts up over 300 ms.
-- Under `prefers-reduced-motion` every one of these is instant.
+Light rail ([ADR-0045](adr/0045-light-rail-motion.md)) is the one motion language for change. The engine is
+`packages/ui/src/motion/lightRail.ts` and the parts are drawn by `packages/ui/src/styles/light-rail.css`. The plan,
+with every moment and the phase that builds it, and the approved mockup are in `docs/design/light-rail/` (`PLAN.md`,
+`mockup/ozyvtt-light-rail.html`). A surface whose moment is not built yet keeps the motion it has.
+
+1. Light travels from the old place to the new one. It drains out of the old place, runs as one comet, bursts and
+   fills where it lands. A wash is optional.
+2. Light rides lines that are already there: the horizon, a tab strip's edge, the top edge of a surface, a bar or a
+   rail of pips. A line is never added for the light alone.
+3. Content never waits. It starts fading in within 60 ms and is complete within 300 ms. The light around it ends
+   within 500 ms. A sequence that lights several things in order, like a long rest or the start of an encounter, may
+   run to 700 ms.
+4. One pass per change. Light never loops or pulses. A moment plays again only when the thing happens again.
+5. The page itself only fades. Light lives in bars, strips and overlays, so the pane keeps its no-transform rule and
+   fixed overlays stay put. A wash in the pane animates opacity alone.
+6. Waiting is still. Something waiting on a person shows WAIT on a grey, unlit line (`--unlit`) and doesn't move.
+   When it resolves, light runs along that line.
+7. Lists that reorder slide. When items change places, each slides from where it was in 240 ms, and light runs along
+   the rail between the old place and the new one.
+8. Each 80s element keeps its job. Status uses its own lines, and chrome lettering catches light only when it names
+   who is acting (YOUR TURN). A condition chip arriving and concentration breaking are the only places for the pink
+   and cyan split.
+9. Dawn has no glow. The burst is a flash on the line, and the wash is half as strong.
+10. Reduced motion skips the light, and content swaps instantly. Reduced transparency drops the wash and the glow.
+
+Light presents state that has arrived from the server, and only what the viewer's projection already holds. It never
+plays on first mount, and `canMove()` holds it while a whole snapshot lands (a connect, a reconnect, a switch of
+encounter). On a new turn the sun frame slides to the next tile over 200 ms and the turn order scrolls it into view.
+A life bar's lost segments flash white once (two frames) when damage lands, ahead of the light along the bar. A damage
+number rises from the token 20 ms after the burst and is gone by 900 ms, the one exception to the 500 ms rule, because
+it is a value to read. It shows only where the viewer already holds the creature's exact hit points; elsewhere the
+burst plays with no number, and healing never shows one.
+
+| Token             | Value                            | Used for                                  |
+| ----------------- | -------------------------------- | ----------------------------------------- |
+| `--dur-drain`     | 130 ms                           | The old place letting go                  |
+| `--dur-comet`     | 230 ms                           | The trip, whatever the distance           |
+| `--dur-fill`      | 140 ms                           | The new place lighting                    |
+| `--dur-burst`     | 200 ms                           | The flash on arrival                      |
+| `--dur-wash`      | 260 ms                           | Light falling onto what changed           |
+| `--dur-content`   | 200 ms                           | The content fade                          |
+| `--delay-content` | 60 ms                            | When the content fade starts              |
+| `--delay-fill`    | 170 ms                           | When the new place starts to fill         |
+| `--delay-burst`   | 210 ms                           | When the burst lands                      |
+| `--delay-wash`    | 200 ms                           | When the wash starts                      |
+| `--dur-count`     | 300 ms                           | A roll's total counting up                |
+| `--ease-travel`   | `cubic-bezier(0.45, 0, 0.25, 1)` | The comet, slow to start and slow to stop |
 
 ## Page patterns
 
@@ -415,8 +458,8 @@ mouse is a bug.
   iOS zooms the page into a focused field with smaller text. The floor in `design-tokens.css` sees to it, so a
   field's own rule may stay smaller for a laptop.
 - A focused input inside a locked region must stay visible above the on-screen keyboard.
-- `prefers-reduced-motion` freezes animations; reduced transparency replaces blur with a solid
-  surface.
+- `prefers-reduced-motion` freezes animations and skips the light; reduced transparency replaces
+  blur with a solid surface.
 
 ## Writing
 

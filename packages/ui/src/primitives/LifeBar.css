@@ -1,6 +1,7 @@
 /* The life bar: a 1px well holding segments, lit ones in --hp and lost ones in --hp-lost. The segments are two
    identical stripes, the lit one clipped to the share of hit points left, so a fill can end inside a segment. */
 .nh-lifebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -47,9 +48,22 @@
 .nh-lifebar-lost {
   --nh-seg: var(--hp-lost);
 }
+/* The fill follows the light along the bar (ADR-0045), so it has no transition of its own. */
 .nh-lifebar-left {
   --nh-seg: var(--hp);
-  transition: clip-path var(--dur-base) ease-out;
+}
+/* Temporary hit points: a cyan line along the top of the bar, over its edge and the gap above the segments, so it
+   takes no room. Its length is the share of the maximum they make, and never under 40px. */
+.nh-lifebar-templine {
+  position: absolute;
+  top: -1px;
+  left: 2px;
+  width: 0;
+  height: 3px;
+  background: var(--cyan);
+}
+.nh-lifebar-templine.is-on {
+  width: min(calc(100% - 4px), max(40px, calc((100% - 4px) * var(--nh-temp))));
 }
 /* Damage lands: the lost segments flash white once, for two frames. */
 .nh-lifebar.is-hit .nh-lifebar-lost {

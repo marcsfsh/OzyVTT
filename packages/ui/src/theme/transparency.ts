@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 /* Reduce transparency, shared by the app, the standalone sheet and the viewer. Reduction is on when this device's
    setting is on or the system asks for it, and the setting can never turn a system request off. While it is on,
-   <html data-transparency="reduced"> makes the glass solid and drops the scanlines and glows. The no-flash script in
+   <html data-transparency="reduced"> makes the glass solid and drops the glows. The no-flash script in
    each HTML entry repeats the key and the decision, so the first paint is already solid. */
 
 const STORAGE_KEY = "vtt.reduce-transparency";

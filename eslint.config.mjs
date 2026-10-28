@@ -11,7 +11,9 @@ export default tseslint.config(
       "data/**",
       "packages/content-srd-5.2.1/bundles/**",
       "e2e/test-results/**",
-      "e2e/playwright-report/**"
+      "e2e/playwright-report/**",
+      // The Light rail handoff's mockup: script fragments that build.sh stitches into one page.
+      "docs/design/light-rail/**"
     ]
   },
   js.configs.recommended,

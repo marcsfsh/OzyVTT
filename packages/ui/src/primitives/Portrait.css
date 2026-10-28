@@ -57,6 +57,13 @@
 .nh-portrait.is-dim {
   opacity: 0.45;
 }
+/* At 0 hit points the picture greys and the portrait fades as an acted one does. */
+.nh-portrait.is-down {
+  opacity: 0.45;
+}
+.nh-portrait.is-down .nh-picture {
+  filter: grayscale(1);
+}
 .nh-portrait.is-now .nh-picture {
   transition: none;
 }

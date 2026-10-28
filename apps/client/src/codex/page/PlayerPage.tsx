@@ -1,5 +1,5 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Alert, IconSparkle, Skeleton, cx } from "@vtt/ui";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, IconSparkle, Skeleton, canMove, comet, cx, fadeIn, useOnChange, wash } from "@vtt/ui";
 import { pageLinkKey } from "@vtt/domain";
 import { playerCodexApi } from "../api";
 import { pageRecordApi } from "../api-records";
@@ -51,6 +51,9 @@ function markRead(pageId: string, at: string) {
 
 type Open = (kind: AnyPageConnection["otherKind"], id: string) => void;
 
+/** How a revealed block is known on the player's side: when it first reached them, and its title. */
+const blockKey = (block: PlayerCodexBlock) => `${block.revealed.at}|${block.title ?? ""}`;
+
 /**
  * A page as one viewer receives it: the assembled body with the blocks that reached them read as ordinary text, the
  * fields and relationships they may read, and their Timeline. Nothing on it says another viewer reads more. The GM's
@@ -89,6 +92,29 @@ export function PlayerPageBody({
   }, [page, onLoaded]);
   const followLink = useFollowPlayerLink(token);
   const { go } = useCodexShell();
+  // A block the GM reveals while the page is open arrives under a comet along its top, a wash falls on it and it
+  // brightens once (ADR-0045). Blocks reach a player with no id, so one is known by when it reached them and its title.
+  const docRef = useRef<HTMLElement>(null);
+  const keys = page ? `${pageId}\n${page.blocks.map(blockKey).join("\n")}` : null;
+  useOnChange(keys, (before, now) => {
+    const doc = docRef.current;
+    if (!before || !now || !doc || !canMove()) return;
+    const [wasPage, ...was] = before.split("\n");
+    const [nowPage, ...shown] = now.split("\n");
+    if (wasPage !== nowPage) return;
+    for (const key of shown) {
+      if (was.includes(key)) continue;
+      const block = doc.querySelector<HTMLElement>(`[data-block-key="${CSS.escape(key)}"]`);
+      if (!block) continue;
+      fadeIn(block, { dur: 240 });
+      comet(block, { from: 0, to: block.clientWidth, line: 0, thick: 3, delay: 0, dur: 260 });
+      wash(block, { at: block.clientWidth / 2, h: block.clientHeight, delay: 200 });
+      block.animate(
+        [{ filter: "brightness(1)" }, { offset: 0.4, filter: "brightness(1.25)" }, { filter: "brightness(1)" }],
+        { duration: 460 }
+      );
+    }
+  });
 
   if (tokenError) return <Alert tone="danger">{tokenError}</Alert>;
   if (!token || (read.loading && !page)) return <Skeleton variant="block" height="10rem" />;
@@ -105,7 +131,7 @@ export function PlayerPageBody({
   const isNew = (block: PlayerCodexBlock) => newSince !== null && block.revealed.at > newSince;
 
   const doc = (
-    <article className="cx-doc">
+    <article ref={docRef} className="cx-doc">
       {items.map((item, index) =>
         item.kind === "text" ? (
           <div key={index} className="cx-doc-text">
@@ -118,7 +144,11 @@ export function PlayerPageBody({
             />
           </div>
         ) : (
-          <div key={index} className={cx("cx-doc-text", isNew(item.block) && "is-new")}>
+          <div
+            key={index}
+            data-block-key={blockKey(item.block)}
+            className={cx("cx-doc-text", isNew(item.block) && "is-new")}
+          >
             <CodexMarkdown
               text={item.text}
               token={token}

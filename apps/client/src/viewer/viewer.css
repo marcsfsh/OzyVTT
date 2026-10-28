@@ -92,6 +92,8 @@
 .viewer-stage {
   grid-area: 2 / 1;
   position: relative;
+  /* The map's own void, so a view gliding in from further out never shows the page behind it. */
+  background: var(--void);
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -248,7 +250,8 @@
   stroke: var(--magenta);
   stroke-width: 4;
   vector-effect: non-scaling-stroke;
-  animation: viewer-pulse 1s ease-out 5;
+  /* One ring, once (ADR-0045): a ping never loops. */
+  animation: viewer-pulse 600ms ease-out 1 both;
 }
 .viewer-ping circle + circle {
   fill: var(--magenta);

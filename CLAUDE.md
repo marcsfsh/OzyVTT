@@ -57,4 +57,6 @@ Node 24+. Run from the repo root.
 - Comments say why the code is the way it is, in a line or two, with no ticket IDs. History belongs
   in git; plans, bugs and the roadmap belong in GitHub issues.
 - When docs and code disagree, fix the doc in the same change.
+- Motion is Light rail (ADR-0045). Its plan and approved mockup are in `docs/design/light-rail/`; port the mockup's
+  numbers and ideas, not its files.
 - Commit messages are a short subject and, if needed, a few lines of body.

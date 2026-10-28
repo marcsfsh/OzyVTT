@@ -142,7 +142,9 @@
 /* `min-width: 0` stops a long roll line (e.g. a player's self-only roll with its audience text)
    widening the single auto track past the dock: `min-width: 0` on the children alone does not lower
    the nowrap row's min-content contribution. */
+/* The newest roll's light runs along the card's top edge to its total (ADR-0045). */
 .roll-card {
+  position: relative;
   min-width: 0;
   padding: var(--space-2) 0.7rem;
   border: 1px solid var(--line);
@@ -245,34 +247,6 @@
   font-size: var(--fs-h2);
   color: var(--text);
 }
-/* The newest roll's total flares once (~250ms) on arrival; the dice do not tumble, because any delay
-   before the answer is paid on every roll. Cards are keyed by roll id, so only the new card animates;
-   `:first-child` prevents every total blooming when the whole panel remounts. Reduced motion keeps
-   the colour as a static accent on the newest total. */
-@keyframes roll-flare {
-  from {
-    color: var(--magenta-text);
-    text-shadow:
-      0 0 10px var(--magenta),
-      0 0 26px color-mix(in srgb, var(--magenta) 55%, transparent);
-  }
-  70% {
-    color: var(--magenta-text);
-  }
-  to {
-    color: var(--text);
-    text-shadow: none;
-  }
-}
-.roll-list > .roll-card:first-child .roll-total {
-  animation: roll-flare 250ms var(--ease-settle) 1;
-}
-@media (prefers-reduced-motion: reduce) {
-  .roll-list > .roll-card:first-child .roll-total {
-    color: var(--magenta-text);
-  }
-}
-
 @media (max-width: 760px) {
   .dice-form {
     grid-template-columns: 1fr 1fr;
@@ -282,4 +256,9 @@
   .dice-form {
     grid-template-columns: 1fr;
   }
+}
+
+/* NAT 20 or NAT 1 sits beside the check it marks. */
+.roll-nat {
+  margin-right: auto;
 }

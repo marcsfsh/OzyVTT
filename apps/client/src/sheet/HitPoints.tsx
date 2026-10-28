@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Button, GmOnlyTag, Input, Meter } from "@vtt/ui";
+import { useRef, useState } from "react";
+import { Button, GmOnlyTag, Input, Meter, Roll, countUp, useOnChange } from "@vtt/ui";
 import { HpAdjust } from "../encounter/HpAdjust";
 import { isDeadOnSheet } from "../encounter/mortality";
 import { command } from "../lib/command";
@@ -43,16 +43,25 @@ export function HpControls({
 export function HpReadout({ actor }: Readonly<{ actor: SheetActor }>) {
   const hp = exactHp(actor);
   const down = isDown(actor);
+  // The number counts to its new value as the light runs along the bar (ADR-0045).
+  const big = useRef<HTMLElement>(null);
+  useOnChange(hp?.current ?? null, (before, now) => {
+    if (big.current && before !== null && now !== null) void countUp(big.current, before, now, { delay: 40, dur: 230 });
+  });
   if (!hp) return null;
   return (
     <div className="cs-hp-readout">
       <span className={`cs-eyebrow${down ? " is-danger" : ""}`}>{down ? "Hit Points · Dying" : "Hit Points"}</span>
       <span className="cs-hp-row">
-        <strong className="cs-hp-big">{hp.current}</strong>
+        <strong ref={big} className="cs-hp-big">
+          {hp.current}
+        </strong>
         <span className="cs-hp-of">of {hp.maximum}</span>
-        <span className="cs-hp-temp">Temp {hp.temporary}</span>
+        <span className="cs-hp-temp">
+          Temp <Roll value={String(hp.temporary)} />
+        </span>
       </span>
-      <Meter tone="health" value={hp.current} max={hp.maximum} />
+      <Meter tone="health" light value={hp.current} max={hp.maximum} />
     </div>
   );
 }

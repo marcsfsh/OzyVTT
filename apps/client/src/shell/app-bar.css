@@ -51,8 +51,10 @@
   padding-right: var(--space-1);
 }
 
-/* The sections in the top bar: words that light cyan with an underline when chosen. No track: the bar is the plate. */
+/* The sections in the top bar: words that light cyan with the ink under them when chosen. No track: the bar is the
+   plate. A change of section runs its light along the horizon (shell/pageLight.ts). */
 .app-sections.nh-tabs--horizontal {
+  --nh-ink: var(--state-on-edge);
   align-self: stretch;
   padding: 0;
   gap: 2px;
@@ -76,10 +78,14 @@
   color: var(--cyan-hi);
   text-shadow: var(--glow-tab-text);
   background: none;
-  box-shadow: inset 0 -2px 0 var(--state-on-edge);
+  box-shadow: none;
 }
 .app-sections .nh-tab--active::after {
   display: none;
+}
+/* The ink lies on the horizon, so it paints above the bar's own line. */
+.app-sections > .nh-tabs-ink {
+  z-index: 1;
 }
 
 /* The utilities at the right end: the table screen lamp, who is connected, search, the theme and settings. */
@@ -115,9 +121,13 @@
   padding: 0 var(--space-2);
 }
 .app-bar-connected {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+}
+.app-bar-connected-face {
+  display: inline-flex;
 }
 .app-bar-connected-more {
   font: 400 16px / 1 var(--font-numeric);
@@ -151,6 +161,7 @@
   background: var(--surface-1);
 }
 .section-bar-tabs.nh-tabs--horizontal {
+  --nh-ink: var(--state-on-edge);
   align-self: stretch;
   min-width: 0;
   padding: 0;
@@ -173,7 +184,7 @@
 .section-bar-tabs .nh-tab--active:hover {
   color: var(--text);
   background: none;
-  box-shadow: inset 0 -2px 0 var(--state-on-edge);
+  box-shadow: none;
 }
 .section-bar-tabs .nh-tab--active::after {
   display: none;
@@ -199,9 +210,10 @@
   min-height: 0;
 }
 
-/* The phone's bottom tabs: 64px, an icon over each name, the chosen one cyan with a bar along its top. They sit above
+/* The phone's bottom tabs: 64px, an icon over each name, the chosen one cyan with the ink along its top. They sit above
    the home indicator. */
 .app-bottom-tabs.nh-tabs--horizontal {
+  --nh-ink: var(--state-on-edge);
   padding: 0 0 env(safe-area-inset-bottom);
   gap: 0;
   border-top: 1px solid var(--line-strong);
@@ -229,7 +241,7 @@
   color: var(--cyan-hi);
   text-shadow: var(--glow-tab-text);
   background: none;
-  box-shadow: inset 0 2px 0 var(--state-on-edge);
+  box-shadow: none;
 }
 .app-bottom-tabs .nh-tab--active::after {
   display: none;
@@ -336,4 +348,8 @@
 .app-bar-theme[open] .nh-theme-switch-trigger::before {
   border-color: var(--line-raised);
   background: var(--surface-2);
+}
+.app-bar-screen-lamp {
+  position: relative;
+  display: inline-flex;
 }

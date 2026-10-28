@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { gameTimeSpanLabel, withArticle, type EffectInstance, type PlayerEffect } from "@vtt/domain";
-import { Button, Chip } from "@vtt/ui";
+import { Button, Chip, useChipStrip } from "@vtt/ui";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
 import "./effect-chips.css";
@@ -92,15 +92,18 @@ export function EffectChips({
   onFeedback: (text: string) => void;
 }>) {
   const [shown, setShown] = useState<string | null>(null);
+  const strip = useRef<HTMLSpanElement>(null);
+  useChipStrip(strip);
   if (effects.length === 0) return null;
   const open = effects.find((effect) => effect.id === shown);
   return (
     <div className="effect-chips-block">
-      <span className="effect-chips">
+      <span ref={strip} className="effect-chips">
         {effects.map((effect) => (
           <Chip
             key={effect.id}
             tone="info"
+            leave="split"
             pressed={shown === effect.id}
             aria-expanded={shown === effect.id}
             title={`${effect.name}${effect.sourceName ? ` from ${effect.sourceName}` : ""} · ${effectDurationLabel(effect)}`}

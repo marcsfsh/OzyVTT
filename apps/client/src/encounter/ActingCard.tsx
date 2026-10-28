@@ -35,6 +35,7 @@ export function ActingCard({
           definitions={state.definitions}
           frame={frameOf(actor, "gm")}
           now
+          down={actor.hp.current <= 0}
           size="lg"
         />
         <div className="acting-card-who">

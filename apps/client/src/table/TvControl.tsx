@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { GmView } from "@vtt/domain";
-import { IconTv, Menu, MenuItem, StatusLamp, cx, useToast } from "@vtt/ui";
+import { useRef } from "react";
+import { IconTv, Menu, MenuItem, Roll, StatusLamp, cool, cx, pop, rel, useOnChange, useToast, warm } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import { newId } from "../lib/ids";
 import { navigate, pathForGmTab } from "../router";
@@ -43,6 +44,19 @@ export function TvControl({ gmToken, state, compact }: Readonly<{ gmToken: strin
   };
 
   const on = tableScreenOn(presentation);
+  // The lamp lights with a burst as the screen comes on, and cools with an afterglow as it goes off; ON and OFF roll
+  // over like a tape counter (ADR-0045).
+  const lampHost = useRef<HTMLSpanElement>(null);
+  useOnChange(on, (_was, now) => {
+    const host = lampHost.current;
+    const lamp = host?.querySelector(".nh-status-lamp");
+    if (!host || !lamp) return;
+    if (now) {
+      warm(lamp, { dur: 200 });
+      const box = rel(lamp, host);
+      pop(host, { x: box.cx, y: box.cy, size: 30, tone: "cyan" });
+    } else cool(lamp, "var(--lamp-on)", "var(--use-afterglow)");
+  });
   const showsLive = Boolean(on && liveMap && presentation?.activeMap?.assetId === liveMap.assetId);
   const status =
     presentation === null ? "status unknown" : !on ? "off" : liveMap && !showsLive ? "on, another map" : "on";
@@ -57,9 +71,11 @@ export function TvControl({ gmToken, state, compact }: Readonly<{ gmToken: strin
         <>
           <IconTv />
           {!compact && <span className="app-bar-screen-label">Table screen</span>}
-          <StatusLamp lit={on} />
+          <span ref={lampHost} className="app-bar-screen-lamp">
+            <StatusLamp lit={on} />
+          </span>
           <span className="app-bar-screen-word" aria-hidden="true">
-            {presentation === null ? "--" : on ? "ON" : "OFF"}
+            <Roll value={presentation === null ? "--" : on ? "ON" : "OFF"} />
           </span>
         </>
       }

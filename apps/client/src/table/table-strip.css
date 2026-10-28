@@ -1,6 +1,8 @@
 /* The strip above the map, 64px: the VCR counter, a seam, the status, and at the right end the join address and the
    sound. The status gives way first when the row runs short. */
 .table-strip {
+  /* Positioned: the turn order's light and a change of section run along its bottom line (ADR-0045). */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-4);

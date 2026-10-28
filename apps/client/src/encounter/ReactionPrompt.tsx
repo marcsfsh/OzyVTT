@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import {
   type ActionResolution,
   type HitOffer,
@@ -6,7 +6,7 @@ import {
   type PendingReaction,
   type PlayerPendingReaction
 } from "@vtt/domain";
-import { Button, IconX, SegmentedControl } from "@vtt/ui";
+import { Button, IconX, OverlayEdge, SegmentedControl, edgeIn, fadeIn, openerX, pop, rel, warm } from "@vtt/ui";
 import { typedDie, useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { castsSpell, damageAdjustments, plainActionName } from "./format";
@@ -244,6 +244,26 @@ export function ReactionPrompt({
       }
     });
   };
+  // The prompt arrives from the Reaction lamp (ADR-0045): the lamp lights with a burst, and the prompt rises with its
+  // top edge filling outward from under the lamp.
+  const card = useRef<HTMLDivElement>(null);
+  const edge = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const prompt = card.current;
+    const line = edge.current;
+    if (!prompt || !line) return;
+    const lamp = document.querySelector<HTMLElement>(".nh-lamp--reaction");
+    const light = lamp?.querySelector<HTMLElement>(".nh-lamp-light") ?? null;
+    if (lamp && light) {
+      warm(light);
+      const box = rel(light, lamp);
+      pop(lamp, { x: box.cx, y: box.cy, size: 38, color: "var(--nh-lamp)" });
+    }
+    fadeIn(prompt, { delay: 60, dur: 180, y: 6 });
+    const at = openerX(prompt, light);
+    edgeIn(prompt, line, at === null ? { sweep: "right" } : { at, delay: 100, dur: 220, burstW: 90 });
+  }, []);
+
   // Auto mode rolls the opportunity swing as soon as the prompt appears (still a preview).
   const rollOnAppear = useEffectEvent(() => answer(true, { commit: false }));
   useEffect(() => {
@@ -269,7 +289,8 @@ export function ReactionPrompt({
   // A spell is cast, anything else used: "Cast Shield", "Use Parry".
   const useLabel = `${castsSpell(reaction.actionId, reaction.actionName) ? "Cast" : "Use"} ${name}`;
   return (
-    <div className="save-prompt reaction-prompt" role="group" aria-label={`Reaction for ${actorName}`}>
+    <div ref={card} className="save-prompt reaction-prompt" role="group" aria-label={`Reaction for ${actorName}`}>
+      <OverlayEdge ref={edge} className="reaction-prompt-edge" />
       <span className="save-prompt-label">
         {reaction.kind === "leaves-reach" ? (
           <>

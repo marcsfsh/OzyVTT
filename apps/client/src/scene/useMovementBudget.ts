@@ -3,17 +3,17 @@ import type { ActorMovementReply } from "@vtt/domain";
 import { read } from "../lib/command";
 
 /** A combatant's movement this turn (its budget for each way it can move), asked again as the game changes. Null
- *  until it arrives, or when it fails: the preview then shows the cost alone. */
+ *  until the first arrives for this creature, or when it fails: the preview then shows the cost alone. While a newer
+ *  one loads the last stays, so the Move lamp and the feet beside it never blink back to the creature's base speed. */
 export function useMovementBudget(actorId: string | null, revision: number): ActorMovementReply | null {
-  const [budget, setBudget] = useState<{ key: string; reply: ActorMovementReply } | null>(null);
-  const key = actorId ? `${actorId}|${revision}` : null;
+  const [budget, setBudget] = useState<{ actorId: string; reply: ActorMovementReply } | null>(null);
   useEffect(() => {
-    if (!actorId || !key) return;
+    if (!actorId) return;
     let live = true;
     void read("actor:movement", { actorId }).then((result) => {
       if (!live || !result.ok || result.counted === undefined) return;
       setBudget({
-        key,
+        actorId,
         reply: {
           counted: result.counted,
           speedFeet: result.speedFeet ?? null,
@@ -28,6 +28,6 @@ export function useMovementBudget(actorId: string | null, revision: number): Act
     return () => {
       live = false;
     };
-  }, [actorId, key]);
-  return budget && budget.key === key ? budget.reply : null;
+  }, [actorId, revision]);
+  return budget && budget.actorId === actorId ? budget.reply : null;
 }

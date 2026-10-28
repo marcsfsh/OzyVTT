@@ -1,6 +1,17 @@
 import { useRef } from "react";
-import { Portrait, VcrCounter, Wordmark, cx, defaultAvatarFor, useDragSurface, type PictureSource } from "@vtt/ui";
+import {
+  Portrait,
+  Tag,
+  VcrCounter,
+  Wordmark,
+  cx,
+  defaultAvatarFor,
+  useDragSurface,
+  useOnChange,
+  type PictureSource
+} from "@vtt/ui";
 import { frameOf } from "../actors/ActorPortrait";
+import { natural, rollLands } from "../dice/rollLight";
 import type { Presentation, ViewerRollCard } from "./ViewerApp";
 import "./screen-parts.css";
 
@@ -157,8 +168,15 @@ export function diceWords(card: ViewerRollCard): string {
   return [...dice, ...modifier].join(" ");
 }
 
+const SCREEN_ROLL_PARTS = { dice: ".screen-roll-dice", total: ".screen-roll-total", nat: ".screen-roll-nat" } as const;
+
 /** The newest public roll, as the room reads it across the table: who and what, the total, the dice. */
 function LatestRoll({ card }: Readonly<{ card: ViewerRollCard | null }>) {
+  // A new roll lands on the card the way it does in the dice panel (ADR-0045).
+  const shown = useRef<HTMLElement>(null);
+  useOnChange(card?.id ?? null, (_was, id) => {
+    if (id && card && shown.current) rollLands(shown.current, card.dice, card.total, SCREEN_ROLL_PARTS);
+  });
   if (!card)
     return (
       <section className="screen-card screen-roll" aria-label="Latest roll">
@@ -168,13 +186,19 @@ function LatestRoll({ card }: Readonly<{ card: ViewerRollCard | null }>) {
     );
   return (
     <section
+      ref={shown}
       key={card.id}
-      className="screen-card screen-roll is-rolled"
+      className="screen-card screen-roll"
       aria-label={`Latest roll: ${card.who}, ${card.what}, ${card.total}`}
       aria-live="polite"
     >
       <p className="screen-roll-who">
         <b>{card.who}</b> {card.what}
+        {natural(card.dice) && (
+          <Tag tone={natural(card.dice) === "NAT 20" ? "hit" : "miss"} className="screen-roll-nat">
+            {natural(card.dice)}
+          </Tag>
+        )}
       </p>
       <p className="screen-roll-line">
         <span className="screen-roll-total">{card.total}</span>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, IconChevronLeft, IconLevelUp } from "@vtt/ui";
+import { Button, IconChevronLeft, IconLevelUp, Roll, canMove, pop, rel, useOnChange } from "@vtt/ui";
 
 /**
  * The level box beside the menu button on a phone: the character's level, and when this viewer may level the
@@ -42,10 +42,21 @@ export function LevelBox({
       document.removeEventListener("keydown", escape);
     };
   }, [open]);
+  // A new level rolls over like the round counter, with a gold burst behind it (ADR-0045).
+  const value = useRef<HTMLSpanElement>(null);
+  useOnChange(level, (before, now) => {
+    const number = value.current;
+    const box = number?.closest<HTMLElement>(".cs-level");
+    if (!number || !box || now <= before || !canMove()) return;
+    const at = rel(number, box);
+    pop(box, { x: at.cx, y: at.cy, size: 44, delay: 120, tone: "gold" });
+  });
   const face = (
     <>
       <span className="cs-level-k">Level</span>
-      <span className="cs-level-v">{level}</span>
+      <span ref={value} className="cs-level-v">
+        <Roll value={String(level)} />
+      </span>
     </>
   );
   if (!onLevelUp && !onLevelDown)

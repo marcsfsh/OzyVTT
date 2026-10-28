@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { initTransparency, ThemeSwitch, ToastProvider } from "@vtt/ui";
+import { holdMotion, initTransparency, releaseMotion, ThemeSwitch, ToastProvider } from "@vtt/ui";
 // The global styles load before any component's own stylesheet, as in main.tsx: CSS lands in import order.
 import "@vtt/ui/styles.css";
 import "./styles.css";
@@ -29,6 +29,8 @@ function StandaloneSheet() {
     // The ref guard persists across the remount.
     const onState = (next: GmView | PlayerView) => setState(next);
     socket.on("state:updated", onState);
+    // As in the app: the first snapshot after a connect renders still (ADR-0045).
+    socket.on("connect", holdMotion);
     if (!joined.current) {
       joined.current = true;
       void joinTable(storedPlayerToken()).then((result) =>
@@ -37,8 +39,10 @@ function StandaloneSheet() {
     }
     return () => {
       socket.off("state:updated", onState);
+      socket.off("connect", holdMotion);
     };
   }, []);
+  useEffect(() => releaseMotion(), [state]);
 
   if (status === "denied")
     return (

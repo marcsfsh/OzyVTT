@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClaimReleasedEvent, GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
-import { useToast } from "@vtt/ui";
+import { holdMotion, releaseMotion, useToast } from "@vtt/ui";
 import type { NoticeMessage } from "../components/feedback";
 import { HOST_PATHS } from "@vtt/api-contract";
 import { apiRequest, onSessionEnded } from "../lib/api";
@@ -26,6 +26,10 @@ export type Session = Readonly<{ role: "gm" | "player"; token: string }>;
 
 export const GM_SESSION_ENDED = "Your GM session ended. Sign in again.";
 export const PLAYER_SESSION_ENDED = "Your seat at the table ended. Join again to choose your character.";
+
+/** What the table shows: a switch of encounter or map changes much of the projection in one snapshot. */
+const sceneOf = (view: PlayerView | GmView): string | null =>
+  "activeEncounterId" in view.combat ? view.combat.activeEncounterId : view.combat.mapAssetId;
 
 /** Whether a join was refused because the token sent is dead (ADR-0027). */
 const deadToken = (result: SessionJoinResult) => !result.ok && result.code === "unauthenticated";
@@ -63,6 +67,7 @@ export function useSession(enter: (commit: () => void) => void) {
   // Read by the socket and HTTP listeners, which outlive any one render.
   const current = useRef<Session | null>(null);
   current.current = signedIn;
+  const scene = useRef<string | null | undefined>(undefined);
 
   /** Back to the landing after the server ended this session, with the reason on the matching door. */
   const sessionEnded = useCallback(() => {
@@ -87,7 +92,11 @@ export function useSession(enter: (commit: () => void) => void) {
     apiRequest<{ bootstrapped: boolean }>(HOST_PATHS.setup)
       .then((status) => setBootstrapped(status.bootstrapped))
       .catch((error: Error) => setNotice({ tone: "error", text: error.message }));
-    const onConnect = () => setConnection("online");
+    // Light waits while a whole snapshot lands: the first after a connect or reconnect renders still (ADR-0045).
+    const onConnect = () => {
+      setConnection("online");
+      holdMotion();
+    };
     const onDisconnect = () => {
       setConnection("reconnecting");
       setFresh(false);
@@ -98,9 +107,19 @@ export function useSession(enter: (commit: () => void) => void) {
     };
     // Creatures of one kind are numbered by name in every list, as on their tokens.
     const onState = (next: PlayerView | GmView) => {
+      const shows = sceneOf(next);
+      if (scene.current !== undefined && scene.current !== shows) holdMotion();
+      scene.current = shows;
       setState(withNumberedNames(next));
       setFresh(true);
     };
+    // A tab back from the background may render what changed while it was hidden; it does so still.
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      holdMotion();
+      releaseMotion();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     socket.on("state:updated", onState);
     socket.on("session:ended", sessionEnded);
     socket.on("connect", onConnect);
@@ -121,10 +140,14 @@ export function useSession(enter: (commit: () => void) => void) {
       socket.io.off("reconnect_attempt", onDisconnect);
       socket.io.off("reconnect", onConnect);
       socket.io.off("reconnect_failed", onGaveUp);
+      document.removeEventListener("visibilitychange", onVisible);
       stopListening();
       stopSharing();
     };
   }, [sessionEnded]);
+
+  // The gate opens one frame after a held snapshot has rendered, so the next change lights.
+  useEffect(() => releaseMotion(), [state]);
 
   // The GM let go of this player's character: back to the picker on the Table, with the toast now and the picker's
   // note until they claim again.

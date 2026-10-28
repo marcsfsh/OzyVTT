@@ -242,9 +242,11 @@ describe("the themes", () => {
         expect(resolved(tokens, plate), `${name} ${plate}`).toBe(resolved(tokens, plate.replace("glass-", "")));
       expect(tokens["--glass-blur"], `${name} blur`).toBe("none");
     }
-    expect(tokensOf("dusk", reduced!)["--scanline-opacity"]).toBe("0");
-    expect(tokensOf("dawn")["--scanline-opacity"]).toBe("0");
-    expect(Number(tokensOf("dusk")["--scanline-opacity"])).toBeCloseTo(0.25);
+  });
+
+  it("lays no scanlines over the app in any theme (ADR-0045)", () => {
+    expect(css).not.toMatch(/scanline/i);
+    expect(css).not.toMatch(/body::after/);
   });
 
   it("makes Dawn light paper with no pure white and no harsh black, and Dusk dark", () => {

@@ -1,9 +1,11 @@
+import { Roll } from "./Roll";
 import { cx } from "./util";
 import "./VcrCounter.css";
 
 /**
  * The round, as a VCR counter: PLAY and RND 03 during a fight, STOP and RND -- between fights. One label says it
- * for assistive technology.
+ * for assistive technology. The word and the round roll over like a tape counter when they change (ADR-0045); the
+ * round lands as the light running back to the counter reaches it.
  */
 export function VcrCounter({
   round,
@@ -24,13 +26,13 @@ export function VcrCounter({
       aria-label={playing ? `Round ${round}` : "No encounter running"}
     >
       <span className="nh-vcr-state" aria-hidden="true">
-        {playing ? "PLAY" : "STOP"}
+        <Roll value={playing ? "PLAY" : "STOP"} />
         <svg className="nh-vcr-mark" viewBox="0 0 12 14" aria-hidden="true">
           {playing ? <path d="M1 1l10 6-10 6z" /> : <path d="M1 2h10v10H1z" />}
         </svg>
       </span>
       <span className="nh-vcr-round" aria-hidden="true">
-        RND {shown}
+        RND <Roll value={shown} delay={230} />
       </span>
     </div>
   );

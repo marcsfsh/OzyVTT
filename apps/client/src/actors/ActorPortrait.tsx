@@ -25,6 +25,7 @@ export function ActorPortrait({
   name,
   now,
   dim,
+  down,
   size,
   className
 }: Readonly<{
@@ -36,6 +37,8 @@ export function ActorPortrait({
   name?: string;
   now?: boolean;
   dim?: boolean;
+  /** At 0 hit points, as this viewer's projection says. */
+  down?: boolean;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   className?: string;
 }>) {
@@ -47,6 +50,7 @@ export function ActorPortrait({
       size={size}
       now={now}
       dim={dim}
+      down={down}
       className={className}
       {...(name ? { name } : {})}
     />

@@ -151,6 +151,8 @@
 /* A phone lists a section's own views as a strip under its header (the app's sections are the bottom tabs): words
    with a small icon, the chosen one underlined in cyan. It scrolls sideways when the views outgrow a narrow phone. */
 .cx-tabbar {
+  --nh-ink: var(--state-on-edge);
+  position: relative;
   display: flex;
   gap: 2px;
   padding: 0 var(--space-2);
@@ -191,9 +193,9 @@
 .cx-tabbar-tab:hover {
   color: var(--text);
 }
+/* The chosen tab's underline is the bar's ink (StripInk). */
 .cx-tabbar-tab.is-on {
   color: var(--text);
-  box-shadow: inset 0 -2px 0 var(--state-on-edge);
 }
 
 /* ----- Pieces every view uses ----- */

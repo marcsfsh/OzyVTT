@@ -1191,8 +1191,67 @@ with the rules of `resolveTheme` (`packages/ui/src/theme/theme.ts`): a saved `du
 `apps/client/src/shell/theme-startup.test.ts` runs each entry's script against it. `ThemeToggle` in Settings > Device and
 the standalone sheet's `ThemeSwitch` share `useTheme`, which hears every change on the page. Reduce transparency
 (`theme/transparency.ts`, Settings > Device) is the device setting `vtt.reduce-transparency` or the system's request;
-while it is on, `<html data-transparency="reduced">` turns the glass tokens solid and drops the scanlines and glows. The
+while it is on, `<html data-transparency="reduced">` turns the glass tokens solid and drops the glows. The
 same script sets it before first paint, and each entry calls `initTransparency` to follow the system after that.
+
+Motion is Light rail (ADR-0045), in `packages/ui/src/motion/`. `lightRail.ts` is the engine: each part (a comet, a
+burst, a wash, a fill) reads its timing from the tokens, draws a throwaway `.lr-part` styled by `styles/light-rail.css`
+and removes it when it ends. `useOnChange` runs a moment after a render that changed a value, never on the first.
+`canMove()` is the one guard: it is false under reduced motion, without the Web Animations API (so in jsdom), while the
+page is hidden and while the motion gate is held. `useSession` holds the gate from a connect or reconnect until one
+frame after the first snapshot has rendered, across a switch of encounter or map, and for a frame when the tab comes
+back; the sheet window holds it on connect the same way.
+
+A tab strip's underline is its ink (`StripInk` in `@vtt/ui`), one line that `Tabs` and the link bars (the Codex,
+Compendium and Settings section bars, their phone tab bars and the sheet's) carry as their last child. A change of
+tab drains it, runs a comet along the strip and fills it under the new tab, and fades in the panel the strip names. The
+top bar's sections hand their trip to `shell/pageLight.ts`, which runs it along the horizon (the first bar marked
+`data-horizon`), washes the pane and fades the page in; the scanline wipe is gone. `shell/recordLight.ts` lights
+opening a record from a list and going back to it, for the Codex's pages and the Compendium's tables, whose rows carry
+`data-record-key`.
+Overlays (`Modal`, `Menu`, `Drawer`, `Toast`) carry an `OverlayEdge` along their top, which `motion/overlay.ts` lights
+outward from the control last pressed or focused. Closing never waits on it: the overlay closes at once and an inert,
+id-free copy of its surface drains the edge and fades where it was (`ghostOut`), so focus return, Escape and the
+backdrop behave as they would with no motion.
+The turn order is a rail. `table/orderLight.ts` (`useOrderLight`) measures a list's rows after each render and lights
+what changed: a new turn runs a comet from the acting row to the next and slides the sun frame, a new round runs it
+back to the VCR counter, an encounter starting or ending runs it from or to the counter, and a join, a leave or a swap
+slides the rows with `flipFrom`. The table strip, the GM's order and the player's order each run it; only the strip
+lights the turn's lamps. `Roll` in `@vtt/ui` rolls a value over like a tape counter (the VCR counter's word and round,
+the legendary count), and `Lamp` warms as it lights and cools through `--nh-lamp-afterglow` when it is spent.
+A life bar is a rail too: `LifeBar` runs light along its top edge from the old value to the new, red as hit points fall
+and gold as they rise, with the fill and the number following it, and temporary hit points draw a cyan line along that
+edge. A band moves the same way with no number, and `Meter`'s `light` does it for the sheet's hit points. `Portrait`'s
+`down` greys a creature at 0. `encounter/saveLight.ts` pops each death save into its pip. A chip strip that calls
+`useChipStrip` settles a new chip in with the chroma split and slides the others to their new places. A chip with
+`leave="split"` (Concentration) leaves an inert copy that comes apart, through `ghostOut`, when it leaves a strip that
+stays.
+A roll lands on its card through `dice/rollLight.ts` (the dice panel and the table screen's latest roll), and a roll
+call fills in through `dice/callLight.ts`. An attack resolved on a device lights that device's map: `AttackOutcome`
+hands the final result to `scene/attackLight.ts`, which runs a comet from attacker to target with `cometTo`. Damage
+numbers come from `scene/damageNumbers.ts`, which compares each creature's health between two projections and
+raises the drop only where the viewer holds exact hit points; the table screen holds only bands, so it bursts with no
+number. No projection or table event gained a field for it. `encounter/WaitNote.tsx` is the still WAIT line that
+lights when settled, and `encounter/requestLight.ts` brings a save to a player along the horizon.
+The map's own light is SVG in map units, from `scene/mapLight.ts`: a token glides to where it moved with a trail (never
+the token this device is dragging), a fog reveal clears behind an edge of light (a cover over the new area, since an
+SVG mask can't animate), an opened door swings on its hinge, a light or area spreads from its centre and a trap that
+springs flashes once. A ping rings once. The table screen's `viewer/screenLight.ts` glides the view when it follows
+the GM's camera, picking up from where a glide in progress is, and uncovers a new map behind a sweep; it moves only
+the map's own layer.
+A new log line fades in with a comet along its lower edge (from the Send side for this device's own chat, which
+`noteChatSent` marks), and `onLogEntry` lets the table panel run light along its tabs to Log while another tab shows
+(`shell/tabLight.ts`); the same trip takes a player's section strip to Codex when its count of new pages rises. A block
+revealed to a player while their page is open arrives under a comet with a wash; player blocks have no ids, so one is
+known by when it reached the reader and its title. A player's face in the top bar warms as they connect and fades as
+they drop, the table screen's lamp lights or cools with ON and OFF rolling, and picking a character lights its card.
+Resources are pips: `usePipLight` in `@vtt/ui` (through the sheet's `PipRow`) cools a pip as it is spent and relights
+them in order as a rest brings them back, for uses, spell slots, Hit Point Dice and Exhaustion. Counters that change
+roll over with `Roll` (an effect's time left, Heroic Inspiration, the level, the replay's position, a track's title,
+Copy and Copied) or count with `countUp` (experience, the encounter budget, rolled ability scores). An effect that ends
+comes apart like Concentration. The small controls light at a smaller size: `Switch`, `Checklist`, `Steps` and a
+`RowEditor` reorder. `Skeleton` runs one comet over a group of plates and never loops, and the reconnect bar has its
+own still grey line, lit by a comet when the table is back.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map

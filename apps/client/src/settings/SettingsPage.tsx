@@ -1,6 +1,17 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { IconButton, IconCode, IconCog, IconDie, IconKey, IconLevelUp, IconSearch, IconUser, IconX } from "@vtt/ui";
+import {
+  IconButton,
+  IconCode,
+  IconCog,
+  IconDie,
+  IconKey,
+  IconLevelUp,
+  IconSearch,
+  IconUser,
+  IconX,
+  StripInk
+} from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { ApiReference } from "../integrations/ApiReference";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -139,6 +150,8 @@ export function SettingsPage({
 
   const search = <SettingsSearch entries={settingsFor(role)} onPick={pick} autoFocus={phone && searching} />;
 
+  // A section's content fades in as the bar's light lands on it.
+  const content = useRef<HTMLDivElement>(null);
   let body: ReactNode = null;
   if (section === "device") body = <DeviceSection role={role} onLeave={onLeave ? () => void leave() : undefined} />;
   else if (gm && gmToken) {
@@ -217,6 +230,7 @@ export function SettingsPage({
                   {item.label}
                 </button>
               ))}
+              <StripInk active={section} panel={() => content.current} />
             </nav>
             <span className="cx-grow" />
             {search}
@@ -237,11 +251,16 @@ export function SettingsPage({
                 <span>{item.label}</span>
               </button>
             ))}
+            <StripInk active={section} selector=".is-on" panel={() => content.current} />
           </nav>
         )}
         {/* The reference is a frame of its own, with its results as the one scroller, so its filter flyout spans
           what is on screen. Every other section scrolls as one page. */}
-        <div className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"} key={section}>
+        <div
+          ref={content}
+          className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
+          key={section}
+        >
           {body}
         </div>
         {dialog}

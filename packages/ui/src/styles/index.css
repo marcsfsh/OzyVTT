@@ -1,6 +1,7 @@
 /* @vtt/ui styles barrel. Import once at each app entry:  import "@vtt/ui/styles.css";
    Order matters: fonts define @font-face first, then the tokens + base/utilities
-   (design-tokens.css carries both the variables and the shared base rules). */
+   (design-tokens.css carries both the variables and the shared base rules), then the light's parts. */
 @import "./fonts.css";
 @import "./design-tokens.css";
+@import "./light-rail.css";
 @import "./patterns.css";

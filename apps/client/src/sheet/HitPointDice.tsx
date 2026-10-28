@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { HitDiceEntry } from "@vtt/schemas";
 import { Button, Stepper } from "@vtt/ui";
 import { command } from "../lib/command";
+import { PipRow } from "./PipRow";
 
 type HitDice = Readonly<{ remaining: number; maximum: number; entries: readonly HitDiceEntry[] }>;
 
@@ -16,11 +17,11 @@ function DieBoxes({ entry }: Readonly<{ entry: HitDiceEntry }>) {
       <span className="cs-hd-die-name" aria-hidden="true">
         {entry.die}
       </span>
-      <span className="cs-boxes" aria-hidden="true">
+      <PipRow lit={entry.remaining} className="cs-boxes" aria-hidden>
         {Array.from({ length: entry.maximum }, (_, index) => (
           <i key={index} className={index < entry.remaining ? "is-on" : undefined} />
         ))}
-      </span>
+      </PipRow>
     </span>
   );
 }

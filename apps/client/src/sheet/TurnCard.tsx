@@ -3,6 +3,7 @@ import { Button, IconList, IconPin } from "@vtt/ui";
 import { revealInRegion } from "../lib/reveal";
 import { ActionList, ConcentrationTag } from "./ActionList";
 import { COST_GROUPS, type TurnOption } from "./turn-options";
+import { PipRow } from "./PipRow";
 
 /** How many tiles the card shows before anything is pinned. */
 const TILES = 6;
@@ -81,11 +82,11 @@ function Tile({
       {option.effect && <span className="cs-turntile-line">{option.effect}</span>}
       {option.slot && (
         <span className="cs-turntile-slots">
-          <span className="cs-pips" aria-hidden="true">
+          <PipRow lit={option.slot.remaining} className="cs-pips" aria-hidden>
             {Array.from({ length: option.slot.max }, (_, index) => (
               <i key={index} className={index < option.slot!.remaining ? "is-on" : undefined} />
             ))}
-          </span>
+          </PipRow>
           level {option.slot.level}
         </span>
       )}
