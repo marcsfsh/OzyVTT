@@ -114,6 +114,12 @@ export const SETTING = entries({
     hint: "Damage dice, unless an encounter chooses its own.",
     words: "physical dice type manual roll total face damage healing"
   },
+  targeting: {
+    section: "fights",
+    label: "Who picks targets",
+    hint: "In an encounter, the player aims their own actions, or asks you to choose.",
+    words: "target targeting aim choose pick gm player attack spell"
+  },
   healthDisplay: {
     section: "fights",
     label: HEALTH_DISPLAY_LABEL,

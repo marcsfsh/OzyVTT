@@ -52,6 +52,16 @@ export const DICE_MODE_HELP = {
   app: "The app rolls players' dice."
 } as const;
 
+/** Who picks the targets of a player's action in an encounter (ADR-0044). */
+export const TARGETING_OPTIONS = [
+  { value: "player", label: "The player" },
+  { value: "gm", label: "The GM" }
+] as const;
+export const TARGETING_HELP = {
+  player: "Players tap an action and pick its target on the map.",
+  gm: "Players tap an action and it waits in Needs you. You pick the target, then it resolves."
+} as const;
+
 /** The health display's name, and who sees it. */
 export const HEALTH_DISPLAY_LABEL = "Health display";
 export const HEALTH_AUDIENCE_LABEL = "Health is";

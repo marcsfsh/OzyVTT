@@ -44,7 +44,7 @@ import { IdentityEditor } from "./IdentityEditor";
 import { CheckAnswers, LatestRoll, useSessionRoll } from "./LatestRoll";
 import { LevelBox } from "./LevelBox";
 import { NotesTab } from "./NotesTab";
-import { PlayFight } from "./PlayFight";
+import { ActionsTab } from "./ActionsTab";
 import { DeathSavesCard, PlayCalm, RestMenu, StatTile } from "./PlayTab";
 import {
   armorClassOf,
@@ -203,7 +203,14 @@ export function CharacterSheet({
   const hasSpells = Boolean(definition?.spellcasting && definition.spellcasting.spells.length > 0);
   const tabs = sheetTabs({ layout, role, hasSpells, hidePlay });
   const down = isDown(actor);
-  const [remembered, setTab] = useRememberedTab(`vtt.sheet.tab.${layout}`, tabs, tabs[0] ?? "play", down);
+  // Going down opens Play, where the Death Saving Throws are; an encounter starting or ending opens Actions or Play.
+  const fightOpens = controller.inFight && !down && tabs.includes("actions");
+  const [remembered, setTab] = useRememberedTab(
+    `vtt.sheet.tab.${layout}`,
+    tabs,
+    fightOpens ? "actions" : (tabs[0] ?? "play"),
+    `${down}:${controller.inFight}`
+  );
   const tab = remembered as SheetTabId;
   const idBase = `cs-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
   // Going down opens Play at its top, where the Death Saving Throws are.
@@ -211,11 +218,11 @@ export function CharacterSheet({
   useEffect(() => {
     if (down) bodyRef.current?.scrollTo({ top: 0 });
   }, [down]);
-  // An attack or a cast aimed from a tab other than Play (or from the table's Sheet tab) is picked and rolled at the
-  // top of that tab; the Play tab's own list holds its own.
+  // An attack or a cast aimed from a tab other than Actions (or from the table's Sheet tab) is picked and rolled at the
+  // top of that tab; the Actions tab's own list holds its own.
   const aim = useTargeting();
   const [aimedHere, setAimedHere] = useState(false);
-  const aimingElsewhere = attackMode === "inline" && (tab !== "play" || hidePlay);
+  const aimingElsewhere = attackMode === "inline" && (tab !== "actions" || hidePlay);
   useEffect(() => {
     if (aim?.attackerId === actor.id && aimingElsewhere) setAimedHere(true);
   }, [aim?.attackerId, aim?.action.id, actor.id, aimingElsewhere]);
@@ -309,22 +316,8 @@ export function CharacterSheet({
         onFeedback={say}
       />
     ) : null;
-  const playBody = controller.inFight ? (
-    <PlayFight
-      actor={actor}
-      role={role}
-      state={state}
-      definition={definition}
-      serverActions={serverActions}
-      facts={facts}
-      place={place}
-      controller={controller}
-      showEconomy={presentation !== "panel"}
-      card={phoneViews}
-      death={deathCard}
-      onFeedback={say}
-    />
-  ) : (
+  // Play holds the character's state; in an encounter a save it owes is the table's prompt, or the Actions tab's.
+  const playBody = (
     <PlayCalm
       actor={actor}
       role={role}
@@ -338,11 +331,29 @@ export function CharacterSheet({
       restAsked={restAsked}
       restOpen={restOpen}
       inFight={controller.inFight}
-      savesOwed={controller.savesOwed}
+      savesOwed={controller.inFight ? [] : controller.savesOwed}
       death={deathCard}
       onFeedback={say}
     />
   );
+  const actionsBody = definition ? (
+    <ActionsTab
+      actor={actor}
+      role={role}
+      state={state}
+      definition={definition}
+      derived={derived}
+      serverActions={serverActions}
+      facts={facts}
+      place={place}
+      controller={controller}
+      rolls={rolls}
+      showEconomy={presentation !== "panel"}
+      card={phoneViews}
+      death={deathCard}
+      onFeedback={say}
+    />
+  ) : null;
   const checksBody = definition ? (
     <ChecksTab
       actor={actor}
@@ -493,6 +504,8 @@ export function CharacterSheet({
     switch (id) {
       case "play":
         return playBody;
+      case "actions":
+        return actionsBody;
       case "checks":
         return checksBody;
       case "spells":
@@ -507,9 +520,9 @@ export function CharacterSheet({
         return gmBody;
     }
   };
-  // On a phone's Play tab between fights the Vitals hold the numbers and live states, so the header shows only who and
+  // On a phone's Play tab the Vitals hold the numbers and live states, so the header shows only who and
   // the table's row only its numbers.
-  const vitalsShow = phoneViews && tab === "play" && !controller.inFight;
+  const vitalsShow = phoneViews && tab === "play";
   // The laptop's band carries Heroic Inspiration, so its strip leaves it out.
   const status = (
     <StatusStrip

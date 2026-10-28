@@ -54,6 +54,7 @@ describe("recipient-safe encounter projections", () => {
       round: 3,
       // A player's own damage rolls (ADR-0043); none here.
       damageRolls: [],
+      targetAsks: [],
       turnActorId: null,
       mapAssetId: MAP,
       hiddenTurn: true,

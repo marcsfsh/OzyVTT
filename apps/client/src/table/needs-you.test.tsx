@@ -4,14 +4,16 @@ import { GameStateSchema, type GmView } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
 
 const command = vi.fn(async (..._args: unknown[]) => ({ ok: true }) as Record<string, unknown>);
+const read = vi.fn(async (..._args: unknown[]) => ({ ok: false }) as Record<string, unknown>);
 vi.mock("../lib/command", () => ({
   command: (...args: unknown[]) => command(...args),
-  read: vi.fn(async () => ({ ok: false }))
+  read: (...args: unknown[]) => read(...args)
 }));
 vi.mock("../socket", () => ({
   socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn(), connected: true, timeout: () => ({ emit: vi.fn() }) }
 }));
 
+import { clearTargeting, useTargeting } from "../encounter/targeting";
 import { NeedsYou } from "./NeedsYou";
 import { needsItems } from "./needs";
 
@@ -191,5 +193,59 @@ describe("Needs you", () => {
       </ToastProvider>
     );
     expect(container.querySelector(".needs-you")).toBeNull();
+  });
+});
+
+describe("a player's action waiting for the GM's aim (ADR-0044)", () => {
+  const ask = {
+    id: "40000000-0000-4000-8000-0000000000e1",
+    actorId: IDS.borin,
+    actorName: "Borin",
+    actionId: "spell-guiding-bolt",
+    actionName: "Guiding Bolt",
+    slotLevel: 2,
+    createdAt: 0
+  };
+  const asking = () =>
+    table((state) => {
+      state.combat.targetAsks = [ask];
+      const borin = state.actors.find((actor) => actor.id === IDS.borin)!;
+      (borin as { definitionId?: string }).definitionId = "borin-def";
+    });
+  function AimProbe() {
+    const aim = useTargeting();
+    return <output aria-label="Aiming">{aim ? `${aim.attackerId} ${aim.action.id} ${aim.slotLevel}` : "none"}</output>;
+  }
+
+  it("names it with how its player cast it, and opens the aim at that slot", async () => {
+    clearTargeting();
+    read.mockImplementation(async () => ({
+      ok: true,
+      actions: [{ id: "spell-guiding-bolt", name: "Guiding Bolt", activation: "action", attackBonus: 5, damage: [] }]
+    }));
+    render(
+      <ToastProvider>
+        <NeedsYou state={asking()} token={null} />
+        <AimProbe />
+      </ToastProvider>
+    );
+    expect(screen.getByText("Borin uses Guiding Bolt · choose a target")).toBeTruthy();
+    expect(
+      screen.getByText("Cast at level 2. Pick the target on the map, then roll it as you would your own.")
+    ).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Choose the target" })));
+    expect(read).toHaveBeenCalledWith("content:monster-actions", { definitionId: "borin-def", actorId: IDS.borin });
+    expect(screen.getByRole("status", { name: "Aiming" }).textContent).toBe(`${IDS.borin} spell-guiding-bolt 2`);
+  });
+
+  it("turns it down", async () => {
+    command.mockClear();
+    render(
+      <ToastProvider>
+        <NeedsYou state={asking()} token={null} />
+      </ToastProvider>
+    );
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Turn down" })));
+    expect(command).toHaveBeenCalledWith("action:withdraw-target-ask", { askId: ask.id });
   });
 });

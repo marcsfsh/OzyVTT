@@ -1061,8 +1061,6 @@ export const PendingFallSchema = z
   .strict();
 export type PendingFall = z.infer<typeof PendingFallSchema>;
 
-/** A player's hit awaiting the GM's Apply (proposal mode, the default), so players never change HP on a creature
- * they don't own. GM-only: never projected to players or the viewer. */
 /**
  * A player's damage waiting for the number their dice came to (ADR-0043): the damage dice of a hit, or of an action
  * whose targets save, while the table's damage mode asks players to type it. What waits on it applies once it is in.
@@ -1090,6 +1088,35 @@ export const DamageRollSchema = z
   .strict();
 export type DamageRoll = z.infer<typeof DamageRollSchema>;
 
+/** Who picks the targets of a player's action in an encounter (ADR-0044): the player, or the GM, who is asked. */
+export const TargetingSchema = z.enum(["player", "gm"]);
+export type Targeting = z.infer<typeof TargetingSchema>;
+
+/**
+ * A player's action waiting for the GM to pick its targets, at a table where the GM picks them (ADR-0044): the action
+ * and how its player chose to cast it. The GM aims and resolves it; it goes when they do, when its player takes it
+ * back, or when the turn ends.
+ */
+export const TargetAskSchema = z
+  .object({
+    id: z.uuid(),
+    actorId: z.uuid(),
+    actorName: z.string().min(1).max(120),
+    actionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    actionName: z.string().min(1).max(120),
+    slotLevel: z.number().int().min(1).max(9).optional(),
+    darts: z.number().int().min(1).max(20).optional(),
+    shaping: z.array(CastShapingSchema).max(4).optional(),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type TargetAsk = z.infer<typeof TargetAskSchema>;
+
+/** A player's hit awaiting the GM's Apply (proposal mode, the default), so players never change HP on a creature
+ * they don't own. GM-only: never projected to players or the viewer. */
 export const PendingDamageSchema = z
   .object({
     id: z.uuid(),
@@ -1992,7 +2019,9 @@ const sceneCombatShape = {
    *  device (false), chosen at the start (ADR-0042). Kept while the encounter runs or is parked; GM-only. */
   atTable: z.record(z.uuid(), z.boolean()).optional(),
   /** Players' damage waiting for their typed number (ADR-0043). A player sees their own characters'. */
-  damageRolls: z.array(DamageRollSchema).max(50).default([])
+  damageRolls: z.array(DamageRollSchema).max(50).default([]),
+  /** Players' actions waiting for the GM to pick their targets (ADR-0044). A player sees their own characters'. */
+  targetAsks: z.array(TargetAskSchema).max(20).default([])
 };
 
 /** A parked scene's frozen combat: same fields and invariants as the live combat, minus the map (the Scene owns that). */
@@ -2431,6 +2460,8 @@ export const GameStateSchema = z.object({
   /** How players' dice are entered, the table's default (ADR-0043); an encounter may choose its own. GM-set,
    *  player-read as the modes that apply (`effectivePlayerDice`). */
   playerDice: PlayerDiceSchema.prefault({}),
+  /** Who picks the targets of a player's action in an encounter (ADR-0044). GM-set, player-read. */
+  targeting: TargetingSchema.default("player"),
   /** Table defaults for staging new combatants. GM-set, GM-read. */
   stagingDefaults: StagingDefaultsSchema.prefault({}),
   /** How much a player sees of another player's character (see PartyVisibilitySchema). GM-set; player-read via `PlayerView`. */

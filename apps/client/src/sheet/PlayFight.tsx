@@ -49,7 +49,7 @@ export function PlayFight({
   showEconomy,
   card,
   death,
-  onFeedback
+  filter
 }: Readonly<{
   actor: SheetActor;
   role: "gm" | "player";
@@ -65,7 +65,8 @@ export function PlayFight({
   /** A player's phone: the turn card with its favourite tiles. */
   card: boolean;
   death: ReactNode;
-  onFeedback: (text: string) => void;
+  /** The Actions subtab's choice of rows. */
+  filter?: ActionFilter;
 }>) {
   const derivedRows = useMemo(
     () => serverActions.filter((row) => !definition?.actions.some((own) => own.id === row.id)),
@@ -115,6 +116,7 @@ export function PlayFight({
           round={state?.combat.round ?? null}
           acting={acting}
           {...(isDown(actor) ? { unavailable: "Unavailable while Unconscious" } : {})}
+          {...(filter ? { filter } : {})}
           header={
             showEconomy && state ? (
               <>
@@ -127,15 +129,14 @@ export function PlayFight({
           }
         />
       ) : (
-        <GmPlayList
+        <SheetActionList
           actor={actor}
           definition={definition}
-          derivedRows={derivedRows}
           serverActions={serverActions}
           facts={facts}
           place={place}
           controller={controller}
-          onFeedback={onFeedback}
+          {...(filter ? { filter } : {})}
         />
       )}
     </div>
@@ -154,25 +155,37 @@ export function UnconsciousNote({ name }: Readonly<{ name: string }>) {
   );
 }
 
-/** The GM's copy of the list: a tap sends the use to the server, a spell first picks its slot. */
-function GmPlayList({
+/** Which rows an Actions subtab lists, and whether the generic actions (Dash, Dodge) show with them. */
+export type ActionFilter = Readonly<{ option: (option: TurnOption) => boolean; common: boolean }>;
+
+/**
+ * The list a tap sends straight to the server: the GM's copy in an encounter, and everyone's outside one, where the
+ * server rolls the use as the sheet always has (an attack with its damage). A spell first picks its slot.
+ */
+export function SheetActionList({
   actor,
   definition,
-  derivedRows,
   serverActions,
   facts,
   place,
-  controller
+  controller,
+  filter,
+  empty
 }: Readonly<{
   actor: SheetActor;
   definition: ActorDefinition;
-  derivedRows: readonly ContentActionSummary[];
   serverActions: readonly ContentActionSummary[];
   facts: ReadonlyMap<string, RowFacts>;
   place: DetailPlace;
   controller: SheetController;
-  onFeedback: (text: string) => void;
+  filter?: ActionFilter;
+  /** What the list says when it has no rows. */
+  empty?: string;
 }>) {
+  const derivedRows = useMemo(
+    () => serverActions.filter((row) => !definition.actions.some((own) => own.id === row.id)),
+    [serverActions, definition]
+  );
   const spellReference = useSpellReference();
   const spellIndex = useMemo(() => new Map(spellReference.map((entry) => [entry.id, entry])), [spellReference]);
   const options = useMemo(
@@ -229,9 +242,10 @@ function GmPlayList({
   return (
     <>
       <ActionList
-        options={options}
+        options={filter ? options.filter(filter.option) : options}
         myTurn
         busy={false}
+        {...(empty ? { empty } : {})}
         onUse={(option) => {
           if (option.picks && option.picks.length > 0) {
             setChoosing(option);
@@ -241,7 +255,12 @@ function GmPlayList({
           const shapeable = (option.summary.shaping?.options.length ?? 0) > 0;
           if (option.spell && (choices.length > 1 || shapeable)) setCasting(option);
           else if (option.spell && choices.length === 1) cast(option, choices[0]!);
-          else controller.sendThroughServer(option.id);
+          // Outside an encounter an attack rolls its damage with it, as the Gear tab's does.
+          else
+            controller.sendThroughServer(
+              option.id,
+              !controller.inFight && option.summary.damage.length > 0 ? { includeDamage: true } : {}
+            );
         }}
       />
       {detail && casting && (

@@ -16,6 +16,7 @@ import {
   SceneEnvironmentSchema,
   SceneInitiativeDefaultsSchema,
   DiceModeSchema,
+  TargetingSchema,
   ScenePlayerDiceSchema,
   TableRollPurposeSchema
 } from "./state.js";
@@ -1247,6 +1248,14 @@ export const TableSetPlayerDiceSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** GM sets who picks the targets of a player's action in an encounter (ADR-0044). */
+export const TableSetTargetingSchema = z
+  .object({
+    commandId: z.uuid(),
+    targeting: TargetingSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** GM sets how much a player sees of another player's character (tiers in `PartyVisibilitySchema`). */
 export const TableSetPartyVisibilitySchema = z
   .object({
@@ -1286,6 +1295,29 @@ export const DamageReportSchema = z
   .refine((payload) => (payload.total === undefined) !== (payload.faces === undefined), {
     error: "Send the damage total or each die's face, and only one of the two."
   });
+/** A player asks the GM to pick the targets of their character's action (ADR-0044), with how they chose to cast it. */
+export const TargetAskCreateSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    actionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    slotLevel: z.number().int().min(1).max(9).optional(),
+    darts: z.number().int().min(1).max(20).optional(),
+    shaping: CastShapingListSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Takes back an action waiting for the GM's aim: its player, or the GM declining it. */
+export const TargetAskWithdrawSchema = z
+  .object({
+    commandId: z.uuid(),
+    askId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** Table-wide default for how token health shows on the map (GM). */
 export const SetHealthDisplaySchema = z
   .object({

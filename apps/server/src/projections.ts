@@ -523,6 +523,10 @@ export function projectPlayerCombat(
         fixed: roll.fixed,
         mode: roll.mode
       })),
+    // The player's own characters' actions waiting for the GM's aim: their own choices, nothing of anyone else's.
+    targetAsks: state.combat.targetAsks
+      .filter((ask) => ownedBy(state, ask.actorId, playerSessionId))
+      .map((ask) => ({ id: ask.id, actorId: ask.actorId, actionId: ask.actionId, actionName: ask.actionName })),
     // An Initiative Swap offer names only the two characters in it, and reaches only their players.
     ...swapOffersFor(state, playerSessionId),
     playerInitiativeMode: state.combat.playerInitiativeMode,
@@ -1017,6 +1021,8 @@ export function projectPlayerView(
     // The modes that apply now, a table rule players read: which box their rolls ask for. The encounter's own
     // record stays the GM's.
     playerDice: effectivePlayerDice(state),
+    // Who picks a player's targets, a table rule players read: whether a tap aims or asks the GM.
+    targeting: state.targeting,
     // Archived characters the GM shared: id + name only, and only ones that were public.
     archivedCharacters: state.actors
       .filter((actor) => actor.archived && actor.sheetPreview && actor.visibility === "public")

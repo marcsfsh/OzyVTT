@@ -1,4 +1,4 @@
-import type { DiceMode, GmView, RuleExceptions, RuleFamily, RuleMode } from "@vtt/domain";
+import type { DiceMode, GmView, RuleExceptions, RuleFamily, RuleMode, Targeting } from "@vtt/domain";
 import { Badge, RevealSwitch, SegmentedControl, Select, Switch } from "@vtt/ui";
 import { HealthStyleOptions } from "../encounter/health-display";
 import { SETTING } from "./sections";
@@ -7,6 +7,8 @@ import {
   BADGE_AUDIENCE_REASON,
   DIAL_COPY,
   DICE_MODE_HELP,
+  TARGETING_HELP,
+  TARGETING_OPTIONS,
   DICE_MODE_OPTIONS,
   dialLabel,
   dialLine,
@@ -140,6 +142,18 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
           options={DICE_MODE_OPTIONS.map((option) => ({ ...option }))}
         />
         <p className="settings-note">{DICE_MODE_HELP[state.playerDice.damage]}</p>
+      </SettingRow>
+
+      <SettingRow setting={SETTING.targeting} stacked>
+        <SegmentedControl
+          ariaLabel="Who picks targets"
+          value={state.targeting}
+          onChange={(value) =>
+            void send("table:set-targeting", { targeting: value as Targeting }, "That setting was rejected.")
+          }
+          options={TARGETING_OPTIONS.map((option) => ({ ...option }))}
+        />
+        <p className="settings-note">{TARGETING_HELP[state.targeting]}</p>
       </SettingRow>
 
       <SettingRow setting={SETTING.healthDisplay} stacked>

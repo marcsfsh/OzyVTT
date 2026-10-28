@@ -55,7 +55,8 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     pendingInitiative: combat.pendingInitiative,
     initiativeWindow: combat.initiativeWindow,
     ...(combat.atTable ? { atTable: combat.atTable } : {}),
-    damageRolls: combat.damageRolls
+    damageRolls: combat.damageRolls,
+    targetAsks: combat.targetAsks
   };
 }
 
@@ -96,7 +97,8 @@ function emptySceneCombat(): SceneCombat {
     pendingRuleAsks: [],
     pendingInitiative: [],
     initiativeWindow: [],
-    damageRolls: []
+    damageRolls: [],
+    targetAsks: []
   };
 }
 

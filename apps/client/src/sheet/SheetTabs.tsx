@@ -1,10 +1,11 @@
 import { useRef, type KeyboardEvent, type ReactNode } from "react";
-import { IconBag, IconBolt, IconDie, IconEye, IconPage, IconSparkle, IconStar, Tabs } from "@vtt/ui";
+import { IconBag, IconBolt, IconDie, IconEye, IconPage, IconSparkle, IconStar, IconTarget, Tabs } from "@vtt/ui";
 
-export type SheetTabId = "play" | "checks" | "spells" | "gear" | "features" | "notes" | "gm";
+export type SheetTabId = "play" | "actions" | "checks" | "spells" | "gear" | "features" | "notes" | "gm";
 
 const TAB_META: Readonly<Record<SheetTabId, { label: string; icon: ReactNode }>> = {
   play: { label: "Play", icon: <IconBolt /> },
+  actions: { label: "Actions", icon: <IconTarget /> },
   checks: { label: "Checks", icon: <IconDie /> },
   spells: { label: "Spells", icon: <IconSparkle /> },
   gear: { label: "Gear", icon: <IconBag /> },
@@ -16,9 +17,9 @@ const TAB_META: Readonly<Record<SheetTabId, { label: string; icon: ReactNode }>>
 export const tabLabel = (id: SheetTabId) => TAB_META[id].label;
 
 /**
- * The tabs a sheet shows where it is. A phone's bottom bar has all six (the GM's swaps Notes for its GM tab); a
- * laptop keeps the checks in a column of their own; the table's panel drops Play in a fight, where its Turn tab
- * already shows it. Spells appear only for a character with spells.
+ * The tabs a sheet shows where it is. A phone's bottom bar has them all (the GM's swaps Notes for its GM tab); a
+ * laptop keeps the checks in a column of their own; the table's panel drops Play and Actions in a fight, where its
+ * Turn tab already shows them. Spells appear only for a character with spells.
  */
 export function sheetTabs({
   layout,
@@ -26,11 +27,11 @@ export function sheetTabs({
   hasSpells,
   hidePlay
 }: Readonly<{ layout: "narrow" | "wide" | "panel"; role: "gm" | "player"; hasSpells: boolean; hidePlay: boolean }>) {
-  const ids: SheetTabId[] = ["play", "checks", "spells", "gear", "features", "notes"];
+  const ids: SheetTabId[] = ["play", "actions", "checks", "spells", "gear", "features", "notes"];
   return ids
     .filter((id) => !(id === "spells" && !hasSpells))
     .filter((id) => !(id === "checks" && layout === "wide"))
-    .filter((id) => !(id === "play" && hidePlay))
+    .filter((id) => !((id === "play" || id === "actions") && hidePlay))
     .map((id) => (id === "notes" && layout === "narrow" && role === "gm" ? "gm" : id));
 }
 

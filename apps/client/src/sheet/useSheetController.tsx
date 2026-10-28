@@ -17,6 +17,8 @@ import { ShapeShiftDialog, type LooseShift } from "../encounter/ShapeShiftDialog
 import { summaryOfOwnAction, withShapeOffer } from "../encounter/PlayerActionRunner";
 import { sameName } from "../encounter/sheet-names";
 import { beginTargeting, setTargetingResult } from "../encounter/targeting";
+import { askTheGm } from "../encounter/TargetAsk";
+import { gmPicksTargets } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { inRunningFight, type SheetActor, type SheetState } from "./sheet-model";
 import { noteSheetRolls } from "./sheet-roll-ids";
@@ -242,6 +244,13 @@ export function useSheetController({
     const own = withShapeOffer({ ...summaryOfOwnAction(action), ...(offers ? { shaping: offers } : {}) }, row);
     const aimless =
       own.targeting === undefined && serverActions.some((row) => row.id === action.id && row.targeting === "none");
+    // Where the GM picks targets, an aimed action asks the GM instead (ADR-0044).
+    if (!aimless && role === "player" && gmPicksTargets(actor.id)) {
+      askTheGm(actor.id, action.id, { slotLevel, darts, shaping: shaping ?? [] }, (text) =>
+        toast(text, { tone: "error" })
+      );
+      return;
+    }
     beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts, shaping);
     if (attackMode === "jump") onJumpToInitiative?.();
   };
@@ -249,6 +258,10 @@ export function useSheetController({
    *  `fastHands`, a Thief takes it as a Bonus Action. */
   const routeSummary = (row: ContentActionSummary, fastHands = false) => {
     setTargetingResult(null);
+    if (!fastHands && row.targeting !== "none" && role === "player" && gmPicksTargets(actor.id)) {
+      askTheGm(actor.id, row.id, {}, (text) => toast(text, { tone: "error" }));
+      return;
+    }
     beginTargeting(row, actor.id, undefined, undefined, undefined, fastHands ? { fastHands: true } : {});
     if (attackMode === "jump") onJumpToInitiative?.();
   };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { withArticle, type ActorDefinition, type ActorDerivedSheet, type DerivedDefence } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { ABILITIES, abilityModifier, saveBonus, skillBonus, type Ability } from "@vtt/rules-5e";
@@ -124,13 +124,9 @@ export function CheckSituations({
 const tierWord = (tier: SkillRow["tier"]) =>
   tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient";
 
-/** The six scores, each with its check and its saving throw side by side. */
-function AbilityGrid({
-  definition,
-  derived,
-  rolls
-}: Readonly<{ definition: ActorDefinition; derived: ActorDerivedSheet | null; rolls: SheetRolls }>) {
-  const rows = ABILITIES.map((ability) => {
+/** Each ability's score, check and saving throw, as the engine works them out. */
+function abilityRows(definition: ActorDefinition, derived: ActorDerivedSheet | null) {
+  return ABILITIES.map((ability) => {
     const score = definition.abilityScores[ability];
     const row = derived?.abilities.find((entry) => entry.ability === ability) ?? null;
     const proficient = row?.saveProficient ?? definition.proficiencies?.saves.includes(ability) ?? false;
@@ -146,12 +142,70 @@ function AbilityGrid({
       fails: row?.saveAutoFails ?? null
     };
   });
-  // Abilities as tiles that roll the check (the modifier large, the score under it), then the saving throws as rows
-  // with a cyan square where the character is proficient.
+}
+
+/**
+ * The six saving throws as rows, with a cyan square where the character is proficient. A save the character owes now
+ * (`owed`) takes its ability's row, so the tap answers it; the others roll freely.
+ */
+export function SavingThrowList({
+  definition,
+  derived,
+  rolls,
+  owed
+}: Readonly<{
+  definition: ActorDefinition;
+  derived: ActorDerivedSheet | null;
+  rolls: SheetRolls;
+  owed?: (ability: Ability) => ReactNode;
+}>) {
+  return (
+    <ul className="cs-saves">
+      {abilityRows(definition, derived).map(({ ability, row, proficient, save, fromItems, fails }) => {
+        const answer = owed?.(ability);
+        if (answer) return <li key={ability}>{answer}</li>;
+        const saveName = `${ABILITY_WORDS[ability]} saving throw`;
+        return (
+          <li key={ability}>
+            <button
+              type="button"
+              className={`cs-save interactive${proficient ? " is-proficient" : ""}${fails ? " is-failing" : ""}`}
+              disabled={rolls.rolling}
+              aria-label={`Roll ${withArticle(saveName)}, ${signed(save)}${proficient ? ", proficient" : ""}${fromItems !== 0 ? `, ${signed(fromItems)} from equipment` : ""}${fails ? ", fails automatically" : modeLabel(row?.saveMode)}`}
+              onClick={() => void rolls.rollSave(ability)}
+            >
+              <span className={`cs-tier${proficient ? " is-proficient" : ""}`} aria-hidden="true" />
+              <span className="cs-save-name">
+                <span className="cs-save-long">{ABILITY_WORDS[ability]}</span>
+                <span className="cs-save-short">{ability.toUpperCase()}</span>
+              </span>
+              {fails ? (
+                <span className="roll-mode-tag is-disadvantage" aria-hidden="true">
+                  Fails
+                </span>
+              ) : (
+                <RollModeTag mode={row?.saveMode} />
+              )}
+              <strong className="cs-save-bonus">{signed(save)}</strong>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** The six scores, each with its check and its saving throw side by side. */
+function AbilityGrid({
+  definition,
+  derived,
+  rolls
+}: Readonly<{ definition: ActorDefinition; derived: ActorDerivedSheet | null; rolls: SheetRolls }>) {
+  // Abilities as tiles that roll the check (the modifier large, the score under it), then the saving throws.
   return (
     <>
       <div className="cs-abilities" role="group" aria-label="Abilities">
-        {rows.map(({ ability, score, row, check }) => {
+        {abilityRows(definition, derived).map(({ ability, score, row, check }) => {
           const checkName = `${ABILITY_WORDS[ability]} check`;
           return (
             <button
@@ -171,36 +225,7 @@ function AbilityGrid({
         })}
       </div>
       <span className="cs-eyebrow">Saving throws</span>
-      <ul className="cs-saves">
-        {rows.map(({ ability, row, proficient, save, fromItems, fails }) => {
-          const saveName = `${ABILITY_WORDS[ability]} saving throw`;
-          return (
-            <li key={ability}>
-              <button
-                type="button"
-                className={`cs-save interactive${proficient ? " is-proficient" : ""}${fails ? " is-failing" : ""}`}
-                disabled={rolls.rolling}
-                aria-label={`Roll ${withArticle(saveName)}, ${signed(save)}${proficient ? ", proficient" : ""}${fromItems !== 0 ? `, ${signed(fromItems)} from equipment` : ""}${fails ? ", fails automatically" : modeLabel(row?.saveMode)}`}
-                onClick={() => void rolls.rollSave(ability)}
-              >
-                <span className={`cs-tier${proficient ? " is-proficient" : ""}`} aria-hidden="true" />
-                <span className="cs-save-name">
-                  <span className="cs-save-long">{ABILITY_WORDS[ability]}</span>
-                  <span className="cs-save-short">{ability.toUpperCase()}</span>
-                </span>
-                {fails ? (
-                  <span className="roll-mode-tag is-disadvantage" aria-hidden="true">
-                    Fails
-                  </span>
-                ) : (
-                  <RollModeTag mode={row?.saveMode} />
-                )}
-                <strong className="cs-save-bonus">{signed(save)}</strong>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <SavingThrowList definition={definition} derived={derived} rolls={rolls} />
     </>
   );
 }

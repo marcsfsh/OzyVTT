@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 18 GameState fields · 187 commands · 364 HTTP paths
+- 19 GameState fields · 190 commands · 367 HTTP paths
 
 ## GameState shape
 
@@ -30,6 +30,7 @@ single JSON blob the server persists and projects per role.
 - `rulesPolicy`
 - `schemaVersion`
 - `stagingDefaults`
+- `targeting`
 
 ## Commands
 
@@ -43,8 +44,10 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 
 | Command | Scope |
 | --- | --- |
+| `action.ask-target` | `combat:write` |
 | `action.resolve` | `combat:write` |
 | `action.use` | `combat:write` |
+| `action.withdraw-target-ask` | `combat:write` |
 | `actor.add-from-definition` | `actor:write` |
 | `actor.apply-damage` | `actor:write` |
 | `actor.award-experience` | `actor:write` |
@@ -205,6 +208,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `table.set-party-visibility` | `combat:write` |
 | `table.set-player-dice` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
+| `table.set-targeting` | `combat:write` |
 | `terrain.paint` | `encounter:write` |
 | `terrain.reset` | `encounter:write` |
 | `time.pass` | `combat:write` |
@@ -330,6 +334,8 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `GET /api/v1/content/subclasses`
 - `GET /api/v1/game`
 - `POST /api/v1/game/actions/resolve`
+- `POST /api/v1/game/actions/target-asks`
+- `POST /api/v1/game/actions/target-asks/withdraw`
 - `POST /api/v1/game/actions/use`
 - `POST /api/v1/game/actors`
 - `DELETE /api/v1/game/actors/{actorId}`
@@ -499,6 +505,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/table/party-visibility`
 - `POST /api/v1/game/table/player-dice`
 - `POST /api/v1/game/table/staging-defaults`
+- `POST /api/v1/game/table/targeting`
 - `POST /api/v1/game/terrain/paint`
 - `POST /api/v1/game/terrain/reset`
 - `POST /api/v1/game/time/dawn`

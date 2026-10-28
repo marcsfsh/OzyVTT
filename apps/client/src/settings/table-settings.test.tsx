@@ -122,3 +122,16 @@ describe("one name for one setting", () => {
     expect(menu.queryByText(/GM confirms|Direct - players/)).toBeNull();
   });
 });
+
+describe("who picks targets (ADR-0044)", () => {
+  beforeEach(() => command.mockClear());
+
+  it("starts with the player, says what each choice does, and hands the choice to the GM", async () => {
+    renderSettings(gmView());
+    const choice = screen.getByRole("group", { name: "Who picks targets" });
+    expect(within(choice).getByRole("button", { name: "The player" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Players tap an action and pick its target on the map.")).toBeTruthy();
+    await userEvent.setup().click(within(choice).getByRole("button", { name: "The GM" }));
+    expect(command).toHaveBeenLastCalledWith("table:set-targeting", { targeting: "gm" });
+  });
+});

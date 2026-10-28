@@ -881,7 +881,11 @@ How a player's dice are entered is the table's dice modes (ADR-0043, `GameState.
 always type or roll, and types the total for a character played at the table. With `damage` at `total` or `die`, a
 player's damage waits on a `DamageRoll` (`damage-rolls.ts`, `combat.damageRolls`) until `damage.report` brings their
 number; a hit's proposal (`awaitingRoll`) and the saves the action opened (`damageRollId`, which can't be confirmed
-meanwhile) then take it. On the client every roll prompt
+meanwhile) then take it. Who picks a player's targets in an encounter is `GameState.targeting` (ADR-0044, set with
+`table.set-targeting`). At `gm`, `action.resolve` refuses a player's own targets or area (`gmPicksTargets` in
+`target-asks.ts`), and their tap sends `action.ask-target` instead, which waits in `combat.targetAsks` with how they
+chose to cast it; the GM aims it from Needs you and resolves it as their own, and that committed resolve, the player's
+`action.withdraw-target-ask` or the turn ending clears it. On the client every roll prompt
 shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`). A call
 for a check can name the creature it is about (`aboutActorId`, never projected), whose traits weigh on the roll (a
@@ -1146,8 +1150,12 @@ page (My character, `/characters/<id>`, `sheet.html`), the GM's dialog, or the t
 picks a narrow, wide or panel frame from the presentation and the width. Its tabs share one controller
 (`useSheetController.tsx`) that sends every change as a command. `useSheetDefinition.ts` reads
 `actor:available-actions` into the turn's options (`turn-options.ts`) with each row's reason, passive flag and mastery.
-The laptop's list (`ActionList.tsx`) and the phone's turn card (`TurnCard.tsx`) draw the same options, and the table's
-Turn tab runs them through `encounter/PlayerActionRunner.tsx`, which also aims a cast started on the sheet. A cast,
+Play holds the character's state (Vitals on a phone, rests, pinned checks, slots, uses); the Actions tab
+(`ActionsTab.tsx`, ADR-0044) lists the options under subtabs by cost, with the six saving throws, a save the character
+owes taking its ability's row. The laptop's list (`ActionList.tsx`) and the phone's turn card (`TurnCard.tsx`) draw the
+same options. In an encounter the Actions tab and the table's Turn tab run them through
+`encounter/PlayerActionRunner.tsx`, which also aims a cast started on the sheet; outside one the server rolls a tap on
+the loose route (`SheetActionList` in `PlayFight.tsx`). A cast,
 an item or a spell to copy opens through `SheetDetail.tsx`: where its list was, in a drawer, or in the laptop's right
 column. The sheet notes the ids of the rolls it starts (`sheet-roll-ids.ts`), and its latest-roll line shows only
 those.

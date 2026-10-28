@@ -123,6 +123,8 @@ import type {
   CommandIdentitySchema,
   DamageResolveSchema,
   DamageReportSchema,
+  TargetAskCreateSchema,
+  TargetAskWithdrawSchema,
   DeathSaveRollSchema,
   DiceRollSchema,
   EffectAddSchema,
@@ -195,6 +197,7 @@ import type {
   TableSetPartyVisibilitySchema,
   TableSetStagingDefaultsSchema,
   TableSetPlayerDiceSchema,
+  TableSetTargetingSchema,
   TempHpSchema,
   TimePassSchema,
   SurvivalSetTrackingSchema,
@@ -479,6 +482,11 @@ export interface ClientToServerEvents {
   /** GM sets how players' dice are entered, for d20 rolls and for damage (ADR-0043). */
   "table:set-player-dice": (
     payload: CommandPayload<typeof TableSetPlayerDiceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM sets who picks the targets of a player's action in an encounter (ADR-0044). */
+  "table:set-targeting": (
+    payload: CommandPayload<typeof TableSetTargetingSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM sets the table's staging defaults (the visibility a newly staged combatant's token starts at). */
@@ -824,6 +832,16 @@ export interface ClientToServerEvents {
   /** A player (or the GM) reports what a damage roll came to (ADR-0043). */
   "damage:report": (
     payload: CommandPayload<typeof DamageReportSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A player asks the GM to pick their action's targets (ADR-0044). */
+  "action:ask-target": (
+    payload: CommandPayload<typeof TargetAskCreateSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Its player takes back an action waiting for the GM's aim, or the GM declines it. */
+  "action:withdraw-target-ask": (
+    payload: CommandPayload<typeof TargetAskWithdrawSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:available-actions": (

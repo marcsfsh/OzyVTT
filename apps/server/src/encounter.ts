@@ -704,6 +704,7 @@ export function endEncounter(state: GameState) {
     pendingInitiative: [],
     initiativeWindow: [],
     damageRolls: [],
+    targetAsks: [],
     turnSteps: null,
     historyCursor: null,
     historyDirty: false
@@ -1138,6 +1139,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
+    // An action asked for on the turn that ended goes with it (ADR-0044).
+    targetAsks: [],
     secondTurn: second
       ? { ...second, resume: passesRound ? null : state.combat.initiative[currentIndex + steps]!.actorId }
       : null,

@@ -64,6 +64,7 @@ export function ActionList({
   myTurn,
   busy,
   unavailable,
+  empty,
   onUse
 }: Readonly<{
   options: readonly TurnOption[];
@@ -72,8 +73,11 @@ export function ActionList({
   busy: boolean;
   /** Why nothing can be taken now ("Unavailable while Unconscious"): the list stays in view, disabled. */
   unavailable?: string;
+  /** What shows when there are no rows (an Actions subtab with nothing in it). */
+  empty?: string;
   onUse: (option: TurnOption) => void;
 }>) {
+  if (options.length === 0 && empty) return <p className="cs-note">{empty}</p>;
   const note = (option: TurnOption) =>
     unavailable ? "Unavailable" : option.cost === "reaction" ? "Off turn" : !myTurn ? "On your turn" : verbOf(option);
   const off = (option: TurnOption) => busy || unavailable !== undefined || (!myTurn && option.cost !== "reaction");

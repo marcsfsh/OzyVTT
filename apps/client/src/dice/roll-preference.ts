@@ -168,3 +168,24 @@ export function useRollPreference(actorId?: string) {
     setSheetAttackMode
   };
 }
+
+/** Whether this player's tap for the character asks the GM to aim it (ADR-0044): the table has the GM pick targets
+ *  and the character is in the running encounter. Never on the GM's own view. */
+export function gmPicksTargets(actorId: string): boolean {
+  if (view === null || "definitions" in view || view.targeting !== "gm") return false;
+  return view.combat.active && view.combat.initiative.some((entry) => entry.actorId === actorId);
+}
+
+/** Reactive: whether the GM picks this character's targets, and the action it has waiting for the GM's aim. */
+export function useTargetAsk(actorId: string) {
+  useSyncExternalStore(
+    subscribe,
+    () => version,
+    () => version
+  );
+  const waiting =
+    view !== null && !("definitions" in view)
+      ? (view.combat.targetAsks?.find((ask) => ask.actorId === actorId) ?? null)
+      : null;
+  return { gmPicks: gmPicksTargets(actorId), waiting };
+}

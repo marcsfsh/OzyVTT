@@ -8,6 +8,7 @@ import {
   SetRulesModeSchema,
   TableSetPartyVisibilitySchema,
   TableSetPlayerDiceSchema,
+  TableSetTargetingSchema,
   TableSetStagingDefaultsSchema
 } from "@vtt/domain/commands";
 import { HOLDING_BREATH_TAG, startHoldingBreath } from "../breath.js";
@@ -132,6 +133,29 @@ export const tableSettingCommands = [
         };
       });
       audit(kit, committed, "Players' dice modes changed.");
+    }
+  }),
+
+  defineCommand({
+    type: "table.set-targeting",
+    operationId: "setTargeting",
+    description:
+      "Sets who picks the targets of a player's action in an encounter (GM-grade only, ADR-0044): `player` (the default; the player aims on the map) or `gm` (the player's action waits in `combat.targetAsks` until the GM aims and resolves it; `action.resolve` refuses a player's own targets or area then). An action aimed at no one resolves at once either way, and outside an encounter the player aims as before. Players read the setting.",
+    summary: "Set who picks the targets of a player's action in an encounter (GM).",
+    schema: TableSetTargetingSchema,
+    malformed: "The targeting command is malformed.",
+    gmOnly: "Only the GM can set who picks targets.",
+    async run({ request, execute }, kit) {
+      const committed = await execute((state) => {
+        state.targeting = request.targeting;
+        // Asks left waiting when players pick again are theirs to aim now.
+        if (request.targeting === "player") state.combat = { ...state.combat, targetAsks: [] };
+      });
+      audit(
+        kit,
+        committed,
+        request.targeting === "gm" ? "The GM now picks players' targets." : "Players now pick their own targets."
+      );
     }
   }),
 

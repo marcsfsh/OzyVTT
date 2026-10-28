@@ -108,27 +108,27 @@ const tabNames = (name: string) =>
     .map((tab) => tab.textContent);
 
 describe("the sheet's tabs", () => {
-  it("puts six tabs under a player's thumb, and drops Spells for a character with none", () => {
+  it("puts every tab under a player's thumb, and drops Spells for a character with none", () => {
     const { unmount } = render(
       <CharacterSheet actor={hero()} role="player" state={view(hero())} onClose={() => {}} />,
       {
         wrapper: ToastProvider
       }
     );
-    expect(tabNames("Sheet")).toEqual(["Play", "Checks", "Spells", "Gear", "Features", "Notes"]);
+    expect(tabNames("Sheet")).toEqual(["Play", "Actions", "Checks", "Spells", "Gear", "Features", "Notes"]);
     unmount();
     const fighter = hero({ definition: { ...wizard, spellcasting: undefined } });
     render(<CharacterSheet actor={fighter} role="player" state={view(fighter)} onClose={() => {}} />, {
       wrapper: ToastProvider
     });
-    expect(tabNames("Sheet")).toEqual(["Play", "Checks", "Gear", "Features", "Notes"]);
+    expect(tabNames("Sheet")).toEqual(["Play", "Actions", "Checks", "Gear", "Features", "Notes"]);
   });
 
   it("swaps Notes for the violet GM tab on the GM's narrow sheet", () => {
     render(<CharacterSheet actor={hero() as unknown as GmActor} role="gm" onClose={() => {}} />, {
       wrapper: ToastProvider
     });
-    expect(tabNames("Sheet")).toEqual(["Play", "Checks", "Spells", "Gear", "Features", "GM"]);
+    expect(tabNames("Sheet")).toEqual(["Play", "Actions", "Checks", "Spells", "Gear", "Features", "GM"]);
     expect(screen.getByRole("tab", { name: "GM" }).classList.contains("is-gm")).toBe(true);
   });
 
@@ -154,7 +154,7 @@ describe("the sheet's tabs", () => {
     render(<CharacterSheet actor={hero()} role="player" state={view(hero())} onClose={() => {}} />, {
       wrapper: ToastProvider
     });
-    expect(tabNames("Sheet")).toEqual(["Play", "Spells", "Gear", "Features", "Notes"]);
+    expect(tabNames("Sheet")).toEqual(["Play", "Actions", "Spells", "Gear", "Features", "Notes"]);
     expect(
       within(screen.getByLabelText("Checks")).getByRole("button", { name: /^Roll a Strength check/ })
     ).toBeTruthy();

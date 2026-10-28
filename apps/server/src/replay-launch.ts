@@ -93,8 +93,9 @@ function sceneCombatFrom(combat: GameState["combat"]): SceneCombat {
     pendingRuleAsks: combat.pendingRuleAsks,
     pendingInitiative: combat.pendingInitiative,
     initiativeWindow: combat.initiativeWindow,
-    // A replay starts with no damage waiting for a player's roll.
-    damageRolls: []
+    // A replay starts with nothing waiting on a player's roll or the GM's aim.
+    damageRolls: [],
+    targetAsks: []
   };
 }
 

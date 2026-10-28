@@ -5,7 +5,8 @@ import {
   type AnnotationPoint,
   type AnnotationShapeKind,
   type GameState,
-  type RollRecord
+  type RollRecord,
+  type TargetAsk
 } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
@@ -25,7 +26,13 @@ import { moveEncounterToken } from "../token-placement.js";
 import { pushThroughZones } from "../pushed-through.js";
 import { placeTemplates } from "../multi-templates.js";
 import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
-import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domain/commands";
+import {
+  ActionResolveSchema,
+  ActionUseSchema,
+  DiceRollSchema,
+  TargetAskCreateSchema,
+  TargetAskWithdrawSchema
+} from "@vtt/domain/commands";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
@@ -33,6 +40,7 @@ import { activeMoveGrant } from "../granted-moves.js";
 import { DISTANCE_TOLERANCE_FEET, mapDistance, tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { holdForDamageRolls } from "../damage-rolls.js";
+import { answerTargetAsks, askForTarget, gmPicksTargets, withdrawTargetAsk } from "../target-asks.js";
 import { diceMode } from "../player-dice.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
@@ -174,6 +182,14 @@ export const actionCommands = [
         // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
         // else's get one answer, so a player can't probe which ids exist.
         requireActorAccess(initiator, draft, actorId, "attack");
+        // Where the GM picks targets, a player's tap asks the GM instead of aiming (ADR-0044); aiming at themself
+        // (a potion they drink) is no one else's to pick.
+        if (
+          isPlayer &&
+          (template || templates || targetIds?.some((id) => id !== actorId)) &&
+          gmPicksTargets(draft, actorId)
+        )
+          throw new CommandRejectedError("The GM picks targets at this table. Choose the action and the GM aims it.");
         // What already waited before this resolve, so a player's damage roll holds only what it opens (ADR-0043).
         const waitingBefore = {
           proposalIds: new Set(draft.combat.pendingDamage.map((proposal) => proposal.id)),
@@ -769,6 +785,8 @@ export const actionCommands = [
             draft.combat.playerDamageMode === "direct",
             { newId: kit.context.newId, now: () => Date.now() }
           );
+        // The GM resolving for a character answers what its player asked them to aim.
+        if (!isPlayer && !resolution.preview) answerTargetAsks(draft, actorId);
         // Record the blast as a shape; id=commandId keeps re-delivery idempotent. A cone or line starts at its caster,
         // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.
         const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
@@ -898,6 +916,60 @@ export const actionCommands = [
         }
       }
       return { resolution: reply };
+    }
+  }),
+
+  defineCommand({
+    type: "action.ask-target",
+    operationId: "askForTarget",
+    description:
+      "A player asks the GM to pick the targets of their character's action, at a table where the GM picks them (`targeting: \"gm\"`, ADR-0044), with how they chose to cast it (`slotLevel`, `darts`, `shaping`). It waits in `combat.targetAsks` for the GM, who aims it and resolves it with `action.resolve`; a committed resolve for the character answers it, and the turn ending drops it. Refused at a table where players pick their own targets, outside an encounter, off the character's turn (a Readied character aside), for an action the character doesn't have, and while another of its actions waits. Only for the player's own claimed character.",
+    summary: "Ask the GM to pick an action's targets (a player, their own claimed character).",
+    schema: TargetAskCreateSchema,
+    malformed: "The target request is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      let asked: TargetAsk | undefined;
+      const { duplicate } = await execute((draft) => {
+        asked = askForTarget(
+          draft,
+          initiatorOf(principal),
+          request,
+          (state, actorId, actionId) => {
+            const actor = state.actors.find((candidate) => candidate.id === actorId);
+            if (!actor) return null;
+            const definition = actor.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
+            const action =
+              effectiveActions(definition, actor, kit.equipmentCatalog()).find(
+                (candidate) => candidate.id === actionId
+              ) ?? builtinActionFor(definition, actionId, actor);
+            return action?.name ?? null;
+          },
+          { newId: kit.context.newId, now: () => Date.now() }
+        );
+      });
+      if (duplicate || !asked) return;
+      kit.context.appendLog({
+        kind: "action",
+        text: `${asked.actorName} uses ${asked.actionName}. The GM picks the target.`,
+        actorIds: [asked.actorId]
+      });
+    }
+  }),
+
+  defineCommand({
+    type: "action.withdraw-target-ask",
+    operationId: "withdrawTargetAsk",
+    description:
+      "Takes back an action waiting in `combat.targetAsks` for the GM's aim (ADR-0044): its player, to choose another, or the GM, declining it. Nothing is spent.",
+    summary: "Take back an action waiting for the GM's aim (its player or the GM).",
+    schema: TargetAskWithdrawSchema,
+    malformed: "The withdraw command is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }) {
+      await execute((draft) => {
+        withdrawTargetAsk(draft, initiatorOf(principal), request.askId);
+      });
     }
   }),
 
