@@ -1,0 +1,1914 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><style>body{margin:0;font:14px system-ui}[hidden]{display:none!important}</style></head><body>
+<title>OzyVTT Page Transitions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=Bungee&family=Mr+Dafoe&family=VT323&display=swap">
+<style>
+/* Layout: an intro, a control row, one live OzyVTT frame, then the three options as cards.
+   The palette is the app's own: Dusk on bare :root, Dawn for light viewers or the Dawn toggle. */
+:root {
+  color-scheme: dark;
+  --ground: #171a2e;
+  --sky: radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%),
+    linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%);
+  --bar: rgba(18, 20, 34, 0.78);
+  --void: rgba(10, 12, 22, 0.55);
+  --surface-1: rgba(26, 29, 46, 0.62);
+  --surface-2: rgba(44, 48, 72, 0.5);
+  --well-solid: #131524;
+  --control-solid: #25283f;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-raised: rgba(255, 255, 255, 0.2);
+  --text: #eef0f8;
+  --text-dim: #c3c7d9;
+  --text-muted: #b0b4ca;
+  --magenta: #ff2f92;
+  --magenta-text: #ff8cc0;
+  --cyan: #4fe3ff;
+  --cyan-hi: #6fe8ff;
+  --party: #7aa2ff;
+  --violet: #bb90ff;
+  --violet-text: #d9c2ff;
+  --violet-wash: rgba(187, 144, 255, 0.07);
+  --hp: #ffd54d;
+  --hp-text: #ffd54d;
+  --hp-lost: rgba(120, 30, 50, 0.6);
+  --grad-horizon: linear-gradient(90deg, #4fe3ff 0%, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d 100%);
+  --grad-chrome: linear-gradient(180deg, #eaf8ff 0%, #9fdcff 42%, #ffffff 49%, #3b2163 51%, #ff5fae 75%, #ffd6ea 100%);
+  --chrome-split: -1.5px 0 rgba(43, 228, 255, 0.55), 1.5px 0 rgba(255, 47, 146, 0.55);
+  --script-ink: #ff4fa3;
+  --script-glow: 0 0 8px rgba(255, 47, 146, 0.9), 0 0 18px rgba(255, 47, 146, 0.5);
+  --glow-horizon: 0 0 12px rgba(255, 47, 146, 0.6);
+  --glow-tab-text: 0 0 10px rgba(43, 228, 255, 0.7);
+  --glow-select: 0 0 0 1px rgba(43, 228, 255, 0.55), 0 0 16px 2px rgba(43, 228, 255, 0.22);
+  --ink-glow: 0 0 8px rgba(43, 228, 255, 0.7);
+  --scan-line: rgba(0, 0, 0, 0.2);
+  --scan-opacity: 0.25;
+
+  /* The transitions' own values. Splits follow the wordmark: cyan to the left, pink to the right. */
+  --split-cyan: rgba(43, 228, 255, 0.6);
+  --split-pink: rgba(255, 47, 146, 0.6);
+  --split-cyan-0: rgba(43, 228, 255, 0);
+  --split-pink-0: rgba(255, 47, 146, 0);
+  --spark: #ffffff;
+  --spark-glow: drop-shadow(0 0 5px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 10px rgba(255, 47, 146, 0.7));
+  --wash-strength: 0.2;
+  --wash-blend: screen;
+  --streak-strength: 0.45;
+
+  --font-display: "Bungee", "Arial Black", system-ui, sans-serif;
+  --font-body: "Bai Jamjuree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-numeric: "VT323", ui-monospace, "Courier New", monospace;
+  --font-script: "Mr Dafoe", "Brush Script MT", cursive;
+  --ease-settle: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-spark: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-split: cubic-bezier(0.33, 0.5, 0.45, 1);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --ground: #ebe7ef;
+    --sky: #ebe7ef;
+    --bar: #ebe7ef;
+    --void: #e3dee8;
+    --surface-1: #f3f0f5;
+    --surface-2: #f7f5f9;
+    --well-solid: #e3dee8;
+    --control-solid: #f7f5f9;
+    --line: #e0dbe6;
+    --line-strong: #d3ccdc;
+    --line-raised: #b9b0c8;
+    --text: #2a2537;
+    --text-dim: #4f4862;
+    --text-muted: #655d77;
+    --magenta: #f0559b;
+    --magenta-text: #b0306e;
+    --cyan: #2a8fa8;
+    --cyan-hi: #1d6a80;
+    --party: #4a72d9;
+    --violet: #8a62d6;
+    --violet-text: #6a46b0;
+    --violet-wash: rgba(138, 98, 214, 0.06);
+    --hp: #d9a43a;
+    --hp-text: #7a5718;
+    --hp-lost: #ecd6dc;
+    --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+    --grad-chrome: linear-gradient(#2a2537, #2a2537);
+    --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+    --script-ink: #c23b7e;
+    --script-glow: 0 0 #0000;
+    --glow-horizon: 0 0 #0000;
+    --glow-tab-text: 0 0 #0000;
+    --glow-select: 0 0 0 1px #1d6a80;
+    --ink-glow: 0 0 #0000;
+    --scan-opacity: 0;
+    --split-cyan: rgba(42, 143, 168, 0.45);
+    --split-pink: rgba(240, 85, 155, 0.45);
+    --split-cyan-0: rgba(42, 143, 168, 0);
+    --split-pink-0: rgba(240, 85, 155, 0);
+    --spark: #ffffff;
+    --spark-glow: drop-shadow(0 0 0 transparent);
+    --wash-strength: 0.16;
+    --wash-blend: multiply;
+    --streak-strength: 0.4;
+  }
+}
+:root[data-theme="light"],
+.page[data-look="dawn"] {
+  color-scheme: light;
+  --ground: #ebe7ef;
+  --sky: #ebe7ef;
+  --bar: #ebe7ef;
+  --void: #e3dee8;
+  --surface-1: #f3f0f5;
+  --surface-2: #f7f5f9;
+  --well-solid: #e3dee8;
+  --control-solid: #f7f5f9;
+  --line: #e0dbe6;
+  --line-strong: #d3ccdc;
+  --line-raised: #b9b0c8;
+  --text: #2a2537;
+  --text-dim: #4f4862;
+  --text-muted: #655d77;
+  --magenta: #f0559b;
+  --magenta-text: #b0306e;
+  --cyan: #2a8fa8;
+  --cyan-hi: #1d6a80;
+  --party: #4a72d9;
+  --violet: #8a62d6;
+  --violet-text: #6a46b0;
+  --violet-wash: rgba(138, 98, 214, 0.06);
+  --hp: #d9a43a;
+  --hp-text: #7a5718;
+  --hp-lost: #ecd6dc;
+  --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+  --grad-chrome: linear-gradient(#2a2537, #2a2537);
+  --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+  --script-ink: #c23b7e;
+  --script-glow: 0 0 #0000;
+  --glow-horizon: 0 0 #0000;
+  --glow-tab-text: 0 0 #0000;
+  --glow-select: 0 0 0 1px #1d6a80;
+  --ink-glow: 0 0 #0000;
+  --scan-opacity: 0;
+  --split-cyan: rgba(42, 143, 168, 0.45);
+  --split-pink: rgba(240, 85, 155, 0.45);
+  --split-cyan-0: rgba(42, 143, 168, 0);
+  --split-pink-0: rgba(240, 85, 155, 0);
+  --spark: #ffffff;
+  --spark-glow: drop-shadow(0 0 0 transparent);
+  --wash-strength: 0.16;
+  --wash-blend: multiply;
+  --streak-strength: 0.4;
+}
+.page[data-look="dusk"] {
+  color-scheme: dark;
+  --ground: #171a2e;
+  --sky: radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%),
+    linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%);
+  --bar: rgba(18, 20, 34, 0.78);
+  --void: rgba(10, 12, 22, 0.55);
+  --surface-1: rgba(26, 29, 46, 0.62);
+  --surface-2: rgba(44, 48, 72, 0.5);
+  --well-solid: #131524;
+  --control-solid: #25283f;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-raised: rgba(255, 255, 255, 0.2);
+  --text: #eef0f8;
+  --text-dim: #c3c7d9;
+  --text-muted: #b0b4ca;
+  --magenta: #ff2f92;
+  --magenta-text: #ff8cc0;
+  --cyan: #4fe3ff;
+  --cyan-hi: #6fe8ff;
+  --party: #7aa2ff;
+  --violet: #bb90ff;
+  --violet-text: #d9c2ff;
+  --violet-wash: rgba(187, 144, 255, 0.07);
+  --hp: #ffd54d;
+  --hp-text: #ffd54d;
+  --hp-lost: rgba(120, 30, 50, 0.6);
+  --grad-horizon: linear-gradient(90deg, #4fe3ff 0%, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d 100%);
+  --grad-chrome: linear-gradient(180deg, #eaf8ff 0%, #9fdcff 42%, #ffffff 49%, #3b2163 51%, #ff5fae 75%, #ffd6ea 100%);
+  --chrome-split: -1.5px 0 rgba(43, 228, 255, 0.55), 1.5px 0 rgba(255, 47, 146, 0.55);
+  --script-ink: #ff4fa3;
+  --script-glow: 0 0 8px rgba(255, 47, 146, 0.9), 0 0 18px rgba(255, 47, 146, 0.5);
+  --glow-horizon: 0 0 12px rgba(255, 47, 146, 0.6);
+  --glow-tab-text: 0 0 10px rgba(43, 228, 255, 0.7);
+  --glow-select: 0 0 0 1px rgba(43, 228, 255, 0.55), 0 0 16px 2px rgba(43, 228, 255, 0.22);
+  --ink-glow: 0 0 8px rgba(43, 228, 255, 0.7);
+  --scan-opacity: 0.25;
+  --split-cyan: rgba(43, 228, 255, 0.6);
+  --split-pink: rgba(255, 47, 146, 0.6);
+  --split-cyan-0: rgba(43, 228, 255, 0);
+  --split-pink-0: rgba(255, 47, 146, 0);
+  --spark: #ffffff;
+  --spark-glow: drop-shadow(0 0 5px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 10px rgba(255, 47, 146, 0.7));
+  --wash-strength: 0.2;
+  --wash-blend: screen;
+  --streak-strength: 0.45;
+}
+
+html,
+body {
+  background: var(--ground);
+  color: var(--text);
+}
+* {
+  box-sizing: border-box;
+}
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* ---------- The study page ---------- */
+.page {
+  min-height: 100vh;
+  background: var(--sky);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+}
+.wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cyan-hi);
+}
+.intro h1 {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(30px, 6vw, 46px);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+  color: var(--text);
+}
+.lede {
+  margin: 0;
+  max-width: 64ch;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.rm-note {
+  display: none;
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--magenta-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rm-note {
+    display: block;
+  }
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  align-items: end;
+}
+.ctl {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.ctl-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+/* Segmented controls draw their dividers from the gap over a solid edge colour. */
+.seg {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 1px;
+  background: var(--line-raised);
+  border: 1px solid var(--line-raised);
+}
+.seg button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  background: var(--well-solid);
+  color: var(--text-dim);
+  font: 600 14px/1.2 var(--font-body);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: color 140ms, background 140ms;
+}
+.seg button:hover {
+  color: var(--text);
+}
+.seg button[aria-pressed="true"] {
+  background: var(--control-solid);
+  color: var(--cyan-hi);
+  text-shadow: var(--glow-tab-text);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+.seg .n {
+  font-family: var(--font-numeric);
+  font-size: 19px;
+  line-height: 1;
+  color: var(--text-muted);
+  text-shadow: none;
+}
+.seg button[aria-pressed="true"] .n {
+  color: var(--cyan-hi);
+}
+@media (max-width: 640px) {
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .ctl-option {
+    grid-column: 1 / -1;
+  }
+  .seg-options {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr 1fr;
+  }
+  .seg button {
+    padding: 0 10px;
+  }
+}
+
+.stage {
+  display: grid;
+  gap: 12px;
+}
+.below {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+  justify-content: space-between;
+}
+.caption {
+  flex: 1 1 340px;
+  min-width: 0;
+  margin: 0;
+  max-width: 70ch;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+.caption b {
+  color: var(--text);
+  font-weight: 600;
+}
+.plays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.btn {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line-raised);
+  background: var(--control-solid);
+  color: var(--text);
+  font: 600 14px/1.2 var(--font-body);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: border-color 140ms, color 140ms;
+}
+.btn:hover {
+  border-color: var(--cyan);
+}
+.btn svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 14px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+  transition: border-color 140ms, box-shadow 140ms;
+}
+.card.is-on {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-select);
+}
+.card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.card-num {
+  font-family: var(--font-numeric);
+  font-size: 30px;
+  line-height: 0.8;
+  color: var(--magenta-text);
+}
+.card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 19px;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+.card p,
+.card dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+.ver {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.ver-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.k {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ver-time {
+  font-family: var(--font-numeric);
+  font-size: 19px;
+  letter-spacing: 0.04em;
+  color: var(--cyan-hi);
+  font-variant-numeric: tabular-nums;
+}
+.card dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.card dt {
+  margin-bottom: 2px;
+}
+.card .btn {
+  margin-top: auto;
+  align-self: start;
+}
+.card .btn[aria-pressed="true"] {
+  border-color: var(--cyan);
+  color: var(--cyan-hi);
+}
+.foot {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 80ch;
+}
+
+/* ---------- The live frame: a cut-down OzyVTT ---------- */
+.demo {
+  container: demo / inline-size;
+  position: relative;
+  height: 540px;
+  border: 1px solid var(--line-strong);
+  overflow: hidden;
+  --k: 1;
+}
+@media (max-width: 640px) {
+  .demo {
+    height: 620px;
+  }
+}
+.app {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: 56px minmax(0, 1fr);
+  grid-template-areas:
+    "brand nav who"
+    "pane pane pane";
+  background: var(--sky);
+  color: var(--text);
+  font-family: var(--font-body);
+  overflow: hidden;
+  --gx: 50%;
+  --w: 1000px;
+}
+.scan {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  opacity: var(--scan-opacity);
+  background: repeating-linear-gradient(180deg, var(--scan-line) 0 1px, transparent 1px 3px);
+}
+.bar {
+  grid-area: 1 / 1 / 2 / -1;
+  position: relative;
+  background: var(--bar);
+  z-index: 2;
+}
+.horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--grad-horizon);
+  box-shadow: var(--glow-horizon);
+}
+.brand {
+  grid-area: brand;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  padding-inline: 16px 10px;
+}
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  user-select: none;
+}
+.wm-ozy {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+  background: var(--grad-chrome);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: var(--chrome-split);
+}
+.wm-vtt {
+  margin-left: -3px;
+  font-family: var(--font-script);
+  font-size: 27px;
+  line-height: 1;
+  color: var(--script-ink);
+  text-shadow: var(--script-glow);
+  transform: rotate(-8deg) translateY(3px);
+}
+.sections {
+  grid-area: nav;
+  z-index: 3;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+.sections button {
+  height: 56px;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 600 15px/1 var(--font-body);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sections button svg {
+  display: none;
+  width: 20px;
+  height: 20px;
+}
+.sections button[aria-current="page"] {
+  color: var(--cyan-hi);
+  text-shadow: var(--glow-tab-text);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+.who {
+  grid-area: who;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-inline: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.mini {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--party);
+  background: var(--void);
+  display: grid;
+  place-items: center;
+}
+.mini svg {
+  width: 20px;
+  height: 20px;
+}
+.pane {
+  grid-area: pane;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+.view {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 20px 22px 32px;
+  overscroll-behavior: contain;
+}
+
+/* Phone layout: sections drop to bottom tabs, as in the app. */
+@container demo (max-width: 620px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 52px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand who"
+      "pane pane"
+      "nav nav";
+  }
+  .sections {
+    background: var(--bar);
+    border-top: 1px solid var(--line-strong);
+  }
+  .sections button {
+    flex: 1;
+    height: 62px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    font-size: 12px;
+  }
+  .sections button svg {
+    display: block;
+  }
+  .sections button[aria-current="page"] {
+    box-shadow: inset 0 2px 0 var(--cyan);
+  }
+  .who-name {
+    display: none;
+  }
+  .view {
+    padding: 16px 16px 28px;
+  }
+}
+
+/* Sheet */
+.sheet-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 18px;
+  padding-bottom: 16px;
+}
+.portrait {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border: 2px solid var(--party);
+  background: var(--void);
+  display: grid;
+  place-items: center;
+}
+.portrait svg {
+  width: 44px;
+  height: 44px;
+}
+.who-block {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.sub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.stats {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+}
+.box {
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.box dt {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.box dd {
+  margin: 0;
+  font-family: var(--font-numeric);
+  font-size: 28px;
+  line-height: 0.85;
+}
+.hp {
+  flex: 1 1 200px;
+  max-width: 300px;
+  min-width: 0;
+}
+.hp-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.hp-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hp-text);
+}
+.hp-num {
+  font-family: var(--font-numeric);
+  font-size: 24px;
+  line-height: 1;
+}
+.hp-bar {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 2px;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+}
+.hp-bar i {
+  flex: 1;
+  height: 10px;
+  background: var(--hp);
+}
+.hp-bar i.lost {
+  background: var(--hp-lost);
+}
+.tabs {
+  position: relative;
+  display: flex;
+  border-bottom: 1px solid var(--line-strong);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs button {
+  flex: none;
+  height: 48px;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 600 14px/1 var(--font-body);
+  cursor: pointer;
+}
+.tabs button[aria-selected="true"] {
+  color: var(--text);
+}
+.ink {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--cyan);
+  box-shadow: var(--ink-glow);
+  pointer-events: none;
+}
+.ink::after {
+  content: "";
+  position: absolute;
+  inset: -1px 0;
+  background: var(--grad-horizon);
+  opacity: 0;
+}
+.tabpanel {
+  padding-top: 14px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.chip b,
+.coin b {
+  font-family: var(--font-numeric);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 0.8;
+  color: var(--text);
+}
+.group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 14px 0 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rows li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.rname {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.rmeta {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.tag {
+  padding: 0 5px;
+  border: 1px solid var(--line-raised);
+  font-family: var(--font-numeric);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.tag.on {
+  border-color: var(--cyan);
+  color: var(--cyan-hi);
+}
+.pips {
+  display: flex;
+  gap: 3px;
+}
+.pips i {
+  width: 9px;
+  height: 9px;
+  background: var(--party);
+}
+.pips i.used {
+  background: transparent;
+  border: 1px solid var(--line-raised);
+}
+.coin {
+  display: flex;
+  gap: 14px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.session {
+  font-family: var(--font-numeric);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+@container demo (max-width: 620px) {
+  .portrait {
+    width: 52px;
+    height: 52px;
+  }
+  .portrait svg {
+    width: 36px;
+    height: 36px;
+  }
+  .name {
+    font-size: 19px;
+  }
+  .stats {
+    flex: 1 1 100%;
+  }
+  .box {
+    flex: 1;
+    width: auto;
+    height: 54px;
+  }
+  .hp {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .rows li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Codex */
+.doc {
+  max-width: 680px;
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.crumbs svg {
+  width: 14px;
+  height: 14px;
+}
+.doc-title {
+  margin: 10px 0 14px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
+  color: var(--text);
+}
+.props {
+  margin: 0 0 16px;
+  border-top: 1px solid var(--line-strong);
+}
+.props div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.props dt {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.props dd {
+  margin: 0;
+  font-size: 15px;
+}
+.doc p {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.doc a {
+  color: var(--cyan-hi);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.hidden-block {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px dashed var(--violet);
+  background: var(--violet-wash);
+}
+.hb-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--violet-text);
+}
+.hb-label svg {
+  width: 16px;
+  height: 16px;
+}
+.hidden-block p {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+/* Compendium */
+.comp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.comp-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--text);
+}
+.comp-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.search {
+  flex: 0 1 260px;
+  min-width: 0;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.search svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.mon {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.mon th {
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid var(--line-strong);
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.mon td {
+  padding: 10px 10px 10px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-dim);
+}
+.mon td:first-child {
+  font-weight: 600;
+  color: var(--text);
+}
+.mon .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mon td.n {
+  font-family: var(--font-numeric);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text);
+}
+@container demo (max-width: 620px) {
+  .mon .type {
+    display: none;
+  }
+}
+
+/* ---------- The transitions ----------
+   --k scales every duration for slow motion. .enter-page goes on a new view, .enter-tab on a new sheet
+   panel, and .go restarts the overlay layers. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 1. Chroma settle */
+@keyframes chroma-text-page {
+  from {
+    text-shadow: -6px 0 var(--split-cyan), 6px 0 var(--split-pink);
+  }
+  to {
+    text-shadow: 0 0 var(--split-cyan-0), 0 0 var(--split-pink-0);
+  }
+}
+@keyframes chroma-edge-page {
+  from {
+    box-shadow: -5px 0 0 var(--split-cyan), 5px 0 0 var(--split-pink);
+  }
+  to {
+    box-shadow: 0 0 0 var(--split-cyan-0), 0 0 0 var(--split-pink-0);
+  }
+}
+@keyframes chroma-text-tab {
+  from {
+    opacity: 0.3;
+    text-shadow: -3px 0 var(--split-cyan), 3px 0 var(--split-pink);
+  }
+  to {
+    opacity: 1;
+    text-shadow: 0 0 var(--split-cyan-0), 0 0 var(--split-pink-0);
+  }
+}
+.demo[data-opt="chroma"] .view.enter-page {
+  animation:
+    fade-in calc(160ms * var(--k)) var(--ease-settle) backwards,
+    chroma-text-page calc(200ms * var(--k)) var(--ease-split) backwards;
+}
+.demo[data-opt="chroma"] .view.enter-page :is(.box, .portrait, .hp-bar, .chip, .hidden-block, .search) {
+  animation: chroma-edge-page calc(200ms * var(--k)) var(--ease-split) backwards;
+}
+.demo[data-opt="chroma"] .tabpanel.enter-tab {
+  animation: chroma-text-tab calc(150ms * var(--k)) var(--ease-split) backwards;
+}
+
+/* 2. Horizon glint */
+.spark {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 140px;
+  height: 4px;
+  margin-left: -70px;
+  background: linear-gradient(90deg, transparent, var(--spark) 50%, transparent);
+  filter: var(--spark-glow);
+  opacity: 0;
+  pointer-events: none;
+}
+.flash {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 90px;
+  height: 6px;
+  margin-left: -45px;
+  background: radial-gradient(closest-side, var(--spark), transparent);
+  filter: var(--spark-glow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(var(--gx));
+}
+@keyframes spark-left {
+  from {
+    opacity: 1;
+    transform: translateX(var(--gx));
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-80px);
+  }
+}
+@keyframes spark-right {
+  from {
+    opacity: 1;
+    transform: translateX(var(--gx));
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(var(--w) + 80px));
+  }
+}
+@keyframes flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.demo[data-opt="glint"] .horizon.go .spark-l {
+  animation: spark-left calc(200ms * var(--k)) var(--ease-spark);
+}
+.demo[data-opt="glint"] .horizon.go .spark-r {
+  animation: spark-right calc(200ms * var(--k)) var(--ease-spark);
+}
+.demo[data-opt="glint"] .horizon.go .flash {
+  animation: flash calc(200ms * var(--k)) ease-out;
+}
+.spill {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 55%;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--grad-horizon);
+  mix-blend-mode: var(--wash-blend);
+  -webkit-mask-image: radial-gradient(75% 100% at var(--gx) 0, #000 0%, rgba(0, 0, 0, 0.4) 40%, transparent 100%);
+  mask-image: radial-gradient(75% 100% at var(--gx) 0, #000 0%, rgba(0, 0, 0, 0.4) 40%, transparent 100%);
+}
+@keyframes spill {
+  from {
+    opacity: var(--wash-strength);
+  }
+  to {
+    opacity: 0;
+  }
+}
+.demo[data-opt="glint"] .spill.go {
+  animation: spill calc(200ms * var(--k)) ease-out;
+}
+.demo[data-opt="glint"] .view.enter-page {
+  animation: fade-in calc(160ms * var(--k)) var(--ease-settle) calc(30ms * var(--k)) backwards;
+}
+.demo[data-opt="glint"] .ink.slide {
+  transition:
+    left calc(200ms * var(--k)) var(--ease-settle),
+    width calc(200ms * var(--k)) var(--ease-settle);
+}
+@keyframes ink-flare {
+  0% {
+    opacity: 0;
+  }
+  15%,
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo[data-opt="glint"] .ink.slide::after {
+  animation: ink-flare calc(240ms * var(--k)) ease-out;
+}
+.demo[data-opt="glint"] .tabpanel.enter-tab {
+  animation: fade-in calc(120ms * var(--k)) var(--ease-settle) calc(40ms * var(--k)) backwards;
+}
+
+/* 3. Tape shuttle. --dir is 1 moving right through the sections or tabs, -1 moving left. */
+@keyframes shuttle-page {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--dir) * 18px));
+  }
+}
+@keyframes shuttle-tab {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--dir) * 10px));
+  }
+}
+.demo[data-opt="shuttle"] .view.enter-page {
+  animation: shuttle-page calc(200ms * var(--k)) var(--ease-settle) backwards;
+}
+.demo[data-opt="shuttle"] .tabpanel.enter-tab {
+  animation: shuttle-tab calc(160ms * var(--k)) var(--ease-settle) backwards;
+}
+.streaks {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+  --dir: 1;
+}
+.streaks i {
+  position: absolute;
+  left: 0;
+  width: 45%;
+  height: 1px;
+  background: var(--grad-horizon);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  opacity: 0;
+}
+.streaks i:nth-child(1) {
+  top: 23%;
+}
+.streaks i:nth-child(2) {
+  top: 51%;
+  height: 2px;
+}
+.streaks i:nth-child(3) {
+  top: 78%;
+}
+/* The streak is 45% of the pane wide, so 222% of itself is the pane's far edge. */
+@keyframes streak {
+  from {
+    opacity: 0;
+    transform: translateX(calc(61% + var(--dir) * 161%));
+  }
+  20% {
+    opacity: var(--streak-strength);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(61% - var(--dir) * 161%));
+  }
+}
+.demo[data-opt="shuttle"] .streaks.go i {
+  animation: streak calc(180ms * var(--k)) cubic-bezier(0.3, 0.6, 0.4, 1) backwards;
+}
+.demo[data-opt="shuttle"] .streaks.go i:nth-child(2) {
+  animation-delay: calc(25ms * var(--k));
+}
+.demo[data-opt="shuttle"] .streaks.go i:nth-child(3) {
+  animation-delay: calc(12ms * var(--k));
+}
+
+/* Today's scanline wipe, as styles.css draws it, for comparison. Sheet tabs swap instantly today. */
+@keyframes wipe {
+  from {
+    -webkit-mask-image: var(--wipe-band);
+    mask-image: var(--wipe-band);
+    -webkit-mask-position: 0 100%;
+    mask-position: 0 100%;
+  }
+  to {
+    -webkit-mask-image: var(--wipe-band);
+    mask-image: var(--wipe-band);
+    -webkit-mask-position: 0 0%;
+    mask-position: 0 0%;
+  }
+}
+.demo {
+  --wipe-band: linear-gradient(
+    to bottom,
+    #000 0 45%,
+    rgba(0, 0, 0, 0.34) 47.4%,
+    rgba(0, 0, 0, 0.34) 49%,
+    #000 51.4% 100%
+  );
+}
+.demo[data-opt="current"] .view.enter-page {
+  animation:
+    fade-in calc(120ms * var(--k)) var(--ease-settle) backwards,
+    wipe calc(180ms * var(--k)) linear;
+  -webkit-mask-size: 100% 200%;
+  mask-size: 100% 200%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+</style>
+
+<div class="page" id="page">
+  <div class="wrap">
+    <header class="intro">
+      <p class="eyebrow">OzyVTT motion study</p>
+      <h1>Page transitions</h1>
+      <p class="lede">Three candidates to replace the scanline wipe. Each one has a page version for moving between sections, like Codex to Compendium, and a quieter in-page version for tabs inside a page, like the character sheet's Spells and Gear tabs.</p>
+      <p class="rm-note">Your device asks for reduced motion. The demo still plays these when you click, so you can judge them; in the app they would be instant for you.</p>
+    </header>
+
+    <div class="controls">
+      <div class="ctl ctl-option">
+        <span class="ctl-label" id="lbl-opt">Option</span>
+        <div class="seg seg-options" role="group" aria-labelledby="lbl-opt">
+          <button type="button" id="opt-chroma" data-opt="chroma" aria-pressed="true"><span class="n">1</span>Chroma settle</button>
+          <button type="button" id="opt-glint" data-opt="glint" aria-pressed="false"><span class="n">2</span>Horizon glint</button>
+          <button type="button" id="opt-shuttle" data-opt="shuttle" aria-pressed="false"><span class="n">3</span>Tape shuttle</button>
+          <button type="button" id="opt-current" data-opt="current" aria-pressed="false">Current wipe</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <span class="ctl-label" id="lbl-speed">Speed</span>
+        <div class="seg" role="group" aria-labelledby="lbl-speed">
+          <button type="button" id="speed-1" data-speed="1" aria-pressed="true">Real</button>
+          <button type="button" id="speed-6" data-speed="6" aria-pressed="false">Slow, 6x</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <span class="ctl-label" id="lbl-look">Theme</span>
+        <div class="seg" role="group" aria-labelledby="lbl-look">
+          <button type="button" id="look-dusk" data-look="dusk" aria-pressed="true">Dusk</button>
+          <button type="button" id="look-dawn" data-look="dawn" aria-pressed="false">Dawn</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="stage" aria-label="Live demo">
+      <div class="demo" id="demo" data-opt="chroma">
+        <div class="app" id="app">
+          <div class="bar">
+            <div class="horizon" id="horizon">
+              <span class="flash"></span>
+              <span class="spark spark-l"></span>
+              <span class="spark spark-r"></span>
+            </div>
+          </div>
+          <div class="brand">
+            <span class="wordmark" aria-label="OzyVTT"><span class="wm-ozy">OZY</span><span class="wm-vtt">vtt</span></span>
+          </div>
+          <nav class="sections" aria-label="Sections">
+            <button type="button" data-page="sheet" aria-current="page">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+              Sheet
+            </button>
+            <button type="button" data-page="codex">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h7M9 17h7"/></svg>
+              Codex
+            </button>
+            <button type="button" data-page="compendium">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/><path d="M9 7.5h6"/></svg>
+              Compendium
+            </button>
+          </nav>
+          <div class="who">
+            <span class="mini" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="var(--party)" stroke-width="2.4" stroke-linejoin="round"><path d="M24 7 33 33H15z"/><path d="M8 35c4 3 28 3 32 0"/></svg></span>
+            <span class="who-name">Playing Lyra</span>
+          </div>
+          <div class="pane" id="pane">
+            <div class="spill" id="spill"></div>
+            <div class="streaks" id="streaks"><i></i><i></i><i></i></div>
+          </div>
+          <div class="scan" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="below">
+        <p class="caption" id="caption" aria-live="polite"></p>
+        <div class="plays">
+          <button type="button" class="btn" id="play-page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+            Change page
+          </button>
+          <button type="button" class="btn" id="play-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18"/><path d="M3 8V5h7v3"/><path d="M3 8v11h18V8"/></svg>
+            Change sheet tab
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="cards" aria-label="The options">
+      <article class="card" data-card="chroma">
+        <div class="card-head"><span class="card-num">1</span><h2>Chroma settle</h2></div>
+        <p>The colour bleed of a worn tape. The new view arrives with its cyan and pink channels a few pixels apart, and they slide back into register as it fades up.</p>
+        <div class="ver">
+          <div class="ver-head"><span class="k">Page</span><span class="ver-time">200 MS</span></div>
+          <p>Text and panel edges start 6 px out of register and settle while the view fades in.</p>
+        </div>
+        <div class="ver">
+          <div class="ver-head"><span class="k">In-page</span><span class="ver-time">150 MS</span></div>
+          <p>Only the text splits, by 3 px, and the panel fades up from 30%.</p>
+        </div>
+        <dl>
+          <div><dt class="k">Why it fits</dt><dd>The wordmark already wears this exact split, so the motion borrows a mark the app has. Dawn gets the softer split its lettering uses.</dd></div>
+          <div><dt class="k">To build it</dt><dd>Only shadows and opacity animate, so the pane's no-transform rule holds. Headings that set their own shadow need the keyframe as well.</dd></div>
+        </dl>
+        <button type="button" class="btn" data-opt="chroma" aria-pressed="true">Show in the demo</button>
+      </article>
+
+      <article class="card" data-card="glint">
+        <div class="card-head"><span class="card-num">2</span><h2>Horizon glint</h2></div>
+        <p>The neon line under the top bar does the work. A spark runs out along it from the section you picked, and a faint wash of its colour falls on the page as the page fades up.</p>
+        <div class="ver">
+          <div class="ver-head"><span class="k">Page</span><span class="ver-time">200 MS</span></div>
+          <p>The spark reaches both edges of the bar. The wash starts at 20% under the tapped section and is gone by the time the view has faded in.</p>
+        </div>
+        <div class="ver">
+          <div class="ver-head"><span class="k">In-page</span><span class="ver-time">200 MS</span></div>
+          <p>The tab underline slides to the new tab, lit in the horizon colours while it moves and cyan once it lands. The panel fades in behind it.</p>
+        </div>
+        <dl>
+          <div><dt class="k">Why it fits</dt><dd>The horizon line already marks the top of the app, and the sliding underline moves the way the sun frame does between turns.</dd></div>
+          <div><dt class="k">To build it</dt><dd>The spark sits in the top bar, outside the pane, so it can use transforms. The wash is one opacity layer, and the underline is one new element in the Tabs primitive.</dd></div>
+        </dl>
+        <button type="button" class="btn" data-opt="glint" aria-pressed="false">Show in the demo</button>
+      </article>
+
+      <article class="card" data-card="shuttle">
+        <div class="card-head"><span class="card-num">3</span><h2>Tape shuttle</h2></div>
+        <p>Fast-forward and rewind. The new view slides in from the side you're heading toward. On a page change, faint tracking lines streak across with it.</p>
+        <div class="ver">
+          <div class="ver-head"><span class="k">Page</span><span class="ver-time">200 MS</span></div>
+          <p>The view slides 18 px and fades in while three 1 px lines in the horizon colours cross the pane.</p>
+        </div>
+        <div class="ver">
+          <div class="ver-head"><span class="k">In-page</span><span class="ver-time">160 MS</span></div>
+          <p>The panel slides 10 px and fades in, with no lines.</p>
+        </div>
+        <dl>
+          <div><dt class="k">Why it fits</dt><dd>Moving right through the sections fast-forwards and moving left rewinds, so the motion also tells you which way you went.</dd></div>
+          <div><dt class="k">To build it</dt><dd>This is the one that moves the view, which today's pane rule forbids because a transform traps fixed overlays. It needs the View Transitions API, which animates a snapshot of the page, or a transform on an inner wrapper with no fixed overlays inside.</dd></div>
+        </dl>
+        <button type="button" class="btn" data-opt="shuttle" aria-pressed="false">Show in the demo</button>
+      </article>
+    </section>
+
+    <p class="foot">Every timing stays inside the app's 120 to 200 ms motion rule, and each would be an instant swap under reduced motion. Current wipe is in the picker for comparison: the scanline band on page changes, with sheet tabs swapping instantly as they do today.</p>
+  </div>
+</div>
+
+<template id="tpl-sheet">
+  <section class="sheet" aria-label="Lyra Emberwise">
+    <div class="sheet-head">
+      <div class="portrait" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none" stroke="var(--party)" stroke-width="2" stroke-linejoin="round"><path d="M24 5 34 33H14z"/><path d="M6 35.5c5 3.5 31 3.5 36 0"/><path d="M21 17l1 2 2 .4-1.5 1.4.4 2.1-1.9-1-1.9 1 .4-2.1L18 19.4l2-.4z" stroke="var(--hp)" stroke-width="1.4"/><path d="M27 26.5l.6 1.2 1.3.2-.9.9.2 1.3-1.2-.6-1.2.6.2-1.3-.9-.9 1.3-.2z" stroke="var(--hp)" stroke-width="1.2"/></svg>
+      </div>
+      <div class="who-block">
+        <h2 class="name">Lyra Emberwise</h2>
+        <p class="sub">Elf wizard 7, Evoker. Sage.</p>
+      </div>
+      <dl class="stats">
+        <div class="box"><dt>AC</dt><dd>15</dd></div>
+        <div class="box"><dt>Init</dt><dd>+2</dd></div>
+        <div class="box"><dt>Speed</dt><dd>30</dd></div>
+      </dl>
+      <div class="hp">
+        <div class="hp-top"><span class="hp-label">HP</span><span class="hp-num">38/44</span></div>
+        <div class="hp-bar" aria-hidden="true"></div>
+      </div>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Sheet">
+      <button type="button" role="tab" data-tab="spells">Spells</button>
+      <button type="button" role="tab" data-tab="gear">Gear</button>
+      <button type="button" role="tab" data-tab="features">Features</button>
+      <button type="button" role="tab" data-tab="notes">Notes</button>
+      <span class="ink" aria-hidden="true"></span>
+    </div>
+    <div class="tabpanel-host"></div>
+  </section>
+</template>
+
+<template id="tpl-spells">
+  <div>
+    <div class="chips"><span class="chip">Save DC <b>15</b></span><span class="chip">Attack <b>+7</b></span></div>
+    <h3 class="group">Cantrips</h3>
+    <ul class="rows">
+      <li><span class="rname">Fire Bolt</span><span class="rmeta">Action, 120 ft. +7, 2d10 fire</span></li>
+      <li><span class="rname">Light</span><span class="rmeta">Action, touch</span></li>
+      <li><span class="rname">Mage Hand</span><span class="rmeta">Action, 30 ft.</span></li>
+      <li><span class="rname">Ray of Frost</span><span class="rmeta">Action, 60 ft. +7, 2d8 cold</span></li>
+    </ul>
+    <h3 class="group">Level 1 <span class="pips" aria-label="3 of 4 slots left"><i></i><i></i><i></i><i class="used"></i></span></h3>
+    <ul class="rows">
+      <li><span class="rname">Detect Magic <span class="tag">RITUAL</span></span><span class="rmeta">Action, self</span></li>
+      <li><span class="rname">Mage Armor <span class="tag on">ON, 6 H</span></span><span class="rmeta">Action, touch</span></li>
+      <li><span class="rname">Magic Missile</span><span class="rmeta">Action, 120 ft. 3 darts of 1d4 + 1</span></li>
+      <li><span class="rname">Shield <span class="tag">REACTION</span></span><span class="rmeta">Reaction, self. +5 AC</span></li>
+    </ul>
+  </div>
+</template>
+
+<template id="tpl-gear">
+  <div>
+    <h3 class="group">Weapons</h3>
+    <ul class="rows">
+      <li><span class="rname">Dagger <span class="tag">2</span></span><span class="rmeta">Melee or thrown 20/60 ft. +5, 1d4 + 2 piercing</span></li>
+      <li><span class="rname">Quarterstaff</span><span class="rmeta">Melee +2, 1d6 - 1 bludgeoning</span></li>
+    </ul>
+    <h3 class="group">Pack</h3>
+    <ul class="rows">
+      <li><span class="rname">Spellbook</span><span class="rmeta">14 spells copied</span></li>
+      <li><span class="rname">Component pouch</span><span class="rmeta">Spellcasting focus</span></li>
+      <li><span class="rname">Scholar's pack</span><span class="rmeta">Ink, quill, parchment, a little bag of sand</span></li>
+      <li><span class="rname">Hollins reliquary <span class="tag on">QUEST</span></span><span class="rmeta">Silver, palm-sized, warm to the touch</span></li>
+    </ul>
+    <div class="coin"><span><b>34</b> gp</span><span><b>12</b> sp</span><span><b>7</b> cp</span></div>
+  </div>
+</template>
+
+<template id="tpl-features">
+  <div>
+    <h3 class="group">Wizard</h3>
+    <ul class="rows">
+      <li><span class="rname">Arcane Recovery <span class="tag on">READY</span></span><span class="rmeta">Once a day after a short rest, recover spell slots worth 4 levels.</span></li>
+      <li><span class="rname">Sculpt Spells</span><span class="rmeta">Shield 1 + the spell's level creatures from your evocations.</span></li>
+      <li><span class="rname">Potent Cantrip</span><span class="rmeta">A creature that saves against your cantrip still takes half damage.</span></li>
+    </ul>
+    <h3 class="group">Elf and background</h3>
+    <ul class="rows">
+      <li><span class="rname">Darkvision</span><span class="rmeta">60 ft.</span></li>
+      <li><span class="rname">Fey Ancestry</span><span class="rmeta">Advantage on saves against being charmed. Magic can't put you to sleep.</span></li>
+      <li><span class="rname">Researcher</span><span class="rmeta">When you don't know a piece of lore, you often know where to find it.</span></li>
+    </ul>
+  </div>
+</template>
+
+<template id="tpl-notes">
+  <div>
+    <h3 class="group">Lyra's notes <span class="session">SESSION 4</span></h3>
+    <ul class="rows">
+      <li><span class="rname">Brother Aldous</span><span class="rmeta">I owe him 15 gp for the healing draughts.</span></li>
+      <li><span class="rname">The reliquary</span><span class="rmeta">It carries the Hollins crest: a heron over wheat.</span></li>
+      <li><span class="rname">Grukk Twotooth</span><span class="rmeta">Afraid of fire. Ask Borin how he knows.</span></li>
+      <li><span class="rname">Thornwood</span><span class="rmeta">The east path floods after rain. Take the ridge.</span></li>
+    </ul>
+  </div>
+</template>
+
+<template id="tpl-codex">
+  <article class="doc">
+    <div class="crumbs">Pages <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Locations</div>
+    <h2 class="doc-title">The Goblin Warren</h2>
+    <dl class="props">
+      <div><dt>Region</dt><dd>Thornwood</dd></div>
+      <div><dt>Danger</dt><dd>Moderate</dd></div>
+    </dl>
+    <p>A sinkhole in the <a href="#codex-demo" tabindex="-1">Thornwood</a> opens into a warren of low tunnels. The goblins have lined the main hall with stolen bedrolls and a long table taken from the <a href="#codex-demo" tabindex="-1">Hollins farm</a>.</p>
+    <div class="hidden-block">
+      <div class="hb-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c5 0 9 6 9 6a16 16 0 0 1-3 3.4M6.4 7.6A15.7 15.7 0 0 0 3 12s4 6 9 6a8.8 8.8 0 0 0 4.1-1"/></svg>Hidden</div>
+      <p>Grukk Twotooth keeps the Hollins reliquary under the bedrolls in the east chamber. A DC 13 Wisdom (Perception) check spots the loose stones.</p>
+    </div>
+    <p>The warren answers to <a href="#codex-demo" tabindex="-1">Grukk Twotooth</a>, who rarely leaves the east chamber.</p>
+  </article>
+</template>
+
+<template id="tpl-compendium">
+  <section>
+    <div class="comp-head">
+      <div>
+        <h2 class="comp-title">Monsters</h2>
+        <p class="comp-sub">SRD 5.1, challenge 2 or lower</p>
+      </div>
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>Search the Compendium</div>
+    </div>
+    <table class="mon">
+      <thead><tr><th>Name</th><th class="type">Type</th><th class="n">AC</th><th class="n">HP</th><th class="n">CR</th></tr></thead>
+      <tbody>
+        <tr><td>Goblin</td><td class="type">Small humanoid</td><td class="n">15</td><td class="n">7</td><td class="n">1/4</td></tr>
+        <tr><td>Wolf</td><td class="type">Medium beast</td><td class="n">13</td><td class="n">11</td><td class="n">1/4</td></tr>
+        <tr><td>Hobgoblin</td><td class="type">Medium humanoid</td><td class="n">18</td><td class="n">11</td><td class="n">1/2</td></tr>
+        <tr><td>Worg</td><td class="type">Large monstrosity</td><td class="n">13</td><td class="n">26</td><td class="n">1/2</td></tr>
+        <tr><td>Bugbear</td><td class="type">Medium humanoid</td><td class="n">16</td><td class="n">27</td><td class="n">1</td></tr>
+        <tr><td>Dire Wolf</td><td class="type">Large beast</td><td class="n">14</td><td class="n">37</td><td class="n">1</td></tr>
+        <tr><td>Ogre</td><td class="type">Large giant</td><td class="n">11</td><td class="n">59</td><td class="n">2</td></tr>
+      </tbody>
+    </table>
+  </section>
+</template>
+
+<script>
+(function () {
+  var PAGES = ["sheet", "codex", "compendium"];
+  var TABS = ["spells", "gear", "features", "notes"];
+  var CAPTIONS = {
+    chroma: "<b>Chroma settle.</b> The view arrives with its cyan and pink channels apart, and they slide into register.",
+    glint: "<b>Horizon glint.</b> A spark runs out along the horizon line from the section you picked, and the sheet's underline slides between tabs.",
+    shuttle: "<b>Tape shuttle.</b> The view slides in from the side you're heading toward, like fast-forward and rewind.",
+    current: "<b>Current wipe, for comparison.</b> A dimmed scanline band sweeps down on page changes, and sheet tabs swap instantly."
+  };
+  var HINT = " The section buttons play the page version and the sheet's tabs play the in-page version.";
+
+  var page = document.getElementById("page");
+  var demo = document.getElementById("demo");
+  var app = document.getElementById("app");
+  var pane = document.getElementById("pane");
+  var horizon = document.getElementById("horizon");
+  var spill = document.getElementById("spill");
+  var streaks = document.getElementById("streaks");
+  var caption = document.getElementById("caption");
+
+  var current = { page: "sheet", tab: "spells", opt: "chroma" };
+
+  function clone(id) {
+    return document.getElementById(id).content.firstElementChild.cloneNode(true);
+  }
+  function restart(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+  function direction(list, from, to) {
+    return list.indexOf(to) >= list.indexOf(from) ? 1 : -1;
+  }
+  // Leaving .enter-* or .go on an element would replay its animation when the option changes.
+  function clearMarks() {
+    demo.querySelectorAll(".enter-page, .enter-tab").forEach(function (el) {
+      el.classList.remove("enter-page", "enter-tab");
+    });
+    [horizon, spill, streaks].forEach(function (el) {
+      el.classList.remove("go");
+    });
+    demo.querySelectorAll(".ink.slide").forEach(function (el) {
+      el.classList.remove("slide");
+    });
+  }
+
+  function fillTab(view, id, animate, dir) {
+    var host = view.querySelector(".tabpanel-host");
+    var panel = clone("tpl-" + id);
+    panel.className = "tabpanel";
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-label", id.charAt(0).toUpperCase() + id.slice(1));
+    if (animate) {
+      panel.style.setProperty("--dir", dir);
+      panel.classList.add("enter-tab");
+    }
+    host.replaceChildren(panel);
+    view.querySelectorAll("[role=tab]").forEach(function (b) {
+      var on = b.dataset.tab === id;
+      b.setAttribute("aria-selected", on ? "true" : "false");
+      b.tabIndex = on ? 0 : -1;
+    });
+  }
+  function placeInk(view, animate) {
+    var ink = view.querySelector(".ink");
+    var btn = view.querySelector('[data-tab="' + current.tab + '"]');
+    if (!ink || !btn) return;
+    if (animate) restart(ink, "slide");
+    else ink.classList.remove("slide");
+    ink.style.left = btn.offsetLeft + "px";
+    ink.style.width = btn.offsetWidth + "px";
+  }
+  function measure(next) {
+    var btn = app.querySelector('[data-page="' + next + '"]');
+    var a = app.getBoundingClientRect();
+    var b = btn.getBoundingClientRect();
+    app.style.setProperty("--gx", Math.round(b.left + b.width / 2 - a.left) + "px");
+    app.style.setProperty("--w", Math.round(a.width) + "px");
+  }
+
+  function showPage(next, animate) {
+    var dir = direction(PAGES, current.page, next);
+    current.page = next;
+    var view = clone("tpl-" + next);
+    var wrap = document.createElement("div");
+    wrap.className = "view";
+    wrap.appendChild(view);
+    if (next === "sheet") {
+      var bar = wrap.querySelector(".hp-bar");
+      for (var i = 0; i < 22; i++) {
+        var seg = document.createElement("i");
+        if (i >= 19) seg.className = "lost";
+        bar.appendChild(seg);
+      }
+    }
+    var old = pane.querySelector(".view");
+    if (old) old.remove();
+    pane.insertBefore(wrap, pane.firstChild);
+    if (next === "sheet") {
+      fillTab(wrap, current.tab, false);
+      placeInk(wrap, false);
+    }
+    app.querySelectorAll("[data-page]").forEach(function (b) {
+      if (b.dataset.page === next) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
+    if (!animate) return;
+    wrap.style.setProperty("--dir", dir);
+    wrap.classList.add("enter-page");
+    measure(next);
+    streaks.style.setProperty("--dir", dir);
+    restart(horizon, "go");
+    restart(spill, "go");
+    restart(streaks, "go");
+  }
+
+  function showTab(next, animate) {
+    var view = pane.querySelector(".view");
+    if (!view || current.page !== "sheet" || next === current.tab) return;
+    var dir = direction(TABS, current.tab, next);
+    current.tab = next;
+    fillTab(view, next, animate, dir);
+    placeInk(view, animate);
+  }
+
+  function setOpt(opt) {
+    clearMarks();
+    current.opt = opt;
+    demo.dataset.opt = opt;
+    document.querySelectorAll("[data-opt]").forEach(function (b) {
+      if (b === demo) return;
+      b.setAttribute("aria-pressed", b.dataset.opt === opt ? "true" : "false");
+    });
+    document.querySelectorAll(".card").forEach(function (c) {
+      c.classList.toggle("is-on", c.dataset.card === opt);
+    });
+    document.querySelectorAll(".card .btn").forEach(function (b) {
+      b.textContent = b.dataset.opt === opt ? "In the demo now" : "Show in the demo";
+    });
+    caption.innerHTML = CAPTIONS[opt] + HINT;
+  }
+
+  function setSpeed(k) {
+    demo.style.setProperty("--k", k);
+    document.querySelectorAll("[data-speed]").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.dataset.speed === String(k) ? "true" : "false");
+    });
+  }
+
+  function effectiveLook() {
+    var t = document.documentElement.getAttribute("data-theme");
+    if (t === "light") return "dawn";
+    if (t === "dark") return "dusk";
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "dawn" : "dusk";
+  }
+  function markLook(look) {
+    document.querySelectorAll("[data-look]").forEach(function (b) {
+      if (b === page) return;
+      b.setAttribute("aria-pressed", b.dataset.look === look ? "true" : "false");
+    });
+  }
+  function setLook(look) {
+    page.dataset.look = look;
+    markLook(look);
+    var view = pane.querySelector(".view");
+    if (view) placeInk(view, false);
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button, a");
+    if (!t) return;
+    if (t.tagName === "A" && t.closest(".doc")) {
+      e.preventDefault();
+      return;
+    }
+    if (t.dataset.page) {
+      if (t.dataset.page !== current.page) showPage(t.dataset.page, true);
+    } else if (t.dataset.tab) {
+      showTab(t.dataset.tab, true);
+    } else if (t.dataset.opt) {
+      setOpt(t.dataset.opt);
+      if (t.closest(".card")) {
+        var r = demo.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > window.innerHeight) demo.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    } else if (t.dataset.speed) {
+      setSpeed(Number(t.dataset.speed));
+    } else if (t.dataset.look && t !== page) {
+      setLook(t.dataset.look);
+    } else if (t.id === "play-page") {
+      var i = PAGES.indexOf(current.page);
+      showPage(PAGES[(i + 1) % PAGES.length], true);
+    } else if (t.id === "play-tab") {
+      if (current.page !== "sheet") showPage("sheet", false);
+      var j = TABS.indexOf(current.tab);
+      var nextTab = TABS[(j + 1) % TABS.length];
+      requestAnimationFrame(function () {
+        showTab(nextTab, true);
+      });
+    }
+  });
+
+  // Arrow keys move between sheet tabs, as the app's Tabs primitive does.
+  demo.addEventListener("keydown", function (e) {
+    var tab = e.target.closest && e.target.closest("[role=tab]");
+    if (!tab || (e.key !== "ArrowRight" && e.key !== "ArrowLeft")) return;
+    var i = TABS.indexOf(current.tab);
+    var next = TABS[(i + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length];
+    showTab(next, true);
+    var btn = pane.querySelector('[data-tab="' + next + '"]');
+    if (btn) btn.focus();
+    e.preventDefault();
+  });
+
+  if (window.ResizeObserver) {
+    new ResizeObserver(function () {
+      var view = pane.querySelector(".view");
+      if (view) placeInk(view, false);
+    }).observe(demo);
+  }
+
+  markLook(effectiveLook());
+  setOpt("chroma");
+  showPage("sheet", false);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      var view = pane.querySelector(".view");
+      if (view) placeInk(view, false);
+    });
+  }
+})();
+</script>
+</body></html>

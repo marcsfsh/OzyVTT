@@ -326,8 +326,9 @@ from the mockups.
 ## Motion
 
 Light rail ([ADR-0045](adr/0045-light-rail-motion.md)) is the one motion language for change. The engine is
-`packages/ui/src/motion/lightRail.ts` and the parts are drawn by `packages/ui/src/styles/light-rail.css`. The ADR lists
-the moments and the phases that build them; a surface whose moment is not built yet keeps the motion it has.
+`packages/ui/src/motion/lightRail.ts` and the parts are drawn by `packages/ui/src/styles/light-rail.css`. The plan,
+with every moment and the phase that builds it, and the approved mockup are in `docs/design/light-rail/` (`PLAN.md`,
+`mockup/ozyvtt-light-rail.html`). A surface whose moment is not built yet keeps the motion it has.
 
 1. Light travels from the old place to the new one. It drains out of the old place, runs as one comet, bursts and
    fills where it lands. A wash is optional.

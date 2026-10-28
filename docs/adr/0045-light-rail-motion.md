@@ -3,7 +3,8 @@
 ## Status
 
 Accepted on 2026-10-28 with the owner's choice of Light rail, after two rounds of mockups. Built in phases; the
-Motion section of `docs/DESIGN.md` holds the rules every phase follows.
+Motion section of `docs/DESIGN.md` holds the rules every phase follows. The plan (`PLAN.md`, with every moment, its
+file and its trigger) and the approved mockup are committed in `docs/design/light-rail/`.
 
 ## Context and decision drivers
 

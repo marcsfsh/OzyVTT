@@ -1,0 +1,104 @@
+/* ---------- The light ----------
+   Script places these and drives them with the Web Animations API; this file only says how each part
+   looks. Every part is a throwaway element removed when its animation ends. */
+.fx {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+}
+/* Comet: a bright head on one end and a tapered tail. face-r has its head on the right. */
+.comet {
+  height: 4px;
+  filter: var(--spark-glow);
+  --head: var(--spark);
+  --tail: var(--spark-tail);
+}
+.comet.face-r {
+  transform-origin: 100% 50%;
+  background: linear-gradient(90deg, transparent, var(--tail) 65%, var(--head));
+}
+.comet.face-l {
+  transform-origin: 0 50%;
+  background: linear-gradient(270deg, transparent, var(--tail) 65%, var(--head));
+}
+.comet.gold {
+  --head: var(--gold-head);
+  --tail: var(--gold-tail);
+}
+.comet.cyan {
+  --head: var(--cyan-head);
+  --tail: var(--cyan-tail);
+}
+.comet.red {
+  --head: var(--red-head);
+  --tail: var(--red-tail);
+}
+/* Burst: a short flash on a line. Pop: the round version, for pips, tokens and points on the map. */
+.burst {
+  height: 10px;
+  background: radial-gradient(closest-side, var(--burst-c, var(--spark)), transparent);
+  filter: var(--spark-glow);
+}
+.pop {
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--burst-c, var(--spark)), transparent);
+  filter: var(--spark-glow);
+}
+.burst.gold,
+.pop.gold {
+  --burst-c: var(--gold-head);
+}
+.burst.cyan,
+.pop.cyan {
+  --burst-c: var(--cyan-head);
+}
+.burst.red,
+.pop.red {
+  --burst-c: var(--red-head);
+}
+/* Wash: the line's own colours falling onto what changed, strongest under where the light landed. */
+.wash {
+  background: var(--grad-horizon);
+  mix-blend-mode: var(--wash-blend);
+  -webkit-mask-image: radial-gradient(52% 100% at var(--at, 50%) 0, #000 0%, rgba(0, 0, 0, 0.45) 32%, transparent 100%);
+  mask-image: radial-gradient(52% 100% at var(--at, 50%) 0, #000 0%, rgba(0, 0, 0, 0.45) 32%, transparent 100%);
+}
+/* A line lit in the horizon colours, used where a fill needs its own layer. */
+.lit-line {
+  height: 2px;
+  background: var(--grad-horizon);
+  box-shadow: var(--glow-horizon);
+}
+/* A thin vertical edge of light, for reveals that sweep across the map. */
+.edge-v {
+  width: 3px;
+  background: linear-gradient(180deg, transparent, var(--spark) 20%, var(--spark) 80%, transparent);
+  filter: var(--spark-glow);
+}
+/* One sweep of the horizon's colours, laid over an element's own lettering as a copy of its text.
+   The copy is transparent outside the band, so the lettering underneath (chrome or plain) shows through. */
+.sheen-ov {
+  inset: 0;
+  z-index: 1;
+  white-space: nowrap;
+  background-image: linear-gradient(
+    105deg,
+    transparent 0 36%,
+    var(--sheen-a) 42%,
+    var(--sheen-b) 47%,
+    var(--sheen-c) 53%,
+    var(--sheen-d) 58%,
+    transparent 64% 100%
+  );
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  text-shadow: none;
+}
+.ping-ring {
+  border: 3px solid var(--magenta);
+  border-radius: 50%;
+}
