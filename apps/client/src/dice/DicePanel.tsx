@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { GmView, PlayerView, RollPurpose, RollVisibility, TableRollPurpose } from "@vtt/domain";
-import { Button, Input, SegmentedControl, Select, Stepper, useToast } from "@vtt/ui";
+import { Button, Input, SegmentedControl, Select, Stepper, Tag, useOnChange, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
+import { natural, rollLands } from "./rollLight";
 import { useRollPreference } from "./roll-preference";
 import { setRollVisibility, useRollVisibility } from "./roll-visibility";
 import { RollCallPanel } from "./RollCallPanel";
@@ -19,6 +20,7 @@ const PURPOSE_LABELS: Record<TableRollPurpose, string> = {
 /** A roll's label in the log, the character builder's own rolls included. */
 const ROLL_LABELS: Record<RollPurpose, string> = { ...PURPOSE_LABELS, builder: "Builder" };
 const QUICK_DICE = [4, 6, 8, 10, 12, 20] as const;
+const ROLL_PARTS = { dice: ".die", total: ".roll-total", nat: ".roll-nat" } as const;
 
 /**
  * The product's reveal words for each roll visibility, shared by the picker and the roll-meta line.
@@ -89,6 +91,15 @@ export function DicePanel({
   // the result from the roller too.
   const visibilityOptions = VISIBILITY_OPTIONS[role];
   const visibilityLabel = (value: RollVisibility) => ROLL_VISIBILITY_WORD[value] ?? value;
+  const rolls =
+    mineActorId && rollFilter === "mine" ? state.rolls.filter((roll) => roll.actorId === mineActorId) : state.rolls;
+  // The newest roll lands on its card at the top of the list (ADR-0045).
+  const rollList = useRef<HTMLDivElement>(null);
+  const newest = rolls.at(-1);
+  useOnChange(newest?.id ?? null, (_was, id) => {
+    const card = rollList.current?.querySelector<HTMLElement>(":scope > .roll-card");
+    if (id && card && newest) rollLands(card, newest.dice, newest.total, ROLL_PARTS);
+  });
 
   // A roll lands in the feed below, so only what the feed cannot show gets a toast.
   const submit = async (rollFormula: string, rollPurpose: TableRollPurpose) => {
@@ -273,10 +284,6 @@ export function DicePanel({
         <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
       </details>
       {(() => {
-        const rolls =
-          mineActorId && rollFilter === "mine"
-            ? state.rolls.filter((roll) => roll.actorId === mineActorId)
-            : state.rolls;
         return (
           <>
             <div className="roll-list-head">
@@ -294,7 +301,7 @@ export function DicePanel({
                 />
               )}
             </div>
-            <div className="roll-list scroll-y" aria-label="Recent rolls">
+            <div ref={rollList} className="roll-list scroll-y" aria-label="Recent rolls">
               {rolls.length === 0 && (
                 <p>{rollFilter === "mine" ? "No rolls from this character yet." : "No rolls yet."}</p>
               )}
@@ -307,6 +314,11 @@ export function DicePanel({
                       <span className={`roll-badge roll-badge--${roll.purpose}`} title={ROLL_LABELS[roll.purpose]}>
                         {roll.label ?? ROLL_LABELS[roll.purpose]}
                       </span>
+                      {natural(roll.dice) && (
+                        <Tag tone={natural(roll.dice) === "NAT 20" ? "hit" : "miss"} size="sm" className="roll-nat">
+                          {natural(roll.dice)}
+                        </Tag>
+                      )}
                       <span className="roll-meta">
                         {roll.initiatorLabel ?? "Unknown roller"} · {visibilityLabel(roll.visibility)}
                         {roll.free ? " · Free roll" : ""}

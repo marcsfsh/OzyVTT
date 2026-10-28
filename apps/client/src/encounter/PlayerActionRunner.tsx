@@ -619,7 +619,13 @@ export function PlayerActionRunner({
           {(result.attack || result.check) && result.rollMode && result.rollMode.mode !== "normal" && (
             <p className="action-rollmode">{modeWords(result.rollMode).replace(/^ · /, "")}</p>
           )}
-          {result.attack && <AttackOutcome attack={result.attack} audience="player" />}
+          {result.attack && (
+            <AttackOutcome
+              attack={result.attack}
+              audience="player"
+              attackerId={result.preview || result.waitingOnReaction ? undefined : actorId}
+            />
+          )}
           {result.check && <CheckOutcome check={result.check} />}
           {result.effectGranted && (
             <p className="action-effect-granted">

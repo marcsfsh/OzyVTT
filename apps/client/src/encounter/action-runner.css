@@ -321,6 +321,7 @@
   margin-top: var(--space-2);
 }
 .action-result {
+  position: relative;
   margin-top: 0.4rem;
   padding: 0.6rem 0.7rem;
   border: 1px solid transparent;

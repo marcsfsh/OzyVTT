@@ -179,3 +179,28 @@
   inset: 0;
   background: var(--overlay);
 }
+
+/* A comet's track between two points at any angle (cometTo): turned to face the target from its start. */
+.lr-track {
+  transform-origin: 0 0;
+}
+
+/* Damage rising from a token (floatText): gold numerals over a dark shadow, larger for a critical hit. The number only
+   reaches a viewer who already holds the creature's exact hit points. */
+.lr-damage {
+  color: var(--hp-text);
+  font: 400 32px / 1 var(--font-numeric);
+  text-shadow:
+    0 2px 0 var(--void),
+    0 0 8px var(--void);
+}
+.lr-damage.is-critical {
+  font-size: 46px;
+}
+/* MISS where an attack ran out of light. */
+.lr-miss {
+  color: var(--text-muted);
+  font: 400 26px / 1 var(--font-numeric);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 6px var(--void);
+}

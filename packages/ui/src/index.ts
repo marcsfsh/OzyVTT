@@ -34,12 +34,14 @@ export {
   clearLight,
   comet,
   cometPath,
+  cometTo,
   cool,
   countUp,
   drain,
   fadeIn,
   fadeOut,
   fill,
+  flash,
   flip,
   flipDelta,
   flipFrom,
@@ -63,6 +65,7 @@ export {
   type Axis,
   type Box,
   type LightTiming,
+  type PointTrip,
   type Tone
 } from "./motion/lightRail";
 export { holdMotion, motionReleased, releaseMotion } from "./motion/gate";

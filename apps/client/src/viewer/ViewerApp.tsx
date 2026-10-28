@@ -10,6 +10,7 @@ type ViewerRect = Readonly<{ x: number; y: number; width: number; height: number
 import { bandFraction, TokenAltitudeBadge, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
+import { useDamageNumbers, type SeenHealth } from "../scene/damageNumbers";
 import { ScreenColumn, ScreenTop } from "./ScreenParts";
 import { ScreenPairing } from "./ScreenPairing";
 import { TableSound } from "./TableSound";
@@ -164,6 +165,19 @@ export function MapStage({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
   const stageSurface = useDragSurface(stageRef);
+  // The screen holds only health bands, and shows them where its health display does: damage there bursts on the
+  // token as the band falls, with no number (ADR-0045).
+  const shownTokens = presentation.encounter.tokens;
+  const bands = useMemo(
+    () =>
+      new Map<string, SeenHealth>(
+        shownTokens.flatMap((token) =>
+          token.healthDisplay ? [[token.actorId, { kind: "band", band: token.health ?? "healthy" }] as const] : []
+        )
+      ),
+    [shownTokens]
+  );
+  useDamageNumbers(stageRef, bands);
   const href = mapImageUrl ?? (presentation.activeMap ? imageUrl(presentation.activeMap.assetId) : "");
   useEffect(() => {
     setLocalCamera(null);
@@ -330,6 +344,7 @@ export function MapStage({
           <g
             className={`viewer-token ${token.kind}${token.active ? " active" : ""}`}
             key={token.actorId}
+            data-token-id={token.actorId}
             transform={`translate(${token.position.x} ${token.position.y})`}
           >
             {token.healthDisplay?.style === "aura" && (

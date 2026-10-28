@@ -6,12 +6,14 @@ import {
   type RollAnswerOffer,
   type RollAnswered
 } from "@vtt/domain";
+import { OverlayEdge } from "@vtt/ui";
 import { typedDie, useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { RollControls, type AnswerChoice, type DieMode } from "./RollControls";
 import { damageAdjustments } from "./format";
 import { modeWords } from "./roll-mode-notes";
 import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
+import { useRequestLight } from "./requestLight";
 import "./prompts.css";
 
 /**
@@ -59,6 +61,8 @@ export function SavePrompt({
   /** Remaining Legendary Resistance uses (GM view of a legendary target only), which offer "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number;
 }>) {
   const [busy, setBusy] = useState(false);
+  // A save reaching a player arrives along the horizon, and leaves sinking once answered (ADR-0045).
+  const light = useRequestLight(save.id, viewer === "player");
   // A player's typed damage stands in for dice, so it follows the table's setting for typed dice.
   const { mayTypeDamage } = useRollPreference(save.targetActorId);
   // A rolled-but-not-applied result: the server records the die and returns the projected outcome,
@@ -246,7 +250,8 @@ export function SavePrompt({
     return () => clearTimeout(timer);
   }, [rolled, stale, busy, recheck, proposal, damageOverride, save.id, forced]);
   return (
-    <div className="save-prompt" role="group" aria-label={`Saving throw for ${targetName}`}>
+    <div ref={light.prompt} className="save-prompt" role="group" aria-label={`Saving throw for ${targetName}`}>
+      {viewer === "player" && <OverlayEdge ref={light.edge} className="save-prompt-edge" />}
       <span className="save-prompt-label">
         <strong>
           DC {save.dc} {save.ability.toUpperCase()}

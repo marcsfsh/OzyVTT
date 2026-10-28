@@ -1226,6 +1226,13 @@ edge. A band moves the same way with no number, and `Meter`'s `light` does it fo
 `useChipStrip` settles a new chip in with the chroma split and slides the others to their new places. A chip with
 `leave="split"` (Concentration) leaves an inert copy that comes apart, through `ghostOut`, when it leaves a strip that
 stays.
+A roll lands on its card through `dice/rollLight.ts` (the dice panel and the table screen's latest roll), and a roll
+call fills in through `dice/callLight.ts`. An attack resolved on a device lights that device's map: `AttackOutcome`
+hands the final result to `scene/attackLight.ts`, which runs a comet from attacker to target with `cometTo`. Damage
+numbers come from `scene/damageNumbers.ts`, which compares each creature's health between two projections and
+raises the drop only where the viewer holds exact hit points; the table screen holds only bands, so it bursts with no
+number. No projection or table event gained a field for it. `encounter/WaitNote.tsx` is the still WAIT line that
+lights when settled, and `encounter/requestLight.ts` brings a save to a player along the horizon.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map

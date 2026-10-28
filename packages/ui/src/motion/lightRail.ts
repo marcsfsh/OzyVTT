@@ -233,6 +233,57 @@ export function comet(host: Element, o: CometOptions): Animation | null {
   });
 }
 
+/** The white flash of a critical hit or a natural 20: two frames over the whole host, as the life bar's damage does. */
+export function flash(host: Element, o: Timed = {}): Animation | null {
+  if (!canMove()) return null;
+  return temp(host, "lr-flash", {}, [{ opacity: 0.85 }, { offset: 0.99, opacity: 0.85 }, { opacity: 0 }], {
+    dur: o.dur ?? 34,
+    delay: o.delay ?? 0,
+    ease: "linear"
+  });
+}
+
+export interface PointTrip extends Timed {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  thick?: number;
+  tone?: Tone;
+  /** Where along the way it stops and fades, as a share of the trip: a miss runs out of light short of its target. */
+  reach?: number;
+}
+
+/**
+ * A comet between two points at any angle, for the map, where an attack runs from one token to another. The trip runs
+ * in a track turned to face the target, so it is the same comet as on a line.
+ */
+export function cometTo(host: Element, o: PointTrip): Animation | null {
+  if (!canMove()) return null;
+  const dx = o.to.x - o.from.x;
+  const dy = o.to.y - o.from.y;
+  const length = Math.hypot(dx, dy) * (o.reach ?? 1);
+  if (length < 1) return null;
+  const track = spawn(host, "lr-track", {
+    left: px(o.from.x),
+    top: px(o.from.y),
+    width: px(length),
+    height: "0px",
+    transform: `rotate(${Math.atan2(dy, dx)}rad)`
+  });
+  const trip = comet(track, {
+    from: 0,
+    to: length,
+    line: 0,
+    thick: o.thick ?? 3,
+    tone: o.tone,
+    delay: o.delay,
+    dur: o.dur
+  });
+  const remove = () => track.remove();
+  if (trip) trip.finished.then(remove, remove);
+  else remove();
+  return trip;
+}
+
 export interface BurstOptions extends Timed {
   /** Where on the line it lands. */
   at: number;

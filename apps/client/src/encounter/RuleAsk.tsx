@@ -3,6 +3,7 @@ import type { AskableCommand, GmView, PlayerView } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { command } from "../lib/command";
 import { clearBlockedPrompt, useTargetingBlocked } from "./targeting";
+import { WaitNote } from "./WaitNote";
 import "./rule-ask.css";
 
 /**
@@ -76,7 +77,9 @@ export function MyPendingAsks({ state }: Readonly<{ state: PlayerView }>) {
       {asks.map((ask) => (
         <li key={ask.id} className="rule-ask rule-ask-waiting">
           <p className="rule-ask-reason">{ask.message}</p>
-          <p className="rule-ask-meta">Waiting on the GM · asked {askedAgo(ask.createdAt)}</p>
+          <WaitNote waiting done={null}>
+            Waiting on the GM · asked {askedAgo(ask.createdAt)}
+          </WaitNote>
         </li>
       ))}
     </ul>

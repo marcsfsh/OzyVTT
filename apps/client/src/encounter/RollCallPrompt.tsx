@@ -1,6 +1,6 @@
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import type { CheckRollResult, PlayerRollCall, PlayerView } from "@vtt/domain";
-import { Button, useToast } from "@vtt/ui";
+import { Button, canMove, fadeIn, pop, rel, useOnChange, useToast } from "@vtt/ui";
 import { useSkillCatalog } from "../content/catalogs";
 import { callLabel } from "../dice/roll-call-words";
 import { typedDie, useRollPreference } from "../dice/roll-preference";
@@ -115,6 +115,17 @@ export function RollCallCard({
   const label = callLabel(call, (id) => skillCatalog.items.find((skill) => skill.id === id)?.name);
   const save = entry.saveId ? state.combat.pendingSaves.find((pending) => pending.id === entry.saveId) : undefined;
   const shown = rerolled ?? outcome;
+  // The answer drops into the card as it lands (ADR-0045).
+  const cardEl = useRef<HTMLElement>(null);
+  useOnChange(shown !== null && shown !== undefined, (_was, now) => {
+    const el = cardEl.current;
+    const result = el?.querySelector<HTMLElement>(".roll-call-result");
+    if (!now || !el || !result || !canMove()) return;
+    fadeIn(result, { dur: 160, y: -6 });
+    const box = rel(result, el);
+    const passed = shown?.check?.success;
+    pop(el, { x: box.cx, y: box.cy, size: 40, tone: passed === true ? "cyan" : passed === false ? "red" : undefined });
+  });
 
   const answer = async (face?: number) => {
     setBusy(true);
@@ -140,7 +151,7 @@ export function RollCallCard({
   };
 
   return (
-    <article className="roll-call-card" aria-label={`${label} for ${name}`}>
+    <article ref={cardEl} className="roll-call-card" aria-label={`${label} for ${name}`}>
       <p className="roll-call-card-eyebrow">The GM calls for a roll</p>
       <p className="roll-call-card-head">
         <strong>{label}</strong>

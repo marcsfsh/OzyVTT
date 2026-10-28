@@ -1,4 +1,5 @@
 .save-prompt {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -131,6 +132,10 @@
   background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo));
 }
 /* Its top edge is cyan, the Reaction lamp's colour, and lights from under the lamp. */
+/* A save that reached a player: its top edge lights as it arrives (requestLight). */
+.save-prompt-edge {
+  --nh-edge: var(--cyan);
+}
 .reaction-prompt-edge {
   --nh-edge: var(--cyan);
   --nh-edge-glow: var(--glow-lamp-reaction);
@@ -414,4 +419,21 @@
 .turn-order-moves {
   display: inline-flex;
   gap: var(--space-1);
+}
+
+/* A wait on its own line: grey and still while it waits, lit once it is settled (WaitNote). */
+.wait-note {
+  position: relative;
+  padding-top: var(--space-2);
+}
+.wait-note-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--unlit);
+}
+.wait-note.is-done .wait-note-line {
+  background: var(--state-on-edge);
 }

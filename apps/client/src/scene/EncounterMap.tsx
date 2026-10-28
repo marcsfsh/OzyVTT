@@ -38,6 +38,8 @@ import { useMapCommands } from "./useMapCommands";
 import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
 import { cameraFocus, useCameraFollow } from "./cameraFollow";
+import { useAimLight, useAttackLight } from "./attackLight";
+import { useDamageNumbers, type SeenHealth } from "./damageNumbers";
 import { VisionLayer, type MapWall } from "./VisionLayer";
 import { DoorMenu } from "./DoorMenu";
 import { publishTableGeometry, usePlacementRequests, useTokenFocusRequests } from "./tableGeometry";
@@ -76,6 +78,7 @@ type TerrainState = Readonly<{
 
 // On-brand annotation swatches. Concrete hexes, since theme vars can't travel: the colour goes over the wire and
 // must read the same on every screen.
+const NO_TARGETS: readonly string[] = [];
 const PLAYER_COLORS = ["#2de2ff", "#5b6ef5", "#a45cff", "#ff2e9a", "#ff2d5e", "#ff8cc6", "#7cefff", "#ffffff"];
 
 /** Whether two creatures fight on the same side, as the view can tell: the GM reads each stat block's disposition,
@@ -111,6 +114,12 @@ function grappledBy(actors: readonly Actor[], moverId: string, role: "gm" | "pla
       )
     )
     .map((actor) => actor.id);
+}
+
+/** A creature's health as this viewer holds it: the GM's and a party member's are exact, the rest a band. */
+function healthSeen(hp: Actor["hp"]): SeenHealth {
+  if ("kind" in hp) return hp.kind === "exact" ? { kind: "exact", points: hp.current + hp.temporary } : hp;
+  return { kind: "exact", points: hp.current + hp.temporary };
 }
 
 function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
@@ -210,6 +219,13 @@ export function EncounterMap({
   const stageSurface = useDragSurface(stageRef);
   const trayRef = useRef<HTMLDivElement | null>(null);
   const actorsById = useMemo(() => new Map(actors.map((actor) => [actor.id, actor])), [actors]);
+  // Attacks and damage light up on the tokens (ADR-0045): a number only where this viewer holds exact hit points.
+  const seenHealth = useMemo(
+    () => new Map<string, SeenHealth>(actors.map((actor) => [actor.id, healthSeen(actor.hp)])),
+    [actors]
+  );
+  useAttackLight(stageRef);
+  useDamageNumbers(stageRef, seenHealth);
   const tokensById = useMemo(
     () => new Map(tokens.map((encounterToken) => [encounterToken.actorId, encounterToken])),
     [tokens]
@@ -293,6 +309,7 @@ export function EncounterMap({
       : { actorId: mine.actorId };
   })();
   const placedAt = (actorId: string) => tokensById.get(actorId)?.position ?? null;
+  useAimLight(stageRef, activeTargeting ? activeTargeting.attackerId : null, activeTargeting?.selected ?? NO_TARGETS);
   // Before a target is chosen, the nearest creature on the other side stands in for it, so the map shows whom the
   // action is likely for. A heal has no such stand-in.
   const likelyTarget = (() => {

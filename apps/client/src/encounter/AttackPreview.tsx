@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { flash } from "@vtt/ui";
 import type { ActionResolution, HitOffer, HitOptionChoice } from "@vtt/domain";
+import { announceAttack } from "../scene/attackLight";
 import { AnswerOffers, ForceModeButtons, RerollControl, type DieMode } from "./RollControls";
 import { DamageLook } from "./DamageLook";
 import { useTargetingTyped, type ResolveOptions } from "./targeting";
@@ -19,14 +21,33 @@ const outcomeOpen = (attack: Attack) =>
  * never sees an AC, so an attack the server could not judge reads as a hit for them. Effect dice (Bless) show in
  * the total once rolled, or as still to roll in a preview, which then names no outcome.
  */
-export function AttackOutcome({ attack, audience }: Readonly<{ attack: Attack; audience: "gm" | "player" }>) {
+export function AttackOutcome({
+  attack,
+  audience,
+  attackerId
+}: Readonly<{
+  attack: Attack;
+  audience: "gm" | "player";
+  /** Who attacked, once the attack is final: the map lights the trip (ADR-0045). Left out for a preview. */
+  attackerId?: string;
+}>) {
+  const line = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (!attackerId || outcomeOpen(attack)) return;
+    const outcome =
+      attack.outcome === "crit" ? "crit" : attack.outcome === "miss" || attack.outcome === "fumble" ? "miss" : "hit";
+    if (!announceAttack(attack, { attackerId, targetId: attack.targetId, outcome })) return;
+    // A critical hit flashes its result card white for two frames.
+    const card = line.current?.closest(".action-result");
+    if (outcome === "crit" && card) flash(card);
+  }, [attack, attackerId]);
   const rolled = (attack.bonusDice ?? []).filter((entry) => entry.total !== null);
   const pending = pendingBonusDice(attack)
     .map((entry) => ` ${entry.dice.startsWith("-") ? "-" : "+"} ${entry.dice.replace(/^-/, "")} ${entry.label}`)
     .join("");
   const inTotal = rolled.map((entry) => `${entry.label} ${entry.total! < 0 ? "" : "+"}${entry.total}`).join(", ");
   return (
-    <p className={`action-outcome outcome-${attack.outcome}`}>
+    <p ref={line} className={`action-outcome outcome-${attack.outcome}`}>
       {attack.total}
       {pending}
       {inTotal !== "" ? ` (${inTotal})` : ""}

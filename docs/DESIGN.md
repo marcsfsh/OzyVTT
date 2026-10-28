@@ -354,7 +354,10 @@ with every moment and the phase that builds it, and the approved mockup are in `
 Light presents state that has arrived from the server, and only what the viewer's projection already holds. It never
 plays on first mount, and `canMove()` holds it while a whole snapshot lands (a connect, a reconnect, a switch of
 encounter). On a new turn the sun frame slides to the next tile over 200 ms and the turn order scrolls it into view.
-A life bar's lost segments flash white once (two frames) when damage lands, ahead of the light along the bar.
+A life bar's lost segments flash white once (two frames) when damage lands, ahead of the light along the bar. A damage
+number rises from the token 20 ms after the burst and is gone by 900 ms, the one exception to the 500 ms rule, because
+it is a value to read. It shows only where the viewer already holds the creature's exact hit points; elsewhere the
+burst plays with no number, and healing never shows one.
 
 | Token             | Value                            | Used for                                  |
 | ----------------- | -------------------------------- | ----------------------------------------- |
