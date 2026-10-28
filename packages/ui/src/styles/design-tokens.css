@@ -433,15 +433,63 @@
      keep their visual weight and grow the area with `.tap-target`. */
   --tap-min: 44px;
 
-  /* Motion: quick and one-shot, 120 to 200 ms, ease-out. Nothing loops, pulses or waits on an animation, and under
-     prefers-reduced-motion every one of these is instant. */
+  /* Motion (Light rail, ADR-0045): content starts fading in within 60 ms and is complete within 300 ms; the light
+     around it ends within 500 ms, or 700 ms for a sequence that lights several things in order. Nothing loops,
+     pulses or waits on an animation, and under prefers-reduced-motion every one of these is instant. */
   --ease-settle: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-drawer: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-travel: cubic-bezier(0.45, 0, 0.25, 1); /* the comet: slow to start, slow to stop */
   --dur-press: 120ms; /* transform on press                   */
   --dur-hover: 140ms; /* color/bg/border/shadow, glow on-off */
   --dur-base: 200ms; /* popovers, the sun frame's slide      */
-  --dur-enter: 120ms; /* tabs and panels fading in           */
-  --dur-count: 300ms; /* the table screen's roll count-up    */
+  --dur-enter: 120ms; /* panels and popovers fading in       */
+  --dur-count: 300ms; /* a roll's total counting up          */
+  --dur-drain: 130ms; /* the old place letting go            */
+  --dur-comet: 230ms; /* the trip, whatever the distance     */
+  --dur-fill: 140ms; /* the new place lighting              */
+  --dur-burst: 200ms; /* the flash on arrival                */
+  --dur-wash: 260ms; /* light falling onto what changed     */
+  --dur-content: 200ms; /* the content fade                    */
+  --delay-content: 60ms; /* when the content fade starts        */
+  --delay-fill: 170ms; /* when the new place starts to fill   */
+  --delay-burst: 210ms; /* when the burst lands                */
+  --delay-wash: 200ms; /* when the wash starts                */
+
+  /* The light (styles/light-rail.css draws it). Dusk lights with white over dark lines. The wash is the horizon's
+     colours falling onto what changed, screened over the glass. */
+  --spark: #ffffff;
+  --spark-tail: rgba(255, 214, 234, 0.55);
+  --spark-glow: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 10px rgba(255, 47, 146, 0.65));
+  --gold-head: #fff4c2;
+  --gold-tail: rgba(255, 213, 77, 0.65);
+  --cyan-head: #e6fbff;
+  --cyan-tail: rgba(79, 227, 255, 0.6);
+  --red-head: #ffe1de;
+  --red-tail: rgba(255, 93, 80, 0.6);
+  --wash-strength: 0.24;
+  --wash-blend: screen;
+  /* The wash's mask stops: read only for their alpha, the same in both themes. */
+  --wash-mask-core: #000;
+  --wash-mask-mid: rgba(0, 0, 0, 0.45);
+  --flash: #ffffff;
+  /* A line that waits on someone: grey and unlit until it resolves. */
+  --unlit: rgba(255, 255, 255, 0.16);
+  /* The ink under a chosen tab. */
+  --ink-glow: 0 0 8px rgba(43, 228, 255, 0.7);
+  /* Chroma settle: a condition chip arrives on a pink and cyan split that settles; the -0 twins are its rest. */
+  --split-cyan: rgba(43, 228, 255, 0.6);
+  --split-pink: rgba(255, 47, 146, 0.6);
+  --split-cyan-0: rgba(43, 228, 255, 0);
+  --split-pink-0: rgba(255, 47, 146, 0);
+  /* Chrome catch: one sweep of the horizon's colours across YOUR TURN. */
+  --sheen-a: #4fe3ff;
+  --sheen-b: #bb90ff;
+  --sheen-c: #ff5fae;
+  --sheen-d: #ffb35c;
+  /* A lamp, pip or use holding its colour for a moment as it cools. */
+  --lamp-afterglow: 0 0 18px 4px rgba(255, 47, 146, 0.9);
+  --pip-afterglow: 0 0 14px 3px rgba(122, 162, 255, 0.85);
+  --use-afterglow: 0 0 14px 3px rgba(79, 227, 255, 0.8);
 
   /* Focus ring: the --focus-ring colour, under the name its callers use. */
   --focus-ring-color: var(--focus-ring);
@@ -549,6 +597,33 @@
   --vcr-glow: 0 0 #0000;
   --glow-tab-text: 0 0 #0000;
 
+  /* The light on paper: no glow, a saturated comet head that reads on pale surfaces, and a wash half as strong that
+     multiplies. */
+  --spark: #e0408a;
+  --spark-tail: rgba(154, 92, 255, 0.5);
+  --spark-glow: drop-shadow(0 0 0 transparent);
+  --gold-head: #b86a12;
+  --gold-tail: rgba(217, 164, 58, 0.6);
+  --cyan-head: #1d6a80;
+  --cyan-tail: rgba(42, 143, 168, 0.55);
+  --red-head: #b8263a;
+  --red-tail: rgba(217, 73, 63, 0.55);
+  --wash-strength: 0.14;
+  --wash-blend: multiply;
+  --unlit: #d3ccdc;
+  --ink-glow: 0 0 #0000;
+  --split-cyan: rgba(42, 143, 168, 0.45);
+  --split-pink: rgba(240, 85, 155, 0.45);
+  --split-cyan-0: rgba(42, 143, 168, 0);
+  --split-pink-0: rgba(240, 85, 155, 0);
+  --sheen-a: #2a8fa8;
+  --sheen-b: #8a62d6;
+  --sheen-c: #e0408a;
+  --sheen-d: #d07a1f;
+  --lamp-afterglow: 0 0 0 3px rgba(240, 85, 155, 0.45);
+  --pip-afterglow: 0 0 0 3px rgba(74, 114, 217, 0.4);
+  --use-afterglow: 0 0 0 3px rgba(42, 143, 168, 0.4);
+
   --track-edge: var(--line-raised);
   --tab-on: linear-gradient(#fbfafc, #fbfafc);
 
@@ -616,6 +691,10 @@
   --glow-lamp-reaction: 0 0 #0000;
   --vcr-glow: 0 0 #0000;
   --glow-tab-text: 0 0 #0000;
+  /* The light keeps its flat colour: no glow around a comet or burst, and no wash. */
+  --spark-glow: drop-shadow(0 0 0 transparent);
+  --wash-strength: 0;
+  --ink-glow: 0 0 #0000;
 }
 
 /* A browser that can't blur what is behind a panel gets the solid surfaces too. */

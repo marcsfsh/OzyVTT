@@ -5,7 +5,7 @@
  */
 import type { Page } from "@playwright/test";
 import { contrastRatio, luminance, parseColour, type Rgb } from "../packages/ui/src/theme/colour";
-import { expect, test } from "./smoke";
+import { expect, settleLight, test } from "./smoke";
 
 const INKS = ["--text", "--text-dim", "--text-muted", "--magenta-text", "--cyan-hi", "--hp-text"] as const;
 
@@ -63,6 +63,7 @@ async function floatPlates(page: Page) {
     }
   }, PROBES);
   await page.waitForTimeout(100);
+  await settleLight(page);
 }
 
 /** The lightest and darkest pixels in a region of the screenshot, as the screen shows them. */

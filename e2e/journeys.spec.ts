@@ -24,6 +24,7 @@ import {
   playerSection,
   positionOf,
   press,
+  settleLight,
   signInAsGm,
   stageFight,
   test,
@@ -917,4 +918,32 @@ test("a player packs a thing into a container from the Gear tab and sees what it
   await sheet.getByRole("combobox", { name: "Where the Spare Rope is" }).selectOption("");
   await press(sheet.getByRole("button", { name: "Back", exact: true }));
   await expect(sheet.getByRole("list", { name: "In the Old Backpack" })).toBeHidden();
+});
+
+test("the light runs as the GM changes sections and tabs, and leaves nothing behind", async ({ open, request }) => {
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  // Motion on, whatever the machine running the suite prefers: this journey is about the light.
+  await gm.emulateMedia({ reducedMotion: "no-preference" });
+  const errors: string[] = [];
+  gm.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  await signInAsGm(gm);
+
+  for (const name of ["Prep", "Codex", "Compendium", "Play"] as const) {
+    await press(gmSection(gm, name));
+    await expect(gmSection(gm, name)).toHaveAttribute("aria-selected", "true");
+  }
+  for (const name of ["Party", "Maps", "Encounters"]) await openGmSection(gm, name);
+  await press(gmSection(gm, "Play"));
+  const panel = gm.getByRole("tablist", { name: "The table" });
+  for (const name of ["Log", "Party", "Notes", "Encounter"]) {
+    await press(panel.getByRole("tab", { name, exact: true }));
+    await expect(panel.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true");
+  }
+
+  await settleLight(gm);
+  expect(await gm.locator('[class^="lr-"], [class*=" lr-"]').count(), "Light rail parts left on the page").toBe(0);
+  expect(errors, "console errors").toEqual([]);
 });

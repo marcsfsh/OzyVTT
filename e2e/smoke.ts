@@ -180,6 +180,26 @@ export async function expectTokenUncovered(page: Page, tokenId: string) {
 }
 
 /**
+ * Waits until the light has finished: no script-driven animation is running and no Light rail part is on the page
+ * (ADR-0045). CSS animations are the page's own and are left alone. A pixel sample taken after this reads the page at
+ * rest, with no wash in flight.
+ */
+export async function settleLight(page: Page) {
+  await page.waitForFunction(
+    () =>
+      document.querySelector(".lr-part") === null &&
+      document
+        .getAnimations()
+        .every(
+          (animation) =>
+            animation instanceof CSSAnimation || animation instanceof CSSTransition || animation.playState !== "running"
+        ),
+    undefined,
+    { timeout: 5_000 }
+  );
+}
+
+/**
  * Sets the GM password from loopback unless the first journey already did (409), so any journey can
  * run on its own with `--grep`. Players cannot join before it is set.
  */

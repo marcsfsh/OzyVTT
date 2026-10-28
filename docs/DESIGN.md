@@ -325,12 +325,49 @@ from the mockups.
 
 ## Motion
 
-- Changes are quick and one-shot: 120 to 200 ms, ease-out. Nothing loops, pulses or waits on an animation.
-- Tabs and panels fade in over 120 ms.
-- On a new turn the sun frame slides to the next tile over 200 ms, and the turn order scrolls it into view.
-- A life bar's lost segments flash white once (two frames) when damage lands.
-- On the table screen only, a roll's total counts up over 300 ms.
-- Under `prefers-reduced-motion` every one of these is instant.
+Light rail ([ADR-0045](adr/0045-light-rail-motion.md)) is the one motion language for change. The engine is
+`packages/ui/src/motion/lightRail.ts` and the parts are drawn by `packages/ui/src/styles/light-rail.css`. The ADR lists
+the moments and the phases that build them; a surface whose moment is not built yet keeps the motion it has.
+
+1. Light travels from the old place to the new one. It drains out of the old place, runs as one comet, bursts and
+   fills where it lands. A wash is optional.
+2. Light rides lines that are already there: the horizon, a tab strip's edge, the top edge of a surface, a bar or a
+   rail of pips. A line is never added for the light alone.
+3. Content never waits. It starts fading in within 60 ms and is complete within 300 ms. The light around it ends
+   within 500 ms. A sequence that lights several things in order, like a long rest or the start of an encounter, may
+   run to 700 ms.
+4. One pass per change. Light never loops or pulses. A moment plays again only when the thing happens again.
+5. The page itself only fades. Light lives in bars, strips and overlays, so the pane keeps its no-transform rule and
+   fixed overlays stay put. A wash in the pane animates opacity alone.
+6. Waiting is still. Something waiting on a person shows WAIT on a grey, unlit line (`--unlit`) and doesn't move.
+   When it resolves, light runs along that line.
+7. Lists that reorder slide. When items change places, each slides from where it was in 240 ms, and light runs along
+   the rail between the old place and the new one.
+8. Each 80s element keeps its job. Status uses its own lines, and chrome lettering catches light only when it names
+   who is acting (YOUR TURN). A condition chip arriving and concentration breaking are the only places for the pink
+   and cyan split.
+9. Dawn has no glow. The burst is a flash on the line, and the wash is half as strong.
+10. Reduced motion skips the light, and content swaps instantly. Reduced transparency drops the wash and the glow.
+
+Light presents state that has arrived from the server, and only what the viewer's projection already holds. It never
+plays on first mount, and `canMove()` holds it while a whole snapshot lands (a connect, a reconnect, a switch of
+encounter). On a new turn the sun frame slides to the next tile over 200 ms and the turn order scrolls it into view.
+A life bar's lost segments flash white once (two frames) when damage lands, ahead of the light along the bar.
+
+| Token             | Value                            | Used for                                  |
+| ----------------- | -------------------------------- | ----------------------------------------- |
+| `--dur-drain`     | 130 ms                           | The old place letting go                  |
+| `--dur-comet`     | 230 ms                           | The trip, whatever the distance           |
+| `--dur-fill`      | 140 ms                           | The new place lighting                    |
+| `--dur-burst`     | 200 ms                           | The flash on arrival                      |
+| `--dur-wash`      | 260 ms                           | Light falling onto what changed           |
+| `--dur-content`   | 200 ms                           | The content fade                          |
+| `--delay-content` | 60 ms                            | When the content fade starts              |
+| `--delay-fill`    | 170 ms                           | When the new place starts to fill         |
+| `--delay-burst`   | 210 ms                           | When the burst lands                      |
+| `--delay-wash`    | 200 ms                           | When the wash starts                      |
+| `--dur-count`     | 300 ms                           | A roll's total counting up                |
+| `--ease-travel`   | `cubic-bezier(0.45, 0, 0.25, 1)` | The comet, slow to start and slow to stop |
 
 ## Page patterns
 
@@ -415,8 +452,8 @@ mouse is a bug.
   iOS zooms the page into a focused field with smaller text. The floor in `design-tokens.css` sees to it, so a
   field's own rule may stay smaller for a laptop.
 - A focused input inside a locked region must stay visible above the on-screen keyboard.
-- `prefers-reduced-motion` freezes animations; reduced transparency replaces blur with a solid
-  surface.
+- `prefers-reduced-motion` freezes animations and skips the light; reduced transparency replaces
+  blur with a solid surface.
 
 ## Writing
 

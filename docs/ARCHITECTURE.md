@@ -1194,6 +1194,14 @@ the standalone sheet's `ThemeSwitch` share `useTheme`, which hears every change 
 while it is on, `<html data-transparency="reduced">` turns the glass tokens solid and drops the scanlines and glows. The
 same script sets it before first paint, and each entry calls `initTransparency` to follow the system after that.
 
+Motion is Light rail (ADR-0045), in `packages/ui/src/motion/`. `lightRail.ts` is the engine: each part (a comet, a
+burst, a wash, a fill) reads its timing from the tokens, draws a throwaway `.lr-part` styled by `styles/light-rail.css`
+and removes it when it ends. `useOnChange` runs a moment after a render that changed a value, never on the first.
+`canMove()` is the one guard: it is false under reduced motion, without the Web Animations API (so in jsdom), while the
+page is hidden and while the motion gate is held. `useSession` holds the gate from a connect or reconnect until one
+frame after the first snapshot has rendered, across a switch of encounter or map, and for a frame when the tab comes
+back; the sheet window holds it on connect the same way.
+
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map
 library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets

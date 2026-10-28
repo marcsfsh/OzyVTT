@@ -22,6 +22,49 @@ export {
   type Rgba
 } from "./theme/colour";
 
+/* Motion: Light rail (ADR-0045), its gate and the hooks that run it after a change */
+export {
+  COMET_MAX,
+  COMET_MAX_SCREEN,
+  EASE,
+  LIGHT_TIMING,
+  TIMING_TOKENS,
+  burst,
+  canMove,
+  clearLight,
+  comet,
+  cometPath,
+  cool,
+  countUp,
+  drain,
+  fadeIn,
+  fadeOut,
+  fill,
+  flip,
+  flipDelta,
+  flipFrom,
+  floatText,
+  lightLine,
+  lightTiming,
+  parseDuration,
+  pop,
+  px,
+  rel,
+  rollTo,
+  sheen,
+  splitIn,
+  splitOut,
+  stripSwitch,
+  warm,
+  wash,
+  type Axis,
+  type Box,
+  type LightTiming,
+  type Tone
+} from "./motion/lightRail";
+export { holdMotion, motionReleased, releaseMotion } from "./motion/gate";
+export { useOnChange, usePrevious } from "./motion/hooks";
+
 /* Primitives */
 export { cx } from "./primitives/util";
 export { Button, IconButton } from "./primitives/Button";

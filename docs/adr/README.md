@@ -45,6 +45,7 @@
 | [042](0042-characters-played-at-the-table.md)   | Accepted                                       | Characters played at the table: a GM-only mark on the character, changeable per encounter, that sends its prompts to the GM and refuses claims                                                                |
 | [043](0043-player-dice-modes.md)                | Accepted                                       | Players' dice: total, die only or the app rolls, set apart for d20 rolls and damage, with a table default and an encounter override                                                                           |
 | [044](0044-sheet-actions-in-the-encounter.md)   | Accepted                                       | The sheet's Actions tab by cost, resolved in the running encounter, with a GM setting for who picks the target                                                                                                |
+| [045](0045-light-rail-motion.md)                | Accepted                                       | Light rail: one motion language for change, where light runs along lines already on screen; content fades in within 300 ms and the light ends within 500 ms                                                   |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 

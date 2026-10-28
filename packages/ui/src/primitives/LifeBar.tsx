@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import { useOnChange } from "../motion/hooks";
 import { cx } from "./util";
 import "./LifeBar.css";
 
@@ -72,12 +73,9 @@ function ExactLifeBar({
 
 /** True for two frames after current hit points fall, so the lost segments flash white once. */
 function useDamageFlash(current: number): boolean {
-  const previous = useRef(current);
   const [hit, setHit] = useState(false);
-  useEffect(() => {
-    const fell = current < previous.current;
-    previous.current = current;
-    if (!fell) return;
+  useOnChange(current, (before, now) => {
+    if (now >= before) return;
     setHit(true);
     let second = 0;
     const first = requestAnimationFrame(() => {
@@ -87,6 +85,6 @@ function useDamageFlash(current: number): boolean {
       cancelAnimationFrame(first);
       cancelAnimationFrame(second);
     };
-  }, [current]);
+  });
   return hit;
 }
