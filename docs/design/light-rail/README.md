@@ -3,6 +3,7 @@
 This folder is the handoff as it arrived, committed on 2026-10-28 at the owner's request so later work can find it:
 `docs/design/light-rail/` in the repository. ADR-0045 records the decision and the Motion section of `docs/DESIGN.md`
 holds the rules. Paths below are relative to this folder. ESLint and Prettier skip it, so it stays as written.
+The Horizon update that followed (ADR-0046: the Cup primary, Chakra Petch titles and Horizon light) is in `horizon/`.
 
 Everything a new session needs to build Light rail, the motion system the user chose for OzyVTT.
 

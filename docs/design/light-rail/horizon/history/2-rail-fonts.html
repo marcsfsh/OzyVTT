@@ -1,0 +1,883 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body><title>OzyVTT Display Fonts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;600;700&family=Bungee&family=Chakra+Petch:wght@600&family=Michroma&family=Orbitron:wght@700&family=Rajdhani:wght@700&family=VT323&display=swap">
+<style>
+/* Layout: the app's own glass over its dusk sky. The Rail button is fixed; a sticky switcher picks the face that
+   replaces plain Bungee (the button's label and the titles), and everything marked to follow repaints. Chrome
+   lettering keeps Bungee. Dusk is :root, Dawn the light override. */
+:root {
+  color-scheme: dark;
+  --sky: radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%), linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%);
+  --ground: #1b1d33;
+  --bg: #151728;
+  --void: #131524;
+  --s1: #1b1e31;
+  --s2: #25283f;
+  --s3: #2b2f49;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-raised: rgba(255, 255, 255, 0.2);
+  --line-raised-hover: rgba(255, 255, 255, 0.32);
+  --text: #eef0f8;
+  --text-dim: #c3c7d9;
+  --text-muted: #b0b4ca;
+  --magenta: #ff2f92;
+  --cyan: #4fe3ff;
+  --cyan-hi: #6fe8ff;
+  --party: #7aa2ff;
+  --hp: #ffd54d;
+  --hp-text: #ffd54d;
+  --state-on-edge: #4fe3ff;
+  --focus-ring: #4fe3ff;
+  --tab-on: #353a55;
+  --grad-horizon: linear-gradient(90deg, #4fe3ff 0%, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d 100%);
+  --grad-chrome: linear-gradient(180deg, #eaf8ff 0%, #9fdcff 42%, #ffffff 49%, #3b2163 51%, #ff5fae 75%, #ffd6ea 100%);
+  --chrome-split: -1.5px 0 rgba(43, 228, 255, 0.55), 1.5px 0 rgba(255, 47, 146, 0.55);
+  --glow-action: 0 0 10px rgba(255, 47, 146, 0.85);
+  --glow-bonus: 0 0 10px rgba(255, 210, 63, 0.8);
+  --glow-reaction: 0 0 10px rgba(43, 228, 255, 0.8);
+  --glow-on: 0 0 8px rgba(43, 228, 255, 0.7);
+
+  /* Rail */
+  --rail-line: #ff2f92;
+  --rail-line-hover: #ff6bb0;
+  --rail-line-glow: 0 0 8px rgba(255, 47, 146, 0.9);
+  --rail-cast: linear-gradient(to top, rgba(255, 47, 146, 0.22), rgba(255, 47, 146, 0) 70%);
+  --rail-cast-hover: linear-gradient(to top, rgba(255, 47, 146, 0.34), rgba(255, 47, 146, 0) 80%);
+  --rail-head: #ffffff;
+
+  --f-display: "Bungee", "Arial Black", system-ui, sans-serif;
+  --f-label: "Bai Jamjuree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num: "VT323", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --sky: #ebe7ef;
+    --ground: #ebe7ef;
+    --bg: #ebe7ef;
+    --void: #e3dee8;
+    --s1: #f3f0f5;
+    --s2: #f7f5f9;
+    --s3: #e8e3ee;
+    --line: #e0dbe6;
+    --line-strong: #d3ccdc;
+    --line-raised: #b9b0c8;
+    --line-raised-hover: #9c92ae;
+    --text: #2a2537;
+    --text-dim: #4f4862;
+    --text-muted: #655d77;
+    --magenta: #f0559b;
+    --cyan: #2a8fa8;
+    --cyan-hi: #1d6a80;
+    --party: #4a72d9;
+    --hp: #d9a43a;
+    --hp-text: #7a5718;
+    --state-on-edge: #1d6a80;
+    --focus-ring: #1d6a80;
+    --tab-on: #fbfafc;
+    --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+    --grad-chrome: linear-gradient(#2a2537, #2a2537);
+    --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+    --glow-action: 0 0 #0000;
+    --glow-bonus: 0 0 #0000;
+    --glow-reaction: 0 0 #0000;
+    --glow-on: 0 0 #0000;
+    --rail-line: #b0306e;
+    --rail-line-hover: #c4166f;
+    --rail-line-glow: 0 0 #0000;
+    --rail-cast: linear-gradient(to top, rgba(240, 85, 155, 0.14), rgba(240, 85, 155, 0) 70%);
+    --rail-cast-hover: linear-gradient(to top, rgba(240, 85, 155, 0.24), rgba(240, 85, 155, 0) 80%);
+    --rail-head: #f0559b;
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --sky: #ebe7ef;
+  --ground: #ebe7ef;
+  --bg: #ebe7ef;
+  --void: #e3dee8;
+  --s1: #f3f0f5;
+  --s2: #f7f5f9;
+  --s3: #e8e3ee;
+  --line: #e0dbe6;
+  --line-strong: #d3ccdc;
+  --line-raised: #b9b0c8;
+  --line-raised-hover: #9c92ae;
+  --text: #2a2537;
+  --text-dim: #4f4862;
+  --text-muted: #655d77;
+  --magenta: #f0559b;
+  --cyan: #2a8fa8;
+  --cyan-hi: #1d6a80;
+  --party: #4a72d9;
+  --hp: #d9a43a;
+  --hp-text: #7a5718;
+  --state-on-edge: #1d6a80;
+  --focus-ring: #1d6a80;
+  --tab-on: #fbfafc;
+  --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+  --grad-chrome: linear-gradient(#2a2537, #2a2537);
+  --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+  --glow-action: 0 0 #0000;
+  --glow-bonus: 0 0 #0000;
+  --glow-reaction: 0 0 #0000;
+  --glow-on: 0 0 #0000;
+  --rail-line: #b0306e;
+  --rail-line-hover: #c4166f;
+  --rail-line-glow: 0 0 #0000;
+  --rail-cast: linear-gradient(to top, rgba(240, 85, 155, 0.14), rgba(240, 85, 155, 0) 70%);
+  --rail-cast-hover: linear-gradient(to top, rgba(240, 85, 155, 0.24), rgba(240, 85, 155, 0) 80%);
+  --rail-head: #f0559b;
+}
+
+/* The five faces and today's, each sized so its capitals stand as tall as Bungee's: --bs is the button size, --ts
+   the factor titles take against their Bungee size. */
+.f-bungee { --bf: "Bungee", "Arial Black", sans-serif; --bw: 400; --bs: 16px; --bt: 0.04em; --ts: 1; }
+.f-bai { --bf: "Bai Jamjuree", system-ui, sans-serif; --bw: 700; --bs: 16px; --bt: 0.1em; --ts: 1.03; }
+.f-chakra { --bf: "Chakra Petch", "Bai Jamjuree", system-ui, sans-serif; --bw: 600; --bs: 16px; --bt: 0.08em; --ts: 1.03; }
+.f-orbitron { --bf: "Orbitron", "Bai Jamjuree", system-ui, sans-serif; --bw: 700; --bs: 15px; --bt: 0.06em; --ts: 0.96; }
+.f-michroma { --bf: "Michroma", "Bai Jamjuree", system-ui, sans-serif; --bw: 400; --bs: 14px; --bt: 0.04em; --ts: 0.88; }
+.f-rajdhani { --bf: "Rajdhani", "Bai Jamjuree", system-ui, sans-serif; --bw: 700; --bs: 18px; --bt: 0.08em; --ts: 1.1; }
+/* A title in the chosen face. Chrome lettering never takes this class. */
+.ttl { font-family: var(--bf); font-weight: var(--bw); text-transform: uppercase; letter-spacing: 0.03em; }
+
+html { background: var(--ground); }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--sky);
+  background-color: var(--ground);
+  background-attachment: fixed;
+  color: var(--text);
+  font: 400 15px/1.5 var(--f-label);
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--bg);
+}
+.wrap {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.disp { font-family: var(--f-display); font-weight: 400; letter-spacing: 0.02em; }
+.vt { font-family: var(--f-num); font-size: 20px; line-height: 1; letter-spacing: 0.04em; }
+.eyebrow {
+  margin: 0;
+  font: 600 11px/1.2 var(--f-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.horizon { height: 2px; background: var(--grad-horizon); }
+
+/* ---- Page header ---- */
+.page-head { padding-block: 28px 20px; display: grid; gap: 10px; }
+.page-head h1 { margin: 0; font-size: calc(clamp(24px, 4vw, 34px) * var(--ts, 1)); line-height: 1.1; text-wrap: balance; }
+.page-head p { margin: 0; max-width: 64ch; color: var(--text-dim); }
+.seg.head-theme { display: none; justify-self: start; }
+@media (max-width: 760px) { .seg.head-theme { display: inline-flex; } }
+
+/* ---- Sticky switcher ---- */
+.switch-bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line-strong);
+}
+.switch-row { display: flex; align-items: center; gap: 8px 16px; padding-block: 8px; }
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+}
+.seg button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 14px/1 var(--f-label);
+  cursor: pointer;
+}
+.seg button svg { width: 14px; height: 14px; flex: none; }
+.seg button:hover { color: var(--text); background: color-mix(in srgb, var(--s2) 70%, transparent); }
+.seg button[aria-pressed="true"] { color: var(--text); background: var(--tab-on); box-shadow: inset 0 -2px 0 var(--state-on-edge); }
+.seg button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; z-index: 1; }
+.font-seg { flex: 1 1 auto; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.font-seg button { padding: 0 6px; font-family: var(--bf); font-weight: var(--bw); font-size: calc(var(--bs) * 0.82); letter-spacing: 0.02em; white-space: nowrap; }
+.theme-seg button { min-width: 64px; }
+.bar-theme { flex: none; }
+@media (max-width: 760px) {
+  .font-seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bar-theme { display: none; }
+}
+@media (any-pointer: coarse) { .seg button { min-height: 44px; } }
+
+/* ---- Sections ---- */
+main { display: grid; gap: 36px; padding-block: 24px 56px; }
+section { display: grid; gap: 14px; min-width: 0; }
+.sec-head { display: grid; gap: 4px; }
+.sec-head h2 { margin: 0; font-size: 18px; line-height: 1.2; }
+.sec-head p { margin: 0; color: var(--text-muted); font-size: 14px; max-width: 70ch; }
+
+/* Side by side */
+.compare { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 849px) { .compare { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .compare { grid-template-columns: minmax(0, 1fr); } }
+.cmp {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 12px;
+  padding: 14px 14px 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--s1);
+  min-width: 0;
+}
+.cmp.is-on { border-color: var(--state-on-edge); box-shadow: inset 0 -2px 0 var(--state-on-edge); }
+.cmp-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.cmp-name { margin: 0; font-family: var(--bf); font-weight: var(--bw); font-size: calc(var(--bs) * 1.05); letter-spacing: 0.02em; line-height: 1.1; }
+.cmp-title { margin: 0; font-size: calc(20px * var(--ts)); line-height: 1.1; color: var(--text); }
+.cmp-stage { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; padding-block: 10px; min-height: 76px; }
+.cmp-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cmp .width { margin: 0; font-size: 12px; color: var(--text-muted); }
+.cmp .width b { font: 400 17px/1 var(--f-num); color: var(--text-dim); }
+.cmp .pick {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--cyan-hi);
+  font: 600 14px/1 var(--f-label);
+  cursor: pointer;
+}
+.cmp .pick:hover { text-decoration: underline; text-underline-offset: 3px; }
+.cmp .pick:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cmp.is-on .pick { color: var(--text-muted); cursor: default; text-decoration: none; }
+
+/* The face */
+.idea {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 20px 32px;
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  background: var(--s1);
+}
+@media (max-width: 760px) { .idea { grid-template-columns: minmax(0, 1fr); padding: 16px; } }
+.idea h2 { margin: 0 0 8px; font-family: var(--bf); font-weight: var(--bw); font-size: calc(var(--bs) * 1.6); letter-spacing: 0.02em; line-height: 1.1; }
+.idea p { margin: 0; max-width: 62ch; color: var(--text-dim); }
+.idea .side { display: grid; gap: 6px; align-content: start; }
+.idea .side p { font-size: 14px; }
+.specimen {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-family: var(--bf);
+  font-weight: var(--bw);
+  letter-spacing: var(--bt);
+  text-transform: uppercase;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.specimen .title { font-size: calc(30px * var(--ts)); line-height: 1.15; letter-spacing: 0.03em; }
+.specimen .big { font-size: calc(var(--bs) * 1.4); line-height: 1.3; }
+.specimen .small { font-size: var(--bs); line-height: 1.4; color: var(--text-dim); }
+
+/* States */
+.states { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 979px) { .states { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .states { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .state { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 10px 12px; }
+}
+.state {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 14px 10px 16px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--s1) 70%, transparent);
+}
+.state .eyebrow { justify-self: start; }
+
+/* ---- In the app ---- */
+.scenes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.scenes .wide { grid-column: 1 / -1; }
+@media (max-width: 979px) {
+  .scenes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scenes .phone-wrap { grid-column: 1 / -1; }
+}
+@media (max-width: 650px) { .scenes { grid-template-columns: minmax(0, 1fr); } }
+.scene-wrap { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.scene-wrap .where { margin: 0; font-size: 13px; color: var(--text-muted); }
+.scene { position: relative; border: 1px solid var(--line-strong); background: var(--s1); min-width: 0; }
+
+.mbar { display: flex; align-items: center; gap: 18px; min-height: 48px; padding: 0 12px 0 16px; background: var(--bg); }
+.brand { font-size: 17px; background: var(--grad-chrome); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: var(--chrome-split); }
+.mtabs { display: flex; align-self: stretch; }
+.mtabs span { display: grid; place-items: center; padding: 0 14px; font: 600 14px/1 var(--f-label); color: var(--text-dim); }
+.mtabs span.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--state-on-edge); background: color-mix(in srgb, var(--tab-on) 60%, transparent); }
+.mbar-end { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--text-dim); font: 600 13px/1 var(--f-label); }
+.mbar-end .vt { color: var(--text); font-size: 19px; }
+.ibtn { display: grid; place-items: center; width: 40px; height: 40px; color: var(--text-dim); }
+.ibtn svg { width: 19px; height: 19px; }
+.lamp { width: 14px; height: 14px; background: var(--cyan); box-shadow: var(--glow-on); }
+@media (max-width: 760px) { .mtabs { display: none; } }
+@media (max-width: 560px) { .ts-label { display: none; } }
+.mhead { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 18px 16px 10px; }
+.mhead h3 { margin: 0; font-size: calc(22px * var(--ts)); line-height: 1; }
+.mlist { display: grid; padding: 0 16px 16px; }
+.mrow { display: flex; align-items: center; gap: 12px; min-height: 48px; border-top: 1px solid var(--line); }
+.mrow .nm { font-weight: 600; }
+.mrow .kind { color: var(--text-muted); font-size: 13px; }
+.tag { margin-left: auto; padding: 2px 6px 1px; border: 1px solid var(--hp); color: var(--hp-text); font: 400 16px/1 var(--f-num); letter-spacing: 0.06em; }
+
+.mtool { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.mtool .grow { flex: 1; }
+.mpub { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 18px 16px 4px; }
+.mpub .seg button { padding: 0 12px; }
+.hint { margin: 0; padding: 8px 16px 18px; font-size: 13px; color: var(--text-muted); }
+
+.turn { display: grid; gap: 16px; padding: 16px; }
+.turn-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.vcr { display: inline-flex; gap: 10px; padding: 4px 8px; border: 1px solid var(--line-raised); background: var(--void); color: var(--cyan-hi); }
+.your-turn { font-size: 20px; background: var(--grad-chrome); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: var(--chrome-split); }
+.lamps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.lampbox { display: grid; gap: 6px; justify-items: center; padding: 10px 4px 8px; border: 1px solid var(--line); background: var(--void); }
+.lampbox i { display: block; width: 24px; height: 24px; }
+.lampbox .l-action { background: var(--magenta); box-shadow: var(--glow-action); }
+.lampbox .l-bonus { background: var(--hp); box-shadow: var(--glow-bonus); }
+.lampbox .l-reaction { background: var(--cyan); box-shadow: var(--glow-reaction); }
+.lampbox .gauge { display: flex; gap: 3px; height: 24px; align-items: center; }
+.lampbox .gauge b { width: 6px; height: 16px; background: var(--text); }
+.lampbox .gauge b.off { background: var(--s3); }
+.lampbox span { font: 600 11px/1 var(--f-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+
+.dlg { display: grid; gap: 12px; padding: 18px 16px 16px; background: var(--s1); }
+.dlg::before { content: ""; position: absolute; inset: -1px -1px auto; height: 2px; background: var(--grad-horizon); }
+.dlg h3 { margin: 0; font-size: calc(18px * var(--ts)); line-height: 1.1; }
+.dlg p { margin: 0; color: var(--text-dim); }
+.dmg { display: flex; align-items: baseline; gap: 10px; }
+.dmg .vt { font-size: 40px; color: var(--hp-text); }
+.dmg span:last-child { color: var(--text-muted); font-size: 14px; }
+.dlg-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 4px; }
+.sbtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line-raised);
+  background: var(--s2);
+  color: var(--text);
+  font: 600 14px/1 var(--f-label);
+  cursor: pointer;
+}
+.sbtn:hover { background: var(--s3); border-color: var(--line-raised-hover); }
+.sbtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+
+.phone { display: grid; gap: 12px; padding: 18px 16px 16px; max-width: 380px; margin: 0 auto; }
+.phone h3 { margin: 0 0 2px; font-size: calc(18px * var(--ts)); line-height: 1.1; }
+.claim { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line-raised); background: var(--s2); }
+.claim.on { border-color: var(--state-on-edge); box-shadow: inset 0 -2px 0 var(--state-on-edge); }
+.claim .av { display: grid; place-items: center; width: 44px; height: 44px; border: 2px solid var(--party); background: var(--void); font-size: calc(18px * var(--ts)); line-height: 1; color: var(--text); }
+.claim .who { display: grid; gap: 2px; min-width: 0; }
+.claim .who b { font-weight: 600; }
+.claim .who span { color: var(--text-muted); font-size: 13px; }
+.claim .tag { border-color: var(--line-raised); color: var(--text-muted); }
+
+/* ---- What changes ---- */
+.changes { padding: 20px; border: 1px solid var(--line-strong); background: var(--s1); }
+.changes ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 80ch; color: var(--text-dim); }
+.changes code { font: 400 17px/1 var(--f-num); color: var(--cyan-hi); }
+@media (max-width: 560px) { .changes { padding: 16px; } }
+
+/* =========================================================================
+   The Rail button. Geometry and paint are fixed; the label's face comes from the f- class it carries.
+   ========================================================================= */
+.pbtn {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 26px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--bf);
+  font-weight: var(--bw);
+  font-size: var(--bs);
+  letter-spacing: var(--bt);
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pbtn svg { width: 16px; height: 16px; flex: none; }
+.pbtn.sm { min-height: 42px; padding: 0 18px; font-size: calc(var(--bs) * 0.875); }
+.pbtn.sm svg { width: 14px; height: 14px; }
+.pbtn.block { display: flex; width: 100%; }
+.pbtn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 1px solid var(--line-raised);
+  background: var(--rail-cast), var(--s2);
+  transition: background-color 140ms, border-color 140ms;
+}
+.pbtn::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--rail-line);
+  box-shadow: var(--rail-line-glow);
+  transition: background-color 140ms;
+}
+.pbtn:hover:not(:disabled)::before, .pbtn.is-hover::before { background: var(--rail-cast-hover), var(--s3); border-color: var(--line-raised-hover); }
+.pbtn:hover:not(:disabled)::after, .pbtn.is-hover::after { background: var(--rail-line-hover); }
+.pbtn:active:not(:disabled), .pbtn.is-press { transform: translateY(1px); }
+.pbtn.is-press::after { background: var(--rail-head); }
+.pbtn:focus-visible, .pbtn.is-focus { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+.pbtn .rail-fx-line {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  pointer-events: none;
+  background: var(--rail-head);
+  box-shadow: var(--rail-line-glow);
+}
+.pbtn .rail-fx-burst {
+  position: absolute;
+  bottom: 1px;
+  width: 44px;
+  height: 18px;
+  pointer-events: none;
+  background: radial-gradient(closest-side, var(--rail-head), color-mix(in srgb, var(--rail-line) 60%, transparent) 55%, transparent);
+}
+.pbtn:disabled { cursor: not-allowed; color: var(--text-muted); transform: none; }
+.pbtn:disabled::before { background: var(--s2); border-color: var(--line); }
+.pbtn:disabled::after { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .pbtn, .pbtn::before, .pbtn::after { transition: none; }
+}
+</style>
+
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; design options</p>
+  <h1 class="ttl" data-follow>Display fonts</h1>
+  <p>Five faces to replace Bungee wherever it's plain: the Rail button's label and the page, record and dialog titles. Bungee stays wherever the lettering is chrome, which is the OzyVTT wordmark, YOUR TURN and the acting creature's name. Each face is sized so its capitals stand as tall as Bungee's. Pick one above the page to see it everywhere.</p>
+  <div class="seg theme-seg head-theme" role="group" aria-label="Theme">
+    <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+    <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+  </div>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row">
+    <div class="seg font-seg" role="group" aria-label="Button face" id="font-seg">
+      <button type="button" class="f-bungee" data-f="bungee" aria-pressed="false">Bungee</button>
+      <button type="button" class="f-bai" data-f="bai" aria-pressed="false">Bai Jamjuree</button>
+      <button type="button" class="f-chakra" data-f="chakra" aria-pressed="true">Chakra Petch</button>
+      <button type="button" class="f-orbitron" data-f="orbitron" aria-pressed="false">Orbitron</button>
+      <button type="button" class="f-michroma" data-f="michroma" aria-pressed="false">Michroma</button>
+      <button type="button" class="f-rajdhani" data-f="rajdhani" aria-pressed="false">Rajdhani</button>
+    </div>
+    <div class="seg theme-seg bar-theme" role="group" aria-label="Theme">
+      <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+      <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+    </div>
+  </div>
+  <div class="horizon"></div>
+</div>
+
+<main class="wrap">
+  <section aria-labelledby="h-compare">
+    <div class="sec-head">
+      <h2 id="h-compare">Side by side</h2>
+      <p>A record title and two button labels in each face. The width line measures the longest primary label in the app, New encounter on this map, as a button.</p>
+    </div>
+    <div class="compare" id="compare"></div>
+  </section>
+
+  <section aria-labelledby="idea-name" class="idea" id="idea">
+    <div>
+      <p class="eyebrow" id="idea-eyebrow">The face</p>
+      <h2 id="idea-name">Chakra Petch</h2>
+      <p id="idea-text"></p>
+    </div>
+    <div class="side">
+      <p class="eyebrow">Watch for</p>
+      <p id="idea-watch"></p>
+    </div>
+    <div class="specimen" aria-hidden="true">
+      <span class="title">Bandit captain</span>
+      <span class="big">Make live &middot; End turn</span>
+      <span class="small">ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789</span>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-states">
+    <div class="sec-head">
+      <h2 id="h-states">States</h2>
+      <p>Held in each state so the label can be read in all of them.</p>
+    </div>
+    <div class="states">
+      <div class="state"><p class="eyebrow">Rest</p><button type="button" class="pbtn" data-follow tabindex="-1">Make live</button></div>
+      <div class="state"><p class="eyebrow">Hover</p><button type="button" class="pbtn is-hover" data-follow tabindex="-1">Make live</button></div>
+      <div class="state"><p class="eyebrow">Pressed</p><button type="button" class="pbtn is-press" data-follow tabindex="-1">Make live</button></div>
+      <div class="state"><p class="eyebrow">Keyboard focus</p><button type="button" class="pbtn is-focus" data-follow tabindex="-1">Make live</button></div>
+      <div class="state"><p class="eyebrow">Disabled</p><button type="button" class="pbtn" data-follow disabled>Make live</button></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-app">
+    <div class="sec-head">
+      <h2 id="h-app">In the app</h2>
+      <p>Five places the primary appears, drawn with the app's own tokens. Titles follow the face you pick; chrome lettering doesn't.</p>
+    </div>
+    <div class="scenes">
+      <div class="scene-wrap wide">
+        <p class="where">A section bar: the wordmark stays chrome Bungee, the page title and the small primary change</p>
+        <div class="scene">
+          <div class="mbar">
+            <span class="brand disp">OzyVTT</span>
+            <nav class="mtabs" aria-hidden="true"><span>Table</span><span>Codex</span><span>Compendium</span><span class="on">Homebrew</span></nav>
+            <div class="mbar-end">
+              <span class="ts-label">Table screen</span><span class="lamp" aria-hidden="true"></span><span class="vt">ON</span>
+              <span class="ibtn" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>
+              <span class="ibtn" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></span>
+            </div>
+          </div>
+          <div class="horizon"></div>
+          <div class="mhead">
+            <h3 class="ttl" data-follow>Homebrew</h3>
+            <button type="button" class="pbtn sm" data-follow><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>New homebrew</button>
+          </div>
+          <div class="mlist">
+            <div class="mrow"><span class="nm">Ember drake</span><span class="kind">Creature</span><span class="tag">HOMEBREW</span></div>
+            <div class="mrow"><span class="nm">Tidecaller's blade</span><span class="kind">Magic item</span><span class="tag">HOMEBREW</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene-wrap wide">
+        <p class="where">The homebrew editor, where Publish sits beside who can see it</p>
+        <div class="scene">
+          <div class="mtool">
+            <div class="seg" aria-hidden="true"><button type="button" tabindex="-1" aria-pressed="true">Steps</button><button type="button" tabindex="-1">All questions</button></div>
+            <span class="grow"></span>
+            <span class="ibtn" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></span>
+            <span class="ibtn" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+          </div>
+          <div class="mpub">
+            <div class="seg" aria-hidden="true">
+              <button type="button" tabindex="-1" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l18 18M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 9 6 9 6a16 16 0 0 1-2.6 3.2M6.2 7.6C4.1 9.3 3 12 3 12s4 6 9 6a8.6 8.6 0 0 0 4-1"/></svg>Hidden</button>
+              <button type="button" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12s4-6 9-6 9 6 9 6-4 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.5"/></svg>Everyone</button>
+              <button type="button" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 4-6 7-6s6 2 7 6"/></svg>Characters</button>
+            </div>
+            <button type="button" class="pbtn" data-follow>Publish</button>
+          </div>
+          <p class="hint">Publish it before you share it.</p>
+        </div>
+      </div>
+
+      <div class="scene-wrap">
+        <p class="where">The turn panel: YOUR TURN stays chrome Bungee</p>
+        <div class="scene">
+          <div class="turn">
+            <div class="turn-top">
+              <span class="your-turn disp">Your turn</span>
+              <span class="vcr vt"><span>PLAY</span><span>RND 03</span></span>
+            </div>
+            <div class="lamps" aria-hidden="true">
+              <div class="lampbox"><i class="l-action"></i><span>Action</span></div>
+              <div class="lampbox"><i class="l-bonus"></i><span>Bonus</span></div>
+              <div class="lampbox"><i class="l-reaction"></i><span>Reaction</span></div>
+              <div class="lampbox"><div class="gauge"><b></b><b></b><b></b><b></b><b class="off"></b><b class="off"></b></div><span>Move</span></div>
+            </div>
+            <button type="button" class="pbtn block" data-follow>End turn</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene-wrap">
+        <p class="where">A dialog, beside a secondary button</p>
+        <div class="scene dlg">
+          <h3 class="ttl" data-follow>Damage roll</h3>
+          <div class="dmg"><span class="vt">14</span><span>slashing</span></div>
+          <p>To the Bandit captain, who has 35 hit points left.</p>
+          <div class="dlg-actions">
+            <button type="button" class="sbtn">Never mind</button>
+            <button type="button" class="pbtn" data-follow>Send the damage</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene-wrap phone-wrap">
+        <p class="where">The join screen on a phone, full width</p>
+        <div class="scene">
+          <div class="phone">
+            <h3 class="ttl" data-follow>Who are you playing?</h3>
+            <div class="claim on"><span class="av ttl" data-follow>B</span><span class="who"><b>Borin</b><span>Dwarf fighter, level 3</span></span></div>
+            <div class="claim"><span class="av ttl" data-follow>L</span><span class="who"><b>Lyra</b><span>Elf wizard, level 3</span></span><span class="tag">TAKEN</span></div>
+            <button type="button" class="pbtn block" data-follow>Play as Borin</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-changes" class="changes">
+    <div class="sec-head">
+      <p class="eyebrow">If this one wins</p>
+      <h2 id="h-changes">What changes in the code</h2>
+    </div>
+    <ul id="changes-list"></ul>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var COMMON_TOKEN = "<code>design-tokens.css</code>: <code>--font-display</code> moves to this face. That one token sets the primary and every page and record title (76 uses in 42 files), so they change together.";
+  var COMMON_CHROME = "Chrome keeps Bungee: <code>.chrome</code> gains <code>font-family: var(--font-wordmark)</code>, which covers YOUR TURN, the acting creature's name and the table screen's acting name. The wordmark already uses <code>--font-wordmark</code>.";
+  var COMMON_DOCS = "DESIGN.md: the Type table (Display names this face; a Chrome row keeps Bungee for chrome lettering) and the Primary bullet in Components. Title sizes were set for Bungee, so check the 34 px display size and long record names at 390 px.";
+  var FONTS = {
+    bungee: {
+      name: "Bungee",
+      tag: "Today",
+      idea: "Heavy block capitals with rounded square counters. It sets the wordmark and the chrome lettering, where it stays, and today also every page and record title and the primary button.",
+      watch: "This is the reference. In chrome it reads as an 80s logo; plain, on a title or on the Rail plate, its weight fights the thin lines around it.",
+      changes: ["Nothing. The Rail button and the titles keep <code>--font-display</code> as Bungee."]
+    },
+    bai: {
+      name: "Bai Jamjuree",
+      tag: "Already in the app",
+      idea: "The app's own label face, in bold capitals with wide tracking. Nothing new loads, and the primary speaks in the same voice as every other control. The capitals, the tracking and the lit line are what mark it as the one to press.",
+      watch: "It's the nearest to a secondary button, which already uses Bai Jamjuree at the same size; next to Never mind in the dialog, the difference is case and weight alone. Titles and labels become one family, so headings stand out by size and capitals only.",
+      changes: [
+        COMMON_TOKEN + " It points at Bai Jamjuree at weight 700, with titles in capitals.",
+        COMMON_CHROME,
+        "Nothing new to install: <code>fonts.css</code> already imports Bai Jamjuree 700.",
+        "<code>Button.css</code>: the primary sets <code>font: 700 16px / 1 var(--font-display)</code>, <code>letter-spacing: 0.1em</code> and <code>text-transform: uppercase</code>, so labels stay in sentence case in the code.",
+        COMMON_DOCS
+      ]
+    },
+    chakra: {
+      name: "Chakra Petch",
+      tag: "Bai Jamjuree's sibling",
+      idea: "From Cadson Demak, the Thai foundry that made Bai Jamjuree, with the corners of each letter cut at 45 degrees like an arcade cabinet's bevelled panel. It sits beside the app's labels as family while reading as a harder, more mechanical voice.",
+      watch: "At the small size in a section bar the cut corners shrink to a pixel or two, so New homebrew shows less of the character than Publish does.",
+      changes: [
+        COMMON_TOKEN,
+        COMMON_CHROME,
+        "Install <code>@fontsource/chakra-petch</code> in <code>packages/ui</code> and import its 600 weight in <code>fonts.css</code>. It's self-hosted like the others, so the table still works with no internet.",
+        "<code>Button.css</code>: the primary sets <code>font: 600 16px / 1 var(--font-display)</code>, <code>letter-spacing: 0.08em</code> and <code>text-transform: uppercase</code>.",
+        COMMON_DOCS
+      ]
+    },
+    orbitron: {
+      name: "Orbitron",
+      tag: "80s sci-fi",
+      idea: "Wide, geometric and squared, the lettering of 80s science fiction titles and synth album covers. It's the most openly retro of the five, and it sits closest to Bungee's shapes, so the chrome lettering and the titles feel related.",
+      watch: "It's wide: New encounter on this map is 346 px as a button, close to a phone's 358 px of room. It's also been used on a lot of retro-themed projects, so it can read as a stock choice, and its O and 0 are nearly the same shape.",
+      changes: [
+        COMMON_TOKEN,
+        COMMON_CHROME,
+        "Install <code>@fontsource/orbitron</code> and import its 700 weight in <code>fonts.css</code>.",
+        "<code>Button.css</code>: the primary sets <code>font: 700 15px / 1 var(--font-display)</code>, <code>letter-spacing: 0.06em</code> and <code>text-transform: uppercase</code>. The section bar size drops to 13 px.",
+        COMMON_DOCS
+      ]
+    },
+    michroma: {
+      name: "Michroma",
+      tag: "Hi-fi faceplate",
+      idea: "A wide extended face in the Microgramma tradition, the lettering printed on 80s VCRs, tape decks and stereo faceplates. It belongs to the same machine as the VCR counter without being pixelated.",
+      watch: "The widest of the five, and it ships in one weight. As a full-size button, New encounter on this map is 385 px, wider than a phone's 358 px of room, so on a phone long labels need the small size or two lines, and long record names wrap sooner.",
+      changes: [
+        COMMON_TOKEN,
+        COMMON_CHROME,
+        "Install <code>@fontsource/michroma</code> and import its one weight, 400, in <code>fonts.css</code>. Like Bungee and VT323, never synthesize a bold from it.",
+        "<code>Button.css</code>: the primary sets <code>font: 400 14px / 1 var(--font-display)</code>, <code>letter-spacing: 0.04em</code> and <code>text-transform: uppercase</code>.",
+        COMMON_DOCS
+      ]
+    },
+    rajdhani: {
+      name: "Rajdhani",
+      tag: "Condensed",
+      idea: "A condensed, squared face from the Indian Type Foundry, close to the lettering on 80s digital readouts and arcade marquees. It's the narrowest of the five, so long labels stay short on a phone.",
+      watch: "Its letters are lighter and shorter than the others at the same size, so it's set at 18 px in its boldest weight to match. At the section bar size it starts to look thin.",
+      changes: [
+        COMMON_TOKEN,
+        COMMON_CHROME,
+        "Install <code>@fontsource/rajdhani</code> and import its 700 weight in <code>fonts.css</code>.",
+        "<code>Button.css</code>: the primary sets <code>font: 700 18px / 1 var(--font-display)</code>, <code>letter-spacing: 0.08em</code> and <code>text-transform: uppercase</code>.",
+        COMMON_DOCS
+      ]
+    }
+  };
+  var ORDER = ["bungee", "bai", "chakra", "orbitron", "michroma", "rajdhani"];
+  var current = "chakra";
+
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+  // Side by side cells, one per face.
+  var cmp = $("#compare");
+  ORDER.forEach(function (k) {
+    var f = FONTS[k];
+    var cell = document.createElement("div");
+    cell.className = "cmp f-" + k;
+    cell.dataset.f = k;
+    cell.innerHTML =
+      '<div class="cmp-top"><p class="cmp-name">' + esc(f.name) + '</p><p class="eyebrow">' + esc(f.tag) + "</p></div>" +
+      '<p class="cmp-title ttl">Bandit captain</p>' +
+      '<div class="cmp-stage"><button type="button" class="pbtn">Publish</button><button type="button" class="pbtn">Send the damage</button></div>' +
+      '<div class="cmp-foot"><p class="width">Longest label <b data-w>--</b> px</p><button type="button" class="pick">Show in the app</button></div>';
+    $(".pick", cell).addEventListener("click", function () { setFont(k); });
+    cmp.appendChild(cell);
+  });
+
+  function setFont(k, fromHash) {
+    if (!FONTS[k]) return;
+    current = k;
+    var f = FONTS[k];
+    $$("[data-follow], #idea").forEach(function (el) {
+      ORDER.forEach(function (o) { el.classList.remove("f-" + o); });
+      el.classList.add("f-" + k);
+    });
+    $$("#font-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.f === k)); });
+    $$("#compare .cmp").forEach(function (c) {
+      var on = c.dataset.f === k;
+      c.classList.toggle("is-on", on);
+      $(".pick", c).textContent = on ? "Showing in the app" : "Show in the app";
+    });
+    $("#idea-eyebrow").textContent = "The face · " + f.tag;
+    $("#idea-name").textContent = f.name;
+    $("#idea-text").textContent = f.idea;
+    $("#idea-watch").textContent = f.watch;
+    $("#changes-list").innerHTML = f.changes.map(function (c) { return "<li>" + c + "</li>"; }).join("");
+    if (!fromHash) {
+      try { history.replaceState(null, "", "#" + k); } catch (e) { /* the frame may refuse it */ }
+    }
+  }
+  $$("#font-seg button").forEach(function (b) { b.addEventListener("click", function () { setFont(b.dataset.f); }); });
+  window.addEventListener("hashchange", function () { var k = location.hash.slice(1); if (FONTS[k]) setFont(k, true); });
+
+  // Measure the longest label as a real button in each face, once the faces have loaded.
+  function measure() {
+    var probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden";
+    document.body.appendChild(probe);
+    $$("#compare .cmp").forEach(function (c) {
+      var b = document.createElement("button");
+      b.className = "pbtn f-" + c.dataset.f;
+      b.textContent = "New encounter on this map";
+      probe.appendChild(b);
+      $("[data-w]", c).textContent = String(Math.round(b.getBoundingClientRect().width));
+    });
+    probe.remove();
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); else measure();
+
+  // Theme: Dusk and Dawn map onto the viewer's dark and light. Nothing is stored; the host's own choice wins on load.
+  var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+  function effective() {
+    var t = document.documentElement.getAttribute("data-theme");
+    if (t === "light" || t === "dark") return t;
+    return mq && mq.matches ? "light" : "dark";
+  }
+  function paintTheme() {
+    var t = effective();
+    $$(".theme-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.th === t)); });
+  }
+  $$(".theme-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.documentElement.setAttribute("data-theme", b.dataset.th);
+      paintTheme();
+    });
+  });
+  if (mq && mq.addEventListener) mq.addEventListener("change", paintTheme);
+  if (window.MutationObserver) new MutationObserver(paintTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // Rail's press: a burst where the pointer is, and the line lighting outward from there.
+  function canMove(el) {
+    if (!el.animate) return false;
+    return !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+  function railPress(btn, x) {
+    if (!canMove(btn)) return;
+    var w = btn.clientWidth;
+    x = Math.max(8, Math.min(w - 8, x));
+    var line = document.createElement("span");
+    line.className = "rail-fx-line";
+    line.setAttribute("aria-hidden", "true");
+    line.style.transformOrigin = x + "px 50%";
+    btn.appendChild(line);
+    var a = line.animate(
+      [{ transform: "scaleX(0)", opacity: 1 }, { transform: "scaleX(1)", opacity: 1, offset: 0.55 }, { transform: "scaleX(1)", opacity: 0 }],
+      { duration: 420, easing: "cubic-bezier(0.45, 0, 0.25, 1)" }
+    );
+    var burst = document.createElement("span");
+    burst.className = "rail-fx-burst";
+    burst.setAttribute("aria-hidden", "true");
+    burst.style.left = x + "px";
+    btn.appendChild(burst);
+    var b = burst.animate(
+      [{ transform: "translate(-50%, 50%) scale(0.3)", opacity: 1 }, { transform: "translate(-50%, 50%) scale(1.5)", opacity: 0 }],
+      { duration: 240, easing: "ease-out" }
+    );
+    function rmLine() { line.remove(); }
+    function rmBurst() { burst.remove(); }
+    a.finished.then(rmLine, rmLine);
+    b.finished.then(rmBurst, rmBurst);
+  }
+  document.addEventListener("pointerdown", function (e) {
+    var btn = e.target.closest && e.target.closest(".pbtn");
+    if (!btn || btn.disabled || btn.classList.contains("is-press")) return;
+    var r = btn.getBoundingClientRect();
+    railPress(btn, e.clientX - r.left);
+  });
+  document.addEventListener("click", function (e) {
+    if (e.detail !== 0) return;
+    var btn = e.target.closest && e.target.closest(".pbtn");
+    if (btn && !btn.disabled) railPress(btn, btn.clientWidth / 2);
+  });
+
+  var start = location.hash.slice(1);
+  setFont(FONTS[start] ? start : "chakra", true);
+  paintTheme();
+})();
+</script>
+</body></html>

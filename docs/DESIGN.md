@@ -2,7 +2,8 @@
 
 The rules a UI change has to follow. Token values live in `packages/ui/src/styles/design-tokens.css`, the primitives
 are exported from `packages/ui/src/index.ts` and the default avatars are in `packages/ui/src/avatars/`.
-[ADR-0037](adr/0037-arcade-cabinet-redesign.md) records why the app looks this way. The static mockups in
+[ADR-0037](adr/0037-arcade-cabinet-redesign.md) records why the app looks this way, and
+[ADR-0046](adr/0046-horizon-light-and-the-cup-primary.md) why the primary, plain titles and the light changed since. The static mockups in
 `docs/design/mockups/` show every view below in both themes (`<view>-dusk.html` and `<view>-dawn.html`), with real
 default avatars in portraits and tokens. The pictures and game values are sample fixtures, not seeded campaign data.
 `docs/design/IMPLEMENTATION.md` records the branch audit, feature dependencies and implementation contracts. Read its
@@ -342,7 +343,9 @@ from the mockups.
 Light rail ([ADR-0045](adr/0045-light-rail-motion.md)) is the one motion language for change. The engine is
 `packages/ui/src/motion/lightRail.ts` and the parts are drawn by `packages/ui/src/styles/light-rail.css`. The plan,
 with every moment and the phase that builds it, and the approved mockup are in `docs/design/light-rail/` (`PLAN.md`,
-`mockup/ozyvtt-light-rail.html`). A surface whose moment is not built yet keeps the motion it has.
+`mockup/ozyvtt-light-rail.html`). The Horizon update ([ADR-0046](adr/0046-horizon-light-and-the-cup-primary.md)) and
+its mockups are in `docs/design/light-rail/horizon/` (`UPDATE-PLAN.md`, `mockups/light-rail-horizon.html` and
+`mockups/cup-button.html`). A surface whose moment is not built yet keeps the motion it has.
 
 1. Light travels from the old place to the new one. It drains out of the old place, runs as one comet, bursts and
    fills where it lands. A wash is optional.

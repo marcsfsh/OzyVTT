@@ -1,0 +1,185 @@
+
+/* ---------- Horizon tone ----------
+   The Cup button's light carried into the rest of Light rail. Every lit line is a horizon, cyan to yellow across
+   its own length, with a veiled cast of the same colours beside it. A comet takes the horizon's colour at the
+   place it leaves and the place it lands; a burst takes the colour where it lands. Hit points, damage, healing and
+   targeting keep their own colours, because those colours carry meaning. Plain display lettering moves to Chakra
+   Petch; chrome lettering keeps Bungee. The page's data-tone switches it, so Before stays as approved. */
+/* The tone's values per theme, following the page's own Dusk and Dawn selectors. --hz-k is 0 in Dusk and 1 in
+   Dawn, so a part can lean toward white light with a glow in Dusk and toward plain ink in Dawn. */
+:root,
+.page[data-look="dusk"] {
+  --hz-paint: linear-gradient(90deg, #4fe3ff, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d);
+  --hz-cast: 0.24;
+  --hz-plate: #25283f;
+  --hz-veil: 66%;
+  --hz-glow: 0 0 8px rgba(255, 47, 146, 0.45);
+  --hz-drop: drop-shadow(0 0 4px rgba(255, 47, 146, 0.7));
+  --hz-k: 0;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --hz-paint: linear-gradient(90deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+    --hz-cast: 0.14;
+    --hz-plate: #f7f5f9;
+    --hz-veil: 80%;
+    --hz-glow: 0 0 #0000;
+    --hz-drop: none;
+    --hz-k: 1;
+  }
+}
+:root[data-theme="light"],
+.page[data-look="dawn"] {
+  --hz-paint: linear-gradient(90deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+  --hz-cast: 0.14;
+  --hz-plate: #f7f5f9;
+  --hz-veil: 80%;
+  --hz-glow: 0 0 #0000;
+  --hz-drop: none;
+  --hz-k: 1;
+}
+.page[data-tone="horizon"] {
+  --font-display: "Chakra Petch", "Bai Jamjuree", system-ui, sans-serif;
+  --ink-glow: var(--hz-glow);
+}
+
+/* Plain display lettering in capitals, as Bungee set it. Chrome lettering keeps Bungee. */
+.page[data-tone="horizon"] :is(.tb-name, .intro h1, .sec-head h2, .g-head h2, .btn.primary, .doc-title, .name, .ov-name, .tile-face, .hp-name, .token, .st-content h3, .parts-title, .pres, .claim-face, .prp-placed) {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.page[data-tone="horizon"] :is(.wm-ozy, .yourturn) {
+  font-family: "Bungee", "Arial Black", system-ui, sans-serif;
+}
+
+/* Inks: the lit stretch under a chosen tab or row is a horizon, with its cast rising into what it marks */
+.page[data-tone="horizon"] :is(.ink, .strip-ink, .sections .ul, .ana-stop .ul, .row-line, .pres-line) {
+  background: var(--hz-paint);
+  box-shadow: var(--ink-glow);
+}
+/* The cast is an ellipse centred on the ink, so it fades out sideways as well as upward: no hard vertical edge
+   where it ends. */
+.page[data-tone="horizon"] :is(.ink, .strip-ink, .sections .ul, .ana-stop .ul, .row-line)::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  bottom: 100%;
+  height: 18px;
+  background: var(--hz-paint);
+  opacity: var(--hz-cast);
+  -webkit-mask-image: radial-gradient(50% 100% at 50% 100%, #000 25%, transparent 100%);
+  mask-image: radial-gradient(50% 100% at 50% 100%, #000 25%, transparent 100%);
+  pointer-events: none;
+}
+.page[data-tone="horizon"] .gp-strip button[aria-selected="true"] {
+  color: var(--text);
+  text-shadow: none;
+}
+
+/* An overlay's top edge keeps the app's horizon and casts it down into the surface */
+.page[data-tone="horizon"] .surface > .edge::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 18px;
+  background: var(--hz-paint);
+  opacity: var(--hz-cast);
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
+  mask-image: linear-gradient(to bottom, #000, transparent);
+  pointer-events: none;
+}
+
+/* The primary is the Cup: a plate holding a horizon, 3 px at the base and 1 px up the sides */
+.page[data-tone="horizon"] .btn.primary {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.page[data-tone="horizon"] .btn.primary::before,
+.page[data-tone="horizon"] .btn.primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.page[data-tone="horizon"] .btn.primary::before {
+  border: 1px solid var(--line-raised);
+  background:
+    linear-gradient(to top, transparent, var(--hz-plate)),
+    linear-gradient(color-mix(in srgb, var(--hz-plate) var(--hz-veil), transparent), color-mix(in srgb, var(--hz-plate) var(--hz-veil), transparent)),
+    var(--hz-paint);
+}
+.page[data-tone="horizon"] .btn.primary::after {
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: 3px;
+  border-image: var(--hz-paint) 1;
+  -webkit-mask-image: linear-gradient(to top, #000 40%, rgba(0, 0, 0, 0.6));
+  mask-image: linear-gradient(to top, #000 40%, rgba(0, 0, 0, 0.6));
+  filter: var(--hz-drop);
+}
+
+/* Comets and bursts that carry no meaning of their own take the horizon's colours (set by the engine). In Dusk
+   the head is white with a glow in the landing colour; in Dawn the head is the landing colour, flat. */
+.page[data-tone="horizon"] .comet.lr-hz {
+  --head: color-mix(in srgb, var(--tail-b) calc(var(--hz-k) * 100%), #ffffff);
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, calc(0.85 - var(--hz-k) * 0.85))) drop-shadow(0 0 8px color-mix(in srgb, var(--tail-b) calc(100% - var(--hz-k) * 100%), transparent));
+}
+.page[data-tone="horizon"] .comet.lr-hz.face-r {
+  background: linear-gradient(90deg, transparent, var(--tail-a) 40%, var(--tail-b) 80%, var(--head));
+}
+.page[data-tone="horizon"] .comet.lr-hz.face-l {
+  background: linear-gradient(270deg, transparent, var(--tail-a) 40%, var(--tail-b) 80%, var(--head));
+}
+.page[data-tone="horizon"] :is(.burst, .pop).lr-hz {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--burst-ring) calc(var(--hz-k) * 100%), #ffffff), var(--burst-ring) 45%, transparent);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--burst-ring) calc(100% - var(--hz-k) * 100%), transparent));
+}
+
+/* The tone switch makes a third control in the top bar, so on a phone the speed reads 1x and 6x. */
+.tb-ctl .sm { display: none; }
+@media (max-width: 560px) {
+  .tb-ctl .lg { display: none; }
+  .tb-ctl .sm { display: inline; }
+}
+
+/* The chosen stop's ink rides the rail: it lies over the bar's horizon line instead of stacking a second line
+   above it. Both tones, since the lit stretch is the rail itself lit. */
+.ana-stop .ul {
+  bottom: -2px;
+  z-index: 1;
+}
+
+/* An ink on a line that is already the horizon shows the line's own colours there, brighter, 3 px tall so it
+   stands just proud of the 2 px rail. The engine marks these with on-rail and passes the rail's width and offset. */
+.page[data-tone="horizon"] :is(.ana-stop .ul, .sections .ul.on-rail) {
+  height: 3px;
+  background: var(--grad-horizon) var(--win-x, 0) 0 / var(--win-w, 100%) 100% no-repeat;
+  filter: var(--hz-bright);
+}
+.page[data-tone="horizon"] :is(.ana-stop .ul, .sections .ul.on-rail)::before {
+  background: var(--grad-horizon) calc(var(--win-x, 0px) + 10px) 0 / var(--win-w, 100%) 100% no-repeat;
+}
+:root,
+.page[data-look="dusk"] {
+  --hz-bright: brightness(1.35) saturate(1.15);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --hz-bright: brightness(0.8) saturate(1.2);
+  }
+}
+:root[data-theme="light"],
+.page[data-look="dawn"] {
+  --hz-bright: brightness(0.8) saturate(1.2);
+}

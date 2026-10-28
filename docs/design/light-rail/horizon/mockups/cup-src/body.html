@@ -1,0 +1,77 @@
+
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; design options</p>
+  <h1 class="ttl">Terminal or Cradle</h1>
+  <p>Horizon light and Chakra Petch, as chosen. Terminal and Cradle as you last saw them, each with three new versions. Pick one above the page to see it everywhere the primary lives, and press any button to see its light.</p>
+  <div class="seg theme-seg head-theme" role="group" aria-label="Theme">
+    <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+    <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+  </div>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row" id="picker">
+    <div class="fam-pick">
+      <p class="eyebrow">Terminal</p>
+      <div class="seg" role="group" aria-label="Terminal versions">
+        <button type="button" data-v="terminal" aria-pressed="false">Before</button>
+        <button type="button" data-v="both" aria-pressed="false">Both ends</button>
+        <button type="button" data-v="corner" aria-pressed="false">Corner</button>
+        <button type="button" data-v="hook" aria-pressed="false">Hook</button>
+      </div>
+    </div>
+    <div class="fam-pick">
+      <p class="eyebrow">Cradle</p>
+      <div class="seg" role="group" aria-label="Cradle versions">
+        <button type="button" data-v="cradle" aria-pressed="false">Before</button>
+        <button type="button" data-v="frame" aria-pressed="false">Frame</button>
+        <button type="button" data-v="cup" aria-pressed="false">Cup</button>
+        <button type="button" data-v="holder" aria-pressed="false">Holder</button>
+      </div>
+    </div>
+    <div class="seg theme-seg bar-theme" role="group" aria-label="Theme">
+      <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+      <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+    </div>
+  </div>
+  <div class="horizon"></div>
+</div>
+
+<main class="wrap">
+  <section aria-labelledby="h-compare">
+    <div class="sec-head">
+      <h2 id="h-compare">Side by side</h2>
+      <p>Each family's earlier version first, then the three new ones.</p>
+    </div>
+    <div class="fams">
+      <div class="fam" id="fam-terminal"><h3>Terminal</h3></div>
+      <div class="fam" id="fam-cradle"><h3>Cradle</h3></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="idea-name" class="idea" id="idea">
+    <div>
+      <p class="eyebrow" id="idea-eyebrow">The version</p>
+      <h2 class="ttl" id="idea-name">Corner</h2>
+      <p id="idea-text"></p>
+    </div>
+    <div class="side">
+      <p class="eyebrow">Watch for</p>
+      <p id="idea-watch"></p>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-states">
+    <div class="sec-head">
+      <h2 id="h-states">States</h2>
+      <p>Held in each state so they can be compared. Disabled is the same flat box in every version, so a disabled primary never reads as the thing to press.</p>
+    </div>
+    <div class="states">
+      <div class="state"><p class="eyebrow">Rest</p><button type="button" class="pbtn" data-follow tabindex="-1">Make live</button></div>
+      <div class="state"><p class="eyebrow">Hover</p><button type="button" class="pbtn is-hover" data-follow tabindex="-1">Make live</button></div>
+      <div class="state"><p class="eyebrow">Pressed</p><button type="button" class="pbtn is-press" data-follow tabindex="-1">Make live</button></div>
+      <div class="state"><p class="eyebrow">Keyboard focus</p><button type="button" class="pbtn is-focus" data-follow tabindex="-1">Make live</button></div>
+      <div class="state"><p class="eyebrow">Disabled</p><button type="button" class="pbtn" data-follow disabled>Make live</button></div>
+    </div>
+  </section>
+

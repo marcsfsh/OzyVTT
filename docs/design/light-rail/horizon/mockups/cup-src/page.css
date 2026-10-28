@@ -1,0 +1,401 @@
+
+html { background: var(--ground); }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--sky);
+  background-color: var(--ground);
+  background-attachment: fixed;
+  color: var(--text);
+  font: 400 15px/1.5 var(--f-label);
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--bg);
+}
+.wrap {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.disp { font-family: var(--f-display); font-weight: 400; letter-spacing: 0.02em; }
+.vt { font-family: var(--f-num); font-size: 20px; line-height: 1; letter-spacing: 0.04em; }
+.eyebrow {
+  margin: 0;
+  font: 600 11px/1.2 var(--f-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.horizon { height: 2px; background: var(--grad-horizon); }
+
+/* ---- Page header ---- */
+.page-head { padding-block: 28px 20px; display: grid; gap: 10px; }
+.page-head h1 { margin: 0; font-size: calc(clamp(24px, 4vw, 34px) * var(--ts, 1)); line-height: 1.1; text-wrap: balance; }
+.page-head p { margin: 0; max-width: 66ch; color: var(--text-dim); }
+
+/* ---- Sticky switcher: one row per family ---- */
+.switch-bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line-strong);
+}
+.switch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-block: 8px; }
+.fam-pick { flex: 1 1 360px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; }
+.fam-pick .eyebrow { width: 64px; }
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+}
+.seg button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 14px/1 var(--f-label);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.seg button:hover { color: var(--text); background: color-mix(in srgb, var(--s2) 70%, transparent); }
+.seg button[aria-pressed="true"] { color: var(--text); background: var(--tab-on); box-shadow: inset 0 -2px 0 var(--state-on-edge); }
+.seg button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; z-index: 1; }
+.fam-pick .seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.fam-pick .seg button { padding: 0 6px; }
+.theme-seg button { min-width: 60px; }
+.head-theme { justify-self: start; }
+.seg.head-theme { display: none; }
+@media (max-width: 760px) {
+  .fam-pick { flex-basis: 100%; }
+  .fam-pick .eyebrow { width: 52px; }
+  .fam-pick .seg button { font-size: 13px; padding: 0 2px; }
+  .bar-theme { display: none; }
+  .seg.head-theme { display: inline-flex; }
+}
+@media (any-pointer: coarse) { .seg button { min-height: 44px; } }
+
+/* ---- Sections ---- */
+main { display: grid; gap: 36px; padding-block: 24px 56px; }
+section { display: grid; gap: 14px; min-width: 0; }
+.sec-head { display: grid; gap: 4px; }
+.sec-head h2 { margin: 0; font-size: 18px; line-height: 1.2; }
+.sec-head p { margin: 0; color: var(--text-muted); font-size: 14px; max-width: 72ch; }
+
+/* Side by side: the two families in columns, each with its four versions */
+.fams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 849px) { .fams { grid-template-columns: minmax(0, 1fr); } }
+.fam { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.fam > h3 { margin: 0; font: 600 16px/1.2 var(--f-label); }
+.vcard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--s1);
+}
+.vcard.is-on { border-color: var(--state-on-edge); box-shadow: inset 0 -2px 0 var(--state-on-edge); }
+.vcard-info { display: grid; gap: 2px; min-width: 0; }
+.vcard-info h4 { margin: 0; font: 600 15px/1.2 var(--f-label); }
+.vcard-info h4 .eyebrow { display: inline; margin-left: 6px; }
+.vcard-info p { margin: 0; font-size: 13px; color: var(--text-muted); }
+.vcard-stage { display: grid; place-items: center; padding: 8px 4px; }
+.vcard .pick {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--cyan-hi);
+  font: 600 14px/1 var(--f-label);
+  cursor: pointer;
+}
+.vcard .pick:hover { text-decoration: underline; text-underline-offset: 3px; }
+.vcard .pick:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.vcard.is-on .pick { color: var(--text-muted); cursor: default; text-decoration: none; }
+@media (max-width: 420px) {
+  .vcard { grid-template-columns: minmax(0, 1fr); }
+  .vcard-stage { justify-self: start; }
+}
+
+/* The idea */
+.idea {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 20px 32px;
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  background: var(--s1);
+}
+@media (max-width: 760px) { .idea { grid-template-columns: minmax(0, 1fr); padding: 16px; } }
+.idea h2 { margin: 0 0 8px; font-size: calc(24px * var(--ts)); line-height: 1.1; }
+.idea p { margin: 0; max-width: 62ch; color: var(--text-dim); }
+.idea .side { display: grid; gap: 6px; align-content: start; }
+.idea .side p { font-size: 14px; }
+.idea .side .eyebrow:not(:first-child) { margin-top: 10px; }
+
+/* States */
+.states { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 979px) { .states { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .states { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .state { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 10px 12px; }
+}
+.state {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 14px 10px 16px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--s1) 70%, transparent);
+}
+.state .eyebrow { justify-self: start; }
+
+/* =========================================================================
+   The Rail button. `.pbtn` carries geometry and the label face (its f- class); an r- class shapes the rail and a
+   c- class colours it. The plate is ::before and the light is ::after in every version, so none changes the box.
+   ========================================================================= */
+
+/* The choices made: Horizon for the light and Chakra Petch for the label and titles. */
+:root {
+  --rail-start: var(--k-cyan);
+  --rail-end: var(--k-yellow);
+  --rail-c: var(--k-magenta);
+  --rail-paint: linear-gradient(90deg, var(--k-cyan), var(--k-violet) 30%, var(--k-magenta) 60%, var(--k-orange) 85%, var(--k-yellow));
+  --bf: "Chakra Petch", "Bai Jamjuree", system-ui, sans-serif;
+  --bw: 600;
+  --bs: 16px;
+  --bt: 0.08em;
+  --ts: 1.03;
+}
+
+.pbtn {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 26px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--bf);
+  font-weight: var(--bw);
+  font-size: var(--bs);
+  letter-spacing: var(--bt);
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  --rail-head: color-mix(in srgb, var(--rail-c) var(--head-k), #ffffff);
+  --rail-line-glow: 0 0 8px color-mix(in srgb, var(--rail-c) var(--glow-k), transparent);
+  --rail-drop-glow: drop-shadow(0 0 4px color-mix(in srgb, var(--rail-c) var(--glow-k), transparent));
+  --rail-shadow: var(--rail-line-glow);
+}
+.pbtn svg { width: 16px; height: 16px; flex: none; }
+.pbtn.sm { min-height: 42px; padding: 0 18px; font-size: calc(var(--bs) * 0.875); }
+.pbtn.sm svg { width: 14px; height: 14px; }
+.pbtn.block { display: flex; width: 100%; }
+.pbtn::before,
+.pbtn::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+/* The plate: the line's paint, dimmed by a plate-coloured veil, and faded out upward so it only tints the base */
+.pbtn::before {
+  --plate: var(--s2);
+  --veil: var(--plate-k);
+  --fade: linear-gradient(to top, transparent, var(--plate) 70%);
+  inset: 0;
+  border: 1px solid var(--line-raised);
+  background: var(--fade), linear-gradient(color-mix(in srgb, var(--plate) var(--veil), transparent), color-mix(in srgb, var(--plate) var(--veil), transparent)), var(--rail-paint);
+  transition: border-color 140ms;
+}
+.pbtn:hover:not(:disabled)::before, .pbtn.is-hover::before {
+  --plate: var(--s3);
+  --veil: var(--plate-k-hover);
+  --fade: linear-gradient(to top, transparent, var(--plate) 85%);
+  border-color: var(--line-raised-hover);
+}
+.pbtn:active:not(:disabled), .pbtn.is-press { transform: translateY(1px); }
+.pbtn:focus-visible, .pbtn.is-focus { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+
+/* Cradle: the line runs along the base and up both sides, fading out two thirds of the way up */
+.r-cradle::after {
+  inset: 0;
+  border: 2px solid transparent;
+  border-top: 0;
+  border-image: var(--rail-paint) 1;
+  -webkit-mask-image: linear-gradient(to top, #000 28%, transparent 78%);
+  mask-image: linear-gradient(to top, #000 28%, transparent 78%);
+  filter: var(--rail-drop-glow);
+}
+.r-cradle:hover:not(:disabled)::after, .r-cradle.is-hover::after { filter: var(--rail-drop-glow) var(--hover-filter); }
+.r-cradle.is-press::after { border-image: linear-gradient(var(--rail-head), var(--rail-head)) 1; }
+
+/* Terminal: a square where the light starts, at the left end of the line, in the line's starting colour */
+.r-terminal::after {
+  inset: auto 0 0;
+  height: 8px;
+  background:
+    linear-gradient(var(--rail-start), var(--rail-start)) 0 100% / 8px 8px no-repeat,
+    var(--rail-paint) 0 100% / 100% 3px no-repeat;
+  filter: var(--rail-drop-glow);
+}
+.r-terminal:hover:not(:disabled)::after, .r-terminal.is-hover::after {
+  background:
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 100% / 8px 8px no-repeat,
+    linear-gradient(var(--hover-wash), var(--hover-wash)) 0 100% / 100% 3px no-repeat,
+    var(--rail-paint) 0 100% / 100% 3px no-repeat;
+}
+.r-terminal.is-press::after {
+  background:
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 100% / 8px 8px no-repeat,
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 100% / 100% 3px no-repeat;
+}
+
+/* Both ends: a terminal at each end, in the colour of the horizon at that end */
+.r-both::after {
+  inset: auto 0 0;
+  height: 8px;
+  background:
+    linear-gradient(var(--rail-start), var(--rail-start)) 0 100% / 8px 8px no-repeat,
+    linear-gradient(var(--rail-end), var(--rail-end)) 100% 100% / 8px 8px no-repeat,
+    var(--rail-paint) 0 100% / 100% 3px no-repeat;
+  filter: var(--rail-drop-glow);
+}
+.r-both:hover:not(:disabled)::after, .r-both.is-hover::after {
+  background:
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 100% / 8px 8px no-repeat,
+    linear-gradient(var(--rail-end), var(--rail-end)) 100% 100% / 8px 8px no-repeat,
+    linear-gradient(var(--hover-wash), var(--hover-wash)) 0 100% / 100% 3px no-repeat,
+    var(--rail-paint) 0 100% / 100% 3px no-repeat;
+}
+.r-both.is-press::after {
+  background:
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 100% / 8px 8px no-repeat,
+    linear-gradient(var(--rail-head), var(--rail-head)) 100% 100% / 8px 8px no-repeat,
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 100% / 100% 3px no-repeat;
+}
+
+/* Corner: the terminal grows into the whole left edge and meets the base line */
+.r-corner::after {
+  inset: 0;
+  background:
+    linear-gradient(to top, var(--rail-start), color-mix(in srgb, var(--rail-start) 45%, transparent)) 0 0 / 3px 100% no-repeat,
+    var(--rail-paint) 0 100% / 100% 3px no-repeat;
+  filter: var(--rail-drop-glow);
+}
+.r-corner:hover:not(:disabled)::after, .r-corner.is-hover::after { filter: var(--rail-drop-glow) var(--hover-filter); }
+.r-corner.is-press::after {
+  background:
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 0 / 3px 100% no-repeat,
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 100% / 100% 3px no-repeat;
+}
+
+/* Hook: a terminal where the light starts, and the line turning up the right edge where it lands */
+.r-hook::after {
+  inset: 0;
+  background:
+    linear-gradient(var(--rail-start), var(--rail-start)) 0 100% / 8px 8px no-repeat,
+    linear-gradient(var(--rail-end), var(--rail-end)) 100% 100% / 3px 12px no-repeat,
+    var(--rail-paint) 0 100% / 100% 3px no-repeat;
+  filter: var(--rail-drop-glow);
+}
+.r-hook:hover:not(:disabled)::after, .r-hook.is-hover::after { filter: var(--rail-drop-glow) var(--hover-filter); }
+.r-hook.is-press::after {
+  background:
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 100% / 8px 8px no-repeat,
+    linear-gradient(var(--rail-head), var(--rail-head)) 100% 100% / 3px 12px no-repeat,
+    linear-gradient(var(--rail-head), var(--rail-head)) 0 100% / 100% 3px no-repeat;
+}
+
+/* Frame: the cradle closed across the top, full strength at the base and about a third at the top */
+.r-frame::after {
+  inset: 0;
+  border: 2px solid transparent;
+  border-image: var(--rail-paint) 1;
+  -webkit-mask-image: linear-gradient(to top, #000 30%, rgba(0, 0, 0, 0.32));
+  mask-image: linear-gradient(to top, #000 30%, rgba(0, 0, 0, 0.32));
+  filter: var(--rail-drop-glow);
+}
+.r-frame:hover:not(:disabled)::after, .r-frame.is-hover::after { filter: var(--rail-drop-glow) var(--hover-filter); }
+.r-frame.is-press::after { border-image: linear-gradient(var(--rail-head), var(--rail-head)) 1; }
+
+/* Cup: a 3 px base and 1 px sides at full height, with the cast filling the lower half of the plate */
+.r-cup::before { --veil: calc(var(--plate-k) - 10%); --fade: linear-gradient(to top, transparent, var(--plate) 100%); }
+.r-cup:hover:not(:disabled)::before, .r-cup.is-hover::before { --veil: calc(var(--plate-k-hover) - 10%); --fade: linear-gradient(to top, transparent 10%, var(--plate) 100%); }
+.r-cup::after {
+  inset: 0;
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: 3px;
+  border-image: var(--rail-paint) 1;
+  -webkit-mask-image: linear-gradient(to top, #000 40%, rgba(0, 0, 0, 0.6));
+  mask-image: linear-gradient(to top, #000 40%, rgba(0, 0, 0, 0.6));
+  filter: var(--rail-drop-glow);
+}
+.r-cup.is-press::after { border-image: linear-gradient(var(--rail-head), var(--rail-head)) 1; }
+
+/* Holder: the cradle stands 5 px off the plate, in the space the old pressed edge used; a press sinks the plate
+   into it while the holder stays put */
+.pbtn.r-holder { margin: 0 5px 5px; }
+.pbtn.block.r-holder { width: calc(100% - 10px); }
+.r-holder::after {
+  inset: 35% -5px -5px;
+  border: 2px solid transparent;
+  border-top: 0;
+  border-image: var(--rail-paint) 1;
+  -webkit-mask-image: linear-gradient(to top, #000 45%, transparent);
+  mask-image: linear-gradient(to top, #000 45%, transparent);
+  filter: var(--rail-drop-glow);
+  transition: transform var(--press, 120ms) ease-out;
+}
+.r-holder:hover:not(:disabled)::after, .r-holder.is-hover::after { filter: var(--rail-drop-glow) var(--hover-filter); }
+.r-holder:active:not(:disabled), .r-holder.is-press { transform: translateY(3px); }
+.r-holder:active:not(:disabled)::after, .r-holder.is-press::after { transform: translateY(-3px); border-image: linear-gradient(var(--rail-head), var(--rail-head)) 1; }
+
+/* Light that a press spawns */
+.pbtn .fx { position: absolute; pointer-events: none; }
+.fx-line { left: 0; right: 0; bottom: 0; height: 3px; background: var(--rail-head); box-shadow: var(--rail-line-glow); }
+.fx-burst {
+  bottom: 1px;
+  width: 44px;
+  height: 18px;
+  background: radial-gradient(closest-side, var(--rail-head), color-mix(in srgb, var(--rail-c) 60%, transparent) 55%, transparent);
+}
+.fx-side { bottom: 0; width: 2px; height: 70%; background: linear-gradient(to top, var(--rail-head), transparent); }
+.fx-drop { top: 0; left: 0; width: 3px; height: 100%; background: linear-gradient(to bottom, transparent, var(--rail-head)); box-shadow: var(--rail-line-glow); }
+.fx-cup { inset: 0; z-index: -1; background: var(--rail-paint); opacity: 0; }
+.fx-comet { left: 0; bottom: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--rail-c), var(--rail-head)); box-shadow: var(--rail-line-glow); }
+
+/* Disabled: a flat box in every version and colour */
+.pbtn:disabled { cursor: not-allowed; color: var(--text-muted); transform: none; }
+.pbtn:disabled::before { background: var(--s2); border: 1px solid var(--line); border-image: none; }
+.pbtn:disabled::after { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .pbtn, .pbtn::before, .pbtn::after { transition: none; }
+}
+

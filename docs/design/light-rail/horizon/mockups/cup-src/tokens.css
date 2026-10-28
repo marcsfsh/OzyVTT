@@ -1,0 +1,160 @@
+:root {
+  color-scheme: dark;
+  --sky: radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%), linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%);
+  --ground: #1b1d33;
+  --bg: #151728;
+  --void: #131524;
+  --s1: #1b1e31;
+  --s2: #25283f;
+  --s3: #2b2f49;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-raised: rgba(255, 255, 255, 0.2);
+  --line-raised-hover: rgba(255, 255, 255, 0.32);
+  --text: #eef0f8;
+  --text-dim: #c3c7d9;
+  --text-muted: #b0b4ca;
+  --magenta: #ff2f92;
+  --cyan: #4fe3ff;
+  --cyan-hi: #6fe8ff;
+  --party: #7aa2ff;
+  --hp: #ffd54d;
+  --hp-text: #ffd54d;
+  --state-on-edge: #4fe3ff;
+  --focus-ring: #4fe3ff;
+  --tab-on: #353a55;
+  --grad-horizon: linear-gradient(90deg, #4fe3ff 0%, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d 100%);
+  --grad-chrome: linear-gradient(180deg, #eaf8ff 0%, #9fdcff 42%, #ffffff 49%, #3b2163 51%, #ff5fae 75%, #ffd6ea 100%);
+  --chrome-split: -1.5px 0 rgba(43, 228, 255, 0.55), 1.5px 0 rgba(255, 47, 146, 0.55);
+  --glow-action: 0 0 10px rgba(255, 47, 146, 0.85);
+  --glow-bonus: 0 0 10px rgba(255, 210, 63, 0.8);
+  --glow-reaction: 0 0 10px rgba(43, 228, 255, 0.8);
+  --glow-on: 0 0 8px rgba(43, 228, 255, 0.7);
+
+
+  /* Rail colour schemes: the colours a scheme draws from, and how light behaves in this theme */
+  --k-magenta: #ff2f92;
+  --k-violet: #9a5cff;
+  --k-orange: #ff8a1f;
+  --k-cyan: #4fe3ff;
+  --k-yellow: #ffe14d;
+  --k-white: #ffffff;
+  --k-synth: #cc45c8;
+  --k-sunset: #ff5c58;
+  --k-chrome-glow: #d9d4ff;
+  --k-split: 0 -1px 0 rgba(43, 228, 255, 0.75), 0 1px 0 rgba(255, 47, 146, 0.75);
+  --head-k: 0%;
+  --glow-k: 90%;
+  --hover-wash: rgba(255, 255, 255, 0.3);
+  --hover-filter: brightness(1.3);
+  --plate-k: 76%;
+  --plate-k-hover: 64%;
+
+  --f-display: "Bungee", "Arial Black", system-ui, sans-serif;
+  --f-label: "Bai Jamjuree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num: "VT323", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --sky: #ebe7ef;
+    --ground: #ebe7ef;
+    --bg: #ebe7ef;
+    --void: #e3dee8;
+    --s1: #f3f0f5;
+    --s2: #f7f5f9;
+    --s3: #e8e3ee;
+    --line: #e0dbe6;
+    --line-strong: #d3ccdc;
+    --line-raised: #b9b0c8;
+    --line-raised-hover: #9c92ae;
+    --text: #2a2537;
+    --text-dim: #4f4862;
+    --text-muted: #655d77;
+    --magenta: #f0559b;
+    --cyan: #2a8fa8;
+    --cyan-hi: #1d6a80;
+    --party: #4a72d9;
+    --hp: #d9a43a;
+    --hp-text: #7a5718;
+    --state-on-edge: #1d6a80;
+    --focus-ring: #1d6a80;
+    --tab-on: #fbfafc;
+    --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+    --grad-chrome: linear-gradient(#2a2537, #2a2537);
+    --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+    --glow-action: 0 0 #0000;
+    --glow-bonus: 0 0 #0000;
+    --glow-reaction: 0 0 #0000;
+    --glow-on: 0 0 #0000;
+    --k-magenta: #b0306e;
+    --k-violet: #6a46b0;
+    --k-orange: #c4610f;
+    --k-cyan: #1d6a80;
+    --k-yellow: #8a5612;
+    --k-white: #2a2537;
+    --k-synth: #8d3b8f;
+    --k-sunset: #ba4840;
+    --k-chrome-glow: #4f4862;
+    --k-split: 0 -1px 0 rgba(42, 143, 168, 0.55), 0 1px 0 rgba(240, 85, 155, 0.55);
+    --head-k: 55%;
+    --glow-k: 0%;
+    --hover-wash: rgba(0, 0, 0, 0.14);
+    --hover-filter: brightness(0.85);
+    --plate-k: 90%;
+    --plate-k-hover: 84%;
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --sky: #ebe7ef;
+  --ground: #ebe7ef;
+  --bg: #ebe7ef;
+  --void: #e3dee8;
+  --s1: #f3f0f5;
+  --s2: #f7f5f9;
+  --s3: #e8e3ee;
+  --line: #e0dbe6;
+  --line-strong: #d3ccdc;
+  --line-raised: #b9b0c8;
+  --line-raised-hover: #9c92ae;
+  --text: #2a2537;
+  --text-dim: #4f4862;
+  --text-muted: #655d77;
+  --magenta: #f0559b;
+  --cyan: #2a8fa8;
+  --cyan-hi: #1d6a80;
+  --party: #4a72d9;
+  --hp: #d9a43a;
+  --hp-text: #7a5718;
+  --state-on-edge: #1d6a80;
+  --focus-ring: #1d6a80;
+  --tab-on: #fbfafc;
+  --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+  --grad-chrome: linear-gradient(#2a2537, #2a2537);
+  --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+  --glow-action: 0 0 #0000;
+  --glow-bonus: 0 0 #0000;
+  --glow-reaction: 0 0 #0000;
+  --glow-on: 0 0 #0000;
+  --k-magenta: #b0306e;
+  --k-violet: #6a46b0;
+  --k-orange: #c4610f;
+  --k-cyan: #1d6a80;
+  --k-yellow: #8a5612;
+  --k-white: #2a2537;
+  --k-synth: #8d3b8f;
+  --k-sunset: #ba4840;
+  --k-chrome-glow: #4f4862;
+  --k-split: 0 -1px 0 rgba(42, 143, 168, 0.55), 0 1px 0 rgba(240, 85, 155, 0.55);
+  --head-k: 55%;
+  --glow-k: 0%;
+  --hover-wash: rgba(0, 0, 0, 0.14);
+  --hover-filter: brightness(0.85);
+  --plate-k: 90%;
+  --plate-k-hover: 84%;
+}
+
+/* A title in the chosen face. Chrome lettering never takes this class. */
+.ttl { font-family: var(--bf); font-weight: var(--bw); text-transform: uppercase; letter-spacing: 0.03em; }
+

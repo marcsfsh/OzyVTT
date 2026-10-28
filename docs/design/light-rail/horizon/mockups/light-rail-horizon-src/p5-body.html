@@ -1,0 +1,768 @@
+<div class="page" id="page" data-tone="horizon">
+  <header class="toolbar">
+    <div class="tb-inner">
+      <span class="tb-name">Light rail</span>
+      <a class="tb-link" href="#about">How it works</a>
+      <div class="tb-ctl">
+        <div class="seg" role="group" aria-label="Speed">
+          <button type="button" id="speed-1" data-speed="1" aria-pressed="true"><span class="lg">Real</span><span class="sm">1x</span></button>
+          <button type="button" id="speed-6" data-speed="6" aria-pressed="false"><span class="lg">Slow, 6x</span><span class="sm">6x</span></button>
+        </div>
+        <div class="seg" role="group" aria-label="Tone">
+          <button type="button" id="tone-before" data-tone="before" aria-pressed="false">Before</button>
+          <button type="button" id="tone-horizon" data-tone="horizon" aria-pressed="true">Horizon</button>
+        </div>
+        <div class="seg" role="group" aria-label="Theme">
+          <button type="button" id="look-dusk" data-look="dusk" aria-pressed="true">Dusk</button>
+          <button type="button" id="look-dawn" data-look="dawn" aria-pressed="false">Dawn</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main" id="top">
+    <section class="player" id="player" aria-label="Light rail player">
+      <div class="gp-bar" id="gp-bar">
+        <div class="gp-strip" id="gp-strip" role="tablist" aria-label="Groups"></div>
+        <div class="hz gp-hz" id="gp-hz"></div>
+      </div>
+      <p class="gp-note" id="gp-note"></p>
+      <div class="gp-stage" id="gp-stage">
+      <div class="gpanel" id="anatomy" data-num="" data-name="Anatomy" data-note="A page change shows all six parts. Every other moment uses some of them, in the same order." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">A page change</span></div>
+          <div class="ana-grid">
+        <div class="ana-demo">
+          <div class="ana-stage" id="ana-stage">
+            <div class="ana-bar">
+              <span class="ana-stop" id="ana-a"><span class="lbl">Where you were</span><i class="ul"></i></span>
+              <span class="ana-stop" id="ana-b"><span class="lbl">Where you're going</span><i class="ul"></i></span>
+              <div class="hz" id="ana-hz"></div>
+            </div>
+            <div class="ana-area" id="ana-area">
+              <div class="ana-content" id="ana-content">
+                <span class="sk w60"></span><span class="sk w90"></span><span class="sk w75"></span><span class="sk w40"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figure class="timeline" id="timeline">
+          <figcaption>A page change, from tap to the last fade. Light bars are solid; the content bar is hatched.</figcaption>
+          <div class="tl-rows" id="tl-rows">
+            <div class="tl-row" data-phase="drain"><span class="tl-name">Drain</span><span class="tl-track"><span class="tl-bar" style="--s: 0; --d: 130" title="Drain, 0 to 130 ms"></span></span><span class="tl-ms">0 to 130</span></div>
+            <div class="tl-row" data-phase="comet"><span class="tl-name">Comet</span><span class="tl-track"><span class="tl-bar" style="--s: 40; --d: 230" title="Comet, 40 to 270 ms"></span></span><span class="tl-ms">40 to 270</span></div>
+            <div class="tl-row" data-phase="fill"><span class="tl-name">Fill</span><span class="tl-track"><span class="tl-bar" style="--s: 170; --d: 140" title="Fill, 170 to 310 ms"></span></span><span class="tl-ms">170 to 310</span></div>
+            <div class="tl-row" data-phase="burst"><span class="tl-name">Burst</span><span class="tl-track"><span class="tl-bar" style="--s: 210; --d: 200" title="Burst, 210 to 410 ms"></span></span><span class="tl-ms">210 to 410</span></div>
+            <div class="tl-row" data-phase="wash"><span class="tl-name">Wash</span><span class="tl-track"><span class="tl-bar" style="--s: 200; --d: 260" title="Wash, 200 to 460 ms"></span></span><span class="tl-ms">200 to 460</span></div>
+            <div class="tl-row is-content" data-phase="content"><span class="tl-name">Content</span><span class="tl-track"><span class="tl-bar" style="--s: 60; --d: 200" title="Content fade, 60 to 260 ms"></span></span><span class="tl-ms">60 to 260</span></div>
+            <div class="tl-axis" aria-hidden="true"><span style="--t: 0">0</span><span style="--t: 100">100</span><span style="--t: 200">200</span><span style="--t: 300">300</span><span style="--t: 400">400</span><span style="--t: 500">500 ms</span></div>
+            <span class="tl-head" id="tl-head" aria-hidden="true"></span>
+          </div>
+        </figure>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>All six parts</h3><span class="tag">ANATOMY</span></div><p>The old place drains, a comet runs along the horizon, the new place fills and a burst lands. A wash falls onto the content as it fades in. The chart's playhead follows along.</p><div class="m-foot"><span class="m-time">460 MS</span><button type="button" class="btn play" data-play="anatomy.play">Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-nav" data-num="1" data-name="Navigation" data-note="Light travels along the line you tapped on, from where you were to where you're going." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar">
+            <span class="stage-name">The app</span>
+            <div class="seg seg-sm" role="group" aria-label="Frame">
+              <button type="button" data-frame="laptop" aria-pressed="true">Laptop</button>
+              <button type="button" data-frame="phone" aria-pressed="false">Phone</button>
+            </div>
+          </div>
+          <div class="nav-holder" id="nav-holder"></div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Change page</h3><span class="tag tag-replace">REPLACES WIPE</span></div><p>The old section's underline drains into a comet that runs along the horizon and fills the new one from the side it arrived on. A short wash falls onto the page as it fades in.</p><div class="m-foot"><span class="m-time">460 MS</span><button type="button" class="btn play" data-play="nav.page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Change tab</h3><span class="tag">NEW</span></div><p>The same trip along the bottom edge of the tab strip. The panel fades in as the light lands.</p><div class="m-foot"><span class="m-time">380 MS</span><button type="button" class="btn play" data-play="nav.tab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Open a record</h3><span class="tag">NEW</span></div><p>Light runs along the row you picked, then falls from the bar above as a wash while the record fades in. There's no sideways comet, since you moved deeper into the same section.</p><div class="m-foot"><span class="m-time">420 MS</span><button type="button" class="btn play" data-play="nav.open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Go back</h3><span class="tag">NEW</span></div><p>The list fades back in and the light runs back along the row you came from, so you can see where you were.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="nav.back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Search</h3><span class="tag">NEW</span></div><p>The launcher's top edge fills outward from the point under the search button, with a burst where it starts. Closing drains it back to that point.</p><div class="m-foot"><span class="m-time">320 MS</span><button type="button" class="btn play" data-play="nav.search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+
+      <div class="gpanel" id="g-overlays" data-num="2" data-name="Overlays" data-note="Every surface that opens above the page gets a horizon line along its top edge, lit from the control that opened it." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">Lyra's sheet</span></div>
+          <div class="ov-stage" id="ov-stage">
+            <div class="ov-page">
+              <div class="ov-head">
+                <span class="portrait sm" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="var(--party)" stroke-width="2.4" stroke-linejoin="round"><path d="M24 6 34 33H14z"/><path d="M7 35.5c5 3.5 29 3.5 34 0"/></svg></span>
+                <div class="ov-who"><span class="ov-name">Lyra Emberwise</span><span class="ov-sub">Elf wizard 7</span></div>
+              </div>
+              <div class="ov-actions">
+                <button type="button" class="btn" id="ov-btn-dialog">Change HP</button>
+                <button type="button" class="btn" id="ov-btn-menu">Rest <svg viewBox="0 0 24 24" aria-hidden="true" class="chev"><path d="M6 9l6 6 6-6"/></svg></button>
+                <button type="button" class="btn" id="ov-btn-sheet">Conditions</button>
+                <button type="button" class="btn" id="ov-btn-drawer">Party</button>
+              </div>
+              <div class="ov-lines" aria-hidden="true"><span class="sk w90"></span><span class="sk w75"></span><span class="sk w60"></span><span class="sk w90"></span><span class="sk w40"></span></div>
+            </div>
+            <div class="ov-scrim" id="ov-scrim" hidden></div>
+            <div class="ov-dialog surface" id="ov-dialog" role="dialog" aria-label="Change HP" hidden>
+              <div class="edge"></div>
+              <div class="sf-head"><strong>Change HP</strong><button type="button" class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+              <div class="sf-row"><span class="num big">38</span><span class="mute">of 44</span></div>
+              <div class="sf-btns"><span class="btn ghost">Damage</span><span class="btn ghost">Heal</span><span class="btn primary">Apply</span></div>
+            </div>
+            <div class="ov-menu surface" id="ov-menu" role="menu" aria-label="Rest" hidden>
+              <div class="edge"></div>
+              <span class="mi" role="menuitem">Short rest</span>
+              <span class="mi" role="menuitem">Long rest</span>
+            </div>
+            <div class="ov-drawer surface" id="ov-drawer" aria-label="Party" hidden>
+              <div class="edge"></div>
+              <div class="sf-head"><strong>Party</strong><button type="button" class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+              <ul class="party-list"><li><span class="dot"></span>Lyra <span class="num">38/44</span></li><li><span class="dot"></span>Borin <span class="num">52/52</span></li><li><span class="dot"></span>Mirena <span class="num">21/30</span></li></ul>
+            </div>
+            <div class="ov-sheet surface" id="ov-sheet" aria-label="Conditions" hidden>
+              <div class="edge"></div>
+              <div class="sf-head"><strong>Conditions</strong><button type="button" class="x" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+              <div class="chip-row"><span class="chip">Blinded</span><span class="chip">Charmed</span><span class="chip">Frightened</span><span class="chip">Poisoned</span><span class="chip">Prone</span></div>
+            </div>
+            <div class="ov-toast surface" id="ov-toast" role="status" hidden>
+              <div class="edge"></div>
+              <span>Saved to the Codex</span>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Dialog</h3><span class="tag tag-restyle">RESTYLE</span></div><p>The dialog rises 8 px as it fades in, and its top edge fills outward from above the button you pressed.</p><div class="m-foot"><span class="m-time">340 MS</span><button type="button" class="btn play" data-play="ov.dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Menu</h3><span class="tag tag-restyle">RESTYLE</span></div><p>The menu's top edge fills outward from the button it hangs from, over a shorter 200 ms.</p><div class="m-foot"><span class="m-time">280 MS</span><button type="button" class="btn play" data-play="ov.menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Drawer</h3><span class="tag tag-restyle">RESTYLE</span></div><p>The drawer slides in from the right, and a comet runs along its top edge in the same direction.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="ov.drawer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Phone sheet</h3><span class="tag tag-restyle">RESTYLE</span></div><p>The sheet slides up from the bottom, with its top edge filling outward from the button that opened it.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="ov.sheet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Toast</h3><span class="tag tag-restyle">RESTYLE</span></div><p>The toast rises, and a comet runs along its top edge from left to right. When it leaves, the line drains first.</p><div class="m-foot"><span class="m-time">340 MS</span><button type="button" class="btn play" data-play="ov.toast"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Closing</h3><span class="tag">NEW</span></div><p>Any of these drains its line back to where it started while the surface fades. Press the close button or outside the surface.</p><div class="m-foot"><span class="m-time">160 MS</span><button type="button" class="btn play" data-play="ov.close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+
+      <div class="gpanel" id="g-turns" data-num="3" data-name="Turn flow" data-note="The turn order is a rail. Light moves along it whenever the turn or the round changes, and the lamps light and cool like a cabinet's bulbs." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">An encounter</span></div>
+          <div class="tf-stage" id="tf-stage">
+            <div class="tf-order" id="tf-order">
+              <div class="vcr" id="tf-vcr"><span class="vcr-state" id="tf-state">PLAY<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1.5v7l6-3.5z"/></svg></span><span class="vcr-rnd">RND <span class="roll" id="tf-rnd"><span>03</span></span></span></div>
+              <div class="tf-tiles" id="tf-tiles"></div>
+              <div class="hz tf-rail" id="tf-rail"></div>
+            </div>
+            <div class="tf-panel">
+              <div class="tf-actor" id="tf-actor"></div>
+              <div class="lamps" id="tf-lamps">
+                <div class="lamp" data-lamp="action"><i class="bulb"></i><span class="lamp-name">Action</span><span class="lamp-val">READY</span></div>
+                <div class="lamp" data-lamp="bonus"><i class="bulb"></i><span class="lamp-name">Bonus</span><span class="lamp-val">READY</span></div>
+                <div class="lamp" data-lamp="reaction"><i class="bulb"></i><span class="lamp-name">Reaction</span><span class="lamp-val">READY</span></div>
+                <div class="lamp" data-lamp="move"><i class="bulb bars"></i><span class="lamp-name">Move</span><span class="lamp-val">30 FT</span></div>
+              </div>
+              <div class="tf-prompt surface" id="tf-prompt" hidden>
+                <div class="edge"></div>
+                <p><span class="tag tag-on">REACTION</span> Goblin 2 is leaving your reach. Make an opportunity attack?</p>
+                <div class="sf-btns"><span class="btn ghost">Let it go</span><span class="btn primary">Attack</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Next turn</h3><span class="tag tag-restyle">RESTYLE</span></div><p>The sun frame slides to the next tile as it does today, with a comet under the tiles and a burst where it lands. The new creature's lamps light in order.</p><div class="m-foot"><span class="m-time">400 MS</span><button type="button" class="btn play" data-play="tf.next"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>New round</h3><span class="tag">NEW</span></div><p>After the last tile, the comet runs all the way back to the round counter. RND 03 rolls over to RND 04 like a tape counter as the sun frame returns to the top of the order.</p><div class="m-foot"><span class="m-time">520 MS</span><button type="button" class="btn play" data-play="tf.round"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Start encounter</h3><span class="tag">NEW</span></div><p>STOP becomes PLAY and RND 01 rolls in. A comet runs from the counter to the first tile, and the four lamps light one after another, Action to Move.</p><div class="m-foot"><span class="m-time">640 MS</span><button type="button" class="btn play" data-play="tf.start"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>End encounter</h3><span class="tag">NEW</span></div><p>The lamps go dark from Move back to Action and the sun frame drains. A comet returns to the counter as PLAY turns to STOP.</p><div class="m-foot"><span class="m-time">520 MS</span><button type="button" class="btn play" data-play="tf.end"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Use an action</h3><span class="tag">NEW</span></div><p>The Action lamp switches off with a short afterglow, like a cabinet bulb cooling.</p><div class="m-foot"><span class="m-time">320 MS</span><button type="button" class="btn play" data-play="tf.use"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>YOUR TURN</h3><span class="tag">NEW</span></div><p>The chrome lettering catches one sweep of the horizon's colours when your turn starts. It's round two's Chrome catch, kept for the lettering whose job is showing who's acting.</p><div class="m-foot"><span class="m-time">440 MS</span><button type="button" class="btn play" data-play="tf.yours"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Reaction prompt</h3><span class="tag">NEW</span></div><p>The Reaction lamp lights with a burst, and the prompt opens below with its top edge filling outward from the lamp.</p><div class="m-foot"><span class="m-time">380 MS</span><button type="button" class="btn play" data-play="tf.reaction"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+
+      <div class="gpanel" id="g-dice" data-num="4" data-name="Dice and checks" data-note="A roll is light arriving at a number. The light runs to the total, and the total counts up as it lands." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">The dice panel</span></div>
+          <div class="dc-stage">
+            <div class="roll-card surface" id="dc-card">
+              <div class="edge" id="dc-edge"></div>
+              <div class="rc-head"><span class="rc-what" id="dc-what">Perception</span><span class="tag tag-hidden" id="dc-tag">NAT 20</span></div>
+              <div class="rc-body">
+                <div class="dice" id="dc-dice"><span class="die" id="dc-d1"><span class="num">13</span></span><span class="die is-off" id="dc-d2" hidden><span class="num">6</span></span></div>
+                <span class="rc-mod num" id="dc-mod">+4</span>
+                <span class="rc-total num" id="dc-total">17</span>
+              </div>
+            </div>
+            <div class="call-card surface" id="dc-call">
+              <div class="edge"></div>
+              <div class="rc-head"><span class="rc-what">Wisdom save, DC 13</span><span class="call-state" id="dc-call-state">Waiting on 4</span></div>
+              <ul class="call-list" id="dc-call-list">
+                <li data-who="Lyra"><span>Lyra</span><span class="call-val num"></span></li>
+                <li data-who="Borin"><span>Borin</span><span class="call-val num"></span></li>
+                <li data-who="Mirena"><span>Mirena</span><span class="call-val num"></span></li>
+                <li data-who="Taren"><span>Taren</span><span class="call-val num"></span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>A roll lands</h3><span class="tag tag-restyle">RESTYLE</span></div><p>A comet runs along the card's top edge to the total, which counts up over 300 ms as the burst lands.</p><div class="m-foot"><span class="m-time">420 MS</span><button type="button" class="btn play" data-play="dc.roll"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Natural 20</h3><span class="tag">NEW</span></div><p>The card flashes white once, for two frames, and the burst over the total lands twice as wide. NAT 20 lights beside the check.</p><div class="m-foot"><span class="m-time">520 MS</span><button type="button" class="btn play" data-play="dc.nat20"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Natural 1</h3><span class="tag">NEW</span></div><p>The light goes the other way. The card's top edge drains back toward the die, and the total dims briefly before settling.</p><div class="m-foot"><span class="m-time">360 MS</span><button type="button" class="btn play" data-play="dc.nat1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Advantage</h3><span class="tag">NEW</span></div><p>Both dice land, then light runs from the die that doesn't count to the one that does. The dropped die dims to 40%. Disadvantage runs the same way toward the lower die.</p><div class="m-foot"><span class="m-time">440 MS</span><button type="button" class="btn play" data-play="dc.adv"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Roll call</h3><span class="tag">NEW</span></div><p>Each answer drops into the list as it arrives. When the last one lands, a comet runs under the whole list and the header reads All in.</p><div class="m-foot"><span class="m-time">AS ANSWERS COME</span><button type="button" class="btn play" data-play="dc.call"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+
+      <div class="gpanel" id="g-hp" data-num="5" data-name="Hit points and conditions" data-note="The life bar is a rail. Light runs along it from the old value to the new one, in the direction the hit points moved." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">A character band</span><button type="button" class="linkbtn" data-play="hp.reset">Reset</button></div>
+          <div class="hp-stage" id="hp-stage">
+            <div class="hp-who">
+              <span class="portrait" id="hp-portrait" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="var(--party)" stroke-width="2" stroke-linejoin="round"><path d="M24 5 34 33H14z"/><path d="M6 35.5c5 3.5 31 3.5 36 0"/><path d="M21 17l1 2 2 .4-1.5 1.4.4 2.1-1.9-1-1.9 1 .4-2.1L18 19.4l2-.4z" stroke="var(--hp)" stroke-width="1.4"/></svg></span>
+              <div><span class="hp-name">Lyra Emberwise</span><span class="hp-sub">Elf wizard 7</span></div>
+            </div>
+            <div class="lifebar" id="hp-bar">
+              <div class="lb-head"><span class="lb-label">HP</span><span class="lb-temp num" id="hp-temp" hidden>+5 TEMP</span><span class="num lb-num"><span id="hp-now">38</span>/44</span></div>
+              <div class="lb-rail" id="hp-rail">
+                <div class="lb-templine" id="hp-templine"></div>
+                <div class="lb-well">
+                  <div class="lb-seg lb-lost" id="hp-lost"></div>
+                  <div class="lb-seg lb-left" id="hp-left"></div>
+                </div>
+              </div>
+            </div>
+            <div class="saves" id="hp-saves" hidden>
+              <div class="save-row"><span class="save-k">Successes</span><span class="pips" data-kind="ok"><i></i><i></i><i></i></span></div>
+              <div class="save-row"><span class="save-k">Failures</span><span class="pips" data-kind="bad"><i></i><i></i><i></i></span></div>
+              <span class="tag tag-hidden" id="hp-stable">STABLE</span>
+            </div>
+            <div class="chip-row" id="hp-chips">
+              <span class="chip chip-conc" id="hp-conc">Concentrating: Hold Person<i class="chip-line"></i></span>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Damage</h3><span class="tag tag-restyle">RESTYLE</span></div><p>The lost segments flash white for two frames, as today. A comet then runs left along the bar to the new value and bursts there.</p><div class="m-foot"><span class="m-time">400 MS</span><button type="button" class="btn play" data-play="hp.damage"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Healing</h3><span class="tag">NEW</span></div><p>A gold comet runs right from the old value, and the regained segments fill in behind it.</p><div class="m-foot"><span class="m-time">400 MS</span><button type="button" class="btn play" data-play="hp.heal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Temporary hit points</h3><span class="tag">NEW</span></div><p>A cyan line draws along the top of the bar with its own comet, and the TEMP readout appears.</p><div class="m-foot"><span class="m-time">360 MS</span><button type="button" class="btn play" data-play="hp.temp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Dropping to 0</h3><span class="tag">NEW</span></div><p>The bar drains to empty and the portrait dims. The death save pips fade in under it.</p><div class="m-foot"><span class="m-time">520 MS</span><button type="button" class="btn play" data-play="hp.down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Death saves</h3><span class="tag">NEW</span></div><p>Each save fills its pip with a burst, cyan for a success and red for a failure. Three successes light STABLE.</p><div class="m-foot"><span class="m-time">300 MS</span><span class="m-btns"><button type="button" class="btn play" data-play="hp.saveok">Success</button><button type="button" class="btn play" data-play="hp.savebad">Failure</button></span></div></li>
+          <li class="moment"><div class="m-head"><h3>A condition arrives</h3><span class="tag">NEW</span></div><p>The chip arrives with round one's Chroma settle split, pink and cyan, which settles as it fades in.</p><div class="m-foot"><span class="m-time">200 MS</span><button type="button" class="btn play" data-play="hp.cond"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Concentration breaks</h3><span class="tag">NEW</span></div><p>The chip's edge drains away and the chip splits apart as it fades.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="hp.conc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+
+      <div class="gpanel" id="g-map" data-num="6" data-name="Map and table screen" data-note="On the map, light follows what moved. Tokens glide, areas open from the side they were opened from, and the table screen gets the one big version." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name" id="map-name">The map</span><button type="button" class="linkbtn" data-play="map.reset">Reset</button></div>
+          <div class="map-frame" id="map-frame">
+            <div class="map" id="map">
+              <div class="map-scene" id="map-scene"></div>
+              <div class="hz map-hz" id="map-hz"></div>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Token moves</h3><span class="tag">NEW</span></div><p>The token glides along its path in 240 ms, and a trail in its ring colour draws behind it and drains from the start.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="map.move"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Fog clears</h3><span class="tag">NEW</span></div><p>The revealed room opens from the door side, with a thin edge of light moving across ahead of the reveal.</p><div class="m-foot"><span class="m-time">340 MS</span><button type="button" class="btn play" data-play="map.fog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Door opens</h3><span class="tag">NEW</span></div><p>The door swings on its hinge with a small burst at the hinge.</p><div class="m-foot"><span class="m-time">200 MS</span><button type="button" class="btn play" data-play="map.door"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Light source</h3><span class="tag">NEW</span></div><p>The torch's light fades up from the token as it grows to its full radius.</p><div class="m-foot"><span class="m-time">280 MS</span><button type="button" class="btn play" data-play="map.light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Spell zone</h3><span class="tag">NEW</span></div><p>A 20-foot Fireball spreads out from its point of origin, and its edge fills in behind the spread.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="map.zone"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Trap springs</h3><span class="tag">NEW</span></div><p>One red flash on the square, then the trap mark appears.</p><div class="m-foot"><span class="m-time">240 MS</span><button type="button" class="btn play" data-play="map.trap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Ping</h3><span class="tag tag-replace">REPLACES LOOP</span></div><p>One ring spreads and fades, once. Today the map's ping pulses until it's removed and the table screen's pulses five times.</p><div class="m-foot"><span class="m-time">600 MS</span><button type="button" class="btn play" data-play="map.ping"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Scene change</h3><span class="tag">NEW</span></div><p>Table screen only. A comet crosses the whole screen along the horizon and uncovers the new map behind it, and a wash falls as it lands.</p><div class="m-foot"><span class="m-time">700 MS</span><button type="button" class="btn play" data-play="map.scene"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+
+      <div class="gpanel" id="g-codex" data-num="7" data-name="Codex" data-note="Something new in the Codex arrives the way a page does, with light running to it." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">A player's Codex</span><button type="button" class="linkbtn" data-play="cx.reset">Reset</button></div>
+          <div class="cx-stage">
+            <div class="cx-bar">
+              <div class="tabs cx-tabs" id="cx-tabs">
+                <button type="button" role="tab" aria-selected="false">Home</button>
+                <button type="button" role="tab" aria-selected="false" id="cx-pages">Pages <span class="badge num" id="cx-badge" hidden>2 NEW</span></button>
+                <button type="button" role="tab" aria-selected="true">Atlas</button>
+                <button type="button" role="tab" aria-selected="false">Story</button>
+                <span class="ink" id="cx-ink"></span>
+              </div>
+            </div>
+            <article class="cx-doc" id="cx-doc">
+              <div class="crumbs">Atlas <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Locations</div>
+              <h3 class="doc-title">The Goblin Warren</h3>
+              <p>A sinkhole in the <a href="#g-codex" tabindex="-1">Thornwood</a> opens into a warren of low tunnels. The goblins have lined the main hall with stolen bedrolls.</p>
+              <div id="cx-slot"></div>
+              <p>The warren answers to <a href="#g-codex" tabindex="-1">Grukk Twotooth</a>, who rarely leaves the east chamber.</p>
+            </article>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>A GM reveal</h3><span class="tag">NEW</span></div><p>On a player's screen, the revealed block fades in under a comet along its top edge and a wash that falls onto it. It brightens once and settles.</p><div class="m-foot"><span class="m-time">460 MS</span><button type="button" class="btn play" data-play="cx.reveal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>New pages</h3><span class="tag">NEW</span></div><p>A comet runs along the Codex's own bar to Pages and bursts there as the 2 NEW count arrives. From another section, the same comet runs along the horizon and ends at Codex.</p><div class="m-foot"><span class="m-time">400 MS</span><button type="button" class="btn play" data-play="cx.new"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+
+      <div class="gpanel" id="g-rest" data-num="8" data-name="Character and rest" data-note="Resources are lamps and pips. Spending one cools it, and a rest relights them in order." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">Lyra's resources</span><button type="button" class="linkbtn" data-play="rs.reset">Reset</button></div>
+          <div class="rs-stage" id="rs-stage">
+            <div class="lifebar" id="rs-bar">
+              <div class="lb-head"><span class="lb-label">HP</span><span class="num lb-num"><span id="rs-now">21</span>/44</span></div>
+              <div class="lb-rail" id="rs-rail"><div class="lb-well"><div class="lb-seg lb-lost"></div><div class="lb-seg lb-left" id="rs-left"></div></div></div>
+            </div>
+            <div class="rs-grid">
+              <div class="rs-box">
+                <span class="k">Spell slots</span>
+                <div class="slot-row"><span class="slot-lv num">1</span><span class="pips slot" data-level="1"><i></i><i></i><i></i><i></i></span></div>
+                <div class="slot-row"><span class="slot-lv num">2</span><span class="pips slot" data-level="2"><i></i><i></i><i></i></span></div>
+                <div class="slot-row"><span class="slot-lv num">3</span><span class="pips slot" data-level="3"><i></i><i></i><i></i></span></div>
+              </div>
+              <div class="rs-box">
+                <span class="k">Arcane Recovery</span>
+                <div class="slot-row"><span class="pips use" id="rs-ar"><i></i></span><span class="mute sm" id="rs-ar-note">Once a day, short rest</span></div>
+                <span class="k">Heroic Inspiration</span>
+                <div class="insp" id="rs-insp"><span class="insp-dot"></span><span class="insp-label" id="rs-insp-label">NONE</span><i class="insp-line" id="rs-insp-line"></i></div>
+              </div>
+            </div>
+            <div class="xp" id="rs-xp">
+              <div class="lvl" id="rs-lvl"><span class="lvl-k">LVL</span><span class="roll num" id="rs-lvl-num"><span>7</span></span></div>
+              <div class="xp-main">
+                <div class="xp-head"><span class="k">Experience</span><span class="num" id="rs-xp-num">28,400 / 34,000</span></div>
+                <div class="xp-rail" id="rs-xp-rail"><div class="xp-fill" id="rs-xp-fill"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Spend a slot</h3><span class="tag">NEW</span></div><p>The pip goes dark with a short afterglow.</p><div class="m-foot"><span class="m-time">320 MS</span><button type="button" class="btn play" data-play="rs.spend"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Short rest</h3><span class="tag">NEW</span></div><p>Arcane Recovery's use cools, and the slots it recovers relight one after another with a small burst each.</p><div class="m-foot"><span class="m-time">480 MS</span><button type="button" class="btn play" data-play="rs.short"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Long rest</h3><span class="tag">NEW</span></div><p>Hit points refill along the bar with a gold comet, then every spent pip relights in order.</p><div class="m-foot"><span class="m-time">700 MS</span><button type="button" class="btn play" data-play="rs.long"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Heroic Inspiration</h3><span class="tag">NEW</span></div><p>A comet runs along the bottom edge of the badge and fills it, then INSPIRED lights.</p><div class="m-foot"><span class="m-time">360 MS</span><button type="button" class="btn play" data-play="rs.insp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Experience</h3><span class="tag">NEW</span></div><p>The experience bar fills with a comet to the new total, and the number counts up.</p><div class="m-foot"><span class="m-time">420 MS</span><button type="button" class="btn play" data-play="rs.xp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Level up</h3><span class="tag">NEW</span></div><p>The level number rolls over like the round counter with a burst behind it. The experience bar then drains and starts again for the next level.</p><div class="m-foot"><span class="m-time">640 MS</span><button type="button" class="btn play" data-play="rs.level"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+
+      <div class="gpanel" id="g-status" data-num="9" data-name="Connection and status" data-note="Status gets its own lines, so the horizon keeps its one job of marking the top of the app." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">The top of the app</span></div>
+          <div class="st-stage" id="st-stage">
+            <div class="st-appbar"><span class="wordmark" aria-label="OzyVTT"><span class="wm-ozy">OZY</span><span class="wm-vtt">vtt</span></span><span class="st-nav"><span>Table</span><span class="on">Sheet</span><span>Codex</span></span><div class="hz"></div></div>
+            <div class="st-reconnect" id="st-reconnect" hidden>
+              <span class="st-msg" id="st-msg">Reconnecting to the table</span>
+              <div class="st-line" id="st-line"></div>
+            </div>
+            <div class="st-body" id="st-body">
+              <div class="st-load" id="st-load">
+                <span class="sk w60"></span><span class="sk w90"></span><span class="sk w75"></span><span class="sk w90"></span><span class="sk w40"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Connection lost</h3><span class="tag">NEW</span></div><p>The reconnecting bar drops in under the top bar. Its own line is grey and unlit while the app waits.</p><div class="m-foot"><span class="m-time">240 MS</span><button type="button" class="btn play" data-play="st.lost"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Back at the table</h3><span class="tag tag-restyle">RESTYLE</span></div><p>A comet runs along the bar's line and lights it in the horizon colours. The bar reads Back at the table for 2 seconds, then drains and goes.</p><div class="m-foot"><span class="m-time">400 MS</span><button type="button" class="btn play" data-play="st.back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Loading</h3><span class="tag tag-replace">REPLACES LOOP</span></div><p>One comet runs along the top of the loading area when loading starts, and the placeholders stay still. The content fades in over them when it arrives.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="st.load"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-attack" data-num="10" data-name="Attacks and damage" data-note="An attack is light travelling from the attacker to the target. Whether it lands, and how hard, is the result." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">The map and the result card</span><button type="button" class="linkbtn" data-play="atk.reset">Reset</button></div>
+          <div class="atk-stage">
+            <div class="atk-map" id="atk-map">
+              <div class="atk-grid"></div>
+              <div class="atk-line" id="atk-line" hidden></div>
+              <span class="atk-range num" id="atk-range" hidden>FIRE BOLT 35 FT</span>
+              <div class="token atk-tok" id="atk-from">L</div>
+              <div class="atk-target" id="atk-target">
+                <div class="atk-bar"><i id="atk-bar-left"></i></div>
+                <div class="token foe atk-tok" id="atk-to">B</div>
+                <span class="atk-reticle" id="atk-reticle" hidden></span>
+              </div>
+            </div>
+            <div class="atk-card surface" id="atk-card">
+              <div class="edge" id="atk-edge"></div>
+              <div class="rc-head"><span class="rc-what">Fire Bolt at the bugbear</span><span class="tag tag-hidden" id="atk-tag">HIT</span></div>
+              <div class="atk-rows">
+                <div><span class="k">Attack</span><span class="num atk-n" id="atk-roll">--</span><span class="mute sm">vs AC 16</span></div>
+                <div><span class="k">Damage</span><span class="num atk-n" id="atk-dmg">--</span><span class="mute sm">fire</span></div>
+              </div>
+              <p class="atk-wait sm" id="atk-wait" hidden>Held while Borin decides whether to use his reaction.</p>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Aim</h3><span class="tag">NEW</span></div><p>Picking a target draws the attack line out from the attacker with a comet at its tip, and the reticle settles onto the target.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="atk.aim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Hit</h3><span class="tag">NEW</span></div><p>A comet runs down the attack line and bursts on the target. The damage number rises from the token, and its bar drains to match.</p><div class="m-foot"><span class="m-time">520 MS</span><button type="button" class="btn play" data-play="atk.hit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Critical hit</h3><span class="tag">NEW</span></div><p>The same trip with a gold burst twice as wide, and the result card flashes white for two frames. The damage number lands larger.</p><div class="m-foot"><span class="m-time">600 MS</span><button type="button" class="btn play" data-play="atk.crit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Miss</h3><span class="tag">NEW</span></div><p>The comet runs out of light short of the target and fades. MISS shows at the reticle, and the target&#x27;s bar doesn&#x27;t move.</p><div class="m-foot"><span class="m-time">360 MS</span><button type="button" class="btn play" data-play="atk.miss"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Held, then released</h3><span class="tag">NEW</span></div><p>While the GM waits on a reaction, the card shows WAIT on a grey, unlit line, and nothing pulses. Press again to release: light runs along the line and the damage lands.</p><div class="m-foot"><span class="m-time">460 MS</span><button type="button" class="btn play" data-play="atk.hold"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-init" data-num="11" data-name="Initiative and the turn order" data-note="When the turn order changes, the tiles slide to their new places and light runs between them along the rail." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">The turn order</span><button type="button" class="linkbtn" data-play="ini.reset">Reset</button></div>
+          <div class="ini-stage">
+            <div class="tf-order ini-order" id="ini-order">
+              <div class="vcr"><span class="vcr-state">PLAY<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1.5v7l6-3.5z"/></svg></span><span class="vcr-rnd">RND <span class="roll"><span>01</span></span></span></div>
+              <div class="tf-tiles ini-tiles" id="ini-tiles"></div>
+              <div class="hz tf-rail" id="ini-rail"></div>
+            </div>
+            <p class="ini-note" id="ini-note">Initiative isn't rolled yet.</p>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Roll initiative</h3><span class="tag">NEW</span></div><p>Each tile&#x27;s number lands in turn. The tiles then slide into order, a comet runs the length of the rail, and the sun frame settles on whoever goes first.</p><div class="m-foot"><span class="m-time">700 MS</span><button type="button" class="btn play" data-play="ini.roll"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>A creature joins</h3><span class="tag">NEW</span></div><p>The tiles after its place slide apart and the new tile fades into the gap. The rail fills under it with a burst.</p><div class="m-foot"><span class="m-time">360 MS</span><button type="button" class="btn play" data-play="ini.join"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>A creature falls</h3><span class="tag">NEW</span></div><p>Its portrait greys and the tile drains away, then the tiles after it slide back to close the gap.</p><div class="m-foot"><span class="m-time">420 MS</span><button type="button" class="btn play" data-play="ini.fall"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Trading places</h3><span class="tag">NEW</span></div><p>When a readied action or a swap changes the order, the two tiles cross and a comet runs each way along the rail.</p><div class="m-foot"><span class="m-time">360 MS</span><button type="button" class="btn play" data-play="ini.swap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Legendary action</h3><span class="tag">NEW</span></div><p>A pip under the dragon&#x27;s name cools with an afterglow. Once all three are spent, the next press relights them in order, as at the end of its turn.</p><div class="m-foot"><span class="m-time">320 MS</span><button type="button" class="btn play" data-play="ini.legend"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-ask" data-num="12" data-name="Requests to players" data-note="A request travels from the GM to a player&#x27;s phone and the answer travels back, along the top of the screen." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">A player&#x27;s phone</span><button type="button" class="linkbtn" data-play="ask.reset">Reset</button></div>
+          <div class="ask-stage">
+            <div class="ask-phone" id="ask-phone">
+              <div class="ask-bar"><span class="wordmark" aria-label="OzyVTT"><span class="wm-ozy">OZY</span><span class="wm-vtt">vtt</span></span><span class="ask-who">Playing Lyra</span><div class="hz ask-hz" id="ask-hz"></div></div>
+              <div class="ask-body">
+                <div class="ask-card surface" id="ask-rules">
+                  <div class="wline" id="ask-rules-line"><i class="wlit"></i></div>
+                  <span class="k">Your question</span>
+                  <p>Can I cast Shield after the GM says the arrow hits?</p>
+                  <p class="mute sm" id="ask-rules-wait">Waiting on the GM</p>
+                  <div class="ask-answer" id="ask-rules-answer" hidden><span class="k">The GM</span><p>Yes. Shield is a reaction to being hit, so it comes before the damage.</p></div>
+                </div>
+                <div class="ask-card surface" id="ask-hold">
+                  <div class="wline" id="ask-hold-line"><i class="wlit"></i></div>
+                  <div class="ask-head"><span class="ask-what">Shield</span><span class="tag tag-wait" id="ask-hold-tag">WAIT</span></div>
+                  <p class="sm" id="ask-hold-text">Sent. The GM is holding the hit until your Shield is applied.</p>
+                </div>
+              </div>
+              <div class="ask-sheet surface" id="ask-sheet" hidden>
+                <div class="edge" id="ask-sheet-edge"></div>
+                <div class="rc-head"><span class="rc-what">Wisdom save, DC 13</span><span class="tag tag-on">SAVE</span></div>
+                <p class="ask-why sm">Hold Person, cast by Grukk Twotooth.</p>
+                <div class="ask-roll"><span class="num ask-total" id="ask-total">--</span><span class="btn primary">Roll the save</span></div>
+              </div>
+              <span class="ask-sent num" id="ask-sent" hidden>SENT TO THE GM</span>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Save prompt arrives</h3><span class="tag">NEW</span></div><p>A comet runs in along the horizon, and the prompt rises from the bottom with its top edge lit behind it.</p><div class="m-foot"><span class="m-time">420 MS</span><button type="button" class="btn play" data-play="ask.save"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>The answer goes</h3><span class="tag">NEW</span></div><p>The roll lands in the prompt and counts up. Light then runs back along the prompt&#x27;s edge toward the GM, and the prompt sinks away.</p><div class="m-foot"><span class="m-time">460 MS</span><button type="button" class="btn play" data-play="ask.answer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Waiting, then done</h3><span class="tag">NEW</span></div><p>A request the GM hasn&#x27;t settled shows WAIT on a grey line and stays still. When the GM settles it, light runs along the line and WAIT becomes DONE.</p><div class="m-foot"><span class="m-time">380 MS</span><button type="button" class="btn play" data-play="ask.wait"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>A rules answer arrives</h3><span class="tag">NEW</span></div><p>Your question sits under a grey line. The GM&#x27;s answer arrives beneath it as the line lights from the left.</p><div class="m-foot"><span class="m-time">380 MS</span><button type="button" class="btn play" data-play="ask.rules"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-log" data-num="13" data-name="Log and chat" data-note="New lines arrive at the top of the log, and light marks each one as it lands." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">The GM&#x27;s sidebar</span><button type="button" class="linkbtn" data-play="log.reset">Reset</button></div>
+          <div class="log-stage" id="log-stage">
+            <div class="tabs log-tabs" id="log-tabs">
+              <button type="button" aria-selected="false" data-lt="fight">Fight</button>
+              <button type="button" aria-selected="true" data-lt="log">Log <span class="lbadge num"><span class="roll" id="log-badge"><span>2</span></span></span></button>
+              <button type="button" aria-selected="false" data-lt="party">Party</button>
+              <button type="button" aria-selected="false" data-lt="notes">Notes</button>
+              <span class="ink" id="log-ink"></span>
+            </div>
+            <ul class="log-list" id="log-list"></ul>
+            <div class="log-chat"><span class="log-input" id="log-input">Borin, hold the door</span><span class="btn" id="log-send">Send</span></div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>A log entry arrives</h3><span class="tag">NEW</span></div><p>The entries below slide down to make room. The new one fades in with a comet along its lower edge.</p><div class="m-foot"><span class="m-time">360 MS</span><button type="button" class="btn play" data-play="log.entry"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>While you&#x27;re on another tab</h3><span class="tag">NEW</span></div><p>A comet runs along the tab strip from where you are to Log and bursts there, and the count rolls up by one like a tape counter.</p><div class="m-foot"><span class="m-time">400 MS</span><button type="button" class="btn play" data-play="log.count"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>You send a message</h3><span class="tag">NEW</span></div><p>The field clears and your message appears at the top. Light runs along its edge from the side the Send button is on.</p><div class="m-foot"><span class="m-time">340 MS</span><button type="button" class="btn play" data-play="log.send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-table" data-num="14" data-name="The table and its people" data-note="The GM&#x27;s bar shows who&#x27;s here and what the table screen is doing. Both change with a lamp lighting or cooling." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">The GM&#x27;s bar, the table screen and the join screen</span></div>
+          <div class="tbl-stage">
+            <div class="tbl-bar">
+              <span class="tbl-screen"><span class="tbl-k">Table screen</span><i class="tbl-lamp" id="tbl-lamp"></i><span class="roll num tbl-state" id="tbl-state"><span>ON</span></span></span>
+              <span class="tbl-people" id="tbl-people">
+                <span class="pres" data-p="lyra">L<i class="pres-line"></i></span>
+                <span class="pres" data-p="borin">B<i class="pres-line"></i></span>
+                <span class="pres is-off" data-p="mirena">M<i class="pres-line"></i></span>
+              </span>
+            </div>
+            <div class="tbl-row">
+              <div class="tbl-preview" id="tbl-preview">
+                <div class="tbl-view" id="tbl-view"><span class="room r1"></span><span class="room r2 b"></span><span class="room r3"></span><span class="grid"></span><span class="tbl-tok" style="left: 22%; top: 46%"></span><span class="tbl-tok" style="left: 30%; top: 30%"></span><span class="tbl-tok foe" style="left: 66%; top: 38%"></span></div>
+                <div class="hz tbl-hz" id="tbl-hz"></div>
+                <span class="tbl-cap num">TABLE SCREEN</span>
+              </div>
+              <div class="tbl-claim" id="tbl-claim">
+                <span class="k">Join screen</span>
+                <div class="claim-card surface" data-c="lyra"><div class="edge"></div><span class="claim-face">L</span>Lyra</div>
+                <div class="claim-card surface" data-c="borin"><div class="edge"></div><span class="claim-face">B</span>Borin</div>
+                <div class="claim-card surface" data-c="mirena"><div class="edge"></div><span class="claim-face">M</span>Mirena</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>A player joins</h3><span class="tag">NEW</span></div><p>Their square brightens, and a line fills under it from the centre with a burst.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="tbl.join"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>A player drops</h3><span class="tag">NEW</span></div><p>Their square cools with a short afterglow, and its line drains.</p><div class="m-foot"><span class="m-time">320 MS</span><button type="button" class="btn play" data-play="tbl.drop"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Table screen on or off</h3><span class="tag">NEW</span></div><p>The lamp lights and OFF rolls over to ON, while a comet runs along the preview&#x27;s horizon and the picture fades up. Turning it off runs the other way.</p><div class="m-foot"><span class="m-time">420 MS</span><button type="button" class="btn play" data-play="tbl.screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>The screen follows your view</h3><span class="tag">NEW</span></div><p>When the table screen follows the GM&#x27;s camera, it glides to the new view in 320 ms and a wash falls where it settles.</p><div class="m-foot"><span class="m-time">360 MS</span><button type="button" class="btn play" data-play="tbl.follow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>A character is claimed</h3><span class="tag">NEW</span></div><p>On the join screen, the picked card&#x27;s top edge fills outward from its centre and the other cards dim.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="tbl.claim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-prep" data-num="15" data-name="Prep and building" data-note="Building something is a rail too. Steps, scores and budgets fill as they move." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">The character builder and Prep</span><button type="button" class="linkbtn" data-play="prp.reset">Reset</button></div>
+          <div class="prp-stage">
+            <div class="tabs prp-steps" id="prp-steps"></div>
+            <p class="prp-note" id="prp-note">Step 4 of 6: Abilities</p>
+            <dl class="prp-abil" id="prp-abil"></dl>
+            <div class="prp-meter">
+              <div class="prp-head"><span class="k">Encounter budget</span><span class="roll num prp-band" id="prp-band"><span>MODERATE</span></span></div>
+              <div class="prp-rail" id="prp-rail"><span class="band low"></span><span class="band mod"></span><span class="band high"></span><i class="prp-fill" id="prp-fill"></i></div>
+            </div>
+            <div class="prp-tray">
+              <div class="prp-tray-box"><span class="k">Staging tray</span><span class="token foe prp-tok">K</span><span class="mute sm">Kobold, 3 left</span></div>
+              <div class="prp-cells" id="prp-cells"><i></i><i></i><i></i><i class="is-target"></i><i></i><i></i></div>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Next builder step</h3><span class="tag">NEW</span></div><p>The character builder&#x27;s step rail does a tab change. The step you finished keeps its tick, and the next step&#x27;s page fades in.</p><div class="m-foot"><span class="m-time">380 MS</span><button type="button" class="btn play" data-play="prp.step"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Roll ability scores</h3><span class="tag">NEW</span></div><p>The six scores land one after another, each counting up with a small burst.</p><div class="m-foot"><span class="m-time">560 MS</span><button type="button" class="btn play" data-play="prp.roll"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Encounter budget rises</h3><span class="tag">NEW</span></div><p>Adding a monster runs a comet out to the meter&#x27;s new level. Crossing into a new band rolls the band&#x27;s name over.</p><div class="m-foot"><span class="m-time">380 MS</span><button type="button" class="btn play" data-play="prp.meter"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>A token is placed</h3><span class="tag">NEW</span></div><p>A token dropped from the staging tray settles into its square with a burst.</p><div class="m-foot"><span class="m-time">240 MS</span><button type="button" class="btn play" data-play="prp.place"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-time" data-num="16" data-name="Time and survival" data-note="Time is a counter. When it moves, every duration it touches moves with it." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">Lyra, three days into the Thornwood</span><button type="button" class="linkbtn" data-play="tim.reset">Reset</button></div>
+          <div class="tim-stage">
+            <div class="chip-row" id="tim-effects"></div>
+            <div class="lifebar" id="tim-bar">
+              <div class="lb-head"><span class="lb-label">HP</span><span class="num lb-num"><span id="tim-now">21</span>/44</span></div>
+              <div class="lb-rail" id="tim-rail"><div class="lb-well"><div class="lb-seg lb-lost"></div><div class="lb-seg lb-left" id="tim-left"></div></div></div>
+            </div>
+            <div class="tim-row"><span class="tim-k">Hit dice</span><span class="pips use" id="tim-hd"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="num mute">D6</span></div>
+            <div class="tim-row"><span class="tim-k">Exhaustion</span><span class="pips" data-kind="bad" id="tim-exh"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="sm mute" id="tim-exh-note">None</span></div>
+            <div class="tim-row"><span class="tim-k">Breath</span><span class="roll num tim-breath" id="tim-breath"><span>3 ROUNDS</span></span><span class="tim-bline"><i id="tim-blit"></i></span></div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Time passes</h3><span class="tag">NEW</span></div><p>When the GM passes time, each effect&#x27;s duration rolls down by the time that passed, and an effect that runs out splits apart as it goes. There&#x27;s no world clock.</p><div class="m-foot"><span class="m-time">420 MS</span><button type="button" class="btn play" data-play="tim.pass"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Hit dice spent</h3><span class="tag">NEW</span></div><p>A hit die cools with an afterglow, and a gold comet runs along the life bar to the healed value.</p><div class="m-foot"><span class="m-time">380 MS</span><button type="button" class="btn play" data-play="tim.hd"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Exhaustion</h3><span class="tag">NEW</span></div><p>The next level&#x27;s pip fills red with a burst, and the penalty line updates.</p><div class="m-foot"><span class="m-time">260 MS</span><button type="button" class="btn play" data-play="tim.exh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Holding breath</h3><span class="tag">NEW</span></div><p>The rounds left roll down one at a time and the line under them drains a third. At zero the counter turns red and reads CHOKING.</p><div class="m-foot"><span class="m-time">260 MS</span><button type="button" class="btn play" data-play="tim.breath"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-media" data-num="17" data-name="Sound and replay" data-note="Music and replays have their own transport, so their own lines carry the light." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">Now playing and a replay</span></div>
+          <div class="med-stage">
+            <div class="med-card surface">
+              <div class="med-head"><span class="k">Now playing</span><span class="roll num med-state" id="med-state"><span>PLAY</span></span></div>
+              <div class="roll med-title" id="med-title"><span>Goblin warren, low drums</span></div>
+              <div class="med-line" id="med-line"><i class="med-lit" id="med-lit"></i></div>
+              <div class="med-btns" aria-hidden="true">
+                <span class="med-b"><svg viewBox="0 0 24 24"><path d="M7 6v12M18 6l-9 6 9 6z"/></svg></span>
+                <span class="med-b"><svg viewBox="0 0 24 24"><path d="M8 6v12M16 6v12"/></svg></span>
+                <span class="med-b"><svg viewBox="0 0 24 24"><path d="M17 6v12M6 6l9 6-9 6z"/></svg></span>
+              </div>
+            </div>
+            <div class="med-card surface">
+              <div class="med-head"><span class="k">Replay: The Goblin Warren</span><span class="num med-vcr">RND <span class="roll" id="med-rnd"><span>01</span></span></span></div>
+              <div class="med-scrub" id="med-scrub"><i class="med-tick"></i><i class="med-tick"></i><i class="med-tick"></i><i class="med-tick"></i><i class="med-tick"></i><span class="med-play" id="med-playhead"></span></div>
+              <div class="med-rounds num" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+            </div>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Next track</h3><span class="tag">NEW</span></div><p>The progress line drains back to the start and the new title rolls in, with a burst where the line begins again.</p><div class="m-foot"><span class="m-time">380 MS</span><button type="button" class="btn play" data-play="med.next"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Pause and play</h3><span class="tag">NEW</span></div><p>PLAY and PAUSE swap like a tape deck&#x27;s display, and the lit part of the progress line dims while paused.</p><div class="m-foot"><span class="m-time">240 MS</span><button type="button" class="btn play" data-play="med.pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Next round in a replay</h3><span class="tag">NEW</span></div><p>The round counter rolls over, and the playhead runs along the scrubber to the new round with a comet on the scrubber&#x27;s line.</p><div class="m-foot"><span class="m-time">420 MS</span><button type="button" class="btn play" data-play="med.round"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Scrubbing</h3><span class="tag">NEW</span></div><p>Letting go of the playhead glides it to the nearest round, with a burst where it stops.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="med.scrub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+      <div class="gpanel" id="g-controls" data-num="18" data-name="Controls" data-note="Small controls use the same light at a smaller size." role="tabpanel" hidden>
+        <div class="g-stage">
+          <div class="stage-bar"><span class="stage-name">Settings and lists</span></div>
+          <div class="ctl-stage">
+            <div class="ctl-row"><span>Reduce transparency</span><button type="button" class="sw" id="ctl-switch" role="switch" aria-checked="false" aria-label="Reduce transparency"><i class="sw-fill" id="ctl-sw-fill"></i><i class="sw-thumb" id="ctl-sw-thumb"></i></button></div>
+            <ul class="ctl-checks" id="ctl-checks">
+              <li><span class="cbox"></span>Rope, 50 feet<i class="row-line"></i></li>
+              <li><span class="cbox"></span>Healing draughts<i class="row-line"></i></li>
+              <li><span class="cbox"></span>The Hollins reliquary<i class="row-line"></i></li>
+            </ul>
+            <div class="ctl-copy"><span class="ctl-field num" id="ctl-field">http://192.168.1.20:3001<i class="row-line" id="ctl-fline"></i></span><span class="btn"><span class="roll" id="ctl-copy"><span>Copy</span></span></span></div>
+            <ul class="ctl-list" id="ctl-list">
+              <li data-r="a"><span class="grip" aria-hidden="true"></span>Goblin warren<i class="row-line"></i></li>
+              <li data-r="b"><span class="grip" aria-hidden="true"></span>Thornwood road<i class="row-line"></i></li>
+              <li data-r="c"><span class="grip" aria-hidden="true"></span>Hollins farm<i class="row-line"></i></li>
+            </ul>
+          </div>
+        </div>
+        <ol class="moments">
+          <li class="moment"><div class="m-head"><h3>Switch</h3><span class="tag">NEW</span></div><p>The thumb slides across and the track fills behind it from the side it left, with a small burst where it stops.</p><div class="m-foot"><span class="m-time">200 MS</span><button type="button" class="btn play" data-play="ctl.switch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Checkbox</h3><span class="tag">NEW</span></div><p>The box fills with a burst, and a comet runs along the row&#x27;s line as it lights.</p><div class="m-foot"><span class="m-time">220 MS</span><button type="button" class="btn play" data-play="ctl.check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Copy the join address</h3><span class="tag">NEW</span></div><p>A comet runs along the field&#x27;s line, and Copy rolls over to Copied for two seconds.</p><div class="m-foot"><span class="m-time">360 MS</span><button type="button" class="btn play" data-play="ctl.copy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+          <li class="moment"><div class="m-head"><h3>Reorder by dragging</h3><span class="tag">NEW</span></div><p>The dropped row settles into its place as the rows around it slide, and its line fills with a burst.</p><div class="m-foot"><span class="m-time">300 MS</span><button type="button" class="btn play" data-play="ctl.reorder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>Play</button></div></li>
+        </ol>
+      </div>
+
+      </div>
+      <div class="dock" id="dock">
+        <div class="mo-bar" id="mo-bar">
+          <div class="mo-strip" id="mo-strip" role="group" aria-label="Moments"></div>
+        </div>
+        <div class="mo-info" id="mo-info">
+          <div class="mo-row"><span class="mo-meta"><span class="tag" id="mo-tag"></span><span class="m-time" id="mo-time"></span></span><span class="mo-btns" id="mo-btns"></span></div>
+          <p class="mo-desc" id="mo-desc"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="intro block" id="about" aria-labelledby="about-title">
+      <p class="eyebrow">OzyVTT motion system</p>
+      <h1 id="about-title">Light rail</h1>
+      <p class="lede">One motion language for every change in the app. Light travels along a line that's already on screen, from where something was to where it's going. It drains out of the old place, runs as a comet, bursts on arrival and fills the new place. A short wash falls onto whatever changed. The content itself only fades, so nothing waits on the light.</p>
+      <p class="lede">The player above has one live stage per group. Pick a group along the top, then a moment along the bottom, and it plays. Play runs it again, and you can also use a stage directly where it has controls. Slow, 6x in the bar stretches every timing so you can study it.</p>
+      <p class="lede">The Tone switch in the bar compares the approved light (Before) with Horizon, which carries the Cup button's look into every moment. Each lit line is a horizon, cyan to yellow along its own length, with a faint cast of the same colours beside it. A comet takes the horizon's colour where it leaves and where it lands, and a burst takes the colour where it lands. Hit points, damage, healing and targeting keep their own colours, because those colours mean something. Plain display lettering moves to Chakra Petch, and chrome lettering stays Bungee.</p>
+      <p class="rm-note">Your device asks for reduced motion. The stages still play when you press, so you can judge them; in the app these would be instant for you.</p>
+  <h2 class="parts-title">The six parts</h2>
+      <dl class="parts">
+        <div><dt>Drain</dt><dd>The old place lets go of its light, shrinking toward the direction of travel.</dd></div>
+        <div><dt>Comet</dt><dd>A bright head with a tapered tail runs along an existing line. Its tail stretches mid-trip and shrinks into the head on arrival.</dd></div>
+        <div><dt>Fill</dt><dd>The new place lights from the side the comet arrived on.</dd></div>
+        <div><dt>Burst</dt><dd>One short flash where the light lands. Dusk gives it a glow; Dawn shows only the flash on the line.</dd></div>
+        <div><dt>Wash</dt><dd>A faint fall of the line's own colour onto what changed, gone in a quarter second.</dd></div>
+        <div><dt>Content</dt><dd>The thing you asked for. It starts fading in at 60 ms and is complete by 260 ms.</dd></div>
+      </dl>
+    </section>
+
+    <section class="block rules" id="rules" aria-labelledby="rules-title">
+      <div class="sec-head">
+        <h2 id="rules-title">Rules</h2>
+        <p>What the Motion section of the design doc would say if Light rail is adopted. These replace the current 120 to 200 ms rule and the tab fade.</p>
+      </div>
+      <ol class="rule-list">
+        <li><h4>Light travels from the old place to the new one.</h4><p>It drains out of the old place, runs as one comet, bursts and fills where it lands. A wash is optional.</p></li>
+        <li><h4>Light rides lines that are already there.</h4><p>The horizon, tab strips, the top edge of a surface, a bar or a rail of pips. Nothing gets a new line just to carry light.</p></li>
+        <li><h4>Content never waits.</h4><p>It starts fading in within 60 ms and is complete within 300 ms. The light around it ends within 500 ms, except for sequences that light several things in order, like a long rest or the start of an encounter, which may run to 700 ms.</p></li>
+        <li><h4>One pass per change.</h4><p>Light never loops or pulses. A moment plays again only when the thing happens again.</p></li>
+        <li><h4>The page itself only fades.</h4><p>Light lives in bars, strips and overlays, so the pane keeps its no-transform rule and fixed overlays stay put.</p></li>
+        <li><h4>Waiting is still.</h4><p>Something waiting on a person shows WAIT on a grey, unlit line and doesn't move. When it resolves, light runs along that line.</p></li>
+        <li><h4>Lists that reorder slide.</h4><p>When items change places, each slides from where it was in 240 ms, and light runs along the rail between the old place and the new one.</p></li>
+        <li><h4>Each 80s element keeps its job.</h4><p>Status uses its own lines, and chrome lettering only catches light when it names who's acting.</p></li>
+        <li><h4>Dawn has no glow.</h4><p>The burst is a flash on the line and the wash is half as strong.</p></li>
+        <li><h4>Reduced motion skips the light.</h4><p>Content swaps instantly. Reduced transparency drops the wash.</p></li>
+      </ol>
+      <div class="tokens">
+        <h3>Proposed tokens</h3>
+        <div class="table-wrap">
+          <table class="tok">
+            <thead><tr><th>Token</th><th class="n">Value</th><th>Used for</th></tr></thead>
+            <tbody>
+              <tr><td><code>--dur-drain</code></td><td class="n">130 ms</td><td>The old place letting go</td></tr>
+              <tr><td><code>--dur-comet</code></td><td class="n">230 ms</td><td>The trip, whatever the distance</td></tr>
+              <tr><td><code>--dur-fill</code></td><td class="n">140 ms</td><td>The new place lighting</td></tr>
+              <tr><td><code>--dur-burst</code></td><td class="n">200 ms</td><td>The flash on arrival</td></tr>
+              <tr><td><code>--dur-wash</code></td><td class="n">260 ms</td><td>Light falling onto what changed</td></tr>
+              <tr><td><code>--dur-content</code></td><td class="n">200 ms</td><td>The content fade, after a 60 ms start</td></tr>
+              <tr><td><code>--ease-travel</code></td><td class="n">0.45, 0, 0.25, 1</td><td>The comet, slow to start and slow to stop</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="loops">
+        <h3>Loops to retire</h3>
+        <ul>
+          <li>The loading skeleton sweeps forever, in <code>packages/ui/src/primitives/Skeleton.css</code>. Group 9 replaces it with one comet.</li>
+          <li>The map's ping pulses until it's removed, in <code>apps/client/src/scene/annotation.css</code>. Group 6 replaces it with one ring.</li>
+          <li>The table screen's ping pulses five times, in <code>apps/client/src/viewer/viewer.css</code>. It takes the same single ring.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</div>
+
+<template id="tpl-nav-app">
+  <div class="demo">
+    <div class="app">
+      <div class="bar"><div class="hz app-hz"></div></div>
+      <div class="brand"><span class="wordmark" aria-label="OzyVTT"><span class="wm-ozy">OZY</span><span class="wm-vtt">vtt</span></span></div>
+      <nav class="sections" aria-label="Sections">
+        <button type="button" data-page="sheet"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span class="lbl">Sheet</span></button>
+        <button type="button" data-page="codex"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h7M9 17h7"/></svg><span class="lbl">Codex</span></button>
+        <button type="button" data-page="compendium"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/><path d="M9 7.5h6"/></svg><span class="lbl">Compendium</span></button>
+      </nav>
+      <div class="who">
+        <button type="button" class="iconbtn" data-search aria-label="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
+        <span class="mini" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="var(--party)" stroke-width="2.6" stroke-linejoin="round"><path d="M24 7 33 33H15z"/><path d="M8 35c4 3 28 3 32 0"/></svg></span>
+      </div>
+      <div class="pane"></div>
+      <div class="scrim" hidden></div>
+      <div class="launcher surface" hidden>
+        <div class="edge"></div>
+        <div class="ln-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><span>Search pages, monsters, spells</span><span class="kbd">ESC</span></div>
+        <ul class="ln-list"><li><span>Goblin</span><span class="mute">Monster</span></li><li><span>The Goblin Warren</span><span class="mute">Codex page</span></li><li><span>Grukk Twotooth</span><span class="mute">Codex page</span></li></ul>
+      </div>
+      <div class="scan" aria-hidden="true"></div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-sheet">
+  <section aria-label="Lyra Emberwise">
+    <div class="sheet-head">
+      <span class="portrait" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="var(--party)" stroke-width="2" stroke-linejoin="round"><path d="M24 5 34 33H14z"/><path d="M6 35.5c5 3.5 31 3.5 36 0"/><path d="M21 17l1 2 2 .4-1.5 1.4.4 2.1-1.9-1-1.9 1 .4-2.1L18 19.4l2-.4z" stroke="var(--hp)" stroke-width="1.4"/></svg></span>
+      <div class="who-block"><h3 class="name">Lyra Emberwise</h3><p class="sub">Elf wizard 7, Evoker. Sage.</p></div>
+      <dl class="stats"><div class="box"><dt>AC</dt><dd>15</dd></div><div class="box"><dt>Init</dt><dd>+2</dd></div><div class="box"><dt>Speed</dt><dd>30</dd></div></dl>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Sheet" data-group="sheet">
+      <button type="button" role="tab" data-tab="spells">Spells</button>
+      <button type="button" role="tab" data-tab="gear">Gear</button>
+      <button type="button" role="tab" data-tab="features">Features</button>
+      <button type="button" role="tab" data-tab="notes">Notes</button>
+      <span class="ink"></span>
+    </div>
+    <div class="host" data-group="sheet"></div>
+  </section>
+</template>
+<template id="tpl-sheet-spells"><div><h4 class="group-k">Cantrips</h4><ul class="rows"><li><span class="rname">Fire Bolt</span><span class="rmeta">Action, 120 ft. +7, 2d10 fire</span></li><li><span class="rname">Mage Hand</span><span class="rmeta">Action, 30 ft.</span></li><li><span class="rname">Ray of Frost</span><span class="rmeta">Action, 60 ft. +7, 2d8 cold</span></li></ul><h4 class="group-k">Level 1</h4><ul class="rows"><li><span class="rname">Magic Missile</span><span class="rmeta">Action, 120 ft. 3 darts of 1d4 + 1</span></li><li><span class="rname">Shield <span class="tag">REACTION</span></span><span class="rmeta">Reaction, self. +5 AC</span></li></ul></div></template>
+<template id="tpl-sheet-gear"><div><h4 class="group-k">Weapons</h4><ul class="rows"><li><span class="rname">Dagger <span class="tag">2</span></span><span class="rmeta">Melee or thrown 20/60 ft. +5, 1d4 + 2 piercing</span></li><li><span class="rname">Quarterstaff</span><span class="rmeta">Melee +2, 1d6 - 1 bludgeoning</span></li></ul><h4 class="group-k">Pack</h4><ul class="rows"><li><span class="rname">Spellbook</span><span class="rmeta">14 spells copied</span></li><li><span class="rname">Hollins reliquary <span class="tag on">QUEST</span></span><span class="rmeta">Silver, palm-sized, warm to the touch</span></li></ul></div></template>
+<template id="tpl-sheet-features"><div><h4 class="group-k">Wizard</h4><ul class="rows"><li><span class="rname">Arcane Recovery <span class="tag on">READY</span></span><span class="rmeta">Once a day after a short rest, recover slots worth 4 levels.</span></li><li><span class="rname">Sculpt Spells</span><span class="rmeta">Shield 1 + the spell's level creatures from your evocations.</span></li></ul><h4 class="group-k">Elf</h4><ul class="rows"><li><span class="rname">Darkvision</span><span class="rmeta">60 ft.</span></li><li><span class="rname">Fey Ancestry</span><span class="rmeta">Advantage on saves against being charmed.</span></li></ul></div></template>
+<template id="tpl-sheet-notes"><div><h4 class="group-k">Lyra's notes</h4><ul class="rows"><li><span class="rname">Brother Aldous</span><span class="rmeta">I owe him 15 gp for the healing draughts.</span></li><li><span class="rname">The reliquary</span><span class="rmeta">It carries the Hollins crest: a heron over wheat.</span></li><li><span class="rname">Grukk Twotooth</span><span class="rmeta">Afraid of fire. Ask Borin how he knows.</span></li></ul></div></template>
+
+<template id="tpl-codex">
+  <article class="doc">
+    <div class="crumbs">Pages <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Locations</div>
+    <h3 class="doc-title">The Goblin Warren</h3>
+    <p>A sinkhole in the <a href="#g-nav" tabindex="-1">Thornwood</a> opens into a warren of low tunnels. The goblins have lined the main hall with stolen bedrolls and a long table taken from the <a href="#g-nav" tabindex="-1">Hollins farm</a>.</p>
+    <p>The warren answers to <a href="#g-nav" tabindex="-1">Grukk Twotooth</a>, who rarely leaves the east chamber.</p>
+  </article>
+</template>
+
+<template id="tpl-compendium">
+  <section>
+    <div class="subbar">
+      <div class="tabs" role="tablist" aria-label="Compendium" data-group="compendium">
+        <button type="button" role="tab" data-tab="monsters">Monsters</button>
+        <button type="button" role="tab" data-tab="spells">Spells</button>
+        <button type="button" role="tab" data-tab="items">Items</button>
+        <span class="ink"></span>
+      </div>
+    </div>
+    <div class="host" data-group="compendium"></div>
+  </section>
+</template>
+<template id="tpl-compendium-monsters"><div><table class="ctable"><thead><tr><th>Name</th><th class="mid">Type</th><th class="n">AC</th><th class="n">HP</th><th class="n">CR</th></tr></thead><tbody><tr class="openable" data-record="goblin" tabindex="0"><td>Goblin</td><td class="mid">Small humanoid</td><td class="n">15</td><td class="n">7</td><td class="n">1/4</td></tr><tr><td>Wolf</td><td class="mid">Medium beast</td><td class="n">13</td><td class="n">11</td><td class="n">1/4</td></tr><tr><td>Hobgoblin</td><td class="mid">Medium humanoid</td><td class="n">18</td><td class="n">11</td><td class="n">1/2</td></tr><tr><td>Bugbear</td><td class="mid">Medium humanoid</td><td class="n">16</td><td class="n">27</td><td class="n">1</td></tr><tr><td>Ogre</td><td class="mid">Large giant</td><td class="n">11</td><td class="n">59</td><td class="n">2</td></tr></tbody></table></div></template>
+<template id="tpl-compendium-spells"><div><table class="ctable"><thead><tr><th>Name</th><th class="mid">School</th><th>Level</th></tr></thead><tbody><tr><td>Fire Bolt</td><td class="mid">Evocation</td><td>Cantrip</td></tr><tr><td>Shield</td><td class="mid">Abjuration</td><td>1st</td></tr><tr><td>Misty Step</td><td class="mid">Conjuration</td><td>2nd</td></tr><tr><td>Counterspell</td><td class="mid">Abjuration</td><td>3rd</td></tr><tr><td>Fireball</td><td class="mid">Evocation</td><td>3rd</td></tr></tbody></table></div></template>
+<template id="tpl-compendium-items"><div><table class="ctable"><thead><tr><th>Name</th><th class="mid">Type</th><th>Rarity</th></tr></thead><tbody><tr><td>Potion of Healing</td><td class="mid">Potion</td><td>Common</td></tr><tr><td>Bag of Holding</td><td class="mid">Wondrous item</td><td>Uncommon</td></tr><tr><td>Cloak of Protection</td><td class="mid">Wondrous item</td><td>Uncommon</td></tr><tr><td>Ring of Protection</td><td class="mid">Ring</td><td>Rare</td></tr><tr><td>Flame Tongue</td><td class="mid">Weapon (any sword)</td><td>Rare</td></tr></tbody></table></div></template>
+<template id="tpl-record-goblin">
+  <div class="record">
+    <div class="crumbs"><button type="button" class="linkbtn" data-back><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Monsters</button></div>
+    <h3 class="doc-title">Goblin</h3>
+    <p class="sub">Small humanoid (goblinoid), neutral evil</p>
+    <dl class="statline"><div class="box"><dt>AC</dt><dd>15</dd></div><div class="box"><dt>HP</dt><dd>7</dd></div><div class="box"><dt>Speed</dt><dd>30</dd></div><div class="box"><dt>CR</dt><dd>1/4</dd></div></dl>
+    <ul class="rows"><li><span class="rname">Nimble Escape</span><span class="rmeta">Disengage or Hide as a bonus action on each of its turns.</span></li><li><span class="rname">Scimitar</span><span class="rmeta">Melee +4, 5 ft. 1d6 + 2 slashing</span></li><li><span class="rname">Shortbow</span><span class="rmeta">Ranged +4, 80/320 ft. 1d6 + 2 piercing</span></li></ul>
+  </div>
+</template>

@@ -1,0 +1,357 @@
+/* ---------- The player ----------
+   One screen: groups along the top, the stage in the middle, moments and Play along the bottom where a
+   thumb reaches. Both switchers are Light rail tab strips, so switching is itself a demo. */
+:root {
+  --tb-h: 54px;
+}
+html {
+  scroll-padding-top: 70px;
+}
+.tb-inner {
+  flex-wrap: nowrap;
+}
+.tb-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tb-link {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cyan-hi);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tb-link:hover {
+  text-decoration: underline;
+}
+@media (max-width: 560px) {
+  .tb-link {
+    display: none;
+  }
+  .tb-ctl {
+    gap: 6px;
+  }
+  .tb-ctl .seg button {
+    padding: 0 9px;
+  }
+}
+.main {
+  padding-block: 0 80px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.player {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--tb-h) - env(safe-area-inset-top, 0px));
+  min-height: 560px;
+  max-height: 1080px;
+  padding-block: 12px;
+}
+
+/* The two switchers share one look: buttons on a strip, a cyan ink under the chosen one. */
+.gp-bar,
+.mo-bar {
+  position: relative;
+  flex: none;
+}
+.gp-bar {
+  background: var(--bar);
+  border: 1px solid var(--line-strong);
+  border-bottom: 0;
+}
+.gp-hz {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  bottom: -2px;
+}
+.gp-strip,
+.mo-strip {
+  position: relative;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.gp-strip::-webkit-scrollbar,
+.mo-strip::-webkit-scrollbar {
+  display: none;
+}
+.gp-strip button,
+.mo-strip button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 600 14px/1 var(--font-body);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 140ms;
+}
+.gp-strip button {
+  height: 48px;
+  padding: 0 14px;
+}
+.gp-strip button:hover,
+.mo-strip button:hover {
+  color: var(--text);
+}
+.gp-strip button .n {
+  font-family: var(--font-numeric);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--magenta-text);
+  text-shadow: none;
+}
+.gp-strip button[aria-selected="true"] {
+  color: var(--cyan-hi);
+  text-shadow: var(--glow-tab-text);
+}
+.strip-ink {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--cyan);
+  box-shadow: var(--ink-glow);
+  pointer-events: none;
+}
+.gp-note {
+  flex: none;
+  margin: 12px 2px 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.gp-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  margin-top: 10px;
+}
+.gpanel {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gpanel > .moments {
+  display: none;
+}
+.gpanel > .g-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.g-stage > .stage-bar {
+  flex: none;
+  min-height: 28px;
+}
+.g-stage > :not(.stage-bar) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.tf-stage,
+.dc-stage,
+.hp-stage,
+.cx-stage,
+.rs-stage,
+.st-stage,
+.ana-grid {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.dc-stage,
+.hp-stage,
+.rs-stage {
+  align-content: start;
+}
+.ov-stage {
+  height: auto;
+}
+.nav-holder {
+  display: flex;
+  justify-content: center;
+}
+.nav-holder .demo,
+.nav-holder.is-phone .demo {
+  height: 100%;
+}
+.map-frame {
+  max-width: none;
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+.map {
+  width: min(100cqw, 200cqh);
+}
+
+/* The dock */
+.dock {
+  flex: none;
+  margin-top: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.mo-bar {
+  border-bottom: 1px solid var(--line-strong);
+}
+.mo-strip button {
+  height: 44px;
+  padding: 0 13px;
+}
+.mo-strip button[aria-pressed="true"] {
+  color: var(--text);
+}
+.gp-strip,
+.mo-strip {
+  -webkit-mask-image: linear-gradient(90deg, #000 0 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(90deg, #000 0 calc(100% - 24px), transparent);
+}
+.gp-strip.at-end,
+.mo-strip.at-end {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.mo-info {
+  display: grid;
+  gap: 8px;
+  padding: 10px 14px 12px;
+}
+.mo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.mo-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.mo-btns {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+.mo-btns .btn {
+  min-height: 44px;
+  padding: 0 18px;
+  margin-bottom: 3px;
+}
+.mo-btns .btn svg {
+  width: 14px;
+  height: 14px;
+}
+.mo-desc {
+  margin: 0;
+  max-width: 82ch;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+/* About and rules, below the player */
+.intro h1 {
+  font-size: clamp(30px, 6vw, 46px);
+}
+.parts-title {
+  margin: 18px 0 12px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(20px, 3vw, 24px);
+  color: var(--text);
+}
+
+/* Phone: every stage fits the space between the two switchers. */
+@media (max-width: 640px) {
+  .gp-note,
+  .timeline figcaption,
+  .stage-bar [data-frame],
+  .g-stage > .stage-bar:not(:has(.linkbtn)) {
+    display: none;
+  }
+  .gp-stage {
+    margin-top: 8px;
+  }
+  .gp-strip button {
+    height: 44px;
+    padding: 0 11px;
+  }
+  .ana-area {
+    height: 96px;
+  }
+  .tl-track {
+    height: 12px;
+  }
+  .ana-grid {
+    gap: 14px;
+  }
+  .tl-rows {
+    gap: 6px;
+    --name-w: 58px;
+    --ms-w: 70px;
+  }
+  .tl-ms {
+    font-size: 14px;
+  }
+  .dc-stage {
+    gap: 10px;
+    padding: 10px;
+  }
+  .rc-total {
+    font-size: 46px;
+  }
+  .call-list li {
+    min-height: 32px;
+  }
+  .hp-stage,
+  .rs-stage {
+    gap: 12px;
+    padding: 12px;
+  }
+  .tile {
+    width: 54px;
+    font-size: 11px;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .vcr {
+    padding: 0 10px 0 10px;
+  }
+  .vcr-rnd {
+    font-size: 22px;
+  }
+  .tf-panel {
+    padding: 12px 10px;
+  }
+  .rs-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rs-box {
+    padding: 10px;
+  }
+  .cx-doc {
+    padding: 12px 14px 16px;
+  }
+  .mo-info {
+    padding: 8px 12px 10px;
+  }
+  .mo-desc {
+    font-size: 13px;
+  }
+}

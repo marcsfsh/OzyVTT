@@ -1,0 +1,259 @@
+
+  <section aria-labelledby="h-changes" class="changes">
+    <div class="sec-head">
+      <p class="eyebrow">If this one wins</p>
+      <h2 id="h-changes">What changes in the code</h2>
+    </div>
+    <ul id="changes-list"></ul>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var V = {
+    terminal: {
+      fam: "terminal", name: "Terminal", tag: "Before",
+      short: "A square at the left end where the light starts.",
+      idea: "The version from the last round. A small square terminal sits at the left end of the line, in the horizon's cyan, and a press always sends a comet from it to the right end, where a burst lands, so the light moves forward whatever point you pressed.",
+      watch: "A lit square is close to a cabinet lamp, and lamps already mean available or on. Check it under the turn panel's lamps.",
+      changes: [
+        "<code>Button.css</code>: <code>::after</code> draws an 8 px square in the horizon's first colour at the left of a 3 px line.",
+        "Press: the engine's <code>comet</code> from the terminal to the right end (230 ms on <code>--ease-travel</code>), and a <code>burst</code> there at 210 ms."
+      ]
+    },
+    both: {
+      fam: "terminal", name: "Both ends", tag: "New",
+      short: "A square at each end, cyan where the light leaves and yellow where it lands.",
+      idea: "The line becomes a circuit between two terminals, each in the horizon's colour at its end: cyan where the light leaves and yellow where it lands. A press flashes the cyan terminal and sends the comet across to the yellow one, which bursts as it arrives.",
+      watch: "Two lit squares are more lamp-like than one. On the turn panel, End turn would sit under four lamps with two more squares of its own.",
+      changes: [
+        "<code>Button.css</code>: <code>::after</code> draws 8 px squares at both ends, in <code>--grad-horizon</code>'s first and last colours, on a 3 px line.",
+        "Press: the left square flashes, the engine's <code>comet</code> runs to the right square and a <code>burst</code> lands on it at 210 ms."
+      ]
+    },
+    corner: {
+      fam: "terminal", name: "Corner", tag: "New",
+      short: "The light starts down the left edge and turns along the base.",
+      idea: "The terminal grows into the button's whole left edge: a cyan bar that meets the base line in a corner, so the light reads as one L. A press drops light down the left edge and sends it along the base to the yellow end. It sits between Terminal and Cradle: a start like Terminal's, an edge like Cradle's.",
+      watch: "A vertical tab strip marks its chosen tab with a cyan bar on the left edge, so in a sidebar list this could read as selected. The left bar also makes the start heavier than the end.",
+      changes: [
+        "<code>Button.css</code>: <code>::after</code> draws a 3 px bar up the left edge in the horizon's first colour, fading slightly toward the top, and the 3 px base line.",
+        "Press: light drops down the left bar in 120 ms, then the engine's <code>comet</code> runs the base and a <code>burst</code> lands at the right end by 400 ms."
+      ]
+    },
+    hook: {
+      fam: "terminal", name: "Hook", tag: "New",
+      short: "A square where the light starts and a hook where it lands.",
+      idea: "A terminal at the start, and at the far end the line turns up the right edge for 12 px, marking where the light is going. A press runs the comet along the base and up the hook, with a burst at its tip. Of the Terminal versions it shows direction most plainly.",
+      watch: "The hook is small. At the 42 px section bar size it's 12 px of yellow on the right edge, and in Dawn that yellow is a dark gold, so it's quieter there.",
+      changes: [
+        "<code>Button.css</code>: <code>::after</code> draws the start square, the 3 px base line and a 3 by 12 px hook up the right edge in the horizon's last colour.",
+        "Press: the engine's <code>comet</code> along the base, the light climbs the hook from 200 ms, and a <code>burst</code> lands at its tip."
+      ]
+    },
+    cradle: {
+      fam: "cradle", name: "Cradle", tag: "Before",
+      short: "The line wraps up both sides and fades.",
+      idea: "The version from the last round. The line runs along the base and turns up both sides, fading out two thirds of the way up, so the label sits in a lit channel. A press fills the base outward from your finger, then the light climbs the sides.",
+      watch: "It reads more like a frame than a line. Selection elsewhere is a cyan underline; a horizon U is different enough, but check it next to a selected segmented control.",
+      changes: [
+        "<code>Button.css</code>: <code>::after</code> is a 2 px border with no top, painted with <code>border-image</code> and masked to fade upward (<code>mask-image</code>, with <code>-webkit-mask-image</code> for Safari).",
+        "Press: the engine's <code>fill</code> along the base from the press point, then the light climbs each side from 120 ms."
+      ]
+    },
+    frame: {
+      fam: "cradle", name: "Frame", tag: "New",
+      short: "The cradle closed into a full frame, faint at the top.",
+      idea: "The cradle's sides keep climbing and close across the top, so the whole plate is framed in the horizon, full strength at the base and about a third at the top. A press fills the base from your finger, the light climbs both sides and the top edge flashes last.",
+      watch: "A full lit frame is the closest of these to a neon outline, like the Neon tube option from the first round. In a dialog its faint top edge repeats the dialog's own horizon edge.",
+      changes: [
+        "<code>Button.css</code>: <code>::after</code> is a 2 px border on all four sides, painted with <code>border-image</code> and masked from full strength at the base to about a third at the top.",
+        "Press: the engine's <code>fill</code> along the base, the sides from 120 ms and a flash along the top at 220 ms."
+      ]
+    },
+    cup: {
+      fam: "cradle", name: "Cup", tag: "New",
+      short: "A thick base and thin sides that hold the light.",
+      idea: "A 3 px base and 1 px sides that run the full height, with the cast filling the lower half of the plate, so the button looks like it's holding light. A press fills the cup: the horizon rises to the top of the plate and settles back.",
+      watch: "The stronger cast tints the plate behind the label, most at the yellow end, so it's the busiest plate of the four. Check the label at a glance in Dawn.",
+      changes: [
+        "<code>Button.css</code>: <code>::after</code> is a border of 1 px sides and a 3 px base with no top, at full height. The plate's cast is 10% stronger and fades out at the top instead of at 70%.",
+        "Press: a wash of the horizon rises up the plate and fades in 320 ms, behind the label."
+      ]
+    },
+    holder: {
+      fam: "cradle", name: "Holder", tag: "New",
+      short: "The cradle stands off the plate; a press sinks the plate into it.",
+      idea: "The cradle moves out to sit 5 px around the plate, like a lit holder the button rests in. A press sinks the plate 3 px into the holder and lights it. It uses the same 5 px the old arcade button's pressed edge used, so the press keeps some of the arcade's weight.",
+      watch: "It needs 5 px clear on three sides, so it can't sit flush against a panel's edge, and full-width buttons lose 10 px of width.",
+      changes: [
+        "<code>Button.css</code>: <code>::after</code> sits 5 px outside the plate on three sides, painted with <code>border-image</code> and masked to fade upward. The button takes a 5 px margin on those sides, the space the old pressed edge used.",
+        "Press: the plate moves 3 px down while the holder stays put and lights, and the engine's <code>fill</code> runs along the holder's base from the press point."
+      ]
+    }
+  };
+  var COMMON = [
+    "Colour: the line takes <code>--grad-horizon</code>. Dawn's button needs darker stops (#1d6a80 to #8a5612) so the yellow end still shows on paper.",
+    "Face: install <code>@fontsource/chakra-petch</code> in <code>packages/ui</code>, import its 600 weight in <code>fonts.css</code>, and move <code>--font-display</code> to it. <code>.chrome</code> gains <code>font-family: var(--font-wordmark)</code> so YOUR TURN and the acting creature's name keep Bungee.",
+    "DESIGN.md: the Arcade button row of the Look table, the Primary bullet in Components, and the Type table. The horizon gains a second job, the primary, so its row in the Look table says so."
+  ];
+  var ORDER = ["terminal", "both", "corner", "hook", "cradle", "frame", "cup", "holder"];
+  var current = "corner";
+
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+  ORDER.forEach(function (k) {
+    var d = V[k];
+    var card = document.createElement("div");
+    card.className = "vcard";
+    card.dataset.v = k;
+    card.innerHTML =
+      '<div class="vcard-info"><h4>' + esc(d.name) + '<span class="eyebrow">' + esc(d.tag) + "</span></h4><p>" + esc(d.short) + '</p><button type="button" class="pick">Show in the app</button></div>' +
+      '<div class="vcard-stage"><button type="button" class="pbtn r-' + k + '">Make live</button></div>';
+    $(".pick", card).addEventListener("click", function () { set(k); });
+    $("#fam-" + d.fam).appendChild(card);
+  });
+
+  function set(k, fromHash) {
+    if (!V[k]) return;
+    current = k;
+    var d = V[k];
+    $$(".pbtn[data-follow]").forEach(function (el) {
+      ORDER.forEach(function (o) { el.classList.remove("r-" + o); });
+      el.classList.add("r-" + k);
+    });
+    $$("#picker .fam-pick button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.v === k)); });
+    $$(".vcard").forEach(function (c) {
+      var on = c.dataset.v === k;
+      c.classList.toggle("is-on", on);
+      $(".pick", c).textContent = on ? "Showing in the app" : "Show in the app";
+    });
+    $("#idea-eyebrow").textContent = (d.fam === "terminal" ? "Terminal" : "Cradle") + " · " + d.tag;
+    $("#idea-name").textContent = d.name;
+    $("#idea-text").textContent = d.idea;
+    $("#idea-watch").textContent = d.watch;
+    $("#changes-list").innerHTML = d.changes.concat(COMMON).map(function (c) { return "<li>" + c + "</li>"; }).join("");
+    if (!fromHash) {
+      try { history.replaceState(null, "", "#" + k); } catch (e) { /* the frame may refuse it */ }
+    }
+  }
+  $$("#picker .fam-pick button").forEach(function (b) { b.addEventListener("click", function () { set(b.dataset.v); }); });
+  window.addEventListener("hashchange", function () { set(location.hash.slice(1), true); });
+
+  // Theme: Dusk and Dawn map onto the viewer's dark and light. Nothing is stored; the host's own choice wins on load.
+  var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+  function effective() {
+    var t = document.documentElement.getAttribute("data-theme");
+    if (t === "light" || t === "dark") return t;
+    return mq && mq.matches ? "light" : "dark";
+  }
+  function paintTheme() {
+    var t = effective();
+    $$(".theme-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.th === t)); });
+  }
+  $$(".theme-seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.documentElement.setAttribute("data-theme", b.dataset.th);
+      paintTheme();
+    });
+  });
+  if (mq && mq.addEventListener) mq.addEventListener("change", paintTheme);
+  if (window.MutationObserver) new MutationObserver(paintTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---- Light on press, one recipe per version ----
+  var TRAVEL = "cubic-bezier(0.45, 0, 0.25, 1)";
+  function canMove(el) {
+    if (!el.animate) return false;
+    return !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+  function spawn(btn, cls, style) {
+    var e = document.createElement("span");
+    e.className = "fx " + cls;
+    e.setAttribute("aria-hidden", "true");
+    for (var k in style) e.style[k] = style[k];
+    btn.appendChild(e);
+    return e;
+  }
+  function run(e, frames, opts) {
+    opts.fill = "backwards";
+    var a = e.animate(frames, opts);
+    function rm() { e.remove(); }
+    a.finished.then(rm, rm);
+  }
+  // A line lighting outward from x. `at` places it: bottom or top offset, and how far past the sides it runs.
+  function fillFrom(btn, x, o) {
+    o = o || {};
+    var style = { transformOrigin: (x + (o.out || 0)) + "px 50%", height: (o.h || 3) + "px", opacity: "0", left: -(o.out || 0) + "px", right: -(o.out || 0) + "px" };
+    if (o.top !== undefined) { style.top = o.top + "px"; style.bottom = "auto"; } else style.bottom = (o.bottom || 0) + "px";
+    var e = spawn(btn, "fx-line", style);
+    run(e, [{ transform: "scaleX(0)", opacity: 1 }, { transform: "scaleX(1)", opacity: 1, offset: 0.55 }, { transform: "scaleX(1)", opacity: 0 }], { duration: o.dur || 380, delay: o.delay || 0, easing: TRAVEL });
+  }
+  function burst(btn, x, delay, bottom) {
+    var e = spawn(btn, "fx-burst", { left: x + "px", bottom: (bottom === undefined ? 1 : bottom) + "px", opacity: "0" });
+    run(e, [{ transform: "translate(-50%, 50%) scale(0.3)", opacity: 1 }, { transform: "translate(-50%, 50%) scale(1.5)", opacity: 0 }], { duration: 240, delay: delay || 0, easing: "ease-out" });
+  }
+  function rise(btn, side, delay, o) {
+    o = o || {};
+    var style = { opacity: "0", transformOrigin: "50% 100%", height: o.h || "70%", bottom: (o.bottom || 0) + "px" };
+    style[side] = (o.offset || 0) + "px";
+    var e = spawn(btn, "fx-side", style);
+    run(e, [{ transform: "scaleY(0)", opacity: 1 }, { transform: "scaleY(1)", opacity: 1, offset: 0.6 }, { transform: "scaleY(1)", opacity: 0 }], { duration: o.dur || 300, delay: delay, easing: TRAVEL });
+  }
+  function drop(btn) {
+    var e = spawn(btn, "fx-drop", { transformOrigin: "50% 0", opacity: "0" });
+    run(e, [{ transform: "scaleY(0)", opacity: 1 }, { transform: "scaleY(1)", opacity: 1, offset: 0.7 }, { transform: "scaleY(1)", opacity: 0 }], { duration: 200, easing: TRAVEL });
+  }
+  function comet(btn, from, to, delay) {
+    var len = Math.min(120, Math.max(40, (to - from) * 0.5));
+    var e = spawn(btn, "fx-comet", { width: len + "px", opacity: "0" });
+    run(e, [
+      { transform: "translateX(" + (from - len) + "px)", opacity: 1 },
+      { transform: "translateX(" + (to - len) + "px)", opacity: 1, offset: 0.85 },
+      { transform: "translateX(" + (to - len) + "px)", opacity: 0 }
+    ], { duration: 270, delay: delay || 0, easing: TRAVEL });
+  }
+  function flash(btn, x, size, delay) {
+    var e = spawn(btn, "fx-line", { left: x + "px", right: "auto", width: size + "px", height: size + "px", bottom: "0px", opacity: "0" });
+    run(e, [{ opacity: 1 }, { opacity: 0 }], { duration: 220, delay: delay || 0, easing: "ease-out" });
+  }
+  function cupFill(btn) {
+    var e = spawn(btn, "fx-cup", { transformOrigin: "50% 100%" });
+    run(e, [{ transform: "scaleY(0)", opacity: 0.45 }, { transform: "scaleY(1)", opacity: 0.32, offset: 0.5 }, { transform: "scaleY(1)", opacity: 0 }], { duration: 320, easing: TRAVEL });
+  }
+  var PRESS = {
+    terminal: function (btn) { var w = btn.clientWidth; comet(btn, 8, w, 0); burst(btn, w - 8, 210); },
+    both: function (btn) { var w = btn.clientWidth; flash(btn, 0, 8, 0); comet(btn, 8, w - 8, 0); burst(btn, w - 4, 210); flash(btn, w - 8, 8, 210); },
+    corner: function (btn) { var w = btn.clientWidth; drop(btn); comet(btn, 0, w, 120); burst(btn, w - 6, 330); },
+    hook: function (btn) { var w = btn.clientWidth; comet(btn, 8, w, 0); rise(btn, "right", 200, { h: "12px", dur: 160 }); burst(btn, w - 2, 280, 12); },
+    cradle: function (btn, x) { burst(btn, x); fillFrom(btn, x, { h: 2 }); rise(btn, "left", 120); rise(btn, "right", 120); },
+    frame: function (btn, x) { burst(btn, x); fillFrom(btn, x, { h: 2 }); rise(btn, "left", 120, { h: "100%" }); rise(btn, "right", 120, { h: "100%" }); fillFrom(btn, btn.clientWidth / 2, { h: 2, top: 0, delay: 220, dur: 260 }); },
+    cup: function (btn, x) { cupFill(btn); fillFrom(btn, x); },
+    holder: function (btn, x) { fillFrom(btn, x, { h: 2, bottom: -5, out: 5 }); rise(btn, "left", 120, { h: "60%", bottom: -5, offset: -5 }); rise(btn, "right", 120, { h: "60%", bottom: -5, offset: -5 }); }
+  };
+  function press(btn, x) {
+    if (!canMove(btn)) return;
+    var v = ORDER.filter(function (k) { return btn.classList.contains("r-" + k); })[0];
+    if (!v) return;
+    var w = btn.clientWidth;
+    PRESS[v](btn, Math.max(8, Math.min(w - 8, x)));
+  }
+  document.addEventListener("pointerdown", function (e) {
+    var btn = e.target.closest && e.target.closest(".pbtn");
+    if (!btn || btn.disabled || btn.classList.contains("is-press")) return;
+    var r = btn.getBoundingClientRect();
+    press(btn, e.clientX - r.left);
+  });
+  document.addEventListener("click", function (e) {
+    if (e.detail !== 0) return;
+    var btn = e.target.closest && e.target.closest(".pbtn");
+    if (btn && !btn.disabled) press(btn, btn.clientWidth / 2);
+  });
+
+  var start = location.hash.slice(1);
+  set(V[start] ? start : "cup", true);
+  paintTheme();
+})();
+</script>
