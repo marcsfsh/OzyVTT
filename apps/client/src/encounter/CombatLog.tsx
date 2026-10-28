@@ -1,8 +1,9 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { CombatLogEntry } from "@vtt/domain";
-import { IconButton, IconX, useToast } from "@vtt/ui";
+import { IconButton, IconX, burst, canMove, comet, fadeIn, useOnChange, useToast } from "@vtt/ui";
 import { command, read } from "../lib/command";
 import { socket } from "../socket";
+import { announceLogEntry, chatSentRecently } from "./logArrivals";
 import "./combat-log.css";
 
 /**
@@ -32,6 +33,7 @@ function push(entry: CombatLogEntry) {
   if (entries.some((existing) => existing.id === entry.id)) return; // ignore a live event already in the backfill
   entries = [...entries, entry].slice(-CAP);
   emit();
+  announceLogEntry(entry);
 }
 function load() {
   void read("log:read", {}).then((result) => {
@@ -70,6 +72,19 @@ function CombatLogList({ canRemove }: Readonly<{ canRemove?: (entry: CombatLogEn
     const element = listRef.current;
     if (element) element.scrollTop = element.scrollHeight;
   }, [log.length]);
+  // A new line fades in with a comet along its lower edge; a chat line this device just sent lights from the right,
+  // where the Send button is (ADR-0045).
+  const newest = log.at(-1);
+  useOnChange(newest?.id ?? null, (_was, id) => {
+    const line = listRef.current?.lastElementChild;
+    if (id === null || !(line instanceof HTMLElement) || !canMove()) return;
+    fadeIn(line, { dur: 180, y: 6 });
+    const mine = newest?.kind === "chat" && chatSentRecently();
+    const width = line.clientWidth;
+    const [from, to] = mine ? [width, 0] : [0, width];
+    comet(line, { from, to, line: line.clientHeight - 1, thick: 2, delay: 40, dur: 260 });
+    burst(line, { at: to, line: line.clientHeight - 1, delay: 280, w: 60, h: 6 });
+  });
   if (log.length === 0) return <p className="combat-log-empty">No combat events yet.</p>;
   return (
     <ol className="combat-log-list scroll-y" ref={listRef} aria-live="polite">

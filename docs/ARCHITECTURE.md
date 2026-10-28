@@ -1239,6 +1239,12 @@ SVG mask can't animate), an opened door swings on its hinge, a light or area spr
 springs flashes once. A ping rings once. The table screen's `viewer/screenLight.ts` glides the view when it follows
 the GM's camera, picking up from where a glide in progress is, and uncovers a new map behind a sweep; it moves only
 the map's own layer.
+A new log line fades in with a comet along its lower edge (from the Send side for this device's own chat, which
+`noteChatSent` marks), and `onLogEntry` lets the table panel run light along its tabs to Log while another tab shows
+(`shell/tabLight.ts`); the same trip takes a player's section strip to Codex when its count of new pages rises. A block
+revealed to a player while their page is open arrives under a comet with a wash; player blocks have no ids, so one is
+known by when it reached the reader and its title. A player's face in the top bar warms as they connect and fades as
+they drop, the table screen's lamp lights or cools with ON and OFF rolling, and picking a character lights its card.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map

@@ -1,5 +1,7 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Tabs } from "@vtt/ui";
+import { onLogEntry } from "../encounter/logArrivals";
+import { tabTrip } from "../shell/tabLight";
 import { FooterSlotContext } from "./footerSlot";
 import "./table-panel.css";
 
@@ -38,8 +40,24 @@ export function TablePanel({
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const idBase = `table-panel-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
   const current = tabs.find((tab) => tab.id === active) ?? tabs[0];
+  // A line reaching the log while another tab shows runs light along the strip to Log (ADR-0045).
+  const panel = useRef<HTMLElement>(null);
+  const showing = useRef(current.id);
+  useEffect(() => {
+    showing.current = current.id;
+  });
+  useEffect(
+    () =>
+      onLogEntry(() => {
+        const strip = panel.current?.querySelector<HTMLElement>(":scope > .table-panel-tabs");
+        const log = document.getElementById(`${idBase}-tab-log`);
+        if (!strip || !log || showing.current === "log") return;
+        tabTrip(strip, document.getElementById(`${idBase}-tab-${showing.current}`), log);
+      }),
+    [idBase]
+  );
   return (
-    <section className="table-panel" aria-label={label}>
+    <section ref={panel} className="table-panel" aria-label={label}>
       <FooterSlotContext.Provider value={phone ? slot : null}>
         {top}
         <Tabs

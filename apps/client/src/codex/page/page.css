@@ -144,6 +144,7 @@
   color: var(--text);
 }
 .cx-doc-text {
+  position: relative;
   font: 400 var(--fs-body) / var(--lh-body) var(--font-body);
 }
 .cx-doc-text p {

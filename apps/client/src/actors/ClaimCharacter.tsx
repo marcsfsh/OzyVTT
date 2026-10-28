@@ -1,6 +1,18 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { rosterActors, type PlayerActor, type PlayerView } from "@vtt/domain";
-import { Alert, Button, IconUser, StatusLamp, Tag, Wordmark, useToast } from "@vtt/ui";
+import {
+  Alert,
+  Button,
+  IconUser,
+  StatusLamp,
+  Tag,
+  Wordmark,
+  burst,
+  canMove,
+  fill,
+  useOnChange,
+  useToast
+} from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { LandingScene } from "../shell/Landing";
 import { PdfImportModal } from "./PdfImportModal";
@@ -42,6 +54,25 @@ export function ClaimCharacter({ state, art = false }: Readonly<{ state: PlayerV
   // One open character is chosen from the start, so Play as is one tap away.
   const chosen = open.find((actor) => actor.id === chosenId) ?? (open.length === 1 ? open[0] : undefined);
   const builderOpen = state.builderPolicy?.playerBuilder === "open";
+  // The picked card's top edge fills outward from its centre with a burst, and the others dim for a moment (ADR-0045).
+  const list = useRef<HTMLUListElement>(null);
+  useOnChange(chosen?.id ?? null, (_was, id) => {
+    const rows = list.current ? [...list.current.querySelectorAll<HTMLElement>(":scope > .claim-row")] : [];
+    const picked = rows.find((row) => row.dataset.actor === id)?.querySelector<HTMLElement>(".claim-row-pick");
+    if (!id || !picked || !canMove()) return;
+    const edge = picked.ownerDocument.createElement("span");
+    edge.className = "lr-part claim-row-edge";
+    edge.setAttribute("aria-hidden", "true");
+    picked.append(edge);
+    const lit = fill(edge, { origin: "50%", delay: 0, dur: 220 });
+    const remove = () => edge.remove();
+    if (lit) lit.finished.then(remove, remove);
+    else remove();
+    burst(picked, { at: picked.clientWidth / 2, line: 0, delay: 40, w: 100 });
+    for (const row of rows)
+      if (row.dataset.actor !== id)
+        row.animate([{ opacity: 1 }, { offset: 0.4, opacity: 0.55 }, { opacity: 1 }], { duration: 300 });
+  });
 
   const claim = async (actorId: string, name: string) => {
     // Claiming binds the character to this device, so it is confirmed in the table's claim words.
@@ -90,14 +121,18 @@ export function ClaimCharacter({ state, art = false }: Readonly<{ state: PlayerV
           </span>
         </div>
       ) : (
-        <ul className="claim-list" role="radiogroup" aria-labelledby="claim-heading">
+        <ul ref={list} className="claim-list" role="radiogroup" aria-labelledby="claim-heading">
           {characters.map((actor) => {
             const claimState = claimStateOf(actor);
             const taken = claimState === "claimed";
             const line = pickLine(actor);
             const on = chosen?.id === actor.id;
             return (
-              <li key={actor.id} className={`claim-row${taken ? " is-taken" : ""}${on ? " is-chosen" : ""}`}>
+              <li
+                key={actor.id}
+                data-actor={actor.id}
+                className={`claim-row${taken ? " is-taken" : ""}${on ? " is-chosen" : ""}`}
+              >
                 <button
                   type="button"
                   role="radio"

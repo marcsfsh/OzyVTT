@@ -121,9 +121,13 @@
   padding: 0 var(--space-2);
 }
 .app-bar-connected {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+}
+.app-bar-connected-face {
+  display: inline-flex;
 }
 .app-bar-connected-more {
   font: 400 16px / 1 var(--font-numeric);
@@ -344,4 +348,8 @@
 .app-bar-theme[open] .nh-theme-switch-trigger::before {
   border-color: var(--line-raised);
   background: var(--surface-2);
+}
+.app-bar-screen-lamp {
+  position: relative;
+  display: inline-flex;
 }

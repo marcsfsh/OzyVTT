@@ -29,6 +29,7 @@
   list-style: none;
 }
 .claim-row-pick {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -143,4 +144,12 @@
     top: 18%;
     transform: translateX(-50%) scale(1.6);
   }
+}
+/* The picked card's top edge as it lights (ADR-0045). */
+.claim-row-edge {
+  left: -1px;
+  right: -1px;
+  top: -1px;
+  height: 2px;
+  background: var(--state-on-edge);
 }

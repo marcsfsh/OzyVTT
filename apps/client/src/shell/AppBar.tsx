@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { GmView, PlayerView } from "@vtt/domain";
 import {
@@ -14,7 +14,14 @@ import {
   Portrait,
   Tabs,
   Wordmark,
-  cx
+  canMove,
+  cx,
+  ghostOut,
+  pop,
+  rel,
+  useOnChange,
+  warm,
+  type PictureSource
 } from "@vtt/ui";
 import { pictureOf } from "../actors/actor-picture";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -37,6 +44,7 @@ import { LiveScenePicker } from "../table/LiveScenePicker";
 import { PlayerIdentity } from "../table/PlayerIdentity";
 import { TvControl } from "../table/TvControl";
 import { pageLight } from "./pageLight";
+import { tabTrip } from "./tabLight";
 import { SearchLauncher } from "./SearchLauncher";
 import "./app-bar.css";
 
@@ -104,6 +112,23 @@ function SectionTabs({
   );
 }
 
+/**
+ * New Codex pages for a player (ADR-0045, group 7): when the count of new ones rises, light runs along the section
+ * strip from the section showing to Codex and bursts there. `strip` names the strip's class: the laptop's top bar or
+ * the phone's bottom tabs.
+ */
+function useCodexNews(unread: number, strip: "app-sections" | "app-bottom-tabs") {
+  useOnChange(unread, (before, now) => {
+    if (now <= before) return;
+    const bar = document.querySelector<HTMLElement>(`.${strip}`);
+    const tabs = bar ? [...bar.querySelectorAll<HTMLElement>("[role='tab']")] : [];
+    const codex = tabs.find((tab) => tab.textContent?.trim().startsWith("Codex"));
+    if (!bar || !codex) return;
+    const from = tabs.find((tab) => tab.getAttribute("aria-selected") === "true") ?? null;
+    tabTrip(bar, from, codex, strip === "app-bottom-tabs" ? "top" : "bottom");
+  });
+}
+
 /** The top bar's frame: the wordmark, what goes in it, and the horizon line along its bottom edge. */
 function TopBar({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
   return (
@@ -116,6 +141,11 @@ function TopBar({ children, className }: Readonly<{ children: ReactNode; classNa
 
 /** Who is connected, as the projection says it: the claimed characters whose players are online. */
 function Connected({ state }: Readonly<{ state: GmView }>) {
+  // Marked once it has rendered, so only a face that joins afterwards lights up.
+  const row = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (row.current) row.current.dataset.settled = "true";
+  });
   const online = state.actors.filter(
     (actor) =>
       actor.kind === "player-character" && !actor.archived && actor.ownerSessionId && actor.presence === "online"
@@ -123,13 +153,48 @@ function Connected({ state }: Readonly<{ state: GmView }>) {
   if (online.length === 0) return null;
   const label = `${online.length} ${online.length === 1 ? "character" : "characters"} online`;
   return (
-    <span className="app-bar-connected" role="img" aria-label={label} title={online.map((a) => a.name).join(", ")}>
+    <span
+      ref={row}
+      className="app-bar-connected"
+      role="img"
+      aria-label={label}
+      title={online.map((a) => a.name).join(", ")}
+    >
       {online.slice(0, 4).map((actor) => (
-        <Portrait key={actor.id} size="xs" frame="party" picture={pictureOf(actor, null, state.definitions)} />
+        <PresenceFace key={actor.id} picture={pictureOf(actor, null, state.definitions)} />
       ))}
       {online.length > 4 && <span className="app-bar-connected-more">+{online.length - 4}</span>}
     </span>
   );
+}
+
+/**
+ * One player at the table (ADR-0045, group 14): their face warms with a burst as they connect, and fades where it was
+ * as they drop. Leaving the page plays nothing: the copy shows only when the face left a row that stayed.
+ */
+function PresenceFace({ picture }: Readonly<{ picture: PictureSource }>) {
+  const face = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = face.current;
+    if (!el) return;
+    if (canMove() && arrivedLate(el)) {
+      warm(el, { dur: 220 });
+      const box = rel(el, el.parentElement ?? el);
+      if (el.parentElement) pop(el.parentElement, { x: box.cx, y: box.cy, size: 36, tone: "cyan" });
+    }
+    return () => ghostOut(el, { leave: "fade", whenGone: true, within: el.parentElement });
+  }, []);
+  return (
+    <span ref={face} className="app-bar-connected-face">
+      <Portrait size="xs" frame="party" picture={picture} />
+    </span>
+  );
+}
+
+/** A face joining a row already on the page, so the row's first render (and a reload) shows its faces at rest. */
+function arrivedLate(face: HTMLElement): boolean {
+  const row = face.parentElement;
+  return row !== null && row.dataset.settled === "true";
 }
 
 function SettingsButton() {
@@ -249,6 +314,7 @@ export function PlayerTopBar({
   const route = useRoute();
   const phone = usePhoneShell();
   const section = litPlayerSection(route);
+  useCodexNews(codexUnread, "app-sections");
   // On a phone the table and its log head with the character being played, as the top bar belongs to the page.
   const claimed = state.actors.some((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
   if (phone && token && claimed && (section === "table" || section === "log"))
@@ -293,6 +359,7 @@ export function PlayerBottomTabs({
 }: Readonly<{ codexUnread: number; onCodexSeen: () => void }>) {
   const route = useRoute();
   const section = litPlayerSection(route);
+  useCodexNews(codexUnread, "app-bottom-tabs");
   return (
     <SectionTabs
       ariaLabel="Player sections"
