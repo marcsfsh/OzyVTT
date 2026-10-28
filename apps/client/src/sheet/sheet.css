@@ -1145,8 +1145,10 @@ button.cs-lastroll-open {
   align-items: center;
   gap: var(--space-2);
 }
+/* A rest button is never narrower than its label, so on a narrow phone the two stack. */
 .cs-rest > .nh-btn {
   flex: 1 1 9rem;
+  min-width: max-content;
 }
 .cs-slots-left {
   display: flex;

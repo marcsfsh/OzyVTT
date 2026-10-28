@@ -175,7 +175,7 @@ The shells:
   small map with Open map.
 
 Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. Its front
-page pins New map and New encounter side by side at the top, then the Maps and Encounters tabs, each a sortable table. The table screen's controls open from the
+page pins New map and New encounter at the top, side by side when both labels fit, then the Maps and Encounters tabs, each a sortable table. The table screen's controls open from the
 table screen button in the top bar. The rules reference opens from search and from the Compendium. Settings is the gear.
 
 The table (Play), as a docked workbench (ADR-0025):

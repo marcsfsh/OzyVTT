@@ -45,6 +45,10 @@
   display: contents;
   color: var(--nh-ink);
 }
+/* An icon keeps its size. A button narrower than its label would otherwise squeeze the icon to a sliver. */
+.nh-btn > nh-label > svg {
+  flex: none;
+}
 
 .nh-btn::before {
   content: "";
