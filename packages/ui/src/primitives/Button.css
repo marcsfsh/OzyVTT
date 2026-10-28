@@ -124,9 +124,10 @@
   --nh-rim: var(--line-raised);
 }
 
-/* Link: cyan words with no box, at the 44px height. */
+/* Link: cyan words with no box, at the 44px height. The room beside the words matches the room above them, so a
+   focus ring sits evenly around them. */
 .nh-btn--link {
-  padding-inline: var(--space-1);
+  padding-inline: var(--space-2);
   color: var(--cyan-hi);
 }
 
