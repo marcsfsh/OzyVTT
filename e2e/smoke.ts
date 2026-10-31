@@ -66,12 +66,30 @@ function hitArea(control: Locator) {
   });
 }
 
+/**
+ * The one exception to the floor outside GM data regions (ADR-0047, docs/DESIGN.md Phones and touch): the laptop
+ * sheet's skill rows are `--row-h-dense` (30px) with a mouse and no coarse pointer. Anywhere else, or with any coarse
+ * pointer, the floor is 44px.
+ */
+const DENSE_MIN = 30;
+function floorFor(control: Locator) {
+  return control.evaluate(
+    (element: HTMLElement, [dense, floor]) =>
+      element.matches(".cs--wide .cs-skill-row") &&
+      matchMedia("(hover: hover) and (pointer: fine)").matches &&
+      !matchMedia("(any-pointer: coarse)").matches
+        ? dense
+        : floor,
+    [DENSE_MIN, TAP_MIN] as const
+  );
+}
+
 async function expectTapTarget(control: Locator) {
   await expect(control).toBeVisible();
   const area = await hitArea(control);
   expect
     .soft(Math.min(area.width, area.height), `${control} hit area ${area.width}x${area.height}`)
-    .toBeGreaterThanOrEqual(TAP_MIN);
+    .toBeGreaterThanOrEqual(await floorFor(control));
 }
 
 /** Taps (or clicks, without touch) a control after checking its hit area meets the floor. */

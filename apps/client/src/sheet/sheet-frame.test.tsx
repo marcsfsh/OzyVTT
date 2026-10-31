@@ -350,7 +350,7 @@ describe("the Hit Point Dice", () => {
 });
 
 describe("the GM's sheet on a laptop", () => {
-  it("marks itself and its tools GM only, the tools in violet", () => {
+  it("marks itself and its tools GM only, the tools in violet", async () => {
     onLaptop(true);
     const state = {
       actors: [hero()],
@@ -362,6 +362,8 @@ describe("the GM's sheet on a laptop", () => {
       wrapper: ToastProvider
     });
     const sheet = within(screen.getByRole("dialog", { name: "Lyra character sheet" }));
+    // The GM tab, last in the box.
+    await userEvent.setup().click(sheet.getByRole("tab", { name: "GM" }));
     const tools = within(sheet.getByRole("region", { name: "GM tools" }));
     expect(tools.getByText("GM only")).toBeTruthy();
     for (const name of ["Set HP", "Set AC", "Give Heroic Inspiration", "Long Rest"])

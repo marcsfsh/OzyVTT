@@ -17,7 +17,7 @@
   flex: none;
 }
 .cs > .cs-body,
-.cs > .cs-cols {
+.cs > .cs-ledger-body {
   flex: 1 1 0;
   min-height: 0;
 }
@@ -858,10 +858,7 @@ button.cs-insp:hover .cs-insp-box {
   height: 4px;
 }
 
-/* The phone's abilities sit 3 by 2, and the saves 3 by 2 with their short names. */
-.cs--narrow .cs-abilities {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
+/* The phone's saves sit 3 by 2 with their short names. */
 .cs--narrow .cs-saves {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1053,81 +1050,301 @@ button.cs-lastroll-open {
   font-size: var(--fs-xs);
 }
 
-/* ---- The laptop's columns ---- */
-.cs-cols {
+/* ---- The Ledger (ADR-0047) ----
+   A laptop's sheet under the band: the abilities and senses, the skills, then the tabbed box. From 1280px each is a
+   column that scrolls itself; from 980px to 1279px the first two stack in one 280px column. */
+.cs-ledger-body {
   display: grid;
-  grid-template-columns: minmax(16rem, 21rem) minmax(0, 1fr) minmax(15rem, 19rem);
+  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 20px 14px;
 }
-.cs-cols.has-dice {
-  grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr) minmax(14rem, 17rem) minmax(15rem, 19rem);
+.cs-ledger-body.has-dice {
+  grid-template-columns: 280px minmax(0, 1fr);
 }
-.cs-col {
+.cs-checkcols {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 18px;
+  min-height: 0;
+}
+.cs-checkcol {
+  display: contents;
+}
+.cs-checkcols .cs-lastroll {
+  order: 0;
+}
+.cs-checkcols .cs-ledger {
+  order: 1;
+}
+.cs-checkcols .cs-skills-card {
+  order: 2;
+}
+.cs-checkcols .cs-senses {
+  order: 3;
+}
+.cs-checkcols .cs-tools {
+  order: 4;
+}
+.cs-checkcols > * > *,
+.cs-checkcols > * {
+  flex: none;
+}
+.cs-col-box {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: var(--space-3);
 }
-.cs-col + .cs-col {
-  border-left: 1px solid var(--line-strong);
-}
-.cs-col-mid {
-  padding: var(--space-3) 0 0;
-}
-.cs-col-mid > .cs-tabs {
-  margin: 0 var(--space-3);
-}
-.cs-col-mid > .cs-body {
+.cs-col-box > .cs-body {
   flex: 1 1 0;
   min-height: 0;
+  padding: 12px 14px 16px;
+}
+.cs-ledger-body > .cs-col-dice {
+  display: none;
+}
+@media (min-width: 1280px) {
+  .cs-ledger-body {
+    grid-template-columns: 250px 250px minmax(0, 1fr);
+  }
+  .cs-ledger-body.has-dice {
+    grid-template-columns: 250px 250px minmax(480px, 1fr) 280px;
+  }
+  .cs-ledger-body > .cs-col-dice {
+    display: flex;
+    flex-direction: column;
+  }
+  .cs-checkcols {
+    display: grid;
+    grid-column: 1 / span 2;
+    grid-template-columns: 250px 250px;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .cs-checkcol {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 0;
+  }
+}
+
+/* The abilities: a heading row, then one row each, the check one button and the save another. */
+.cs-ledger-head,
+.cs-ledger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+}
+.cs-ledger-head {
+  grid-template-columns: minmax(0, 1fr) 60px 76px;
+  padding: 0 4px 6px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.cs-ledger-head > :not(:first-child) {
+  justify-content: center;
+}
+.cs-ledger-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-ledger-row {
+  border-bottom: 1px solid var(--line);
+}
+.cs-ledger-row:last-child {
+  border-bottom: 0;
+}
+.cs-ledger-check,
+.cs-ledger-save {
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.cs-ledger-check {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 60px;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 4px;
+  text-align: left;
+}
+.cs-ledger-name {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cs-ledger-word {
+  margin: 0;
+  font: 600 15px / 1.2 var(--font-body);
+  color: var(--text);
+}
+.cs-ledger-score {
+  margin: 0;
+  font: 400 17px / 1 var(--font-numeric);
+  color: var(--text-muted);
+}
+.cs-ledger-mod {
+  grid-column: 3;
+  margin: 0;
+  font: 400 34px / 1 var(--font-numeric);
+  color: var(--text);
+  text-align: center;
+}
+.cs-ledger-save {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  border-left: 1px solid var(--line);
+}
+.cs-ledger-savev {
+  margin: 0;
+  font: 400 20px / 1 var(--font-numeric);
+  color: var(--text);
+}
+.cs-ledger-save.is-failing .cs-ledger-savev {
+  color: var(--danger-text);
+}
+.cs-ledger-owed {
+  grid-column: 1 / -1;
+  padding: 0 0 var(--space-2);
+}
+:is(.cs-ledger-check, .cs-ledger-save, .cs-skill-row):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+:is(
+  .cs-ledger-check:hover .cs-ledger-mod,
+  .cs-ledger-save:hover .cs-ledger-savev,
+  .cs-skill-row:hover .cs-skill-bonus
+) {
+  color: var(--cyan-hi);
+}
+:is(.cs-ledger-check, .cs-ledger-save, .cs-skill-row):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+:is(.cs-ledger-check, .cs-ledger-save, .cs-skill-row) :is(span, strong) {
+  margin-top: 0;
+}
+
+/* The skills: one row each, the whole row the button. 44px; 30px on a laptop's sheet with a mouse (ADR-0047). */
+.cs-skills {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-skill {
+  border-top: 1px solid var(--line);
+}
+.cs-skill:first-child {
+  border-top: 0;
+}
+.cs-skill-row {
+  display: grid;
+  grid-template-columns: 10px 28px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--row-h);
+  padding: 0 4px 0 2px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 400 14px / 1.2 var(--font-label);
+  text-align: left;
+  cursor: pointer;
+}
+.cs-skill-row.is-static {
+  cursor: default;
+}
+.cs-skill-ab {
+  margin: 0;
+  font: 600 10px / 1 var(--font-label);
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.cs-skill-name {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 14px / 1.2 var(--font-body);
+  color: var(--text);
+}
+.cs-skill.is-proficient .cs-skill-name {
+  font-weight: 600;
+}
+.cs-skill-bonus {
+  grid-column: 5;
+  min-width: 30px;
+  margin: 0;
+  font: 400 21px / 1 var(--font-numeric);
+  color: var(--text);
+  text-align: right;
+}
+@media (hover: hover) and (pointer: fine) {
+  .cs--wide .cs-skill-row {
+    min-height: var(--row-h-dense);
+  }
+}
+@media (any-pointer: coarse) {
+  .cs--wide .cs-skill-row {
+    min-height: var(--row-h);
+  }
+}
+.cs-pinned {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+/* Senses: read only, an open group with a rule above it. */
+.cs-open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: 10px;
+  border-top: 1px solid var(--line-strong);
+}
+.cs-senses-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-senses-rows > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  border-top: 1px solid var(--line);
+  font: 400 14px / 1.2 var(--font-body);
+}
+.cs-senses-rows > li:first-child {
+  border-top: 0;
+}
+.cs-senses-v {
+  min-width: 28px;
+  font: 400 22px / 1 var(--font-numeric);
+  text-align: center;
+}
+.cs-senses-text {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
 }
 
 /* ---- Checks ---- */
 /* Three to a row where each box fits its two 44px buttons side by side, else fewer (the laptop's left column). */
 /* Abilities: tiles that roll the check, the name over the modifier large in VT323 and the score under it. */
-.cs-abilities {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-.cs-ability {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-height: 82px;
-  padding: var(--space-2) var(--space-1);
-  border: 1px solid var(--line-raised);
-  background: var(--surface-2);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-.cs-ability:hover:not(:disabled) {
-  border-color: var(--line-raised-hover);
-  background: var(--surface-3);
-}
-.cs-ability:disabled {
-  cursor: default;
-}
-.cs-ability-name {
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-}
-.cs-ability-mod {
-  font: 400 34px / 1 var(--font-numeric);
-}
-.cs-ability-score {
-  color: var(--text-muted);
-  font: 400 15px / 1 var(--font-numeric);
-}
-.cs-ability .roll-mode-tag {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-}
 /* Saving throws: a row each, the cyan square where the character is proficient. */
 .cs-saves {
   display: flex;
@@ -1218,47 +1435,6 @@ button.cs-lastroll-open {
 .cs-roll:disabled {
   color: var(--text-muted);
   cursor: default;
-}
-/* Skills: one list, a cyan square for proficiency, the ability in small caps and the bonus at the right. */
-.cs-skills {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.cs-skill {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: 0 0 0 var(--space-3);
-  border-bottom: 1px solid var(--line);
-}
-.cs-skill-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fs-sm);
-}
-.cs-skill-name em {
-  float: right;
-  margin-left: var(--space-2);
-  font-style: normal;
-  color: var(--text-muted);
-  font: 600 11px / 1.6 var(--font-label);
-}
-.cs-skill .cs-roll {
-  min-width: 3rem;
-  padding-inline: var(--space-1);
-  border-color: transparent;
-  background: none;
-  box-shadow: none;
-}
-.cs-skill .cs-roll strong {
-  font-size: 20px;
 }
 /* The proficiency square: empty, cyan for proficient, cyan with a second ring for expertise. */
 .cs-tier {
@@ -1890,19 +2066,11 @@ button.cs-lastroll-open {
 .cs--wide .cs-band .nh-avatar {
   flex: none;
 }
-.cs-col-left {
-  background: var(--surface-1);
-}
-.cs-col-right .cs-card {
-  flex: none;
-}
 .cs-col-dice {
+  min-height: 0;
   background: var(--surface-1);
 }
-/* What a tab opens, in the right column on a laptop or in place on a phone. */
-.cs-detail-host:empty {
-  display: none;
-}
+/* What a tab opens, in place inside the box. */
 .cs-detail {
   display: flex;
   flex-direction: column;

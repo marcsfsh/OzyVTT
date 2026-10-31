@@ -10,7 +10,6 @@ import { SavePrompt } from "../encounter/SavePrompt";
 import type { SrdExtension } from "../encounter/sheet-extension";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
-import { SkillButton, useSkillRows, type SkillRow } from "./ChecksTab";
 import { FoodAndWater } from "./FoodAndWater";
 import { HitPointDice } from "./HitPointDice";
 import { HpControls, HpReadout } from "./HitPoints";
@@ -26,7 +25,6 @@ import {
 import { slotPools } from "./spell-model";
 import { StatusStrip } from "./StatusStrip";
 import { UseBoxes, UseList, type Pool } from "./Uses";
-import type { SheetRolls } from "./useSheetRolls";
 import { PipRow } from "./PipRow";
 
 /** A number read at a glance: AC, Speed, Initiative, Passive Perception. `note` names a lowered value's base. */
@@ -177,86 +175,6 @@ export function GmLongRest({ actorId, onFeedback }: Readonly<{ actorId: string; 
     >
       Long Rest
     </Button>
-  );
-}
-
-const pinnedKey = (actorId: string) => `vtt.sheet.pinned-checks.${actorId}`;
-const readPinned = (actorId: string): string[] | null => {
-  try {
-    const stored = localStorage.getItem(pinnedKey(actorId));
-    const parsed: unknown = stored ? JSON.parse(stored) : null;
-    return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : null;
-  } catch {
-    return null;
-  }
-};
-const writePinned = (actorId: string, ids: readonly string[]) => {
-  try {
-    localStorage.setItem(pinnedKey(actorId), JSON.stringify(ids));
-  } catch {
-    /* private mode: the pins last as long as the page */
-  }
-};
-
-/** Until a player pins their own, the checks a table calls for most: Perception, then the character's best. */
-function defaultPins(skills: readonly SkillRow[]): string[] {
-  const best = [...skills]
-    .filter((skill) => skill.tier && skill.bonus !== null && skill.id !== "perception")
-    .sort((left, right) => (right.bonus ?? 0) - (left.bonus ?? 0))
-    .map((skill) => skill.id);
-  return ["perception", ...best].slice(0, 4);
-}
-
-/** The checks this player keeps on the Play tab, remembered on this device, with Edit to choose them. */
-function PinnedChecks({
-  actorId,
-  definition,
-  derived,
-  rolls
-}: Readonly<{ actorId: string; definition: ActorDefinition; derived: ActorDerivedSheet | null; rolls: SheetRolls }>) {
-  const skills = useSkillRows(definition, derived);
-  const [pinned, setPinned] = useState<string[] | null>(() => readPinned(actorId));
-  const [editing, setEditing] = useState(false);
-  const ids = pinned ?? defaultPins(skills);
-  const shown = ids.flatMap((id) => skills.filter((skill) => skill.id === id));
-  if (skills.length === 0) return null;
-  const toggle = (id: string) => {
-    const next = ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id];
-    setPinned(next);
-    writePinned(actorId, next);
-  };
-  return (
-    <section className="cs-group" aria-label="Pinned checks">
-      <div className="cs-section-head">
-        <span className="cs-eyebrow">Pinned checks</span>
-        <Button size="sm" variant="ghost" aria-expanded={editing} onClick={() => setEditing((current) => !current)}>
-          {editing ? "Done" : "Edit"}
-        </Button>
-      </div>
-      {editing ? (
-        <div className="cs-chiprow" role="group" aria-label="Choose the pinned checks">
-          {skills.map((skill) => (
-            <button
-              key={skill.id}
-              type="button"
-              className={`cs-toggle${ids.includes(skill.id) ? " is-on" : ""}`}
-              aria-pressed={ids.includes(skill.id)}
-              onClick={() => toggle(skill.id)}
-            >
-              {skill.name}
-            </button>
-          ))}
-        </div>
-      ) : shown.length > 0 ? (
-        <div className="cs-chiprow">
-          {shown.map((skill) => (
-            <SkillButton key={skill.id} skill={skill} rolls={rolls} label />
-          ))}
-        </div>
-      ) : (
-        <p className="cs-sub">None pinned. Edit chooses the checks to keep here.</p>
-      )}
-    </section>
   );
 }
 
@@ -584,7 +502,6 @@ export function PlayCalm({
   definition,
   extension,
   derived,
-  rolls,
   pools,
   phoneViews,
   showHitDice,
@@ -600,7 +517,6 @@ export function PlayCalm({
   definition: ActorDefinition | null;
   extension: SrdExtension;
   derived: ActorDerivedSheet | null;
-  rolls: SheetRolls;
   pools: readonly Pool[];
   /** A player's phone: B's Vitals take the top. */
   phoneViews: boolean;
@@ -653,7 +569,6 @@ export function PlayCalm({
         )
       )}
       {actor.kind === "player-character" && <FoodAndWater actor={actor} role={role} onFeedback={onFeedback} />}
-      {definition && <PinnedChecks actorId={actor.id} definition={definition} derived={derived} rolls={rolls} />}
       {definition && <SlotsLeft definition={definition} actor={actor} />}
       {restPools.length > 0 && (
         <section className="cs-group" aria-label="Uses">

@@ -19,7 +19,9 @@ import type { SrdExtension } from "../encounter/sheet-extension";
 import { setTargetingResult, useTargeting } from "../encounter/targeting";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { TokenLibrary } from "../tokens/TokenLibrary";
+import { AbilityLedger } from "./AbilityLedger";
 import { ChecksTab } from "./ChecksTab";
+import { SensesCard, SkillsCard, ToolsCard } from "./LedgerCards";
 import { FeaturesTab, NextLevel } from "./FeaturesTab";
 import { experienceOf } from "./Experience";
 import { GearTab } from "./GearTab";
@@ -70,6 +72,8 @@ export type SheetPresentation = "page" | "dialog" | "panel";
 
 /** A laptop's sheet has three columns from this width; below it a phone's narrow sheet with its tabs under the thumb. */
 const WIDE_QUERY = "(min-width: 980px)";
+/** From this width a laptop's sheet has room for the dice log as a fourth column. */
+const DOCK_QUERY = "(min-width: 1280px)";
 
 /** What the caller offers the menu: the player's extras on My character, and the doors only some callers have. */
 export type SheetDoors = Pick<SheetMenuItems, "party" | "createCharacter" | "release">;
@@ -167,6 +171,7 @@ export function CharacterSheet({
 
   // Placement.
   const wideScreen = useMediaQuery(WIDE_QUERY);
+  const dockRoom = useMediaQuery(DOCK_QUERY);
   const [floating, setFloating] = useState(false);
   const layout: "narrow" | "wide" | "panel" =
     presentation === "panel" ? "panel" : wideScreen && !floating ? "wide" : "narrow";
@@ -179,15 +184,9 @@ export function CharacterSheet({
   const [editingNames, setEditingNames] = useState(false);
   const [rollSettings, setRollSettings] = useState(false);
   const [pickingToken, setPickingToken] = useState(false);
-  const [detailHost, setDetailHost] = useState<HTMLElement | null>(null);
-  // A cast, an item or a copy opens in the right column on a laptop, in a drawer over the GM's narrow sheet, and in
-  // place on a player's phone.
-  const place: DetailPlace =
-    layout === "wide"
-      ? { kind: "column", host: detailHost }
-      : layout === "narrow" && role === "gm"
-        ? { kind: "drawer" }
-        : { kind: "inline" };
+  // A cast, an item or a copy opens in place inside the box on a laptop and on a player's phone, and in a drawer over
+  // the GM's narrow sheet.
+  const place: DetailPlace = layout === "narrow" && role === "gm" ? { kind: "drawer" } : { kind: "inline" };
 
   const extension = (definition?.extensions["open5e.srd-2024"] ?? {}) as SrdExtension;
   const hasSpells = Boolean(definition?.spellcasting && definition.spellcasting.spells.length > 0);
@@ -272,7 +271,9 @@ export function CharacterSheet({
           }
         }
       : {}),
-    ...(layout === "wide" && state ? { dockDice: { docked, onToggle: () => setDocked((current) => !current) } } : {}),
+    ...(layout === "wide" && dockRoom && state
+      ? { dockDice: { docked, onToggle: () => setDocked((current) => !current) } }
+      : {}),
     ...(presentation === "dialog" && wideScreen
       ? { popOut: { floating, onToggle: () => setFloating((current) => !current) } }
       : {}),
@@ -300,7 +301,7 @@ export function CharacterSheet({
         <IconX />
       </IconButton>
     ) : null;
-  const openLog = state ? () => (layout === "wide" ? setDocked(true) : setDiceOpen(true)) : null;
+  const openLog = state ? () => (layout === "wide" && dockRoom ? setDocked(true) : setDiceOpen(true)) : null;
   const lastRoll = session ? (
     <LatestRoll roll={session} role={role} rolls={rolls} canReroll={canReroll} onOpenLog={openLog} />
   ) : canReroll || (rolls.lastCheck?.answers?.length ?? 0) > 0 ? (
@@ -331,7 +332,6 @@ export function CharacterSheet({
       definition={definition}
       extension={extension}
       derived={derived}
-      rolls={rolls}
       pools={pools}
       phoneViews={phoneViews}
       showHitDice={layout !== "wide"}
@@ -378,6 +378,37 @@ export function CharacterSheet({
       onFeedback={say}
     />
   ) : null;
+  // A laptop's first two columns: the same cards, split so the abilities and the skills sit side by side from 1280px.
+  const ledger = definition
+    ? {
+        abilities: <AbilityLedger actor={actor} definition={definition} derived={derived} rolls={rolls} />,
+        skills: (
+          <SkillsCard
+            actor={actor}
+            definition={definition}
+            derived={derived}
+            rolls={rolls}
+            busy={busy}
+            edit={edit}
+            onEdited={showEdited}
+          />
+        ),
+        senses: <SensesCard extension={extension} derived={derived} />,
+        tools: (
+          <ToolsCard
+            actor={actor}
+            definition={definition}
+            derived={derived}
+            rolls={rolls}
+            quarry={controller.quarry}
+            helping={controller.inFight ? undefined : state}
+            inFight={controller.inFight}
+            party={state}
+            onFeedback={say}
+          />
+        )
+      }
+    : null;
   const spellsBody = definition ? (
     <SpellsTab
       actor={actor}
@@ -501,10 +532,11 @@ export function CharacterSheet({
   const notesBody = (
     <NotesTab actor={actor} role={role} definition={definition} extension={extension} derived={derived} />
   );
+  // A laptop keeps Notes as its own tab, so its GM tab holds the tools alone.
   const gmBody = (
     <div className="cs-gm-tab">
       <GmTools actor={actor} state={state} onFeedback={say} />
-      {notesBody}
+      {layout !== "wide" && notesBody}
     </div>
   );
   const bodyOf = (id: SheetTabId): ReactNode => {
@@ -653,22 +685,23 @@ export function CharacterSheet({
           }
         />
         {toastRow}
-        {lastRoll}
         {top}
-        <div className={`cs-cols${docked && state ? " has-dice" : ""}`}>
-          <div className="cs-col cs-col-left scroll-y" aria-label="Checks">
-            {checksBody}
+        <div className={`cs-ledger-body${docked && state ? " has-dice" : ""}`}>
+          <div className="cs-checkcols scroll-y" aria-label="Checks">
+            <div className="cs-checkcol scroll-y">
+              {lastRoll}
+              {ledger?.abilities}
+              {ledger?.senses}
+              {ledger?.tools}
+            </div>
+            <div className="cs-checkcol scroll-y">{ledger?.skills}</div>
           </div>
-          <div className="cs-col cs-col-mid">
+          <div className="cs-col-box">
             <SheetTabStrip tabs={tabs} active={tab} onChange={setTab} idBase={idBase} />
             {body}
           </div>
-          <div className="cs-col cs-col-right scroll-y" aria-label="Details">
-            {role === "gm" && <GmTools actor={actor} state={state} onFeedback={say} />}
-            <div ref={setDetailHost} className="cs-detail-host" />
-          </div>
           {docked && state && (
-            <div className="cs-col cs-col-dice scroll-y" aria-label="Dice log">
+            <div className="cs-col-dice scroll-y" aria-label="Dice log">
               <DicePanel role={role} state={state} mineActorId={actor.id} />
             </div>
           )}

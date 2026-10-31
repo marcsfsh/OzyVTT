@@ -3,6 +3,7 @@ import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary, Conversi
 import { Button, IconLevelUp, Select } from "@vtt/ui";
 import { RichText } from "../encounter/RichText";
 import type { SrdExtension } from "../encounter/sheet-extension";
+import { SensesAndDefences } from "./ChecksTab";
 import { ConversionList, RestStep } from "./Conversions";
 import type { SheetActor } from "./sheet-model";
 import { KnownForms } from "./KnownForms";
@@ -324,6 +325,10 @@ export function FeaturesTab({
         />
       )}
       {experience && <ExperienceLine {...experience} />}
+      <section className="cs-open" aria-label="Defences">
+        <span className="cs-eyebrow">Defences and Proficiency</span>
+        <SensesAndDefences definition={definition} extension={extension} derived={derived} defencesOnly />
+      </section>
       {columns.length > 0 && <ClassColumns columns={columns} />}
       {pools.length > 0 && (
         <section className="cs-group" aria-label="Uses">

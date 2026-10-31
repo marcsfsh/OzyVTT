@@ -295,7 +295,9 @@ describe("the sheet's checks", () => {
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
     await openTab(user, "Checks");
-    await user.click(await screen.findByRole("button", { name: "Roll Stealth, +5" }));
+    // The skills list, past the pinned checks at the top of the card that may name Stealth too.
+    const skills = within(await screen.findByRole("list", { name: "All skills" }));
+    await user.click(await skills.findByRole("button", { name: "Roll Stealth, +5" }));
     await user.type(screen.getByPlaceholderText("1 to 20"), "17");
     await user.click(screen.getByRole("button", { name: "Roll" }));
     expect(sent("check:roll")).toEqual([
@@ -362,7 +364,9 @@ describe("the sheet's checks", () => {
       await screen.findByRole("button", { name: "Roll a Dexterity check, +1 with Disadvantage (Poisoned)" })
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Roll Stealth, +5 with Disadvantage (Poisoned, Chain Mail)" })
+      within(screen.getByRole("list", { name: "All skills" })).getByRole("button", {
+        name: "Roll Stealth, +5 with Disadvantage (Poisoned, Chain Mail)"
+      })
     ).toBeTruthy();
     const notes = within(screen.getByRole("list", { name: "Advantage and Disadvantage" }));
     expect(notes.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
@@ -370,7 +374,8 @@ describe("the sheet's checks", () => {
       "Disadvantage on ability checks · Poisoned"
     ]);
     // Passive Perception is the server's, Disadvantage's -5 included.
-    expect(screen.getByText("Passive Perception").nextElementSibling?.textContent).toBe("6");
+    // The Senses card puts the number before its label.
+    expect(screen.getByText("Passive Perception").previousElementSibling?.textContent).toBe("6");
   });
 
   it("finds the quarry of the character's Hunter's Mark with Advantage", async () => {

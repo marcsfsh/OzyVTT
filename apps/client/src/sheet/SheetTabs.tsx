@@ -43,7 +43,8 @@ export function sheetTabs({
     .filter((id) => !(id === "spells" && !hasSpells))
     .filter((id) => !(id === "checks" && layout === "wide"))
     .filter((id) => !((id === "play" || id === "actions") && hidePlay))
-    .map((id) => (id === "notes" && layout === "narrow" && role === "gm" ? "gm" : id));
+    .map((id) => (id === "notes" && layout === "narrow" && role === "gm" ? "gm" : id))
+    .concat(layout === "wide" && role === "gm" ? ["gm"] : []);
 }
 
 /** Ties a tab to its panel, as the `Tabs` primitive does. */

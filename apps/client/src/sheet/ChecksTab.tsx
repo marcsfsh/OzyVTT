@@ -5,11 +5,11 @@ import { ABILITIES, abilityModifier, saveBonus, skillBonus, type Ability } from 
 import { useSkillCatalog } from "../content/catalogs";
 import { signed, titleCase } from "../encounter/format";
 import { modeLabel } from "../encounter/roll-mode-notes";
-import { RollModeNotes, RollModeTag } from "../encounter/RollModeTag";
+import { RollModeTag } from "../encounter/RollModeTag";
 import type { SrdExtension } from "../encounter/sheet-extension";
-import { HelpAnAlly } from "./HelpAnAlly";
-import { ToolUses } from "./ToolUses";
-import { ABILITY_WORDS, exhaustionLevel, type SheetActor, type SheetState } from "./sheet-model";
+import { AbilityLedger } from "./AbilityLedger";
+import { SensesCard, SkillsCard, ToolsCard } from "./LedgerCards";
+import { ABILITY_WORDS, type SheetActor, type SheetState } from "./sheet-model";
 import type { Quarry } from "./useSheetController";
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
@@ -121,11 +121,8 @@ export function CheckSituations({
   );
 }
 
-const tierWord = (tier: SkillRow["tier"]) =>
-  tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient";
-
 /** Each ability's score, check and saving throw, as the engine works them out. */
-function abilityRows(definition: ActorDefinition, derived: ActorDerivedSheet | null) {
+export function abilityRows(definition: ActorDefinition, derived: ActorDerivedSheet | null) {
   return ABILITIES.map((ability) => {
     const score = definition.abilityScores[ability];
     const row = derived?.abilities.find((entry) => entry.ability === ability) ?? null;
@@ -195,60 +192,35 @@ export function SavingThrowList({
   );
 }
 
-/** The six scores, each with its check and its saving throw side by side. */
-function AbilityGrid({
-  definition,
-  derived,
-  rolls
-}: Readonly<{ definition: ActorDefinition; derived: ActorDerivedSheet | null; rolls: SheetRolls }>) {
-  // Abilities as tiles that roll the check (the modifier large, the score under it), then the saving throws.
-  return (
-    <>
-      <div className="cs-abilities" role="group" aria-label="Abilities">
-        {abilityRows(definition, derived).map(({ ability, score, row, check }) => {
-          const checkName = `${ABILITY_WORDS[ability]} check`;
-          return (
-            <button
-              key={ability}
-              type="button"
-              className="cs-ability interactive"
-              disabled={rolls.rolling}
-              aria-label={`Roll ${withArticle(checkName)}, ${signed(check)}${modeLabel(row?.checkMode)}`}
-              onClick={() => void rolls.rollCheck({ ability }, checkName)}
-            >
-              <span className="cs-ability-name">{ABILITY_WORDS[ability]}</span>
-              <strong className="cs-ability-mod">{signed(check)}</strong>
-              <span className="cs-ability-score">{score}</span>
-              <RollModeTag mode={row?.checkMode} />
-            </button>
-          );
-        })}
-      </div>
-      <span className="cs-eyebrow">Saving throws</span>
-      <SavingThrowList definition={definition} derived={derived} rolls={rolls} />
-    </>
-  );
-}
-
 /** A defence row as the engine applies it: each type, and what grants it when that isn't the stat block. */
 const defenceText = (rows: readonly DerivedDefence[]) =>
   rows.map((row) => (row.source ? `${titleCase(row.type)} (${row.source})` : titleCase(row.type))).join(", ");
 
-/** Senses, Passive Perception and the damage defences the engine applies; a monster's prose where nothing is typed. */
+/**
+ * The damage defences the engine applies, a monster's prose where nothing is typed, and the Proficiency Bonus. The
+ * Senses card holds the senses and passive scores, so `defencesOnly` leaves them out (the top of Features).
+ */
 export function SensesAndDefences({
   definition,
   extension,
-  derived
-}: Readonly<{ definition: ActorDefinition; extension: SrdExtension; derived: ActorDerivedSheet | null }>) {
+  derived,
+  defencesOnly = false
+}: Readonly<{
+  definition: ActorDefinition;
+  extension: SrdExtension;
+  derived: ActorDerivedSheet | null;
+  defencesOnly?: boolean;
+}>) {
   const defence = (typed: readonly DerivedDefence[] | undefined, prose: string | null | undefined) =>
     typed && typed.length > 0 ? defenceText(typed) : prose;
   const rows: Array<[string, string]> = [];
-  if (extension.senses && extension.senses.length > 0) rows.push(["Senses", extension.senses.join(", ")]);
+  if (!defencesOnly && extension.senses && extension.senses.length > 0)
+    rows.push(["Senses", extension.senses.join(", ")]);
   const passive = derived?.passivePerception ?? extension.passivePerception ?? null;
-  if (passive !== null) rows.push(["Passive Perception", String(passive)]);
-  const vulnerabilities = defence(derived?.defences.vulnerabilities, extension.damageVulnerabilities);
-  const resistances = defence(derived?.defences.resistances, extension.damageResistances);
-  const immunities = defence(derived?.defences.immunities, extension.damageImmunities);
+  if (!defencesOnly && passive !== null) rows.push(["Passive Perception", String(passive)]);
+  const vulnerabilities = defence(derived?.defences?.vulnerabilities, extension.damageVulnerabilities);
+  const resistances = defence(derived?.defences?.resistances, extension.damageResistances);
+  const immunities = defence(derived?.defences?.immunities, extension.damageImmunities);
   if (vulnerabilities) rows.push(["Vulnerabilities", vulnerabilities]);
   if (resistances) rows.push(["Resistances", resistances]);
   if (immunities) rows.push(["Immunities", immunities]);
@@ -269,7 +241,7 @@ export function SensesAndDefences({
 type ProficiencyDraft = { saves: string[]; skills: Record<string, "proficient" | "expertise"> };
 
 /** The light hand-edit of saving throw and skill proficiencies (the owner and the GM; the server enforces it). */
-function ProficiencyEditor({
+export function ProficiencyEditor({
   actor,
   definition,
   skills,
@@ -360,10 +332,9 @@ function ProficiencyEditor({
 }
 
 /**
- * The checks: each ability's check and saving throw, the skills in two columns with the ability each uses, the tools,
- * the quarry of a Hunter's Mark, outside a fight the help it can give an ally's check, and the senses. A tap rolls on
- * the server, which works out the bonus and any Advantage or Disadvantage, so a button can't disagree with the roll.
- * On a laptop this is the sheet's left column.
+ * The checks on a phone and in the Table panel (ADR-0047): the abilities with their saves, the skills, the senses and the
+ * tools, the same cards as a laptop's first two columns. A tap rolls on the server, which works out the bonus and any
+ * Advantage or Disadvantage, so a button can't disagree with the roll.
  */
 export function ChecksTab({
   actor,
@@ -378,7 +349,8 @@ export function ChecksTab({
   helping,
   onFeedback,
   inFight = false,
-  party
+  party,
+  top
 }: Readonly<{
   actor: SheetActor;
   definition: ActorDefinition;
@@ -396,116 +368,33 @@ export function ChecksTab({
   inFight?: boolean;
   /** The table, for the creature a use works for (Cobbler's Tools' footwear). */
   party?: SheetState | undefined;
+  /** What the Abilities card opens with: the Death Saving Throws while dying, and the saves owed. */
+  top?: ReactNode;
 }>) {
-  const skills = useSkillRows(definition, derived);
-  const [editing, setEditing] = useState(false);
-  const exhaustion = exhaustionLevel(actor);
-  const tools = derived?.tools ?? [];
   return (
     <div className="cs-checks">
-      <AbilityGrid definition={definition} derived={derived} rolls={rolls} />
-      {exhaustion > 0 && (
-        <p className="cs-sub is-caution">
-          Every d20 Test here includes the -{2 * exhaustion} from Exhaustion {exhaustion}.
-        </p>
-      )}
-      <RollModeNotes derived={derived} />
-      <CheckSituations situations={derived?.situations ?? []} rolls={rolls} />
-      <div className="cs-section-head">
-        <span className="cs-eyebrow">Skills</span>
-        {actor.kind === "player-character" && !editing && (
-          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
-            Edit proficiencies
-          </Button>
-        )}
-      </div>
-      {editing ? (
-        <ProficiencyEditor
-          actor={actor}
-          definition={definition}
-          skills={skills}
-          busy={busy}
-          edit={edit}
-          onEdited={onEdited}
-          onDone={() => setEditing(false)}
-        />
-      ) : (
-        <ul className="cs-skills">
-          {skills.map((skill) => (
-            <li key={skill.id} className="cs-skill">
-              <span
-                className={`cs-tier${skill.tier === "expertise" ? " is-expertise" : skill.tier === "proficient" ? " is-proficient" : ""}`}
-                role="img"
-                aria-label={`${tierWord(skill.tier)}${skill.sources.length > 0 ? ` from ${skill.sources.join(", ")}` : ""}`}
-              ></span>
-              <span className="cs-skill-name">
-                {skill.name}
-                {skill.ability && <em>{skill.ability.toUpperCase()}</em>}
-              </span>
-              <SkillButton skill={skill} rolls={rolls} />
-            </li>
-          ))}
-        </ul>
-      )}
-      {tools.length > 0 && (
-        <>
-          <span className="cs-eyebrow">Tools</span>
-          <div className="cs-chiprow">
-            {tools.map((tool) => (
-              <button
-                key={tool.id}
-                type="button"
-                className={`cs-roll has-label${tool.proficient !== false ? " is-proficient" : ""}`}
-                disabled={rolls.rolling}
-                aria-label={`Roll ${tool.name}, ${signed(tool.bonus)}${modeLabel(tool.mode)}`}
-                onClick={() =>
-                  void rolls.rollCheck(
-                    { ability: tool.ability, tool: tool.id },
-                    `${tool.name} (${ABILITY_WORDS[tool.ability]})`
-                  )
-                }
-              >
-                <span className="cs-roll-label">{tool.name}</span>
-                <strong>{signed(tool.bonus)}</strong>
-                <RollModeTag mode={tool.mode} />
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <ToolUses actor={actor} derived={derived} rolls={rolls} inFight={inFight} state={party} />
-      {quarry.map((creature) => (
-        <div key={creature.id} className="cs-chiprow" role="group" aria-label={`Find ${creature.name}`}>
-          <span className="cs-eyebrow">Find {creature.name}</span>
-          {(["perception", "survival"] as const).map((skill) => {
-            const word = skill === "perception" ? "Perception" : "Survival";
-            return (
-              <button
-                key={skill}
-                type="button"
-                className="cs-roll has-label"
-                disabled={rolls.rolling}
-                aria-label={`Roll Wisdom (${word}) to find ${creature.name} (Hunter's Mark)`}
-                onClick={() => void rolls.rollCheck({ ability: "wis", skill }, `Wisdom (${word})`, creature.id)}
-              >
-                <span className="cs-roll-label">{word}</span>
-              </button>
-            );
-          })}
-        </div>
-      ))}
-      {helping && onFeedback && (
-        <HelpAnAlly
-          actor={actor}
-          state={helping}
-          choices={[
-            ...skills.filter((skill) => skill.tier !== undefined).map(({ id, name }) => ({ id, name })),
-            ...tools.map(({ id, name }) => ({ id, name }))
-          ]}
-          onFeedback={onFeedback}
-        />
-      )}
-      <SensesAndDefences definition={definition} extension={extension} derived={derived} />
+      <AbilityLedger actor={actor} definition={definition} derived={derived} rolls={rolls} top={top} />
+      <SkillsCard
+        actor={actor}
+        definition={definition}
+        derived={derived}
+        rolls={rolls}
+        busy={busy}
+        edit={edit}
+        onEdited={onEdited}
+      />
+      <SensesCard extension={extension} derived={derived} />
+      <ToolsCard
+        actor={actor}
+        definition={definition}
+        derived={derived}
+        rolls={rolls}
+        quarry={quarry}
+        helping={helping}
+        inFight={inFight}
+        party={party}
+        onFeedback={onFeedback}
+      />
     </div>
   );
 }
