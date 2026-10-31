@@ -228,11 +228,11 @@ spell card. Add equipment's catalogue keeps A's dialog; C6.8, the token picker, 
 
 ## D. Characters
 
-Job: who you play, from making them to looking them up. Status: D1 Designed; D2 and D3 Designed (`D-characters/SPEC.md`,
+Job: who you play, from making them to looking them up. Status: D1 Built; D2 and D3 Designed (`D-characters/SPEC.md`,
 `D-characters/PLAN.md`, ADR-0051): the roster as bands, the builder's steps and detail, levelling in a dialog and a
 party member as a band.
 
-### D1. The character sheet: Designed (`D1-character-sheet/PLAN.md`, ADR-0047; boxes and controls per T)
+### D1. The character sheet: Built (`D1-character-sheet/PLAN.md`, ADR-0047; boxes and controls per T)
 
 | Id   | Surface                               | Opens at                 | Who    | Files                                                                                             |
 | ---- | ------------------------------------- | ------------------------ | ------ | ------------------------------------------------------------------------------------------------- |

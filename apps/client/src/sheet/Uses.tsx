@@ -98,7 +98,7 @@ export function UseRow({
   cost?: string | null;
   /** What the feature does, in a line. */
   detail?: string | null;
-  /** False on the Play tab, which shows what is left without the controls. */
+  /** False in the Actions tab's Limited use group, which shows what is left without the controls. */
   actions?: boolean;
   /** Uses the pool through one of its actions, which the server applies (Second Wind heals); otherwise Use only counts.
    *  Several spenders get a button each, by name. */

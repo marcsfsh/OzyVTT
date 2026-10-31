@@ -425,25 +425,38 @@ burst plays with no number, and healing never shows one.
 
 ## The character sheet
 
-- On a laptop the header holds the numbers read most: portrait, name in the display face, species, class, level, subclass and
-  background; AC, initiative, speed and proficiency in VT323 boxes; the life bar with Change HP; and Rest as one menu
-  with Short rest and Long rest. The phone uses the compact UI-font identity with AC and HP; its rest row has the two
-  separate buttons drawn in sheet-phone. Rest controls are hidden in an encounter. Keep the other vitals and HP editing
-  reachable from the compact header's details sheet, without forcing laptop-sized boxes into it.
-- Laptop: abilities as 2 by 3 tiles (name, modifier in VT323 at 34px, score under it), saving throws and senses; then
-  skills with a cyan square for proficiency; then Spells, Gear, Features and Notes as tabs.
-- Phone: Checks, Spells, Gear, Features and Notes as a segmented strip. Checks shows abilities 3 by 2, saves 3 by 2 and
-  skills.
-- Spells group by level with that level's slot pips in `--party`. On a laptop a spell's cost, range and effect sit
-  in a column right beside its name, never at the far edge of the panel. Tags say REACTION, BONUS, RITUAL and CONC; an active
-  effect shows in cyan with its time left.
+The sheet is the Ledger (ADR-0047; `docs/design/polish/D1-character-sheet/`).
+
+- A vitals band runs across the top on every frame. On a laptop: the portrait, the name in the display face, the
+  identity line and the live states under it; one stats plate (AC, Hit points with its number in VT323 `--hp-text`,
+  the life bar and Damage, Heal and Temp on base lines, Initiative, Speed, Proficiency and an Inspiration square); then
+  Rest as one menu with the Hit Point Dice under it. The band is one row on a sheet at least 1270px wide and two rows
+  on a narrower one. A phone and the Table panel pin a compact band with the same cells in the same order: the name,
+  the Level box, Rest and the menu, then AC, Hit points (one button that opens the Hit Points dialog), Initiative and
+  Speed. Rest controls are hidden in an encounter.
+- Laptop: the abilities as rows like a paper sheet's left edge (the name with its score, the check's modifier and the
+  saving throw as two buttons) with the senses and tools under them, then the skills, then one tabbed box: Actions,
+  Spells, Gear, Features and Notes, with the GM tab last for the GM. On a sheet at least 1200px wide the first two are
+  250px columns that scroll themselves; a narrower one stacks them in one 280px column.
+- Phone and Table panel: one row of tabs pinned under the band: Main, Actions, Spells, Gear, Features and Notes. Main
+  holds the conditions and effects, a plate of Proficiency, Heroic Inspiration and Hit Point Dice, then the laptop's
+  first two columns. The Death Saving Throws and a save owed come first. In a fight the panel drops Actions, which its
+  Turn tab runs.
+- A number you roll is its own button with no box: the ability row, the Save cell, the skill row. Skill rows are 30px
+  on a laptop with a mouse (`--row-h-dense`) and 44px with any coarse pointer.
+- Actions and Spells are tables. Each action row stays one button, with Range, Hit / DC and Damage in columns inside it
+  and one header row per list; Actions opens with the spell slots left and closes with Limited use. Spells read Name,
+  Time, Range, Hit / DC, Effect and the row's button, grouped by level with that level's slot pips in `--party`. A
+  phone keeps Name, Hit / DC and the dice or effect, with the time, range and type on the name's line.
+- Groups you act in (the stats plates, Abilities, Skills, Tools, the conditions) are Cradle boxes; Senses and the
+  defences at the top of Features are open groups.
 - In an encounter a player's phone shows the turn card on Table: YOUR TURN in chrome with the VCR counter, the four lamps,
   any active effect, slot pips, actions grouped by cost and End turn. Off-turn it shows who is acting in the sun frame,
   only an available Reaction lamp lit, any prompt the player owes at the top, and the small map. A spent reaction,
   incapacitation or server refusal keeps it unlit. Extra actions and movement beyond 30 ft must remain legible.
 - An option that can't be used now stays in its list, disabled, with the server's reason at full strength.
 - GM-only data and restricted-control groups have a violet `GmOnlyTag`. Individual controls retain their semantic
-  colours: the view's primary stays magenta, targeting stays cyan, and danger actions retain their warning treatment.
+  colours: the view's primary is the Cup, targeting stays cyan, and danger actions retain their warning treatment.
 - The latest-roll line shows only rolls made from this sheet (`sheet-roll-ids.ts`).
 
 ## The Codex

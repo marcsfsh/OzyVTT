@@ -1,4 +1,4 @@
-/** Everything a character can do on a turn, grouped by what it costs: the one list behind the sheet's Play tab, the
+/** Everything a character can do on a turn, grouped by what it costs: the one list behind the sheet's Actions tab, the
  *  table's Turn tab and the phone's turn card. The server still decides each use. */
 import type { ActorDefinition, ContentActionSummary, ContentSpellSummary } from "@vtt/domain";
 import { castsSpell, plainActionName, signed } from "../encounter/format";

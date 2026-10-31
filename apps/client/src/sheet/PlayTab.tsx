@@ -1,10 +1,9 @@
 import { useRef, useState, type ReactNode } from "react";
-import type { ActorDefinition, DeathSaves, PendingSave, PlayerPendingSave } from "@vtt/domain";
+import type { ActorDefinition, DeathSaves } from "@vtt/domain";
 import { Button, IconCheck, IconMoon, IconX, Menu, MenuItem } from "@vtt/ui";
 import { rollModeOf, useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "../encounter/DyingTracker";
 import { useSaveLight } from "../encounter/saveLight";
-import { SavePrompt } from "../encounter/SavePrompt";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
 import { heroicInspirationOf, type SheetActor, type SheetState } from "./sheet-model";
@@ -306,38 +305,6 @@ export function EconomyPips({ state, actorId }: Readonly<{ state: SheetState; ac
         </span>
       )}
     </div>
-  );
-}
-
-/** A save the character owes outside a fight (a trap, a Concentration check); in a fight it takes the prompt slot. */
-export function SavesOwed({
-  saves,
-  actor,
-  role,
-  onFeedback
-}: Readonly<{
-  saves: ReadonlyArray<PendingSave | PlayerPendingSave>;
-  actor: SheetActor;
-  role: "gm" | "player";
-  onFeedback: (text: string) => void;
-}>) {
-  if (saves.length === 0) return null;
-  return (
-    <section className="cs-group" aria-label="Saves owed">
-      <span className="cs-eyebrow">Saves owed</span>
-      {saves.map((save) => (
-        <SavePrompt
-          key={save.id}
-          save={save}
-          targetName={actor.name}
-          canDismiss={role === "gm"}
-          onFeedback={onFeedback}
-          rollMode="auto"
-          viewer={role}
-          inspired={heroicInspirationOf(actor) === true}
-        />
-      ))}
-    </section>
   );
 }
 

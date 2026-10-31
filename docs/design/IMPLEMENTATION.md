@@ -228,6 +228,8 @@ Preserve features omitted from the drawings in the following destinations, using
 
 ## Phase 5: sheet and builder
 
+The sheet's layout is now ADR-0047's Ledger; `docs/design/polish/D1-character-sheet/` holds its plan and mockup.
+
 Start at `sheet/CharacterSheet.tsx`, `sheet-main.tsx`, `sheet/TurnCard.tsx`, `sheet/Conversions.tsx`, `builder/CharacterBuilder.tsx`, `builder/draft.ts`,
 and `builder/LevelFlow.tsx`. Preserve standalone `sheet.html` entry behavior as well as shell layers.
 

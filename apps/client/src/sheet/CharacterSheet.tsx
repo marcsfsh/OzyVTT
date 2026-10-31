@@ -71,7 +71,7 @@ import { atTableBlocked, setPlayedAtTable } from "../actors/playedAtTable";
  *  it was opened from, or the table's panel. */
 export type SheetPresentation = "page" | "dialog" | "panel";
 
-/** A laptop's sheet has three columns from this width; below it a phone's narrow sheet with its tabs under the thumb. */
+/** A laptop's sheet, the Ledger's columns, from this width; below it the narrow sheet with its compact band. */
 const WIDE_QUERY = "(min-width: 980px)";
 /** The laptop sheet's own widths (a dialog is narrower than the window): the band in one row, the abilities and the
  *  skills in columns of their own, and room for the dice log as a fourth column with the box at 480px or more. */
@@ -83,9 +83,9 @@ const DOCK_WIDTH = 1336;
 export type SheetDoors = Pick<SheetMenuItems, "party" | "createCharacter" | "release">;
 
 /**
- * The character sheet (ADR-0030). A pinned header holds the numbers read most and every live state; tabs hold the rest:
- * Play, Checks, Spells, Gear, Features and Notes. A phone puts the tabs under the thumb; a laptop gives the checks and
- * the Hit Points columns of their own; the table's panel shows one compact row and the tabs as a strip. The server
+ * The character sheet (ADR-0030), laid out as the Ledger (ADR-0047). A vitals band holds the numbers read most on every
+ * frame. A laptop sets the abilities and skills in columns beside one tabbed box (Actions, Spells, Gear, Features,
+ * Notes); a phone and the table's panel pin a compact band and one row of tabs, with Main holding the checks. The server
  * decides every roll and change; the sheet shows what it reports and sends commands.
  */
 export function CharacterSheet({
@@ -112,7 +112,7 @@ export function CharacterSheet({
   presentation?: SheetPresentation;
   /** The table's panel is in its phone layout. */
   phone?: boolean;
-  /** The table's Sheet tab in a fight, where its Turn tab already shows Play. */
+  /** The table's Sheet tab in a fight, where its Turn tab already runs the actions. */
   hidePlay?: boolean;
   /** The fight a player's own sheet acts in, passed by the table's panel. */
   combat?: SheetCombat;

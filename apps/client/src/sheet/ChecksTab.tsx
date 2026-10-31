@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { withArticle, type ActorDefinition, type ActorDerivedSheet, type DerivedDefence } from "@vtt/domain";
+import { type ActorDefinition, type ActorDerivedSheet, type DerivedDefence } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { ABILITIES, abilityModifier, saveBonus, skillBonus, type Ability } from "@vtt/rules-5e";
 import { useSkillCatalog } from "../content/catalogs";
@@ -139,57 +139,6 @@ export function abilityRows(definition: ActorDefinition, derived: ActorDerivedSh
       fails: row?.saveAutoFails ?? null
     };
   });
-}
-
-/**
- * The six saving throws as rows, with a cyan square where the character is proficient. A save the character owes now
- * (`owed`) takes its ability's row, so the tap answers it; the others roll freely.
- */
-export function SavingThrowList({
-  definition,
-  derived,
-  rolls,
-  owed
-}: Readonly<{
-  definition: ActorDefinition;
-  derived: ActorDerivedSheet | null;
-  rolls: SheetRolls;
-  owed?: (ability: Ability) => ReactNode;
-}>) {
-  return (
-    <ul className="cs-saves">
-      {abilityRows(definition, derived).map(({ ability, row, proficient, save, fromItems, fails }) => {
-        const answer = owed?.(ability);
-        if (answer) return <li key={ability}>{answer}</li>;
-        const saveName = `${ABILITY_WORDS[ability]} saving throw`;
-        return (
-          <li key={ability}>
-            <button
-              type="button"
-              className={`cs-save interactive${proficient ? " is-proficient" : ""}${fails ? " is-failing" : ""}`}
-              disabled={rolls.rolling}
-              aria-label={`Roll ${withArticle(saveName)}, ${signed(save)}${proficient ? ", proficient" : ""}${fromItems !== 0 ? `, ${signed(fromItems)} from equipment` : ""}${fails ? ", fails automatically" : modeLabel(row?.saveMode)}`}
-              onClick={() => void rolls.rollSave(ability)}
-            >
-              <span className={`cs-tier${proficient ? " is-proficient" : ""}`} aria-hidden="true" />
-              <span className="cs-save-name">
-                <span className="cs-save-long">{ABILITY_WORDS[ability]}</span>
-                <span className="cs-save-short">{ability.toUpperCase()}</span>
-              </span>
-              {fails ? (
-                <span className="roll-mode-tag is-disadvantage" aria-hidden="true">
-                  Fails
-                </span>
-              ) : (
-                <RollModeTag mode={row?.saveMode} />
-              )}
-              <strong className="cs-save-bonus">{signed(save)}</strong>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
 }
 
 /** A defence row as the engine applies it: each type, and what grants it when that isn't the stat block. */

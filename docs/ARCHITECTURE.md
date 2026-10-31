@@ -1145,20 +1145,24 @@ settings are the encounter's `initiativeDefaults` (ADR-0039), set with `encounte
 takes the live encounter's value for a choice its request leaves out, a duplicate copies them and a replay has none. The
 table's Start the encounter seeds its two switches from them and sends what the switches show.
 
-The character sheet lives in `sheet/` (ADR-0030). `CharacterSheet.tsx` is one component for every place it sits: a
-page (My character, `/characters/<id>`, `sheet.html`), the GM's dialog, or the table panel's Me and Sheet tabs. It
-picks a narrow, wide or panel frame from the presentation and the width. Its tabs share one controller
-(`useSheetController.tsx`) that sends every change as a command. `useSheetDefinition.ts` reads
-`actor:available-actions` into the turn's options (`turn-options.ts`) with each row's reason, passive flag and mastery.
-Play holds the character's state (Vitals on a phone, rests, pinned checks, slots, uses); the Actions tab
-(`ActionsTab.tsx`, ADR-0044) lists the options under subtabs by cost, with the six saving throws, a save the character
-owes taking its ability's row. The laptop's list (`ActionList.tsx`) and the phone's turn card (`TurnCard.tsx`) draw the
-same options. In an encounter the Actions tab and the table's Turn tab run them through
+The character sheet lives in `sheet/` (ADR-0030, its layout ADR-0047's Ledger). `CharacterSheet.tsx` is one component
+for every place it sits: a page (My character, `/characters/<id>`, `sheet.html`), the GM's dialog, or the table
+panel's Me and Sheet tabs. It picks a narrow, wide or panel frame from the presentation and the window, and on a laptop
+measures its own width for the one-row band and the three columns, since a dialog is narrower than the window. The
+band is `SheetBand.tsx` (`SheetBand` on a laptop, `SheetBandCompact` on a phone and in the panel, `MainPlate` and the
+read-only `BandPlate`). The checks are cards: `AbilityLedger.tsx` and `LedgerCards.tsx` (skills with the pinned checks,
+senses, tools), a laptop's first two columns and a phone's Main tab (`ChecksTab.tsx`). `SheetTabs.tsx` holds the one
+row of tabs (Main on a phone, Actions, Spells, Gear, Features, Notes, GM) and reads a tab remembered as Play or Checks
+where its contents went. Its tabs share one controller (`useSheetController.tsx`) that sends every change as a
+command. `useSheetDefinition.ts` reads `actor:available-actions` into the turn's options (`turn-options.ts`) with each
+row's reason, passive flag, mastery and the table's range, hit or DC and damage. The Actions tab (`ActionsTab.tsx`,
+ADR-0044) lists the options in one table grouped by cost, with no subtabs; a save the character owes takes its
+ability's Save cell in the Abilities card. The sheet's table (`ActionList.tsx`) and the phone's turn card
+(`TurnCard.tsx`) draw the same options. In an encounter the Actions tab and the table's Turn tab run them through
 `encounter/PlayerActionRunner.tsx`, which also aims a cast started on the sheet; outside one the server rolls a tap on
-the loose route (`SheetActionList` in `PlayFight.tsx`). A cast,
-an item or a spell to copy opens through `SheetDetail.tsx`: where its list was, in a drawer, or in the laptop's right
-column. The sheet notes the ids of the rolls it starts (`sheet-roll-ids.ts`), and its latest-roll line shows only
-those.
+the loose route (`SheetActionList` in `PlayFight.tsx`). A cast, an item or a spell to copy opens through
+`SheetDetail.tsx`: in place inside the box, or in a drawer over the GM's narrow sheet. The sheet notes the ids of the
+rolls it starts (`sheet-roll-ids.ts`), and its latest-roll line shows only those.
 
 The Codex client (ADR-0031) lives in `codex/`. `CodexShell.tsx` (the GM) and `PlayerCodex.tsx` (a player, and the
 GM's preview, which runs on a local route) both draw `shell/CodexFrame.tsx`, the section bar or the phone's strip of views,
