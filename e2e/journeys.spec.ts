@@ -49,7 +49,7 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
   await press(gm.getByRole("button", { name: "Make live" }));
   // With a fight running, making another scene live parks it, which the GM confirms.
   const confirm = gm.getByRole("dialog", { name: "Make encounter live?" });
-  const table = gm.getByRole("button", { name: "Go to the table" });
+  const table = gm.getByRole("button", { name: "Go to the table", exact: true });
   await expect(confirm.or(table)).toBeVisible();
   if (await confirm.isVisible()) await press(confirm.getByRole("button", { name: "Make live" }));
   await press(table);
@@ -384,7 +384,7 @@ test("a save on the player's own turn leaves the bar under the thumb on screen",
   state = await game();
   expect(state.combat.turnActorId).toBe(actorId);
   await joinAndClaim(player, hero);
-  await press(player.getByRole("tab", { name: "Turn" }));
+  await press(player.getByRole("tab", { name: "Turn", exact: true }));
   await expect(player.getByRole("heading", { name: "Your turn" })).toBeVisible();
 
   // A saving throw for this character on its own turn: the GM's ruling stands in for whatever forced it.

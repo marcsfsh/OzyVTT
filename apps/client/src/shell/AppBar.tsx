@@ -13,7 +13,8 @@ import {
   Tabs,
   Wordmark,
   cx,
-  useOnChange
+  useOnChange,
+  StatusLamp
 } from "@vtt/ui";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import {
@@ -38,6 +39,7 @@ import { pageLight } from "./pageLight";
 import { tabTrip } from "./tabLight";
 import { SearchLauncher } from "./SearchLauncher";
 import { FrameMenu } from "./FrameMenu";
+import { LiveChip, myTurnNow } from "./LiveChip";
 import { SectionBar, SectionBarSlot } from "./SectionBar";
 import "./app-bar.css";
 
@@ -74,7 +76,7 @@ function SectionTabs({
   bottom
 }: Readonly<{
   ariaLabel: string;
-  tabs: ReadonlyArray<Readonly<{ id: string; label: string; icon?: ReactNode }>>;
+  tabs: ReadonlyArray<Readonly<{ id: string; label: string; icon?: ReactNode; live?: "live" | "mine" }>>;
   activeId: string | null;
   onChange: (id: string) => void;
   bottom: boolean;
@@ -95,8 +97,10 @@ function SectionTabs({
           <span className="app-bottom-tab">
             <span className="app-bottom-tab-icon" aria-hidden="true">
               {tab.icon}
+              {tab.live && <StatusLamp lit className={cx("app-bottom-tab-lamp", tab.live === "mine" && "is-mine")} />}
             </span>
             {tab.label}
+            {tab.live && <span className="nh-sr-only">{tab.live === "mine" ? ", your turn" : ", live"}</span>}
           </span>
         ) : (
           tab.label
@@ -167,12 +171,7 @@ export function GmTopBar({
           bottom={false}
         />
       )}
-      {!phone && section === "play" && (
-        <>
-          <span className="app-bar-divider" aria-hidden="true" />
-          <LiveScenePicker state={state} />
-        </>
-      )}
+      {!phone && (section === "play" ? <LiveScenePicker state={state} chip /> : <LiveChip role="gm" state={state} />)}
       <span className="app-bar-grow" />
       {phone && <TvControl gmToken={token} state={state} compact />}
       <SearchLauncher
@@ -201,13 +200,19 @@ export function GmTopBar({
 }
 
 /** The GM's sections as the phone's bottom tabs. */
-export function GmBottomTabs() {
+export function GmBottomTabs({ state }: Readonly<{ state?: GmView }>) {
   const route = useRoute();
   const section = litGmSection(route.path);
+  // While a fight runs, Play carries a lit lamp (frame rule 3.2).
+  const fighting = state?.combat.active === true;
   return (
     <SectionTabs
       ariaLabel="GM sections"
-      tabs={GM_SECTIONS.map((entry) => ({ ...entry, icon: GM_SECTION_ICONS[entry.id] }))}
+      tabs={GM_SECTIONS.map((entry) => ({
+        ...entry,
+        icon: GM_SECTION_ICONS[entry.id],
+        ...(entry.id === "play" && fighting ? { live: "live" as const } : {})
+      }))}
       activeId={section}
       onChange={(id) => openGmSection(id as GmSection, section)}
       bottom
@@ -272,6 +277,7 @@ export function PlayerTopBar({
           bottom={false}
         />
       )}
+      {!phone && <LiveChip role="player" state={state} />}
       <span className="app-bar-grow" />
       <SearchLauncher
         role="player"
@@ -299,16 +305,23 @@ export function PlayerTopBar({
 /** A player's sections as the phone's bottom tabs: Table, Sheet, Codex and Log. */
 export function PlayerBottomTabs({
   codexUnread,
-  onCodexSeen
-}: Readonly<{ codexUnread: number; onCodexSeen: () => void }>) {
+  onCodexSeen,
+  state
+}: Readonly<{ codexUnread: number; onCodexSeen: () => void; state?: PlayerView }>) {
   const route = useRoute();
   const section = litPlayerSection(route);
   useCodexNews(codexUnread, "app-bottom-tabs");
+  // While a fight runs, Table carries a lit lamp, amber on the player's turn (frame rule 3.2).
+  const live = state?.combat.active ? (myTurnNow(state) ? ("mine" as const) : ("live" as const)) : null;
   return (
     <SectionTabs
       ariaLabel="Player sections"
       tabs={PLAYER_SECTIONS.map((entry) =>
-        entry.id === "codex" && codexUnread > 0 ? { ...entry, label: `Codex, ${codexUnread} new` } : entry
+        entry.id === "codex" && codexUnread > 0
+          ? { ...entry, label: `Codex, ${codexUnread} new` }
+          : entry.id === "table" && live
+            ? { ...entry, live }
+            : entry
       )}
       activeId={section}
       onChange={(id) => openPlayerSection(id as PlayerSection, section, onCodexSeen)}

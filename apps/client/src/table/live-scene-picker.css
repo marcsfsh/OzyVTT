@@ -35,3 +35,15 @@
 .live-scene.is-compact .live-scene-trigger.nh-menu-trigger {
   max-width: 100%;
 }
+/* As the laptop bar's live chip on Play (frame spec 2.1): on its Base line, the lamp, name and round in a row. */
+.live-scene.is-chip .live-scene-trigger.nh-menu-trigger::before {
+  box-shadow: var(--base-line);
+}
+.live-scene.is-chip .live-scene-trigger.nh-menu-trigger:hover::before,
+.live-scene.is-chip[open] .live-scene-trigger.nh-menu-trigger::before {
+  background: none;
+  box-shadow: var(--base-line-hover);
+}
+.live-scene.is-chip .live-scene-trigger .nh-menu-trigger-label {
+  align-items: center;
+}

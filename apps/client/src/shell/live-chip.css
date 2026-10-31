@@ -1,0 +1,57 @@
+/* The live chip (frame spec 2.1): a 36px face in a 44px hit area on a Base line; an 8px lamp, the name at 13px and the
+   round in VT323 17px cyan. Amber on the player's turn. */
+.live-chip,
+.live-scene.is-chip .live-scene-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  box-shadow: var(--base-line);
+  color: var(--text);
+  cursor: pointer;
+}
+.live-chip:hover {
+  box-shadow: var(--base-line-hover);
+}
+.live-chip-lamp.nh-status-lamp {
+  width: 8px;
+  height: 8px;
+}
+.live-chip-lamp.is-mine.is-lit {
+  background: var(--caution);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--caution) 60%, transparent);
+}
+.live-chip-name {
+  margin: 0;
+  font: 600 13px / 1 var(--font-label);
+  color: var(--text);
+  white-space: nowrap;
+}
+.live-chip-round {
+  margin: 0;
+  font: 400 17px / 1 var(--font-numeric);
+  color: var(--cyan-hi);
+}
+.live-chip-mine {
+  margin: 0;
+  font: 600 13px / 1 var(--font-label);
+  color: var(--caution-hi);
+}
+/* The phone's Play or Table tab carries a 7px lamp at its icon's top right while a fight runs. */
+.app-bottom-tab-icon {
+  position: relative;
+}
+.app-bottom-tab-lamp.nh-status-lamp {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  width: 7px;
+  height: 7px;
+}
+.app-bottom-tab-lamp.is-mine.is-lit {
+  background: var(--caution);
+}

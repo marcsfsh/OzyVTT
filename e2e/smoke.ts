@@ -236,7 +236,8 @@ export async function signInAsGm(page: Page) {
 
 /** A player's section tab: in the top bar on a laptop and the bottom tabs on a phone, under one name. */
 export const playerSection = (page: Page, name: "Table" | "Sheet" | "Codex" | "Log") =>
-  page.getByRole("tablist", { name: "Player sections" }).getByRole("tab", { name, exact: true });
+  // Table's name carries its lamp's state in a fight (", live", ", your turn"), Codex its count of new pages.
+  page.getByRole("tablist", { name: "Player sections" }).getByRole("tab", { name: new RegExp(`^${name}\\b`) });
 
 /** Joins, claims `name`, and goes from the Sheet (where a claim lands) to the Table. */
 export async function joinAndClaim(page: Page, name: string) {
@@ -255,7 +256,8 @@ const PREP_PAGES = ["Encounters", "Party", "Maps", "Tokens", "Sound", "Replays"]
 
 /** A GM section's tab: in the top bar on a laptop and the bottom tabs on a phone, under one name. */
 export const gmSection = (page: Page, name: "Play" | "Prep" | "Codex" | "Compendium") =>
-  page.getByRole("tablist", { name: "GM sections" }).getByRole("tab", { name, exact: true });
+  // During a fight Play's name carries its lamp's state (", live"), as frame rule 3.2 has it.
+  page.getByRole("tablist", { name: "GM sections" }).getByRole("tab", { name: new RegExp(`^${name}\\b`) });
 
 /**
  * Opens a place in the GM's app: a section (Play, Prep, Codex, Compendium), one of Prep's pages, or a utility (the
