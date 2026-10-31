@@ -47,7 +47,7 @@ export function MountControl({
             <Button size="sm" variant="secondary" disabled={busy} onClick={() => onMount(mount.id, "controlled")}>
               Ride {mount.name}
             </Button>
-            <Button size="sm" variant="ghost" disabled={busy} onClick={() => onMount(mount.id, "independent")}>
+            <Button size="sm" disabled={busy} onClick={() => onMount(mount.id, "independent")}>
               Ride {mount.name}, acting on its own
             </Button>
           </span>

@@ -321,7 +321,7 @@ export function QuestWriter({
         </ul>
         <Button
           size="sm"
-          variant="ghost"
+
           disabled={draft.objectives.length >= 24}
           onClick={() =>
             setDraft((prev) => ({
@@ -348,7 +348,7 @@ export function QuestWriter({
               </button>
               <Button
                 size="sm"
-                variant="ghost"
+
                 aria-label={`Unlink ${page?.title ?? "this page"}`}
                 onClick={() =>
                   setDraft((prev) => ({ ...prev, entityIds: prev.entityIds.filter((entity) => entity !== id) }))

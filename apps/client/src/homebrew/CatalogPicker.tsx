@@ -105,7 +105,6 @@ export function CatalogPicker({
         {chosen && (
           <div className="hb-catalog-foot">
             <Button
-              variant="ghost"
               size="sm"
               onClick={() => {
                 onChange(null);

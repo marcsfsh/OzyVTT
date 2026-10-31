@@ -41,10 +41,10 @@ export function TickDropdown<Value extends string>({
       {() => (
         <>
           <div className="nh-dropdown-row">
-            <Button size="sm" variant="ghost" onClick={() => onChange(options.map((option) => option.value))}>
+            <Button size="sm" onClick={() => onChange(options.map((option) => option.value))}>
               All
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => onChange([])}>
+            <Button size="sm" onClick={() => onChange([])}>
               Clear
             </Button>
           </div>
@@ -88,7 +88,7 @@ export function ModifiedDropdown({
             <span>To</span>
             <Input type="date" value={to ?? ""} onChange={(event) => onChange(from, event.target.value || null)} />
           </label>
-          <Button size="sm" variant="ghost" onClick={() => onChange(null, null)}>
+          <Button size="sm" onClick={() => onChange(null, null)}>
             Any time
           </Button>
         </>

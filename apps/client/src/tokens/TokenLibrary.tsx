@@ -191,7 +191,7 @@ export function TokenLibrary({
       footer={
         <>
           {currentAssetId && (
-            <Button variant="ghost" disabled={busy} onClick={() => assign(null)}>
+            <Button disabled={busy} onClick={() => assign(null)}>
               Remove image
             </Button>
           )}

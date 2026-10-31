@@ -158,7 +158,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
         footer={
           openRest ? (
             <>
-              <Button variant="ghost" disabled={busy} onClick={() => void finishRest(openRest, false)}>
+              <Button disabled={busy} onClick={() => void finishRest(openRest, false)}>
                 Call off
               </Button>
               <Button variant="primary" disabled={busy} onClick={() => void finishRest(openRest, true)}>
@@ -185,7 +185,6 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
               <p className="party-rest-hint">
                 The date comes from the Codex calendar, which has no date yet.{" "}
                 <Button
-                  variant="ghost"
                   size="sm"
                   onClick={() => {
                     setOpen(false);
@@ -355,7 +354,6 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                         Approve
                       </Button>
                       <Button
-                        variant="ghost"
                         disabled={busy}
                         onClick={() =>
                           void send(

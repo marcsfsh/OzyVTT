@@ -151,7 +151,7 @@ function GmCompactPage({
           <CodexMarkdown text={block.text} token={token} onNavigate={links.follow} knownTitles={links.known} />
         </HiddenBlock>
       ))}
-      <Button size="sm" variant="ghost" onClick={() => void navigate(pagePath(id))}>
+      <Button size="sm" onClick={() => void navigate(pagePath(id))}>
         Open the whole page
       </Button>
       {revealing && (
@@ -210,7 +210,7 @@ function PlayerCompactPage({ token, id, links }: Readonly<{ token: string; id: s
           />
         </div>
       ))}
-      <Button size="sm" variant="ghost" onClick={() => void navigate(pagePath(id))}>
+      <Button size="sm" onClick={() => void navigate(pagePath(id))}>
         Open the whole page
       </Button>
     </div>

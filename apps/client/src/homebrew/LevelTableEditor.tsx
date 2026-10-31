@@ -384,7 +384,6 @@ export function LevelTableEditor({
 
             {overridden && (
               <Button
-                variant="ghost"
                 size="sm"
                 onClick={() =>
                   writeRow(index, { spellSlots: generated[index].spellSlots, pactSlots: generated[index].pactSlots })

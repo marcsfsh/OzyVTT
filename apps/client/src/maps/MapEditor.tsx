@@ -190,14 +190,14 @@ function MapEditorHead({ map }: Readonly<{ map: MapAsset | null }>) {
           <IconChevronLeft />
         </Button>
       ) : (
-        <Button variant="ghost" size="sm" onClick={() => go(SCENES_PATHS.maps)}>
+        <Button size="sm" onClick={() => go(SCENES_PATHS.maps)}>
           <IconList /> Maps
         </Button>
       )}
       <h2 className="sc-scene-title">{map ? map.name : "Add a map"}</h2>
       <span className="sc-grow" />
       {map && !narrow && (
-        <Button variant="ghost" size="sm" onClick={() => go(pathForMap(map.id))}>
+        <Button size="sm" onClick={() => go(pathForMap(map.id))}>
           Open the map
         </Button>
       )}

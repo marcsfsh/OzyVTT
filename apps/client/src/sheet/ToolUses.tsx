@@ -129,7 +129,7 @@ export function ToolUses({
               {fastHands && (
                 <Button
                   size="sm"
-                  variant="ghost"
+
                   disabled={rolls.rolling || !row.carried}
                   aria-label={`Roll ${row.label} with ${row.itemName} as a Bonus Action, DC ${row.dc}`}
                   onClick={() => roll(row, true)}
@@ -148,7 +148,7 @@ export function ToolUses({
             <span className="cs-tool-use-buttons">
               <Button
                 size="sm"
-                variant="ghost"
+
                 disabled={rolls.rolling}
                 aria-label="Roll Dexterity (Sleight of Hand) as a Bonus Action"
                 onClick={() =>

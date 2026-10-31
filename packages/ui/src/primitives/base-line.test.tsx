@@ -32,6 +32,13 @@ describe("the Base line", () => {
     expect(variable(document.documentElement, "--base-line")).toMatch(/^inset 0 ?-1px 0 var\(--line-raised\)$/);
   });
 
+  it("draws a danger action in --danger-text on the grey Base line", () => {
+    render(<Button variant="destructive">Revoke</Button>);
+    const button = screen.getByRole("button", { name: "Revoke" });
+    expect(variable(button, "--nh-sheen")).toBe("var(--base-line)");
+    expect(getComputedStyle(button).color).not.toBe("");
+  });
+
   it("keeps the Dropdown's open state on the 2px cyan line", async () => {
     render(<Dropdown label="State">{() => <span>Panel</span>}</Dropdown>);
     const trigger = screen.getByRole("button", { name: /State/ });

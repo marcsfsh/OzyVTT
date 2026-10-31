@@ -376,16 +376,16 @@ export function PageWriter({
         <div className="cx-writedetails-banner">
           <CodexImage assetId={draft.bannerAssetId} token={token} alt="Page banner" className="cx-banner-img" />
           <div className="cx-writedetails-row">
-            <Button size="sm" variant="ghost" onClick={() => bannerInput.current?.click()}>
+            <Button size="sm" onClick={() => bannerInput.current?.click()}>
               Change banner
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setDraft((prev) => ({ ...prev, bannerAssetId: null }))}>
+            <Button size="sm" onClick={() => setDraft((prev) => ({ ...prev, bannerAssetId: null }))}>
               Remove banner
             </Button>
           </div>
         </div>
       ) : (
-        <Button size="sm" variant="ghost" onClick={() => bannerInput.current?.click()}>
+        <Button size="sm" onClick={() => bannerInput.current?.click()}>
           Add a banner image
         </Button>
       )}

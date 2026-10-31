@@ -86,7 +86,7 @@ export function CommandedCreatures({
                 {orders.look && orders.dismiss && !orders.away && (
                   <Button
                     size="sm"
-                    variant="ghost"
+
                     disabled={busy}
                     title={`Takes ${costOf(orders.dismiss)}`}
                     onClick={() =>
@@ -102,7 +102,7 @@ export function CommandedCreatures({
                 {orders.dismiss && (
                   <Button
                     size="sm"
-                    variant="ghost"
+
                     disabled={busy}
                     title={`Takes ${costOf(orders.dismiss)}`}
                     onClick={() =>

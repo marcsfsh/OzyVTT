@@ -108,7 +108,7 @@ export function RandomCharacterModal({
                   aria-label={`${nameOf(row.classId)} levels`}
                 />
                 {index > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => removeClass(index)}>
+                  <Button size="sm" onClick={() => removeClass(index)}>
                     Remove
                   </Button>
                 )}

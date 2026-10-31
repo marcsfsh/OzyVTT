@@ -90,7 +90,7 @@ export function RestButtons({
         (asked ? (
           <>
             <span className="cs-sub">Long Rest asked</span>
-            <Button variant="ghost" disabled={busy} onClick={() => ask(true)}>
+            <Button disabled={busy} onClick={() => ask(true)}>
               Take back
             </Button>
           </>

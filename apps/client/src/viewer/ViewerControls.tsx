@@ -440,7 +440,7 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
                     </div>
                     {!viewer.revokedAt && (
                       <Button
-                        variant="secondary"
+                        variant="destructive"
                         size="sm"
                         disabled={busy}
                         onClick={async () => {

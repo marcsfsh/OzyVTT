@@ -157,32 +157,32 @@ export function EntryCard({
       )}
       <footer className="story-entry-foot">
         {isEvent && (
-          <Button variant="ghost" size="sm" onClick={() => onOpenPage(record.id)}>
+          <Button size="sm" onClick={() => onOpenPage(record.id)}>
             Open page
           </Button>
         )}
         {!isEvent && record.attachPageId && (
-          <Button variant="ghost" size="sm" onClick={() => onOpenPage(record.attachPageId!)}>
+          <Button size="sm" onClick={() => onOpenPage(record.attachPageId!)}>
             Open page
           </Button>
         )}
         {record.attachMarkerId && onOpenMarker && (
-          <Button variant="ghost" size="sm" onClick={() => onOpenMarker(record.attachMarkerId!)}>
+          <Button size="sm" onClick={() => onOpenMarker(record.attachMarkerId!)}>
             Open pin
           </Button>
         )}
         {record.kind === "combat" && record.sourceEncounterId !== null && onOpenReplay && (
-          <Button variant="ghost" size="sm" onClick={() => onOpenReplay(record.sourceEncounterId!)}>
+          <Button size="sm" onClick={() => onOpenReplay(record.sourceEncounterId!)}>
             Open replay
           </Button>
         )}
         {!isEvent && (
-          <Button variant="ghost" size="sm" onClick={onEdit}>
+          <Button size="sm" onClick={onEdit}>
             Edit
           </Button>
         )}
         {!isEvent && (
-          <Button variant="ghost" size="sm" onClick={onRemove}>
+          <Button variant="destructive" size="sm" onClick={onRemove}>
             Delete
           </Button>
         )}

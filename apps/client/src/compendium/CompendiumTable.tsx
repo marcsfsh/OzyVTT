@@ -210,9 +210,7 @@ export function CompendiumTable(props: CompendiumTableProps) {
               : "Nothing in this table matches. Change the filters to see more."}
           </p>
           {all.length > 0 && (
-            <Button variant="ghost" onClick={() => setQuery((params) => clearTableQuery(params))}>
-              Clear the filters
-            </Button>
+            <Button onClick={() => setQuery((params) => clearTableQuery(params))}>Clear the filters</Button>
           )}
         </div>
       );
@@ -469,7 +467,7 @@ function TableFilterFlyout({
       )}
       <Button
         size="sm"
-        variant="ghost"
+
         disabled={activeFilters(filters, gm) === 0 && !filters.q}
         onClick={() => onFilters(NO_FILTERS)}
       >

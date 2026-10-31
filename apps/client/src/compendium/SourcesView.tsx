@@ -488,7 +488,7 @@ function ExportDialog({ packs, onClose }: Readonly<{ packs: readonly HomebrewPac
               </Button>
             );
           })}
-          <Button size="sm" variant="ghost" disabled={chosen.size === 0} onClick={() => setChosen(new Set())}>
+          <Button size="sm" disabled={chosen.size === 0} onClick={() => setChosen(new Set())}>
             Clear
           </Button>
         </div>

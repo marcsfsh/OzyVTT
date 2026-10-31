@@ -169,7 +169,7 @@ export function GmDowntime({
     <section className="story-card" aria-label="Downtime">
       <div className="story-card-head">
         <h3 className="story-eyebrow">Downtime</h3>
-        <Button variant="ghost" size="sm" onClick={onLog}>
+        <Button size="sm" onClick={onLog}>
           Log downtime
         </Button>
       </div>
@@ -251,7 +251,6 @@ export function GmDowntime({
                     <>
                       <span>{downtimeSummaryLabel(payload)}</span>
                       <Button
-                        variant="ghost"
                         size="sm"
                         onClick={() => {
                           setEditing(record.id);

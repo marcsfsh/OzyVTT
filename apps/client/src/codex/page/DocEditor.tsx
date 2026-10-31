@@ -354,7 +354,7 @@ export function DocEditor({
             <IconEyeOff /> Hidden block
           </Button>
           {onOpenMap && (
-            <Button size="sm" variant="ghost" onClick={onOpenMap}>
+            <Button size="sm" onClick={onOpenMap}>
               Put it on a map
             </Button>
           )}

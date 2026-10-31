@@ -43,7 +43,7 @@ export function PartyStrip(props: Props) {
       <section className="party-strip party-strip-empty" aria-label="The party">
         <p>No characters yet. Create or import them on the Roster tab.</p>
         {props.onOpenRoster && (
-          <Button variant="ghost" size="sm" onClick={props.onOpenRoster}>
+          <Button size="sm" onClick={props.onOpenRoster}>
             Open Roster
           </Button>
         )}

@@ -456,7 +456,7 @@ function MadeFromTemplate({
                   </span>
                 </span>
               </button>
-              <Button variant="ghost" size="sm" onClick={() => void reapply(session)}>
+              <Button size="sm" onClick={() => void reapply(session)}>
                 Re-apply
               </Button>
             </li>

@@ -136,7 +136,7 @@ export function CredentialsTable({
         <Button size="sm" variant="destructive" disabled={!live} onClick={() => void revoke(credential)}>
           Revoke
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => void showHistory(credential)}>
+        <Button size="sm" onClick={() => void showHistory(credential)}>
           History
         </Button>
       </>

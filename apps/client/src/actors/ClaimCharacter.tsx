@@ -166,9 +166,7 @@ export function ClaimCharacter({ state, art = false }: Readonly<{ state: PlayerV
             <IconUser /> Make a new character
           </Button>
         )}
-        <Button variant="ghost" onClick={() => setPdfImportOpen(true)}>
-          Import from D&amp;D Beyond (PDF)
-        </Button>
+        <Button onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>
       </div>
       {open.length > 0 && (
         <Button

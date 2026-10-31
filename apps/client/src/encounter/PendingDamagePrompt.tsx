@@ -56,7 +56,7 @@ export function PendingDamagePrompt({
           Change
         </Button>
       )}
-      <Button size="sm" variant="ghost" disabled={busy} title="Apply nothing" onClick={() => emit(false)}>
+      <Button size="sm" disabled={busy} title="Apply nothing" onClick={() => emit(false)}>
         Dismiss
       </Button>
     </div>

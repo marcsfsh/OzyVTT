@@ -134,7 +134,7 @@ export function CalendarEditor({
         <div className="codex-cal-months">
           <div className="codex-cal-months-head">
             <strong>Eras</strong>
-            <Button variant="ghost" size="sm" onClick={addEra}>
+            <Button size="sm" onClick={addEra}>
               <IconPlus /> Add era
             </Button>
           </div>
@@ -184,7 +184,7 @@ export function CalendarEditor({
         <div className="codex-cal-months">
           <div className="codex-cal-months-head">
             <strong>Months</strong>
-            <Button variant="ghost" size="sm" onClick={addMonth}>
+            <Button size="sm" onClick={addMonth}>
               <IconPlus /> Add month
             </Button>
           </div>
@@ -384,7 +384,7 @@ export function CampaignDateEditor({
           </Button>
           {/* An undated campaign is a legitimate state. */}
           {calendar.currentDate && (
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => void write(null)}>
+            <Button size="sm" disabled={busy} onClick={() => void write(null)}>
               Clear the date
             </Button>
           )}

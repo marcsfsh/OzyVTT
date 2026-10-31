@@ -589,7 +589,6 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
                       />
                       {index > 0 && !rebuild?.heldClasses?.includes(record.id) && (
                         <Button
-                          variant="ghost"
                           size="sm"
                           className="cb-class-remove"
                           onClick={() => editDraft((current) => withoutClass(current, record.id))}
@@ -790,7 +789,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
     blockedReason == null ? undefined : breachOffer ? (
       <>
         {blockedReason}{" "}
-        <Button variant="ghost" size="sm" onClick={() => goTo(steps.indexOf("features"))}>
+        <Button size="sm" onClick={() => goTo(steps.indexOf("features"))}>
           Edit that improvement
         </Button>
       </>

@@ -609,7 +609,7 @@ export function GearTab({
             )}
             <Button
               size="sm"
-              variant="ghost"
+
               className="cs-danger"
               disabled={busy}
               onClick={() => {
@@ -645,7 +645,6 @@ export function GearTab({
                       {inFight && facts.get(action.id)?.fastHands && (
                         <>
                           <Button
-                            variant="ghost"
                             block
                             disabled={busy || actionBlocked !== null || !facts.get(action.id)!.fastHands!.available}
                             onClick={() => onUseAction(action, { fastHands: true })}
@@ -755,7 +754,7 @@ export function GearTab({
         <span className="cs-section-head">
           <span className="cs-eyebrow">Coins</span>
           {coins === null ? (
-            <Button size="sm" variant="ghost" disabled={busy} onClick={() => setCoins(purse)}>
+            <Button size="sm" disabled={busy} onClick={() => setCoins(purse)}>
               Edit
             </Button>
           ) : (

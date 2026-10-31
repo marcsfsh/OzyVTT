@@ -169,7 +169,7 @@ export function IdentityEditor({
         {structural && idDraft.classes.length < 4 && (
           <Button
             size="sm"
-            variant="ghost"
+
             onClick={() => setIdDraft((draft) => ({ ...draft, classes: [...draft.classes, blankClassDraft()] }))}
           >
             Add a class

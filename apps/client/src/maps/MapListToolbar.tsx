@@ -119,7 +119,7 @@ export function MapFiltersFlyout({
       />
       <Button
         size="sm"
-        variant="ghost"
+
         disabled={activeMapFilterCount(filters) === 0}
         onClick={() => onFilters({ ...NO_MAP_FILTERS, kinds: filters.kinds, from: filters.from, to: filters.to })}
       >

@@ -56,7 +56,7 @@ export function SheetCrafting({
       return (
         <Button
           size="sm"
-          variant="ghost"
+
           className="cs-danger"
           disabled={busy}
           onClick={() =>
@@ -103,7 +103,7 @@ export function SheetCrafting({
     <section className="cs-group" aria-label="Crafting">
       <span className="cs-section-head">
         <span className="cs-eyebrow">Crafting</span>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setStarting(true)}>
+        <Button size="sm" disabled={busy} onClick={() => setStarting(true)}>
           Start a project
         </Button>
       </span>

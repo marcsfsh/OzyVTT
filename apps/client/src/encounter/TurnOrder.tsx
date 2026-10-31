@@ -57,7 +57,7 @@ export function TurnOrder({
               <span className="turn-order-moves">
                 <Button
                   size="sm"
-                  variant="ghost"
+
                   aria-label={`${label} earlier`}
                   disabled={busy || index === 0}
                   onClick={() => move(index, -1)}
@@ -66,7 +66,7 @@ export function TurnOrder({
                 </Button>
                 <Button
                   size="sm"
-                  variant="ghost"
+
                   aria-label={`${label} later`}
                   disabled={busy || index === current.length - 1}
                   onClick={() => move(index, 1)}

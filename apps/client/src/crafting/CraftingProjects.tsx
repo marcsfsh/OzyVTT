@@ -72,7 +72,6 @@ export function CraftingProjects({ state, busy, send }: Readonly<{ state: GmView
                         ))}
                       </Select>
                       <Button
-                        variant="ghost"
                         disabled={busy || picked === ""}
                         onClick={() =>
                           void send(
@@ -86,7 +85,6 @@ export function CraftingProjects({ state, busy, send }: Readonly<{ state: GmView
                     </>
                   )}
                   <Button
-                    variant="ghost"
                     className="cs-danger"
                     disabled={busy}
                     onClick={() =>

@@ -213,7 +213,7 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
 
           {saveMsg && <p className="pdf-import-error">{saveMsg}</p>}
           <div className="pdf-import-buttons">
-            <Button variant="ghost" type="button" onClick={reset} disabled={saving}>
+            <Button type="button" onClick={reset} disabled={saving}>
               Choose a different file
             </Button>
             <div className="pdf-import-buttons-right">

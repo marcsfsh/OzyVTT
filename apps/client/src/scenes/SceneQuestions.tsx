@@ -180,9 +180,7 @@ export function SceneSound({ facts }: Readonly<{ facts: SceneFacts }>) {
       ) : (
         <p className="sc-hint">Loading the sound board…</p>
       )}
-      <Button variant="ghost" onClick={() => go("/viewer-controls/sound")}>
-        Open the sound board
-      </Button>
+      <Button onClick={() => go("/viewer-controls/sound")}>Open the sound board</Button>
     </div>
   );
 }
@@ -207,7 +205,7 @@ export function SceneMapFacts({ facts, back }: Readonly<{ facts: SceneFacts; bac
           </Button>
         )}
         {facts.map && (
-          <Button size="sm" variant="ghost" onClick={() => go(pathForMap(facts.map!.id))}>
+          <Button size="sm" onClick={() => go(pathForMap(facts.map!.id))}>
             <IconMap /> Open the map
           </Button>
         )}
@@ -266,7 +264,7 @@ export function SceneCodex({ facts }: Readonly<{ facts: SceneFacts }>) {
                 {entry.via === "session" && session && (
                   <Button
                     size="sm"
-                    variant="ghost"
+
                     onClick={() =>
                       void setStaged(
                         session,

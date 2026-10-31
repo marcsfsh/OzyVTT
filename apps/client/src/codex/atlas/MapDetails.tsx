@@ -128,7 +128,7 @@ export function MapDetails({
         </Button>
       </div>
       <div className="atlas-details-danger">
-        <Button variant="ghost" size="sm" onClick={onDelete}>
+        <Button variant="destructive" size="sm" onClick={onDelete}>
           Delete map
         </Button>
       </div>

@@ -62,7 +62,6 @@ export function LongRestUnderWay({
                   </Button>
                 ) : (
                   <Button
-                    variant="ghost"
                     disabled={busy}
                     onClick={() =>
                       void send(

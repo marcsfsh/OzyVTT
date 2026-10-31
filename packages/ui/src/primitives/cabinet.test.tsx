@@ -288,10 +288,12 @@ describe("the hit-area floor in the stylesheets", () => {
     expect(css).toMatch(/\.nh-switch-track \{[^}]*width: 46px;[^}]*height: 26px;/);
   });
 
-  it("paints 44px options and chips on a touch screen", () => {
-    expect(css).toMatch(/@media \(any-pointer: coarse\) \{\s*\.nh-segmented-option \{\s*min-height: var\(--tap-min\);/);
+  it("paints 44px options and chips on a touch screen and on the phone shell's width", () => {
     expect(css).toMatch(
-      /@media \(any-pointer: coarse\) \{\s*\.nh-chip--pressable,[^{]*\{\s*min-height: var\(--tap-min\);/
+      /@media \(any-pointer: coarse\), \(max-width: 760px\) \{\s*\.nh-segmented-option \{\s*min-height: var\(--tap-min\);/
+    );
+    expect(css).toMatch(
+      /@media \(any-pointer: coarse\), \(max-width: 760px\) \{\s*\.nh-chip--pressable,[^{]*\{\s*min-height: var\(--tap-min\);/
     );
   });
 

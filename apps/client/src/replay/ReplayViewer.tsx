@@ -105,7 +105,7 @@ function GmViewer({
   return (
     <ReplayFrame loaded={document} onMove={playback.move}>
       <div className="replay-header">
-        <Button variant="ghost" onClick={onBack}>
+        <Button onClick={onBack}>
           <IconChevronLeft /> Replays
         </Button>
         <div className="replay-header-text">
@@ -144,7 +144,7 @@ function GmViewer({
                 Step back to the live turn on the table first. The encounter's history banner has the way out.
               </span>
             )}
-            <Button variant="ghost" size="sm" onClick={() => setRefused(null)}>
+            <Button size="sm" onClick={() => setRefused(null)}>
               Dismiss
             </Button>
           </div>

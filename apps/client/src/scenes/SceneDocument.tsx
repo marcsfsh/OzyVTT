@@ -48,7 +48,7 @@ function Section({
         {step && (
           <Button
             size="sm"
-            variant="ghost"
+
             onClick={() => go(pathForScene(encounterId, step))}
             aria-label={`Edit ${title.toLowerCase()}`}
           >

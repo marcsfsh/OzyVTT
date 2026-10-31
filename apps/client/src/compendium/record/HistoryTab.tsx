@@ -206,7 +206,7 @@ export function HistoryTab({
             </Button>
           )}
           {doc.pendingChanges && (
-            <Button size="sm" variant="ghost" disabled={busy} onClick={onDiscard}>
+            <Button size="sm" disabled={busy} onClick={onDiscard}>
               Discard the changes
             </Button>
           )}
@@ -266,7 +266,7 @@ function BasedOn({
         <span className="cp-grow">
           Based on <b>{source.name}</b> ({srd ? "SRD 5.2.1" : "homebrew"}), copied {dayOf(source.copiedAt)}
         </span>
-        <Button size="sm" variant="ghost" onClick={() => onOpen(source)}>
+        <Button size="sm" onClick={() => onOpen(source)}>
           Open the {srd ? "SRD record" : "original"}
         </Button>
       </div>

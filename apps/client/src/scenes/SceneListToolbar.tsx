@@ -149,7 +149,7 @@ export function SceneFiltersFlyout({
       />
       <Button
         size="sm"
-        variant="ghost"
+
         disabled={activeFilterCount(filters) === 0}
         onClick={() => onFilters({ ...NO_SCENE_FILTERS, states: filters.states, from: filters.from, to: filters.to })}
       >

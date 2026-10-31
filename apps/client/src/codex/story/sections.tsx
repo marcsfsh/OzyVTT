@@ -416,7 +416,7 @@ export function GmStorySection() {
                   onChanged={reload}
                 />
                 {!card.actions.warn && (
-                  <Button variant="ghost" size="sm" onClick={card.actions.warnAgain}>
+                  <Button size="sm" onClick={card.actions.warnAgain}>
                     Warn me again before showing a record
                   </Button>
                 )}

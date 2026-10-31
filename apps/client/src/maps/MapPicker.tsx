@@ -198,7 +198,7 @@ export function MapPicker({
           {onSetGrid && (
             <>
               {" "}
-              <Button variant="ghost" size="sm" onClick={() => onSetGrid(justUploaded.id)}>
+              <Button size="sm" onClick={() => onSetGrid(justUploaded.id)}>
                 Set the grid
               </Button>
             </>

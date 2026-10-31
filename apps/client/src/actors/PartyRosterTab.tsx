@@ -323,7 +323,7 @@ export function PartyRosterTab({
                     <Button variant="primary" disabled={busy} onClick={() => resolveImport(pending, true)}>
                       Approve
                     </Button>
-                    <Button variant="ghost" disabled={busy} onClick={() => resolveImport(pending, false)}>
+                    <Button disabled={busy} onClick={() => resolveImport(pending, false)}>
                       Turn away
                     </Button>
                   </span>
@@ -392,7 +392,7 @@ export function PartyRosterTab({
           ariaLabel={`Preview ${previewImport.name}`}
           footer={
             <>
-              <Button variant="ghost" disabled={busy} onClick={() => resolveImport(previewImport, false)}>
+              <Button disabled={busy} onClick={() => resolveImport(previewImport, false)}>
                 Turn away
               </Button>
               <Button variant="primary" disabled={busy} onClick={() => resolveImport(previewImport, true)}>

@@ -135,7 +135,7 @@ function GmDateBar({ token, calendar, gameHours = null, gameMinutes = 0, tight =
             <IconEyeOff />
           </IconButton>
         )}
-        <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>
+        <Button size="sm" onClick={() => setEditorOpen(true)}>
           Edit calendar
         </Button>
       </span>

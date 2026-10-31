@@ -378,7 +378,7 @@ export function SceneEditor({ encounterId, step }: Readonly<{ encounterId: strin
                 <IconChevronLeft />
               </Button>
             ) : (
-              <Button variant="ghost" size="sm" onClick={() => setListOpen(true)} aria-expanded={listOpen}>
+              <Button size="sm" onClick={() => setListOpen(true)} aria-expanded={listOpen}>
                 <IconList /> Encounters
               </Button>
             )}
@@ -388,7 +388,7 @@ export function SceneEditor({ encounterId, step }: Readonly<{ encounterId: strin
             <h2 className="sc-scene-title">{title}</h2>
             <span className="sc-grow" />
             {facts && !narrow && (
-              <Button variant="ghost" size="sm" onClick={() => go(pathForScene(facts.scene.id))}>
+              <Button size="sm" onClick={() => go(pathForScene(facts.scene.id))}>
                 Open the encounter
               </Button>
             )}

@@ -275,7 +275,7 @@ export function LevelFlow({
             searchPlaceholder="Search classes…"
           />
           {!newClassOpen && !goingNew && (
-            <Button variant="ghost" size="sm" onClick={() => setNewClassOpen(true)}>
+            <Button size="sm" onClick={() => setNewClassOpen(true)}>
               Take a new class
             </Button>
           )}

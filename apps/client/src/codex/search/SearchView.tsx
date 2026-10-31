@@ -194,10 +194,10 @@ export function SearchView() {
       {() => (
         <>
           <div className="nh-dropdown-row">
-            <Button size="sm" variant="ghost" onClick={() => update({ types: null })}>
+            <Button size="sm" onClick={() => update({ types: null })}>
               Select all
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => update({ types: [] })}>
+            <Button size="sm" onClick={() => update({ types: [] })}>
               Clear
             </Button>
           </div>
@@ -273,7 +273,7 @@ export function SearchView() {
                   onChange={(event) => update({ to: event.target.value || null })}
                 />
               </label>
-              <Button size="sm" variant="ghost" onClick={() => update({ from: null, to: null })}>
+              <Button size="sm" onClick={() => update({ from: null, to: null })}>
                 Any time
               </Button>
             </>

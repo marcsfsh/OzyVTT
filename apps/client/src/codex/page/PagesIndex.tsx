@@ -208,7 +208,7 @@ export function PagesIndex() {
         <div className="cx-index-listhead">
           <Eyebrow>{group ? group.label : "Every page"}</Eyebrow>
           {folder && (
-            <Button size="sm" variant="ghost" onClick={() => setFilter({ folder: null })}>
+            <Button size="sm" onClick={() => setFilter({ folder: null })}>
               Every folder
             </Button>
           )}
@@ -246,7 +246,7 @@ export function PagesIndex() {
           </ul>
         )}
         {gm && (
-          <Button size="sm" variant="ghost" onClick={() => go(searchPath({}))}>
+          <Button size="sm" onClick={() => go(searchPath({}))}>
             Search with filters and sorting
           </Button>
         )}

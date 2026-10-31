@@ -29,7 +29,7 @@
   font: 600 14px / 1 var(--font-label);
   cursor: pointer;
 }
-@media (any-pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 760px) {
   .nh-segmented-option {
     min-height: var(--tap-min);
   }

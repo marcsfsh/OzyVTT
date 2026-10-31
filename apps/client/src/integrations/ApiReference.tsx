@@ -168,10 +168,10 @@ export function ApiReference({
       {() => (
         <>
           <div className="nh-dropdown-row">
-            <Button size="sm" variant="ghost" onClick={() => set({ tags: null })}>
+            <Button size="sm" onClick={() => set({ tags: null })}>
               Select all
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => set({ tags: [] })}>
+            <Button size="sm" onClick={() => set({ tags: [] })}>
               Clear
             </Button>
           </div>
@@ -273,7 +273,7 @@ export function ApiReference({
         {!phone && (
           <Button
             size="sm"
-            variant="ghost"
+
             title="The new tab asks for the GM password once and never stores the GM token."
             onClick={() => window.open(window.location.pathname, "_blank", "noopener")}
           >
@@ -288,7 +288,7 @@ export function ApiReference({
               {chip.words}
             </Chip>
           ))}
-          <Button size="sm" variant="ghost" onClick={() => set({ methods: [], callers: [], scopes: [] })}>
+          <Button size="sm" onClick={() => set({ methods: [], callers: [], scopes: [] })}>
             Clear filters
           </Button>
         </div>

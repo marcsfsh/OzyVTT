@@ -529,11 +529,7 @@ function LinkDialog({
       title="Link this clue"
       footer={
         <>
-          {link && (
-            <Button variant="ghost" onClick={() => onSave(null)}>
-              Remove the link
-            </Button>
-          )}
+          {link && <Button onClick={() => onSave(null)}>Remove the link</Button>}
           <Button
             variant="primary"
             disabled={!kind || !id}

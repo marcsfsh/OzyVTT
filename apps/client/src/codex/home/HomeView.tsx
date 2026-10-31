@@ -196,7 +196,7 @@ function RevealCheck({
           </button>
         ))}
       {check && check.total > 8 && !short && (
-        <Button size="sm" variant="ghost" onClick={() => go(searchPath({ visibility: "hidden" }))}>
+        <Button size="sm" onClick={() => go(searchPath({ visibility: "hidden" }))}>
           See every Hidden record
         </Button>
       )}
@@ -490,7 +490,7 @@ export function PlayerHome() {
       <div className="cx-card-text">
         <CodexMarkdown text={recap.recap} token={token} audience="player" />
       </div>
-      <Button size="sm" variant="ghost" onClick={() => go(sessionPath(recap.id))}>
+      <Button size="sm" onClick={() => go(sessionPath(recap.id))}>
         Open the session
       </Button>
     </Card>

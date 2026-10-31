@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, IconArrow, Input, Modal, Switch, ThemeToggle, Wordmark } from "@vtt/ui";
+import { Button, Input, Modal, Switch, ThemeToggle, Wordmark } from "@vtt/ui";
 import { Notice, type NoticeMessage } from "../components/feedback";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { LandingScene } from "./LandingScene";
@@ -113,7 +113,6 @@ export function Landing({
         <section className="choices anim-view">
           <Button variant="primary" size="md" lift onClick={onJoin} disabled={busy || resuming}>
             {busy ? "Connecting…" : "Join as Player"}
-            <IconArrow className="nav-arrow" />
           </Button>
           <Button
             variant="secondary"
@@ -125,7 +124,6 @@ export function Landing({
             }}
           >
             Enter as GM
-            <IconArrow className="nav-arrow" />
           </Button>
         </section>
       ) : (
@@ -174,7 +172,6 @@ export function Landing({
             <div className="landing-gm-actions">
               <Button variant="primary" type="submit" disabled={busy || !password}>
                 {busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}
-                {!busy && <IconArrow className="nav-arrow" />}
               </Button>
               <Button
                 variant="ghost"
@@ -191,7 +188,7 @@ export function Landing({
           {/* In a dialog: the steps would push the card past a phone's screen, and the landing never scrolls. */}
           {bootstrapped && (
             <div className="landing-reset">
-              <Button variant="ghost" className="link" onClick={() => setResetSteps(true)}>
+              <Button className="link" onClick={() => setResetSteps(true)}>
                 Forgot the password
               </Button>
               <Modal

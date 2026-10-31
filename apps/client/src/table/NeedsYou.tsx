@@ -70,7 +70,7 @@ function AnswerFor({ name, children }: Readonly<{ name: string; children: ReactN
   return open ? (
     <>{children}</>
   ) : (
-    <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+    <Button size="sm" onClick={() => setOpen(true)}>
       Answer for {name}
     </Button>
   );
@@ -211,7 +211,7 @@ function NeedsCard({
           </Button>
           <Button
             size="sm"
-            variant="ghost"
+
             disabled={busy}
             onClick={() =>
               send(
@@ -275,7 +275,7 @@ function NeedsCard({
           </Button>
           <Button
             size="sm"
-            variant="ghost"
+
             disabled={busy}
             onClick={() =>
               send(() => command("rules:answer", { askId: ask.id, allow: false }), `Denied ${name}'s request.`)

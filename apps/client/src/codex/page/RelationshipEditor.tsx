@@ -160,7 +160,7 @@ export function RelationshipEditor({
                       />
                       <Button
                         size="sm"
-                        variant="ghost"
+
                         disabled={busy}
                         aria-label={`Remove ${name}`}
                         onClick={() =>

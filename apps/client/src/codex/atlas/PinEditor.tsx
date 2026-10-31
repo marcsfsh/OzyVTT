@@ -244,7 +244,7 @@ export function PinEditor({
             ariaLabel="Link a page"
             placeholder="Link a page"
           />
-          <Button variant="ghost" size="sm" onClick={onCreatePage}>
+          <Button size="sm" onClick={onCreatePage}>
             <IconPlus /> New page{marker.label ? ` "${marker.label}"` : ""}
           </Button>
         </div>
@@ -403,7 +403,7 @@ export function PinEditor({
       </details>
 
       <div className="atlas-pineditor-foot">
-        <Button variant="ghost" size="sm" onClick={remove}>
+        <Button variant="destructive" size="sm" onClick={remove}>
           Delete pin
         </Button>
       </div>

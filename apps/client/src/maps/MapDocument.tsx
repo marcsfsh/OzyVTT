@@ -144,7 +144,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
             <IconChevronLeft />
           </Button>
         ) : (
-          <Button variant="ghost" size="sm" onClick={() => setListOpen(true)} aria-expanded={listOpen}>
+          <Button size="sm" onClick={() => setListOpen(true)} aria-expanded={listOpen}>
             <IconList /> Maps
           </Button>
         )}
@@ -186,7 +186,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
               <section className="sc-meta-section" aria-label="Grid">
                 <header className="sc-meta-head">
                   <h3>Grid</h3>
-                  <Button size="sm" variant="ghost" onClick={() => go(pathForMap(map.id, "grid"))}>
+                  <Button size="sm" onClick={() => go(pathForMap(map.id, "grid"))}>
                     <IconPencil /> Edit
                   </Button>
                 </header>

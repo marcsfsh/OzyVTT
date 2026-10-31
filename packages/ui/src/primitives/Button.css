@@ -78,7 +78,7 @@
   padding: var(--space-2) var(--space-3);
   font-size: var(--fs-sm);
 }
-@media (any-pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 760px) {
   .nh-btn--sm {
     min-height: var(--tap-min);
   }
@@ -170,8 +170,9 @@
 }
 
 /* Destructive: the danger words on a danger Base line, lit 2px on hover. */
+/* Danger (theme 2.5): its label in --danger-text on the grey Base line, the line lit red on hover. */
 .nh-btn--destructive {
-  --nh-sheen: inset 0 -1px 0 var(--danger);
+  --nh-sheen: var(--base-line);
   color: var(--danger-text);
 }
 
@@ -307,7 +308,7 @@
   --nh-fill: transparent;
   --nh-sheen: var(--base-line-hover);
 }
-@media (any-pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 760px) {
   .nh-iconbtn--base {
     width: var(--tap-min);
     height: var(--tap-min);

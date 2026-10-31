@@ -84,7 +84,7 @@ export function HiddenBlock({
                 : onHide && (
                     <Button
                       size="sm"
-                      variant="ghost"
+
                       onClick={onHide}
                       disabled={busy}
                       aria-label={`Hide ${name} again`}

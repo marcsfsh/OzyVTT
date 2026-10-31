@@ -693,7 +693,7 @@ function RecapStep({
                     {item.link && <span className="prep-row-line">{linkLine(item.link, context)}</span>}
                   </span>
                   {next && (
-                    <Button variant="ghost" size="sm" onClick={() => void carry(item.text, item.link)}>
+                    <Button size="sm" onClick={() => void carry(item.text, item.link)}>
                       Move to {sessionTitle(next).toLowerCase()}
                     </Button>
                   )}

@@ -156,7 +156,7 @@ export function PlayersSection({
                   </td>
                   <td>{PRESENCE_WORDS[presence(actor)]}</td>
                   <td className="settings-cell-actions">
-                    <Button variant="secondary" size="sm" onClick={() => void forceRelease.release(actor)}>
+                    <Button variant="destructive" size="sm" onClick={() => void forceRelease.release(actor)}>
                       Force release
                     </Button>
                     <Button variant="secondary" size="sm" onClick={() => chooseToken(actor)}>
