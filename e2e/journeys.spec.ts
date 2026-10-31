@@ -977,7 +977,7 @@ test("the light runs as the GM changes sections and tabs, opens a record and goe
 
   // Open a record from the Compendium's table and come back to it.
   await press(gmSection(gm, "Compendium"));
-  await press(gm.getByRole("navigation", { name: "Compendium sections" }).getByRole("button", { name: "Browse" }));
+  await press(gm.getByRole("navigation", { name: "Compendium sections" }).getByRole("tab", { name: "Browse" }));
   const row = gm.locator("[data-record-key]").first();
   const key = await row.getAttribute("data-record-key");
   await press(row);

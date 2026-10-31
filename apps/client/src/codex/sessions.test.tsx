@@ -223,7 +223,7 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Story" }));
+    await user.click(screen.getByRole("tab", { name: "Story" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
 
     // The entry whose session is gone files under a plain heading; only a real session's heading opens it.
@@ -252,7 +252,7 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Story" }));
+    await user.click(screen.getByRole("tab", { name: "Story" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
 
     const spine = within(await screen.findByRole("list", { name: "Sessions and what happened" }));

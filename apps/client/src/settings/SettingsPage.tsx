@@ -1,21 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import {
-  IconButton,
-  IconCode,
-  IconCog,
-  IconDie,
-  IconKey,
-  IconLevelUp,
-  IconSearch,
-  IconUser,
-  IconX,
-  StripInk
-} from "@vtt/ui";
+import { IconButton, IconSearch, IconX } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { ApiReference } from "../integrations/ApiReference";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { navigate, useRoute } from "../router";
+import { SectionBar } from "../shell/SectionBar";
 import { AccessSection } from "./AccessSection";
 import { CharactersSection } from "./CharactersSection";
 import { DeviceSection } from "./DeviceSection";
@@ -44,15 +34,6 @@ import "./settings.css";
  * mount, so GM controls are never in a player's tree. The GM sections take `state` as a `GmView`, which a player
  * projection is not.
  */
-
-const SECTION_ICONS: Readonly<Record<SettingsSectionId, ReactNode>> = {
-  players: <IconUser className="cx-icon" />,
-  fights: <IconDie className="cx-icon" />,
-  characters: <IconLevelUp className="cx-icon" />,
-  device: <IconCog className="cx-icon" />,
-  access: <IconKey className="cx-icon" />,
-  api: <IconCode className="cx-icon" />
-};
 
 /**
  * A GM token is not yet a GM view: on a cold deep link to `/settings` the first state can still be
@@ -139,14 +120,6 @@ export function SettingsPage({
     setFocus(entry.id);
   };
   const go = (id: SettingsSectionId) => void navigate(pathForSection(id));
-  // The phone's bar scrolls sideways; the chosen tab is brought into it, so a section opened from far along shows.
-  const keepChosenInView = (bar: HTMLElement | null) => {
-    const chosen = bar?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!bar || !chosen) return;
-    const left = chosen.offsetLeft - bar.offsetLeft;
-    if (left < bar.scrollLeft || left + chosen.offsetWidth > bar.scrollLeft + bar.clientWidth)
-      bar.scrollLeft = Math.max(0, left - (bar.clientWidth - chosen.offsetWidth) / 2);
-  };
 
   const search = <SettingsSearch entries={settingsFor(role)} onPick={pick} autoFocus={phone && searching} />;
 
@@ -194,75 +167,47 @@ export function SettingsPage({
   return (
     <PrimarySlot.Provider value={slot}>
       <div className={`settings cx-shell ${phone ? "is-phone" : "is-laptop"}`}>
-        {phone ? (
-          <header className="cx-phonebar settings-phonebar">
-            {searching ? (
-              <>
-                {search}
-                <IconButton label="Close the search" size="sm" onClick={() => setSearching(false)}>
-                  <IconX />
-                </IconButton>
-              </>
-            ) : (
-              <>
-                <h2 className="cx-phonebar-title">Settings</h2>
-                <div className="cx-phonebar-actions">
-                  <span ref={setSlot} className="settings-primary-slot" />
-                  <IconButton label="Search settings" size="sm" onClick={() => setSearching(true)}>
-                    <IconSearch />
-                  </IconButton>
-                </div>
-              </>
-            )}
-          </header>
-        ) : (
-          <div className="cx-bar settings-bar">
-            <nav className="cx-bar-sections nh-tabs nh-tabs--horizontal" aria-label="Settings sections">
-              {sections.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`nh-tab cx-bar-tab${section === item.id ? " nh-tab--active" : ""}`}
-                  aria-current={section === item.id ? "page" : undefined}
-                  onClick={() => go(item.id)}
-                >
-                  {SECTION_ICONS[item.id]}
-                  {item.label}
-                </button>
-              ))}
-              <StripInk active={section} panel={() => content.current} />
-            </nav>
-            <span className="cx-grow" />
-            {search}
-            <span ref={setSlot} className="settings-primary-slot" />
-          </div>
-        )}
-        {phone && (
-          <nav className="cx-tabbar settings-tabbar" aria-label="Settings sections" ref={keepChosenInView}>
-            {sections.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`cx-tabbar-tab${section === item.id ? " is-on" : ""}`}
-                aria-current={section === item.id ? "page" : undefined}
-                onClick={() => go(item.id)}
-              >
-                {SECTION_ICONS[item.id]}
-                <span>{item.label}</span>
-              </button>
-            ))}
-            <StripInk active={section} selector=".is-on" panel={() => content.current} />
-          </nav>
-        )}
-        {/* The reference is a frame of its own, with its results as the one scroller, so its filter flyout spans
-          what is on screen. Every other section scrolls as one page. */}
-        <div
-          ref={content}
-          className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
-          key={section}
+        <SectionBar
+          name="Settings"
+          navLabel="Settings sections"
+          pagesLabel="Settings pages"
+          pages={sections.map((item) => ({ id: item.id, label: item.label }))}
+          activeId={section}
+          onChange={(id) => go(id as SettingsSectionId)}
+          panel={() => content.current}
+          search={search}
+          end={<span ref={setSlot} className="settings-primary-slot" />}
+          phoneIcons={
+            <>
+              <span ref={setSlot} className="settings-primary-slot" />
+              <IconButton label="Search settings" onClick={() => setSearching(true)}>
+                <IconSearch />
+              </IconButton>
+            </>
+          }
+          {...(phone && searching
+            ? {
+                phoneHead: (
+                  <>
+                    {search}
+                    <IconButton label="Close the search" onClick={() => setSearching(false)}>
+                      <IconX />
+                    </IconButton>
+                  </>
+                )
+              }
+            : {})}
         >
-          {body}
-        </div>
+          {/* The reference is a frame of its own, with its results as the one scroller, so its filter flyout spans
+          what is on screen. Every other section scrolls as one page. */}
+          <div
+            ref={content}
+            className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
+            key={section}
+          >
+            {body}
+          </div>
+        </SectionBar>
         {dialog}
       </div>
     </PrimarySlot.Provider>

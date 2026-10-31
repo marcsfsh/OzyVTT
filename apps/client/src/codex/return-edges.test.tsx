@@ -145,7 +145,7 @@ const renderWorkspace = (onOpenReplay?: (archiveId: number) => void) =>
 /** Open Story from the nav, wait for the chronicle, and open the entry's row on the spine. */
 const openJournal = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
-  await user.click(screen.getByRole("button", { name: "Story" }));
+  await user.click(screen.getByRole("tab", { name: "Story" }));
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
   await user.click(await screen.findByRole("button", { name: /A battle was fought here/ }));
 };
@@ -179,7 +179,7 @@ describe("Chronicle entry → its marker", () => {
 
     await user.click(await screen.findByRole("button", { name: "Open pin" }));
 
-    expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("tab", { name: "Atlas" })).toHaveAttribute("aria-selected", "true");
     // The pin's map, where the default would be wrong.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));

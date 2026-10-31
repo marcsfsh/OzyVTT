@@ -36,8 +36,8 @@ beforeEach(() => {
 const bar = () => within(screen.getByRole("navigation", { name: "Codex sections" }));
 const lit = () =>
   bar()
-    .queryAllByRole("button")
-    .filter((button) => button.getAttribute("aria-current") === "page");
+    .queryAllByRole("tab")
+    .filter((tab) => tab.getAttribute("aria-selected") === "true");
 
 describe("The laptop's section bar", () => {
   it.each(CODEX_BAR.map((item) => [item.label, item.path] as const))(
@@ -47,7 +47,7 @@ describe("The laptop's section bar", () => {
       renderShell(label === "Home" ? "/codex/quests" : "/codex");
       await waitFor(() => expect(listPages).toHaveBeenCalled());
 
-      await user.click(bar().getByRole("button", { name: label }));
+      await user.click(bar().getByRole("tab", { name: label }));
       await waitFor(() => expect(window.location.pathname).toBe(path));
       expect(lit()).toHaveLength(1);
       expect(lit()[0]).toHaveAccessibleName(label);
@@ -161,9 +161,9 @@ describe("The browser's own buttons", () => {
     renderShell("/codex");
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
-    await user.click(bar().getByRole("button", { name: "Quests" }));
+    await user.click(bar().getByRole("tab", { name: "Quests" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/quests"));
-    await user.click(bar().getByRole("button", { name: "Story" }));
+    await user.click(bar().getByRole("tab", { name: "Story" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/story"));
 
     window.history.back();
@@ -178,7 +178,7 @@ describe("The browser's own buttons", () => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     const depth = window.history.length;
 
-    await user.click(bar().getByRole("button", { name: "Quests" }));
+    await user.click(bar().getByRole("tab", { name: "Quests" }));
     expect(window.history.length).toBe(depth);
   });
 });
@@ -191,12 +191,12 @@ describe("The phone's tab bar under the thumb", () => {
     await waitFor(() => expect(getPage).toHaveBeenCalled());
     expect(
       bar()
-        .getAllByRole("button")
+        .getAllByRole("tab")
         .map((tab) => tab.textContent)
     ).toEqual(["Home", "Pages", "Atlas", "Campaign", "Search"]);
     expect(lit().map((tab) => tab.textContent)).toEqual(["Pages"]);
     // The laptop's section bar is gone.
-    expect(screen.queryByRole("button", { name: "Relationships" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Relationships" })).not.toBeInTheDocument();
   });
 
   it("switches Campaign's four parts under the top bar, and Campaign reopens the last one", async () => {
@@ -214,18 +214,18 @@ describe("The phone's tab bar under the thumb", () => {
 
     await user.click(campaign.getByRole("button", { name: "Relationships" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/relationships"));
-    await user.click(bar().getByRole("button", { name: "Home" }));
+    await user.click(bar().getByRole("tab", { name: "Home" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex"));
     expect(screen.queryByRole("navigation", { name: "Campaign" })).not.toBeInTheDocument();
 
-    await user.click(bar().getByRole("button", { name: "Campaign" }));
+    await user.click(bar().getByRole("tab", { name: "Campaign" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/relationships"));
     view.unmount();
   });
 
   it("titles the top bar with the section when the view has no bar of its own", async () => {
     renderShell("/codex/backup");
-    expect(await screen.findByRole("heading", { level: 2, name: "Backup" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Backup" })).toBeInTheDocument();
   });
 
   it("keeps New, the GM menu and Search on a section's own top bar", async () => {
@@ -234,7 +234,7 @@ describe("The phone's tab bar under the thumb", () => {
     expect(screen.getByLabelText("GM menu")).toBeInTheDocument();
     expect(screen.getByLabelText("New")).toBeInTheDocument();
     expect(
-      within(document.querySelector(".cx-phonebar") as HTMLElement).getByRole("button", { name: "Search" })
+      within(document.querySelector(".secbar-head") as HTMLElement).getByRole("button", { name: "Search" })
     ).toBeInTheDocument();
   });
 

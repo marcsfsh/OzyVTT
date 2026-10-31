@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GmView } from "@vtt/domain";
-import { Button, IconPlus, Kbd, StripInk, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
+import { Button, IconButton, IconPlus, IconSearch, Kbd, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
 import { CodexIcon } from "../codex/icons";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { RulesButton } from "../reference/RulesReference";
 import { navigate, replaceQuery, useRoute } from "../router";
 import { useRecordLight } from "../shell/recordLight";
+import { SectionBar } from "../shell/SectionBar";
 import {
   CompendiumContext,
   CompendiumGameContext,
@@ -153,23 +154,16 @@ export function CompendiumShell({
     <CompendiumContext.Provider value={value}>
       <CompendiumGameContext.Provider value={game}>
         <div ref={shell} className={cx("cx-shell cp-shell", phone ? "is-phone" : "is-laptop")}>
-          {!phone && (
-            <div className="cx-bar cp-bar">
-              <h1 className="cp-bar-title">Compendium</h1>
-              <nav className="cx-bar-sections nh-tabs nh-tabs--horizontal" aria-label="Compendium sections">
-                {SECTIONS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={cx("nh-tab cx-bar-tab", section === item.id && "nh-tab--active")}
-                    aria-current={section === item.id ? "page" : undefined}
-                    onClick={() => go(item.path)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-                <StripInk active={section ?? ""} panel={() => shell.current?.querySelector(":scope > .cx-content")} />
-              </nav>
+          <SectionBar
+            name="Compendium"
+            navLabel="Compendium sections"
+            pagesLabel="Compendium pages"
+            pages={SECTIONS.map((item) => ({ id: item.id, label: item.label }))}
+            activeId={phone && newOptions !== null ? "" : (section ?? "")}
+            onChange={(id) => go(SECTIONS.find((item) => item.id === id)!.path)}
+            panel={() => shell.current?.querySelector(":scope > .cx-content")}
+            phoneHidden={view.view === "record"}
+            search={
               <button
                 type="button"
                 className="cx-searchbox cp-searchbox"
@@ -180,47 +174,28 @@ export function CompendiumShell({
                 <span className="cx-searchbox-label">Search the SRD and homebrew</span>
                 {shortcut && <Kbd>{shortcut}</Kbd>}
               </button>
-              <RulesButton />
-              <span className="cx-grow" />
-              <Button variant="primary" onClick={() => openNew({ kind: kindInView })}>
-                <IconPlus /> New homebrew
-              </Button>
-            </div>
-          )}
-          {phone && (
-            <div className="cp-phone-sections">
-              <nav className="cx-tabbar cp-phone-tabs" aria-label="Compendium sections">
-                {SECTIONS.map((item) => {
-                  const on = section === item.id && newOptions === null;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={cx("cx-tabbar-tab", on && "is-on")}
-                      aria-current={on ? "page" : undefined}
-                      onClick={() => go(item.path)}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-                <StripInk
-                  active={newOptions === null ? (section ?? "") : ""}
-                  selector=".is-on"
-                  panel={() => shell.current?.querySelector(":scope > .cx-content")}
-                />
-              </nav>
-              <Button
-                variant="primary"
-                className="cp-phone-new"
-                aria-label="New homebrew"
-                onClick={() => openNew({ kind: kindInView })}
-              >
-                <IconPlus />
-              </Button>
-            </div>
-          )}
-          <div className="cx-content cp-content">{body}</div>
+            }
+            end={
+              <>
+                <RulesButton />
+                <Button variant="primary" size="sm" onClick={() => openNew({ kind: kindInView })}>
+                  New homebrew
+                </Button>
+              </>
+            }
+            phoneIcons={
+              <>
+                <IconButton label="Search the SRD and homebrew" onClick={openSearch}>
+                  <IconSearch />
+                </IconButton>
+                <IconButton label="New homebrew" onClick={() => openNew({ kind: kindInView })}>
+                  <IconPlus />
+                </IconButton>
+              </>
+            }
+          >
+            <div className="cx-content cp-content">{body}</div>
+          </SectionBar>
           {newOptions && <NewRecordDialog options={newOptions} onClose={() => setNewOptions(null)} />}
           {searchOpen && <SearchDialog onClose={() => setSearchOpen(false)} />}
         </div>

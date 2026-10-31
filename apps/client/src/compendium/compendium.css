@@ -94,15 +94,6 @@
   margin: 0;
 }
 
-/* ----- The laptop bar ----- */
-.cp-bar-title {
-  margin: 0 var(--space-2) 0 0;
-  color: var(--heading-ink);
-  font: var(--fw-display) var(--fs-h3) / 1.1 var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-display);
-  white-space: nowrap;
-}
 @media (min-width: 1280px) {
   .cx-searchbox.cp-searchbox {
     width: min(380px, 28vw);
@@ -1294,30 +1285,4 @@
 }
 .cp-add-scene-list .cp-hint.is-caution {
   color: var(--caution-hi);
-}
-/* A phone's Compendium sections, with New beside them: the row the drawn header shows. */
-.cp-phone-sections {
-  display: flex;
-  align-items: stretch;
-  flex: none;
-  background: var(--surface-1);
-  border-bottom: 1px solid var(--line-strong);
-}
-/* The row draws the line under the tabs and New: the tabs draw none of their own and reach over it, so the ink lies
-   on it. */
-.cx-tabbar.cp-phone-tabs {
-  --nh-ink-shift: 0px;
-  flex: 1 1 auto;
-  min-width: 0;
-  margin-bottom: -1px;
-  padding-bottom: 0;
-  box-shadow: none;
-}
-.cp-phone-new {
-  flex: none;
-  align-self: center;
-  min-width: var(--tap-min);
-  min-height: var(--tap-min);
-  margin: 0 var(--space-2);
-  padding: 0;
 }

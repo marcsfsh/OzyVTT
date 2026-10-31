@@ -1,5 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import {
   IconButton,
@@ -46,6 +45,7 @@ import { TvControl } from "../table/TvControl";
 import { pageLight } from "./pageLight";
 import { tabTrip } from "./tabLight";
 import { SearchLauncher } from "./SearchLauncher";
+import { SectionBar, SectionBarSlot } from "./SectionBar";
 import "./app-bar.css";
 
 /** The phone layout's width, from the breakpoint ladder: bottom tabs below it, the top bar's sections above. */
@@ -374,43 +374,32 @@ export function PlayerBottomTabs({
   );
 }
 
-/** Where a Prep page puts its search or its primary: the right end of the section bar. */
-const PrepBarEnd = createContext<HTMLElement | null>(null);
-
 /** Puts a Prep page's search or primary at the right end of Prep's section bar. */
-export function PrepBarSlot({ children }: Readonly<{ children: ReactNode }>) {
-  const target = useContext(PrepBarEnd);
-  return target ? createPortal(children, target) : null;
-}
+export const PrepBarSlot = SectionBarSlot;
 
 /**
- * Prep's section bar over its pages: Scenes, Party, Maps, Tokens, Sound and Replays, with the page's search or primary
- * at the right end. On a phone it is the strip under the page's header.
+ * Prep's section bar over its pages: Encounters, Party, Maps, Tokens, Sound and Replays, with the page's search or
+ * primary at the right end. On a phone it is the header row and the strip under it.
  */
 export function PrepFrame({ children }: Readonly<{ children: ReactNode }>) {
   const route = useRoute();
   const page = prepPageFor(route.path);
-  const [end, setEnd] = useState<HTMLElement | null>(null);
   const shown = useRef<HTMLDivElement>(null);
   return (
     <div className="prep-frame frame-col">
-      <div className="section-bar">
-        <Tabs
-          className="section-bar-tabs"
-          ariaLabel="Prep pages"
-          activeId={page ?? ""}
-          onChange={(id) => void navigate(PREP_PAGES.find((entry) => entry.id === id)!.path)}
-          tabs={PREP_PAGES.map((entry) => ({ id: entry.id, label: entry.label }))}
-          panel={() => shown.current}
-        />
-        <span className="app-bar-grow" />
-        <div className="section-bar-end" ref={setEnd} />
-      </div>
-      <PrepBarEnd.Provider value={end}>
+      <SectionBar
+        name="Prep"
+        navLabel="Prep sections"
+        pagesLabel="Prep pages"
+        pages={PREP_PAGES}
+        activeId={page ?? ""}
+        onChange={(id) => void navigate(PREP_PAGES.find((entry) => entry.id === id)!.path)}
+        panel={() => shown.current}
+      >
         <div ref={shown} className="prep-frame-page frame-col frame-fill">
           {children}
         </div>
-      </PrepBarEnd.Provider>
+      </SectionBar>
     </div>
   );
 }

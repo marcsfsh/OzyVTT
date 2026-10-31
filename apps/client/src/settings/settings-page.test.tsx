@@ -48,12 +48,12 @@ describe("the GM's Settings", () => {
     const user = userEvent.setup();
     renderAt("/settings");
     const bar = screen.getByRole("navigation", { name: "Settings sections" });
-    const sections = within(bar).getAllByRole("button");
+    const sections = within(bar).getAllByRole("tab");
     expect(sections.map((section) => section.textContent)).toEqual(SETTINGS_SECTIONS.map((section) => section.label));
-    expect(within(bar).getByRole("button", { name: "Players" })).toHaveAttribute("aria-current", "page");
+    expect(within(bar).getByRole("tab", { name: "Players" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("heading", { name: "Players", level: 2 })).toBeInTheDocument();
 
-    await user.click(within(bar).getByRole("button", { name: "Encounters" }));
+    await user.click(within(bar).getByRole("tab", { name: "Encounters" }));
     expect(window.location.pathname).toBe("/settings/fights");
     expect(screen.getByRole("heading", { name: "Rules assistant", level: 3 })).toBeInTheDocument();
   });
@@ -87,7 +87,7 @@ describe("the GM's Settings", () => {
     const { container } = renderAt("/settings/access");
     const primaries = container.querySelectorAll(".nh-btn--primary");
     expect([...primaries].map((button) => button.textContent)).toEqual(["New credential"]);
-    expect(primaries[0].closest(".settings-bar")).not.toBeNull();
+    expect(primaries[0].closest(".secbar")).not.toBeNull();
     act(() => goTo("/settings/fights"));
     expect(container.querySelectorAll(".nh-btn--primary")).toHaveLength(0);
   });

@@ -1,0 +1,116 @@
+/* The Titled section bar (theme spec 2.1, ADR-0048): 52px under the top bar, the section's name in Chakra Petch 600
+   capitals, a divider, the pages as words with the horizon ink on the bar's line, then the search and the primary. */
+.secbar {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.secbar-name {
+  flex: none;
+  margin: 0;
+  font: 600 17px / 1 var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.secbar-divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 16px;
+  background: var(--line-strong);
+}
+.secbar-nav {
+  display: flex;
+  align-self: stretch;
+  min-width: 0;
+}
+/* The bar's line is its bottom border: the tabs reach over it, so the ink at their foot lies on it. */
+.secbar-tabs.nh-tabs--horizontal {
+  align-self: stretch;
+  min-width: 0;
+  margin-bottom: -1px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.secbar-tabs .nh-tab {
+  height: 52px;
+  padding: 0 14px;
+  background: none;
+  font: 600 14px / 1 var(--font-label);
+  color: var(--text-dim);
+}
+.secbar-tabs .nh-tab:hover,
+.secbar-tabs .nh-tab:active {
+  color: var(--text);
+  background: none;
+}
+.secbar-tabs .nh-tab--active,
+.secbar-tabs .nh-tab--active:hover {
+  color: var(--text);
+  background: none;
+  box-shadow: none;
+}
+.secbar-tabs .nh-tab--active::after {
+  display: none;
+}
+.secbar-grow {
+  flex: 1 1 auto;
+  min-width: var(--space-4);
+}
+.secbar > :is(.secbar-slot, .secbar-search) {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+.secbar > * + :not(.secbar-divider, .secbar-nav, .secbar-grow) {
+  margin-left: var(--space-2);
+}
+.secbar-slot:empty {
+  display: none;
+}
+
+/* A phone: a header row with the name at 18px and up to two icons, then the pages as one strip of words. */
+.secbar-phone {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  background: var(--surface-1);
+}
+.secbar-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: 0 var(--space-1) 0 var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.secbar-head .secbar-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+}
+.secbar-icons {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0;
+}
+.secbar-phone .secbar-nav {
+  border-bottom: 1px solid var(--line-strong);
+}
+.secbar-phone .secbar-tabs.nh-tabs--horizontal {
+  flex: 1 1 auto;
+}
+.secbar-phone .secbar-tabs .nh-tab {
+  height: var(--tap-min);
+  padding: 0 var(--space-3);
+}

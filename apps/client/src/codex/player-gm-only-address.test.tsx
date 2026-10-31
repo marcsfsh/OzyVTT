@@ -77,7 +77,7 @@ describe("A player at a GM-only address", () => {
     goTo("/codex/audit");
     render(<PlayerCodex token="player" />);
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    expect(screen.getByRole("heading", { level: 2, name: "Codex" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Codex" })).toBeInTheDocument();
   });
 
   it("still titles the phone's top bar with the section on an address a player MAY reach", async () => {

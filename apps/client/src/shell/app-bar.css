@@ -150,59 +150,6 @@
   cursor: default;
 }
 
-/* A section's bar for its pages, 52px under the top bar, with the page's search or primary at the right end. */
-.section-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  min-height: 52px;
-  padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--line-strong);
-  background: var(--surface-1);
-}
-/* The bar's line is its bottom border: the tabs reach over it, so the ink at their foot lies on it. */
-.section-bar-tabs.nh-tabs--horizontal {
-  align-self: stretch;
-  min-width: 0;
-  margin-bottom: -1px;
-  padding: 0;
-  background: none;
-  box-shadow: none;
-}
-.section-bar-tabs .nh-tab {
-  height: 52px;
-  padding: 0 14px;
-  background: none;
-  font-size: 14px;
-  color: var(--text-dim);
-}
-.section-bar-tabs .nh-tab:hover,
-.section-bar-tabs .nh-tab:active {
-  color: var(--text);
-  background: none;
-}
-.section-bar-tabs .nh-tab--active,
-.section-bar-tabs .nh-tab--active:hover {
-  color: var(--text);
-  background: none;
-  box-shadow: none;
-}
-.section-bar-tabs .nh-tab--active::after {
-  display: none;
-}
-/* The page's own controls keep their size; the page tabs scroll in what is left. */
-.section-bar-end {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-2);
-}
-.section-bar-end > * {
-  flex: none;
-}
-.section-bar-end:empty {
-  display: none;
-}
 .prep-frame {
   flex: 1;
 }
@@ -317,29 +264,6 @@
   .app-bar-mark .nh-wordmark-vtt {
     font-size: 24px;
   }
-  /* Six page names fill a phone's width, so a page's own controls take a second row under them. */
-  .section-bar {
-    flex-wrap: wrap;
-    row-gap: 0;
-    min-height: 44px;
-    padding: 0 var(--space-2);
-  }
-  .section-bar-tabs.nh-tabs--horizontal {
-    flex: 1 0 100%;
-  }
-  .section-bar .app-bar-grow {
-    display: none;
-  }
-  .section-bar-end {
-    flex: 1 0 100%;
-    justify-content: flex-end;
-    padding: var(--space-2) 0;
-    border-top: 1px solid var(--line);
-  }
-  .section-bar-tabs .nh-tab {
-    height: 44px;
-    padding: 0 var(--space-3);
-  }
 }
 /* In the bar the theme switch is an icon like its neighbours: no plate until it is hovered or open. */
 .app-bar-theme .nh-theme-switch-trigger::before {
@@ -354,4 +278,9 @@
 .app-bar-screen-lamp {
   position: relative;
   display: inline-flex;
+}
+/* The press nudge (`.interactive:active`, 0.5px down) would push a bottom tab past the screen's edge while it settles,
+   and the page would scroll by a pixel; the tabs show a press with their fill instead. */
+main > :is(.app-bottom-tabs, .app-bottom-nav) :is(.nh-tab, .app-bottom-more):active {
+  transform: none;
 }

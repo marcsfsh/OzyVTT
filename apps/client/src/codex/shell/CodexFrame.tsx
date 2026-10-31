@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { IconButton, Kbd, SegmentedControl, StripInk } from "@vtt/ui";
+import { IconButton, Kbd, SegmentedControl } from "@vtt/ui";
 import { currentDevice, shortcutLabel } from "../../lib/shortcut";
 import { CodexIcon } from "../icons";
 import {
@@ -17,6 +17,7 @@ import {
 } from "../routes";
 import { replaceQuery, useRoute } from "../../router";
 import { useRecordLight } from "../../shell/recordLight";
+import { SectionBar } from "../../shell/SectionBar";
 import { PhoneBarContext, type PhoneBarSlot } from "./PhoneBar";
 import "./shell.css";
 
@@ -158,60 +159,35 @@ export function CodexFrame({
         ref={shell}
         className={`codex-root cx-shell${phone ? " is-phone" : " is-laptop"}${embedded ? " is-embedded" : ""}${className ? ` ${className}` : ""}`}
       >
-        {phone ? (
-          <header className="cx-phonebar">
-            {claims === 0 && (
-              <>
-                <h2 className="cx-phonebar-title">{section ? SECTION_TITLE[section] : "Codex"}</h2>
-                <div className="cx-phonebar-actions">{defaults}</div>
-              </>
-            )}
-            <div className="cx-phonebar-slot" ref={setBarTarget} />
-          </header>
-        ) : (
-          <div className="cx-bar">
-            <nav className="cx-bar-sections nh-tabs nh-tabs--horizontal" aria-label="Codex sections">
-              {CODEX_BAR.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`nh-tab cx-bar-tab${litBar === item.id ? " nh-tab--active" : ""}`}
-                  aria-current={litBar === item.id ? "page" : undefined}
-                  onClick={() => go(item.path)}
-                >
-                  <CodexIcon iconId={item.iconId} className="cx-icon" />
-                  {item.label}
-                </button>
-              ))}
-              <StripInk active={litBar ?? ""} panel={() => shell.current?.querySelector(":scope > .cx-content")} />
-            </nav>
-            <span className="cx-grow" />
-            {searchBox}
-            {laptopActions}
-          </div>
-        )}
-
-        {phone && (
-          <nav className="cx-tabbar" aria-label="Codex sections">
-            {CODEX_PHONE_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={`cx-tabbar-tab${litTab === tab.id ? " is-on" : ""}`}
-                aria-current={litTab === tab.id ? "page" : undefined}
-                onClick={() => go(tabPath(tab.id))}
-              >
-                <CodexIcon iconId={tab.iconId} className="cx-icon" />
-                <span>{tab.label}</span>
-              </button>
-            ))}
-            <StripInk
-              active={litTab ?? ""}
-              selector=".is-on"
-              panel={() => shell.current?.querySelector(":scope > .cx-content")}
-            />
-          </nav>
-        )}
+        <SectionBar
+          name="Codex"
+          navLabel="Codex sections"
+          pagesLabel="Codex pages"
+          pages={(phone ? CODEX_PHONE_TABS : CODEX_BAR).map((item) => ({ id: item.id, label: item.label }))}
+          activeId={(phone ? litTab : litBar) ?? ""}
+          onChange={(id) => {
+            if (phone) go(tabPath(id as CodexPhoneTab));
+            else go(CODEX_BAR.find((item) => item.id === id)!.path);
+          }}
+          panel={() => shell.current?.querySelector(":scope > .cx-content")}
+          search={searchBox}
+          end={laptopActions}
+          phoneHead={
+            <>
+              {claims === 0 && (
+                <>
+                  {/* A page in the strip is named by the strip, so the header names the section; one off it names
+                      itself (rule 12). */}
+                  <h1 className="secbar-name">{litTab || !section ? "Codex" : SECTION_TITLE[section]}</h1>
+                  <span className="secbar-icons">{defaults}</span>
+                </>
+              )}
+              <div className="cx-phonebar-slot" ref={setBarTarget} />
+            </>
+          }
+        >
+          {null}
+        </SectionBar>
         {phone && part && (
           <nav className="cx-campaign" aria-label="Campaign">
             <SegmentedControl

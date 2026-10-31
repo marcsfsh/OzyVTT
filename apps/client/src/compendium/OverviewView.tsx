@@ -4,7 +4,7 @@ import type { HomebrewOverview } from "../homebrew/api";
 import { useCompendium } from "./context";
 import { useOverview, usePacks } from "./data";
 import { KindIcon, kindPlural, type Kind } from "./kinds";
-import { NameCell, PackSwitch, PhoneHead, SourceMark, packName, whenLabel } from "./pieces";
+import { NameCell, PackSwitch, SourceMark, packName, whenLabel } from "./pieces";
 import { recordPath, tablePath } from "./routes";
 
 type NeedsYou = HomebrewOverview["needsYou"][number];
@@ -52,7 +52,6 @@ export function OverviewView() {
   if (phone)
     return (
       <div className="cp-overview scroll-y">
-        <PhoneHead title="Compendium" />
         <div className="cp-phone-body">
           <h3 className="cp-h">Sources</h3>
           <div className="cp-card-row">

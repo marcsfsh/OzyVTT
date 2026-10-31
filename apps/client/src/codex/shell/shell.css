@@ -35,24 +35,6 @@
   flex: 1 1 auto;
 }
 
-/* ----- Laptop: the section bar ----- */
-.cx-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  background: var(--material-lip), var(--surface-1);
-  border-bottom: 1px solid var(--line-strong);
-  flex: none;
-}
-.cx-bar-sections {
-  flex: 0 1 auto;
-  min-width: 0;
-}
-.cx-bar-tab {
-  font-size: var(--fs-sm);
-  padding-inline: var(--space-3);
-}
 .cx-searchbox {
   display: inline-flex;
   align-items: center;
@@ -141,56 +123,6 @@
 .cx-campaign .nh-segmented-option {
   flex: 1 1 auto;
   padding-inline: var(--space-1);
-}
-/* A phone lists a section's own views as a strip under its header (the app's sections are the bottom tabs): words
-   with a small icon, the chosen one underlined by the ink. It scrolls sideways when the views outgrow a narrow phone,
-   so its bottom line is drawn inside it, where the ink can lie on it. */
-.cx-tabbar {
-  --nh-ink-shift: 1px;
-  position: relative;
-  display: flex;
-  gap: 2px;
-  padding: 0 var(--space-2) 1px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  background: var(--surface-1);
-  box-shadow: inset 0 -1px 0 var(--line-strong);
-  flex: none;
-}
-.cx-tabbar::-webkit-scrollbar {
-  display: none;
-}
-.cx-tabbar-tab {
-  position: relative;
-  display: flex;
-  flex: 1 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: var(--tap-min);
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-dim);
-  font: 600 13px / 1.1 var(--font-label);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.cx-tabbar-tab .cx-icon {
-  width: 1.1rem;
-  height: 1.1rem;
-}
-.cx-tabbar-tab span {
-  margin: 0;
-  color: inherit;
-}
-.cx-tabbar-tab:hover {
-  color: var(--text);
-}
-/* The chosen tab's underline is the bar's ink (StripInk). */
-.cx-tabbar-tab.is-on {
-  color: var(--text);
 }
 
 /* ----- Pieces every view uses ----- */

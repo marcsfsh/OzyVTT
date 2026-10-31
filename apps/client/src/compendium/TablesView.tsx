@@ -4,7 +4,7 @@ import { CompendiumTable } from "./CompendiumTable";
 import { useCompendium } from "./context";
 import { usePacks, useTable } from "./data";
 import { KINDS, type Kind, type Names } from "./kinds";
-import { PhoneHead, SourceMark, sourceWord } from "./pieces";
+import { SourceMark, sourceWord } from "./pieces";
 import { recordPath, tablePath, withTableQuery } from "./routes";
 import type { CompendiumRow } from "./tableModel";
 
@@ -76,7 +76,6 @@ export function TablesView({
       onOpen={(row) => go(withTableQuery(recordPath(row.kind, row.id), query))}
       mark={(row) => <SourceMark row={row} packs={packs} />}
       sourceWord={(row) => sourceWord(row, packs)}
-      head={phone && !inFlyout ? <PhoneHead title="Compendium" /> : undefined}
     />
   );
 }

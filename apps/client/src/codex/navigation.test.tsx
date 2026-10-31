@@ -35,8 +35,8 @@ describe("Codex shell: getting from Home to the pages", () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/quests");
     await waitFor(() => expect(api.codexApi.listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Home" }));
-    expect(screen.getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
+    await user.click(screen.getByRole("tab", { name: "Home" }));
+    expect(screen.getByRole("tab", { name: "Home" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("prepares its destination: a collection on Home opens Pages with only that group listed", async () => {

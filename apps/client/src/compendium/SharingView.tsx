@@ -18,7 +18,7 @@ import { TickDropdown } from "../scenes/listTools";
 import { useCompendium } from "./context";
 import { refreshCompendium, useHomebrewList } from "./data";
 import { KINDS, KindIcon, kindPlural, type Kind } from "./kinds";
-import { NameCell, PhoneHead } from "./pieces";
+import { NameCell } from "./pieces";
 import { recordPath } from "./routes";
 import { SharingTab } from "./record/SharingTab";
 
@@ -91,7 +91,6 @@ export function SharingView() {
   if (phone)
     return (
       <div className="cp-sharing scroll-y">
-        <PhoneHead title="Sharing" />
         <div className="cp-phone-body">
           {rows.length === 0 ? (
             <p className="cp-hint">Nothing is published yet. A record is shared once it is published.</p>

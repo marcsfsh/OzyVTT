@@ -146,15 +146,15 @@ describe("Home is the section name", () => {
   it("on the GM's section bar, lit at /codex, with no 'World' anywhere in it", async () => {
     renderGmCodex("/codex");
     await waitFor(() => expect(records.findApi.home).toHaveBeenCalled());
-    expect(bar().getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
-    expect(bar().queryByRole("button", { name: "World" })).not.toBeInTheDocument();
+    expect(bar().getByRole("tab", { name: "Home" })).toHaveAttribute("aria-selected", "true");
+    expect(bar().queryByRole("tab", { name: "World" })).not.toBeInTheDocument();
   });
 
   it("on a player's section bar too, where a player lands", async () => {
     renderPlayerCodex("/codex");
     await waitFor(() => expect(records.findApi.homeForPlayer).toHaveBeenCalled());
-    expect(bar().getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
-    expect(bar().queryByRole("button", { name: "World" })).not.toBeInTheDocument();
+    expect(bar().getByRole("tab", { name: "Home" })).toHaveAttribute("aria-selected", "true");
+    expect(bar().queryByRole("tab", { name: "World" })).not.toBeInTheDocument();
   });
 
   it("as the command palette's Go to Home, which reaches the section and its cards", async () => {
@@ -167,7 +167,7 @@ describe("Home is the section name", () => {
     expect(palette.queryByText("Go to World")).not.toBeInTheDocument();
     await user.click(palette.getByText("Go to Home"));
 
-    expect(bar().getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
+    expect(bar().getByRole("tab", { name: "Home" })).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByRole("region", { name: "Recently changed" })).toBeInTheDocument();
   });
 });
@@ -192,9 +192,9 @@ describe("The GM's Home", () => {
     // Factions gathers factions and religions, as the Pages index does.
     expect(screen.getByRole("region", { name: "Factions" })).toHaveTextContent("2 revealed · 1 hidden");
     // A journal record is not a page, so it counts toward no tile.
-    expect(screen.getByRole("heading", { name: "Codex" }).parentElement).toHaveTextContent(
-      "16 pages: 13 revealed · 3 hidden"
-    );
+    // The home's own title row, beside the section bar's name.
+    const title = screen.getAllByRole("heading", { name: "Codex" }).find((heading) => !heading.closest(".secbar"));
+    expect(title?.parentElement).toHaveTextContent("16 pages: 13 revealed · 3 hidden");
 
     await user.click(within(people).getByRole("button", { name: "2 hidden" }));
     expect(window.location.pathname).toBe("/codex/search");

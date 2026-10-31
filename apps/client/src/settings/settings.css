@@ -33,28 +33,6 @@
 .settings-primary-slot {
   display: contents;
 }
-/* Six sections share the phone's tab bar: each tab keeps its whole word, and the bar scrolls sideways when they
-   outgrow the screen (the chosen one is scrolled into view). No icons here, so more of them fit at once. */
-.settings-tabbar {
-  display: flex;
-}
-.settings-tabbar .cx-tabbar-tab {
-  flex: 0 0 auto;
-  min-width: var(--tap-min);
-}
-.settings-tabbar .cx-tabbar-tab > svg {
-  display: none;
-}
-/* The phone bar's primary is the small size, so a section with one keeps the bar's height and the tabs don't jump. */
-.settings-phonebar .settings-primary-slot .nh-btn {
-  min-height: var(--tap-min);
-  padding-block: 0;
-  padding-inline: var(--space-3);
-  font-size: var(--fs-sm);
-}
-.settings-phonebar .settings-search {
-  flex: 1 1 auto;
-}
 
 /* ----- The search over settings ----- */
 .settings-search {
@@ -95,10 +73,7 @@
   background: var(--material-lip), var(--surface-2);
   box-shadow: var(--shadow-2);
 }
-.settings-phonebar .settings-search-results {
-  left: 0;
-  right: auto;
-}
+
 .settings-search-results ul {
   margin: 0;
   padding: 0;
