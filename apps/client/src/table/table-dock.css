@@ -33,37 +33,28 @@
   flex: 1 1 auto;
   min-height: 0;
 }
-/* Until the Ladder (C2), today's tiles stand one under another. */
-.table-dock-order .turn-tiles {
-  flex-direction: column;
-  overflow: visible;
-}
-.table-dock-order .turn-tile {
-  flex-direction: row;
-  justify-content: flex-start;
-  width: 100%;
-  min-height: 52px;
-  height: auto;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--line);
-}
 /* Padded so a control's 44px hit area (`.tap-target`) stays inside the dock and never stretches the page. */
 .table-dock-tools {
   flex: none;
   padding: 6px 8px;
   border-top: 1px solid var(--line-strong);
 }
-/* From 980 to 1279px the dock is 72px: each row its face and initiative. From 1280px it is the full dock. */
+/* From 980 to 1279px the dock is 72px: each row its face and initiative, the row whole on pointer or focus. From
+   1280px it is the full dock. */
 .table-dock-head {
   padding: 12px 6px;
 }
 .table-dock-status,
-.table-dock-order .turn-tile-text {
+.table-dock-order .ladder-body {
   display: none;
 }
-.table-dock-order .turn-tile {
-  justify-content: center;
-  padding: 6px 4px;
+.table-dock-order .ladder-row {
+  gap: 4px;
+  padding: 6px 4px 6px 6px;
+}
+/* The 72px dock keeps the round's number and drops RND. */
+.table-dock-head .nh-vcr-round {
+  font-size: 20px;
 }
 @media (min-width: 1280px) {
   .table-dock-head {
@@ -72,11 +63,11 @@
   .table-dock-status {
     display: block;
   }
-  .table-dock-order .turn-tile-text {
-    display: inline-flex;
+  .table-dock-order .ladder-body {
+    display: grid;
   }
-  .table-dock-order .turn-tile {
-    justify-content: flex-start;
+  .table-dock-order .ladder-row {
+    gap: 10px;
     padding: 6px 12px;
   }
 }

@@ -2,7 +2,7 @@ import { useRef, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { VcrCounter } from "@vtt/ui";
 import { useOrderLight } from "./orderLight";
-import { TurnTiles } from "./TurnTiles";
+import { TurnLadder } from "./TurnLadder";
 import { idleStatus } from "./status";
 import "./table-dock.css";
 
@@ -24,7 +24,7 @@ export function TableDock(props: DockProps) {
   const fighting = state.combat.active;
   const dock = useRef<HTMLElement>(null);
   const row = (key: string) =>
-    dock.current?.querySelector<HTMLElement>(`.turn-tiles > li[data-key="${CSS.escape(key)}"]`) ?? null;
+    dock.current?.querySelector<HTMLElement>(`.turn-ladder > li[data-key="${CSS.escape(key)}"]`) ?? null;
   const hiddenTurn = props.role === "player" && props.state.combat.hiddenTurn;
   // The turn order's light runs down the order, from the round counter to the acting row (ADR-0045).
   useOrderLight(dock, {
@@ -32,7 +32,7 @@ export function TableDock(props: DockProps) {
     acting: fighting && !hiddenTurn ? state.combat.turnActorId : null,
     round: fighting ? state.combat.round : null,
     item: row,
-    point: (key) => row(key)?.querySelector<HTMLElement>(".turn-tile-face") ?? null,
+    point: (key) => row(key)?.querySelector<HTMLElement>(".ladder-face") ?? null,
     frame: (key) => row(key)?.querySelector<HTMLElement>(".nh-portrait") ?? null,
     counter: () => dock.current?.querySelector<HTMLElement>(".table-dock-counter") ?? null,
     axis: "y",
@@ -54,9 +54,9 @@ export function TableDock(props: DockProps) {
       )}
       <div className="table-dock-order scroll-y">
         {props.role === "gm" ? (
-          <TurnTiles role="gm" state={props.state} token={props.token} />
+          <TurnLadder role="gm" state={props.state} token={props.token} />
         ) : (
-          <TurnTiles role="player" state={props.state} token={null} />
+          <TurnLadder role="player" state={props.state} token={null} />
         )}
       </div>
       {props.tools && <div className="table-dock-tools">{props.tools}</div>}

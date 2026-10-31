@@ -1,0 +1,161 @@
+/* The turn order as a Ladder (table spec 2.2 and 4): rows of at least 52px on 1px dividers, padding 6px 12px; a 34px
+   face, the name at 13.5px 600, the initiative in VT323 18px; a 4px bar or the wound word at 11.5px; small condition
+   tags, a harmful one on a danger edge. The acting row is tinted --caution at 7% with the horizon ink down its left. */
+.turn-ladder {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ladder-item {
+  border-bottom: 1px solid var(--line);
+}
+.ladder-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 12px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.ladder-row:disabled {
+  cursor: default;
+}
+.ladder-row:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.ladder-row.is-acting {
+  background: color-mix(in srgb, var(--caution) 7%, transparent);
+}
+/* The horizon ink down the acting row's left edge, as a vertical chosen tab's. */
+.ladder-row.is-acting::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--cyan) 0%, var(--violet) 30%, var(--magenta) 60%, var(--caution) 100%);
+}
+.ladder-row.is-gm-turn {
+  color: var(--text-dim);
+  font: 600 13px / 1.3 var(--font-label);
+}
+.ladder-face {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+}
+.ladder-face .nh-portrait {
+  width: 34px;
+  height: 34px;
+}
+.ladder-body {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+}
+.ladder-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font: 600 13.5px / 1.25 var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ladder-row.is-done .ladder-name {
+  color: var(--text-dim);
+}
+.ladder-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  margin: 0;
+}
+.ladder-bar {
+  display: block;
+  flex: 1 1 60px;
+  max-width: 120px;
+  height: 4px;
+  margin: 0;
+  background: var(--hp-lost);
+}
+.ladder-bar-fill {
+  display: block;
+  height: 100%;
+  margin: 0;
+  background: var(--hp);
+}
+.ladder-bar.is-foe .ladder-bar-fill {
+  background: var(--hostile);
+}
+.ladder-word {
+  margin: 0;
+  color: var(--text-muted);
+  font: 500 11.5px / 1.2 var(--font-body);
+}
+.ladder-cond {
+  margin: 0;
+  padding: 0 4px;
+  border: 1px solid var(--line-raised);
+  color: var(--text-dim);
+  font: 400 13px / 16px var(--font-numeric);
+  text-transform: uppercase;
+}
+.ladder-cond.is-harmful {
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+.ladder-init {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  margin: 0;
+}
+.ladder-score {
+  margin: 0;
+  color: var(--text);
+  font: 400 18px / 1 var(--font-numeric);
+}
+.ladder-row.is-acting .ladder-score {
+  color: var(--caution-text);
+}
+.ladder-next {
+  margin: 0;
+  padding: 0 3px;
+  background: var(--text);
+  color: var(--bg);
+  font: 400 11px / 1.2 var(--font-numeric);
+  letter-spacing: 0.04em;
+}
+/* The peek beside the 72px dock: the row whole, over the map's edge, on pointer or focus. */
+.ladder-peek {
+  position: fixed;
+  z-index: 50;
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  max-width: 260px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+}
