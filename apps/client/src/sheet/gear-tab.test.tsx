@@ -208,7 +208,7 @@ describe("the sheet's inventory", () => {
     expect(attunement.getByText("Ring of Resistance")).toBeTruthy();
   });
 
-  it("lets the GM pick a resistance type and hand an item to another character, in violet", async () => {
+  it("lets the GM pick a resistance type and hand an item to another character, under the GM only tag", async () => {
     serve();
     const actor = hero();
     render(<CharacterSheet actor={actor} role="gm" state={stateWith(actor)} onClose={() => {}} />, {
@@ -230,7 +230,7 @@ describe("the sheet's inventory", () => {
     });
     await user.selectOptions(drawer.getByRole("combobox", { name: "Give the Ring of Resistance to" }), FRIEND);
     const give = drawer.getByRole("button", { name: "Give" });
-    expect(give.classList.contains("cs-gm-control")).toBe(true);
+    expect(give.classList.contains("nh-btn--secondary")).toBe(true);
     await user.click(give);
     expect(sent("character:give-item")).toEqual([
       expect.objectContaining({ actorId: HERO, toActorId: FRIEND, itemId: "ring-of-resistance" })
@@ -270,7 +270,7 @@ describe("the sheet's inventory", () => {
       await drawer.findByText("48 hours of study over 6 days or fewer raise Constitution by 2, to at most 30.")
     ).toBeTruthy();
     const mark = drawer.getByRole("button", { name: "Mark it studied" });
-    expect(mark.classList.contains("cs-gm-control")).toBe(true);
+    expect(mark.classList.contains("nh-btn--secondary")).toBe(true);
     await user.click(mark);
     expect(sent("character:study-item")).toEqual([
       expect.objectContaining({ actorId: HERO, itemId: "manual-of-bodily-health" })
@@ -607,7 +607,7 @@ describe("an item's kinds, forms and attunement prerequisites", () => {
     ).toBeTruthy();
   });
 
-  it("lets the GM say which stone an Ioun Stone is, in violet", async () => {
+  it("lets the GM say which stone an Ioun Stone is, under the GM only tag", async () => {
     serve();
     const actor = holding({
       id: "ioun-stone",

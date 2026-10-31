@@ -168,7 +168,7 @@ export function UseRow({
           {role === "gm" && (
             <Button
               size="sm"
-              className="cs-gm-control"
+
               disabled={busy || spent === 0}
               onClick={() => move("actor:restore-uses")}
             >

@@ -509,7 +509,7 @@ export function SpellsTab({
         </p>
       ))}
       {inStep && (role === "gm" || canPrepare) && (
-        <section className="cs-card cs-caution" role="group" aria-label="Change prepared spells">
+        <section className="nh-group cs-caution" role="group" aria-label="Change prepared spells">
           <strong>Change your prepared spells</strong>
           <p className="cs-sub">
             {actor.restStep?.after === "short-rest"
@@ -570,14 +570,14 @@ export function SpellsTab({
         <div className="cs-gm-line">
           <Button
             size="sm"
-            className="cs-gm-control"
+
             aria-pressed={gmEditing}
             onClick={() => setGmEditing((on) => !on)}
           >
             {gmEditing ? "Done changing prepared spells" : "Change prepared spells"}
           </Button>
           {swappable && (
-            <Button size="sm" className="cs-gm-control" disabled={busy} onClick={() => setSwapping(true)}>
+            <Button size="sm" disabled={busy} onClick={() => setSwapping(true)}>
               Swap in a spell
             </Button>
           )}

@@ -40,7 +40,7 @@ export function HeroicGift({
     });
   };
   return (
-    <section className="cs-card cs-caution" role="group" aria-label="Give Heroic Inspiration">
+    <section className="nh-group cs-caution" role="group" aria-label="Give Heroic Inspiration">
       <strong>A second Heroic Inspiration</strong>
       <p className="cs-sub">
         {actor.name} already has Heroic Inspiration. Give this one to a player character who has none, or it is lost.

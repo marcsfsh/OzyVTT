@@ -399,7 +399,7 @@ export function NextLevel({
   onLevelUp
 }: Readonly<{ level: number; lines: readonly string[]; onLevelUp: () => void }>) {
   return (
-    <section className="cs-card cs-next" aria-label={`Level ${level}`}>
+    <section className="nh-group cs-next" aria-label={`Level ${level}`}>
       <span className="cs-eyebrow">At level {level}</span>
       {lines.length > 0 ? (
         <ul className="cs-next-lines">

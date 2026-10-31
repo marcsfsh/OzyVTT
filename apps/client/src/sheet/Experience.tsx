@@ -83,7 +83,7 @@ export function AwardExperience({
         disabled={busy}
         aria-label={`XP to award ${name}`}
       />
-      <Button size="sm" className="cs-gm-control" disabled={busy || amount === 0} onClick={award}>
+      <Button size="sm" disabled={busy || amount === 0} onClick={award}>
         Award XP
       </Button>
     </div>

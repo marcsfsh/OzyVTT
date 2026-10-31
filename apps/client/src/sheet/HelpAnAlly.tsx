@@ -51,7 +51,7 @@ export function HelpAnAlly({
     });
   };
   return (
-    <section className="cs-card" role="group" aria-label="Help an ally">
+    <section className="nh-group" role="group" aria-label="Help an ally">
       <strong>Help an ally</strong>
       <p className="cs-sub">
         Lend a party member a hand with one of your proficiencies: they have Advantage on their next check with it.

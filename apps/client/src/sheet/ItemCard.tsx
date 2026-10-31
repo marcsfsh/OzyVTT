@@ -76,7 +76,7 @@ export function ItemCard({
   children?: ReactNode;
 }>) {
   return (
-    <section className="cs-card cs-item-detail" aria-label={name}>
+    <section className="nh-group cs-item-detail" aria-label={name}>
       <div className="cs-cast-head">
         {before}
         <span className="cs-cast-title">

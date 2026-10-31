@@ -147,7 +147,7 @@ export function GmLongRest({ actorId, onFeedback }: Readonly<{ actorId: string; 
   return (
     <Button
       size="sm"
-      className="cs-gm-control"
+
       disabled={busy}
       onClick={() => {
         setBusy(true);
@@ -230,7 +230,7 @@ export function DeathSavesCard({
     );
   };
   return (
-    <section ref={card} className="cs-card cs-death" aria-label="Death Saving Throws">
+    <section ref={card} className="nh-group cs-death" aria-label="Death Saving Throws">
       <span className="cs-eyebrow is-danger">Death Saving Throws</span>
       <strong className="cs-death-title">
         {dead ? `${actor.name} is dead` : deathSaves.stable ? `${actor.name} is stable` : `${actor.name} is dying`}

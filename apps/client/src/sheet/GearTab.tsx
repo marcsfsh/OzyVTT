@@ -587,7 +587,7 @@ export function GearTab({
                 {study && !open.dormant && (
                   <Button
                     size="sm"
-                    className="cs-gm-control"
+
                     disabled={busy}
                     onClick={() => void edit("character:study-item", { actorId: actor.id, itemId: open.id })}
                   >
@@ -923,7 +923,7 @@ function GiveTo({
           </option>
         ))}
       </Select>
-      <Button type="submit" size="sm" className="cs-gm-control" disabled={busy || !to}>
+      <Button type="submit" size="sm" disabled={busy || !to}>
         Give
       </Button>
     </form>

@@ -57,6 +57,6 @@ describe("a monster's sheet", () => {
     // The Long Rest is the GM's, in the GM tools.
     await user.click(screen.getByRole("tab", { name: "GM" }));
     const tools = within(screen.getByRole("region", { name: "GM tools" }));
-    expect(tools.getByRole("button", { name: "Long Rest" }).classList.contains("cs-gm-control")).toBe(true);
+    expect(tools.getByRole("button", { name: "Long Rest" }).classList.contains("nh-btn--secondary")).toBe(true);
   });
 });

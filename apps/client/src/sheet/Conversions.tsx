@@ -297,7 +297,7 @@ export function RestStep({
   if (recoveries.length === 0 && picks.length === 0) return null;
   return (
     <section
-      className="cs-card cs-caution"
+      className="nh-group cs-caution"
       role="group"
       aria-label={after === "short-rest" ? "After the Short Rest" : "After the Long Rest"}
     >

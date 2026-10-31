@@ -78,7 +78,7 @@ export function HpCard({
   onFeedback
 }: Readonly<{ actor: SheetActor; role: "gm" | "player"; withSet?: boolean; onFeedback: (text: string) => void }>) {
   return (
-    <section className={`cs-card cs-hp-card${isDown(actor) ? " is-down" : ""}`} aria-label="Hit Points">
+    <section className={`nh-group cs-hp-card${isDown(actor) ? " is-down" : ""}`} aria-label="Hit Points">
       <HpReadout actor={actor} />
       <HpControls actor={actor} role={role} onFeedback={onFeedback} />
       {withSet && role === "gm" && !isDeadOnSheet(actor) && (
@@ -139,11 +139,11 @@ export function ArmorClassEditor({
           else if (event.key === "Escape") onDone();
         }}
       />
-      <Button size="sm" className="cs-gm-control" disabled={busy} onClick={set}>
+      <Button size="sm" disabled={busy} onClick={set}>
         Save AC
       </Button>
       {actor.armorClassOverride !== undefined && (
-        <Button size="sm" className="cs-gm-control" disabled={busy} onClick={() => send(null)}>
+        <Button size="sm" disabled={busy} onClick={() => send(null)}>
           Use worn gear
         </Button>
       )}

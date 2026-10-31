@@ -407,7 +407,7 @@ export function CharacterSheet({
     <div className="cs-main">
       {deathCard}
       {owedLine}
-      <section className="cs-card cs-states-card" aria-label="Conditions and effects">
+      <section className="nh-group cs-states-card" aria-label="Conditions and effects">
         <span className="cs-eyebrow">Conditions and effects</span>
         <StatusStrip actor={actor} role={role} inFight={controller.inFight} inspiration={false} onFeedback={say} />
       </section>

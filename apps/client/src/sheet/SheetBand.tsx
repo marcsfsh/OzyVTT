@@ -173,7 +173,7 @@ export function SheetBand({
           {status}
         </span>
       </div>
-      <div className="cs-plate cs-card" role="group" aria-label="Vitals">
+      <div className="cs-plate nh-group" role="group" aria-label="Vitals">
         <Cell label="AC" className="cs-cell-ac" note={figures.armorSetByGm ? "Set by GM" : null}>
           {figures.armorClass ?? "None"}
         </Cell>
@@ -285,7 +285,7 @@ export function SheetBandCompact({
         {canRest && <RestMenu actorId={actor.id} role={role} asked={restAsked} onFeedback={onFeedback} />}
         {end}
       </div>
-      <div className="cs-plate cs-plate-c cs-card" role="group" aria-label="Vitals">
+      <div className="cs-plate cs-plate-c nh-group" role="group" aria-label="Vitals">
         {/* Speed's cell has no room for its base: the "Hit Points" dialog names a lowered Speed's. */}
         <Cell label="AC" className="cs-cell-ac" note={figures.armorSetByGm ? "Set by GM" : null}>
           {figures.armorClass ?? "None"}
@@ -350,7 +350,7 @@ export function MainPlate({
   const { hitDice } = figures;
   if (figures.proficiency === null && figures.inspired === undefined && !hitDice) return null;
   return (
-    <div className="cs-plate cs-plate-main cs-card" role="group" aria-label="Proficiency and Hit Point Dice">
+    <div className="cs-plate cs-plate-main nh-group" role="group" aria-label="Proficiency and Hit Point Dice">
       {figures.proficiency !== null && (
         <Cell label="Proficiency" className="cs-cell-prof">
           {figures.proficiency}
@@ -405,7 +405,7 @@ export function BandPlate({
   className?: string;
 }>) {
   return (
-    <div className={`cs-plate cs-plate-c cs-card${className ? ` ${className}` : ""}`} role="group" aria-label="Vitals">
+    <div className={`cs-plate cs-plate-c nh-group${className ? ` ${className}` : ""}`} role="group" aria-label="Vitals">
       {armorClass !== null && armorClass !== undefined && (
         <Cell label="AC" className="cs-cell-ac">
           {armorClass}

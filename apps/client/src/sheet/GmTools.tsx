@@ -52,7 +52,7 @@ export function GmTools({
         {!dead && (
           <Button
             size="sm"
-            className="cs-gm-control"
+
             aria-expanded={open === "hp"}
             onClick={() => setOpen((current) => (current === "hp" ? null : "hp"))}
           >
@@ -61,7 +61,7 @@ export function GmTools({
         )}
         <Button
           size="sm"
-          className="cs-gm-control"
+
           aria-expanded={open === "ac"}
           onClick={() => setOpen((current) => (current === "ac" ? null : "ac"))}
         >
@@ -70,7 +70,7 @@ export function GmTools({
         {actor.kind === "player-character" && (
           <Button
             size="sm"
-            className="cs-gm-control"
+
             disabled={busy}
             aria-label={inspired ? "Take back Heroic Inspiration" : "Give Heroic Inspiration"}
             onClick={toggleInspiration}
@@ -81,7 +81,7 @@ export function GmTools({
         {actor.kind === "player-character" && (
           <Button
             size="sm"
-            className="cs-gm-control"
+
             aria-expanded={open === "xp"}
             onClick={() => setOpen((current) => (current === "xp" ? null : "xp"))}
           >

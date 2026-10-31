@@ -188,47 +188,9 @@
   align-items: center;
   gap: var(--space-2);
 }
-/* A group you act in is a Cradle box (theme spec 2.4): no fill and no top, a 2px base and sides that fade before the
-   top, the base lighting cyan from the middle out while the pointer or focus is inside. T7 swaps it for `Group`. */
-.cs-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
+/* A group you act in is the kit's Cradle (`Group`, `.nh-group`); inside the sheet its contents stand a little apart. */
+.cs .nh-group {
   gap: var(--space-2);
-  padding: var(--space-2) 14px 12px;
-  border: 0;
-  background: none;
-}
-.cs-card::before {
-  content: "";
-  position: absolute;
-  inset: 6px 0 0;
-  pointer-events: none;
-  border: 1px solid transparent;
-  border-top: 0;
-  border-bottom-width: 2px;
-  border-image: linear-gradient(to bottom, transparent, var(--line-raised) 55%) 1;
-}
-.cs-card::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: var(--cyan);
-  box-shadow: var(--glow-cyan);
-  transform: scaleX(0);
-  transition: transform 280ms var(--ease-travel);
-  pointer-events: none;
-}
-.cs-card:is(:hover, :focus-within)::after {
-  transform: scaleX(1);
-}
-@media (prefers-reduced-motion: reduce) {
-  .cs-card::after {
-    transition: none;
-  }
 }
 
 .cs-attribution {
@@ -372,15 +334,7 @@
   color: var(--text-muted);
   cursor: default;
 }
-/* GM-only controls are violet, and a GM only mark sits beside each group of them. */
-.nh-btn.cs-gm-control {
-  border-color: var(--rim-gm);
-  color: var(--violet-hi);
-}
-.nh-btn.cs-gm-control::before {
-  border-color: var(--rim-gm);
-  background: color-mix(in srgb, var(--rim-gm) 14%, var(--surface-2));
-}
+/* GM-only controls are plain secondaries; the GM only tag on their group's heading says whose they are (rule 7). */
 .cs-gm-mark {
   display: inline-flex;
   align-items: center;
@@ -388,17 +342,13 @@
   color: var(--violet-hi);
   font: 600 var(--fs-xs) / 1 var(--font-label);
 }
+/* The GM's tools and the GM's Set Hit Points: a group under the GM only tag, with no violet bar (rule 7). */
 .cs-gmbox {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--rim-gm);
-  border-left-width: 3px;
-  background: color-mix(in srgb, var(--rim-gm) 10%, var(--surface-1));
-}
-.cs-gmbox .cs-eyebrow {
-  color: var(--violet-hi);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-strong);
 }
 .cs-gm-notes {
   display: flex;
@@ -560,7 +510,7 @@ span.cs-hd-open {
 }
 
 /* The stats plate: a Cradle box of cells divided by 1px lines, each a label over a VT323 value. */
-.cs-plate {
+.cs-plate.nh-group {
   display: flex;
   flex-direction: row;
   align-items: stretch;

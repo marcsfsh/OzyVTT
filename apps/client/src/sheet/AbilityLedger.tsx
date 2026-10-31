@@ -31,7 +31,7 @@ export function AbilityLedger({
 }>) {
   const exhaustion = exhaustionLevel(actor);
   return (
-    <section className="cs-card cs-ledger" aria-label="Abilities">
+    <section className="nh-group cs-ledger" aria-label="Abilities">
       <span className="cs-eyebrow">Abilities</span>
       {top}
       {exhaustion > 0 && (

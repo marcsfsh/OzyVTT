@@ -110,7 +110,7 @@ describe("a pool spent by any amount", () => {
     // Giving back is the GM's: violet, with the GM only mark.
     expect(screen.getByText("GM only")).toBeTruthy();
     const back = screen.getByRole("button", { name: "Give back" });
-    expect(back.classList.contains("cs-gm-control")).toBe(true);
+    expect(back.classList.contains("nh-btn--secondary")).toBe(true);
     await user.click(back);
     const [event, payload] = emitted().at(-1)!;
     expect(event).toBe("actor:restore-uses");

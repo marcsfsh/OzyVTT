@@ -21,7 +21,7 @@ import { CharacterSheet } from "./CharacterSheet";
 import { HitPointDice } from "./HitPointDice";
 
 // The sheet's frame: which tabs it shows where, the phone's Hit Points drawer and Level box, the Hit Point Dice per
-// die, and the GM's controls in violet with the GM only mark.
+// die, and the GM's controls as plain secondaries under the GM only tag.
 
 const HERO = "10000000-0000-4000-8000-000000000001";
 const fixture = ActorDefinitionSchema.parse(loadActorFixture("player-character"));
@@ -355,7 +355,7 @@ describe("the Hit Point Dice", () => {
 });
 
 describe("the GM's sheet on a laptop", () => {
-  it("marks itself and its tools GM only, the tools in violet", async () => {
+  it("marks itself and its tools GM only, the tools plain secondaries under the tag", async () => {
     onLaptop(true);
     const state = {
       actors: [hero()],
@@ -372,7 +372,7 @@ describe("the GM's sheet on a laptop", () => {
     const tools = within(sheet.getByRole("region", { name: "GM tools" }));
     expect(tools.getByText("GM only")).toBeTruthy();
     for (const name of ["Set HP", "Set AC", "Give Heroic Inspiration", "Long Rest"])
-      expect(tools.getByRole("button", { name }).classList.contains("cs-gm-control")).toBe(true);
+      expect(tools.getByRole("button", { name }).classList.contains("nh-btn--secondary")).toBe(true);
     expect(sheet.getByRole("button", { name: "Close" })).toBeTruthy();
   });
 });

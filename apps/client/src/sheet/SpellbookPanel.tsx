@@ -54,7 +54,7 @@ export function SpellbookPanel({
   };
   return (
     <section
-      className="cs-card cs-book"
+      className="nh-group cs-book"
       aria-label={picked ? `${mode === "add" ? "Add" : "Copy"} ${picked.spell.name}` : title}
     >
       <div className="cs-cast-head">

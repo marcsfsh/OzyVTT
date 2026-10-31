@@ -165,7 +165,7 @@ export function SkillsCard({
   const skills = useSkillRows(definition, derived);
   const [editing, setEditing] = useState(false);
   return (
-    <section className="cs-card cs-skills-card" aria-label="Skills">
+    <section className="nh-group cs-skills-card" aria-label="Skills">
       <div className="cs-section-head">
         <span className="cs-eyebrow">Skills</span>
         {actor.kind === "player-character" && !editing && (
@@ -308,7 +308,7 @@ export function ToolsCard({
       />
     ) : null;
   return (
-    <section className="cs-card cs-tools" aria-label="Tools">
+    <section className="nh-group cs-tools" aria-label="Tools">
       <span className="cs-eyebrow">Tools</span>
       {parts}
       {uses}

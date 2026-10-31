@@ -541,7 +541,7 @@ describe("Heroic Inspiration on the sheet", () => {
     serve(derivedSheet());
     render(<CharacterSheet actor={hero()} role="gm" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    // On a narrow screen the GM's tools are a tab of their own, in violet with the GM only mark.
+    // The GM's tools are a tab of their own, a group under the GM only tag.
     await openTab(user, "GM");
     const tools = within(screen.getByRole("region", { name: "GM tools" }));
     expect(tools.getByText("GM only")).toBeTruthy();
