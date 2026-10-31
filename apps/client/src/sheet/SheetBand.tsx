@@ -79,8 +79,15 @@ function InspirationCell({
   actor,
   role,
   inspired,
+  label = "Inspiration",
   onFeedback
-}: Readonly<{ actor: SheetActor; role: "gm" | "player"; inspired: boolean; onFeedback: (text: string) => void }>) {
+}: Readonly<{
+  actor: SheetActor;
+  role: "gm" | "player";
+  inspired: boolean;
+  label?: string;
+  onFeedback: (text: string) => void;
+}>) {
   const cell = useRef<HTMLDivElement>(null);
   useOnChange(inspired, (_was, now) => {
     const el = cell.current;
@@ -104,7 +111,7 @@ function InspirationCell({
     });
   return (
     <div ref={cell} className="cs-cell cs-cell-insp">
-      <span className="cs-cell-k">Inspiration</span>
+      <span className="cs-cell-k">{label}</span>
       {role === "gm" && actor.kind === "player-character" ? (
         <button
           type="button"
@@ -279,8 +286,8 @@ export function SheetBandCompact({
         {end}
       </div>
       <div className="cs-plate cs-plate-c cs-card" role="group" aria-label="Vitals">
-        {/* The compact cells have no room for a note: the "Hit Points" dialog names a lowered Speed's base. */}
-        <Cell label="AC" className="cs-cell-ac" title={figures.armorSetByGm ? "Set by GM" : undefined}>
+        {/* Speed's cell has no room for its base: the "Hit Points" dialog names a lowered Speed's. */}
+        <Cell label="AC" className="cs-cell-ac" note={figures.armorSetByGm ? "Set by GM" : null}>
           {figures.armorClass ?? "None"}
         </Cell>
         <button
@@ -320,5 +327,58 @@ export function SheetBandCompact({
         </Cell>
       </div>
     </header>
+  );
+}
+
+/**
+ * Main's plate on a phone and in the Table panel: what the laptop's band holds that the compact band leaves out, the
+ * Proficiency Bonus, Heroic Inspiration and the Hit Point Dice, which open to spend where the rules allow.
+ */
+export function MainPlate({
+  actor,
+  role,
+  figures,
+  onOpenHitDice,
+  onFeedback
+}: Readonly<{
+  actor: SheetActor;
+  role: "gm" | "player";
+  figures: BandFigures;
+  onOpenHitDice: () => void;
+  onFeedback: (text: string) => void;
+}>) {
+  const { hitDice } = figures;
+  if (figures.proficiency === null && figures.inspired === undefined && !hitDice) return null;
+  return (
+    <div className="cs-plate cs-plate-main cs-card" role="group" aria-label="Proficiency and Hit Point Dice">
+      {figures.proficiency !== null && (
+        <Cell label="Proficiency" className="cs-cell-prof">
+          {figures.proficiency}
+        </Cell>
+      )}
+      {figures.inspired !== undefined && (
+        <InspirationCell
+          actor={actor}
+          role={role}
+          inspired={figures.inspired}
+          label="Heroic Inspiration"
+          onFeedback={onFeedback}
+        />
+      )}
+      {hitDice && (
+        <button
+          type="button"
+          className="cs-cell cs-cell-hd"
+          aria-label={`Hit Point Dice ${hitDice.remaining} of ${hitDice.maximum} ${hitDice.dice}. Open`}
+          onClick={onOpenHitDice}
+        >
+          <span className="cs-cell-k">Hit dice</span>
+          <span className="cs-cell-v">
+            {hitDice.remaining}/{hitDice.maximum}
+            <small className="cs-unit">{hitDice.dice}</small>
+          </span>
+        </button>
+      )}
+    </div>
   );
 }

@@ -1,30 +1,15 @@
 import { useRef, useState, type ReactNode } from "react";
-import type { ActorDefinition, ActorDerivedSheet, DeathSaves, PendingSave, PlayerPendingSave } from "@vtt/domain";
-import { Button, IconCheck, IconMoon, IconX, Menu, MenuItem, Roll, burst, canMove, comet, useOnChange } from "@vtt/ui";
-import { abilityModifier } from "@vtt/rules-5e";
+import type { ActorDefinition, DeathSaves, PendingSave, PlayerPendingSave } from "@vtt/domain";
+import { Button, IconCheck, IconMoon, IconX, Menu, MenuItem } from "@vtt/ui";
 import { rollModeOf, useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "../encounter/DyingTracker";
 import { useSaveLight } from "../encounter/saveLight";
-import { signed } from "../encounter/format";
 import { SavePrompt } from "../encounter/SavePrompt";
-import type { SrdExtension } from "../encounter/sheet-extension";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
-import { FoodAndWater } from "./FoodAndWater";
-import { HitPointDice } from "./HitPointDice";
-import { HpControls, HpReadout } from "./HitPoints";
-import {
-  armorClassOf,
-  exhaustionLevel,
-  hitDiceEntries,
-  heroicInspirationOf,
-  speedOf,
-  type SheetActor,
-  type SheetState
-} from "./sheet-model";
+import { heroicInspirationOf, type SheetActor, type SheetState } from "./sheet-model";
 import { slotPools } from "./spell-model";
-import { StatusStrip } from "./StatusStrip";
-import { UseBoxes, UseList, type Pool } from "./Uses";
+import { UseBoxes, type Pool } from "./Uses";
 import { PipRow } from "./PipRow";
 
 /** A number read at a glance: AC, Speed, Initiative, Passive Perception. `note` names a lowered value's base. */
@@ -178,8 +163,8 @@ export function GmLongRest({ actorId, onFeedback }: Readonly<{ actorId: string; 
   );
 }
 
-/** The spell slots left at each level, read at a glance; the Spells tab spends and restores them. */
-function SlotsLeft({ definition, actor }: Readonly<{ definition: ActorDefinition; actor: SheetActor }>) {
+/** The spell slots left at each level, read at a glance at the top of Actions; the Spells tab spends them. */
+export function SlotsLeft({ definition, actor }: Readonly<{ definition: ActorDefinition; actor: SheetActor }>) {
   const { slots, pact } = slotPools(definition, actor);
   const pools = [...slots, ...(pact ? [pact] : [])];
   if (pools.length === 0) return null;
@@ -214,29 +199,6 @@ const DEATH_BOXES = {
   failure: ".cs-death-box.is-failure",
   word: ".cs-death-title"
 } as const;
-
-/**
- * Heroic Inspiration held or not. Gaining it runs a gold comet along the line's bottom edge with a burst at its end, and
- * the word rolls over to Held (ADR-0045).
- */
-function InspirationLine({ inspired }: Readonly<{ inspired: boolean }>) {
-  const line = useRef<HTMLDivElement>(null);
-  useOnChange(inspired, (_was, now) => {
-    const el = line.current;
-    if (!now || !el || !canMove()) return;
-    const bottom = el.clientHeight - 1;
-    comet(el, { from: 0, to: el.clientWidth, line: bottom, thick: 2, tone: "gold", delay: 0, dur: 300 });
-    burst(el, { at: el.clientWidth, line: bottom, delay: 280, w: 70, tone: "gold" });
-  });
-  return (
-    <div ref={line} className="cs-vital-line">
-      <span className="cs-eyebrow">Heroic Inspiration</span>
-      <span className={inspired ? "cs-held" : "cs-sub"}>
-        <Roll value={inspired ? "Held" : "None"} />
-      </span>
-    </div>
-  );
-}
 
 /** The Death Saving Throws: three success boxes and three failure boxes with their marks, and the roll. */
 export function DeathSavesCard({
@@ -379,103 +341,14 @@ export function SavesOwed({
   );
 }
 
-/**
- * The phone's Vitals, at the top of the Play tab between fights: Hit Points with Damage and Heal, the numbers read at
- * a glance, Hit Point Dice as boxes, Heroic Inspiration and Exhaustion, the live states with Add, and the rests.
- */
-function Vitals({
-  actor,
-  role,
-  definition,
-  extension,
-  derived,
-  inFight,
-  restAsked,
-  restOpen,
-  onFeedback
-}: Readonly<{
-  actor: SheetActor;
-  role: "gm" | "player";
-  definition: ActorDefinition | null;
-  extension: SrdExtension;
-  derived: ActorDerivedSheet | null;
-  inFight: boolean;
-  restAsked: boolean;
-  /** The character is in the Short Rest under way, so its player may spend Hit Point Dice. */
-  restOpen: boolean;
-  onFeedback: (text: string) => void;
-}>) {
-  const speed = speedOf(actor, definition, extension, derived?.speedFeet ?? null);
-  const hitDice = "hitDice" in actor ? actor.hitDice : null;
-  const exhaustion = exhaustionLevel(actor);
-  const inspired = heroicInspirationOf(actor);
-  const passive = derived?.passivePerception ?? extension.passivePerception ?? null;
-  const constitution = definition ? abilityModifier(definition.abilityScores.con) : null;
-  return (
-    <section className="cs-vitals" aria-label="Vitals">
-      <div className="cs-vitals-grid">
-        <div className="cs-vitals-hp">
-          <HpReadout actor={actor} />
-          <HpControls actor={actor} role={role} compact onFeedback={onFeedback} />
-        </div>
-        <StatTile
-          label="AC"
-          value={armorClassOf(actor) ?? "None"}
-          note={actor.armorClassOverride !== undefined ? "Set by GM" : null}
-        />
-        <StatTile label="Initiative" value={actor.initiative !== undefined ? signed(actor.initiative) : "None"} />
-        <StatTile
-          label="Speed"
-          value={speed.now ?? "None"}
-          note={speed.lowered ? `of ${speed.base} ft` : "ft"}
-          caution={speed.lowered}
-        />
-        {passive !== null && <StatTile label="Passive Perception" value={passive} />}
-      </div>
-      {hitDice && hitDiceEntries(actor).length > 0 && (
-        <HitPointDice
-          actorId={actor.id}
-          hitDice={hitDice}
-          constitution={constitution}
-          boxes
-          canSpend={role === "gm" || restOpen}
-          canReroll={role === "gm" || inspired === true}
-          onFeedback={onFeedback}
-        />
-      )}
-      <div className="cs-vitals-pair">
-        {inspired !== undefined && <InspirationLine inspired={inspired} />}
-        <div className="cs-vital-line">
-          <span className="cs-eyebrow">Exhaustion</span>
-          <PipRow
-            lit={exhaustion}
-            tone="red"
-            className="cs-boxes is-caution"
-            role="img"
-            aria-label={`Exhaustion ${exhaustion} of 6`}
-          >
-            {Array.from({ length: 6 }, (_, index) => (
-              <i key={index} className={index < exhaustion ? "is-on" : undefined} />
-            ))}
-          </PipRow>
-        </div>
-      </div>
-      <div className="cs-group">
-        <span className="cs-eyebrow">Conditions and effects</span>
-        <StatusStrip actor={actor} role={role} inFight={inFight} inspiration={false} onFeedback={onFeedback} />
-      </div>
-      {!inFight && (
-        <RestButtons actorId={actor.id} role={role} asked={restAsked} restOpen={restOpen} onFeedback={onFeedback} />
-      )}
-    </section>
-  );
-}
-
 /** A grant's free casting of a spell, as the server names its pool. */
-const FREE_CAST = / \(no slot\)$/;
+export const FREE_CAST = / \(no slot\)$/;
 
 /** The free casts a feat or a species gives, read as one row: the spells, and what is left of them together. */
-function FreeCasts({ pools, spent }: Readonly<{ pools: readonly Pool[]; spent: Readonly<Record<string, number>> }>) {
+export function FreeCasts({
+  pools,
+  spent
+}: Readonly<{ pools: readonly Pool[]; spent: Readonly<Record<string, number>> }>) {
   if (pools.length === 0) return null;
   const limit = pools.reduce((sum, pool) => sum + pool.limit, 0);
   const left = pools.reduce((sum, pool) => sum + Math.max(0, pool.limit - (spent[pool.id] ?? 0)), 0);
@@ -489,100 +362,5 @@ function FreeCasts({ pools, spent }: Readonly<{ pools: readonly Pool[]; spent: R
         <UseBoxes left={left} limit={limit} label={`Free casts: ${left} of ${limit} left`} />
       </li>
     </ul>
-  );
-}
-
-/**
- * The Play tab between fights: the rests and Hit Point Dice (or the phone's Vitals), the pinned checks, the spell slots
- * left and the uses that come back on a rest. At 0 Hit Points the Death Saving Throws come first.
- */
-export function PlayCalm({
-  actor,
-  role,
-  definition,
-  extension,
-  derived,
-  pools,
-  phoneViews,
-  showHitDice,
-  restAsked,
-  restOpen,
-  inFight,
-  savesOwed,
-  death,
-  onFeedback
-}: Readonly<{
-  actor: SheetActor;
-  role: "gm" | "player";
-  definition: ActorDefinition | null;
-  extension: SrdExtension;
-  derived: ActorDerivedSheet | null;
-  pools: readonly Pool[];
-  /** A player's phone: B's Vitals take the top. */
-  phoneViews: boolean;
-  /** False where the laptop's right column already lists them. */
-  showHitDice: boolean;
-  restAsked: boolean;
-  /** The character is in the Short Rest under way. */
-  restOpen: boolean;
-  inFight: boolean;
-  savesOwed: ReadonlyArray<PendingSave | PlayerPendingSave>;
-  death: ReactNode;
-  onFeedback: (text: string) => void;
-}>) {
-  const hitDice = "hitDice" in actor ? actor.hitDice : null;
-  const inspired = heroicInspirationOf(actor);
-  const restPools = pools.filter((pool) => pool.per === "short-rest" || pool.per === "long-rest");
-  const constitution = definition ? abilityModifier(definition.abilityScores.con) : null;
-  return (
-    <div className="cs-play">
-      {death}
-      <SavesOwed saves={savesOwed} actor={actor} role={role} onFeedback={onFeedback} />
-      {phoneViews ? (
-        <Vitals
-          actor={actor}
-          role={role}
-          definition={definition}
-          extension={extension}
-          derived={derived}
-          inFight={inFight}
-          restAsked={restAsked}
-          restOpen={restOpen}
-          onFeedback={onFeedback}
-        />
-      ) : (
-        (actor.kind === "player-character" || role === "gm") && (
-          <section className="cs-group" aria-label="Rest">
-            <span className="cs-eyebrow">Rest</span>
-            <RestButtons actorId={actor.id} role={role} asked={restAsked} restOpen={restOpen} onFeedback={onFeedback} />
-            {showHitDice && hitDice && actor.kind === "player-character" && (
-              <HitPointDice
-                actorId={actor.id}
-                hitDice={hitDice}
-                constitution={constitution}
-                canSpend={role === "gm" || restOpen}
-                canReroll={role === "gm" || inspired === true}
-                onFeedback={onFeedback}
-              />
-            )}
-          </section>
-        )
-      )}
-      {actor.kind === "player-character" && <FoodAndWater actor={actor} role={role} onFeedback={onFeedback} />}
-      {definition && <SlotsLeft definition={definition} actor={actor} />}
-      {restPools.length > 0 && (
-        <section className="cs-group" aria-label="Uses">
-          <span className="cs-eyebrow">Uses</span>
-          <UseList
-            actorId={actor.id}
-            role={role}
-            pools={restPools.filter((pool) => !FREE_CAST.test(pool.name))}
-            spent={actor.actionUses ?? {}}
-            actions={false}
-          />
-          <FreeCasts pools={restPools.filter((pool) => FREE_CAST.test(pool.name))} spent={actor.actionUses ?? {}} />
-        </section>
-      )}
-    </div>
   );
 }

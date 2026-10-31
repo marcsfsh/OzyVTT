@@ -48,9 +48,12 @@ describe("a monster's sheet", () => {
         <CharacterSheet actor={DRAGON} role="gm" onClose={() => {}} />
       </ToastProvider>
     );
-    const rest = screen.getByRole("group", { name: "Rest" });
-    expect(within(rest).getByRole("button", { name: "Short Rest" })).toBeTruthy();
-    expect(screen.queryByRole("group", { name: "Hit Point Dice" })).toBeNull();
+    // The band's Rest, a menu: both rests for the GM.
+    await user.click(screen.getByText("Rest", { selector: ".nh-menu-trigger-label" }));
+    expect(screen.getByRole("menuitem", { name: "Short Rest" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Long Rest" })).toBeTruthy();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("button", { name: /^Hit Point Dice/ })).toBeNull();
     // The Long Rest is the GM's, in the GM tools.
     await user.click(screen.getByRole("tab", { name: "GM" }));
     const tools = within(screen.getByRole("region", { name: "GM tools" }));

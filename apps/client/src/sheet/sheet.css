@@ -121,15 +121,11 @@
     .cs-hd-open,
     .cs-lastroll-open,
     .cs-level,
-    .cs-tabbar-tab,
     .cs-roll,
     .cs-prep
   )
   :is(span, strong) {
   margin-top: 0;
-}
-.cs-tabbar-tab span {
-  color: inherit;
 }
 .cs-action-name,
 .cs-item-name,
@@ -986,54 +982,33 @@ button.cs-lastroll-open {
   color: var(--cyan-hi);
 }
 
-/* ---- Tabs ---- */
-.cs-tabbar {
-  position: relative;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  padding-bottom: env(safe-area-inset-bottom);
-  background: var(--surface-1);
-  border-top: 1px solid var(--line-strong);
-  box-shadow: 0 -8px 20px color-mix(in srgb, var(--void) 60%, transparent);
-}
-.cs-tabbar-tab {
+/* Main on a phone and in the Table panel: the live states, the plate the compact band leaves out, then the cards. */
+.cs-main {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-height: 3.6rem;
-  padding: var(--space-1) 0;
+  gap: 18px;
+}
+.cs-states-card .cs-status-block,
+.cs-band-who .cs-status-block {
+  min-width: 0;
+}
+.cs-states-card .cs-status {
+  padding: 0;
   border: 0;
   background: none;
-  color: var(--text-dim);
-  font: 600 var(--fs-xs) / 1 var(--font-label);
+}
+.cs-plate-main .cs-cell {
+  padding: 8px 6px;
+}
+.cs-cell-hd {
+  min-height: var(--tap-min);
   cursor: pointer;
 }
-.cs-tabbar-icon {
-  font-size: 1.2rem;
-  line-height: 1;
-}
-/* The chosen tab is raised, and the bar's ink (StripInk) lights its top edge. */
-.cs-tabbar-tab.is-on {
-  background: var(--tab-on);
-  color: var(--text);
-}
-.cs-tabbar > .nh-tabs-ink {
-  height: 3px;
-}
-.cs-tabbar-tab.is-on .cs-tabbar-icon {
+.cs-cell-hd:hover .cs-cell-v {
   color: var(--cyan-hi);
 }
-.cs-tabbar-tab.is-gm,
-.cs-tabbar-tab.is-gm .cs-tabbar-icon {
-  color: var(--violet-hi);
-}
-.cs-tabbar-tab:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: -2px;
-}
+
+/* ---- Tabs ---- */
 .cs-tabs {
   flex: none;
 }
@@ -2047,13 +2022,6 @@ button.cs-lastroll-open {
   margin: 0;
   color: var(--text-dim);
   font-size: var(--fs-sm);
-}
-
-/* A short phone keeps the tab bar's labels on one line. */
-@media (max-width: 560px) {
-  .cs-tabbar-tab {
-    font-size: var(--fs-2xs);
-  }
 }
 
 /* ---- The frame's variants ---- */

@@ -155,7 +155,7 @@ describe("the sheet's checks", () => {
     });
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     await user.click(await screen.findByRole("button", { name: "Roll a Strength check, +1" }));
     expect(sent("check:roll")).toEqual([{ actorId: HERO, ability: "str", visibility: "public" }]);
     // Nothing is composed on the client: no free roll carries a check's bonus.
@@ -179,7 +179,7 @@ describe("the sheet's checks", () => {
     });
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     const toggle = await screen.findByRole("button", { name: "Prying with the Crowbar (Advantage)" });
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
     await user.click(toggle);
@@ -213,7 +213,7 @@ describe("the sheet's checks", () => {
     serve(derivedSheet({ tools: [thieves()] }));
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     await user.click(await screen.findByRole("button", { name: "Roll Disarm a trap with Thieves' Tools, DC 15" }));
     expect(sent("check:roll")).toEqual([
       { actorId: HERO, ability: "dex", tool: "thieves-tools", use: 1, visibility: "public" }
@@ -223,7 +223,7 @@ describe("the sheet's checks", () => {
   it("holds back a use whose tool isn't in the pack, and says so", async () => {
     serve(derivedSheet({ tools: [thieves(false)] }));
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
-    await openTab(userEvent.setup(), "Checks");
+    await openTab(userEvent.setup(), "Main");
     const pick = await screen.findByRole("button", { name: "Roll Pick a lock with Thieves' Tools, DC 15" });
     expect((pick as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getAllByText("Not in your pack").length).toBe(2);
@@ -232,7 +232,7 @@ describe("the sheet's checks", () => {
   it("says an before a vowel: Roll an Intelligence check", async () => {
     serve(derivedSheet());
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
-    await openTab(userEvent.setup(), "Checks");
+    await openTab(userEvent.setup(), "Main");
     expect(await screen.findByRole("button", { name: "Roll an Intelligence check, +1" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Roll an Intelligence saving throw/ })).toBeTruthy();
   });
@@ -294,7 +294,7 @@ describe("the sheet's checks", () => {
     setRollInput("manual");
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     // The skills list, past the pinned checks at the top of the card that may name Stealth too.
     const skills = within(await screen.findByRole("list", { name: "All skills" }));
     await user.click(await skills.findByRole("button", { name: "Roll Stealth, +5" }));
@@ -310,7 +310,7 @@ describe("the sheet's checks", () => {
     setRollInput("manual");
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     await user.click(await screen.findByRole("button", { name: "Roll a Strength check, +1" }));
     await user.type(screen.getByPlaceholderText("1 to 20"), "23");
     await user.click(screen.getByRole("button", { name: "Roll" }));
@@ -329,7 +329,7 @@ describe("the sheet's checks", () => {
       wrapper: ToastProvider
     });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     await user.click(await screen.findByRole("button", { name: "Roll a Strength check, +1" }));
     await user.type(screen.getByPlaceholderText("1 to 20"), "23");
     await user.click(screen.getByRole("button", { name: "Roll" }));
@@ -359,7 +359,7 @@ describe("the sheet's checks", () => {
       })
     );
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
-    await openTab(userEvent.setup(), "Checks");
+    await openTab(userEvent.setup(), "Main");
     expect(
       await screen.findByRole("button", { name: "Roll a Dexterity check, +1 with Disadvantage (Poisoned)" })
     ).toBeTruthy();
@@ -392,7 +392,7 @@ describe("the sheet's checks", () => {
       wrapper: ToastProvider
     });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     await user.click(
       await screen.findByRole("button", { name: "Roll Wisdom (Survival) to find Wolf (Hunter's Mark)" })
     );
@@ -411,7 +411,7 @@ describe("the sheet's saving throws", () => {
     });
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     await user.click(await screen.findByRole("button", { name: "Roll a Dexterity saving throw, +1" }));
     expect(sent("save:roll")).toEqual([{ actorId: HERO, ability: "dex" }]);
     expect(sent("dice:roll")).toEqual([]);
@@ -424,7 +424,7 @@ describe("the sheet's saving throws", () => {
     });
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     await user.click(
       await screen.findByRole("button", { name: "Roll a Strength saving throw, +1, fails automatically" })
     );
@@ -509,7 +509,7 @@ describe("a monster's sheet", () => {
     } as unknown as GmActor;
     render(<CharacterSheet actor={goblin} role="gm" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     expect(await screen.findByRole("button", { name: "Roll a Wisdom saving throw, +1" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Roll Stealth, +6" }));
     expect(sent("check:roll")).toEqual([{ actorId: HERO, ability: "dex", skill: "stealth", visibility: "public" }]);
@@ -525,7 +525,7 @@ describe("the sheet's Speed", () => {
     serve(derivedSheet({ speedFeet: 15 }));
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     // The compact header keeps AC and HP; its HP box opens the other vitals, Speed among them.
     await user.click(screen.getByRole("button", { name: /^Hit Points .*see the other vitals$/ }));
     const lowered = await screen.findByText("of 30 ft");
@@ -566,12 +566,11 @@ describe("Heroic Inspiration on the sheet", () => {
       { wrapper: ToastProvider }
     );
     const user = userEvent.setup();
-    // The phone's Vitals hold it on Play, and the header's strip on every other tab.
-    expect(within(screen.getByRole("region", { name: "Vitals" })).getByText("Held")).toBeTruthy();
+    // Main's plate shows it held: a lit square a player reads.
+    await openTab(user, "Main");
+    expect(screen.getByRole("img", { name: "Heroic Inspiration held" })).toBeTruthy();
     // A player spends it from a reroll; it has no button of its own.
     expect(screen.queryByRole("button", { name: "Give Heroic Inspiration" })).toBeNull();
-    await openTab(user, "Checks");
-    expect(within(screen.getByRole("group", { name: "Live states" })).getByText("Heroic Inspiration")).toBeTruthy();
     await user.click(await screen.findByRole("button", { name: "Roll a Strength check, +1" }));
     // The reroll is offered once the check is the character's latest roll.
     expect(screen.queryByRole("button", { name: "Reroll · Heroic Inspiration" })).toBeNull();
@@ -606,7 +605,7 @@ describe("Heroic Inspiration on the sheet", () => {
       { wrapper: ToastProvider }
     );
     const user = userEvent.setup();
-    await openTab(user, "Checks");
+    await openTab(user, "Main");
     await user.click(await screen.findByRole("button", { name: "Roll a Strength check, +1" }));
     rerender(
       <CharacterSheet actor={actor} role="player" state={stateWith([actor], [checkRoll("r1")])} onClose={() => {}} />

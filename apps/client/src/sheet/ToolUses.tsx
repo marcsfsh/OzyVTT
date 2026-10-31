@@ -26,7 +26,7 @@ const rollName = (row: UseRow) => {
 
 /** Every Utilize use the character's tools and carried gear print, in one list. */
 function rowsOf(derived: Derived): UseRow[] {
-  const tools = derived.tools.flatMap((tool) =>
+  const tools = (derived.tools ?? []).flatMap((tool) =>
     tool.uses.map((use, index) => ({
       key: `${tool.id}-${index}`,
       label: use.label,

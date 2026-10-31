@@ -350,7 +350,7 @@ export function ChecksTab({
   onFeedback,
   inFight = false,
   party,
-  top
+  owed
 }: Readonly<{
   actor: SheetActor;
   definition: ActorDefinition;
@@ -368,12 +368,12 @@ export function ChecksTab({
   inFight?: boolean;
   /** The table, for the creature a use works for (Cobbler's Tools' footwear). */
   party?: SheetState | undefined;
-  /** What the Abilities card opens with: the Death Saving Throws while dying, and the saves owed. */
-  top?: ReactNode;
+  /** A save the character owes, which takes its ability's Save cell. */
+  owed?: (ability: Ability) => ReactNode;
 }>) {
   return (
     <div className="cs-checks">
-      <AbilityLedger actor={actor} definition={definition} derived={derived} rolls={rolls} top={top} />
+      <AbilityLedger actor={actor} definition={definition} derived={derived} rolls={rolls} owed={owed} />
       <SkillsCard
         actor={actor}
         definition={definition}

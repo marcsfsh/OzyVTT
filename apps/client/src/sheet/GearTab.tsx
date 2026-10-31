@@ -19,6 +19,7 @@ import { ItemCard, itemLine } from "./ItemCard";
 import { returnsWords, UseBoxes } from "./Uses";
 import type { RowFacts } from "./useSheetDefinition";
 import type { SheetEdit } from "./useSheetEdit";
+import { FoodAndWater } from "./FoodAndWater";
 
 const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
 type Coins = Record<(typeof COINS)[number], number>;
@@ -100,7 +101,8 @@ export function GearTab({
   others = [],
   actionBlocked = null,
   onUseAction,
-  crafting = null
+  crafting = null,
+  onFeedback
 }: Readonly<{
   actor: SheetActor;
   role: "gm" | "player";
@@ -124,6 +126,8 @@ export function GearTab({
   onUseAction: (row: ContentActionSummary, options?: Readonly<{ fastHands?: boolean }>) => void;
   /** The character's crafting projects, under the pack. */
   crafting?: ReactNode;
+  /** Where eating and drinking report, for today's food and water after the coins. */
+  onFeedback?: (text: string) => void;
 }>) {
   const inventory = actor.inventory ?? [];
   const [openId, setOpenId] = useState<string | null>(null);
@@ -795,6 +799,9 @@ export function GearTab({
           )}
         </div>
       </section>
+      {actor.kind === "player-character" && onFeedback && (
+        <FoodAndWater actor={actor} role={role} onFeedback={onFeedback} />
+      )}
       {worn.length > 0 && (
         <section className="cs-group" aria-label="Worn and held">
           <span className="cs-eyebrow">Worn and held</span>

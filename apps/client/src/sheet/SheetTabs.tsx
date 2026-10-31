@@ -1,36 +1,23 @@
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
-import {
-  IconBag,
-  IconBolt,
-  IconDie,
-  IconEye,
-  IconPage,
-  IconSparkle,
-  IconStar,
-  IconTarget,
-  StripInk,
-  Tabs
-} from "@vtt/ui";
+import { Tabs } from "@vtt/ui";
 
-export type SheetTabId = "play" | "actions" | "checks" | "spells" | "gear" | "features" | "notes" | "gm";
+export type SheetTabId = "main" | "actions" | "spells" | "gear" | "features" | "notes" | "gm";
 
-const TAB_META: Readonly<Record<SheetTabId, { label: string; icon: ReactNode }>> = {
-  play: { label: "Play", icon: <IconBolt /> },
-  actions: { label: "Actions", icon: <IconTarget /> },
-  checks: { label: "Checks", icon: <IconDie /> },
-  spells: { label: "Spells", icon: <IconSparkle /> },
-  gear: { label: "Gear", icon: <IconBag /> },
-  features: { label: "Features", icon: <IconStar /> },
-  notes: { label: "Notes", icon: <IconPage /> },
-  gm: { label: "GM", icon: <IconEye /> }
+const TAB_META: Readonly<Record<SheetTabId, { label: string }>> = {
+  main: { label: "Main" },
+  actions: { label: "Actions" },
+  spells: { label: "Spells" },
+  gear: { label: "Gear" },
+  features: { label: "Features" },
+  notes: { label: "Notes" },
+  gm: { label: "GM" }
 };
 
 export const tabLabel = (id: SheetTabId) => TAB_META[id].label;
 
 /**
- * The tabs a sheet shows where it is. A phone's bottom bar has them all (the GM's swaps Notes for its GM tab); a
- * laptop keeps the checks in a column of their own; the table's panel drops Play and Actions in a fight, where its
- * Turn tab already shows them. Spells appear only for a character with spells.
+ * The one row of tabs a sheet shows where it is (ADR-0047). A laptop keeps the checks in columns of their own, so its
+ * box opens on Actions; a phone and the Table panel open on Main, which holds those columns. The panel drops Actions in
+ * a fight, where its Turn tab runs them. Spells appear only for a character with spells, and the GM's tab comes last.
  */
 export function sheetTabs({
   layout,
@@ -38,13 +25,25 @@ export function sheetTabs({
   hasSpells,
   hidePlay
 }: Readonly<{ layout: "narrow" | "wide" | "panel"; role: "gm" | "player"; hasSpells: boolean; hidePlay: boolean }>) {
-  const ids: SheetTabId[] = ["play", "actions", "checks", "spells", "gear", "features", "notes"];
+  const ids: SheetTabId[] = ["main", "actions", "spells", "gear", "features", "notes", "gm"];
   return ids
+    .filter((id) => !(id === "main" && layout === "wide"))
+    .filter((id) => !(id === "actions" && hidePlay))
     .filter((id) => !(id === "spells" && !hasSpells))
-    .filter((id) => !(id === "checks" && layout === "wide"))
-    .filter((id) => !((id === "play" || id === "actions") && hidePlay))
-    .map((id) => (id === "notes" && layout === "narrow" && role === "gm" ? "gm" : id))
-    .concat(layout === "wide" && role === "gm" ? ["gm"] : []);
+    .filter((id) => !(id === "gm" && role !== "gm"));
+}
+
+/**
+ * A tab remembered before the Ledger: Play and Checks are gone, so a phone reads either as Main and a laptop as
+ * Actions. Rewrites the stored value once, so the remembered tab still opens where its contents went.
+ */
+export function migrateRememberedTab(key: string, layout: "narrow" | "wide" | "panel") {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored === "play" || stored === "checks") localStorage.setItem(key, layout === "wide" ? "actions" : "main");
+  } catch {
+    /* private mode: nothing is remembered to move */
+  }
 }
 
 /** Ties a tab to its panel, as the `Tabs` primitive does. */
@@ -53,62 +52,7 @@ export const tabIds = (idBase: string, id: SheetTabId) => ({
   panel: `${idBase}-panel-${id}`
 });
 
-/** The phone's tab bar under the thumb: an icon over each label, the chosen one raised with the ink along its top. */
-export function SheetTabBar({
-  tabs,
-  active,
-  onChange,
-  idBase
-}: Readonly<{ tabs: readonly SheetTabId[]; active: SheetTabId; onChange: (id: SheetTabId) => void; idBase: string }>) {
-  const refs = useRef<Array<HTMLButtonElement | null>>([]);
-  const move = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    const to =
-      event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + step + tabs.length) % tabs.length;
-    if (!step && event.key !== "Home" && event.key !== "End") return;
-    event.preventDefault();
-    onChange(tabs[to]);
-    refs.current[to]?.focus();
-  };
-  return (
-    <div className="cs-tabbar" role="tablist" aria-label="Sheet">
-      {tabs.map((id, index) => {
-        const on = id === active;
-        const ids = tabIds(idBase, id);
-        return (
-          <button
-            key={id}
-            ref={(element) => {
-              refs.current[index] = element;
-            }}
-            type="button"
-            role="tab"
-            id={ids.tab}
-            aria-controls={ids.panel}
-            aria-selected={on}
-            tabIndex={on ? 0 : -1}
-            className={`cs-tabbar-tab interactive${on ? " is-on" : ""}${id === "gm" ? " is-gm" : ""}`}
-            onClick={() => onChange(id)}
-            onKeyDown={(event) => move(event, index)}
-          >
-            <span className="cs-tabbar-icon" aria-hidden="true">
-              {TAB_META[id].icon}
-            </span>
-            {TAB_META[id].label}
-          </button>
-        );
-      })}
-      <StripInk
-        active={active}
-        selector=".is-on"
-        edge="top"
-        panel={() => document.getElementById(tabIds(idBase, active).panel)}
-      />
-    </div>
-  );
-}
-
-/** A laptop's tabs over the middle column, and the table panel's strip, which looks unlike the panel's own tabs. */
+/** The box's tabs on a laptop, and the strip pinned under the compact band on a phone and in the Table panel. */
 export function SheetTabStrip({
   tabs,
   active,

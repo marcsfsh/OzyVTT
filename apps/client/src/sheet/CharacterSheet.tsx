@@ -27,7 +27,7 @@ import { experienceOf } from "./Experience";
 import { GearTab } from "./GearTab";
 import { GmTools } from "./GmTools";
 import { HitPointDice } from "./HitPointDice";
-import { SheetBand, SheetBandCompact, type BandFigures } from "./SheetBand";
+import { MainPlate, SheetBand, SheetBandCompact, type BandFigures } from "./SheetBand";
 import { HeroicGift, hasGift } from "./HeroicGift";
 import { HpCard } from "./HitPoints";
 import { IdentityEditor } from "./IdentityEditor";
@@ -35,7 +35,8 @@ import { CheckAnswers, LatestRoll, useSessionRoll } from "./LatestRoll";
 import { LevelBox } from "./LevelBox";
 import { NotesTab } from "./NotesTab";
 import { ActionsTab } from "./ActionsTab";
-import { DeathSavesCard, PlayCalm, StatTile } from "./PlayTab";
+import { DeathSavesCard, StatTile } from "./PlayTab";
+import { SavePrompt } from "../encounter/SavePrompt";
 import {
   armorClassOf,
   characterLevel,
@@ -52,7 +53,7 @@ import {
 } from "./sheet-model";
 import { type DetailPlace } from "./SheetDetail";
 import { RollSettings, SheetMenu, type SheetMenuItems } from "./SheetMenu";
-import { SheetTabStrip, sheetTabs, tabIds, type SheetTabId } from "./SheetTabs";
+import { SheetTabStrip, migrateRememberedTab, sheetTabs, tabIds, type SheetTabId } from "./SheetTabs";
 import { SpellsTab } from "./SpellsTab";
 import { StatusStrip } from "./StatusStrip";
 import { useSheetController, type SheetCombat } from "./useSheetController";
@@ -192,17 +193,20 @@ export function CharacterSheet({
   const hasSpells = Boolean(definition?.spellcasting && definition.spellcasting.spells.length > 0);
   const tabs = sheetTabs({ layout, role, hasSpells, hidePlay });
   const down = isDown(actor);
-  // Going down opens Play, where the Death Saving Throws are; an encounter starting or ending opens Actions or Play.
+  // Going down opens the first tab, where the Death Saving Throws are; an encounter starting or ending opens Actions or
+  // the first tab.
   const fightOpens = controller.inFight && !down && tabs.includes("actions");
+  const tabKey = `vtt.sheet.tab.${layout}`;
+  useState(() => migrateRememberedTab(tabKey, layout));
   const [remembered, setTab] = useRememberedTab(
-    `vtt.sheet.tab.${layout}`,
+    tabKey,
     tabs,
-    fightOpens ? "actions" : (tabs[0] ?? "play"),
+    fightOpens ? "actions" : (tabs[0] ?? "main"),
     `${down}:${controller.inFight}`
   );
   const tab = remembered as SheetTabId;
   const idBase = `cs-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
-  // Going down opens Play at its top, where the Death Saving Throws are.
+  // Going down opens the first tab at its top, where the Death Saving Throws are.
   const bodyRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (down) bodyRef.current?.scrollTo({ top: 0 });
@@ -324,25 +328,30 @@ export function CharacterSheet({
         onFeedback={say}
       />
     ) : null;
-  // Play holds the character's state; in an encounter a save it owes is the table's prompt, or the Actions tab's.
-  const playBody = (
-    <PlayCalm
-      actor={actor}
-      role={role}
-      definition={definition}
-      extension={extension}
-      derived={derived}
-      pools={pools}
-      phoneViews={phoneViews}
-      showHitDice={layout !== "wide"}
-      restAsked={restAsked}
-      restOpen={restOpen}
-      inFight={controller.inFight}
-      savesOwed={controller.inFight ? [] : controller.savesOwed}
-      death={deathCard}
-      onFeedback={say}
-    />
-  );
+  // A save the character owes takes its ability's Save cell in the Abilities card, with a line saying so. The Table
+  // panel leaves it to the table's prompt.
+  const owed = presentation === "panel" ? [] : controller.savesOwed;
+  const owedLine =
+    owed.length > 0 ? (
+      <p className="cs-sub" role="status">
+        {owed.length === 1 ? "A save waits" : "Saves wait"} for {actor.name}. Answer {owed.length === 1 ? "it" : "them"}{" "}
+        in its Save cell.
+      </p>
+    ) : null;
+  const owedCell = (ability: string) => {
+    const save = owed.find((candidate) => candidate.ability === ability);
+    return save ? (
+      <SavePrompt
+        save={save}
+        targetName={actor.name}
+        canDismiss={role === "gm"}
+        onFeedback={say}
+        rollMode="auto"
+        viewer={role}
+        inspired={inspired === true}
+      />
+    ) : null;
+  };
   const actionsBody = definition ? (
     <ActionsTab
       actor={actor}
@@ -358,6 +367,7 @@ export function CharacterSheet({
       showEconomy={presentation !== "panel"}
       card={phoneViews}
       death={deathCard}
+      pools={pools}
       onFeedback={say}
     />
   ) : null;
@@ -376,12 +386,49 @@ export function CharacterSheet({
       inFight={controller.inFight}
       party={state}
       onFeedback={say}
+      owed={owedCell}
     />
   ) : null;
+  // Main on a phone and in the Table panel: what the laptop's band and first two columns hold. The Death Saving
+  // Throws and a save owed come first.
+  const mainBody = (
+    <div className="cs-main">
+      {deathCard}
+      {owedLine}
+      <section className="cs-card cs-states-card" aria-label="Conditions and effects">
+        <span className="cs-eyebrow">Conditions and effects</span>
+        <StatusStrip actor={actor} role={role} inFight={controller.inFight} inspiration={false} onFeedback={say} />
+      </section>
+      <MainPlate
+        actor={actor}
+        role={role}
+        figures={figures}
+        onOpenHitDice={() => setHitDiceOpen(true)}
+        onFeedback={say}
+      />
+      {checksBody}
+    </div>
+  );
   // A laptop's first two columns: the same cards, split so the abilities and the skills sit side by side from 1280px.
   const ledger = definition
     ? {
-        abilities: <AbilityLedger actor={actor} definition={definition} derived={derived} rolls={rolls} />,
+        abilities: (
+          <AbilityLedger
+            actor={actor}
+            definition={definition}
+            derived={derived}
+            rolls={rolls}
+            owed={owedCell}
+            top={
+              deathCard || owedLine ? (
+                <>
+                  {deathCard}
+                  {owedLine}
+                </>
+              ) : null
+            }
+          />
+        ),
         skills: (
           <SkillsCard
             actor={actor}
@@ -532,21 +579,17 @@ export function CharacterSheet({
   const notesBody = (
     <NotesTab actor={actor} role={role} definition={definition} extension={extension} derived={derived} />
   );
-  // A laptop keeps Notes as its own tab, so its GM tab holds the tools alone.
   const gmBody = (
     <div className="cs-gm-tab">
       <GmTools actor={actor} state={state} onFeedback={say} />
-      {layout !== "wide" && notesBody}
     </div>
   );
   const bodyOf = (id: SheetTabId): ReactNode => {
     switch (id) {
-      case "play":
-        return playBody;
+      case "main":
+        return mainBody;
       case "actions":
         return actionsBody;
-      case "checks":
-        return checksBody;
       case "spells":
         return spellsBody;
       case "gear":
@@ -559,18 +602,9 @@ export function CharacterSheet({
         return gmBody;
     }
   };
-  // On a phone's Play tab the Vitals hold the numbers and live states, so the header shows only who and
-  // the table's row only its numbers.
-  const vitalsShow = phoneViews && tab === "play";
-  // The laptop's band carries Heroic Inspiration, so its strip leaves it out.
+  // The laptop's band carries Heroic Inspiration in its own cell, so its strip leaves it out.
   const status = (
-    <StatusStrip
-      actor={actor}
-      role={role}
-      inFight={controller.inFight}
-      inspiration={layout !== "wide"}
-      onFeedback={say}
-    />
+    <StatusStrip actor={actor} role={role} inFight={controller.inFight} inspiration={false} onFeedback={say} />
   );
   // A creature in a form (Wild Shape's Wolf, Polymorph's Beast) reads the form's statistics, so the sheet says so.
   const inForm = (actor.effects as ReadonlyArray<Readonly<{ name: string; form?: Readonly<{ name: string }> }>>).find(
@@ -616,7 +650,7 @@ export function CharacterSheet({
           }}
         />
       )}
-      {definition || tab === "play" || tab === "notes" || tab === "gm" ? bodyOf(tab) : null}
+      {definition || tab === "main" || tab === "notes" || tab === "gm" ? bodyOf(tab) : null}
       {end}
       <p className="cs-attribution">
         Includes material from the SRD 5.2.1 by Wizards of the Coast LLC, licensed under CC BY 4.0.
@@ -713,7 +747,6 @@ export function CharacterSheet({
       <section className="cs cs--panel" aria-label={`${actor.name} character sheet`}>
         {compactBand}
         <SheetTabStrip tabs={tabs} active={tab} onChange={setTab} idBase={idBase} strip />
-        {!vitalsShow && status}
         {lastRoll}
         {top}
         {body}
@@ -724,7 +757,6 @@ export function CharacterSheet({
       <section className={`cs cs--narrow${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
         {compactBand}
         <SheetTabStrip tabs={tabs} active={tab} onChange={setTab} idBase={idBase} strip />
-        {!vitalsShow && status}
         {toastRow}
         {lastRoll}
         {top}

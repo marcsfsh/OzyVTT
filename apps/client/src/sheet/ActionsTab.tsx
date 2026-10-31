@@ -10,6 +10,8 @@ import { Tabs } from "@vtt/ui";
 import { SavePrompt } from "../encounter/SavePrompt";
 import { SavingThrowList } from "./ChecksTab";
 import { PlayFight, SheetActionList, type ActionFilter } from "./PlayFight";
+import { FREE_CAST, FreeCasts, SlotsLeft } from "./PlayTab";
+import { UseList, type Pool } from "./Uses";
 import { heroicInspirationOf, type SheetActor, type SheetState } from "./sheet-model";
 import type { DetailPlace } from "./SheetDetail";
 import type { TurnOption } from "./turn-options";
@@ -71,6 +73,7 @@ export function ActionsTab({
   showEconomy,
   card,
   death,
+  pools = [],
   onFeedback
 }: Readonly<{
   actor: SheetActor;
@@ -87,8 +90,11 @@ export function ActionsTab({
   /** A player's phone: All shows the turn card with its favourite tiles. */
   card: boolean;
   death: ReactNode;
+  /** The uses that come back on a rest, for the Limited use group at the end. */
+  pools?: readonly Pool[];
   onFeedback: (text: string) => void;
 }>) {
+  const restPools = pools.filter((pool) => pool.per === "short-rest" || pool.per === "long-rest");
   const [subtab, setSubtab] = useState<ActionSubtab>("all");
   const idBase = useId();
   let body: ReactNode;
@@ -139,6 +145,7 @@ export function ActionsTab({
     );
   return (
     <div className="cs-actions-tab">
+      <SlotsLeft definition={definition} actor={actor} />
       <Tabs
         className="cs-subtabs"
         ariaLabel="Actions"
@@ -150,6 +157,19 @@ export function ActionsTab({
       <div role="tabpanel" id={`${idBase}-panel-${subtab}`} aria-labelledby={`${idBase}-tab-${subtab}`}>
         {body}
       </div>
+      {restPools.length > 0 && (
+        <section className="cs-group" aria-label="Limited use">
+          <span className="cs-eyebrow">Limited use</span>
+          <UseList
+            actorId={actor.id}
+            role={role}
+            pools={restPools.filter((pool) => !FREE_CAST.test(pool.name))}
+            spent={actor.actionUses ?? {}}
+            actions={false}
+          />
+          <FreeCasts pools={restPools.filter((pool) => FREE_CAST.test(pool.name))} spent={actor.actionUses ?? {}} />
+        </section>
+      )}
     </div>
   );
 }

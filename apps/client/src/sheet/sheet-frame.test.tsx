@@ -108,27 +108,28 @@ const tabNames = (name: string) =>
     .map((tab) => tab.textContent);
 
 describe("the sheet's tabs", () => {
-  it("puts every tab under a player's thumb, and drops Spells for a character with none", () => {
+  it("gives a phone one row of tabs opening on Main, and drops Spells for a character with none", () => {
     const { unmount } = render(
       <CharacterSheet actor={hero()} role="player" state={view(hero())} onClose={() => {}} />,
       {
         wrapper: ToastProvider
       }
     );
-    expect(tabNames("Sheet")).toEqual(["Play", "Actions", "Checks", "Spells", "Gear", "Features", "Notes"]);
+    expect(tabNames("Sheet")).toEqual(["Main", "Actions", "Spells", "Gear", "Features", "Notes"]);
+    expect(screen.getByRole("tab", { name: "Main" }).getAttribute("aria-selected")).toBe("true");
     unmount();
     const fighter = hero({ definition: { ...wizard, spellcasting: undefined } });
     render(<CharacterSheet actor={fighter} role="player" state={view(fighter)} onClose={() => {}} />, {
       wrapper: ToastProvider
     });
-    expect(tabNames("Sheet")).toEqual(["Play", "Actions", "Checks", "Gear", "Features", "Notes"]);
+    expect(tabNames("Sheet")).toEqual(["Main", "Actions", "Gear", "Features", "Notes"]);
   });
 
-  it("swaps Notes for the violet GM tab on the GM's narrow sheet", () => {
+  it("puts the violet GM tab last on the GM's narrow sheet, after Notes", () => {
     render(<CharacterSheet actor={hero() as unknown as GmActor} role="gm" onClose={() => {}} />, {
       wrapper: ToastProvider
     });
-    expect(tabNames("Sheet")).toEqual(["Play", "Actions", "Checks", "Spells", "Gear", "Features", "GM"]);
+    expect(tabNames("Sheet")).toEqual(["Main", "Actions", "Spells", "Gear", "Features", "Notes", "GM"]);
     expect(screen.getByRole("tab", { name: "GM" }).classList.contains("is-gm")).toBe(true);
   });
 
@@ -149,18 +150,35 @@ describe("the sheet's tabs", () => {
     expect(screen.getByRole("tab", { name: "Gear" }).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("opens a tab remembered as Play or Checks where its contents went", () => {
+    localStorage.setItem("vtt.sheet.tab.narrow", "checks");
+    const { unmount } = render(
+      <CharacterSheet actor={hero()} role="player" state={view(hero())} onClose={() => {}} />,
+      { wrapper: ToastProvider }
+    );
+    expect(screen.getByRole("tab", { name: "Main" }).getAttribute("aria-selected")).toBe("true");
+    expect(localStorage.getItem("vtt.sheet.tab.narrow")).toBe("main");
+    unmount();
+    onLaptop(true);
+    localStorage.setItem("vtt.sheet.tab.wide", "play");
+    render(<CharacterSheet actor={hero()} role="player" state={view(hero())} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    expect(screen.getByRole("tab", { name: "Actions" }).getAttribute("aria-selected")).toBe("true");
+  });
+
   it("keeps the checks in a column of their own on a laptop", () => {
     onLaptop(true);
     render(<CharacterSheet actor={hero()} role="player" state={view(hero())} onClose={() => {}} />, {
       wrapper: ToastProvider
     });
-    expect(tabNames("Sheet")).toEqual(["Play", "Actions", "Spells", "Gear", "Features", "Notes"]);
+    expect(tabNames("Sheet")).toEqual(["Actions", "Spells", "Gear", "Features", "Notes"]);
     expect(
       within(screen.getByLabelText("Checks")).getByRole("button", { name: /^Roll a Strength check/ })
     ).toBeTruthy();
   });
 
-  it("drops Play from the table's Sheet tab in an encounter, where the Turn tab holds it", () => {
+  it("drops Actions from the table's Sheet tab in an encounter, where the Turn tab runs them", () => {
     render(
       <CharacterSheet
         actor={hero()}
@@ -172,7 +190,7 @@ describe("the sheet's tabs", () => {
       />,
       { wrapper: ToastProvider }
     );
-    expect(tabNames("Sheet")).toEqual(["Checks", "Spells", "Gear", "Features", "Notes"]);
+    expect(tabNames("Sheet")).toEqual(["Main", "Spells", "Gear", "Features", "Notes"]);
   });
 });
 
@@ -180,34 +198,21 @@ describe("Heroic Inspiration", () => {
   const strip = () => within(screen.getAllByRole("group", { name: "Live states" })[0]!);
   const inspired = () => hero({ heroicInspiration: true });
 
-  it("shows once on a phone's Play tab, in the Vitals, and on the strip from another tab", async () => {
-    const user = userEvent.setup();
+  it("shows once on a phone, in Main's plate, and stays off the live states", () => {
     render(<CharacterSheet actor={inspired()} role="player" state={view(inspired())} onClose={() => {}} />, {
       wrapper: ToastProvider
     });
-    const vitals = within(screen.getByRole("region", { name: "Vitals" }));
-    expect(vitals.getByText("Held")).toBeTruthy();
-    expect(screen.queryByText("Heroic Inspiration", { selector: ".nh-chip, .nh-chip *" })).toBeNull();
-    await user.click(screen.getByRole("tab", { name: "Notes" }));
-    expect(strip().getByText("Heroic Inspiration")).toBeTruthy();
+    const plate = within(screen.getByRole("group", { name: "Proficiency and Hit Point Dice" }));
+    expect(plate.getByRole("img", { name: "Heroic Inspiration held" })).toBeTruthy();
+    expect(strip().queryByText("Heroic Inspiration")).toBeNull();
   });
 
-  it("stays off the table's compact row while the Vitals show it", async () => {
+  it("lets the GM give and take it back from Main's square", async () => {
     const user = userEvent.setup();
-    render(
-      <CharacterSheet
-        actor={inspired()}
-        role="player"
-        state={view(inspired())}
-        presentation="panel"
-        phone
-        onClose={() => {}}
-      />,
-      { wrapper: ToastProvider }
-    );
-    expect(strip().queryByText("Heroic Inspiration")).toBeNull();
-    await user.click(screen.getByRole("tab", { name: "Gear" }));
-    expect(strip().getByText("Heroic Inspiration")).toBeTruthy();
+    const actor = hero({ heroicInspiration: false }) as unknown as GmActor;
+    render(<CharacterSheet actor={actor} role="gm" onClose={() => {}} />, { wrapper: ToastProvider });
+    await user.click(screen.getByRole("button", { name: "No Heroic Inspiration. Give it" }));
+    expect(sent("actor:set-heroic-inspiration")).toEqual([{ actorId: HERO, has: true }]);
   });
 
   it("stays off a laptop's strip, since the band shows it", () => {
