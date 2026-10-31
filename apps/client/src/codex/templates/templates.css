@@ -14,33 +14,7 @@
   gap: var(--space-3);
   flex-wrap: wrap;
 }
-.tpl-crumbs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-.tpl-crumb {
-  min-height: var(--tap-min);
-  display: inline-flex;
-  align-items: center;
-  padding: 0 var(--space-1);
-  background: none;
-  border: 0;
-  color: var(--cyan-hi);
-  font: 700 var(--fs-sm) / 1 var(--font-label);
-  cursor: pointer;
-}
-span.tpl-crumb {
-  cursor: default;
-  color: var(--text-dim);
-}
-.tpl-crumb.is-current {
-  color: var(--text);
-}
-.tpl-crumbsep {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-}
+
 /* ----- The library ----- */
 .tpl-library {
   list-style: none;
@@ -358,5 +332,17 @@ span.tpl-crumb {
 @media (max-width: 760px) {
   .tpl-section-text {
     grid-template-columns: 1fr;
+  }
+}
+/* A title row's title (theme 2.2): 24px display capitals on a laptop, 20px on a phone. */
+.tpl-title {
+  margin: 0;
+  font: var(--fw-display) 24px / 1.2 var(--font-display);
+  text-transform: uppercase;
+  color: var(--text);
+}
+@media (max-width: 760px) {
+  .tpl-title {
+    font-size: 20px;
   }
 }

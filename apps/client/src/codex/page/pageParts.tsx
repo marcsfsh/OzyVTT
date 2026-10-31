@@ -1,14 +1,5 @@
 import { useCallback } from "react";
-import {
-  Eyebrow,
-  IconChevronRight,
-  IconEyeOff,
-  IconUser,
-  cx,
-  characterNames,
-  namesLabel,
-  type PartyCharacter
-} from "@vtt/ui";
+import { Eyebrow, IconEyeOff, IconUser, cx, characterNames, namesLabel, type PartyCharacter, Crumb } from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
 import { atlasApi, codexApi, playerCodexApi } from "../api";
 import { entityDef } from "../entities";
@@ -24,21 +15,10 @@ import type { CodexBlock } from "@vtt/domain";
 /** Where the page's kind group lists it: People, Places, Factions, Things or Lore. */
 export const groupPath = (type: CodexEntityType) => withQuery(pathForSection("pages"), { group: kindGroupOf(type).id });
 
-/** The crumbs over a page's title: its kind group, then the page. */
-export function PageCrumbs({
-  title,
-  entityType,
-  go
-}: Readonly<{ title: string; entityType: CodexEntityType; go: (path: string) => void }>) {
-  return (
-    <nav className="cx-crumbs" aria-label="Where this page sits">
-      <button type="button" className="cx-crumb" onClick={() => go(groupPath(entityType))}>
-        {kindGroupOf(entityType).label}
-      </button>
-      <IconChevronRight className="cx-crumb-sep" />
-      <b className="cx-crumb-here">{title}</b>
-    </nav>
-  );
+/** The crumb on a page's title line (theme rule 14): back to its kind group, People, Places, Factions, Things or Lore. */
+export function PageCrumb({ entityType, go }: Readonly<{ entityType: CodexEntityType; go: (path: string) => void }>) {
+  const label = kindGroupOf(entityType).label;
+  return <Crumb label={label} href={groupPath(entityType)} onClick={() => go(groupPath(entityType))} />;
 }
 
 /** The page's kind as a chip with its glyph. */

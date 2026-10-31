@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, IconSparkle, Skeleton, canMove, comet, cx, fadeIn, useOnChange, wash } from "@vtt/ui";
+import { Alert, IconSparkle, Skeleton, canMove, comet, cx, fadeIn, useOnChange, wash, TitleLine } from "@vtt/ui";
 import { pageLinkKey } from "@vtt/domain";
 import { playerCodexApi } from "../api";
 import { pageRecordApi } from "../api-records";
@@ -22,7 +22,7 @@ import {
 import {
   KindChip,
   MetaSection,
-  PageCrumbs,
+  PageCrumb,
   PageMapHeader,
   PhoneRecordHeader,
   groupPath,
@@ -285,11 +285,10 @@ export function PlayerPage({ id }: Readonly<{ id: string }>) {
       {summary && (
         <header className="cx-page-head">
           <div className="cx-page-headmain">
-            <PageCrumbs title={summary.title} entityType={summary.entityType} go={go} />
-            <div className="cx-page-titlerow">
+            <TitleLine className="cx-page-titlerow" crumb={<PageCrumb entityType={summary.entityType} go={go} />}>
               <h1 className="cx-page-title">{summary.title}</h1>
               <KindChip type={summary.entityType} />
-            </div>
+            </TitleLine>
           </div>
         </header>
       )}

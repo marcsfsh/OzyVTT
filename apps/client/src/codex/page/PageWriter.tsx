@@ -18,7 +18,8 @@ import {
   FieldAudienceToggle,
   EVERYONE,
   HIDDEN,
-  type Audience
+  type Audience,
+  TitleLine
 } from "@vtt/ui";
 import { useConfirm } from "../../components/feedback";
 import { calendarApi, codexApi, uploadCodexAsset } from "../api";
@@ -36,7 +37,7 @@ import { useCodexShell, useGmCodex } from "../shell/context";
 import { useCodexQuery } from "../useCodexQuery";
 import { DocEditor } from "./DocEditor";
 import { draftDocument, saveShape, type DraftItem } from "./document";
-import { KindChip, PageCrumbs } from "./pageParts";
+import { KindChip, PageCrumb } from "./pageParts";
 import type { AnyPageConnection } from "./MetaPanel";
 import { RelationshipEditor } from "./RelationshipEditor";
 
@@ -498,8 +499,7 @@ export function PageWriter({
     <div className="cx-page is-writing">
       <header className="cx-page-head">
         <div className="cx-page-headmain">
-          <PageCrumbs title={draft.title || page.title} entityType={draft.entityType} go={go} />
-          <div className="cx-page-titlerow">
+          <TitleLine className="cx-page-titlerow" crumb={<PageCrumb entityType={draft.entityType} go={go} />}>
             <Input
               variant="title"
               className="cx-write-title"
@@ -509,7 +509,7 @@ export function PageWriter({
               onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
             />
             <KindChip type={draft.entityType} />
-          </div>
+          </TitleLine>
           <div className="cx-visline">
             <AudienceChip value={page.revealedToPlayers ? EVERYONE : HIDDEN} party={party} />
           </div>

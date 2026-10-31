@@ -1,0 +1,45 @@
+/* A crumb (consistency values): label type 12px with a 14px chevron, 12px before the title, on the title's baseline. */
+.nh-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 600 12px / 1 var(--font-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+}
+.nh-crumb:hover {
+  color: var(--cyan-hi);
+}
+.nh-crumb-chevron {
+  width: 14px;
+  height: 14px;
+}
+.nh-crumb-label {
+  margin: 0;
+  color: inherit;
+}
+.nh-titleline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) 12px;
+  min-width: 0;
+}
+.nh-titleline > :is(h1, h2, h3) {
+  margin: 0;
+  min-width: 0;
+}
+@media (pointer: coarse) {
+  .nh-crumb {
+    min-height: var(--tap-min);
+  }
+}

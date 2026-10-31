@@ -11,7 +11,9 @@ import {
   MenuItem,
   Select,
   Skeleton,
-  useToast
+  useToast,
+  TitleLine,
+  Crumb
 } from "@vtt/ui";
 import { CODEX_PREP_LIMITS, type CodexAutosaveSettings, type CodexPrepTemplate, type CodexSession } from "@vtt/domain";
 import { useConfirm } from "../../components/feedback";
@@ -242,19 +244,9 @@ export function TemplatesView({
   return (
     <div className="tpl-view">
       <div className="tpl-toolbar">
-        <nav className="tpl-crumbs" aria-label="Where you are">
-          {onOpenMenu ? (
-            <button type="button" className="tpl-crumb" onClick={onOpenMenu}>
-              GM menu
-            </button>
-          ) : (
-            <span className="tpl-crumb">GM menu</span>
-          )}
-          <IconChevronRight className="tpl-crumbsep" />
-          <span className="tpl-crumb is-current" aria-current="page">
-            Prep templates
-          </span>
-        </nav>
+        <TitleLine crumb={onOpenMenu && <Crumb label="GM menu" onClick={onOpenMenu} />}>
+          <h2 className="tpl-title">Prep templates</h2>
+        </TitleLine>
         <Button variant="secondary" size="sm" onClick={() => void create()}>
           <IconPlus /> New template
         </Button>

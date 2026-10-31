@@ -5,7 +5,6 @@ import {
   Eyebrow,
   IconButton,
   IconCheck,
-  IconChevronRight,
   IconEye,
   IconEyeOff,
   IconMore,
@@ -22,7 +21,8 @@ import {
   WhoSeesItMenu,
   HIDDEN,
   sinceLabel,
-  type Audience
+  type Audience,
+  TitleLine
 } from "@vtt/ui";
 import { pageLinkKey, type CodexQuestStatus } from "@vtt/domain";
 import { playerCodexApi, questApi } from "../api";
@@ -45,6 +45,7 @@ import { DocText } from "../page/pageParts";
 import { linksSentence, stampOf } from "../shared/reveals";
 import { SeeAsControl, usePreviewToken, type SeeAsViewer } from "../page/SeeAs";
 import { QuestWriter } from "./QuestWriter";
+import { QuestsCrumb } from "./QuestsCrumb";
 import "../page/page.css";
 import "./quests.css";
 
@@ -587,14 +588,9 @@ function GmQuest({ id }: Readonly<{ id: string }>) {
     <div className="cx-page">
       <header className="cx-page-head">
         <div className="cx-page-headmain">
-          <nav className="cx-crumbs" aria-label="Where this quest sits">
-            <button type="button" className="cx-crumb" onClick={() => go(pathForSection("quests"))}>
-              Quests
-            </button>
-            <IconChevronRight className="cx-crumb-sep" />
-            <b className="cx-crumb-here">{quest.title}</b>
-          </nav>
-          <h1 className="cx-page-title">{quest.title}</h1>
+          <TitleLine crumb={<QuestsCrumb go={go} />}>
+            <h1 className="cx-page-title">{quest.title}</h1>
+          </TitleLine>
         </div>
         <div className="cx-page-actions">{actions}</div>
       </header>
@@ -802,14 +798,9 @@ export function PlayerQuests() {
           <div className="cx-page">
             <header className="cx-page-head">
               <div className="cx-page-headmain">
-                <nav className="cx-crumbs" aria-label="Where this quest sits">
-                  <button type="button" className="cx-crumb" onClick={() => go(pathForSection("quests"))}>
-                    Quests
-                  </button>
-                  <IconChevronRight className="cx-crumb-sep" />
-                  <b className="cx-crumb-here">{quest.title}</b>
-                </nav>
-                <h1 className="cx-page-title">{quest.title}</h1>
+                <TitleLine crumb={<QuestsCrumb go={go} />}>
+                  <h1 className="cx-page-title">{quest.title}</h1>
+                </TitleLine>
               </div>
             </header>
             {body}

@@ -186,6 +186,16 @@ describe("Reading a page as the GM", () => {
     expect(window.location.search).toBe("?focus=p1");
   });
 
+  it("puts its crumb on the title's line, back to the page's kind group", async () => {
+    const user = userEvent.setup();
+    renderGmCodex("/codex/pages/p1");
+    const title = await screen.findByRole("heading", { level: 1, name: "Ysolde Varn" });
+    const crumb = screen.getByRole("link", { name: "Back to People" });
+    expect(title.parentElement).toBe(crumb.parentElement);
+    await user.click(crumb);
+    expect(new URLSearchParams(window.location.search).get("group")).toBe("people");
+  });
+
   it("deletes the page only after asking, then lands on its group", async () => {
     const user = userEvent.setup();
     api.codexApi.deletePage.mockResolvedValue({ deleted: true });

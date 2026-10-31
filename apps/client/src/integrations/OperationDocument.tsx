@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, IconChevronLeft, SegmentedControl } from "@vtt/ui";
+import { Button, Crumb, SegmentedControl, TitleLine } from "@vtt/ui";
 import { CALLER_WORDS, type OperationRow } from "./api-rows";
 import {
   authOptions,
@@ -110,10 +110,9 @@ export function OperationDocument({
   return (
     <article className="api-doc" aria-labelledby="api-doc-title">
       <div className="api-doc-main">
-        <Button variant="ghost" size="sm" className="api-doc-back" onClick={onBack}>
-          <IconChevronLeft /> All operations
-        </Button>
-        <h2 id="api-doc-title">{row.summary || row.key}</h2>
+        <TitleLine crumb={<Crumb label="All operations" onClick={onBack} />}>
+          <h2 id="api-doc-title">{row.summary || row.key}</h2>
+        </TitleLine>
         <p className="api-doc-route">
           <code className={`api-method api-method-${method}`}>{method.toUpperCase()}</code>
           <code className="api-path">{path}</code>

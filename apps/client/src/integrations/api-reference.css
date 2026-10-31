@@ -160,9 +160,7 @@
   gap: var(--space-3);
   min-width: 0;
 }
-.api-doc-back {
-  align-self: flex-start;
-}
+
 .api-doc-main h2 {
   margin: 0;
   font-size: var(--fs-h2);

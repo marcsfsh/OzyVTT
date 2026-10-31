@@ -13,15 +13,17 @@ import {
   TagInput,
   WhoSeesItMenu,
   EVERYONE,
-  type Audience
+  type Audience,
+  TitleLine
 } from "@vtt/ui";
+import { QuestsCrumb } from "./QuestsCrumb";
 import type { CodexQuestStatus } from "@vtt/domain";
 import { questRecordApi } from "../api-records";
 import type { CodexBlock, CodexQuest } from "@vtt/domain";
 import { useCodexAutosave } from "../autosave";
 import { EntityIcon } from "../icons";
 import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER } from "../quests";
-import { pagePath, pathForSection } from "../routes";
+import { pagePath } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex } from "../shell/context";
 import { PagePicker } from "../shared/PagePicker";
@@ -407,12 +409,7 @@ export function QuestWriter({
     <div className="cx-page is-writing">
       <header className="cx-page-head">
         <div className="cx-page-headmain">
-          <nav className="cx-crumbs" aria-label="Where this quest sits">
-            <button type="button" className="cx-crumb" onClick={() => go(pathForSection("quests"))}>
-              Quests
-            </button>
-          </nav>
-          {title}
+          <TitleLine crumb={<QuestsCrumb go={go} />}>{title}</TitleLine>
         </div>
         <div className="cx-page-actions">{controls}</div>
       </header>

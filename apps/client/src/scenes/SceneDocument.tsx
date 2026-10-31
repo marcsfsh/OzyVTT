@@ -2,7 +2,7 @@ import { useState } from "react";
 import { rosterActors } from "@vtt/domain";
 import {
   Button,
-  IconChevronLeft,
+  Crumb,
   IconEye,
   IconButton,
   IconCopy,
@@ -13,6 +13,7 @@ import {
   Menu,
   MenuItem,
   Select,
+  TitleLine,
   cx
 } from "@vtt/ui";
 import { EncounterMap } from "../scene/EncounterMap";
@@ -92,13 +93,10 @@ export function SceneDocument({ encounterId }: Readonly<{ encounterId: string }>
 
   const header = (
     <header className={cx("table-header sc-scene-head", seeAs !== "gm" && "is-preview")} aria-label="The encounter">
-      {/* A laptop lists the scenes beside the page; a narrow screen goes back to them. */}
-      {narrow && (
-        <Button variant="ghost" size="sm" onClick={() => go(SCENES_PATHS.list)} aria-label="Back to the encounters">
-          <IconChevronLeft />
-        </Button>
-      )}
-      <h2 className="sc-scene-title">{scene.name}</h2>
+      {/* The crumb on the title's line (theme rule 14): back to the encounters. */}
+      <TitleLine crumb={<Crumb label="Encounters" onClick={() => go(SCENES_PATHS.list)} />}>
+        <h2 className="sc-scene-title">{scene.name}</h2>
+      </TitleLine>
       <IconButton label={`Rename ${scene.name}`} size="sm" onClick={() => void actions.rename(scene)}>
         <IconPencil />
       </IconButton>

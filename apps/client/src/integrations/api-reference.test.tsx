@@ -227,7 +227,7 @@ describe("an operation", () => {
     expect(document.querySelector(".api-code")).toHaveTextContent("Stream overlay");
     await user.click(screen.getByRole("button", { name: "Python" }));
     expect(document.querySelector(".api-code")).toHaveTextContent("import requests");
-    await user.click(screen.getByRole("button", { name: "All operations" }));
+    await user.click(screen.getByRole("button", { name: "Back to All operations" }));
     expect(onClose).toHaveBeenCalled();
   });
 

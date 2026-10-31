@@ -13,7 +13,8 @@ import {
   Skeleton,
   cx,
   sinceLabel,
-  type Audience
+  type Audience,
+  TitleLine
 } from "@vtt/ui";
 import { pageLinkKey } from "@vtt/domain";
 import { useConfirm } from "../../components/feedback";
@@ -54,7 +55,7 @@ import {
   DocText,
   KindChip,
   MetaSection,
-  PageCrumbs,
+  PageCrumb,
   PageMapHeader,
   PhoneRecordHeader,
   VisibilityCounts,
@@ -495,11 +496,10 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
     <div className="cx-page">
       <header className="cx-page-head">
         <div className="cx-page-headmain">
-          <PageCrumbs title={page.title} entityType={page.entityType} go={go} />
-          <div className="cx-page-titlerow">
+          <TitleLine className="cx-page-titlerow" crumb={<PageCrumb entityType={page.entityType} go={go} />}>
             <h1 className="cx-page-title">{page.title}</h1>
             <KindChip type={page.entityType} />
-          </div>
+          </TitleLine>
           {visibility}
         </div>
         <div className="cx-page-actions">

@@ -35,26 +35,7 @@
   color: var(--text-dim);
   font: 600 var(--fs-xs) / 1.2 var(--font-label);
 }
-.cx-crumb {
-  min-height: 1.5rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-dim);
-  font: inherit;
-  cursor: pointer;
-}
-.cx-crumb:hover {
-  color: var(--text);
-  text-decoration: underline;
-}
-.cx-crumb-sep {
-  width: 0.9em;
-  height: 0.9em;
-}
-.cx-crumb-here {
-  color: var(--text);
-}
+
 .cx-page-titlerow {
   display: flex;
   align-items: center;

@@ -84,6 +84,7 @@ export { Field, Input, Select, Textarea } from "./primitives/forms";
 export { Group } from "./primitives/Group";
 export { EmptyState } from "./primitives/EmptyState";
 export { SideList, SideListGroup, SideListRow } from "./primitives/SideList";
+export { Crumb, TitleLine } from "./primitives/Crumb";
 export type { SideListGroupSpec, SideListRowProps } from "./primitives/SideList";
 export { Wordmark, Eyebrow, SunMark } from "./primitives/Wordmark";
 export { Chip, type ChipTone } from "./primitives/Chip";
