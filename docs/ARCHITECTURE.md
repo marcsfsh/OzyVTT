@@ -37,7 +37,7 @@ and a change to one never bumps another. They are constructed together in
 | `packages/rules-5e`          | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation.                     |
 | `packages/content-srd-5.2.1` | SRD 5.2.1 content bundles and the scripts that generate them from vendored sources.                            |
 | `packages/dndbeyond-pdf`     | Turns a D&D Beyond character-sheet PDF into an actor definition (runs in the browser).                         |
-| `packages/ui`                | Design tokens, fonts and the `nh-` UI primitives.                                                              |
+| `packages/ui`                | Design tokens, fonts and the `nh-` UI primitives (`Group`, the Cradle, and `EmptyState` among them).           |
 | `packages/test-fixtures`     | Actor fixtures shared by tests.                                                                                |
 
 Packages are consumed as TypeScript source; only the client and server have build steps.
@@ -1086,7 +1086,10 @@ Codex and Compendium (`GM_SECTIONS` in `router.ts`), then the table screen lamp 
 for the page), the characters online, search and Settings; a phone moves the sections to bottom tabs. Prep's section
 bar (`PrepFrame`) holds Encounters, Party, Maps, Tokens, Sound and Replays (`PREP_PAGES`) over their existing addresses
 (`/encounters`, `/roster`, `/encounters/maps`, the new `/prep/tokens`, `/viewer-controls/sound`, `/replays`); a page puts its
-search or primary at the bar's end through `PrepBarSlot`. `litGmSection` and `prepPageFor` say what lights, and
+search or primary at the bar's end through `PrepBarSlot`. Every section with pages (Prep, the Codex, the Compendium
+and Settings) draws the one Titled section bar, `shell/SectionBar.tsx` (ADR-0048): the section's name as the page's
+`h1`, its pages as the kit's tab list inside a navigation landmark, and an end slot (`SectionBarSlot`, which
+`PrepBarSlot` is) a page portals its primary into; on a phone it is the header row and the strip of pages. `litGmSection` and `prepPageFor` say what lights, and
 `lastLocationForSection` returns a section to where the GM was. A player has Table, Sheet (`/me`) and Codex, and a
 phone adds Log, which is the table at `/table?panel=log`. The search (`shell/SearchLauncher.tsx`) is a launcher: Search
 the Codex and Search the Compendium go to that section with a one-shot `openSearch=1` that opens its own dialog, and a

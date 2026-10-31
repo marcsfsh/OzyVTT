@@ -172,9 +172,13 @@ The shells:
 
 - GM, laptop. A 56px top bar: the wordmark; Play, Prep, Codex and Compendium; the live encounter picker on Play; then, on
   the right, the table screen lamp, who is connected, search (Ctrl K), the theme switch (the current theme's mark,
-  which opens Dusk and Dawn) and settings (a toothed gear, so it never reads as the theme's sun). Each section has a 52px bar under it
-  for its pages, with the section's search or its primary at the right end.
-- GM, phone. The same four sections as a bottom tab bar. The top bar belongs to the page on screen. In an encounter, Play
+  which opens Dusk and Dawn) and settings (a toothed gear, so it never reads as the theme's sun). Each section with pages
+  has the Titled section bar under it (`shell/SectionBar.tsx`, ADR-0048): 52px, the section's name in Chakra Petch 600
+  capitals at 17px, a divider, the pages as words with the horizon ink, then the section's search and its primary
+  (the Cup at 42px) at the right end. No icons on the pages.
+- GM, phone. The same four sections as a bottom tab bar. The top bar belongs to the page on screen: a section's page
+  has a header row with the section's name at 18px and up to two icons, then its pages as one strip of words that
+  scrolls sideways with a fade; a record's header is Back and where it goes, with no strip. In an encounter, Play
   stacks the VCR counter and encounter picker, the turn order, the map, and the acting creature's card (portrait and
   chrome name, life bar, pending card, lamps, an Actions row that opens the full list) above End turn. Under the strips
   the map (its tools above it) has a fixed height and scrolls away; the panel below is one screen tall, so scrolled to
@@ -183,8 +187,15 @@ The shells:
 - Player, phone. Bottom tabs Table, Sheet, Codex and Log on every screen. In an encounter, Table holds the turn card and a
   small map with Open map.
 
-Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. Its front
-page pins New map and New encounter at the top, side by side when both labels fit, then the Maps and Encounters tabs, each a sortable table. The table screen's controls open from the
+Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. On its
+front page New encounter is the bar's primary with New map before it as a Base line button; the Maps and Encounters
+tabs follow, each a sortable table.
+
+A page header is for records only (ADR-0048). A list, a settings section or an overview starts with its content and at
+most one description line (14px, `--text-dim`, the GM only tag in front of it on a page players can also open). A
+record opens with its title row: the title in Chakra Petch 600 capitals at 24px (20px on a phone), its tags, one 13px
+line and its actions as secondary controls. Widths: workbenches, lists and tables use the full width; settings and
+forms keep an 880px column, centred, or beside their side list; reading text keeps a 680px measure. The table screen's controls open from the
 table screen button in the top bar. The rules reference opens from search and from the Compendium. Settings is the gear.
 
 The table (Play), as a docked workbench (ADR-0025):
@@ -281,11 +292,18 @@ from the mockups.
   A press sinks it 1px and lights it: the base fills from the press point, and a wash of the horizon rises in the cup
   and settles back. Disabled is a flat `--surface-2` box with a 1px `--line` edge and no lines. The label names the
   result: END TURN, MAKE LIVE, PLAY AS BORIN.
-- Secondary button: at least 44px, a 1px `--line-raised` edge, `--surface-2` fill, Bai Jamjuree 14px semibold, with an
-  optional 18px icon.
+- Secondary controls sit on a Base line (ADR-0048): the label (Bai Jamjuree 600, 13 to 14px) on a 1px `--line-raised`
+  line with no edge and no fill, lit 2px `--cyan` on hover. This covers secondary buttons, a record's icon button
+  (`IconButton base`), menu triggers, the Dropdown and Filters buttons, chips you choose from and segmented options. An
+  open or chosen one keeps the 2px cyan line; a hidden choice is violet on a dashed violet base; a danger action keeps
+  `--danger-text` on a danger line; disabled is `--text-muted` on a `--line` base. The ghost, with no line until hover,
+  is only for Cancel or Back beside a Cup. On a laptop a Base line button has a 36px face and `.tap-target` grows its
+  hit area; with touch the face is 44px. Fields keep their box.
 - Link button: cyan text without a box, at least 44px tall.
 - Icon button: 44 by 44, always with an `aria-label`.
-- Chip: 36px visual face with a 1px edge on a laptop, within a 44px hit area when interactive; 44px on a phone. A removable filter chip has a cyan edge and an x.
+- Chip: a status chip with a tone (harmful, beneficial, magical, info) is a 1px edge in its tone and says what a thing
+  is. A chip you choose from is its words on a Base line, dim until chosen, then `--text` on the 2px cyan line; a
+  removable filter chip stands chosen with its x. 36px on a laptop within a 44px hit area; 44px on a phone.
 - Tag: VT323 uppercase at 15 to 18px, one or two words. NEXT has a white fill, WAIT an amber fill, HIT a yellow fill and
   MISS a grey fill; TAKEN, READY, SRD and HOMEBREW (yellow outline) mark status; HIDDEN FROM PLAYERS is dashed violet.
 - Lamp: a square light. Lit means available or on and glows in its colour; unlit is `--surface-3` with a 1px edge and
@@ -296,8 +314,14 @@ from the mockups.
   A projection that supplies only a health band shows the band label and existing band indicator, never invented
   HP numbers or an exact-looking life bar. Death saves and conditions stay available beside it.
 - Switch: square, 46 by 26 visual track inside a hit area at least 46 by 44. Off is a grey knob on the left; on is a cyan knob on the right with a cyan edge and glow.
-- Segmented control: a sunken well; the chosen option is raised with a cyan underline. Options are 40px tall on a
-  laptop within a 44px hit area, and 44px on a phone.
+- Segmented control: its options side by side, 6px apart, each on its own Base line, with no well; the chosen option
+  keeps the 2px cyan line. Options are 36px on a laptop within a 44px hit area, and 44px on a phone.
+- Group (ADR-0048): a group you act in is the Cradle, `Group` in the kit: no fill and no top, a 2px `--line-raised` base
+  and sides that fade before the top, its heading the one eyebrow in the open top, and its base lighting cyan from the
+  middle out while the pointer or focus is inside. A group you only read is open (`kind="read"`): its heading and a
+  1px `--line-strong` rule above it. Never a box in a box; groups stand 20px apart.
+- Steps: one rail everywhere. A mark is a 24px square with its number in VT323 17px: done a cyan check, current a cyan
+  outline, a step that needs a choice an amber dashed mark. No magenta.
 - Row: a full-width button at least 52px tall with the name on the left, the key number in VT323 on the right and a
   one-line detail under the name in `--text-dim`.
 - Table: a sticky 12px header in `--text-muted` and 48px rows. The selected row is tinted cyan with a 2px cyan edge on
@@ -333,9 +357,9 @@ from the mockups.
   replay them with new command IDs or announce success before an acknowledgement. The bar's own line is grey and
   unlit while it waits. When the connection returns a comet lights that line in the horizon's colours and the bar
   says "Back at the table" for 2 seconds, then goes.
-- Empty states: one line saying what is missing and one button that fixes it, in the space the content would fill. For
-  example, the log says "No rolls yet." above the dice, and an encounter without a map says "No map yet." with Pick a map.
-  No illustrations; the sunset belongs to arrival screens.
+- Empty states (`EmptyState`): one line saying what is missing and one secondary button that fixes it, in the space the
+  content would fill, with no heading, icon or box. For example, the log says "No rolls yet." above the dice, and an
+  encounter without a map says "No map yet." with Pick a map. No illustrations; the sunset belongs to arrival screens.
 - Icons are 20px stroked SVG. Never render an emoji or a text symbol as an icon.
 
 ## Motion
@@ -400,6 +424,20 @@ burst plays with no number, and healing never shows one.
 | `--ease-travel`   | `cubic-bezier(0.45, 0, 0.25, 1)` | The comet, slow to start and slow to stop |
 
 ## Page patterns
+
+The theme spec (`docs/design/polish/T-theme/SPEC.md`, ADR-0048) holds the rules every area follows; each area builds
+its pages from these patterns.
+
+| Pattern         | What it is                                                                                                  |
+| --------------- | ----------------------------------------------------------------------------------------------------------- |
+| Workbench       | The map in the middle, tools on the left, one tabbed panel on the right, turn order across the top          |
+| Sheet           | A vitals band, columns of what you read and roll, one tabbed region for what you do                         |
+| Record document | The record as its readers see it, with a panel beside it answering what the GM asks                         |
+| List as a table | Toolbar (filters, sort, count), then a sortable table; rows with two facts on a phone                       |
+| Making as steps | Steps on the left, questions in the middle, a live preview on the right                                     |
+| Settings rows   | Cradle groups of rows: label and hint on the left, the control on the right, centred at 880px               |
+| Arrival         | The sunset with one card or one pair of buttons                                                             |
+| Dialog          | A title on the horizon edge, the content, a footer with the primary at the right; a bottom sheet on a phone |
 
 - Sections go in a bar. A section with several pages lists them in its bar with the search or the primary at the
   right end. A phone lists the app's sections as bottom tabs and the page's own views as a segmented strip under its

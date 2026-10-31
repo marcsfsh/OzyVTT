@@ -24,7 +24,7 @@ Status words: Designed (plan written), Built, Next (the next design round), Open
 
 | Step | What                                                                              | Why this order                                             |
 | ---- | --------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| 1    | T, the theme spec (Designed, with its shared parts)                               | Gathers the rules D1 proved so every area starts from them |
+| 1    | T, the theme spec (Built; its shared parts Designed)                               | Gathers the rules D1 proved so every area starts from them |
 | 2    | A, the frame (Designed)                                                           | Every surface sits in it                                   |
 | 3    | C, the table (frame, C2 to C6 Designed)                                           | Combat first: the surface used most, by everyone           |
 | 4    | D, characters (D2, D3 Designed)                                                   | Finishes what D1 started                                   |
@@ -46,7 +46,7 @@ D1, the character sheet, was designed before the hierarchy existed. Its conventi
 
 ## T. Theme: Light Rail / Horizon
 
-Job: one look and one motion language for every surface. Status: Designed (`T-theme/SPEC.md`, `T-theme/PLAN.md`,
+Job: one look and one motion language for every surface. Status: Built (`T-theme/SPEC.md`, `T-theme/PLAN.md`,
 ADR-0048), on top of what is Built (ADR-0037, ADR-0045, ADR-0046). The spec settles the section bar (Titled), page
 headers (records only), groups (Mixed), the box (Cradle) and secondary controls (Base line), with twenty rules and the
 page patterns.

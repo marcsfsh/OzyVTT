@@ -48,7 +48,7 @@
 | [045](0045-light-rail-motion.md)                 | Accepted                                             | Light rail: one motion language for change, where light runs along lines already on screen; content fades in within 300 ms and the light ends within 500 ms                                                   |
 | [046](0046-horizon-light-and-the-cup-primary.md) | Accepted                                             | Horizon light and the Cup primary: the primary is a plate holding a horizon, plain titles move to Chakra Petch, and light with no meaning of its own takes the horizon's colours                              |
 | [047](0047-ledger-character-sheet.md)            | Accepted                                             | The Ledger character sheet: a vitals band on every screen, three columns on a laptop (abilities, skills, one tabbed box), one row of tabs with Main on a phone, and dense skill rows only with a mouse        |
-| [048](0048-theme-spec.md)                        | Accepted                                             | The theme spec: a titled section bar, page headers for records only, mixed groups with the Cradle box for what you act in, and secondary controls on a Base line, with the rules every area follows           |
+| [048](0048-theme-spec.md)                        | Accepted and built                                   | The theme spec: a titled section bar, page headers for records only, mixed groups with the Cradle box for what you act in, and secondary controls on a Base line, with the rules every area follows           |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 
