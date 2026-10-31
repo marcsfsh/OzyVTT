@@ -216,25 +216,25 @@ describe("Heroic Inspiration", () => {
       wrapper: ToastProvider
     });
     expect(strip().queryByText("Heroic Inspiration")).toBeNull();
-    expect(screen.getByText("Heroic Inspiration", { selector: ".cs-band *" })).toBeTruthy();
+    // The band's Inspiration cell: a square lit while it is held.
+    expect(screen.getByRole("img", { name: "Heroic Inspiration held" }).closest(".cs-band")).toBeTruthy();
   });
 });
 
-describe("the phone's header", () => {
-  it("opens the Hit Points drawer from its tile", async () => {
+describe("the compact band", () => {
+  it("opens the Hit Points drawer from the band's Hit Points cell", async () => {
     const user = userEvent.setup();
     render(<CharacterSheet actor={hero()} role="player" state={view(hero())} onClose={() => {}} />, {
       wrapper: ToastProvider
     });
-    // The Play tab's Vitals hold the numbers, so another tab shows the header's tiles.
-    await user.click(screen.getByRole("tab", { name: "Notes" }));
+    // The compact band shows the hit points on every tab.
     await user.click(
       screen.getByRole("button", { name: "Hit Points 30 of 44. Change Hit Points and see the other vitals" })
     );
     const drawer = within(screen.getByRole("dialog", { name: "Hit Points" }));
     for (const name of ["Damage", "Heal", "Temp"]) expect(drawer.getByRole("button", { name })).toBeTruthy();
-    // The vitals the compact header leaves out are here too.
-    for (const label of ["Speed", "Init"]) expect(drawer.getByText(label)).toBeTruthy();
+    // Speed, Initiative and Proficiency come with them.
+    for (const label of ["Speed", "Init", "Proficiency"]) expect(drawer.getByText(label)).toBeTruthy();
     expect(drawer.queryByText("GM only")).toBeNull();
   });
 

@@ -8,21 +8,7 @@ import {
   type ReactNode
 } from "react";
 import type { GmActor, GmView, PlayerActor } from "@vtt/domain";
-import {
-  Button,
-  Chip,
-  GmOnlyTag,
-  IconButton,
-  IconPencil,
-  IconSkull,
-  IconX,
-  LifeBar,
-  Modal,
-  Roll,
-  ToastOutlet,
-  useDragSurface,
-  useToast
-} from "@vtt/ui";
+import { Button, GmOnlyTag, IconButton, IconX, Modal, ToastOutlet, useDragSurface, useToast } from "@vtt/ui";
 import { abilityModifier } from "@vtt/rules-5e";
 import { SheetCrafting } from "../crafting/SheetCrafting";
 import { DicePanel } from "../dice/DicePanel";
@@ -39,6 +25,7 @@ import { experienceOf } from "./Experience";
 import { GearTab } from "./GearTab";
 import { GmTools } from "./GmTools";
 import { HitPointDice } from "./HitPointDice";
+import { SheetBand, SheetBandCompact, type BandFigures } from "./SheetBand";
 import { HeroicGift, hasGift } from "./HeroicGift";
 import { HpCard } from "./HitPoints";
 import { IdentityEditor } from "./IdentityEditor";
@@ -46,12 +33,13 @@ import { CheckAnswers, LatestRoll, useSessionRoll } from "./LatestRoll";
 import { LevelBox } from "./LevelBox";
 import { NotesTab } from "./NotesTab";
 import { ActionsTab } from "./ActionsTab";
-import { DeathSavesCard, PlayCalm, RestMenu, StatTile } from "./PlayTab";
+import { DeathSavesCard, PlayCalm, StatTile } from "./PlayTab";
 import {
   armorClassOf,
   characterLevel,
   exactHp,
   heroicInspirationOf,
+  hitDiceEntries,
   identityLine,
   isDown,
   levelUpTarget,
@@ -187,6 +175,7 @@ export function CharacterSheet({
   const [docked, setDocked] = useState(false);
   const [diceOpen, setDiceOpen] = useState(false);
   const [hpOpen, setHpOpen] = useState(false);
+  const [hitDiceOpen, setHitDiceOpen] = useState(false);
   const [editingNames, setEditingNames] = useState(false);
   const [rollSettings, setRollSettings] = useState(false);
   const [pickingToken, setPickingToken] = useState(false);
@@ -248,6 +237,23 @@ export function CharacterSheet({
     (role === "gm" || inspired === true);
   const hitDice = "hitDice" in actor ? actor.hitDice : null;
   const constitution = definition ? abilityModifier(definition.abilityScores.con) : null;
+  const diceSizes = [...new Set(hitDiceEntries(actor).map((entry) => entry.die))];
+  const figures: BandFigures = {
+    armorClass: armorClassOf(actor) ?? null,
+    armorSetByGm: actor.armorClassOverride !== undefined,
+    initiative: actor.initiative !== undefined ? signed(actor.initiative) : "None",
+    speed: { now: speed.now ?? null, base: speed.base ?? null, lowered: speed.lowered, modes: speed.modes },
+    proficiency: definition ? signed(derived?.proficiencyBonus ?? definition.proficiencyBonus) : null,
+    inspired,
+    hp: hp ?? null,
+    down,
+    hitDice:
+      hitDice && hitDice.entries.length > 0 && actor.kind === "player-character"
+        ? { remaining: hitDice.remaining, maximum: hitDice.maximum, dice: diceSizes.join(" ") }
+        : null
+  };
+  // A rest is taken between fights, so the band's Rest leaves while one runs.
+  const canRest = !controller.inFight && (actor.kind === "player-character" || role === "gm");
 
   const menuItems: SheetMenuItems = {
     ...(canLevel && !phoneViews && levelUpTo !== null ? { levelUp: { to: levelUpTo, onSelect: onLevel! } } : {}),
@@ -593,61 +599,59 @@ export function CharacterSheet({
       <span className="cs-idline">{identityLine(actor, definition, extension)}</span>
     </span>
   );
+  const portrait = (size: "lg" | "sm") => (
+    <ActorPortrait
+      actor={actor}
+      token={token}
+      definitions={role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined}
+      frame={frameOf(actor, role)}
+      size={size}
+    />
+  );
+  const bandBase = {
+    actor,
+    role,
+    figures,
+    name,
+    canRest,
+    restAsked,
+    onOpenHp: () => setHpOpen(true),
+    // The narrow sheet's dialog also holds Speed, Initiative and Proficiency.
+    hpWords: layout === "narrow" ? "Change Hit Points and see the other vitals" : "Change Hit Points",
+    onFeedback: say
+  };
+  const compactBand = (
+    <SheetBandCompact
+      {...bandBase}
+      portrait={portrait("sm")}
+      levelBox={levelBox}
+      end={
+        <>
+          {menu}
+          {close}
+          {headerEnd}
+        </>
+      }
+    />
+  );
   let frame: ReactNode;
   if (layout === "wide") {
     frame = (
       <section className={`cs cs--wide${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
-        <header className="cs-band">
-          <ActorPortrait
-            actor={actor}
-            token={token}
-            definitions={role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined}
-            frame={frameOf(actor, role)}
-            size="lg"
-          />
-          {name}
-          <div className="cs-band-stats">
-            <StatTile
-              label="AC"
-              value={armorClassOf(actor) ?? "None"}
-              note={actor.armorClassOverride !== undefined ? "Set by GM" : null}
-            />
-            <StatTile label="Init" value={actor.initiative !== undefined ? signed(actor.initiative) : "None"} />
-            <StatTile
-              label="Speed"
-              value={speed.now ?? "None"}
-              note={speed.lowered ? `of ${speed.base} ft` : speed.modes}
-              caution={speed.lowered}
-            />
-            {definition && (
-              <StatTile label="Proficiency" value={signed(derived?.proficiencyBonus ?? definition.proficiencyBonus)} />
-            )}
-            {(derived?.passivePerception ?? extension.passivePerception) != null && (
-              <StatTile label="Passive Perception" value={derived?.passivePerception ?? extension.passivePerception} />
-            )}
-            {inspired !== undefined && (
-              <StatTile label="Heroic Inspiration" value={<Roll value={inspired ? "Held" : "None"} />} />
-            )}
-          </div>
-          {hp && (
-            <div className="cs-band-life">
-              <LifeBar hp={hp} />
-              <Button variant="secondary" size="sm" onClick={() => setHpOpen(true)}>
-                <IconPencil /> Change HP
-              </Button>
-            </div>
-          )}
-          <span className="cs-grow" />
-          {role === "gm" && <GmOnlyTag />}
-          {/* A rest is taken between fights, so the band's Rest leaves while one runs. */}
-          {!controller.inFight && (actor.kind === "player-character" || role === "gm") && (
-            <RestMenu actorId={actor.id} role={role} asked={restAsked} onFeedback={say} />
-          )}
-          {menu}
-          {close}
-          {headerEnd}
-        </header>
-        {status}
+        <SheetBand
+          {...bandBase}
+          portrait={portrait("lg")}
+          status={status}
+          onOpenHitDice={() => setHitDiceOpen(true)}
+          end={
+            <>
+              {role === "gm" && <GmOnlyTag />}
+              {menu}
+              {close}
+              {headerEnd}
+            </>
+          }
+        />
         {toastRow}
         {lastRoll}
         {top}
@@ -659,18 +663,7 @@ export function CharacterSheet({
             <SheetTabStrip tabs={tabs} active={tab} onChange={setTab} idBase={idBase} />
             {body}
           </div>
-          <div className="cs-col cs-col-right scroll-y" aria-label="Hit Points and details">
-            <HpCard actor={actor} role={role} onFeedback={say} />
-            {hitDice && hitDice.entries.length > 0 && actor.kind === "player-character" && (
-              <HitPointDice
-                actorId={actor.id}
-                hitDice={hitDice}
-                constitution={constitution}
-                canSpend={role === "gm" || restOpen}
-                canReroll={role === "gm" || inspired === true}
-                onFeedback={say}
-              />
-            )}
+          <div className="cs-col cs-col-right scroll-y" aria-label="Details">
             {role === "gm" && <GmTools actor={actor} state={state} onFeedback={say} />}
             <div ref={setDetailHost} className="cs-detail-host" />
           </div>
@@ -685,40 +678,9 @@ export function CharacterSheet({
   } else if (layout === "panel") {
     frame = (
       <section className="cs cs--panel" aria-label={`${actor.name} character sheet`}>
-        <div className="cs-compact">
-          <StatusStrip
-            actor={actor}
-            role={role}
-            inFight={controller.inFight}
-            states={!vitalsShow}
-            onFeedback={say}
-            leading={
-              <>
-                {hp && (
-                  <Chip
-                    className="cs-chip-hp"
-                    aria-label={`Hit Points ${hp.current} of ${hp.maximum}. Change Hit Points`}
-                    onClick={() => setHpOpen(true)}
-                  >
-                    HP {hp.current}/{hp.maximum}
-                  </Chip>
-                )}
-                <Chip className="cs-chip-static">AC {armorClassOf(actor) ?? "None"}</Chip>
-                <Chip className="cs-chip-static">
-                  Init {actor.initiative !== undefined ? signed(actor.initiative) : "None"}
-                </Chip>
-                {down && (
-                  <Chip tone="harmful" icon={<IconSkull />} className="cs-chip-static">
-                    Dying
-                  </Chip>
-                )}
-              </>
-            }
-          />
-          {levelBox}
-          {menu}
-        </div>
+        {compactBand}
         <SheetTabStrip tabs={tabs} active={tab} onChange={setTab} idBase={idBase} strip />
+        {!vitalsShow && status}
         {lastRoll}
         {top}
         {body}
@@ -727,46 +689,7 @@ export function CharacterSheet({
   } else {
     frame = (
       <section className={`cs cs--narrow${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
-        <header className="cs-head">
-          <div className="cs-id">
-            <ActorPortrait
-              actor={actor}
-              token={token}
-              definitions={role === "gm" && state && "definitions" in state ? (state as GmView).definitions : undefined}
-              frame={frameOf(actor, role)}
-              size="sm"
-            />
-            {name}
-            {!vitalsShow && (
-              <StatTile
-                label="AC"
-                value={armorClassOf(actor) ?? "None"}
-                note={actor.armorClassOverride !== undefined ? "Set by GM" : null}
-              />
-            )}
-            {/* The compact header keeps AC and HP; the HP box opens the hit points with the other vitals. */}
-            {!vitalsShow && (
-              <button
-                type="button"
-                className={`cs-stat cs-tile-hp${down ? " is-down" : ""}`}
-                aria-label={
-                  hp
-                    ? `Hit Points ${hp.current} of ${hp.maximum}${down ? ", dying" : ""}. Change Hit Points and see the other vitals`
-                    : "Hit Points and the other vitals"
-                }
-                onClick={() => setHpOpen(true)}
-              >
-                <strong className="cs-stat-v">{hp ? `${hp.current}/${hp.maximum}` : "None"}</strong>
-                <span className="cs-stat-k">{down ? "Dying" : "HP"}</span>
-              </button>
-            )}
-            {levelBox}
-            {menu}
-            {close}
-            {headerEnd}
-          </div>
-          {!vitalsShow && hp && <LifeBar hp={hp} showNumbers={false} className="cs-head-life" />}
-        </header>
+        {compactBand}
         <SheetTabStrip tabs={tabs} active={tab} onChange={setTab} idBase={idBase} strip />
         {!vitalsShow && status}
         {toastRow}
@@ -801,6 +724,19 @@ export function CharacterSheet({
             </div>
           )}
           <HpCard actor={actor} role={role} withSet onFeedback={say} />
+        </Modal>
+      )}
+      {hitDiceOpen && hitDice && (
+        <Modal open onClose={() => setHitDiceOpen(false)} align="bottom" title="Hit Point Dice">
+          <HitPointDice
+            actorId={actor.id}
+            hitDice={hitDice}
+            constitution={constitution}
+            boxes
+            canSpend={role === "gm" || restOpen}
+            canReroll={role === "gm" || inspired === true}
+            onFeedback={say}
+          />
         </Modal>
       )}
       {diceOpen && state && (

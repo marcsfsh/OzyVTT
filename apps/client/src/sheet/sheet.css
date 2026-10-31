@@ -115,7 +115,10 @@
     .cs-item,
     .cs-cast-option,
     .cs-feature-head,
-    .cs-tile-hp,
+    .cs-cell,
+    .cs-hp-open,
+    .cs-insp,
+    .cs-hd-open,
     .cs-lastroll-open,
     .cs-level,
     .cs-tabbar-tab,
@@ -191,13 +194,47 @@
   align-items: center;
   gap: var(--space-2);
 }
+/* A group you act in is a Cradle box (theme spec 2.4): no fill and no top, a 2px base and sides that fade before the
+   top, the base lighting cyan from the middle out while the pointer or focus is inside. T7 swaps it for `Group`. */
 .cs-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line-strong);
-  background: var(--surface-1);
+  padding: var(--space-2) 14px 12px;
+  border: 0;
+  background: none;
+}
+.cs-card::before {
+  content: "";
+  position: absolute;
+  inset: 6px 0 0;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: 2px;
+  border-image: linear-gradient(to bottom, transparent, var(--line-raised) 55%) 1;
+}
+.cs-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--cyan);
+  box-shadow: var(--glow-cyan);
+  transform: scaleX(0);
+  transition: transform 280ms var(--ease-travel);
+  pointer-events: none;
+}
+.cs-card:is(:hover, :focus-within)::after {
+  transform: scaleX(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cs-card::after {
+    transition: none;
+  }
 }
 .cs-entry {
   margin: 0;
@@ -408,26 +445,13 @@
   overflow-wrap: anywhere;
 }
 
-/* ---- The phone's header ---- */
-.cs-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: var(--material-lip), var(--surface-1);
-  border-bottom: 1px solid var(--line-strong);
-}
-.cs-id {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
+/* ---- The vitals band (ADR-0047) ----
+   One band on every frame. The laptop's is identity, the stats plate and the end in one row (two rows below 1280px);
+   the phone's and the Table panel's is the same cells, compact, in two rows. */
 .cs-id-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1 1 auto;
   min-width: 0;
 }
 .cs-name {
@@ -435,71 +459,405 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: var(--fw-display) 1.15rem/1.1 var(--font-display);
+  font: 600 22px / 1.1 var(--font-display);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   color: var(--heading-ink);
-  text-shadow: var(--heading-shadow);
 }
 .cs-idline {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 700 var(--fs-xs) / 1.25 var(--font-label);
-  color: var(--cyan-hi);
+  font: 500 13px / 1.3 var(--font-body);
+  color: var(--text-dim);
 }
-.cs-tiles {
+.cs-menu-trigger {
+  flex: none;
+}
+/* The sheet's close sits in its window's top-right corner, however tall the band beside it grows. */
+.cs-close {
+  flex: none;
+  align-self: flex-start;
+}
+.cs-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "id end" "plate plate";
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--glass-surface-1);
+}
+.cs-band-id {
+  grid-area: id;
   display: flex;
-  gap: var(--space-1);
-}
-.cs-tiles > .cs-stat {
-  flex: 1 1 0;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
 }
-/* The compact header's HP box: a number box that opens the hit points with the other vitals. */
-.cs-tile-hp {
+.cs-band-id > .actor-portrait,
+.cs-band-id > :first-child {
   flex: none;
-  min-width: 4.5rem;
-  min-height: var(--tap-min);
-  border: 1px solid var(--line-raised);
-  background: var(--surface-2);
-  color: var(--text);
-  font: inherit;
+  width: 52px;
+  height: 52px;
+}
+.cs-band-who {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.cs-band-who .cs-status-block {
+  min-width: 0;
+}
+.cs-band-who .cs-status {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.cs-band .cs-plate {
+  grid-area: plate;
+}
+/* The laptop's name may take two lines before it gives up the room the plate needs. */
+.cs-band .cs-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+.cs-band-end {
+  grid-area: end;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cs-band-rest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.cs-hd-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 1.5rem;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 500 12.5px / 1.2 var(--font-body);
+  white-space: nowrap;
   cursor: pointer;
 }
-.cs-tile-hp:hover {
-  border-color: var(--line-raised-hover);
+span.cs-hd-open {
+  cursor: default;
 }
-.cs-id > .cs-stat {
-  flex: none;
-}
-.cs-id > .cs-id-text {
-  flex: 1 1 auto;
-}
-.cs--narrow .cs-name {
-  font: 700 17px / 1.2 var(--font-body);
+.cs-hd-open:hover {
   color: var(--text);
-  text-shadow: none;
-  text-transform: none;
 }
-.cs--narrow .cs-idline {
-  font: 500 var(--fs-sm) / 1.25 var(--font-body);
+.cs-hd-count {
+  margin: 0;
+  font: 400 17px / 1 var(--font-numeric);
+  color: var(--text);
+}
+@media (min-width: 1280px) {
+  .cs-band {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: "id plate end";
+  }
+}
+
+/* The stats plate: a Cradle box of cells divided by 1px lines, each a label over a VT323 value. */
+.cs-plate {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  padding: 6px 0 2px;
+}
+.cs-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 4px 8px 6px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+}
+.cs-cell:first-child {
+  border-left: 0;
+}
+.cs-cell-k {
+  margin: 0;
+  font: 600 var(--fs-2xs) / 1.2 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.cs-cell-k.is-danger {
+  color: var(--danger-text);
+}
+.cs-cell-v {
+  margin: 0;
+  font: 400 32px / 1 var(--font-numeric);
+  color: var(--text);
+  white-space: nowrap;
+}
+.cs-unit {
+  margin-left: 3px;
+  font: 500 12px / 1 var(--font-body);
   color: var(--text-muted);
 }
-.cs-head {
-  background:
-    var(--grad-horizon) bottom / 100% 2px no-repeat,
-    var(--surface-1);
-  border-bottom: 0;
+.cs-cell-n {
+  margin: 0;
+  font: 500 var(--fs-2xs) / 1.15 var(--font-body);
+  color: var(--text-dim);
 }
-.cs-vitals-strip {
+.cs-cell.is-caution .cs-cell-n,
+.cs-cell.is-caution .cs-cell-v {
+  color: var(--caution-hi);
+}
+.cs-cell-hp {
+  flex: 3 1 18rem;
+  align-items: stretch;
+  gap: 6px;
+  padding-inline: 12px;
+}
+.cs-cell-hp-head,
+.cs-cell-hp-row {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
 }
-.cs-vitals-strip > .cs-stat {
-  flex: 1 1 0;
+.cs-cell-hp-row {
+  align-items: center;
 }
+.cs-hp-open {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.cs-hp-open:hover .cs-hp-now,
+.cs-hp-open:focus-visible .cs-hp-now {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--hp-text) 50%, transparent);
+}
+.cs-hp-now {
+  margin: 0;
+  font: 400 34px / 1 var(--font-numeric);
+  color: var(--hp-text);
+}
+.cs-hp-max {
+  margin: 0;
+  font: 400 20px / 1 var(--font-numeric);
+  color: var(--text-muted);
+}
+.cs-hp-temp {
+  margin: 0;
+  font: 500 12px / 1 var(--font-body);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.cs-cell-hp.is-down .cs-hp-now {
+  color: var(--danger-text);
+}
+.cs-band-life .nh-lifebar-well {
+  height: 6px;
+  padding: 1px;
+}
+/* The band's Damage, Heal and Temp: an amount field 52px wide and three Base line buttons. */
+.cs-cell-hp .hp-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.cs-cell-hp .hp-editor .nh-input,
+.cs-cell-hp .hp-editor input {
+  width: 52px;
+  min-width: 0;
+  text-align: center;
+}
+/* On a Base line, as the mockup draws them: the label on a 1px line that lights cyan on hover, a 36px face in a 44px
+   hit area. Damage keeps the danger colour. */
+.cs-cell-hp .hp-editor > button {
+  position: relative;
+  flex: none;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: inset 0 -1px 0 var(--line-raised);
+  font: 600 13px / 1 var(--font-body);
+}
+.cs-cell-hp .hp-editor > button::before {
+  display: none;
+}
+.cs-cell-hp .hp-editor > button::after {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
+.cs-cell-hp .hp-editor > button:first-of-type {
+  color: var(--danger-text);
+}
+.cs-cell-hp .hp-editor > button:hover:not(:disabled) {
+  border: 0;
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+.cs-cell-insp {
+  flex: 0 0 auto;
+}
+.cs-insp {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--tap-min);
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: default;
+}
+button.cs-insp {
+  cursor: pointer;
+}
+.cs-insp-box {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-raised);
+  color: var(--bg);
+}
+.cs-insp-box.is-on {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.cs-insp-box svg {
+  width: 18px;
+  height: 18px;
+}
+button.cs-insp:hover .cs-insp-box {
+  border-color: var(--cyan);
+}
+@media (min-width: 1280px) {
+  .cs--wide .cs-cell-ac {
+    flex: 0 0 62px;
+  }
+  .cs--wide .cs-cell-hp {
+    flex: 0 0 396px;
+  }
+  .cs--wide .cs-cell-init {
+    flex: 0 0 84px;
+  }
+  .cs--wide .cs-cell-speed {
+    flex: 0 0 80px;
+  }
+  .cs--wide .cs-cell-prof {
+    flex: 0 0 84px;
+  }
+  .cs--wide .cs-cell-insp {
+    flex: 0 0 92px;
+  }
+}
+
+/* The compact band: the phone, a small dialog, the floating sheet and the Table panel. */
+.cs-band-c {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--glass-surface-1);
+}
+.cs-band-c-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.cs-band-c-id > :first-child {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+.cs-band-c-id > .cs-id-text {
+  flex: 1 1 auto;
+}
+.cs-band-c .cs-name {
+  font-size: 18px;
+}
+.cs-band-c-id .cs-rest-trigger {
+  flex: none;
+  white-space: nowrap;
+}
+.cs-band-c .cs-idline {
+  font-size: 12px;
+}
+.cs-plate-c .cs-cell {
+  padding: 2px 6px 6px;
+}
+.cs-plate-c .cs-cell-ac {
+  flex: 0 0 50px;
+}
+.cs-plate-c .cs-cell-init {
+  flex: 0 0 58px;
+}
+.cs-plate-c .cs-cell-speed {
+  flex: 0 0 54px;
+}
+.cs-plate-c .cs-cell-v {
+  font-size: 26px;
+}
+.cs-plate-c .cs-cell-hp {
+  flex: 1 1 auto;
+  gap: 4px;
+  min-height: var(--tap-min);
+  cursor: pointer;
+}
+.cs-plate-c .cs-hp-now {
+  font-size: 26px;
+}
+.cs-plate-c .cs-hp-max {
+  font-size: 16px;
+}
+.cs-hp-pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.cs-hp-change {
+  margin: 0;
+  font: 600 12px / 1 var(--font-body);
+  color: var(--cyan-hi);
+}
+.cs-plate-c .cs-cell-hp:hover .cs-hp-change {
+  text-decoration: underline;
+}
+.cs-plate-c .cs-band-life .nh-lifebar-well {
+  height: 4px;
+}
+
 /* The phone's abilities sit 3 by 2, and the saves 3 by 2 with their short names. */
 .cs--narrow .cs-abilities {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -520,83 +878,6 @@
 .cs--narrow .cs-save-short {
   display: inline;
 }
-/* The laptop band's life bar and Change HP, beside the number boxes. */
-.cs-band-life {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex: 1 1 14rem;
-  min-width: 12rem;
-}
-.cs-band-life > .nh-lifebar {
-  flex: 1 1 auto;
-}
-.cs-tile-hp-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-1);
-}
-.cs-tile-hp.is-down {
-  border-color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 16%, var(--surface-2));
-}
-.cs-tile-hp.is-down .cs-stat-k {
-  color: var(--danger-text);
-}
-.cs-menu-trigger {
-  flex: none;
-}
-/* The sheet's close sits in its window's top-right corner, however tall the band beside it grows. */
-.cs-close {
-  flex: none;
-  align-self: flex-start;
-}
-
-/* ---- The laptop's band ---- */
-.cs-band {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  background: var(--material-lip), var(--surface-1);
-  border-bottom: 1px solid var(--line-strong);
-}
-.cs-band > .cs-id-text {
-  flex: 0 1 16rem;
-}
-.cs-band .cs-name {
-  font-size: var(--fs-h3);
-}
-.cs-band-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-/* ---- The table's compact row ---- */
-.cs-compact {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--line-strong);
-  background: var(--surface-1);
-}
-.cs-compact > .cs-status-block {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.cs-compact .cs-status {
-  padding: 0;
-  border: 0;
-  background: none;
-}
-/* Every chip in the row stands the same height, the pressable ones and the plain ones. */
-.cs-compact .nh-chip {
-  min-height: 2rem;
-}
-
 /* ---- Live states ---- */
 .cs-status-block {
   display: flex;
@@ -1596,9 +1877,6 @@ button.cs-lastroll-open {
 @media (max-width: 560px) {
   .cs-tabbar-tab {
     font-size: var(--fs-2xs);
-  }
-  .cs-band-stats .cs-stat {
-    min-width: 2.75rem;
   }
 }
 

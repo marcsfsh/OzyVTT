@@ -13,12 +13,15 @@ export function HpControls({
   actor,
   role,
   compact = false,
+  band = false,
   onFeedback
 }: Readonly<{
   actor: SheetActor;
   role: "gm" | "player";
   /** The phone's Vitals: Damage and Heal only; the Hit Points drawer has the type and Temp. */
   compact?: boolean;
+  /** The laptop band: Damage, Heal and Temp with no type; the "Hit Points" dialog has the type. */
+  band?: boolean;
   onFeedback: (text: string) => void;
 }>) {
   if (isDeadOnSheet(actor))
@@ -33,7 +36,7 @@ export function HpControls({
     <HpAdjust
       actor={actor}
       controls={compact ? ["damage", "heal"] : ["damage", "heal", "temp"]}
-      typed={!compact}
+      typed={!compact && !band}
       onFeedback={onFeedback}
     />
   );
