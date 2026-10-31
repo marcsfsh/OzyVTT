@@ -7,7 +7,9 @@
   min-width: 0;
   min-height: 0;
 }
+/* Positioned: the map's controls and the tray chip sit inside its box (table rules 4 and 6). */
 .map-bench-main {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;

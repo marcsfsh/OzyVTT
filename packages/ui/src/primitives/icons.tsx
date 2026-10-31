@@ -611,6 +611,15 @@ export function IconPage({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** Minus: zoom out, a stepper's down. */
+export function IconMinus({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M5 12h14" />
+    </Glyph>
+  );
+}
+
 /** Sort: three bars shortening, a list's order. */
 export function IconSort({ className }: Readonly<{ className?: string }>) {
   return (

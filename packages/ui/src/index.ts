@@ -204,6 +204,7 @@ export {
   IconPage,
   IconFolder,
   IconSort,
+  IconMinus,
   IconMoon,
   IconLevelUp,
   IconUser,

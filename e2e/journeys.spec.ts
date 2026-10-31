@@ -301,7 +301,8 @@ test("the GM runs an encounter on a new map and the player moves their token", a
     await expectPageFits(player);
   }
 
-  // The player places their own token from the tray, then drags it across the map.
+  // The player opens the tray from its chip, places their own token, then drags it across the map.
+  await press(player.getByRole("button", { name: /^Tray\b/ }));
   await press(player.getByLabel("Staging tray").getByRole("button", { name: hero }));
   const token = player.getByRole("button", { name: new RegExp(`^${hero}.*Drag to move`) });
   await expect(token).toBeVisible();

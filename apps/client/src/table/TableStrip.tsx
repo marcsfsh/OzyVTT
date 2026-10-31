@@ -1,8 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { Button, IconLocate, Modal, ToastOutlet, VcrCounter } from "@vtt/ui";
+import { Button, Modal, ToastOutlet, VcrCounter } from "@vtt/ui";
 import { JoinAddress } from "../components/JoinAddress";
-import { focusTokenOnMap } from "../scene/tableGeometry";
 import { NowPlaying } from "../sound/NowPlaying";
 import { LiveScenePicker } from "./LiveScenePicker";
 import { useOrderLight } from "./orderLight";
@@ -88,7 +87,6 @@ export function TableStrip(props: StripProps) {
         {/* Notices land here during a fight, so a toast never floats over the map. */}
         <ToastOutlet className="table-strip-notice" />
         {props.role === "gm" && <NowPlaying token={props.token} compact />}
-        {props.role === "player" && <MeButton state={props.state} />}
         {end}
       </header>
     );
@@ -105,30 +103,9 @@ export function TableStrip(props: StripProps) {
           {!fighting && state.combat.mapAssetId && <JoinAddress token={props.token} layout="strip" />}
           <NowPlaying token={props.token} compact />
         </>
-      ) : (
-        <MeButton state={props.state} />
-      )}
+      ) : null}
       {end}
     </header>
-  );
-}
-
-/** A player's Me: brings their own token into view once it is on the map. */
-export function MeButton({ state }: Readonly<{ state: PlayerView }>) {
-  const mine = state.actors.find((actor) => actor.claimStatus === "mine");
-  const placed = mine && state.combat.tokens.some((entry) => entry.actorId === mine.id && entry.position);
-  if (!mine || !placed) return null;
-  return (
-    <Button
-      variant="secondary"
-      size="sm"
-      className="table-strip-me"
-      title="Bring your token into view"
-      onClick={() => focusTokenOnMap(mine.id)}
-    >
-      <IconLocate />
-      Me
-    </Button>
   );
 }
 

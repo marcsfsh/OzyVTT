@@ -308,3 +308,63 @@
   outline: 2px solid var(--cyan-hi);
   outline-offset: 1px;
 }
+
+/* The laptop dock's grid (table spec 2.1 and 4): two columns of icon and word, 46px rows, icon 18px and word 11px. A
+   group's options open beside the dock, over the map's left edge, as the 15rem column in glass. */
+.map-rail-wrap--grid {
+  position: relative;
+  display: block;
+  background: none;
+}
+.map-rail-wrap--grid .map-rail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: auto;
+  padding: 0;
+  border-right: 0;
+}
+.map-rail-wrap--grid .map-rail-button {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 46px;
+  padding: 0 10px;
+}
+.map-rail-wrap--grid .map-rail-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.map-rail-wrap--grid .map-options {
+  position: absolute;
+  bottom: 0;
+  left: calc(100% + 1px);
+  z-index: 30;
+  max-height: 32rem;
+  border: 1px solid var(--line-strong);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+/* The 72px dock: the tools are icons alone, one to a row. */
+.table-dock .map-rail-wrap--grid .map-rail {
+  grid-template-columns: minmax(0, 1fr);
+}
+.table-dock .map-rail-wrap--grid .map-rail-label {
+  display: none;
+}
+.table-dock .map-rail-wrap--grid .map-rail-button {
+  justify-content: center;
+  padding: 0;
+}
+@media (min-width: 1280px) {
+  .table-dock .map-rail-wrap--grid .map-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .table-dock .map-rail-wrap--grid .map-rail-label {
+    display: inline;
+  }
+  .table-dock .map-rail-wrap--grid .map-rail-button {
+    justify-content: flex-start;
+    padding: 0 10px;
+  }
+}

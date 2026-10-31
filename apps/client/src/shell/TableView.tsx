@@ -23,7 +23,8 @@ import { NeedsYou } from "../table/NeedsYou";
 import { useScrollPast } from "../table/scrollPast";
 import { hasPlayerPrompt, PromptSlot } from "../table/PromptSlot";
 import { StripEndContext } from "../table/stripSlot";
-import { MeButton, TableStrip } from "../table/TableStrip";
+import { TableStrip } from "../table/TableStrip";
+import { DockToolsTarget } from "../table/dockTools";
 import { TableDock } from "../table/TableDock";
 import { NowPlaying } from "../sound/NowPlaying";
 import { usePhoneShell } from "./AppBar";
@@ -64,6 +65,8 @@ export function TableView(props: TableViewProps) {
   const phone = useMediaQuery(PHONE_TABLE_QUERY);
   // The narrower phone shell, where Play's strip stands in for the top bar.
   const phoneShell = usePhoneShell();
+  // The dock's tools row, where the map renders its tools on a laptop (table spec 2.1).
+  const [dockTools, setDockTools] = useState<HTMLElement | null>(null);
   // The strip's right end, where the GM's Fight menu lands during a fight.
   const [stripEnd, setStripEnd] = useState<HTMLElement | null>(null);
   /**
@@ -98,9 +101,9 @@ export function TableView(props: TableViewProps) {
   // strip as its header until the Switch (C5).
   const header = !phone ? (
     props.role === "gm" ? (
-      <TableDock role="gm" state={props.state} token={token} />
+      <TableDock role="gm" state={props.state} token={token} toolsRef={setDockTools} />
     ) : (
-      <TableDock role="player" state={props.state} token={token} tools={<MeButton state={props.state} />} />
+      <TableDock role="player" state={props.state} token={token} toolsRef={setDockTools} />
     )
   ) : props.role === "gm" ? (
     <TableStrip role="gm" state={props.state} token={token} phone={phoneShell} endRef={setStripEnd} />
@@ -255,7 +258,11 @@ export function TableView(props: TableViewProps) {
     <div className={`table-bench anim-view ${role}${claimingOnly ? " is-claiming" : ""}`}>
       {header}
       <div className={cx("table-bench-split", column.className)} ref={column.columnRef}>
-        {map && <div className="table-bench-map">{map}</div>}
+        {map && (
+          <div className="table-bench-map">
+            <DockToolsTarget.Provider value={phone ? null : dockTools}>{map}</DockToolsTarget.Provider>
+          </div>
+        )}
         <div className="table-bench-panel">
           <StripEndContext.Provider value={stripEnd}>{panel}</StripEndContext.Provider>
         </div>

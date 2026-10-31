@@ -1,4 +1,5 @@
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type {
   Annotation,
   AnnotationVisibility,
@@ -25,6 +26,8 @@ import { useAuthorizedMapImage } from "./mapImage";
 import { MapToken } from "./MapToken";
 import { MapTokenTray } from "./MapTokenTray";
 import { MapRail } from "./MapRail";
+import { MapControls } from "./MapControls";
+import { DockToolsTarget } from "../table/dockTools";
 import { isVisionTool, LIGHT_PRESETS, type AreaKindId, type LightPresetId, type MapTool } from "./mapTools";
 import { alliesByKind, extraPerStepFor, moveLabel, movementWallsOf, previewMove, type MoveMode } from "./movePreview";
 import { MOVE_MODE_KEYS, MOVE_MODE_NAMES, MoveModeChoice } from "./MoveModeChoice";
@@ -673,6 +676,9 @@ export function EncounterMap({
         onDeleted={() => setSelectedId(null)}
       />
     ) : null;
+  // On the laptop table the tools live in the dock (table spec 2.1); elsewhere they stand beside the map.
+  const dockTools = useContext(DockToolsTarget);
+  const [trayOpen, setTrayOpen] = useState(false);
   const rail = (
     <MapRail
       role={role}
@@ -744,18 +750,20 @@ export function EncounterMap({
       onToggleFullscreen={view.toggleFullscreen}
       notificationsMuted={notificationsMuted}
       onNotificationsMutedChange={setNotificationsMuted}
-      {...(role === "player" && ownActorId && !readOnly ? { onLocate: () => focusOn(ownActorId) } : {})}
       {...(inspector ? { inspector } : {})}
       readOnly={readOnly}
+      layout={dockTools ? "grid" : "column"}
     />
   );
+  // Centre on me (table rule 6): a player's own token, or for the GM whoever acts.
+  const centreOn = role === "player" ? ownActorId : (activeActorId ?? null);
   // Whose eyes the GM is looking through, named in the banner above the map.
   const seeingAs =
     looking === null ? null : looking === "party" ? "the party" : (actorsById.get(looking)?.name ?? null);
 
   return (
     <div className="map-bench">
-      {rail}
+      {dockTools ? createPortal(rail, dockTools) : rail}
       <div className="map-bench-main">
         {seeingAs && (
           <div className="map-seeing-as" role="status">
@@ -773,16 +781,36 @@ export function EncounterMap({
             </Button>
           </div>
         )}
+        {!readOnly && (
+          <MapControls
+            onZoom={view.zoomCenter}
+            centreLabel={role === "player" ? "Bring your token into view" : "Centre on who acts"}
+            {...(centreOn ? { onCentre: () => focusOn(centreOn) } : {})}
+          />
+        )}
         <div className="encounter-map-interaction" {...handlers}>
           {trayShown && (
-            <MapTokenTray
-              trayRef={trayRef}
-              unplaced={unplaced}
-              actorsById={actorsById}
-              dragging={dragging !== null}
-              busy={busyActorId !== null}
-              placeAtCenter={commands.placeAtCenter}
-            />
+            <div className="map-tray">
+              <Button
+                size="sm"
+                className="map-tray-chip"
+                aria-expanded={trayOpen || dragging !== null}
+                onClick={() => setTrayOpen((open) => !open)}
+              >
+                Tray <span className="map-tray-count">{unplaced.length}</span>
+              </Button>
+              {/* Open while chosen, and while a token is dragged so it can be dropped back in. */}
+              {(trayOpen || dragging !== null) && (
+                <MapTokenTray
+                  trayRef={trayRef}
+                  unplaced={unplaced}
+                  actorsById={actorsById}
+                  dragging={dragging !== null}
+                  busy={busyActorId !== null}
+                  placeAtCenter={commands.placeAtCenter}
+                />
+              )}
+            </div>
           )}
           <div className="encounter-map-stage" ref={stageSurface} aria-busy={image.status !== "ready"}>
             {image.status === "ready" && size ? (

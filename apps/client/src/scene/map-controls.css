@@ -1,0 +1,44 @@
+/* The map's controls (table rule 6): together in glass at the map's bottom right, inside the map's own box. */
+.map-controls {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .map-controls {
+    background: var(--surface-2);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+/* The tray (table rule 4): a chip at the map's top left, "Tray" and how many wait in VT323 amber; it opens the tray
+   over the map and never pushes the map down. */
+.map-tray {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 4;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  max-width: calc(100% - 2 * var(--space-3));
+}
+.map-tray-chip.nh-btn {
+  background: var(--glass-bg);
+}
+.map-tray-count {
+  margin: 0;
+  color: var(--caution-text);
+  font: 400 18px / 1 var(--font-numeric);
+}
+.map-tray > .encounter-token-tray {
+  width: min(28rem, 100%);
+}

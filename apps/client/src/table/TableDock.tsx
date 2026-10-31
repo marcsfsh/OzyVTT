@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useRef } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { VcrCounter } from "@vtt/ui";
 import { useOrderLight } from "./orderLight";
@@ -8,8 +8,8 @@ import "./table-dock.css";
 
 type DockProps = Readonly<{
   token: string;
-  /** The map's tools, under the order (C3 moves them here). */
-  tools?: ReactNode;
+  /** The tools row, which the map fills with its tools through a portal. */
+  toolsRef?: (node: HTMLElement | null) => void;
 }> &
   Readonly<{ role: "gm"; state: GmView } | { role: "player"; state: PlayerView }>;
 
@@ -59,7 +59,7 @@ export function TableDock(props: DockProps) {
           <TurnLadder role="player" state={props.state} token={null} />
         )}
       </div>
-      {props.tools && <div className="table-dock-tools">{props.tools}</div>}
+      <div className="table-dock-tools" ref={props.toolsRef} />
     </aside>
   );
 }

@@ -84,9 +84,11 @@ export function MapRail(
       inspector?: ReactNode;
       /** A map that only shows (a preview, a map's own page): View alone, since nothing on it may change. */
       readOnly?: boolean;
+      /** A column beside the map (the encounter page in Prep), the laptop dock's two-column grid, or a phone's row. */
+      layout?: "column" | "grid" | "row";
     }>
 ) {
-  const { role, tool, onToolChange, calibrated, onLocate, inspector, readOnly = false } = props;
+  const { role, tool, onToolChange, calibrated, onLocate, inspector, readOnly = false, layout = "column" } = props;
   const [openGroup, setOpenGroup] = useState<GroupId | null>(null);
   const baseId = useId();
   const groups: GroupId[] = readOnly
@@ -134,7 +136,7 @@ export function MapRail(
   const shown: GroupId | "inspector" | null = inspector ? "inspector" : openGroup;
 
   return (
-    <div className={`map-rail-wrap${shown ? " has-options" : ""}`}>
+    <div className={`map-rail-wrap map-rail-wrap--${layout}${shown ? " has-options" : ""}`}>
       <div className="map-rail" role="toolbar" aria-label="Map tools">
         {(readOnly ? [] : DIRECT_TOOLS).map((entry) => {
           const blocked = entry.needsGrid === true && !calibrated;
