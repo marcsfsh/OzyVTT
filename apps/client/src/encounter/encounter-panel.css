@@ -1255,3 +1255,24 @@
 .encounter-tab-head > .encounter-menu-toggle {
   margin-left: auto;
 }
+
+/* The foot (table rule 1 and spec 4): the Cup at 50px with Previous beside it at 44px on its Base line, and who is
+   next under it at 12.5px; off a player's turn, when their turn comes, with no button. */
+.table-panel-foot .turn-controls > .turn-next,
+.table-panel-foot .table-panel-foot-start > .table-panel-primary {
+  min-height: 50px;
+}
+.table-panel-foot .turn-controls {
+  align-items: center;
+}
+.table-panel-foot .turn-next-up {
+  margin-top: 6px;
+  font-size: 12.5px;
+}
+.table-panel-foot-wait {
+  margin: 0;
+  padding: var(--space-1) 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  text-align: center;
+}

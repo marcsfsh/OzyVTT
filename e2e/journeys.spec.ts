@@ -398,7 +398,7 @@ test("a save on the player's own turn leaves the bar under the thumb on screen",
     targetIds: [actorId],
     override: { reason: "A save on the character's own turn" }
   });
-  const slot = player.getByRole("region", { name: "Answer now" });
+  const slot = player.getByRole("region", { name: "Prompts" });
   await expect(slot.getByRole("heading", { name: /Dexterity saving throw/ })).toBeVisible();
   // The prompt throws the die as it opens and shows a disabled Roll until the server answers. A new Confirm button
   // then takes its place, so the check waits for Confirm, the button the player presses.

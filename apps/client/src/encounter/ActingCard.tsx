@@ -3,15 +3,17 @@ import { LifeBar } from "@vtt/ui";
 import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
 import "./acting-card.css";
 
-const SIDE_WORD: Readonly<Record<GmActor["kind"], string>> = {
-  "player-character": "Party",
-  npc: "NPC",
-  monster: "Monster"
+/** Who runs the acting creature (table spec 2.3): the GM runs a monster or an NPC, a player their character. */
+const ACTING_WORD: Readonly<Record<GmActor["kind"], string>> = {
+  "player-character": "Acting · from the player's device",
+  npc: "Acting · you run it",
+  monster: "Acting · you run it"
 };
 
 /**
- * Who acts, at the top of the GM's Fight tab: the portrait in the sun frame, the name in chrome, then the life bar
- * with AC and speed. A legendary creature acting off-turn takes the card while it acts.
+ * Who acts, at the top of the GM's Encounter tab (table spec 2.3): the 44px face in the sun frame, the name in Chakra
+ * Petch capitals (YOUR TURN is the table's one chrome lettering), who runs it, then the life bar with AC and speed. A
+ * legendary creature acting off-turn takes the card while it acts.
  */
 export function ActingCard({
   state,
@@ -36,11 +38,14 @@ export function ActingCard({
           frame={frameOf(actor, "gm")}
           now
           down={actor.hp.current <= 0}
-          size="lg"
+          size="md"
         />
         <div className="acting-card-who">
-          <h2 className="acting-card-name chrome">{actor.name}</h2>
-          <p className="acting-card-side">{hidden ? "Hidden from players" : SIDE_WORD[actor.kind]}</p>
+          <h2 className="acting-card-name">{actor.name}</h2>
+          <p className="acting-card-side">
+            {ACTING_WORD[actor.kind]}
+            {hidden && " · hidden from players"}
+          </p>
         </div>
       </div>
       <div className="acting-card-numbers">

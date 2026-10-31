@@ -288,9 +288,10 @@
 /* Active turn: the sun frame's gold ring and glow, pulsing once. The ring only renders while active, so the
    one-shot animation runs on each turn change. `transform-box: fill-box` is required, or the SVG
    default (view box) would scale it about the centre of the whole map. */
+/* The acting token's ring is amber on every map (table rule 7): amber means the table waits on someone. */
 .encounter-token-turn {
-  fill: color-mix(in srgb, var(--hp) 14%, transparent);
-  stroke: var(--hp);
+  fill: color-mix(in srgb, var(--caution) 14%, transparent);
+  stroke: var(--caution);
   stroke-width: 4;
   vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--caution) 70%, transparent));

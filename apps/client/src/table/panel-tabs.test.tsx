@@ -132,6 +132,10 @@ describe("the GM's panel", () => {
     const fight = screen.getByRole("tabpanel", { name: /^Encounter/ });
     expect(within(fight).getByText("Needs you · 2")).toBeTruthy();
     expect(within(fight).getByRole("region", { name: "Now acting · Lyra" })).toBeTruthy();
+    // The acting name is Chakra Petch with who runs it; YOUR TURN is the table's one chrome lettering.
+    expect(within(fight).getByRole("heading", { name: "Lyra" }).classList.contains("chrome")).toBe(false);
+    expect(within(fight).getByText("Acting · from the player's device")).toBeTruthy();
+    expect(document.querySelectorAll(".chrome")).toHaveLength(0);
     // The order and its row tools fold under the acting creature.
     expect(within(fight).getByText("Turn order and tools")).toBeTruthy();
     // With no strip over the map, the Encounter menu heads the tab (table spec 2.1).
@@ -236,6 +240,8 @@ describe("a player's panel", () => {
         <EncounterPanel role="player" state={playerView(true)} phone slots={slots} />
       </ToastProvider>
     );
+    expect(document.querySelectorAll(".chrome")).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "Your turn" }).classList.contains("chrome")).toBe(true);
     const tabs = screen.getByRole("group", { name: "Your turn resources" });
     expect(
       within(tabs)
@@ -265,6 +271,8 @@ describe("a player's panel", () => {
     // Two in the order: after the goblin, the round wraps to Lyra.
     expect(screen.getByText("Your turn is next")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "End turn" })).toBeNull();
+    // The foot says when the turn comes, with no button.
+    expect(document.querySelector(".table-panel-foot-wait")?.textContent).toBe("Your turn is next.");
     // Action and Bonus Action wait, and the Reaction tab is chosen.
     expect(screen.getByRole("button", { name: "Action, not now" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Bonus Action, not now" })).toBeTruthy();

@@ -211,7 +211,7 @@ export function PromptSlot({
       slot.current?.contains(document.activeElement) === true || document.activeElement === document.body;
     shownKey.current = key;
     if (first) {
-      setAnnouncement(`Answer now: ${titleOf(first)}.`);
+      setAnnouncement(`A prompt for you: ${titleOf(first)}.`);
       if (!typing(document.activeElement) || hadFocus) heading.current?.focus({ preventScroll: true });
     } else if (hadFocus) onSettled?.()?.focus({ preventScroll: true });
     // Keyed on which prompt leads the slot.
@@ -372,7 +372,7 @@ export function PromptSlot({
         {announcement}
       </p>
       {!first && rerolling?.heroicInspiration === true && (
-        <section className="prompt-slot scroll-y" aria-label="Answer now">
+        <section className="prompt-slot scroll-y" aria-label="Prompts">
           <PromptCard
             eyebrow="Initiative"
             title={`Initiative rolled for ${rerolling.name}`}
@@ -384,7 +384,7 @@ export function PromptSlot({
         </section>
       )}
       {(first || outcome) && (
-        <section className="prompt-slot scroll-y" aria-label="Answer now" ref={slot}>
+        <section className="prompt-slot scroll-y" aria-label="Prompts" ref={slot}>
           {card}
           {entries.length > 1 && (
             <p className="prompt-slot-more">

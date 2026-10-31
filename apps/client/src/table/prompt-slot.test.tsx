@@ -106,7 +106,7 @@ const slot = (state: PlayerView, onSettled?: () => HTMLElement | null) =>
 describe("the player's prompt slot", () => {
   it("holds one prompt at a time, the reaction first, says what comes after, and takes the focus", () => {
     slot(view({ pendingReactions: [SHIELD], pendingSaves: [SAVE] }));
-    const region = screen.getByRole("region", { name: "Answer now" });
+    const region = screen.getByRole("region", { name: "Prompts" });
     expect(region).toBeTruthy();
     const heading = screen.getByRole("heading", { name: "Goblin 1's attack would hit you" });
     expect(document.activeElement).toBe(heading);
@@ -122,7 +122,7 @@ describe("the player's prompt slot", () => {
     expect(screen.getByRole("button", { name: "Cast Shield" }).className).toContain("encounter-primary");
     expect(screen.getByText("1 more after this: DC 15 Dexterity saving throw")).toBeTruthy();
     // The reaction is announced for a screen reader.
-    expect(screen.getByText("Answer now: Goblin 1's attack would hit you.")).toBeTruthy();
+    expect(screen.getByText("A prompt for you: Goblin 1's attack would hit you.")).toBeTruthy();
   });
 
   it("moves on to the next prompt once one is answered, and gives the focus back when the slot empties", () => {
@@ -141,7 +141,7 @@ describe("the player's prompt slot", () => {
         <PromptSlot state={view()} onSettled={() => back} />
       </ToastProvider>
     );
-    expect(screen.queryByRole("region", { name: "Answer now" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Prompts" })).toBeNull();
     expect(document.activeElement).toBe(back);
     back.remove();
   });

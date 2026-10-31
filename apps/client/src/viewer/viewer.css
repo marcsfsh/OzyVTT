@@ -196,9 +196,10 @@
 }
 /* One pulse on the turn change: the ring mounts with the turn, so it runs once. `transform-box:
    fill-box` because an SVG element's default transform box is the view box. */
+/* Amber, as on every map (table rule 7). */
 .viewer-token-turn {
-  fill: rgb(255 46 154 / 18%);
-  stroke: var(--magenta);
+  fill: color-mix(in srgb, var(--caution) 18%, transparent);
+  stroke: var(--caution);
   stroke-width: 5;
   vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%));

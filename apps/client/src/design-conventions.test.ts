@@ -199,7 +199,7 @@ const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: str
   ["apps/client/src/scene/encounter-map.css", 6, "SVG paint, and the black/white pair a token ring needs on any map"],
   ["apps/client/src/styles.css", 2, "a two-stop black mask, read only for its alpha"],
   ["apps/client/src/viewer/viewer-controls.css", 1, "the white A/B measurement labels, over arbitrary map art"],
-  ["apps/client/src/viewer/viewer.css", 6, "SVG paint and a scrim over the projected map"],
+  ["apps/client/src/viewer/viewer.css", 5, "SVG paint and a scrim over the projected map"],
   ["packages/ui/src/primitives/Combobox.css", 1, "a shadow over an arbitrary backdrop"],
   ["packages/ui/src/primitives/Tabs.css", 10, "ten black-alpha stops in one shadow ladder"],
   ["packages/ui/src/primitives/forms.css", 1, "a data-URI SVG chevron, which cannot reference var()"]

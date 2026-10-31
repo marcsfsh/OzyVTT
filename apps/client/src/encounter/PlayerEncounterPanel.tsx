@@ -24,7 +24,7 @@ import { useTargeting } from "./targeting";
 import { revealInRegion } from "../lib/reveal";
 import { TurnTabs, useCostTab, type TurnEconomy } from "./TurnTabs";
 import type { CostTab } from "../sheet/turn-options";
-import { PlayerTurnCard } from "./PlayerTurnCard";
+import { nextTurnWords, PlayerTurnCard } from "./PlayerTurnCard";
 import { navigate, replaceQuery, useRoute } from "../router";
 import { useOrderLight } from "../table/orderLight";
 
@@ -685,13 +685,17 @@ export function PlayerEncounterPanel({
     turnTo: { when: fighting && (hasPlayerPrompt(state) || myTurn || actingFor !== null), view: "turn" }
   });
 
-  // End turn under the thumb, on this player's turn or the turn of a creature they command.
+  // End turn under the thumb, on this player's turn or the turn of a creature they command; off it, the foot says
+  // when the player's turn comes, with no button (table rule 1).
+  const waitWords = fighting && inFight && myId !== null && !myTurn && !actingFor ? nextTurnWords(combat, myId) : null;
   const footer =
     actingFor || (fighting && inFight && myTurn) ? (
       <PlayerEndTurn
         quiet={rollPending}
         {...(!actingFor && myActor && owesDeathSave(state, myActor) ? { endWaits: "Roll your death save first." } : {})}
       />
+    ) : waitWords ? (
+      <p className="table-panel-foot-wait">{waitWords}.</p>
     ) : null;
 
   return (

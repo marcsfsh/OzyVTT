@@ -570,16 +570,17 @@ export function GmEncounterPanel({
   const turnControls = (
     <div className="table-panel-foot-turn">
       <div className="table-panel-foot-row turn-controls">
-        <button
-          type="button"
-          className="encounter-primary turn-prev"
+        {/* Previous is a Base line control beside the Cup (table rule 1). */}
+        <Button
+          variant="secondary"
+          className="turn-prev"
           disabled={busy}
           onClick={previous}
           title="Previous turn"
           aria-label="Previous turn"
         >
           <IconChevronLeft />
-        </button>
+        </Button>
         {/* One primary at a time: while a roll waits, or history is under review, End turn steps down. */}
         <Button
           variant={rollPending || reviewing ? "secondary" : "primary"}
@@ -590,7 +591,7 @@ export function GmEncounterPanel({
           {nextLabel}
         </Button>
       </div>
-      {nextUp && !reviewing && <p className="start-fight-count">Next: {nextUp.name}</p>}
+      {nextUp && !reviewing && <p className="start-fight-count turn-next-up">Next: {nextUp.name}</p>}
       {/* On a phone the Encounter menu sits at the end of Play's header; a laptop has it in the tab's head. */}
       {phone && <InStripEnd>{fightMenu}</InStripEnd>}
     </div>
