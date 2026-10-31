@@ -114,3 +114,12 @@
   height: var(--tap-min);
   padding: 0 var(--space-3);
 }
+/* The bar's controls keep one line; the page tabs shrink and scroll first. */
+.secbar :is(.nh-menu-trigger, .nh-btn) {
+  white-space: nowrap;
+}
+.secbar .nh-menu-trigger-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}

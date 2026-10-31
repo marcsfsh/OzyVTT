@@ -326,13 +326,11 @@ export function GmHome() {
       <div className="cx-home-grid">
         <div className="cx-home-col">
           {dateBar}
-          <div className="cx-home-titlerow">
-            <h1 className="cx-page-title">Codex</h1>
-            <span className="cx-count">
-              {pageRevealed + pageHidden} pages:{" "}
-              <RevealedCount revealed={pageRevealed} hidden={pageHidden} onHidden={() => hiddenSearch()} />
-            </span>
-          </div>
+          {/* The bar names the Codex, so the overview opens with one line about it (theme spec 2.2). */}
+          <p className="cx-home-line">
+            {pageRevealed + pageHidden} pages:{" "}
+            <RevealedCount revealed={pageRevealed} hidden={pageHidden} onHidden={() => hiddenSearch()} />
+          </p>
           {read.error && <Alert tone="danger">{read.error}</Alert>}
           {firstPage}
           <div className="cx-home-tiles">

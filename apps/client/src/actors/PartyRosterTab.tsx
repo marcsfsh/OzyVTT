@@ -4,6 +4,7 @@ import { Badge, Button, Eyebrow, Modal, RevealSwitch, Switch, useToast } from "@
 import { useConfirm } from "../components/feedback";
 import { JoinAddress } from "../components/JoinAddress";
 import { navigate } from "../router";
+import { PrepBarSlot } from "../shell/AppBar";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { PdfImportModal } from "./PdfImportModal";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
@@ -266,14 +267,16 @@ export function PartyRosterTab({
   /* Heading and actions stay fixed; the queue, gallery and archived drawer share one region below. */
   return (
     <section className="party-roster pane-frame pane-scene frame-col anim-view">
-      <div className="party-heading neon-beam">
-        <h2>Roster</h2>
+      {/* A list has no title row: Prep's bar names the page and holds its primary (theme spec 2.2). */}
+      {onCreateCharacter && (
+        <PrepBarSlot>
+          <Button variant="primary" size="sm" onClick={onCreateCharacter}>
+            Create a character
+          </Button>
+        </PrepBarSlot>
+      )}
+      <div className="party-heading">
         <div className="party-heading-actions">
-          {onCreateCharacter && (
-            <Button variant="primary" onClick={onCreateCharacter}>
-              Create a character
-            </Button>
-          )}
           <Button onClick={() => setRandomOpen(true)}>Roll a random character</Button>
           <Button onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>
           <input

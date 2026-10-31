@@ -676,7 +676,6 @@ dt.cx-meta-key .cx-meta-hidden {
   margin: 0 auto;
   padding: var(--space-3) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
 }
-.cx-index-head,
 .cx-index-listhead {
   display: flex;
   align-items: center;

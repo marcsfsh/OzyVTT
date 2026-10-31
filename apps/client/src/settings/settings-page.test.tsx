@@ -75,12 +75,17 @@ describe("the GM's Settings", () => {
 
   it("marks every GM section GM only, and the GM's own row in Device", async () => {
     renderAt("/settings/fights");
-    expect(screen.getByRole("heading", { name: /^Encounters/, level: 2 }).parentElement).toHaveTextContent("GM only");
+    // The tag stands in front of the section's description line, under its hidden heading.
+    expect(screen.getByRole("heading", { name: /^Encounters/, level: 2 }).nextElementSibling).toHaveTextContent(
+      "GM only"
+    );
     act(() => goTo("/settings/device"));
     expect(await screen.findByRole("heading", { name: /^Arrange new encounters/, level: 3 })).toHaveTextContent(
       "GM only"
     );
-    expect(screen.getByRole("heading", { name: /^Device/, level: 2 }).parentElement).not.toHaveTextContent("GM only");
+    expect(screen.getByRole("heading", { name: /^Device/, level: 2 }).nextElementSibling).not.toHaveTextContent(
+      "GM only"
+    );
   });
 
   it("puts one primary in the bar, the view's own: New credential in Access", () => {

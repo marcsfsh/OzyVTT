@@ -83,17 +83,23 @@ export function ReplayList({
      plain `<li>`s with rules drawn in `replay.css`, and no cards. */
   return (
     <section className="replay-panel replay-list-page pane-frame pane-scene frame-col anim-view">
-      <header className="replay-list-head neon-beam">
-        {onBack && (
-          <Button variant="ghost" className="replay-list-back" onClick={onBack}>
-            <IconChevronLeft /> Back to the table
-          </Button>
-        )}
-        <h2>Replays</h2>
-        {/* Player only: why their list may be short. */}
-        {role === "player" && <p>The encounters your GM has shared with the party.</p>}
-        {error && <p className="replay-error">{error}</p>}
-      </header>
+      {/* The GM's list sits under Prep's bar, which names it, so it has no title row (theme spec 2.2). A player's page
+          is below the table, so it keeps Back and its own name (rule 12). */}
+      {role === "player" ? (
+        <header className="replay-list-head">
+          {onBack && (
+            <Button variant="ghost" className="replay-list-back" onClick={onBack}>
+              <IconChevronLeft /> Back to the table
+            </Button>
+          )}
+          <h2>Replays</h2>
+          {/* Why their list may be short. */}
+          <p>The encounters your GM has shared with the party.</p>
+          {error && <p className="replay-error">{error}</p>}
+        </header>
+      ) : (
+        error && <p className="replay-error">{error}</p>
+      )}
       <div className="replay-list-body scroll-y frame-fill">
         {archives === null && <p>Loading replays…</p>}
         {/* No door: the list fills itself when a fight ends. */}

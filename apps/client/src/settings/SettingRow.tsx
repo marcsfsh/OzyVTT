@@ -30,11 +30,15 @@ export function SettingsSection({
       className={cx("settings-section", `settings-section--${id}`, wide && "is-wide")}
       aria-labelledby={`settings-${id}-title`}
     >
-      <header className="settings-section-head">
-        <h2 id={`settings-${id}-title`}>{section.label}</h2>
+      {/* The bar names the section, so it opens with its one description line, the GM only tag in front of it on a GM
+          section (theme spec 2.2). The name stays as a hidden heading for the outline. */}
+      <h2 id={`settings-${id}-title`} className="nh-sr-only">
+        {section.label}
+      </h2>
+      <p className="settings-section-line">
         {gmOnly && <GmOnlyTag />}
-        <p>{section.hint}</p>
-      </header>
+        {section.hint}
+      </p>
       <Group className="settings-panel">{children}</Group>
     </section>
   );

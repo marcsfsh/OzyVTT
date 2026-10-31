@@ -186,28 +186,27 @@ export function CodexFrame({
             </>
           }
         >
-          {null}
+          {phone && part && (
+            <nav className="cx-campaign" aria-label="Campaign">
+              <SegmentedControl
+                size="sm"
+                current
+                ariaLabel="Campaign parts"
+                value={part}
+                onChange={(id) => {
+                  const target = CAMPAIGN_PARTS.find((candidate) => candidate.id === id);
+                  if (target) go(target.path);
+                }}
+                options={CAMPAIGN_PARTS.map((candidate) => ({ value: candidate.id, label: candidate.label }))}
+              />
+            </nav>
+          )}
+
+          {notices}
+          <div className="cx-content">{children}</div>
+
+          {overlays}
         </SectionBar>
-        {phone && part && (
-          <nav className="cx-campaign" aria-label="Campaign">
-            <SegmentedControl
-              size="sm"
-              current
-              ariaLabel="Campaign parts"
-              value={part}
-              onChange={(id) => {
-                const target = CAMPAIGN_PARTS.find((candidate) => candidate.id === id);
-                if (target) go(target.path);
-              }}
-              options={CAMPAIGN_PARTS.map((candidate) => ({ value: candidate.id, label: candidate.label }))}
-            />
-          </nav>
-        )}
-
-        {notices}
-        <div className="cx-content">{children}</div>
-
-        {overlays}
       </div>
     </PhoneBarContext.Provider>
   );

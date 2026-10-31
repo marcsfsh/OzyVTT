@@ -45,7 +45,8 @@ describe("Codex shell: getting from Home to the pages", () => {
     await user.click(await screen.findByRole("button", { name: "Open People" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/pages"));
     expect(window.location.search).toBe("?group=people");
-    expect(await screen.findByRole("heading", { level: 1, name: "People" })).toBeInTheDocument();
+    // A list has no title row (theme spec 2.2): the chosen group's row says which group is listed.
+    expect(await screen.findByRole("button", { name: /^People/ })).toHaveAttribute("aria-current", "true");
     expect(list().getByText("Strahd")).toBeInTheDocument();
     expect(list().queryByText("Barovia")).not.toBeInTheDocument();
   });
@@ -53,7 +54,8 @@ describe("Codex shell: getting from Home to the pages", () => {
   it("clearing the group lists every page again", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/pages?group=people");
-    expect(await screen.findByRole("heading", { level: 1, name: "People" })).toBeInTheDocument();
+    // A list has no title row (theme spec 2.2): the chosen group's row says which group is listed.
+    expect(await screen.findByRole("button", { name: /^People/ })).toHaveAttribute("aria-current", "true");
     await user.click(screen.getByRole("button", { name: /^People/ }));
     expect(window.location.search).toBe("");
     expect(await list().findByText("Barovia")).toBeInTheDocument();

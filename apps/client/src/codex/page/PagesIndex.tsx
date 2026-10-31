@@ -18,6 +18,7 @@ import { codexApi } from "../api";
 import { entityDef } from "../entities";
 import { CodexIcon, EntityIcon } from "../icons";
 import { pagePath, searchPath, tagPath } from "../routes";
+import { SectionBarSlot } from "../../shell/SectionBar";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useOptionalGmCodex, PlayerCodexContext } from "../shell/context";
 import { KIND_GROUPS } from "./document";
@@ -173,15 +174,13 @@ export function PagesIndex() {
         }
       />
       <div className="cx-index-body">
-        {!phone && (
-          <div className="cx-index-head">
-            <h1 className="cx-page-title">{group ? group.label : "Pages"}</h1>
-            {gm && (
-              <Button size="sm" onClick={() => gm.quickCreate({ entityType: group?.types[0] })}>
-                <IconPlus /> New page
-              </Button>
-            )}
-          </div>
+        {/* A list has no title row: the bar names the page, and New page sits at the bar's end (theme spec 2.2). */}
+        {!phone && gm && (
+          <SectionBarSlot>
+            <Button size="sm" onClick={() => gm.quickCreate({ entityType: group?.types[0] })}>
+              <IconPlus /> New page
+            </Button>
+          </SectionBarSlot>
         )}
         <Input
           type="search"

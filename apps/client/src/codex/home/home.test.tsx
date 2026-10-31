@@ -192,9 +192,9 @@ describe("The GM's Home", () => {
     // Factions gathers factions and religions, as the Pages index does.
     expect(screen.getByRole("region", { name: "Factions" })).toHaveTextContent("2 revealed · 1 hidden");
     // A journal record is not a page, so it counts toward no tile.
-    // The home's own title row, beside the section bar's name.
-    const title = screen.getAllByRole("heading", { name: "Codex" }).find((heading) => !heading.closest(".secbar"));
-    expect(title?.parentElement).toHaveTextContent("16 pages: 13 revealed · 3 hidden");
+    // The bar's name is the page's heading (theme spec 2.2), and the overview opens with its count line.
+    expect(screen.getByRole("heading", { level: 1, name: "Codex" }).closest(".secbar")).not.toBeNull();
+    expect(screen.getByText(/^16 pages:/)).toHaveTextContent("16 pages: 13 revealed · 3 hidden");
 
     await user.click(within(people).getByRole("button", { name: "2 hidden" }));
     expect(window.location.pathname).toBe("/codex/search");

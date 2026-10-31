@@ -813,7 +813,6 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
         title={
           rebuild ? `${rebuild.mode === "down" ? "Level down" : "Level up"} ${rebuild.name}` : "Create a character"
         }
-        eyebrow="Character builder"
         steps={stepsForShell}
         current={stepIndex}
         /* Every reached step stays reachable, finished or not; steps past the frontier stay locked. */
