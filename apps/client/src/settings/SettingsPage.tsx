@@ -4,7 +4,7 @@ import { IconButton, IconSearch, IconX } from "@vtt/ui";
 import { ApiReference } from "../integrations/ApiReference";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { navigate, useRoute } from "../router";
-import { SectionBar } from "../shell/SectionBar";
+import { PhoneHeader, SectionBar } from "../shell/SectionBar";
 import { useLeaveTable } from "../shell/useLeaveTable";
 import { AccessSection } from "./AccessSection";
 import { CharactersSection } from "./CharactersSection";
@@ -147,6 +147,8 @@ export function SettingsPage({
   if (role === "player")
     return (
       <div className="settings cx-shell is-single">
+        {/* A phone has no top bar, so the page names itself (frame spec 2.2). */}
+        <PhoneHeader title="Settings" />
         <div className="settings-content scroll-y">{body}</div>
         {dialog}
       </div>

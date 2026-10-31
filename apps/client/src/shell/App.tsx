@@ -150,9 +150,16 @@ export function App() {
         </div>
       </TableCurrent.Provider>
       {/* Row 4: a phone's bottom tabs, the sections under the thumb. */}
-      {shell?.role === "gm" && phone && <GmBottomTabs state={shell.state as GmView} />}
+      {shell?.role === "gm" && phone && (
+        <GmBottomTabs state={shell.state as GmView} token={shell.token} onSignOut={() => void session.signOutGm()} />
+      )}
       {shell?.role === "player" && phone && (
-        <PlayerBottomTabs codexUnread={recap.unread} onCodexSeen={recap.markSeen} state={shell.state as PlayerView} />
+        <PlayerBottomTabs
+          codexUnread={recap.unread}
+          onCodexSeen={recap.markSeen}
+          state={shell.state as PlayerView}
+          onLeave={session.leavePlayer}
+        />
       )}
     </main>
   );

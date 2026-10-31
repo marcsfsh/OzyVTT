@@ -1,0 +1,55 @@
+/* The phone's More sheet (frame spec 2.2, 4): from the bottom, above the tabs, rows of 52px, a 40 by 4px handle. */
+.more-scrim {
+  position: fixed;
+  inset: 0 0 var(--bottom-tabs-h, 65px) 0;
+  z-index: 60;
+  background: color-mix(in srgb, var(--void) 55%, transparent);
+}
+.more-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--bottom-tabs-h, 65px);
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - var(--bottom-tabs-h, 65px) - 48px);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-top: 1px solid var(--line-strong);
+}
+.more-handle {
+  align-self: center;
+  width: 40px;
+  height: 4px;
+  margin: 8px 0 2px;
+  background: var(--line-raised);
+}
+.more-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 var(--space-1) 0 var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.more-title {
+  margin: 0;
+  font: 600 20px / 1 var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.more-rows {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: var(--space-2);
+}
+.more-rows .nh-menu-item {
+  min-height: 52px;
+  border-bottom: 1px solid var(--line);
+}
+.more-rows .frame-menu-row {
+  min-height: 52px;
+}

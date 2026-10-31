@@ -27,10 +27,11 @@ main > .app-bar,
 main > .player-identity {
   grid-row: 1;
 }
-main > .app-bottom-tabs {
+main > :is(.app-bottom-tabs, .app-bottom-nav) {
   grid-row: 4;
 }
-main:has(> .app-bottom-tabs) {
+/* On the root, so the toast viewport and the More sheet, which sit outside main's rows, can read it too. */
+:root:has(main > :is(.app-bottom-tabs, .app-bottom-nav)) {
   --bottom-tabs-h: 65px;
 }
 /* Row 3, the content pane: always rendered; its one in-flow child fills it. Fixed and top-layer
@@ -47,6 +48,22 @@ main:has(> .app-bottom-tabs) {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+}
+/* A player's table on a phone, under the character's header row. */
+.player-table-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.player-table-wrap > :last-child {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.player-table-wrap > .player-identity {
+  flex: none;
+}
+/* A phone's header row inside the pane (frame spec 2.2) keeps its height; the page under it fills the rest. */
+.app-pane > :is(.phone-head, .player-identity) {
+  flex: none;
 }
 /* Every surface's frame: the pane's one child, a `.frame-col` (@vtt/ui) with chrome rows above one
    `.scroll-y .frame-fill` region. This class adds the page gutter and top spacing; the region carries

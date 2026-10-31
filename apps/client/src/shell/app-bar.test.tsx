@@ -123,18 +123,27 @@ describe("the GM's top bar", () => {
     expect(container.querySelector(".app-bar")).toBeNull();
   });
 
-  it("moves the sections to the bottom tabs on a phone and keeps the utilities in the top bar", () => {
+  it("has no top bar on a phone: the sections are the bottom tabs, with More as the fifth", async () => {
+    const user = userEvent.setup();
     setViewport(390);
     goTo("/codex");
-    render(
+    const { container } = render(
       <>
         <GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />
-        <GmBottomTabs />
+        <GmBottomTabs state={gmView()} token="gm" onSignOut={() => {}} />
       </>
     );
+    expect(container.querySelector(".app-bar")).toBeNull();
     expect(screen.getAllByRole("tablist", { name: "GM sections" })).toHaveLength(1);
     expect(screen.getByRole("tablist", { name: "GM sections" })).toHaveClass("app-bottom-tabs");
-    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
+    // More opens its sheet above the tabs, with the menu's rows: Settings among them.
+    const more = screen.getByRole("button", { name: "More" });
+    await user.click(more);
+    expect(more).toHaveAttribute("aria-expanded", "true");
+    const sheet = within(screen.getByRole("dialog", { name: "More" }));
+    expect(sheet.getByRole("menuitem", { name: "Settings" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "More" })).toBeNull();
   });
 });
 

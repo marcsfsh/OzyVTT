@@ -1,5 +1,6 @@
 import { Button } from "@vtt/ui";
 import { navigate } from "../router";
+import { PhoneHeader } from "../shell/SectionBar";
 
 /**
  * What an address that names nothing renders. A player asking for a GM-only address gets exactly
@@ -30,6 +31,7 @@ export function NotFoundView({ role: _role }: Readonly<{ role: "gm" | "player" }
 export function NotFoundPage({ role }: Readonly<{ role: "gm" | "player" }>) {
   return (
     <div className="pane-frame pane-scene frame-col">
+      <PhoneHeader title="Not found" />
       <div className="scroll-y frame-fill notfound-stage">
         <NotFoundView role={role} />
       </div>

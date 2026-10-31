@@ -18,6 +18,7 @@ import {
 } from "../router";
 import { useSceneActions } from "../scenes/sceneActions";
 import { PrepFrame } from "./AppBar";
+import { PhoneHeader } from "./SectionBar";
 import { setViewerPreviewOpen, useViewerPreviewOpen } from "../viewer/preview-open";
 import { isFullPageLayer, LayerView } from "./LayerView";
 import { TableView } from "./TableView";
@@ -187,6 +188,10 @@ export function GmShell({
           scenes={scenes.map((scene) => ({ id: scene.id, name: scene.name }))}
           activeEncounterId={state.combat.activeEncounterId ?? null}
         />
+      )}
+      {tab("viewer") && route.segments[1] !== "sound" && (
+        // A phone has no top bar, so the page names itself (frame spec 2.2).
+        <PhoneHeader title="Table screen" />
       )}
       {tab("viewer") && route.segments[1] !== "sound" && (
         <ViewerControls

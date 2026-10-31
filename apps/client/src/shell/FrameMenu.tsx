@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { IconCog, Menu, MenuItem, Portrait, ThemeToggle } from "@vtt/ui";
 import { pictureOf } from "../actors/actor-picture";
@@ -23,8 +24,9 @@ const partyOf = (state: GmView) =>
 export function GmMenuRows({
   state,
   token,
-  onSignOut
-}: Readonly<{ state: GmView; token: string; onSignOut: () => void }>) {
+  onSignOut,
+  afterWho
+}: Readonly<{ state: GmView; token: string; onSignOut: () => void; afterWho?: ReactNode }>) {
   const screen = useTableScreen(token, state);
   const { confirm, dialog } = useConfirm();
   const online = onlineOf(state);
@@ -38,6 +40,7 @@ export function GmMenuRows({
           <span>Running this table</span>
         </span>
       </div>
+      {afterWho}
       <div className="frame-menu-row" role="group" aria-label={`Who is here, ${online.length} of ${party.length}`}>
         <span className="frame-menu-label">Who is here</span>
         <span className="frame-menu-faces">
@@ -85,7 +88,11 @@ export function GmMenuRows({
  * A player's rows: who you are and what you play, Release when one character is claimed (with more, the sheet's menu
  * releases each), the theme, Settings and Leave the table.
  */
-export function PlayerMenuRows({ state, onLeave }: Readonly<{ state: PlayerView; onLeave: () => void }>) {
+export function PlayerMenuRows({
+  state,
+  onLeave,
+  afterWho
+}: Readonly<{ state: PlayerView; onLeave: () => void; afterWho?: ReactNode }>) {
   const { release, releasing, dialog: releaseDialog } = useReleaseCharacter(state);
   const { leave, dialog: leaveDialog } = useLeaveTable(state, onLeave);
   const mine = state.actors.filter((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
@@ -102,6 +109,7 @@ export function PlayerMenuRows({ state, onLeave }: Readonly<{ state: PlayerView;
           </span>
         </span>
       </div>
+      {afterWho}
       {mine.length === 1 && first && (
         <MenuItem tone="danger" disabled={releasing} onClick={() => void release(first.name)}>
           Release {first.name}

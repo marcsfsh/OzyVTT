@@ -81,7 +81,7 @@ export function SectionBar({
     <SectionBarEnd.Provider value={slot}>
       {phone && phoneHidden ? null : phone ? (
         <div className="secbar-phone">
-          <header className="secbar-head">
+          <header className="secbar-head" data-horizon="">
             {phoneHead ?? (
               <>
                 <h1 className="secbar-name">{name}</h1>
@@ -107,5 +107,20 @@ export function SectionBar({
       )}
       {children}
     </SectionBarEnd.Provider>
+  );
+}
+
+/**
+ * A phone's header row for a page with no bar of its own (frame spec 2.2, T rule 12): its title at 18px and up to two
+ * icons, the page's own. Nothing on a laptop, where the top bar and the section bar stand above the page.
+ */
+export function PhoneHeader({ title, icons }: Readonly<{ title: string; icons?: ReactNode }>) {
+  const phone = useMediaQuery("(max-width: 760px)");
+  if (!phone) return null;
+  return (
+    <header className="secbar-head phone-head" data-horizon="">
+      <h1 className="secbar-name">{title}</h1>
+      {icons && <span className="secbar-icons">{icons}</span>}
+    </header>
   );
 }

@@ -1,9 +1,7 @@
-import { useRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import {
-  IconButton,
-  ThemeSwitch,
-  IconCog,
+  IconMore,
   IconDie,
   IconList,
   IconLog,
@@ -33,12 +31,11 @@ import {
   type PlayerSection
 } from "../router";
 import { LiveScenePicker } from "../table/LiveScenePicker";
-import { PlayerIdentity } from "../table/PlayerIdentity";
-import { TvControl } from "../table/TvControl";
 import { pageLight } from "./pageLight";
 import { tabTrip } from "./tabLight";
 import { SearchLauncher } from "./SearchLauncher";
-import { FrameMenu } from "./FrameMenu";
+import { FrameMenu, GmMenuRows, PlayerMenuRows } from "./FrameMenu";
+import { MoreSheet } from "./MoreSheet";
 import { LiveChip, myTurnNow } from "./LiveChip";
 import { SectionBar, SectionBarSlot } from "./SectionBar";
 import "./app-bar.css";
@@ -137,13 +134,16 @@ function TopBar({ children, className }: Readonly<{ children: ReactNode; classNa
   );
 }
 
-function SettingsButton() {
-  return (
-    <IconButton label="Settings" className="app-bar-icon" onClick={() => void navigate("/settings")}>
-      <IconCog />
-    </IconButton>
-  );
-}
+/** Where search's Go to can take the GM: the sections, Prep's pages, the table screen and Settings. */
+const gmGoTo = [
+  ...GM_SECTIONS.map((entry) => ({ label: entry.label, path: entry.path })),
+  ...PREP_PAGES.filter((page) => page.id !== "scenes").map((page) => ({
+    label: `Prep · ${page.label}`,
+    path: page.path
+  })),
+  { label: "Table screen", path: pathForGmTab("viewer") },
+  { label: "Settings", path: "/settings" }
+];
 
 /**
  * The GM's top bar (frame spec 2.1). On a laptop: the wordmark, Play, Prep, Codex and Compendium, then search and the
@@ -158,54 +158,65 @@ export function GmTopBar({
   const route = useRoute();
   const phone = usePhoneShell();
   const section = litGmSection(route.path);
-  // On a phone the top bar belongs to the page on screen, and Play's strip is its own header.
-  if (phone && section === "play") return null;
+  // A phone has no top bar (frame spec 2.2): each page's header row is its first row, and More holds the rest.
+  if (phone) return null;
   return (
     <TopBar className="app-bar--gm">
-      {!phone && (
-        <SectionTabs
-          ariaLabel="GM sections"
-          tabs={GM_SECTIONS}
-          activeId={section}
-          onChange={(id) => openGmSection(id as GmSection, section)}
-          bottom={false}
-        />
-      )}
-      {!phone && (section === "play" ? <LiveScenePicker state={state} chip /> : <LiveChip role="gm" state={state} />)}
-      <span className="app-bar-grow" />
-      {phone && <TvControl gmToken={token} state={state} compact />}
-      <SearchLauncher
-        role="gm"
-        route={route}
-        sections={[
-          ...GM_SECTIONS.map((entry) => ({ label: entry.label, path: entry.path })),
-          ...PREP_PAGES.filter((page) => page.id !== "scenes").map((page) => ({
-            label: `Prep · ${page.label}`,
-            path: page.path
-          })),
-          { label: "Table screen", path: pathForGmTab("viewer") },
-          { label: "Settings", path: "/settings" }
-        ]}
+      <SectionTabs
+        ariaLabel="GM sections"
+        tabs={GM_SECTIONS}
+        activeId={section}
+        onChange={(id) => openGmSection(id as GmSection, section)}
+        bottom={false}
       />
-      {phone ? (
-        <>
-          <ThemeSwitch className="app-bar-theme" />
-          <SettingsButton />
-        </>
-      ) : (
-        <FrameMenu role="gm" state={state} token={token} onSignOut={onSignOut} />
-      )}
+      {section === "play" ? <LiveScenePicker state={state} chip /> : <LiveChip role="gm" state={state} />}
+      <span className="app-bar-grow" />
+      <SearchLauncher role="gm" route={route} sections={gmGoTo} />
+      <FrameMenu role="gm" state={state} token={token} onSignOut={onSignOut} />
     </TopBar>
   );
 }
 
+/**
+ * The phone's bottom tabs with More as the fifth (frame spec 2.2): five equal columns, More drawn like a tab with the
+ * dots, opening its sheet above the tabs. While the sheet is open More carries the ink and the chosen tab keeps its
+ * selection without its ink.
+ */
+function BottomNav({ label, tabs, rows }: Readonly<{ label: string; tabs: ReactNode; rows: ReactNode }>) {
+  const [open, setOpen] = useState(false);
+  return (
+    <nav className={cx("app-bottom-nav", open && "is-more")} aria-label={label}>
+      {tabs}
+      <button
+        type="button"
+        className="app-bottom-more interactive"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="app-bottom-tab">
+          <span className="app-bottom-tab-icon" aria-hidden="true">
+            <IconMore />
+          </span>
+          More
+        </span>
+      </button>
+      {open && <MoreSheet onClose={() => setOpen(false)}>{rows}</MoreSheet>}
+    </nav>
+  );
+}
+
 /** The GM's sections as the phone's bottom tabs. */
-export function GmBottomTabs({ state }: Readonly<{ state?: GmView }>) {
+export function GmBottomTabs({
+  state,
+  token,
+  onSignOut
+}: Readonly<{ state?: GmView; token?: string; onSignOut?: () => void }>) {
   const route = useRoute();
   const section = litGmSection(route.path);
   // While a fight runs, Play carries a lit lamp (frame rule 3.2).
   const fighting = state?.combat.active === true;
-  return (
+  const tabs = (
     <SectionTabs
       ariaLabel="GM sections"
       tabs={GM_SECTIONS.map((entry) => ({
@@ -216,6 +227,21 @@ export function GmBottomTabs({ state }: Readonly<{ state?: GmView }>) {
       activeId={section}
       onChange={(id) => openGmSection(id as GmSection, section)}
       bottom
+    />
+  );
+  if (!state || !token || !onSignOut) return tabs;
+  return (
+    <BottomNav
+      label="GM navigation"
+      tabs={tabs}
+      rows={
+        <GmMenuRows
+          state={state}
+          token={token}
+          onSignOut={onSignOut}
+          afterWho={<SearchLauncher role="gm" route={route} sections={gmGoTo} />}
+        />
+      }
     />
   );
 }
@@ -244,7 +270,6 @@ function openPlayerSection(section: PlayerSection, current: PlayerSection | null
  */
 export function PlayerTopBar({
   state,
-  token,
   codexUnread,
   onCodexSeen,
   onLeave
@@ -259,61 +284,47 @@ export function PlayerTopBar({
   const phone = usePhoneShell();
   const section = litPlayerSection(route);
   useCodexNews(codexUnread, "app-sections");
-  // On a phone the table and its log head with the character being played, as the top bar belongs to the page.
-  const claimed = state.actors.some((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
-  if (phone && token && claimed && (section === "table" || section === "log"))
-    return <PlayerIdentity state={state} token={token} />;
+  // A phone has no top bar (frame spec 2.2): the table and its log head with the character in the pane.
+  if (phone) return null;
   return (
     <TopBar className="app-bar--player">
-      {!phone && (
-        <SectionTabs
-          ariaLabel="Player sections"
-          tabs={PLAYER_SECTIONS.filter((entry) => entry.id !== "log").map((entry) =>
-            entry.id === "codex" && codexUnread > 0 ? { ...entry, label: `Codex, ${codexUnread} new` } : entry
-          )}
-          // The log is the table's own panel on a laptop, so the Table tab stays lit there.
-          activeId={section === "log" ? "table" : section}
-          onChange={(id) => openPlayerSection(id as PlayerSection, section, onCodexSeen)}
-          bottom={false}
-        />
-      )}
-      {!phone && <LiveChip role="player" state={state} />}
-      <span className="app-bar-grow" />
-      <SearchLauncher
-        role="player"
-        route={route}
-        sections={[
-          ...PLAYER_SECTIONS.filter((entry) => entry.id !== "log").map((entry) => ({
-            label: entry.label,
-            path: entry.path
-          })),
-          { label: "Settings", path: "/settings" }
-        ]}
+      <SectionTabs
+        ariaLabel="Player sections"
+        tabs={PLAYER_SECTIONS.filter((entry) => entry.id !== "log").map((entry) =>
+          entry.id === "codex" && codexUnread > 0 ? { ...entry, label: `Codex, ${codexUnread} new` } : entry
+        )}
+        // The log is the table's own panel on a laptop, so the Table tab stays lit there.
+        activeId={section === "log" ? "table" : section}
+        onChange={(id) => openPlayerSection(id as PlayerSection, section, onCodexSeen)}
+        bottom={false}
       />
-      {phone ? (
-        <>
-          <ThemeSwitch className="app-bar-theme" />
-          <SettingsButton />
-        </>
-      ) : (
-        <FrameMenu role="player" state={state} onLeave={onLeave} />
-      )}
+      <LiveChip role="player" state={state} />
+      <span className="app-bar-grow" />
+      <SearchLauncher role="player" route={route} sections={playerGoTo} />
+      <FrameMenu role="player" state={state} onLeave={onLeave} />
     </TopBar>
   );
 }
+
+/** Where search's Go to can take a player: the sections and Settings. */
+const playerGoTo = [
+  ...PLAYER_SECTIONS.filter((entry) => entry.id !== "log").map((entry) => ({ label: entry.label, path: entry.path })),
+  { label: "Settings", path: "/settings" }
+];
 
 /** A player's sections as the phone's bottom tabs: Table, Sheet, Codex and Log. */
 export function PlayerBottomTabs({
   codexUnread,
   onCodexSeen,
-  state
-}: Readonly<{ codexUnread: number; onCodexSeen: () => void; state?: PlayerView }>) {
+  state,
+  onLeave
+}: Readonly<{ codexUnread: number; onCodexSeen: () => void; state?: PlayerView; onLeave?: () => void }>) {
   const route = useRoute();
   const section = litPlayerSection(route);
   useCodexNews(codexUnread, "app-bottom-tabs");
   // While a fight runs, Table carries a lit lamp, amber on the player's turn (frame rule 3.2).
   const live = state?.combat.active ? (myTurnNow(state) ? ("mine" as const) : ("live" as const)) : null;
-  return (
+  const tabs = (
     <SectionTabs
       ariaLabel="Player sections"
       tabs={PLAYER_SECTIONS.map((entry) =>
@@ -326,6 +337,20 @@ export function PlayerBottomTabs({
       activeId={section}
       onChange={(id) => openPlayerSection(id as PlayerSection, section, onCodexSeen)}
       bottom
+    />
+  );
+  if (!state || !onLeave) return tabs;
+  return (
+    <BottomNav
+      label="Player navigation"
+      tabs={tabs}
+      rows={
+        <PlayerMenuRows
+          state={state}
+          onLeave={onLeave}
+          afterWho={<SearchLauncher role="player" route={route} sections={playerGoTo} />}
+        />
+      }
     />
   );
 }

@@ -5,6 +5,8 @@ import { NotFoundPage } from "../components/NotFoundView";
 import { isGmOnlyPath, isKnownPath, layerOf, litPlayerTab, navigate, useRoute, type Route } from "../router";
 import { isFullPageLayer, LayerView } from "./LayerView";
 import { TableView } from "./TableView";
+import { PlayerIdentity } from "../table/PlayerIdentity";
+import { usePhoneShell } from "./AppBar";
 import type { Connection } from "./useSession";
 
 const PlayerCodex = lazySurface(() => import("../codex/PlayerCodex").then((m) => m.PlayerCodex));
@@ -33,11 +35,13 @@ export function PlayerShell({
   onLeave: () => void;
 }>) {
   const route = useRoute();
+  const phone = usePhoneShell();
   const view = viewOf(route);
   const layer = layerOf(route.path);
   if (isFullPageLayer(layer))
     return <LayerView layer={layer} role="player" state={state} token={token} connection={connection} />;
   const reachable = isKnownPath(route.path) && !isGmOnlyPath(route.path);
+  const claimed = state.actors.some((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
   switch (view) {
     /* The player Codex owns its frame: a rail beside chrome rows over one scrolling region. */
     case "codex":
@@ -74,6 +78,14 @@ export function PlayerShell({
             onBack={() => navigate("/table")}
           />
         );
-      return <TableView role="player" state={state} token={token} />;
+      // A phone has no top bar (frame spec 2.2): the table and its log head with the character being played.
+      return claimed && phone ? (
+        <div className="player-table-wrap">
+          <PlayerIdentity state={state} token={token} />
+          <TableView role="player" state={state} token={token} />
+        </div>
+      ) : (
+        <TableView role="player" state={state} token={token} />
+      );
   }
 }
