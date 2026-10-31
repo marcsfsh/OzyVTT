@@ -1,23 +1,25 @@
 /* Bottom right on a laptop; on a phone, just above the bottom tabs (the shell sets --bottom-tabs-h). */
+/* News stays in the corner (ADR-0049, 2.4): 420px wide, 16px from the bottom right of a laptop; on a phone 8px in from
+   each side, just above the bottom tabs. */
 .nh-toast-viewport {
   position: fixed;
   z-index: 80;
-  right: var(--space-5);
-  bottom: var(--space-5);
+  right: 16px;
+  bottom: 16px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: var(--space-2);
-  width: min(100vw - 2rem, 26rem);
+  width: min(100vw - 2rem, 420px);
   pointer-events: none;
 }
 /* A phone shows the newest message alone: a second one would hang over the page's own controls. */
 @media (max-width: 760px) {
   .nh-toast-viewport {
-    left: 50%;
-    right: auto;
-    bottom: calc(var(--bottom-tabs-h, 0px) + env(safe-area-inset-bottom) + var(--space-3));
-    transform: translateX(-50%);
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--bottom-tabs-h, 0px) + env(safe-area-inset-bottom) + 8px);
+    width: auto;
     align-items: stretch;
   }
   .nh-toast-viewport > .nh-toast:not(:last-child) {
@@ -32,8 +34,8 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  min-height: var(--tap-min);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  min-height: 52px;
+  padding: var(--space-1) var(--space-2) var(--space-1) 14px;
   box-sizing: border-box;
   border: 1px solid var(--line-raised);
   background: var(--surface-2);
@@ -62,13 +64,13 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-/* A quiet x; `.tap-target` lifts the hit area to 44px without growing the toast. */
+/* A quiet x in a 36px square (T rule, toast close), 44px under a finger. */
 .nh-toast-close {
   flex: none;
   display: grid;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -80,6 +82,12 @@
 .nh-toast-close:hover,
 .nh-toast-close:active {
   color: var(--text);
+}
+@media (pointer: coarse) {
+  .nh-toast-close {
+    width: var(--tap-min);
+    height: var(--tap-min);
+  }
 }
 
 /* The in-flow outlet: one line in a layout's status row, so nothing floats over the page. */

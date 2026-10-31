@@ -44,6 +44,11 @@
   border-color: var(--state-on-edge);
   color: var(--cyan-hi);
 }
+/* ROLL: a roll the GM calls for, outlined in the WAIT amber (frame rule 3.10). */
+.nh-tag--roll {
+  border-color: var(--caution);
+  color: var(--caution-hi);
+}
 .nh-tag--error {
   border-color: var(--hostile);
   color: var(--danger-text);

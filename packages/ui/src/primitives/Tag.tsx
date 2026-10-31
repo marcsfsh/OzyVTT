@@ -4,10 +4,10 @@ import "./Tag.css";
 
 /**
  * What a tag marks. Fills: NEXT white, WAIT amber, HIT yellow, MISS grey. Outlines mark status: READY, TAKEN, SRD,
- * DONE and ERROR in their inks, HOMEBREW in yellow; HIDDEN FROM PLAYERS is dashed violet.
+ * DONE and ERROR in their inks, ROLL in amber, HOMEBREW in yellow; HIDDEN FROM PLAYERS is dashed violet.
  */
 export type TagTone =
-  "next" | "wait" | "hit" | "miss" | "status" | "ready" | "done" | "error" | "srd" | "homebrew" | "hidden";
+  "next" | "wait" | "hit" | "miss" | "status" | "ready" | "done" | "roll" | "error" | "srd" | "homebrew" | "hidden";
 
 /** A VT323 tag: one or two words, uppercase, always beside the thing it marks. The words carry the meaning. */
 export function Tag({

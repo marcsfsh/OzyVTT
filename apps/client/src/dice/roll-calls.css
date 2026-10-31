@@ -142,30 +142,76 @@
 
 /* The player's cards away from the table: a row at the top of the pane that pushes the page down, so it never
    covers a control. Several open calls scroll inside it. On the table the prompt slot holds them. */
+/* Away from the table each call is a band in the pane's first row (frame rule 3.10, values "Bands under the bar"):
+   at least 48px, tinted --caution at 9%, the ROLL tag, what the GM asks for, and the roll on a 2px amber base. */
 .app-pane > .roll-call-dock {
   flex: 0 0 auto;
   display: grid;
-  gap: var(--space-2);
   max-height: 40%;
-  padding: var(--space-2) var(--pane-gutter);
-  border-bottom: 1px solid var(--line-strong);
-  background: var(--surface-1);
 }
-.roll-call-dock .roll-call-card {
-  border-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong));
-  border-left-color: var(--cyan);
-  background: var(--surface-1);
+.roll-call-card.is-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) 10px;
+  min-height: 48px;
+  padding: var(--space-1) 12px var(--space-1) var(--pane-gutter);
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--caution) 9%, var(--bg));
+}
+.roll-call-card.is-band .roll-call-card-head {
+  display: block;
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: 14px;
+}
+.roll-call-card.is-band .roll-call-meta {
+  display: inline;
+  margin-left: var(--space-2);
+}
+.roll-call-card.is-band .roll-call-card-head strong {
+  font-weight: 600;
+}
+.roll-call-card.is-band :is(.save-prompt-actions, .roll-call-answered, .save-prompt, .roll-call-situations) {
+  flex: 0 1 auto;
+}
+.roll-call-roll {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  box-shadow: inset 0 -2px 0 var(--caution);
+  color: var(--text);
+  font: 600 14px / 1 var(--font-label);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.roll-call-roll:hover {
+  background: color-mix(in srgb, var(--caution) 10%, transparent);
+}
+.roll-call-roll:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.roll-call-roll .roll-call-roll-num {
+  display: inline;
+  margin: 0;
+  color: var(--text);
+  font: 400 24px / 1 var(--font-numeric);
+}
+@media (pointer: coarse) {
+  .roll-call-roll {
+    min-height: var(--tap-min);
+  }
 }
 .roll-call-dock .save-prompt,
 .prompt-slot .save-prompt {
   margin: 0;
   padding: 0;
-}
-/* While a card is pinned to the foot of the screen, toasts come down from the top, so the one announcing the call
-   never covers the field the player types the die into. */
-body:has(.roll-call-dock) .nh-toast-viewport {
-  top: calc(var(--space-4) + env(safe-area-inset-top));
-  bottom: auto;
 }
 /* A call card's situations: chips that wrap, each wide enough for its words on a phone. */
 .roll-call-situations {
@@ -177,4 +223,8 @@ body:has(.roll-call-dock) .nh-toast-viewport {
   max-width: 100%;
   text-align: left;
   overflow-wrap: anywhere;
+}
+/* The band's roll is its own Base line, so the prompt actions' raised plate stays off it. */
+.save-prompt-actions .roll-call-roll::before {
+  content: none;
 }

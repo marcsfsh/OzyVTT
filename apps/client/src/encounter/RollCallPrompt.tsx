@@ -1,13 +1,14 @@
-import { useRef, useState, useSyncExternalStore } from "react";
-import type { CheckRollResult, PlayerRollCall, PlayerView } from "@vtt/domain";
-import { Button, canMove, fadeIn, pop, rel, useOnChange, useToast } from "@vtt/ui";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { ActorDerivedSheet, CheckRollResult, PlayerRollCall, PlayerView } from "@vtt/domain";
+import { Button, Tag, canMove, cx, fadeIn, pop, rel, useOnChange, useToast } from "@vtt/ui";
 import { useSkillCatalog } from "../content/catalogs";
-import { callLabel } from "../dice/roll-call-words";
+import { ABILITY_WORDS, callLabel } from "../dice/roll-call-words";
 import { typedDie, useRollPreference } from "../dice/roll-preference";
-import { command } from "../lib/command";
+import { command, read } from "../lib/command";
 import { FaceEntry, RerollControl } from "./RollControls";
 import { SavePrompt } from "./SavePrompt";
 import { checkLine } from "../sheet/useSheetRolls";
+import { signed } from "./format";
 import { CallSituations, toggled } from "../dice/CallSituations";
 import "../dice/roll-calls.css";
 
@@ -60,8 +61,8 @@ export function useRollCallCards(state: PlayerView) {
 }
 
 /**
- * The GM's calls for a roll on the pages away from the table, as a row of the frame that pushes the page down: it
- * never covers a control. On the table they wait in the prompt slot instead.
+ * The GM's calls for a roll on the pages away from the table (frame rule 3.10): an amber band each, in the frame's
+ * first row, that pushes the page down and never covers a control. On the table they wait in the prompt slot instead.
  */
 export function RollCallPrompts({ state }: Readonly<{ state: PlayerView }>) {
   const { cards, named, keep, putAway } = useRollCallCards(state);
@@ -71,6 +72,7 @@ export function RollCallPrompts({ state }: Readonly<{ state: PlayerView }>) {
       {cards.map((card) => (
         <RollCallCard
           key={card.key}
+          band
           card={card}
           state={state}
           named={named}
@@ -90,10 +92,13 @@ export function RollCallCard({
   card,
   state,
   named,
+  band = false,
   onAnswered,
   onPutAway
 }: Readonly<{
   card: RollCallCardModel;
+  /** Away from the table: the amber band of frame rule 3.10 in place of the card. */
+  band?: boolean;
   state: PlayerView;
   named: boolean;
   onAnswered: (outcome: CheckRollResult) => void;
@@ -114,6 +119,7 @@ export function RollCallCard({
   const inspired = actor?.heroicInspiration === true;
   const label = callLabel(call, (id) => skillCatalog.items.find((skill) => skill.id === id)?.name);
   const save = entry.saveId ? state.combat.pendingSaves.find((pending) => pending.id === entry.saveId) : undefined;
+  const bonus = useCallBonus(band ? entry.actorId : null, call);
   const shown = rerolled ?? outcome;
   // The answer drops into the card as it lands (ADR-0045).
   const cardEl = useRef<HTMLElement>(null);
@@ -151,9 +157,10 @@ export function RollCallCard({
   };
 
   return (
-    <article ref={cardEl} className="roll-call-card" aria-label={`${label} for ${name}`}>
-      <p className="roll-call-card-eyebrow">The GM calls for a roll</p>
+    <article ref={cardEl} className={cx("roll-call-card", band && "is-band")} aria-label={`${label} for ${name}`}>
+      {band ? <Tag tone="roll">Roll</Tag> : <p className="roll-call-card-eyebrow">The GM calls for a roll</p>}
       <p className="roll-call-card-head">
+        {band && "The GM asks for a "}
         <strong>{label}</strong>
         <span className="roll-call-meta">
           {named ? name : ""}
@@ -204,9 +211,22 @@ export function RollCallCard({
             onToggle={(situation) => setPicked((current) => toggled(current, situation))}
           />
           <span className="save-prompt-actions">
-            <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => void answer()}>
-              Roll {label}
-            </button>
+            {band ? (
+              <button
+                type="button"
+                className="roll-call-roll"
+                aria-label={`Roll ${label}`}
+                disabled={busy}
+                onClick={() => void answer()}
+              >
+                {rollName(call, label)}
+                {bonus !== null && <span className="roll-call-roll-num">{signed(bonus)}</span>}
+              </button>
+            ) : (
+              <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => void answer()}>
+                Roll {label}
+              </button>
+            )}
             {mayType && (
               <FaceEntry
                 label={`Your d20 for the ${label}`}
@@ -221,4 +241,36 @@ export function RollCallCard({
       )}
     </article>
   );
+}
+
+/** The roll's own short name on the band's button: "Perception", "Wisdom save", "Strength". */
+function rollName(call: PlayerRollCall, label: string): string {
+  const ability = ABILITY_WORDS[call.subject.ability];
+  if (call.kind === "save") return `${ability} save`;
+  const named = /\(([^)]+)\)/.exec(label)?.[1];
+  if (call.subject.skill && named) return named;
+  return ability;
+}
+
+/** The bonus the server rolls for this call, read from the character's derived sheet (the same read the sheet makes),
+ *  so the band shows the server's number; null until it answers or when it cannot. */
+function useCallBonus(actorId: string | null, call: PlayerRollCall): number | null {
+  const [derived, setDerived] = useState<ActorDerivedSheet | null>(null);
+  useEffect(() => {
+    if (!actorId) return;
+    let live = true;
+    void read("actor:available-actions", { actorId }).then((result) => {
+      if (live && result.ok && result.derived) setDerived(result.derived);
+    });
+    return () => {
+      live = false;
+    };
+  }, [actorId]);
+  if (!derived) return null;
+  const { ability, skill, tool } = call.subject;
+  const row = derived.abilities.find((each) => each.ability === ability);
+  if (call.kind === "save") return row?.save ?? null;
+  if (skill) return derived.skills.find((each) => each.id === skill)?.bonus ?? null;
+  if (tool) return (derived.tools ?? []).find((each) => each.id === tool)?.bonus ?? null;
+  return row?.check ?? null;
 }

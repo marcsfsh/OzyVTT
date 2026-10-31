@@ -295,32 +295,36 @@ textarea:focus {
   padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
-/* The reconnecting bar, under the top bar while the connection is down or the table has not sent a fresh snapshot
-   since it came back. Reading the last snapshot still works; the bar says to wait before making changes. */
+/* The reconnecting band (frame rule 3.11): under the top bar on a laptop and the first row on a phone, at least 48px
+   of glass with the amber WAIT tag and a 3px amber edge. Reading the last snapshot still works; it says to wait
+   before making changes. */
 .reconnect-bar {
   grid-row: 2;
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  min-height: var(--tap-min);
+  gap: 10px;
+  min-height: 48px;
   margin: 0;
-  padding: var(--space-1) var(--space-5);
-  background: color-mix(in srgb, var(--caution) 10%, var(--surface-1));
+  padding: var(--space-1) 12px var(--space-1) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--caution) 45%, var(--line-strong));
+  background: var(--glass-bg);
+  box-shadow: inset 3px 0 0 var(--caution);
   color: var(--text);
-  font-size: var(--fs-sm);
+  font-size: 14px;
 }
 .reconnect-bar.is-back {
-  background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong));
+  box-shadow: inset 3px 0 0 var(--cyan);
 }
-/* The bar's own line (ADR-0045): grey and unlit while it waits, lit in the horizon's colours once the table is back. */
+/* Its own 1px line (ADR-0045): grey and unlit while it waits, lit in the horizon's colours once the table is back. */
 .reconnect-bar-line {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
-  height: 2px;
-  background: var(--unlit);
+  bottom: -1px;
+  height: 1px;
+  background: var(--line-raised);
 }
 .reconnect-bar.is-back .reconnect-bar-line {
   background: var(--grad-horizon);

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ContentSkillSummary, GmView, PendingSave, PlayerRollCall, PlayerView, RollCall } from "@vtt/domain";
 
@@ -210,7 +210,10 @@ describe("the player's card for a call", () => {
     });
     const user = userEvent.setup();
     const { rerender } = render(<RollCallPrompts state={playerState([playerCall()])} />, { wrapper: ToastProvider });
-    expect(await screen.findByText("The GM calls for a roll")).toBeTruthy();
+    // Away from the table the call is the amber band (frame rule 3.10): the ROLL tag and what the GM asks for.
+    const band = await screen.findByRole("article", { name: "Wisdom (Perception) check for Aria" });
+    expect(within(band).getByText("Roll")).toHaveClass("nh-tag--roll");
+    expect(band).toHaveTextContent(/^RollThe GM asks for a Wisdom \(Perception\) check/);
     expect(screen.getByText("Wisdom (Perception) check", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("DC 15")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Roll Wisdom (Perception) check" }));
@@ -220,7 +223,23 @@ describe("the player's card for a call", () => {
     rerender(<RollCallPrompts state={playerState([])} />);
     expect(screen.getByText("Wisdom (Perception): 17 (d20 12) vs DC 15 · success.")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Done" }));
-    expect(screen.queryByText("The GM calls for a roll")).toBeNull();
+    expect(screen.queryByRole("article", { name: /for Aria$/ })).toBeNull();
+  });
+
+  it("shows the server's bonus for the call on the roll", async () => {
+    serve({
+      "actor:available-actions": {
+        ok: true,
+        derived: {
+          abilities: [{ ability: "wis", check: 2, save: 4 }],
+          skills: [{ id: "perception", name: "Perception", ability: "wis", bonus: 5 }],
+          tools: []
+        }
+      }
+    });
+    render(<RollCallPrompts state={playerState([playerCall()])} />, { wrapper: ToastProvider });
+    const roll = await screen.findByRole("button", { name: "Roll Wisdom (Perception) check" });
+    await waitFor(() => expect(roll).toHaveTextContent("Perception+5"));
   });
 
   it("takes a typed face from a physical die", async () => {
@@ -255,7 +274,7 @@ describe("the player's card for a call", () => {
     expect(sent("check:reroll")).toEqual([{ actorId: ARIA }]);
     rerender(<RollCallPrompts state={playerState([], { heroicInspiration: true })} />);
     await user.click(screen.getByRole("button", { name: "Done" }));
-    expect(screen.queryByText("The GM calls for a roll")).toBeNull();
+    expect(screen.queryByRole("article", { name: /for Aria$/ })).toBeNull();
   });
 
   it("asks for a typed reroll after a typed answer, even on a card mounted again", async () => {
