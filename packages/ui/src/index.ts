@@ -83,6 +83,8 @@ export { Button, IconButton } from "./primitives/Button";
 export { Field, Input, Select, Textarea } from "./primitives/forms";
 export { Group } from "./primitives/Group";
 export { EmptyState } from "./primitives/EmptyState";
+export { SideList, SideListGroup, SideListRow } from "./primitives/SideList";
+export type { SideListGroupSpec, SideListRowProps } from "./primitives/SideList";
 export { Wordmark, Eyebrow, SunMark } from "./primitives/Wordmark";
 export { Chip, type ChipTone } from "./primitives/Chip";
 export { Tabs } from "./primitives/Tabs";
@@ -194,6 +196,7 @@ export {
   IconBolt,
   IconBag,
   IconPage,
+  IconFolder,
   IconMoon,
   IconLevelUp,
   IconUser,

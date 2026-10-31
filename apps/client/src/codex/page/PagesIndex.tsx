@@ -5,11 +5,14 @@ import {
   Eyebrow,
   IconChevronRight,
   IconEyeOff,
+  IconFolder,
   IconMore,
   IconPlus,
   Input,
   Menu,
   MenuItem,
+  SideListGroup,
+  SideListRow,
   cx
 } from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
@@ -249,10 +252,66 @@ export function PagesIndex() {
         )}
         {gm && (
           <section className="cx-index-folders" aria-label="Folders">
-            <Eyebrow>Folders</Eyebrow>
+            <SideListGroup eyebrow="Folders">
+              {folders.map(([path, count]) => {
+                const depth = path.split("/").length - 1;
+                return renaming?.from === path ? (
+                  <li key={path} className="nh-sidelist-row">
+                    <form
+                      className="cx-folderrow"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void renameFolder(path, renaming.to);
+                      }}
+                    >
+                      <Input
+                        aria-label={`New name for ${path}`}
+                        value={renaming.to}
+                        autoFocus
+                        onChange={(event) => setRenaming({ from: path, to: event.target.value })}
+                      />
+                      <Button size="sm" type="submit">
+                        Rename
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>
+                        Cancel
+                      </Button>
+                    </form>
+                  </li>
+                ) : (
+                  // A tree by indent (theme rule 13): the folder's own name, 16px a level, its full path as its name.
+                  <SideListRow
+                    key={path}
+                    className="cx-folderrow"
+                    leading={<IconFolder />}
+                    label={path.slice(path.lastIndexOf("/") + 1)}
+                    ariaLabel={path}
+                    depth={depth}
+                    count={count}
+                    current={folder === path}
+                    onSelect={() => setFilter({ folder: folder === path ? null : path })}
+                    end={
+                      <Menu icon align="end" label={`Actions for ${path}`} trigger={<IconMore />}>
+                        <MenuItem onClick={() => gm?.quickCreate({ folder: path })}>New page here</MenuItem>
+                        <MenuItem onClick={() => setNewFolder(`${path}/`)}>New subfolder</MenuItem>
+                        <MenuItem onClick={() => setRenaming({ from: path, to: path })}>Rename folder</MenuItem>
+                        {path.includes("/") && (
+                          <MenuItem onClick={() => void renameFolder(path, path.slice(path.lastIndexOf("/") + 1))}>
+                            Move to top level
+                          </MenuItem>
+                        )}
+                        <MenuItem tone="danger" onClick={() => void deleteFolder(path, count)}>
+                          Delete folder
+                        </MenuItem>
+                      </Menu>
+                    }
+                  />
+                );
+              })}
+            </SideListGroup>
             <p className="cx-hint">Your own filing. Players never see it.</p>
             {newFolder === null ? (
-              <Button size="sm" variant="ghost" onClick={() => setNewFolder("")}>
+              <Button size="sm" onClick={() => setNewFolder("")}>
                 <IconPlus /> New folder
               </Button>
             ) : (
@@ -276,56 +335,6 @@ export function PagesIndex() {
                   Cancel
                 </Button>
               </form>
-            )}
-            {folders.map(([path, count]) =>
-              renaming?.from === path ? (
-                <form
-                  key={path}
-                  className="cx-folderrow"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void renameFolder(path, renaming.to);
-                  }}
-                >
-                  <Input
-                    aria-label={`New name for ${path}`}
-                    value={renaming.to}
-                    autoFocus
-                    onChange={(event) => setRenaming({ from: path, to: event.target.value })}
-                  />
-                  <Button size="sm" type="submit">
-                    Rename
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>
-                    Cancel
-                  </Button>
-                </form>
-              ) : (
-                <div key={path} className={cx("cx-folderrow", folder === path && "is-on")}>
-                  <button
-                    type="button"
-                    className="cx-folderrow-name"
-                    aria-pressed={folder === path}
-                    onClick={() => setFilter({ folder: folder === path ? null : path })}
-                  >
-                    {path}
-                  </button>
-                  <span className="cx-grouprow-count">{count}</span>
-                  <Menu icon align="end" label={`Actions for ${path}`} trigger={<IconMore />}>
-                    <MenuItem onClick={() => gm?.quickCreate({ folder: path })}>New page here</MenuItem>
-                    <MenuItem onClick={() => setNewFolder(`${path}/`)}>New subfolder</MenuItem>
-                    <MenuItem onClick={() => setRenaming({ from: path, to: path })}>Rename folder</MenuItem>
-                    {path.includes("/") && (
-                      <MenuItem onClick={() => void renameFolder(path, path.slice(path.lastIndexOf("/") + 1))}>
-                        Move to top level
-                      </MenuItem>
-                    )}
-                    <MenuItem tone="danger" onClick={() => void deleteFolder(path, count)}>
-                      Delete folder
-                    </MenuItem>
-                  </Menu>
-                </div>
-              )
             )}
           </section>
         )}

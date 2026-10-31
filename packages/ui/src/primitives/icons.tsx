@@ -611,6 +611,15 @@ export function IconPage({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** A folder: a side list's row for one. */
+export function IconFolder({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M3 6h6l2 2h10v11H3z" />
+    </Glyph>
+  );
+}
+
 /** A rest. */
 export function IconMoon({ className }: Readonly<{ className?: string }>) {
   return (
