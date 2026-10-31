@@ -13,7 +13,8 @@ import {
   MenuItem,
   SideListGroup,
   SideListRow,
-  cx
+  cx,
+  FindField
 } from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
 import { useConfirm } from "../../components/feedback";
@@ -185,8 +186,7 @@ export function PagesIndex() {
             </Button>
           </SectionBarSlot>
         )}
-        <Input
-          type="search"
+        <FindField
           aria-label="Find a page by name"
           placeholder="Find a page by name"
           value={filter}

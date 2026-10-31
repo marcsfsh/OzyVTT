@@ -243,10 +243,7 @@
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface-1) 55%, transparent);
 }
-.sc-sub-count {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
+
 /* The table and the Filters flyout that opens over its left side. */
 .sc-list-main {
   position: relative;

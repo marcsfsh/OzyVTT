@@ -1,4 +1,4 @@
-import { Button, Eyebrow, FilterChips, FilterFlyout, FiltersButton } from "@vtt/ui";
+import { Button, Eyebrow, FilterChips, FilterFlyout, FiltersButton, ListToolbar } from "@vtt/ui";
 import type { MapAsset } from "../maps/map-catalog";
 import { ModifiedDropdown, OneChoice, SortButton, TickDropdown } from "./listTools";
 import { STATE_LABEL } from "./sceneFacts";
@@ -39,30 +39,34 @@ export function SceneListToolbar({
   onFlyout: (open: boolean) => void;
 }>) {
   return (
-    <div className="sc-sub">
-      <FiltersButton
-        open={flyoutOpen}
-        onToggle={() => onFlyout(!flyoutOpen)}
-        controls={SCENE_FILTERS_ID}
-        count={activeFilterCount(filters)}
-      />
-      <TickDropdown
-        name="State"
-        options={SCENE_STATES.map((state) => ({ value: state, label: STATE_LABEL[state] }))}
-        selected={filters.states}
-        onChange={(states) => onFilters({ ...filters, states })}
-      />
-      <ModifiedDropdown
-        from={filters.from}
-        to={filters.to}
-        onChange={(from, to) => onFilters({ ...filters, from, to })}
-      />
-      <span className="sc-grow" />
-      <span className="sc-sub-count" role="status">
-        {shown === total ? `${total} ${total === 1 ? "encounter" : "encounters"}` : `${shown} of ${total} encounters`}
-      </span>
-      <SortButton sort={sort} keys={SCENE_SORT_KEYS} labels={SCENE_SORT_LABEL} onSort={onSort} />
-    </div>
+    <ListToolbar
+      className="sc-sub"
+      filters={
+        <>
+          <FiltersButton
+            open={flyoutOpen}
+            onToggle={() => onFlyout(!flyoutOpen)}
+            controls={SCENE_FILTERS_ID}
+            count={activeFilterCount(filters)}
+          />
+          <TickDropdown
+            name="State"
+            options={SCENE_STATES.map((state) => ({ value: state, label: STATE_LABEL[state] }))}
+            selected={filters.states}
+            onChange={(states) => onFilters({ ...filters, states })}
+          />
+          <ModifiedDropdown
+            from={filters.from}
+            to={filters.to}
+            onChange={(from, to) => onFilters({ ...filters, from, to })}
+          />
+        </>
+      }
+      count={
+        shown === total ? `${total} ${total === 1 ? "encounter" : "encounters"}` : `${shown} of ${total} encounters`
+      }
+      sort={<SortButton sort={sort} keys={SCENE_SORT_KEYS} labels={SCENE_SORT_LABEL} onSort={onSort} />}
+    />
   );
 }
 

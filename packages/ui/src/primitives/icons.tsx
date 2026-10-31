@@ -611,6 +611,15 @@ export function IconPage({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** Sort: three bars shortening, a list's order. */
+export function IconSort({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M4 7h16M7 12h10M10 17h4" />
+    </Glyph>
+  );
+}
+
 /** A folder: a side list's row for one. */
 export function IconFolder({ className }: Readonly<{ className?: string }>) {
   return (

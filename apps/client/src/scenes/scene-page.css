@@ -20,13 +20,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sc-kind {
-  flex: none;
-  color: var(--text-muted);
-  font: 600 var(--fs-2xs) / 1 var(--font-label);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
+
 /* See as: the label sits beside the choice on a laptop, and only the choice shows on a phone. */
 .sc-see-as {
   display: inline-flex;

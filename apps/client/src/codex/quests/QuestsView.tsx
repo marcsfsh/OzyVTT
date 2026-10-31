@@ -22,7 +22,8 @@ import {
   HIDDEN,
   sinceLabel,
   type Audience,
-  TitleLine
+  TitleLine,
+  FindField
 } from "@vtt/ui";
 import { pageLinkKey, type CodexQuestStatus } from "@vtt/domain";
 import { playerCodexApi, questApi } from "../api";
@@ -121,8 +122,7 @@ function QuestList({
   );
   return (
     <>
-      <Input
-        type="search"
+      <FindField
         aria-label="Filter quests"
         placeholder="Filter quests"
         value={text}

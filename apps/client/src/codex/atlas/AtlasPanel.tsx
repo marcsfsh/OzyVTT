@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { Combobox, IconChevronRight, IconEye, IconEyeOff, Input, Menu } from "@vtt/ui";
+import { Combobox, IconChevronRight, IconEye, IconEyeOff, Menu, FindField } from "@vtt/ui";
 import { countOf } from "@vtt/domain";
 import { CodexIcon, pinSwatchVar } from "../icons";
 import { LAYER_META, type AtlasLayer, type AtlasLayers } from "./layers";
@@ -125,7 +125,7 @@ export function PinFilter({
   const tags = useMemo(() => [...new Set(pins.flatMap((pin) => pin.tags))].sort(), [pins]);
   return (
     <div className="atlas-pinfilter">
-      <Input
+      <FindField
         aria-label="Filter pins"
         placeholder="Filter pins"
         value={text}

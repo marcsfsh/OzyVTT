@@ -12,7 +12,8 @@ import {
   MenuItem,
   Select,
   Switch,
-  cx
+  cx,
+  Kind
 } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import { EncounterMap } from "../scene/EncounterMap";
@@ -148,7 +149,8 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
           </Button>
         )}
         <h2 className="sc-scene-title">{map.name}</h2>
-        {!phone && <span className="sc-kind">{MAP_KIND_LABEL[map.kind]}</span>}
+        {/* A kind is its icon and its word, never a boxed state (theme rule 19). */}
+        {!phone && <Kind icon={<IconMap />}>{MAP_KIND_LABEL[map.kind]}</Kind>}
         <span className="sc-grow" />
         {map.calibration && (
           <Switch checked={showGrid} label={phone ? "Grid" : "Show the grid"} onChange={setShowGrid} />

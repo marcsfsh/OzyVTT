@@ -12,7 +12,8 @@ import {
   Dropdown,
   SortDialog,
   EVERYONE,
-  HIDDEN
+  HIDDEN,
+  IconSort
 } from "@vtt/ui";
 import type { CodexEntityType, CodexRecordKind } from "@vtt/domain";
 import { findApi } from "../api-records";
@@ -282,8 +283,8 @@ export function SearchView() {
         <span className="cx-search-count" role="status">
           {result.data ? `${result.data.total} ${result.data.total === 1 ? "result" : "results"}` : ""}
         </span>
-        <Button size="sm" aria-haspopup="dialog" onClick={() => setSorting(true)}>
-          {sortSummary(sort)}
+        <Button size="sm" aria-haspopup="dialog" aria-label={sortSummary(sort)} onClick={() => setSorting(true)}>
+          <IconSort /> {sortSummary(sort).replace(/^Sort: /, "")}
         </Button>
       </div>
       <div className="cx-search-results scroll-y">

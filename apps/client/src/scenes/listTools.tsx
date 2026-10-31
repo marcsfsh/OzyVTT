@@ -7,7 +7,8 @@ import {
   FilterChips,
   SortDialog,
   type SortDirection,
-  type SortLevelOf
+  type SortLevelOf,
+  IconSort
 } from "@vtt/ui";
 import { firstSortDirection, modifiedRangeLabel, sortDirectionLabel, sortSummary } from "./scene-lists";
 
@@ -145,8 +146,9 @@ export function SortButton<Key extends string>({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        {phone ? "Sort" : sortSummary(sort, labels)}
+      {/* The sort icon and its word (theme rule 17); the name keeps "Sort:" for a screen reader. */}
+      <Button size="sm" aria-haspopup="dialog" aria-label={sortSummary(sort, labels)} onClick={() => setOpen(true)}>
+        <IconSort /> {phone ? "Sort" : sort.map((level) => labels[level.key]).join(", then ")}
       </Button>
       {open && (
         <SortDialog

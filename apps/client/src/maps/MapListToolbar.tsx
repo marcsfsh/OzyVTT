@@ -1,4 +1,4 @@
-import { Button, Eyebrow, FilterChips, FilterFlyout, FiltersButton } from "@vtt/ui";
+import { Button, Eyebrow, FilterChips, FilterFlyout, FiltersButton, ListToolbar } from "@vtt/ui";
 import { ModifiedDropdown, OneChoice, SortButton, TickDropdown } from "../scenes/listTools";
 import type { SortLevel } from "../scenes/scene-lists";
 import {
@@ -38,30 +38,32 @@ export function MapListToolbar({
   onFlyout: (open: boolean) => void;
 }>) {
   return (
-    <div className="sc-sub">
-      <FiltersButton
-        open={flyoutOpen}
-        onToggle={() => onFlyout(!flyoutOpen)}
-        controls={MAP_FILTERS_ID}
-        count={activeMapFilterCount(filters)}
-      />
-      <TickDropdown
-        name="Type"
-        options={MAP_KINDS.map((kind) => ({ value: kind, label: MAP_KIND_LABEL[kind] }))}
-        selected={filters.kinds}
-        onChange={(kinds) => onFilters({ ...filters, kinds })}
-      />
-      <ModifiedDropdown
-        from={filters.from}
-        to={filters.to}
-        onChange={(from, to) => onFilters({ ...filters, from, to })}
-      />
-      <span className="sc-grow" />
-      <span className="sc-sub-count" role="status">
-        {shown === total ? `${total} ${total === 1 ? "map" : "maps"}` : `${shown} of ${total} maps`}
-      </span>
-      <SortButton sort={sort} keys={MAP_SORT_KEYS} labels={MAP_SORT_LABEL} onSort={onSort} />
-    </div>
+    <ListToolbar
+      className="sc-sub"
+      filters={
+        <>
+          <FiltersButton
+            open={flyoutOpen}
+            onToggle={() => onFlyout(!flyoutOpen)}
+            controls={MAP_FILTERS_ID}
+            count={activeMapFilterCount(filters)}
+          />
+          <TickDropdown
+            name="Type"
+            options={MAP_KINDS.map((kind) => ({ value: kind, label: MAP_KIND_LABEL[kind] }))}
+            selected={filters.kinds}
+            onChange={(kinds) => onFilters({ ...filters, kinds })}
+          />
+          <ModifiedDropdown
+            from={filters.from}
+            to={filters.to}
+            onChange={(from, to) => onFilters({ ...filters, from, to })}
+          />
+        </>
+      }
+      count={shown === total ? `${total} ${total === 1 ? "map" : "maps"}` : `${shown} of ${total} maps`}
+      sort={<SortButton sort={sort} keys={MAP_SORT_KEYS} labels={MAP_SORT_LABEL} onSort={onSort} />}
+    />
   );
 }
 

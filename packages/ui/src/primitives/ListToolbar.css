@@ -1,0 +1,59 @@
+/* A list's toolbar (consistency values): the count 13px --text-dim in plain words; sort a Base line button with the
+   sort icon and its word. */
+.nh-listbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) 6px;
+  min-width: 0;
+}
+.nh-listbar-grow {
+  flex: 1 1 auto;
+}
+.nh-listbar-count {
+  margin: 0;
+  color: var(--text-dim);
+  font: 500 13px / 1.3 var(--font-body);
+  white-space: nowrap;
+}
+/* A find field: the search icon 15px inside the field's start; the placeholder stays --text-muted. */
+.nh-findfield {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.nh-findfield-icon {
+  position: absolute;
+  left: 10px;
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.nh-findfield-input.nh-input {
+  width: 100%;
+  padding-left: 32px;
+}
+/* A kind: its icon and its word, unboxed. */
+.nh-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-dim);
+  font: 500 13px / 1.3 var(--font-body);
+}
+.nh-kind-icon {
+  display: inline-grid;
+  place-items: center;
+  margin: 0;
+}
+.nh-kind-icon svg {
+  width: 15px;
+  height: 15px;
+}
+.nh-kind-word {
+  margin: 0;
+  color: inherit;
+}

@@ -4,7 +4,6 @@ import {
   Button,
   Chip,
   IconDownload,
-  Input,
   SegmentedControl,
   Skeleton,
   Dropdown,
@@ -12,7 +11,9 @@ import {
   FilterFlyout,
   FiltersButton,
   SortDialog,
-  type SortLevelOf
+  type SortLevelOf,
+  IconSort,
+  FindField
 } from "@vtt/ui";
 import { apiRequest, jsonRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -239,8 +240,7 @@ export function ApiReference({
             { value: "commands", label: "Commands" }
           ]}
         />
-        <Input
-          type="search"
+        <FindField
           className="api-find"
           aria-label={view === "operations" ? "Find an operation" : "Find a command"}
           placeholder={view === "operations" ? "Find a path or summary" : "Find a command"}
@@ -256,8 +256,13 @@ export function ApiReference({
               controls={flyoutId}
               count={filterCount}
             />
-            <Button size="sm" aria-haspopup="dialog" onClick={() => setSorting(true)}>
-              {`Sort: ${sort.map((level) => SORT_WORDS[level.key]).join(", then ")}`}
+            <Button
+              size="sm"
+              aria-haspopup="dialog"
+              aria-label={`Sort: ${sort.map((level) => SORT_WORDS[level.key]).join(", then ")}`}
+              onClick={() => setSorting(true)}
+            >
+              <IconSort /> {sort.map((level) => SORT_WORDS[level.key]).join(", then ")}
             </Button>
           </>
         )}
