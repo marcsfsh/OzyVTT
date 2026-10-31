@@ -1,6 +1,6 @@
 /**
  * The Codex's addresses, its section bar and its phone tabs in one place, so nothing else needs to know the path
- * shapes. Data, not JSX: the shell reads these tables, and the command palette offers the same destinations.
+ * shapes. Data, not JSX: the shell reads these tables, and the Codex search offers the same destinations.
  */
 
 import type { CodexSearchHit } from "@vtt/domain";

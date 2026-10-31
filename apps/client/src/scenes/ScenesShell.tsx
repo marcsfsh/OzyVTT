@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import type { GmView } from "@vtt/domain";
 import { Button, Combobox, IconButton, IconMap, IconPlus, IconScene, Kbd, Tabs, cx } from "@vtt/ui";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
@@ -47,16 +47,6 @@ const NARROW_QUERY = "(max-width: 979px)";
 function FindBox({ state, maps }: Readonly<{ state: GmView; maps: readonly MapAsset[] | null }>) {
   const box = useRef<HTMLDivElement>(null);
   const shortcut = useMemo(() => shortcutLabel("K", currentDevice()), []);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        box.current?.querySelector("input")?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
   const options = [
     ...state.combat.encounters.map((scene) => ({
       id: `scene:${scene.id}`,

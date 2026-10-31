@@ -3,7 +3,7 @@ import { questApi, sessionApi } from "./api";
 import type { SessionRef } from "./sessions";
 import { newId } from "../lib/ids";
 
-/** Creates shared by the rails and the command palette. GM-only, so kept out of modules player surfaces import. */
+/** Creates shared by the rails and the Codex search. GM-only, so kept out of modules player surfaces import. */
 
 export function nextSessionNumber(sessions: readonly SessionRef[]): number {
   return sessions.reduce((best, session) => Math.max(best, session.sessionNumber ?? 0), 0) + 1;

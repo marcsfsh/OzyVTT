@@ -12,7 +12,8 @@ import {
 } from "../router";
 import { useRecapBadge } from "../codex/useRecapBadge";
 import { TableEventToasts } from "../scene/toasts";
-import { GmBottomTabs, GmTopBar, PlayerBottomTabs, PlayerTopBar, usePhoneShell } from "./AppBar";
+import { GmBottomTabs, GmTopBar, gmGoTo, PlayerBottomTabs, PlayerTopBar, playerGoTo, usePhoneShell } from "./AppBar";
+import { SearchDialog } from "./SearchDialog";
 import { GmShell } from "./GmShell";
 import { Landing, useEntryAnimation } from "./Landing";
 import { onPlayerTable, PlayerShell } from "./PlayerShell";
@@ -149,6 +150,9 @@ export function App() {
           )}
         </div>
       </TableCurrent.Provider>
+      {shell && (
+        <SearchDialog role={shell.role} token={shell.token} sections={shell.role === "gm" ? gmGoTo : playerGoTo} />
+      )}
       {/* Row 4: a phone's bottom tabs, the sections under the thumb. */}
       {shell?.role === "gm" && phone && (
         <GmBottomTabs state={shell.state as GmView} token={shell.token} onSignOut={() => void session.signOutGm()} />

@@ -94,11 +94,14 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
+import { SearchDialog } from "../shell/SearchDialog";
+import { closeSearch } from "../shell/search-store";
 import type { CodexSearchHit } from "@vtt/domain";
 
 /**
- * The Codex command palette. It is scoped to the Codex; making it global is a separate decision.
- * The player palette searches through `playerCodexApi` and offers no create verbs.
+ * The Codex's search and commands, as the one search's Codex place (ADR-0049, frame rule 3.4): Ctrl K opens it on
+ * every page, and the Codex adds its creates while it is mounted. A player searches through `searchAsPlayer` and
+ * gets no create verbs.
  */
 
 const PAGE = {
@@ -131,15 +134,18 @@ const HIT: CodexSearchHit = {
   match: null
 };
 
-const palette = () => screen.findByRole("dialog", { name: "Codex command palette" });
+const palette = () => screen.findByRole("dialog", { name: "Search" });
+const noPalette = () => expect(screen.queryByRole("dialog", { name: "Search" })).not.toBeInTheDocument();
 const renderGm = (at = "/codex") =>
   (goTo(at), render)(
     <ToastProvider>
       <CodexShell gmToken="gm" />
+      <SearchDialog role="gm" token="gm" sections={[]} />
     </ToastProvider>
   );
 
 beforeEach(() => {
+  closeSearch();
   listPages.mockResolvedValue([PAGE]);
   listFolders.mockResolvedValue([]);
   listConnections.mockResolvedValue([]);
@@ -184,9 +190,7 @@ describe("Opening and closing", () => {
     expect(await palette()).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument()
-    );
+    await waitFor(noPalette);
   });
 
   it("opens from the bar's search box, which announces the shortcut it duplicates", async () => {
@@ -201,28 +205,34 @@ describe("Opening and closing", () => {
   });
 });
 
-describe("The scope decision: Codex-only, deliberately", () => {
-  /** Fails if the key listener moves to `main.tsx` or module scope. */
-  it("⌘K does nothing when the Codex is not on screen", async () => {
-    /** A bare tree is the discriminating case: a global listener would fire regardless of what's rendered. */
+describe("One Ctrl K, with the Codex's creates while it is mounted", () => {
+  it("opens the same search on a page with no Codex, without the Codex's creates", async () => {
     const user = userEvent.setup();
+    goTo("/table");
     render(
       <ToastProvider>
         <div>Some other tab</div>
+        <SearchDialog role="gm" token="gm" sections={[]} />
       </ToastProvider>
     );
     await user.keyboard("{Control>}k{/Control}");
-    expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument();
+    const box = within(await palette());
+    await user.click(within(box.getByRole("group", { name: "Where to look" })).getByRole("button", { name: "Codex" }));
+    expect(box.getByText("Go to Story")).toBeInTheDocument();
+    expect(box.queryByText("New session")).not.toBeInTheDocument();
   });
 
-  it("stops listening once the Codex unmounts", async () => {
+  it("drops the creates once the Codex unmounts", async () => {
     const user = userEvent.setup();
     const view = renderGm();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     view.unmount();
+    render(<SearchDialog role="gm" token="gm" sections={[]} />);
 
     await user.keyboard("{Control>}k{/Control}");
-    expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument();
+    const box = within(await palette());
+    await user.click(within(box.getByRole("group", { name: "Where to look" })).getByRole("button", { name: "Codex" }));
+    expect(box.queryByText("New session")).not.toBeInTheDocument();
   });
 });
 
@@ -236,11 +246,11 @@ describe("What it can do", () => {
     await user.keyboard("{Control>}k{/Control}");
     const box = within(await palette());
     await user.type(box.getByLabelText("Search the Codex"), "strahd");
-    await user.click(await box.findByText("Strahd von Zarovich"));
+    await user.click(await box.findByRole("button", { name: /Strahd von Zarovich/ }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/codex/pages/p1"));
-    // The palette closes after navigating.
-    expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument();
+    // The search closes after navigating.
+    noPalette();
   });
 
   it("offers a GO TO verb for every place the shell opens: one list, never two", async () => {
@@ -288,12 +298,14 @@ describe("What it can do", () => {
     const box = within(await palette());
 
     await user.type(box.getByLabelText("Search the Codex"), "Vallaki");
-    expect(await box.findByText(/New page "Vallaki"/)).toBeInTheDocument();
+    expect(await box.findByRole("button", { name: /New page "Vallaki"/ })).toBeInTheDocument();
 
     search.mockResolvedValue({ hits: [HIT], truncated: false });
     await user.clear(box.getByLabelText("Search the Codex"));
     await user.type(box.getByLabelText("Search the Codex"), "Strahd von Zarovich");
-    await waitFor(() => expect(box.queryByText(/New page "Strahd von Zarovich"/)).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(box.queryByRole("button", { name: /New page "Strahd von Zarovich"/ })).not.toBeInTheDocument()
+    );
   });
 
   it("says when the result list is CLIPPED rather than letting it look complete", async () => {
@@ -313,7 +325,7 @@ describe("What it can do", () => {
     renderGm();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.keyboard("{Control>}k{/Control}");
-    await (await palette()).querySelector("input")!.focus();
+    (await palette()).querySelector("input")!.focus();
 
     // ArrowDown then Enter must run the second action.
     await user.keyboard("{ArrowDown}{Enter}");
@@ -328,14 +340,14 @@ describe("What it can do", () => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.keyboard("{Control>}k{/Control}");
 
-    await user.click(within(await palette()).getByRole("button", { name: "New session" }));
+    await user.click(within(await palette()).getByRole("button", { name: /^New session/ }));
 
     await waitFor(() => expect(createSessionCall).toHaveBeenCalledTimes(1));
     // The rail's create (`creates.ts`): next number, planned, with an idempotency key.
     expect(createSessionCall.mock.calls[0][1]).toMatchObject({ sessionNumber: 1, status: "planned" });
     expect(createSessionCall.mock.calls[0][1].commandId).toEqual(expect.any(String));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/sessions/s-new"));
-    expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument();
+    noPalette();
   });
 
   it("New quest creates a quest and opens it", async () => {
@@ -344,7 +356,7 @@ describe("What it can do", () => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.keyboard("{Control>}k{/Control}");
 
-    await user.click(within(await palette()).getByRole("button", { name: "New quest" }));
+    await user.click(within(await palette()).getByRole("button", { name: /^New quest/ }));
 
     await waitFor(() => expect(createQuestCall).toHaveBeenCalledTimes(1));
     expect(createQuestCall.mock.calls[0][1]).toMatchObject({ title: "Untitled quest" });
@@ -358,7 +370,7 @@ describe("What it can do", () => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.keyboard("{Control>}k{/Control}");
 
-    await user.click(within(await palette()).getByRole("button", { name: "Log downtime" }));
+    await user.click(within(await palette()).getByRole("button", { name: /^Log downtime/ }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/codex/story"));
     expect(window.location.search).toBe("?kind=downtime");
@@ -367,8 +379,14 @@ describe("What it can do", () => {
   });
 });
 
-describe("The player's palette", () => {
-  const renderPlayer = () => (goTo("/codex"), render)(<PlayerCodex token="player" />);
+describe("The player's Codex search", () => {
+  const renderPlayer = () =>
+    (goTo("/codex"), render)(
+      <>
+        <PlayerCodex token="player" />
+        <SearchDialog role="player" token="player" sections={[]} />
+      </>
+    );
 
   it("searches through the PLAYER endpoint and never the GM's", async () => {
     const user = userEvent.setup();

@@ -157,13 +157,13 @@ describe("Home is the section name", () => {
     expect(bar().queryByRole("tab", { name: "World" })).not.toBeInTheDocument();
   });
 
-  it("as the command palette's Go to Home, which reaches the section and its cards", async () => {
+  it("as the Codex search's Go to Home, which reaches the section and its cards", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/quests");
     await waitFor(() => expect(api.codexApi.listPages).toHaveBeenCalled());
 
     await user.click(screen.getByRole("button", { name: /Search the Codex/ }));
-    const palette = within(screen.getByRole("dialog", { name: "Codex command palette" }));
+    const palette = within(screen.getByRole("dialog", { name: "Search" }));
     expect(palette.queryByText("Go to World")).not.toBeInTheDocument();
     await user.click(palette.getByText("Go to Home"));
 

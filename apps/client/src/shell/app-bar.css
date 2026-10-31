@@ -174,49 +174,6 @@
   line-height: 1;
 }
 
-/* The search launcher: two short lists of doors. */
-.search-launcher {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.search-launcher-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: 52px;
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-top: 1px solid var(--line);
-  background: none;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-.search-launcher-row:hover,
-.search-launcher-row:active {
-  background: var(--surface-3);
-}
-.search-launcher-text {
-  display: grid;
-  gap: 2px;
-}
-.search-launcher-text b {
-  font: 600 14px / 1.3 var(--font-label);
-}
-.search-launcher-text span {
-  font-size: 13px;
-  color: var(--text-dim);
-}
-.search-launcher-heading {
-  margin: var(--space-4) 0 var(--space-1);
-  font: 600 12px / 1.2 var(--font-label);
-  color: var(--text-muted);
-}
-
 @media (max-width: 760px) {
   .app-bar {
     gap: var(--space-2);

@@ -2,63 +2,49 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Modal, Skeleton } from "@vtt/ui";
 import { SEARCH_HIT_CAP } from "./api";
 import { findApi } from "./api-records";
-import { SearchResultRow, searchHitKey, useCodexSearch, type AnySearchHit } from "./SearchResults";
+import { SearchResultRow, searchHitKey, useCodexSearch, type AnySearchHit, type SearchState } from "./SearchResults";
 import { codexDestinations, pathForSection } from "./routes";
+import type { CodexCommands } from "./codex-commands";
 import { withQuery } from "../router";
 
 /**
- * The Codex command palette: jump to a record, go to a section, or create. It belongs to the Codex alone;
- * a test locks that. Create verbs run the same creates as the rails and open the new record; the "Log ..."
- * verbs navigate to the form that composes the record.
+ * The Codex's search and commands: jump to a record, go to a section, or create. The one search shows these as its
+ * Codex place (frame spec 2.3); the GM's See as players preview keeps them in its own small palette, because it
+ * searches as the player it shows. Create verbs run the same creates as the rails and open the new record; the
+ * "Log ..." verbs navigate to the form that composes the record.
  */
 
-type Action =
+export type CodexAction =
   | Readonly<{ kind: "hit"; hit: AnySearchHit }>
   | Readonly<{ kind: "create"; label: string; title: string }>
   | Readonly<{ kind: "verb"; label: string; run: () => void }>
   | Readonly<{ kind: "goto"; label: string; path: string }>;
 
-export type CommandPaletteProps = Readonly<{
-  gmToken: string;
-  onOpenHit: (hit: AnySearchHit) => void;
-  /** Opens quick-create prefilled with the typed name. Absent on the player palette. */
-  onCreatePage?: (title: string) => void;
-  /** Creates a session and opens it (`creates.ts`). Absent on the player palette. */
-  onCreateSession?: () => void;
-  onCreateQuest?: () => void;
-  onNavigate: (path: string) => void;
-  onClose: () => void;
-  player?: boolean;
-}>;
-
-/** The full result list lives in Search. */
-const MAX_HITS = 8;
-
-export function CommandPalette({
-  gmToken,
-  onOpenHit,
-  onCreatePage,
-  onCreateSession,
-  onCreateQuest,
+/** The search for this audience and the actions after it. `commands` is null for a player, who writes nothing, and
+ *  for the GM away from the Codex, whose creates live in the Codex. */
+export function useCodexActions({
+  query,
+  token,
+  player,
+  commands,
   onNavigate,
-  onClose,
-  player = false
-}: CommandPaletteProps) {
-  const [query, setQuery] = useState("");
-  const [active, setActive] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
+  maxHits
+}: Readonly<{
+  query: string;
+  token: string;
+  player: boolean;
+  commands: CodexCommands | null;
+  onNavigate: (path: string) => void;
+  maxHits: number;
+}>): Readonly<{ state: SearchState; actions: CodexAction[] }> {
   const runSearch = useCallback(
-    (text: string) => (player ? findApi.searchAsPlayer(gmToken, { q: text }) : findApi.search(gmToken, { q: text })),
-    [gmToken, player]
+    (text: string) => (player ? findApi.searchAsPlayer(token, { q: text }) : findApi.search(token, { q: text })),
+    [token, player]
   );
   const state = useCodexSearch(query, runSearch);
 
   /** Every place the shell can open for this role, from the table the shell reads. */
-  const gotoVerbs = useMemo<Action[]>(
+  const gotoVerbs = useMemo<CodexAction[]>(
     () =>
       codexDestinations(player ? "player" : "gm").map((item) => ({
         kind: "goto" as const,
@@ -68,25 +54,25 @@ export function CommandPalette({
     [player]
   );
 
-  const actions = useMemo<Action[]>(() => {
+  const actions = useMemo<CodexAction[]>(() => {
     const trimmed = query.trim();
-    const hits = state.status === "ready" ? state.hits.slice(0, MAX_HITS) : [];
-    const list: Action[] = hits.map((hit) => ({ kind: "hit" as const, hit }));
+    const hits = state.status === "ready" ? state.hits.slice(0, maxHits) : [];
+    const list: CodexAction[] = hits.map((hit) => ({ kind: "hit" as const, hit }));
     // Offer "new page" unless a page with exactly this title came back.
     if (
       trimmed &&
-      onCreatePage &&
+      commands &&
       !hits.some((hit) => hit.kind === "page" && hit.title.toLowerCase() === trimmed.toLowerCase())
     ) {
       list.push({ kind: "create", label: `New page "${trimmed}"`, title: trimmed });
     }
     if (!trimmed) {
-      if (onCreatePage) {
+      if (commands) {
         list.push(
           { kind: "create", label: "New page…", title: "" },
           // These two create; the "Log ..." rows below navigate to a form.
-          ...(onCreateSession ? [{ kind: "verb" as const, label: "New session", run: onCreateSession }] : []),
-          ...(onCreateQuest ? [{ kind: "verb" as const, label: "New quest", run: onCreateQuest }] : []),
+          { kind: "verb", label: "New session", run: commands.createSession },
+          { kind: "verb", label: "New quest", run: commands.createQuest },
           { kind: "verb", label: "Log a journal entry", run: () => onNavigate(pathForSection("story")) },
           {
             kind: "verb",
@@ -98,30 +84,75 @@ export function CommandPalette({
       list.push(...gotoVerbs);
     }
     return list;
-  }, [state, query, gotoVerbs, onCreatePage, onCreateSession, onCreateQuest, onNavigate]);
+  }, [state, query, gotoVerbs, commands, onNavigate, maxHits]);
+
+  return { state, actions };
+}
+
+/** Runs one action: opens the hit, starts the create, runs the verb or goes to the place. */
+export function runCodexAction(
+  action: CodexAction,
+  {
+    commands,
+    onOpenHit,
+    onNavigate
+  }: Readonly<{
+    commands: CodexCommands | null;
+    onOpenHit: (hit: AnySearchHit) => void;
+    onNavigate: (path: string) => void;
+  }>
+) {
+  if (action.kind === "hit") onOpenHit(action.hit);
+  else if (action.kind === "create") commands?.createPage(action.title);
+  else if (action.kind === "verb") action.run();
+  else onNavigate(action.path);
+}
+
+/** What the one search says under a clipped list. */
+export const clippedNote = `Showing the first ${SEARCH_HIT_CAP} matches. Narrow the search.`;
+
+/** The full result list lives in Search. */
+const MAX_HITS = 8;
+
+/** The See as players preview's palette: the player's search and Go to verbs, as the previewed player. */
+export function CommandPalette({
+  token,
+  onOpenHit,
+  onNavigate,
+  onClose
+}: Readonly<{
+  token: string;
+  onOpenHit: (hit: AnySearchHit) => void;
+  onNavigate: (path: string) => void;
+  onClose: () => void;
+}>) {
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+  const { state, actions } = useCodexActions({
+    query,
+    token,
+    player: true,
+    commands: null,
+    onNavigate,
+    maxHits: MAX_HITS
+  });
 
   useEffect(() => {
     setActive(0);
   }, [query]);
 
-  const run = (action: Action | undefined) => {
+  const run = (action: CodexAction | undefined) => {
     if (!action) return;
-    if (action.kind === "hit") onOpenHit(action.hit);
-    else if (action.kind === "create") onCreatePage?.(action.title);
-    else if (action.kind === "verb") action.run();
-    else onNavigate(action.path);
+    runCodexAction(action, { commands: null, onOpenHit, onNavigate });
     onClose();
   };
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      size="sm"
-      align="top"
-      ariaLabel="Codex command palette"
-      className="codex-palette-modal"
-    >
+    <Modal open onClose={onClose} size="sm" align="top" ariaLabel="Search the preview" className="codex-palette-modal">
       <input
         ref={inputRef}
         className="nh-input codex-palette-input"
@@ -182,9 +213,7 @@ export function CommandPalette({
             )}
           </li>
         ))}
-        {state.status === "ready" && state.truncated && (
-          <li className="codex-search-truncated">Showing the first {SEARCH_HIT_CAP} matches. Narrow the search.</li>
-        )}
+        {state.status === "ready" && state.truncated && <li className="codex-search-truncated">{clippedNote}</li>}
       </ul>
     </Modal>
   );

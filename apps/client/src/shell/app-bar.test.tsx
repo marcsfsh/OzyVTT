@@ -14,6 +14,8 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { GmBottomTabs, GmTopBar, PlayerBottomTabs, PlayerTopBar } from "./AppBar";
 import { ReconnectBar } from "./ReconnectBar";
+import { SearchDialog } from "./SearchDialog";
+import { closeSearch } from "./search-store";
 
 // The shells (DESIGN.md, Layout): the GM's four sections and utilities, a player's three sections and their
 // character, the phone's bottom tabs, and the reconnecting bar. The addresses stay as they were.
@@ -57,6 +59,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  closeSearch();
   window.matchMedia = original;
   goTo("/");
   localStorage.clear();
@@ -147,36 +150,75 @@ describe("the GM's top bar", () => {
   });
 });
 
-describe("the search launcher", () => {
-  it("opens with Ctrl K where no section has its own search, and offers the GM the Compendium", async () => {
+describe("the one search", () => {
+  const places = (dialog: HTMLElement) =>
+    within(within(dialog).getByRole("group", { name: "Where to look" }))
+      .getAllByRole("button")
+      .map((place) => ({ name: place.textContent, on: place.getAttribute("aria-pressed") === "true" }));
+  const startsAt = (dialog: HTMLElement) => places(dialog).find((place) => place.on)?.name;
+
+  it("opens with Ctrl K on every page, the Codex included, at the section the GM is in", async () => {
+    const user = userEvent.setup();
+    setViewport(1280);
+    for (const [path, place] of [
+      ["/table", "Compendium"],
+      ["/encounters/maps", "Compendium"],
+      ["/codex", "Codex"],
+      ["/compendium", "Compendium"],
+      ["/viewer-controls", "Go to"]
+    ] as const) {
+      goTo(path);
+      const view = render(<SearchDialog role="gm" token="gm" sections={[]} />);
+      await user.keyboard("{Control>}k{/Control}");
+      const dialog = screen.getByRole("dialog", { name: "Search" });
+      expect(startsAt(dialog), path).toBe(place);
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
+      view.unmount();
+    }
+  });
+
+  it("opens from the bar's search button, and the GM's places include the Compendium", async () => {
     const user = userEvent.setup();
     setViewport(1280);
     goTo("/table");
-    render(<GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />);
-    await user.keyboard("{Control>}k{/Control}");
-    const dialog = screen.getByRole("dialog", { name: "Search" });
-    await user.click(within(dialog).getByRole("button", { name: /Search the Compendium/ }));
-    expect(`${window.location.pathname}${window.location.search}`).toBe("/compendium?openSearch=1");
-  });
-
-  it("leaves Ctrl K to a section with its own search", async () => {
-    const user = userEvent.setup();
-    setViewport(1280);
-    goTo("/codex");
-    render(<GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />);
-    await user.keyboard("{Control>}k{/Control}");
-    expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
-  });
-
-  it("gives a player no Compendium door", async () => {
-    const user = userEvent.setup();
-    setViewport(1280);
-    goTo("/table");
-    render(<PlayerTopBar state={playerView()} codexUnread={0} onCodexSeen={vi.fn()} onLeave={() => {}} />);
+    render(
+      <>
+        <GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />
+        <SearchDialog role="gm" token="gm" sections={[]} />
+      </>
+    );
     await user.click(screen.getByRole("button", { name: "Search, Ctrl K" }));
     const dialog = screen.getByRole("dialog", { name: "Search" });
-    expect(within(dialog).queryByRole("button", { name: /Compendium/ })).toBeNull();
-    expect(within(dialog).getByRole("button", { name: /Search the Codex/ })).toBeInTheDocument();
+    expect(places(dialog).map((place) => place.name)).toEqual(["Codex", "Compendium", "Rules", "Go to"]);
+  });
+
+  it("gives a player no Compendium place, and starts on Rules at the table", async () => {
+    const user = userEvent.setup();
+    setViewport(1280);
+    goTo("/table");
+    render(
+      <>
+        <PlayerTopBar state={playerView()} codexUnread={0} onCodexSeen={vi.fn()} onLeave={() => {}} />
+        <SearchDialog role="player" token="player" sections={[]} />
+      </>
+    );
+    await user.click(screen.getByRole("button", { name: "Search, Ctrl K" }));
+    const dialog = screen.getByRole("dialog", { name: "Search" });
+    expect(places(dialog).map((place) => place.name)).toEqual(["Codex", "Rules", "Go to"]);
+    expect(startsAt(dialog)).toBe("Rules");
+  });
+
+  it("goes to a page from Go to, and closes behind itself", async () => {
+    const user = userEvent.setup();
+    setViewport(1280);
+    goTo("/viewer-controls");
+    render(<SearchDialog role="gm" token="gm" sections={[{ label: "Prep · Maps", path: "/encounters/maps" }]} />);
+    await user.keyboard("{Control>}k{/Control}");
+    await user.type(screen.getByLabelText("Go to a page or setting"), "maps");
+    await user.keyboard("{Enter}");
+    expect(window.location.pathname).toBe("/encounters/maps");
+    expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
   });
 });
 

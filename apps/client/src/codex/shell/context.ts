@@ -31,7 +31,7 @@ export type CodexShellValue = Readonly<{
   setQuery: (mutate: (query: URLSearchParams) => void) => void;
   /** Sets or clears query keys in one write; an empty value clears its key. */
   setFilter: (next: Readonly<Record<string, string | null>>) => void;
-  /** Opens the command palette (Ctrl K). */
+  /** Opens search at the Codex: the app's one search, or the preview's own palette. */
   openPalette: () => void;
 }>;
 

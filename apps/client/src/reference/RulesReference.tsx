@@ -8,7 +8,7 @@ type Glossary = Readonly<{ entries: readonly ContentGlossaryEntry[]; attribution
 let glossary: Promise<Glossary> | null = null;
 
 /** The glossary, fetched once per page load; a failed read is forgotten so the next open retries. */
-function loadGlossary(): Promise<Glossary> {
+export function loadGlossary(): Promise<Glossary> {
   glossary ??= read("content:glossary", {}).then((result) => {
     if (!result.ok || !result.glossary) {
       glossary = null;
@@ -23,10 +23,23 @@ function loadGlossary(): Promise<Glossary> {
  * The SRD Rules Glossary, searchable by term, for anyone at the table. A drawer, so the fight or sheet behind
  * it stays in view and usable. A term opens in place; its "See also" names other terms to search for.
  */
-export function RulesReference({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
+export function RulesReference({
+  open,
+  onClose,
+  entry
+}: Readonly<{
+  open: boolean;
+  onClose: () => void;
+  /** A term search's Rules place opened: the drawer searches for it and opens it. */
+  entry?: string;
+}>) {
   const [loaded, setLoaded] = useState<Glossary | null>(null);
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
+  const openedName = entry;
+  const [search, setSearch] = useState(entry ?? "");
+  useEffect(() => {
+    if (entry !== undefined) setSearch(entry);
+  }, [entry]);
   useEffect(() => {
     if (!open || loaded) return;
     void loadGlossary().then(setLoaded, (failure: Error) => setError(failure.message));
@@ -61,7 +74,11 @@ export function RulesReference({ open, onClose }: Readonly<{ open: boolean; onCl
       {loaded && (
         <div className="rules-reference-list scroll-y">
           {shown.map((entry) => (
-            <details key={entry.id} className="rules-reference-entry">
+            <details
+              key={entry.id}
+              className="rules-reference-entry"
+              open={openedName !== undefined && entry.name === openedName}
+            >
               <summary>
                 {entry.name}
                 {entry.tag && <Badge tone="neutral">{entry.tag}</Badge>}

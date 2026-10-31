@@ -8,6 +8,7 @@ import { RulesButton } from "../reference/RulesReference";
 import { navigate, replaceQuery, useRoute } from "../router";
 import { useRecordLight } from "../shell/recordLight";
 import { SectionBar } from "../shell/SectionBar";
+import { openSearch as openOneSearch } from "../shell/search-store";
 import {
   CompendiumContext,
   CompendiumGameContext,
@@ -22,7 +23,6 @@ import { NewRecordDialog } from "./NewRecordDialog";
 import { OverviewView } from "./OverviewView";
 import { RecordView } from "./record/RecordView";
 import { COMPENDIUM_PATHS, compendiumViewOf, sectionOf, type CompendiumSection, type CompendiumView } from "./routes";
-import { SearchDialog } from "./SearchDialog";
 import { SharingView } from "./SharingView";
 import { SourcesView } from "./SourcesView";
 import { TablesView } from "./TablesView";
@@ -57,30 +57,18 @@ export function CompendiumShell({
   const view: CompendiumView = compendiumViewOf(route.segments, route.query) ?? { view: "overview" };
   const section = sectionOf(view);
   const [newOptions, setNewOptions] = useState<NewRecordOptions | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [tableOpen, setTableOpen] = useState(false);
 
   const go = useCallback((path: string, options?: Readonly<{ replace?: boolean }>) => navigate(path, options), []);
   const setQuery = useCallback((mutate: (query: URLSearchParams) => void) => replaceQuery(mutate), []);
   const openNew = useCallback((options?: NewRecordOptions) => setNewOptions(options ?? {}), []);
-  const openSearch = useCallback(() => setSearchOpen(true), []);
+  // The one search, at the Compendium (frame spec 2.3); the app holds Ctrl K for every page.
+  const openSearch = useCallback(() => openOneSearch("compendium"), []);
 
-  // The search belongs to the Compendium, so its shortcut leaves with it.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setSearchOpen((open) => !open);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  // The top bar's search launcher sends `openSearch=1` once: open the search and clear that one key.
+  // An old link's `openSearch=1` opens the search once and clears that one key.
   useEffect(() => {
     if (route.query.get("openSearch") !== "1") return;
-    setSearchOpen(true);
+    openOneSearch("compendium");
     replaceQuery((query) => query.delete("openSearch"));
   }, [route.query]);
 
@@ -197,7 +185,6 @@ export function CompendiumShell({
             <div className="cx-content cp-content">{body}</div>
           </SectionBar>
           {newOptions && <NewRecordDialog options={newOptions} onClose={() => setNewOptions(null)} />}
-          {searchOpen && <SearchDialog onClose={() => setSearchOpen(false)} />}
         </div>
       </CompendiumGameContext.Provider>
     </CompendiumContext.Provider>

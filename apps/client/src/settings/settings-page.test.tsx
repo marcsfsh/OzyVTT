@@ -111,12 +111,11 @@ describe("the GM's Settings", () => {
     expect(search).toHaveValue("");
   });
 
-  it("says when nothing matches, and Ctrl K reaches the search from anywhere", async () => {
+  // Ctrl K is the app's one search now (ADR-0049); this field stays the page's own filter.
+  it("says when nothing matches", async () => {
     const user = userEvent.setup();
     renderAt("/settings/fights");
-    await user.keyboard("{Control>}k{/Control}");
     const search = screen.getByRole("combobox", { name: "Search settings" });
-    expect(search).toHaveFocus();
     await user.type(search, "zeppelin");
     expect(screen.getByRole("status")).toHaveTextContent('No setting matches "zeppelin".');
   });

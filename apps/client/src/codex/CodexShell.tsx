@@ -7,7 +7,6 @@ import {
   codexSectionOf,
   isRetiredSection,
   pagePath,
-  pathForHit,
   questPath,
   recordIdOf,
   retiredTarget,
@@ -16,7 +15,8 @@ import {
 import { NotFoundView } from "../components/NotFoundView";
 import { QuickCreate, type QuickCreateRequest } from "./QuickCreate";
 import { createQuest, createSession } from "./creates";
-import { CommandPalette } from "./CommandPalette";
+import { provideCodexCommands } from "./codex-commands";
+import { openSearch } from "../shell/search-store";
 import { PlayerCodex } from "./PlayerCodex";
 import { useGmFeeds } from "./useGmFeeds";
 import { CodexFrame } from "./shell/CodexFrame";
@@ -71,7 +71,6 @@ export function CodexShell({
     if (address && isRetiredSection(address)) void navigate(retiredTarget(address, route.query), { replace: true });
   }, [address, route.query]);
 
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [quickCreate, setQuickCreate] = useState<QuickCreateRequest | null>(null);
   // See as players mounts the real player Codex on a short-lived player token the server mints for Everyone or
   // for one character, so the preview walks that viewer's projection. Never the GM token.
@@ -136,6 +135,17 @@ export function CodexShell({
     }
   }, [gmToken, questFeed]);
 
+  // While the Codex is mounted the one search offers its creates after the results.
+  useEffect(
+    () =>
+      provideCodexCommands({
+        createPage: (title) => setQuickCreate({ title }),
+        createSession: () => void newSession(),
+        createQuest: () => void newQuest()
+      }),
+    [newSession, newQuest]
+  );
+
   const shell = useMemo<CodexShellValue | null>(
     () =>
       section && {
@@ -150,7 +160,7 @@ export function CodexShell({
         go,
         setQuery: replaceQuery,
         setFilter,
-        openPalette: () => setPaletteOpen(true)
+        openPalette: () => openSearch("codex")
       },
     [section, gmToken, route.segments, route.query, recordId, phone, go, setFilter]
   );
@@ -204,8 +214,6 @@ export function CodexShell({
         recordId={recordId}
         phone={phone}
         go={go}
-        paletteOpen={paletteOpen}
-        onPaletteChange={setPaletteOpen}
         laptopActions={menus(false)}
         phoneActions={menus(true)}
         notices={
@@ -223,17 +231,6 @@ export function CodexShell({
         }
         overlays={
           <>
-            {paletteOpen && (
-              <CommandPalette
-                gmToken={gmToken}
-                onOpenHit={(hit) => go(pathForHit(hit))}
-                onCreatePage={(title) => setQuickCreate({ title })}
-                onCreateSession={() => void newSession()}
-                onCreateQuest={() => void newQuest()}
-                onNavigate={go}
-                onClose={() => setPaletteOpen(false)}
-              />
-            )}
             {quickCreate && (
               <QuickCreate
                 gmToken={gmToken}

@@ -12,7 +12,10 @@ import {
   Wordmark,
   cx,
   useOnChange,
-  StatusLamp
+  StatusLamp,
+  IconButton,
+  IconSearch,
+  MenuItem
 } from "@vtt/ui";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import {
@@ -33,7 +36,7 @@ import {
 import { LiveScenePicker } from "../table/LiveScenePicker";
 import { pageLight } from "./pageLight";
 import { tabTrip } from "./tabLight";
-import { SearchLauncher } from "./SearchLauncher";
+import { openSearch } from "./search-store";
 import { FrameMenu, GmMenuRows, PlayerMenuRows } from "./FrameMenu";
 import { MoreSheet } from "./MoreSheet";
 import { LiveChip, myTurnNow } from "./LiveChip";
@@ -134,8 +137,26 @@ function TopBar({ children, className }: Readonly<{ children: ReactNode; classNa
   );
 }
 
+/** The laptop bar's search icon: Ctrl K opens the same search on every page (frame rule 3.4). */
+function SearchButton() {
+  return (
+    <IconButton label="Search, Ctrl K" className="app-bar-icon" onClick={() => openSearch()}>
+      <IconSearch />
+    </IconButton>
+  );
+}
+
+/** More's Search row, which opens the same search. */
+function SearchRow() {
+  return (
+    <MenuItem icon={<IconSearch />} onClick={() => openSearch()}>
+      Search
+    </MenuItem>
+  );
+}
+
 /** Where search's Go to can take the GM: the sections, Prep's pages, the table screen and Settings. */
-const gmGoTo = [
+export const gmGoTo = [
   ...GM_SECTIONS.map((entry) => ({ label: entry.label, path: entry.path })),
   ...PREP_PAGES.filter((page) => page.id !== "scenes").map((page) => ({
     label: `Prep · ${page.label}`,
@@ -171,7 +192,7 @@ export function GmTopBar({
       />
       {section === "play" ? <LiveScenePicker state={state} chip /> : <LiveChip role="gm" state={state} />}
       <span className="app-bar-grow" />
-      <SearchLauncher role="gm" route={route} sections={gmGoTo} />
+      <SearchButton />
       <FrameMenu role="gm" state={state} token={token} onSignOut={onSignOut} />
     </TopBar>
   );
@@ -234,14 +255,7 @@ export function GmBottomTabs({
     <BottomNav
       label="GM navigation"
       tabs={tabs}
-      rows={
-        <GmMenuRows
-          state={state}
-          token={token}
-          onSignOut={onSignOut}
-          afterWho={<SearchLauncher role="gm" route={route} sections={gmGoTo} />}
-        />
-      }
+      rows={<GmMenuRows state={state} token={token} onSignOut={onSignOut} afterWho={<SearchRow />} />}
     />
   );
 }
@@ -300,14 +314,14 @@ export function PlayerTopBar({
       />
       <LiveChip role="player" state={state} />
       <span className="app-bar-grow" />
-      <SearchLauncher role="player" route={route} sections={playerGoTo} />
+      <SearchButton />
       <FrameMenu role="player" state={state} onLeave={onLeave} />
     </TopBar>
   );
 }
 
 /** Where search's Go to can take a player: the sections and Settings. */
-const playerGoTo = [
+export const playerGoTo = [
   ...PLAYER_SECTIONS.filter((entry) => entry.id !== "log").map((entry) => ({ label: entry.label, path: entry.path })),
   { label: "Settings", path: "/settings" }
 ];
@@ -344,13 +358,7 @@ export function PlayerBottomTabs({
     <BottomNav
       label="Player navigation"
       tabs={tabs}
-      rows={
-        <PlayerMenuRows
-          state={state}
-          onLeave={onLeave}
-          afterWho={<SearchLauncher role="player" route={route} sections={playerGoTo} />}
-        />
-      }
+      rows={<PlayerMenuRows state={state} onLeave={onLeave} afterWho={<SearchRow />} />}
     />
   );
 }

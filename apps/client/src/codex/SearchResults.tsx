@@ -3,7 +3,7 @@ import { CodexIcon, EntityIcon } from "./icons";
 import { entityDef } from "./entities";
 import type { CodexRecordKind, CodexSearchHit, PlayerCodexSearchHit } from "@vtt/domain";
 
-/** The command palette's search: its fetch state, its row and the kind marks, for the GM and for players. */
+/** The Codex search: its fetch state, its row and the kind marks, for the GM and for players. */
 
 /** A hit as either audience receives it. */
 export type AnySearchHit = CodexSearchHit | PlayerCodexSearchHit;

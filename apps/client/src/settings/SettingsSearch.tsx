@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { IconSearch, Input, Kbd, cx } from "@vtt/ui";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { SETTINGS_SECTIONS, searchSettings, type SettingEntry } from "./sections";
@@ -30,18 +30,6 @@ export function SettingsSearch({
   const listId = useId();
   const shortcut = useMemo(() => shortcutLabel("K", currentDevice()), []);
   const matches = useMemo(() => searchSettings(entries, query).slice(0, 8), [entries, query]);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        input.current?.focus();
-        input.current?.select();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   const pick = (entry: SettingEntry) => {
     setQuery("");

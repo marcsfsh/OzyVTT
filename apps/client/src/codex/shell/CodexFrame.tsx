@@ -17,6 +17,7 @@ import {
 } from "../routes";
 import { replaceQuery, useRoute } from "../../router";
 import { useRecordLight } from "../../shell/recordLight";
+import { openSearch } from "../../shell/search-store";
 import { SectionBar } from "../../shell/SectionBar";
 import { PhoneBarContext, type PhoneBarSlot } from "./PhoneBar";
 import "./shell.css";
@@ -36,7 +37,7 @@ export function CodexFrame({
   embedded = false,
   className,
   go,
-  paletteOpen,
+  paletteOpen = false,
   onPaletteChange,
   laptopActions,
   phoneActions,
@@ -53,8 +54,9 @@ export function CodexFrame({
   embedded?: boolean;
   className?: string;
   go: (path: string) => void;
-  paletteOpen: boolean;
-  onPaletteChange: (open: boolean) => void;
+  /** The preview's own palette; the app's one search serves every other Codex. */
+  paletteOpen?: boolean;
+  onPaletteChange?: (open: boolean) => void;
   /** The GM's New and GM menu, after the search box. */
   laptopActions?: ReactNode;
   /** The GM's controls in the phone's default top bar, before Search. */
@@ -66,26 +68,19 @@ export function CodexFrame({
 }>) {
   // The key that opens search, written the way this device's keyboard says it; a touch device shows none.
   const shortcut = useMemo(() => shortcutLabel("K", currentDevice()), []);
-  // The shortcut belongs to the Codex, so it leaves with it.
-  useEffect(() => {
-    if (embedded) return;
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        onPaletteChange(!paletteOpen);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [embedded, paletteOpen, onPaletteChange]);
-
-  // The top bar's search launcher sends `openSearch=1` once: open the palette and clear that one key.
+  // The app's one Ctrl K opens search at the Codex (frame rule 3.4); the GM's preview keeps its own palette, which
+  // searches as the player it shows.
+  const openFind = useCallback(
+    () => (embedded && onPaletteChange ? onPaletteChange(!paletteOpen) : openSearch("codex")),
+    [embedded, paletteOpen, onPaletteChange]
+  );
+  // An old link's `openSearch=1` opens the search once and clears that one key.
   const route = useRoute();
   useEffect(() => {
     if (embedded || route.query.get("openSearch") !== "1") return;
-    onPaletteChange(true);
+    openSearch("codex");
     replaceQuery((query) => query.delete("openSearch"));
-  }, [embedded, route.query, onPaletteChange]);
+  }, [embedded, route.query]);
 
   const shell = useRef<HTMLDivElement>(null);
   useRecordLight(shell, recordId, { content: ":scope > .cx-content" });
@@ -128,12 +123,12 @@ export function CodexFrame({
     () => (
       <>
         {phoneActions}
-        <IconButton label="Search" size="sm" onClick={() => onPaletteChange(true)}>
+        <IconButton label="Search" size="sm" onClick={openFind}>
           <CodexIcon iconId="search" className="cx-icon" />
         </IconButton>
       </>
     ),
-    [phoneActions, onPaletteChange]
+    [phoneActions, openFind]
   );
   const slot = useMemo<PhoneBarSlot>(
     () => ({ target: phone ? barTarget : null, claim, defaults }),
@@ -141,12 +136,7 @@ export function CodexFrame({
   );
 
   const searchBox = (
-    <button
-      type="button"
-      className="cx-searchbox"
-      onClick={() => onPaletteChange(true)}
-      aria-keyshortcuts="Meta+K Control+K"
-    >
+    <button type="button" className="cx-searchbox" onClick={openFind} aria-keyshortcuts="Meta+K Control+K">
       <CodexIcon iconId="search" className="cx-icon" />
       <span className="cx-searchbox-label">Search the Codex</span>
       {!embedded && shortcut && <Kbd>{shortcut}</Kbd>}

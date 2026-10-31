@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "@vtt/ui";
 import { CommandPalette } from "./CommandPalette";
+import { openSearch } from "../shell/search-store";
 import { NotFoundView } from "../components/NotFoundView";
 import { navigate, replaceQuery, useRoute } from "../router";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -93,7 +94,8 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
         go,
         setQuery,
         setFilter,
-        openPalette: () => setPaletteOpen(true)
+        // The app's one search, except in the GM's preview, whose palette searches as the previewed player.
+        openPalette: () => (embedded ? setPaletteOpen(true) : openSearch("codex"))
       },
     [section, token, embedded, segments, recordId, query, phone, go, setQuery, setFilter]
   );
@@ -121,10 +123,10 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
           )
         }
         overlays={
+          embedded &&
           paletteOpen && (
             <CommandPalette
-              gmToken={token}
-              player
+              token={token}
               onOpenHit={(hit) => go(pathForHit(hit))}
               onNavigate={go}
               onClose={() => setPaletteOpen(false)}
