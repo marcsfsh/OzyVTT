@@ -787,9 +787,9 @@ test("a player turns on the situation their Crowbar names and rolls a Strength c
 
   await press(playerSection(player, "Sheet"));
   const sheet = player.getByRole("region", { name: `${hero} character sheet` });
-  // On a phone the checks are a tab of their own; on a laptop they are the sheet's left column.
-  const checksTab = sheet.getByRole("tab", { name: "Checks" });
-  if (await checksTab.isVisible()) await press(checksTab);
+  // On a phone the checks are on Main, the first tab; on a laptop they are the sheet's first two columns.
+  const mainTab = sheet.getByRole("tab", { name: "Main" });
+  if (await mainTab.isVisible()) await press(mainTab);
   const prying = sheet.getByRole("button", { name: "Prying with the Crowbar (Advantage)" });
   await expect(prying).toBeVisible();
   await expectPageFits(player);
@@ -828,8 +828,8 @@ test("a player rolls a tool's Utilize use and starts crafting from the sheet, an
 
   await press(playerSection(player, "Sheet"));
   const sheet = player.getByRole("region", { name: `${hero} character sheet` });
-  const checksTab = sheet.getByRole("tab", { name: "Checks" });
-  if (await checksTab.isVisible()) await press(checksTab);
+  const mainTab = sheet.getByRole("tab", { name: "Main" });
+  if (await mainTab.isVisible()) await press(mainTab);
   const use = sheet.getByRole("button", {
     name: "Roll Write text with impressive flourishes that guard against forgery with Calligrapher's Supplies, DC 15"
   });

@@ -73,8 +73,11 @@ export type SheetPresentation = "page" | "dialog" | "panel";
 
 /** A laptop's sheet has three columns from this width; below it a phone's narrow sheet with its tabs under the thumb. */
 const WIDE_QUERY = "(min-width: 980px)";
-/** From this width a laptop's sheet has room for the dice log as a fourth column. */
-const DOCK_QUERY = "(min-width: 1280px)";
+/** The laptop sheet's own widths (a dialog is narrower than the window): the band in one row, the abilities and the
+ *  skills in columns of their own, and room for the dice log as a fourth column with the box at 480px or more. */
+const BAND_ROW_WIDTH = 1270;
+const THREE_COLUMN_WIDTH = 1200;
+const DOCK_WIDTH = 1336;
 
 /** What the caller offers the menu: the player's extras on My character, and the doors only some callers have. */
 export type SheetDoors = Pick<SheetMenuItems, "party" | "createCharacter" | "release">;
@@ -172,7 +175,16 @@ export function CharacterSheet({
 
   // Placement.
   const wideScreen = useMediaQuery(WIDE_QUERY);
-  const dockRoom = useMediaQuery(DOCK_QUERY);
+  const [sheetWidth, setSheetWidth] = useState(0);
+  const [wideFrame, setWideFrame] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!wideFrame) return;
+    const observer = new ResizeObserver(([entry]) => setSheetWidth(entry?.contentRect.width ?? 0));
+    observer.observe(wideFrame);
+    setSheetWidth(wideFrame.getBoundingClientRect().width);
+    return () => observer.disconnect();
+  }, [wideFrame]);
+  const dockRoom = sheetWidth >= DOCK_WIDTH;
   const [floating, setFloating] = useState(false);
   const layout: "narrow" | "wide" | "panel" =
     presentation === "panel" ? "panel" : wideScreen && !floating ? "wide" : "narrow";
@@ -703,7 +715,11 @@ export function CharacterSheet({
   let frame: ReactNode;
   if (layout === "wide") {
     frame = (
-      <section className={`cs cs--wide${role === "gm" ? " is-gm" : ""}`} aria-label={`${actor.name} character sheet`}>
+      <section
+        ref={setWideFrame}
+        className={`cs cs--wide${role === "gm" ? " is-gm" : ""}${sheetWidth >= BAND_ROW_WIDTH ? " cs--band-row" : ""}${sheetWidth >= THREE_COLUMN_WIDTH ? " cs--three" : ""}`}
+        aria-label={`${actor.name} character sheet`}
+      >
         <SheetBand
           {...bandBase}
           portrait={portrait("lg")}

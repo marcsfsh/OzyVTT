@@ -382,3 +382,64 @@ export function MainPlate({
     </div>
   );
 }
+
+/**
+ * The band's cells read only, for the surfaces that show a character without its sheet (a party member's sheet, the
+ * phone's header on the table): the same cells in the same order, AC, Hit points with its life bar, then Initiative
+ * and Speed where the surface shows them.
+ */
+export function BandPlate({
+  armorClass,
+  hp,
+  hpText,
+  initiative,
+  speed,
+  className
+}: Readonly<{
+  armorClass: number | null | undefined;
+  hp: ExactHp | null;
+  /** What a hit point band reads ("Bloodied") where the viewer has no exact numbers. */
+  hpText?: string | null;
+  initiative?: string | null;
+  speed?: number | null;
+  className?: string;
+}>) {
+  return (
+    <div className={`cs-plate cs-plate-c cs-card${className ? ` ${className}` : ""}`} role="group" aria-label="Vitals">
+      {armorClass !== null && armorClass !== undefined && (
+        <Cell label="AC" className="cs-cell-ac">
+          {armorClass}
+        </Cell>
+      )}
+      {(hp || hpText) && (
+        <div className="cs-cell cs-cell-hp">
+          <span className="cs-cell-hp-head">
+            <span className="cs-cell-k">Hit points</span>
+          </span>
+          <span className="cs-cell-hp-row">
+            {hp ? (
+              <span className="cs-hp-pair">
+                <HpNow hp={hp} />
+                <span className="cs-hp-max">/ {hp.maximum}</span>
+              </span>
+            ) : (
+              <span className="cs-hp-band">{hpText}</span>
+            )}
+            {hp && hp.temporary > 0 && <span className="cs-hp-temp">{`+${hp.temporary}`}</span>}
+          </span>
+          {hp && <LifeBar hp={hp} showNumbers={false} className="cs-band-life" />}
+        </div>
+      )}
+      {initiative !== null && initiative !== undefined && (
+        <Cell label="Init" className="cs-cell-init">
+          {initiative}
+        </Cell>
+      )}
+      {speed !== null && speed !== undefined && (
+        <Cell label="Speed" className="cs-cell-speed">
+          {speed}
+        </Cell>
+      )}
+    </div>
+  );
+}

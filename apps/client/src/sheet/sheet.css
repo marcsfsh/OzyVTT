@@ -442,7 +442,8 @@
 }
 
 /* ---- The vitals band (ADR-0047) ----
-   One band on every frame. The laptop's is identity, the stats plate and the end in one row (two rows below 1280px);
+   One band on every frame. The laptop's is identity, the stats plate and the end in one row on a sheet at least
+   1270px wide, and two rows on a narrower one;
    the phone's and the Table panel's is the same cells, compact, in two rows. */
 .cs-id-text {
   display: flex;
@@ -558,11 +559,10 @@ span.cs-hd-open {
   font: 400 17px / 1 var(--font-numeric);
   color: var(--text);
 }
-@media (min-width: 1280px) {
-  .cs-band {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    grid-template-areas: "id plate end";
-  }
+/* A sheet at least 1270px wide (the page at 1280, not the dialog inside it) has room for the band in one row. */
+.cs--band-row .cs-band {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "id plate end";
 }
 
 /* The stats plate: a Cradle box of cells divided by 1px lines, each a label over a VT323 value. */
@@ -756,25 +756,23 @@ button.cs-insp {
 button.cs-insp:hover .cs-insp-box {
   border-color: var(--cyan);
 }
-@media (min-width: 1280px) {
-  .cs--wide .cs-cell-ac {
-    flex: 0 0 62px;
-  }
-  .cs--wide .cs-cell-hp {
-    flex: 0 0 396px;
-  }
-  .cs--wide .cs-cell-init {
-    flex: 0 0 84px;
-  }
-  .cs--wide .cs-cell-speed {
-    flex: 0 0 80px;
-  }
-  .cs--wide .cs-cell-prof {
-    flex: 0 0 84px;
-  }
-  .cs--wide .cs-cell-insp {
-    flex: 0 0 92px;
-  }
+.cs--band-row .cs-cell-ac {
+  flex: 0 0 62px;
+}
+.cs--band-row .cs-cell-hp {
+  flex: 0 0 396px;
+}
+.cs--band-row .cs-cell-init {
+  flex: 0 0 84px;
+}
+.cs--band-row .cs-cell-speed {
+  flex: 0 0 80px;
+}
+.cs--band-row .cs-cell-prof {
+  flex: 0 0 84px;
+}
+.cs--band-row .cs-cell-insp {
+  flex: 0 0 92px;
 }
 
 /* The compact band: the phone, a small dialog, the floating sheet and the Table panel. */
@@ -841,6 +839,11 @@ button.cs-insp:hover .cs-insp-box {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
+}
+.cs-hp-band {
+  margin: 0;
+  font: 600 14px / 1.2 var(--font-body);
+  color: var(--hp-text);
 }
 .cs-hp-change {
   margin: 0;
@@ -1026,8 +1029,9 @@ button.cs-lastroll-open {
 }
 
 /* ---- The Ledger (ADR-0047) ----
-   A laptop's sheet under the band: the abilities and senses, the skills, then the tabbed box. From 1280px each is a
-   column that scrolls itself; from 980px to 1279px the first two stack in one 280px column. */
+   A laptop's sheet under the band: the abilities and senses, the skills, then the tabbed box. On a sheet at least
+   1200px wide each is a column that scrolls itself; a narrower one (from 980px, or a dialog) stacks the first two in
+   one 280px column. The sheet measures its own width, since a dialog is narrower than the window. */
 .cs-ledger-body {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -1080,30 +1084,29 @@ button.cs-lastroll-open {
 .cs-ledger-body > .cs-col-dice {
   display: none;
 }
-@media (min-width: 1280px) {
-  .cs-ledger-body {
-    grid-template-columns: 250px 250px minmax(0, 1fr);
-  }
-  .cs-ledger-body.has-dice {
-    grid-template-columns: 250px 250px minmax(480px, 1fr) 280px;
-  }
-  .cs-ledger-body > .cs-col-dice {
-    display: flex;
-    flex-direction: column;
-  }
-  .cs-checkcols {
-    display: grid;
-    grid-column: 1 / span 2;
-    grid-template-columns: 250px 250px;
-    grid-template-rows: minmax(0, 1fr);
-    gap: 12px;
-  }
-  .cs-checkcol {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    min-height: 0;
-  }
+/* A sheet at least 1200px wide: the abilities and the skills in two 250px columns beside the box. */
+.cs--three .cs-ledger-body {
+  grid-template-columns: 250px 250px minmax(0, 1fr);
+}
+.cs--three .cs-ledger-body.has-dice {
+  grid-template-columns: 250px 250px minmax(480px, 1fr) 280px;
+}
+.cs--three .cs-ledger-body > .cs-col-dice {
+  display: flex;
+  flex-direction: column;
+}
+.cs--three .cs-checkcols {
+  display: grid;
+  grid-column: 1 / span 2;
+  grid-template-columns: 250px 250px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+}
+.cs--three .cs-checkcol {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
 }
 
 /* The abilities: a heading row, then one row each, the check one button and the save another. */
@@ -1927,6 +1930,7 @@ button.cs-lastroll-open {
 .cs-action-col.is-range {
   font: 500 13px / 1.2 var(--font-body);
   color: var(--text-dim);
+  white-space: normal;
 }
 .cs-action-col.is-hit {
   font: 400 20px / 1 var(--font-numeric);

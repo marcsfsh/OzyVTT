@@ -87,25 +87,6 @@ button.my-character-party-row:hover {
   color: var(--text-dim);
   font-size: 0.9rem;
 }
-.party-sheet-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  margin: 0;
-}
-.party-sheet-stats dt {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.party-sheet-stats dd {
-  margin: 0;
-  font-family: var(--font-numeric);
-  font-variant-numeric: tabular-nums;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
 .party-sheet-abilities {
   display: flex;
   flex-wrap: wrap;

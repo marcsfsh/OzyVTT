@@ -4,6 +4,7 @@ import { abilityModifier } from "@vtt/rules-5e";
 import { Button, Modal, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
+import { BandPlate } from "../sheet/SheetBand";
 import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { command } from "../lib/command";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "../encounter/StabilizeControl";
@@ -61,24 +62,12 @@ function PartyMemberSheet({
           {identity?.race && <> · {identity.race.name}</>}
           {identity?.background && <> · {identity.background.name}</>}
         </p>
-        <dl className="party-sheet-stats">
-          <div>
-            <dt>HP</dt>
-            <dd>{hpLabel(actor.hp)}</dd>
-          </div>
-          {(actor.armorClass ?? definition?.armorClass) !== undefined && (
-            <div>
-              <dt>AC</dt>
-              <dd>{actor.armorClass ?? definition?.armorClass}</dd>
-            </div>
-          )}
-          {(actor.speedFeet ?? definition?.speedFeet) !== undefined && (
-            <div>
-              <dt>Speed</dt>
-              <dd>{actor.speedFeet ?? definition?.speedFeet} ft</dd>
-            </div>
-          )}
-        </dl>
+        <BandPlate
+          armorClass={actor.armorClass ?? definition?.armorClass}
+          hp={actor.hp.kind === "exact" ? actor.hp : null}
+          hpText={hpLabel(actor.hp)}
+          speed={actor.speedFeet ?? definition?.speedFeet}
+        />
         {definition && (
           <ul className="party-sheet-abilities">
             {ABILITIES.map((ability) => (
