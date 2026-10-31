@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { nextTurnWords } from "../encounter/PlayerTurnCard";
-import { turnTiles } from "./TurnTiles";
+import { orderEntries } from "./ladderRows";
 
 // The strip's turn order: the GM's real order, a player's projected one, and NEXT as the next entry that audience has.
 
@@ -35,21 +35,21 @@ const player = (turnActorId: string | null, hiddenTurn: boolean) =>
     }
   }) as unknown as PlayerView;
 
-const marks = (tiles: ReturnType<typeof turnTiles>) =>
-  tiles.map(
+const marks = (entries: ReturnType<typeof orderEntries>) =>
+  entries.map(
     (tile) => `${tile.name}${tile.acting ? " acting" : ""}${tile.next ? " next" : ""}${tile.acted ? " done" : ""}`
   );
 
-describe("the turn order in the strip", () => {
+describe("the turn order as each audience sees it", () => {
   it("gives the GM the real order, with hidden creatures marked, and wraps NEXT at the round's end", () => {
-    expect(marks(turnTiles({ role: "gm", state: gm("b") }))).toEqual(["Lyra done", "Goblin acting", "Borin next"]);
-    expect(marks(turnTiles({ role: "gm", state: gm("c") }))).toEqual(["Lyra next", "Goblin done", "Borin acting"]);
-    expect(turnTiles({ role: "gm", state: gm("a") }).map((tile) => tile.hidden)).toEqual([false, true, false]);
+    expect(marks(orderEntries({ role: "gm", state: gm("b") }))).toEqual(["Lyra done", "Goblin acting", "Borin next"]);
+    expect(marks(orderEntries({ role: "gm", state: gm("c") }))).toEqual(["Lyra next", "Goblin done", "Borin acting"]);
+    expect(orderEntries({ role: "gm", state: gm("a") }).map((tile) => tile.hidden)).toEqual([false, true, false]);
   });
 
   it("gives a player the next entry they can see, and marks nothing during a hidden turn", () => {
-    expect(marks(turnTiles({ role: "player", state: player("a", false) }))).toEqual(["Lyra acting", "Borin next"]);
-    expect(marks(turnTiles({ role: "player", state: player(null, true) }))).toEqual(["Lyra", "Borin"]);
+    expect(marks(orderEntries({ role: "player", state: player("a", false) }))).toEqual(["Lyra acting", "Borin next"]);
+    expect(marks(orderEntries({ role: "player", state: player(null, true) }))).toEqual(["Lyra", "Borin"]);
   });
 });
 

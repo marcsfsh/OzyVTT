@@ -41,11 +41,6 @@
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.economy-extra {
-  grid-column: 1 / -1;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-}
 .player-end-turn {
   display: flex;
   flex-direction: column;

@@ -167,14 +167,6 @@
 .table-panel-foot .encounter-menu-toggle {
   flex: none;
 }
-/* A player's footer: who is acting and their HP while they wait, the economy and End turn on their turn. */
-.player-foot {
-  flex-wrap: wrap;
-}
-.player-foot .turn-economy {
-  flex: 1 1 auto;
-  margin-top: 0;
-}
 /* The bar's readouts, after its buttons: the character's hit points and this turn's movement. */
 .economy-status {
   display: inline-flex;
@@ -544,15 +536,6 @@
   box-shadow: none;
   color: var(--text);
 }
-.turn-economy {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3rem;
-  margin-top: 0.45rem;
-  padding: 0;
-  border: 0;
-}
 /* The slots grow their paint to 44px: in a .3rem-gap row a `.tap-target` overhang would steal the
    neighbour's taps. Their radius is set by the material block near the end of this file. */
 .economy-slot {
@@ -580,11 +563,6 @@
   padding: 0.24rem 0.8rem;
   font-size: var(--fs-sm);
   font-weight: 700;
-}
-.economy-feedback {
-  width: 100%;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
 }
 .economy-movement {
   font-size: var(--fs-xs);
@@ -725,9 +703,6 @@
 .encounter-quiet-note {
   color: var(--text-muted);
   font-size: var(--fs-xs);
-}
-.initiative-list.player .turn-economy {
-  margin-top: 0.3rem;
 }
 
 /* Touch devices: dense rows gain back tap height without changing the layout. */

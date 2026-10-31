@@ -27,7 +27,6 @@ import { PhoneSwitch } from "../table/phoneSwitch";
 import { LadderCards } from "../table/TurnLadder";
 import { TableDock } from "../table/TableDock";
 import { NowPlaying } from "../sound/NowPlaying";
-import { usePhoneShell } from "./AppBar";
 import { TokenTab } from "../table/TokenTab";
 import { useCodexNotice } from "../table/useCodexNotice";
 import "./table-view.css";
@@ -63,8 +62,6 @@ export function TableView(props: TableViewProps) {
   const { role, state, token } = props;
   const gm = props.role === "gm" ? props.gm : null;
   const phone = useMediaQuery(PHONE_TABLE_QUERY);
-  // The narrower phone shell, where Play's strip stands in for the top bar.
-  const phoneShell = usePhoneShell();
   // The dock's tools row, where the map renders its tools on a laptop (table spec 2.1).
   const [dockTools, setDockTools] = useState<HTMLElement | null>(null);
   // The strip's right end, where the GM's Fight menu lands during a fight.
@@ -95,9 +92,9 @@ export function TableView(props: TableViewProps) {
       <TableDock role="player" state={props.state} token={token} toolsRef={setDockTools} />
     )
   ) : props.role === "gm" ? (
-    <TableStrip role="gm" state={props.state} token={token} phone={phoneShell} endRef={setStripEnd} />
+    <TableStrip role="gm" state={props.state} token={token} endRef={setStripEnd} />
   ) : (
-    <TableStrip role="player" state={props.state} token={token} phone={phoneShell} />
+    <TableStrip role="player" state={props.state} token={token} />
   );
 
   const map = state.combat.mapAssetId ? (

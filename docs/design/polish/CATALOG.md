@@ -125,7 +125,7 @@ and the GM's empty table as a lobby.
 
 ## C. The table
 
-Job: run and play the encounter. Status: frame Designed (`C-table/SPEC.md`, `C-table/PLAN.md`, ADR-0050): Two docks on a
+Job: run and play the encounter. Status: frame Built (`C-table/SPEC.md`, `C-table/PLAN.md`, ADR-0050): Two docks on a
 laptop, the turn order as a Ladder, the turn through Cost tabs and a Switch on phones. Its groups, inside that frame: C2
 (the map's menus), C3 (running the encounter, two rounds), C5 (log and dice), and C4 with C6 (a player in a fight)
 Designed. The largest area; designed as one frame, then the groups.

@@ -21,7 +21,7 @@ import { LogComposer } from "../table/LogComposer";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
 import { revealInRegion } from "../lib/reveal";
 import { InStripEnd } from "../table/stripSlot";
-import { turnTiles } from "../table/TurnTiles";
+import { orderEntries } from "../table/ladderRows";
 import { selectToken, useSelectedToken } from "../scene/selectedToken";
 import { useMapView, useSwitchMoments } from "../table/phoneSwitch";
 import { NotesTab } from "../table/NotesTab";
@@ -566,7 +566,7 @@ export function GmEncounterPanel({
     />
   );
   // Who acts after this turn, as the strip's NEXT marks it.
-  const nextUp = turnTiles({ role: "gm", state }).find((tile) => tile.next);
+  const nextUp = orderEntries({ role: "gm", state }).find((entry) => entry.next);
   const turnControls = (
     <div className="table-panel-foot-turn">
       <div className="table-panel-foot-row turn-controls">

@@ -18,8 +18,8 @@ CSS is reference material, not production code. A missing state uses the same pr
   and position: on the table the map comes first, whose turn it is second and any decision someone owes third.
   Anything past the first five goes behind one click, in a menu, a tab or the next page.
 - Familiar first. A player who knows another VTT or D&D Beyond should recognise the layout before reading a word: the
-  map in the middle, tools on the left, one tabbed sidebar on the right, turn order across the top, and a character
-  header with hit points and AC. Break a convention only with a reason in an ADR.
+  map in the middle, the turn order and tools on the left, one tabbed sidebar on the right, and a character header
+  with hit points and AC. Break a convention only with a reason in an ADR.
 - The obvious action is the correct one. Each view has one primary action, and its label names its result.
 - Everything needed, nothing more. Each new setting is a small tax on every future decision. Settings that shape an
   encounter belong to the encounter in Prep, not to the table.
@@ -38,7 +38,7 @@ Neon appears only where it means something, and each 80s element has one job.
 
 | Element                                  | Its job                                        | Where it appears                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sun frame (`--grad-sun`, 3px, with glow) | Now: who is acting                             | The acting tile in the turn order, the acting creature's portrait in the sidebar or turn card, its token ring, and the "is acting" line on a phone                                                                                                                                                    |
+| Sun frame (`--grad-sun`, 3px, with glow) | Now: who is acting                             | The acting row in the turn order, the acting creature's portrait in the sidebar or turn card, and the "is acting" line on a phone                                                                                                                                                                     |
 | Sunset scene                             | Arrival                                        | The title and join screens only. Dusk paints it at night; Dawn paints it as daybreak.                                                                                                                                                                                                                 |
 | Horizon line (`--grad-horizon`, 2px)     | The top of the app, and of what opens above it | The bottom edge of every top bar, laptop and phone, and the top edge of a dialog, menu, drawer or toast, which lights from the control that opened it and casts a faint light down into the surface (`--ink-cast`). The primary's lines and the chosen tab's ink are the same horizon (`--hz-paint`). |
 | Chrome lettering (`.chrome`)             | Who is acting                                  | The wordmark, the acting creature's name and YOUR TURN. Nowhere else. Dawn prints it as solid ink with the same pink and cyan split.                                                                                                                                                                  |
@@ -181,15 +181,15 @@ The shells:
   above them with the menu's rows and Search. Play or Table carries the live lamp while an encounter runs. The header
   row belongs to the page on screen: a section's page
   has a header row with the section's name at 18px and up to two icons, then its pages as one strip of words that
-  scrolls sideways with a fade; a record's header is Back and where it goes, with no strip. In an encounter, Play
-  stacks the VCR counter and encounter picker, the turn order, the map, and the acting creature's card (portrait and
-  chrome name, life bar, pending card, lamps, an Actions row that opens the full list) above End turn. Under the strips
-  the map (its tools above it) has a fixed height and scrolls away; the panel below is one screen tall, so scrolled to
-  the end its tabs sit under the turn order. Its content scrolls only once the map has gone. No handle resizes the map.
+  scrolls sideways with a fade; a record's header is Back and where it goes, with no strip. Play's header row holds
+  the VCR counter, the encounter picker, the sound, Join and the Encounter menu; under it the table is the Switch (table
+  spec 2.4, ADR-0050): Map, Encounter, Log, Party and Notes as a segmented control, the turn order as cards in one line,
+  the chosen view, and the foot with End turn pinned above the bottom tabs in every view.
 - Player, laptop. The wordmark; Table, Sheet and Codex; the live chip while an encounter runs (amber on the player's turn);
   search; and the menu, its face the character they play, holding Release, the theme, Settings and Leave the table.
 - Player, phone. Bottom tabs Table, Sheet, Codex, Log and More on every screen, the character's plate at the top of Table
-  and Log. In an encounter, Table holds the turn card and a small map with Open map.
+  and Log. Table is the Switch: Map, Turn (Me before an encounter), Log and Party, the turn order's cards under it and End turn in
+  reach in every view; choosing a target turns to Map, and an owed prompt or the player's turn turns to Turn.
 
 Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. On its
 front page New encounter is the bar's primary with New map before it as a Base line button; the Maps and Encounters
@@ -204,26 +204,27 @@ menu. The rules reference opens from search's Rules place and from the Compendiu
 sheet from the bottom on a phone. Search is one dialog for the whole app (Ctrl K): Codex, Compendium (the GM's), Rules
 and Go to, starting at the section you are in.
 
-The table (Play), as a docked workbench (ADR-0025):
+The table (Play), as Two docks (ADR-0025, ADR-0050):
 
-- Tool rail, 64px, on the left: Select, Measure, Area and Draw, a divider, then Walls, Light and Fog. Players get
-  Select, Measure and Ping.
-- Turn order, 64px, across the top of the map: the VCR counter, then a tile per combatant with portrait, name and
-  initiative. The acting tile has the sun frame, the next one carries a NEXT tag beside its portrait, tiles that have
-  acted dim their portrait decoration to 45%; their name and initiative keep readable contrast. Hidden combatants
-  show a dashed violet portrait and the crossed eye, to the GM only. An Encounter
-  menu at the end holds adding combatants, rerolling and ending the encounter.
-- The map fills the rest. Nothing floats over it except tokens, marks, the reticle and a zoom control in the bottom
-  right corner.
-- Sidebar, 360px, on the right, with tabs Encounter, Log, Party and Notes (players get Turn, Log and Party). During an encounter,
-  Encounter shows the acting creature: portrait and chrome name; the life bar with AC and speed; a pending card when the game waits on
-  someone; the four lamps; its actions grouped under Action, Bonus action and Reaction, each heading marked in its lamp
-  colour; and End turn pinned at the bottom with who is next.
+- The left dock, 232px from 1280px and 72px from 980px: the round on the VCR counter at its head, the turn order as a
+  Ladder that fills the dock and scrolls itself, and the map's tools under it as a grid of icon and word (icons alone
+  in the 72px dock). A Ladder row is at least 52px: the face, the name, the initiative in VT323 and under the name a 4px
+  bar (the GM sees everyone's; a player the party's) or a foe's wound word, then conditions as small tags. The acting
+  row is tinted amber with the horizon ink down its left edge, NEXT sits under the next initiative, and hidden
+  combatants show a dashed violet face and the crossed eye, to the GM only. In the 72px dock a row shows its face and
+  initiative, and a pointer or focus shows it whole.
+- The map fills the middle. Nothing floats over it except tokens, marks, the reticle, the Tray chip at its top left and
+  its controls (centre, zoom out, zoom in) in glass at its bottom right. The acting token wears an amber ring.
+- The panel, 380px, on the right, with tabs Encounter, Log, Party and Notes, and Token while a token is chosen (players
+  get Turn, Sheet, Log and Party in an encounter, Me, Log and Party before one). During an encounter Encounter shows
+  the acting creature: a 44px face, its name in Chakra Petch capitals with who runs it, the life bar with AC and speed,
+  then the cost tabs and the options the chosen tab lists. The foot holds the Cup with Previous beside it as a Base line
+  control and who is next under it.
 
 Before an encounter, the same frame changes in three places:
 
-- The strip above the map shows the VCR counter at STOP, "No encounter running" with how many of the party and how many
-  enemies are on the map, and the join address with a Copy button.
+- The dock's head shows the VCR counter at STOP with "No encounter running" and how many of the party and how many
+  enemies are on the map under it; the Encounter tab's head holds the join address with a Copy button.
 - The map shows every token with its plain ring; nobody wears the sun frame.
 - Encounter shows Start an encounter: In this encounter lists the staged combatants, ticked, with hidden creatures marked; the two
   initiative switches; Who plays, each party character At the table or On their device (ADR-0042), a claimed one held
@@ -313,7 +314,10 @@ from the mockups.
 - Tag: VT323 uppercase at 15 to 18px, one or two words. NEXT has a white fill, WAIT an amber fill, HIT a yellow fill and
   MISS a grey fill; TAKEN, READY, SRD and HOMEBREW (yellow outline) mark status; HIDDEN FROM PLAYERS is dashed violet.
 - Lamp: a square light. Lit means available or on and glows in its colour; unlit is `--surface-3` with a 1px edge and
-  the value `--`. Action is magenta, Bonus yellow and Reaction cyan; Move is a gauge of white squares, one per 5 ft.
+  the value `--`. Action is magenta, Bonus yellow and Reaction cyan; Move is a gauge of white squares, one per 5 ft. On
+  the table the lamps are the cost tabs: Action, Bonus Action, Reaction and Move as one segmented row, each with its
+  11px light, its name and READY, USED or NOT NOW (Move shows the feet left), and Legendary as a fifth for a creature
+  with Legendary Actions. The chosen tab lists what costs it; the line under them marks it used or ready.
 - Life bar: a segmented bar in a 1px well, lit segments `--hp` and lost ones `--hp-lost`. For exact HP use
   `clamp(ceil(maximum / 2), 1, 22)` segments and a clipped fill proportional to current/maximum. The VT323 number and
   accessible label give exact values, including temporary HP separately. At maximum zero, avoid division by zero.
@@ -414,7 +418,8 @@ its mockups are in `docs/design/light-rail/horizon/` (`UPDATE-PLAN.md`, `mockups
 
 Light presents state that has arrived from the server, and only what the viewer's projection already holds. It never
 plays on first mount, and `canMove()` holds it while a whole snapshot lands (a connect, a reconnect, a switch of
-encounter). On a new turn the sun frame slides to the next tile over 200 ms and the turn order scrolls it into view.
+encounter). On a new turn the sun frame slides to the next row of the Ladder (the next card on a phone) over 200 ms and the turn
+order scrolls it into view.
 A life bar's lost segments flash white once (two frames) when damage lands, ahead of the light along the bar. A damage
 number rises from the token 20 ms after the burst and is gone by 900 ms, the one exception to the 500 ms rule, because
 it is a value to read. It shows only where the viewer already holds the creature's exact hit points; elsewhere the
@@ -442,7 +447,7 @@ its pages from these patterns.
 
 | Pattern         | What it is                                                                                                  |
 | --------------- | ----------------------------------------------------------------------------------------------------------- |
-| Workbench       | The map in the middle, tools on the left, one tabbed panel on the right, turn order across the top          |
+| Workbench       | The map in the middle, the turn order and tools in a dock on the left, one tabbed panel on the right        |
 | Sheet           | A vitals band, columns of what you read and roll, one tabbed region for what you do                         |
 | Record document | The record as its readers see it, with a panel beside it answering what the GM asks                         |
 | List as a table | Toolbar (filters, sort, count), then a sortable table; rows with two facts on a phone                       |
@@ -500,9 +505,10 @@ The sheet is the Ledger (ADR-0047; `docs/design/polish/D1-character-sheet/`).
   phone keeps Name, Hit / DC and the dice or effect, with the time, range and type on the name's line.
 - Groups you act in (the stats plates, Abilities, Skills, Tools, the conditions) are Cradle boxes; Senses and the
   defences at the top of Features are open groups.
-- In an encounter a player's phone shows the turn card on Table: YOUR TURN in chrome with the VCR counter, the four lamps,
-  any active effect, slot pips, actions grouped by cost and End turn. Off-turn it shows who is acting in the sun frame,
-  only an available Reaction lamp lit, any prompt the player owes at the top, and the small map. A spent reaction,
+- In an encounter a player's Turn shows YOUR TURN in chrome with the VCR counter, the cost tabs, the chosen tab's options
+  as the Ledger's columns with favourites first, any active effect, and End turn in the foot. Off-turn it shows who is
+  acting in the sun frame, Action and Bonus Action NOT NOW with the Reaction tab chosen, any prompt the player owes at
+  the top, and a foot that says when their turn comes. A spent reaction,
   incapacitation or server refusal keeps it unlit. Extra actions and movement beyond 30 ft must remain legible.
 - An option that can't be used now stays in its list, disabled, with the server's reason at full strength.
 - GM-only data and restricted-control groups have a violet `GmOnlyTag`. Individual controls retain their semantic

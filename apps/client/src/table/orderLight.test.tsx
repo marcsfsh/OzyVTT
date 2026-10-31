@@ -46,7 +46,7 @@ function Order({ keys, acting, round }: Readonly<{ keys: string[]; acting: strin
         {keys.map((key, index) => (
           <li key={key} data-key={key} data-index={index}>
             <span className="picture" />
-            <span className="turn-tile-score">12</span>
+            <span className="ladder-score">12</span>
           </li>
         ))}
       </ol>
@@ -79,7 +79,7 @@ describe("the turn order's light", () => {
     expect(parts(".lr-comet")).toBe(1);
     expect(parts(".lr-burst")).toBe(1);
     expect(parts(".lr-sunframe")).toBe(1);
-    expect(animated.filter((el) => el.matches(".turn-tile-score"))).toHaveLength(2);
+    expect(animated.filter((el) => el.matches(".ladder-score"))).toHaveLength(2);
   });
 
   it("runs from one creature to the next and slides the sun frame on a new turn", () => {

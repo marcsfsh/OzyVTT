@@ -1108,19 +1108,28 @@ is the server's number from the character's derived sheet. Toasts keep the botto
 bottom tabs on a phone. A confirm or prompt (`components/feedback.tsx`) opens from the bottom on a phone. Not found
 (`components/NotFoundView.tsx`) is an `EmptyState`; `AppErrorBoundary` draws `SomethingBroke` on `shell/LandingScene.tsx`.
 
-The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a strip over the map with the VCR counter and the
-status line (`table/TableStrip.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
-(`table/TablePanel.tsx`) whose tabs are Encounter, Log, Party and Notes for the GM, and whose footer holds the view's one
-primary. The live encounter picker (`table/LiveScenePicker.tsx`) opens from the live chip in the GM's top bar, and sits
-in the strip on a phone, where the strip is Play's header. In an encounter the strip holds the turn order (`table/TurnTiles.tsx`, the real
-order for the GM and the projected one for a player) and, through `table/stripSlot.tsx`, the GM's Encounter menu. The GM's
-Needs you leads the Encounter tab, above the acting creature's card and lamps (`encounter/ActingConsole.tsx`) and the
-order with its row tools; Start an encounter (`encounter/StartFight.tsx`) lists the staged characters and monsters to tick.
-A player's tabs are Turn, Sheet, Log and Party in an encounter (Me, Log and Party between encounters). The Turn tab leads with
-the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts, the round and the four lamps; End turn is the
-footer's one primary. On a phone the map and panel share one column (`table/scrollPast.ts`): the map keeps a fixed
-height and scrolls away, the panel is one screen tall, and its regions scroll only once the map has gone; choosing a
-target scrolls back to the map. Prep's encounter and map pages do the same below 980px. On a phone a player's table and
+The table (`shell/TableView.tsx`) is Two docks on a laptop (ADR-0025, ADR-0050): the left dock (`table/TableDock.tsx`)
+with the VCR counter, the turn order as a Ladder (`table/TurnLadder.tsx`, its rows from `table/ladderRows.ts`: the real
+order for the GM and the projected one for a player, with hit points or a wound word by role) and the map's tools,
+which `scene/EncounterMap.tsx` renders into the dock through `table/dockTools.ts` (`MapRail` in its grid layout); the
+map with its own controls (`scene/MapControls.tsx`) and the Tray chip; and one panel (`table/TablePanel.tsx`) whose
+tabs are Encounter, Log, Party and Notes for the GM, and whose footer holds the view's one primary. The live encounter
+picker (`table/LiveScenePicker.tsx`) opens from the live chip in the GM's top bar. The Encounter tab's head holds the
+sound, Join before an encounter and the GM's Encounter menu during one. The GM's Needs you leads the Encounter tab,
+above the acting creature's card and its cost tabs (`encounter/ActingConsole.tsx`, `encounter/TurnTabs.tsx`) and the
+order with its row tools; Start an encounter (`encounter/StartFight.tsx`) lists the staged characters and monsters to
+tick. A player's tabs are Turn, Sheet, Log and Party in an encounter (Me, Log and Party between encounters). The Turn
+tab leads with the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts and the round, then the cost tabs;
+End turn is the footer's one primary, and off the player's turn the footer says when it comes.
+
+Below 980px the table is the Switch (table spec 2.4): `table/TableStrip.tsx` is the header row (the round, and for the
+GM the encounter picker, the sound, Join and, through `table/stripSlot.tsx`, the Encounter menu), and the panel's tabs
+are drawn as a segmented control with the map as its first view, handed down through `table/phoneSwitch.tsx` and kept
+mounted while hidden. The Ladder's cards (`LadderCards`) sit under the Switch, and the footer stays pinned above the
+bottom tabs. `useSwitchMoments` turns to Map while a target is chosen, with the whole picker in the footer
+(`table/footerSlot.tsx`), and back after; an owed prompt or the player's turn turns to Turn. A player's Switch has no
+Sheet view: Sheet is its own bottom tab. Prep's encounter and map pages still share one column below 980px, the map
+scrolling away above the panel (`table/scrollPast.ts`). On a phone a player's table and
 log head with the character being played (`table/PlayerIdentity.tsx`, the sheet's `BandPlate`) at the top of the pane,
 since a phone has no top bar. The Log tab is the persisted combat log, rolls drawn as cards,
 over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the field rolls the formula after
@@ -1172,8 +1181,10 @@ where its contents went. Its tabs share one controller (`useSheetController.tsx`
 command. `useSheetDefinition.ts` reads `actor:available-actions` into the turn's options (`turn-options.ts`) with each
 row's reason, passive flag, mastery and the table's range, hit or DC and damage. The Actions tab (`ActionsTab.tsx`,
 ADR-0044) lists the options in one table grouped by cost, with no subtabs; a save the character owes takes its
-ability's Save cell in the Abilities card. The sheet's table (`ActionList.tsx`) and the phone's turn card
-(`TurnCard.tsx`) draw the same options. In an encounter the Actions tab and the table's Turn tab run them through
+ability's Save cell in the Abilities card. The sheet's table (`ActionList.tsx`), the sheet's phone turn card
+(`TurnCard.tsx`) and the table's cost tabs draw the same options: `ActionList` with a `tab` lists only what that cost
+buys (`costTab` in `turn-options.ts`), favourites first, and the GM's stat block lists by the same tabs
+(`actionTab` in `encounter/GmActionList.tsx`). In an encounter the Actions tab and the table's Turn tab run them through
 `encounter/PlayerActionRunner.tsx`, which also aims a cast started on the sheet; outside one the server rolls a tap on
 the loose route (`SheetActionList` in `PlayFight.tsx`). A cast, an item or a spell to copy opens through
 `SheetDetail.tsx`: in place inside the box, or in a drawer over the GM's narrow sheet. The sheet notes the ids of the
@@ -1242,8 +1253,8 @@ backdrop behave as they would with no motion.
 The turn order is a rail. `table/orderLight.ts` (`useOrderLight`) measures a list's rows after each render and lights
 what changed: a new turn runs a comet from the acting row to the next and slides the sun frame, a new round runs it
 back to the VCR counter, an encounter starting or ending runs it from or to the counter, and a join, a leave or a swap
-slides the rows with `flipFrom`. The table strip, the GM's order and the player's order each run it; only the strip
-lights the turn's lamps. `Roll` in `@vtt/ui` rolls a value over like a tape counter (the VCR counter's word and round,
+slides the rows with `flipFrom`. The dock's Ladder, the phone's cards, the GM's order and the player's order each run it;
+only the Ladder (its cards on a phone) lights the turn's lamps. `Roll` in `@vtt/ui` rolls a value over like a tape counter (the VCR counter's word and round,
 the legendary count), and `Lamp` warms as it lights and cools through `--nh-lamp-afterglow` when it is spent.
 A life bar is a rail too: `LifeBar` runs light along its top edge from the old value to the new, red as hit points fall
 and gold as they rise, with the fill and the number following it, and temporary hit points draw a cyan line along that

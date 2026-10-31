@@ -1,16 +1,13 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Button, Modal, ToastOutlet, VcrCounter } from "@vtt/ui";
 import { JoinAddress } from "../components/JoinAddress";
 import { NowPlaying } from "../sound/NowPlaying";
 import { LiveScenePicker } from "./LiveScenePicker";
-import { useOrderLight } from "./orderLight";
-import { TurnTiles } from "./TurnTiles";
 import { idleStatus } from "./status";
 import "./table-strip.css";
 
 type StripProps = Readonly<{
-  phone: boolean;
   token: string;
   /** Where the GM's Fight menu lands during a fight. */
   endRef?: (node: HTMLElement | null) => void;
@@ -18,33 +15,13 @@ type StripProps = Readonly<{
   Readonly<{ role: "gm"; state: GmView } | { role: "player"; state: PlayerView }>;
 
 /**
- * The strip above the map: the VCR counter, then what the table is doing. Before a fight that is "No fight running"
- * with who is on the map and, for the GM, the join address; in a fight, the turn order and the GM's Fight menu. The
- * newest notice shows in the strip, so a toast never floats over the map. On a phone the strip is the table's header:
- * the round with the live scene picker, the sound and Join for the GM, the newest notice for a player. The turn order
- * is the Switch's cards under it (table spec 2.4).
+ * The table's header below 980px (table spec 2.4): the VCR counter, then for the GM the live scene picker, the sound,
+ * Join before a fight and the Encounter menu during one; for a player the table's newest notice, or what it is doing
+ * between fights. The turn order is the Switch's cards under it, so a notice never floats over the map.
  */
 export function TableStrip(props: StripProps) {
-  const { state, phone } = props;
+  const { state } = props;
   const fighting = state.combat.active;
-  // The turn order's light runs along the strip's bottom line, between its tiles and the round counter (ADR-0045).
-  const strip = useRef<HTMLElement>(null);
-  const tile = (key: string) =>
-    strip.current?.querySelector<HTMLElement>(`.turn-tiles > li[data-key="${CSS.escape(key)}"]`) ?? null;
-  const hiddenTurn = props.role === "player" && props.state.combat.hiddenTurn;
-  useOrderLight(strip, {
-    keys: fighting ? state.combat.initiative.map((entry) => entry.actorId) : [],
-    acting: fighting && !hiddenTurn ? state.combat.turnActorId : null,
-    round: fighting ? state.combat.round : null,
-    item: tile,
-    point: (key) => tile(key)?.querySelector<HTMLElement>(".turn-tile-face") ?? null,
-    frame: (key) => tile(key)?.querySelector<HTMLElement>(".nh-portrait") ?? null,
-    counter: () => strip.current?.querySelector<HTMLElement>(".table-strip-counter") ?? null,
-    axis: "x",
-    rail: (host) => host.clientHeight - 1,
-    // On a phone the Ladder's cards light the lamps.
-    lamps: !phone
-  });
   const view =
     props.role === "gm" ? { role: "gm" as const, state: props.state } : { role: "player" as const, state: props.state };
   const idle = idleStatus(view);
@@ -54,69 +31,22 @@ export function TableStrip(props: StripProps) {
     </>
   );
   const counter = <VcrCounter round={fighting ? state.combat.round : null} className="table-strip-counter" />;
-  const tiles =
-    props.role === "gm" ? (
-      <TurnTiles role="gm" state={props.state} token={props.token} />
-    ) : (
-      <TurnTiles role="player" state={props.state} token={null} />
-    );
-  const end = <div className="table-strip-end" ref={props.endRef} />;
-
-  if (props.role === "gm" && phone)
-    return (
-      <header
-        ref={strip}
-        className={`table-strip is-header${fighting ? " is-fighting" : ""}`}
-        aria-label="The table"
-        data-horizon=""
-      >
-        <div className="table-strip-row">
-          {counter}
-          <LiveScenePicker state={props.state} compact />
-          <NowPlaying token={props.token} compact />
-          {!fighting && <JoinButton token={props.token} />}
-          {end}
-        </div>
-      </header>
-    );
-  // A player's phone header: the round and the table's newest notice; the order is the Switch's cards.
-  if (phone)
-    return (
-      <header ref={strip} className={`table-strip is-header${fighting ? " is-fighting" : ""}`} aria-label="The table">
-        <div className="table-strip-row">
-          {counter}
-          {/* During a fight the cards say who acts, so the line holds only the newest notice. */}
-          <p className="table-status">{fighting ? <ToastOutlet /> : <ToastOutlet fallback={status} />}</p>
-        </div>
-      </header>
-    );
-  if (fighting)
-    return (
-      <header ref={strip} className="table-strip is-fighting" aria-label="The table">
-        {counter}
-        <span className="table-strip-divider" aria-hidden="true" />
-        {tiles}
-        {/* Notices land here during a fight, so a toast never floats over the map. */}
-        <ToastOutlet className="table-strip-notice" />
-        {props.role === "gm" && <NowPlaying token={props.token} compact />}
-        {end}
-      </header>
-    );
   return (
-    <header ref={strip} className="table-strip" aria-label="The table">
-      {counter}
-      <span className="table-strip-divider" aria-hidden="true" />
-      <p className="table-status">
-        <ToastOutlet fallback={status} />
-      </p>
-      {props.role === "gm" ? (
-        <>
-          {/* With no map the empty table shows the join address large, with its QR code. */}
-          {!fighting && state.combat.mapAssetId && <JoinAddress token={props.token} layout="strip" />}
-          <NowPlaying token={props.token} compact />
-        </>
-      ) : null}
-      {end}
+    <header className={`table-strip is-header${fighting ? " is-fighting" : ""}`} aria-label="The table" data-horizon="">
+      <div className="table-strip-row">
+        {counter}
+        {props.role === "gm" ? (
+          <>
+            <LiveScenePicker state={props.state} compact />
+            <NowPlaying token={props.token} compact />
+            {!fighting && <JoinButton token={props.token} />}
+            <div className="table-strip-end" ref={props.endRef} />
+          </>
+        ) : (
+          /* During a fight the cards say who acts, so the line holds only the newest notice. */
+          <p className="table-status">{fighting ? <ToastOutlet /> : <ToastOutlet fallback={status} />}</p>
+        )}
+      </div>
     </header>
   );
 }

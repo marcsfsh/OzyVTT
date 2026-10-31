@@ -113,7 +113,7 @@ export function useOrderLight(host: RefObject<HTMLElement | null>, o: OrderLight
       if (framed) sunFrame(el, { from: local(framed), mode: "arrive", delay: 300 });
       // Each creature's number lands in turn.
       o.keys.forEach((key, index) => {
-        const score = o.item(key)?.querySelector(".turn-tile-score");
+        const score = o.item(key)?.querySelector(".ladder-score");
         if (score) fadeIn(score, { delay: index * 60, dur: 160 });
       });
       if (o.lamps) lightLamps(document, { delay: 340 });
