@@ -1,5 +1,15 @@
 import { useMemo, type ReactNode } from "react";
-import { Combobox, IconChevronRight, IconEye, IconEyeOff, Menu, FindField } from "@vtt/ui";
+import {
+  Combobox,
+  IconChevronRight,
+  IconEye,
+  IconEyeOff,
+  Menu,
+  FindField,
+  Button,
+  EmptyState,
+  IconPlus
+} from "@vtt/ui";
 import { countOf } from "@vtt/domain";
 import { CodexIcon, pinSwatchVar } from "../icons";
 import { LAYER_META, type AtlasLayer, type AtlasLayers } from "./layers";
@@ -157,7 +167,8 @@ export function PinTable({
   selectedPinId,
   dimmed,
   gm,
-  onSelect
+  onSelect,
+  onAddPin
 }: Readonly<{
   pins: readonly ListedPin[];
   pageTitle: (pageId: string) => string | null;
@@ -166,8 +177,24 @@ export function PinTable({
   dimmed: ReadonlySet<string> | null;
   gm: boolean;
   onSelect: (pinId: string) => void;
+  /** The GM's way to the first pin, offered with the empty state (theme rule 3). */
+  onAddPin?: () => void;
 }>) {
-  if (pins.length === 0) return <p className="atlas-empty">No pins on this map yet.</p>;
+  if (pins.length === 0)
+    return (
+      <EmptyState
+        className="atlas-empty"
+        action={
+          gm && onAddPin ? (
+            <Button size="sm" onClick={onAddPin}>
+              <IconPlus /> Add a pin
+            </Button>
+          ) : undefined
+        }
+      >
+        No pins on this map yet.
+      </EmptyState>
+    );
   return (
     <table className="nh-table atlas-pintable">
       <thead>

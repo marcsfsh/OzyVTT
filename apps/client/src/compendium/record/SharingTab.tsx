@@ -2,8 +2,9 @@ import { IconEyeOff, IconUser, cx, WhoSeesItSwitch, toggleCharacter, type PartyC
 import type { HomebrewRecordDocument, RecordAudience } from "../../homebrew/api";
 import type { Kind } from "../kinds";
 import { placesFor } from "./words";
+import { formatDay } from "../../lib/formatWhen";
 
-const dayOf = (at: string) => new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const dayOf = (at: string) => formatDay(at);
 
 /** Why Who sees it cannot change now, or null when it can. */
 export function audienceLock(doc: HomebrewRecordDocument): string | null {

@@ -107,11 +107,12 @@
 }
 
 /* ----- A section: heading, hint and its panel of rows ----- */
+/* Settings' column is 880px (theme rule 11). */
 .settings-section {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  max-width: 56rem;
+  max-width: 880px;
   margin-inline: auto;
 }
 .settings-section.is-wide {

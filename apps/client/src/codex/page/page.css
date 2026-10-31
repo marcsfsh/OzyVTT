@@ -119,8 +119,9 @@
   min-height: 0;
   overscroll-behavior: contain;
 }
+/* The reading measure is 680px of text (theme rule 11), inside the document's own padding. */
 .cx-doc {
-  max-width: 50rem;
+  max-width: calc(680px + 2 * var(--space-6));
   margin: 0 auto;
   padding: var(--space-4) var(--space-6) calc(var(--space-10) + env(safe-area-inset-bottom));
   color: var(--text);

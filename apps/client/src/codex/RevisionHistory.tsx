@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { Button, Modal } from "@vtt/ui";
 import { codexApi } from "./api";
 import { useCodexQuery } from "./useCodexQuery";
+import { formatWhen } from "../lib/formatWhen";
 
 /** A page's saved versions, newest first, each restorable. Read each time it opens. */
 export function RevisionHistory({
@@ -45,7 +46,7 @@ export function RevisionHistory({
             <li key={revision.id} className="codex-revision">
               <div>
                 <strong>v{revision.rev}</strong> ·{" "}
-                <span className="codex-revision-when">{new Date(revision.authoredAt).toLocaleString()}</span>
+                <span className="codex-revision-when">{formatWhen(revision.authoredAt)}</span>
               </div>
               <div className="codex-revision-title">{revision.title}</div>
               <Button variant="secondary" size="sm" onClick={() => onRestore(revision.id)}>

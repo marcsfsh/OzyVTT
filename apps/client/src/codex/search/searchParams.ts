@@ -1,4 +1,5 @@
 import { CODEX_SEARCH_TYPES, type CodexSearchType, type CodexSearchVisibility } from "@vtt/domain";
+import { formatDay } from "../../lib/formatWhen";
 
 /**
  * Search's filters as its address holds them (`?q=&types=&visibility=&from=&to=&sort=`), so a filtered search is a
@@ -135,18 +136,8 @@ export function dayLabel(day: string): string {
   return date.toLocaleDateString(undefined, { month: "long", day: "numeric", timeZone: "UTC" });
 }
 
-/** When a record last changed, the way a list reads it: Today, Yesterday, or the day. */
+/** When a record last changed, the way a list reads it (theme rule 20): Today, Yesterday, or the day ("Oct 30"). */
 export function modifiedLabel(at: string | null, now: Date = new Date()): string {
   if (!at) return "None";
-  const date = new Date(at);
-  if (Number.isNaN(date.getTime())) return "None";
-  const day = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
-  const days = Math.round((day(now) - day(date)) / 86_400_000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  return date.toLocaleDateString(undefined, {
-    month: "long",
-    day: "numeric",
-    ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {})
-  });
+  return formatDay(at, now);
 }

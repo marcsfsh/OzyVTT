@@ -63,9 +63,19 @@
 }
 
 /* The GM-only content pill reads as status: mono face, tracked uppercase. */
-.nh-reveal-pill {
-  font-family: var(--font-label);
-  letter-spacing: 0.08em;
+/* The GM ONLY tag, one size everywhere (theme rule 7, ADR-0074): VT323 16px in a 22px violet box. */
+.nh-reveal-pill.nh-reveal-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border: 1px solid var(--violet);
+  border-radius: 0;
+  background: none;
+  color: var(--violet-text, var(--violet));
+  font: 400 16px / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 /* Corner-anchored variant; the block provides the positioning context and the pill never takes clicks. */

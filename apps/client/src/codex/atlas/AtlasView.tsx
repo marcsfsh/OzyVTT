@@ -503,6 +503,10 @@ export function AtlasView({
         dimmed={dimmed}
         gm
         onSelect={showPinOnMap}
+        onAddPin={() => {
+          setPlacing("pin");
+          if (phone) setPhoneView("map");
+        }}
       />
     </>
   );

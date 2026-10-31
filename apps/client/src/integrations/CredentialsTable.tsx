@@ -10,6 +10,7 @@ import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import "./integrations-panel.css";
+import { formatWhen } from "../lib/formatWhen";
 
 const SCOPES = IntegrationScopeSchema.options;
 const CREDENTIALS = "/api/v1/gm/integration-credentials";
@@ -36,7 +37,8 @@ const STATE_WORDS: Readonly<Record<CredentialState, [string, BadgeTone]>> = {
   revoked: ["Revoked", "danger"]
 };
 
-const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "Never");
+// One way to write a date and time (theme rule 20), with its capitals kept.
+const when = (value: string | null) => (value ? formatWhen(value) : "Never");
 
 /**
  * The integration credentials as a table: name, scopes, state, last use and expiry, with Rotate, Revoke and History
@@ -157,7 +159,7 @@ export function CredentialsTable({
               <span className="settings-list-text">
                 <b>{credential.name}</b>
                 <span>
-                  {STATE_WORDS[stateOf(credential)][0]} · Last used {when(credential.lastUsedAt).toLowerCase()}
+                  {STATE_WORDS[stateOf(credential)][0]} · Last used {when(credential.lastUsedAt)}
                 </span>
               </span>
               {rowActions(credential)}

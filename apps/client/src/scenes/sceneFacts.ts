@@ -1,5 +1,6 @@
 import type { GmView, Scene, SceneCombat } from "@vtt/domain";
 import type { MapAsset } from "../maps/map-catalog";
+import { formatWhen } from "../lib/formatWhen";
 
 /**
  * What the Scenes tab says about a scene, worked out once from the GM's view and the map library: its state, its map
@@ -180,16 +181,10 @@ export function modifiedAt(scene: Scene): number | null {
   return stamps.length > 0 ? Math.max(...stamps) : null;
 }
 
-/** A date the way the lists show it: Today 21:40, Yesterday, or Oct 17. */
+/** A date the way the lists show it, written the one way (theme rule 20): "Today, 8:41 PM", "Oct 17, 7:40 PM". */
 export function whenLabel(at: number | string | null, now: number = Date.now()): string {
   if (at === null) return "None";
-  const date = new Date(at);
-  if (Number.isNaN(date.getTime())) return "None";
-  const day = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
-  const days = Math.round((day(new Date(now)) - day(date)) / 86_400_000);
-  if (days === 0) return `Today ${date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
-  if (days === 1) return "Yesterday";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatWhen(at, new Date(now));
 }
 
 /** Whether a scene can be made live as it stands, for Prep's list and checklist. A presentation of the facts; nothing

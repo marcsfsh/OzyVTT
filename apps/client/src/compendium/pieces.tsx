@@ -7,6 +7,7 @@ import { refreshCompendium } from "./data";
 import { CodexIcon } from "../codex/icons";
 import { KindIcon, type Kind } from "./kinds";
 import { STATE_WORD, stateOf, type CompendiumRow } from "./tableModel";
+import { formatWhen } from "../lib/formatWhen";
 
 /** A record's state as a word with its mark: Published, Draft, Changes not live or Archived; an SRD row says SRD. */
 export function StateChip({
@@ -67,17 +68,10 @@ export function NameCell({ kind, name, mark }: Readonly<{ kind: Kind; name: stri
   );
 }
 
-/** When a record last changed: Today 21:40, Yesterday, or the day. SRD rows say SRD. */
+/** When a record last changed, written the one way (theme rule 20): "Today, 8:41 PM". SRD rows say SRD. */
 export function whenLabel(at: string | null | undefined, now: Date = new Date()): string {
   if (!at) return "SRD";
-  const day = new Date(at);
-  if (Number.isNaN(day.getTime())) return "None";
-  const time = day.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  const startOf = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const days = Math.round((startOf(now) - startOf(day)) / 86_400_000);
-  if (days === 0) return `Today ${time}`;
-  if (days === 1) return `Yesterday ${time}`;
-  return `${day.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
+  return formatWhen(at, now);
 }
 
 /**

@@ -97,7 +97,11 @@
 .nh-step--done .nh-step-label {
   color: var(--text-dim);
 }
-/* Current is a cyan outline with its number, no fill and no glow. */
+/* Current is a 2px cyan outline with its number, no fill and no glow; a rail down the side gives its row a 3px cyan
+   edge (ADR-0074, fix 7). */
+.nh-steps--vertical .nh-step--current {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
 .nh-step--current .nh-step-marker {
   border: 2px solid var(--cyan);
   background: none;
@@ -108,14 +112,12 @@
   color: var(--text);
 }
 
-/* Visited but not finished: caution, never rose (nothing went wrong). Three signals so it never rests on hue: a
-   dashed ring, the --caution hue and the caution glyph. The label uses --text-dim like done steps (both were
-   visited); only upcoming uses --text-muted. */
+/* A choice needed: a solid amber box with the caution glyph, never rose (nothing went wrong), so it never rests on
+   hue alone. The label uses --text-dim like done steps (both were visited); only upcoming uses --text-muted. */
 .nh-step--incomplete .nh-step-marker {
-  border-style: dashed;
   border-color: var(--caution);
-  background: color-mix(in srgb, var(--caution) 22%, transparent);
-  color: var(--caution-hi);
+  background: var(--caution);
+  color: var(--state-on-ink);
 }
 .nh-step--incomplete .nh-step-label {
   color: var(--text-dim);

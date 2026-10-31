@@ -7,10 +7,11 @@ import { whenLabel } from "../pieces";
 import { CompareTable } from "./Compare";
 import { defaultPicks, historyRows, type HistoryRow } from "./history";
 import { DEVICE_WORDS, compareBodies } from "./words";
+import { formatDay } from "../../lib/formatWhen";
 
 type Body = Readonly<Record<string, unknown>>;
 
-const dayOf = (at: string) => new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const dayOf = (at: string) => formatDay(at);
 
 /** A row's device in words: this device, another one, or how many wrote the edits it folds. */
 const deviceWord = (row: HistoryRow) => (row.devices > 1 ? `${row.devices} devices` : DEVICE_WORDS[row.device]);
