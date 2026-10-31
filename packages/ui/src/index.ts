@@ -91,7 +91,7 @@ export { Chip, type ChipTone } from "./primitives/Chip";
 export { Tabs } from "./primitives/Tabs";
 export { StripInk, type InkEdge } from "./primitives/StripInk";
 export { OverlayEdge } from "./primitives/OverlayEdge";
-export { Menu, MenuItem } from "./primitives/Menu";
+export { Menu, MenuHead, MenuItem } from "./primitives/Menu";
 export { Modal } from "./primitives/Modal";
 export { Drawer } from "./primitives/Drawer";
 export { ToastProvider, ToastOutlet, useToast, useToastMute, type ToastTone } from "./primitives/Toast";

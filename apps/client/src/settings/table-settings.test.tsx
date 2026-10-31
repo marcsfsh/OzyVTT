@@ -114,6 +114,9 @@ describe("one name for one setting", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /Encounter options/ }));
     const menu = within(screen.getByRole("menu", { name: "Encounter options" }));
+    // A menu about one thing names it (theme rule 15), and its first group is How it runs.
+    expect(menu.getByText(/^Encounter · round \d+$/)).toBeTruthy();
+    expect(menu.getByText("How it runs")).toBeTruthy();
     expect(menu.getByRole("option", { name: "Applied by the GM" })).toBeTruthy();
     expect(menu.getByRole("option", { name: "Wait until everyone has rolled" })).toBeTruthy();
     expect(menu.getByRole("option", { name: "Status badge" })).toBeTruthy();

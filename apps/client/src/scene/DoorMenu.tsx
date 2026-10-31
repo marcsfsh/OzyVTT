@@ -11,7 +11,7 @@ import {
   type ObjectStats,
   type ObjectSubstance
 } from "@vtt/domain";
-import { Button, IconButton, IconX, NumberField, Select, Switch } from "@vtt/ui";
+import { Button, IconButton, IconX, MenuHead, NumberField, Select, Switch } from "@vtt/ui";
 import { useMenuDismiss, useMenuPlacement } from "./menuPlacement";
 import type { DoorWork } from "./useMapCommands";
 import type { MapWall } from "./VisionLayer";
@@ -112,13 +112,15 @@ export function DoorMenu({
       ];
   return createPortal(
     <div ref={ref} className="token-context-menu anim-popover scroll-y" role="menu" style={style} aria-label="Door">
-      <div className="token-context-head">
-        <strong>Door</strong>
-        <IconButton label="Close menu" size="sm" onClick={onClose}>
-          <IconX />
-        </IconButton>
-      </div>
-      {role === "gm" && <p className="token-context-feedback door-menu-summary">{doorSummary(wall)}</p>}
+      <MenuHead
+        name="Door"
+        line={role === "gm" ? doorSummary(wall) : undefined}
+        end={
+          <IconButton label="Close menu" size="sm" onClick={onClose}>
+            <IconX />
+          </IconButton>
+        }
+      />
       <button
         type="button"
         role="menuitem"

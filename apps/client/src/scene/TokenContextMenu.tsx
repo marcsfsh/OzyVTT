@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
-import { IconButton, IconX, Select, useToast } from "@vtt/ui";
+import { IconButton, IconX, MenuHead, Select, useToast } from "@vtt/ui";
 import { ConditionEditor } from "../encounter/conditions";
 import { HpAdjust } from "../encounter/HpAdjust";
 import { HealthAudienceOptions, HealthStyleOptions, type HealthStyle } from "../encounter/health-display";
@@ -76,12 +76,15 @@ export function TokenContextMenu({
       style={style}
       aria-label={`Actions for ${actor.name}`}
     >
-      <div className="token-context-head">
-        <strong>{actor.name}</strong>
-        <IconButton label="Close menu" size="sm" onClick={onClose}>
-          <IconX />
-        </IconButton>
-      </div>
+      <MenuHead
+        name={actor.name}
+        line={tokenLine(actor)}
+        end={
+          <IconButton label="Close menu" size="sm" onClick={onClose}>
+            <IconX />
+          </IconButton>
+        }
+      />
       <HeldBy actor={actor} role={role} />
       <TokenControls
         actor={actor}
@@ -363,4 +366,20 @@ export function TokenControls({
       )}
     </>
   );
+}
+
+const KIND_WORD: Readonly<Record<Actor["kind"], string>> = {
+  "player-character": "Character",
+  npc: "NPC",
+  monster: "Monster"
+};
+
+/** The menu head's line: what the creature is and, where the viewer's projection gives exact hit points, how many
+ *  ("Monster · 15/21"). A player's view of a monster carries a band, so it shows the kind alone. */
+export function tokenLine(actor: Actor): string {
+  const hp = actor.hp as Readonly<{ kind?: string; current?: number; maximum?: number }>;
+  const exact = hp.kind === undefined || hp.kind === "exact";
+  return exact && typeof hp.current === "number" && typeof hp.maximum === "number"
+    ? `${KIND_WORD[actor.kind]} · ${hp.current}/${hp.maximum}`
+    : KIND_WORD[actor.kind];
 }

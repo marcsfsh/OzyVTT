@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
-import { IconChevron, Select, Switch } from "@vtt/ui";
+import { IconChevron, Select, Switch, MenuHead } from "@vtt/ui";
 import { command } from "../lib/command";
 import { HealthAudienceOptions, HealthStyleOptions, healthStylePhrase, type HealthStyle } from "./health-display";
 import "./fight-menu.css";
@@ -202,6 +202,9 @@ export function FightMenu({
               is `inset: -1px`, so if the menu itself scrolled the plate would scroll away with the
               content. `role="none"` keeps the wrapper out of the menu's accessibility tree. */}
               <div ref={menuBodyRef} className="encounter-menu-body scroll-y" role="none">
+                {/* A menu about one thing names it (theme rule 15): the live encounter and its round. */}
+                <MenuHead name={encounterName(state)} line={`Encounter · round ${state.combat.round}`} />
+                <p className="menu-section-title">How it runs</p>
                 <label className="rules-mode-control">
                   Rules assistant
                   <Select
@@ -446,4 +449,10 @@ export function FightMenu({
         )}
     </>
   );
+}
+
+/** The live encounter's name for the menu's head, or "Encounter" when none is live. */
+function encounterName(state: GmView): string {
+  const combat = state.combat;
+  return (combat.encounters ?? []).find((scene) => scene.id === combat.activeEncounterId)?.name ?? "Encounter";
 }

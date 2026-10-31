@@ -163,3 +163,20 @@ export function MenuItem({ icon, tone = "default", className, type = "button", c
     </button>
   );
 }
+
+/**
+ * A menu about one thing opens with its name (theme rule 15, ADR-0072): the name in 15px display capitals and its line
+ * in 12px muted words beside it, dropping under it when there is no room ("GOBLIN BOSS  Monster · 15/21"). A menu of
+ * choices keeps an eyebrow as its head instead. `end` holds a close where the menu has one.
+ */
+export function MenuHead({ name, line, end }: Readonly<{ name: ReactNode; line?: ReactNode; end?: ReactNode }>) {
+  return (
+    <div className="nh-menu-head" role="none">
+      <span className="nh-menu-head-text">
+        <span className="nh-menu-head-name">{name}</span>
+        {line != null && <span className="nh-menu-head-line">{line}</span>}
+      </span>
+      {end}
+    </div>
+  );
+}
