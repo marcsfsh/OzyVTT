@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Alert, Button, Field, Modal, Panel, PanelHeader, SegmentedControl, useToast } from "@vtt/ui";
+import { Alert, Button, Field, Group, Modal, SegmentedControl, useToast } from "@vtt/ui";
 import { splitCodexHiddenBlocks, type CodexImportCounts } from "@vtt/domain";
 import { codexApi, type CodexImportBundle } from "./api";
 import { BODY_LAYER, type BodyLayer } from "./TwoLayerBodyTabs";
@@ -156,8 +156,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
         </Alert>
       )}
 
-      <Panel>
-        <PanelHeader title="Download backup" />
+      <Group title="Download backup" headingLevel={2}>
         <p>
           One file with everything: pages, maps, pins, journal, sessions, quests, calendar, settings and version
           history.
@@ -165,10 +164,9 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
         <Button variant="primary" onClick={() => void download()}>
           Download backup
         </Button>
-      </Panel>
+      </Group>
 
-      <Panel>
-        <PanelHeader title="Restore backup" />
+      <Group title="Restore backup" headingLevel={2}>
         <p className="codex-composer-hint">Download a backup first. Restoring replaces everything in the Codex.</p>
         <Button variant="secondary" onClick={() => restoreInputRef.current?.click()}>
           Choose a backup file
@@ -212,10 +210,9 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
             </>
           )}
         </Modal>
-      </Panel>
+      </Group>
 
-      <Panel>
-        <PanelHeader title="Bring in notes" />
+      <Group title="Bring in notes" headingLevel={2}>
         <p>Turns Markdown or text files into pages, one page per file. This adds pages and replaces nothing.</p>
         {/* Can't use `TwoLayerBodyTabs`: it chooses an import destination (GM first, the default) inside a
             `Field`. It shares `BODY_LAYER`'s words instead. */}
@@ -241,7 +238,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
             event.target.value = "";
           }}
         />
-      </Panel>
+      </Group>
     </div>
   );
 }

@@ -5,8 +5,10 @@ import { edgeIn, ghostOut, openerNow, openerX } from "../motion/overlay";
 import { cx } from "./util";
 import { IconX } from "./icons";
 import { OverlayEdge } from "./OverlayEdge";
-import type { PanelAccent } from "./Panel";
 import "./Modal.css";
+
+/** The 2px top hairline that labels a dialog's kind (magenta = combat, cyan = notes, violet = the GM's). */
+export type ModalAccent = "none" | "magenta" | "cyan" | "violet";
 
 interface ModalProps {
   open: boolean;
@@ -15,7 +17,7 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   /** The top edge: the horizon's colours by default (magenta), cyan or violet, or none. It lights from the opener. */
-  accent?: PanelAccent;
+  accent?: ModalAccent;
   /** `full` is a roomy centred sheet on a laptop and edge-to-edge at ≤760px. Use it and leave max-height alone. */
   size?: "sm" | "md" | "lg" | "full";
   /** `top` pins the dialog near the top of the viewport (the command-palette shape); `bottom` rests it on the bottom

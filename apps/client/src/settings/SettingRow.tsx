@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { GmOnlyTag, cx } from "@vtt/ui";
+import { GmOnlyTag, Group, cx } from "@vtt/ui";
 import { SETTINGS_SECTIONS, settingAnchor, type SettingEntry, type SettingsSectionId } from "./sections";
 
 /**
@@ -15,8 +15,8 @@ export function SettingsPrimary({ children }: Readonly<{ children: ReactNode }>)
 }
 
 /**
- * One section: its heading and one-sentence hint over a panel of rows. A GM section is edged in violet with the GM
- * only tag beside its heading, so the GM can tell at a glance that players never see it.
+ * One section: its heading and one-sentence hint over its rows in one Cradle group (ADR-0048). A GM section carries the
+ * GM only tag beside its heading, so the GM can tell at a glance that players never see it.
  */
 export function SettingsSection({
   id,
@@ -35,7 +35,7 @@ export function SettingsSection({
         {gmOnly && <GmOnlyTag />}
         <p>{section.hint}</p>
       </header>
-      <div className={cx("settings-panel", gmOnly && "rim-gm")}>{children}</div>
+      <Group className="settings-panel">{children}</Group>
     </section>
   );
 }

@@ -941,11 +941,9 @@
 .codex-backup {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 20px;
 }
-.codex-backup > .nh-panel {
-  display: flex;
-  flex-direction: column;
+.codex-backup > .nh-group > .nh-group-body {
   gap: var(--space-3);
   align-items: flex-start;
 }

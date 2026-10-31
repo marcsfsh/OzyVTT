@@ -159,15 +159,9 @@
   font-size: var(--fs-sm);
 }
 /* A panel: the plate with the chrome lip along its top. A GM section carries the violet edge (`.rim-gm`). */
-.settings-panel {
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-1) var(--space-5);
-  border: var(--rim-w) solid var(--rim-color);
-  background: var(--material-lip), var(--material-plate);
-}
+/* The section's rows sit in one Cradle (`Group`); a wide section's rows get a little more room above. */
 .settings-section.is-wide .settings-panel {
-  padding: var(--space-3) var(--space-4);
+  padding-top: var(--space-2);
 }
 
 /* One setting: the words at the left, the control at the right; a stacked one puts the control under them. */
@@ -243,14 +237,13 @@
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
 }
-/* A nested group inside a row: the plate alone, with no lip. */
+/* A sub-heading inside a section's group: open, with a 1px rule above it and no box of its own (never a box in a box). */
 .settings-subpanel {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border: var(--rim-w) solid var(--line);
-  background: var(--surface-2);
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--line);
 }
 .settings-check {
   display: flex;
@@ -378,8 +371,5 @@
   }
   .setting-control {
     align-items: flex-start;
-  }
-  .settings-panel {
-    padding-inline: var(--space-3);
   }
 }

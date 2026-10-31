@@ -918,16 +918,13 @@ a:focus-visible .nav-arrow {
   -webkit-backdrop-filter: var(--glass-blur);
 }
 
-/* Role rims: a 3px start-edge bar for chrome that belongs to a role. Never on selection state (that axis
+/* Role rims: a 3px start-edge bar for chrome that belongs to a role (the GM's is a tag now, rule 7). Never on selection state (that axis
    is cyan) and never the only signal of the role. An inset shadow, because a border
    here loses to consumers' `border` shorthands and an inset shadow adds no width; it does conflict with
    `.is-selected` / `.is-active-turn`. The utility is the edge only; sites apply the wash token in their
    own background rule so it composes with `.surface-glass`. */
 .rim-player {
   box-shadow: inset 3px 0 0 0 var(--rim-player);
-}
-.rim-gm {
-  box-shadow: inset 3px 0 0 0 var(--rim-gm);
 }
 
 /* The beam divider: the sky's horizon as a 1px rule along the bottom edge of an element whose bottom is a

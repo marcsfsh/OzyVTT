@@ -81,7 +81,7 @@ export { installCupPress } from "./motion/press";
 export { cx } from "./primitives/util";
 export { Button, IconButton } from "./primitives/Button";
 export { Field, Input, Select, Textarea } from "./primitives/forms";
-export { Panel, PanelHeader } from "./primitives/Panel";
+export { Group } from "./primitives/Group";
 export { Wordmark, Eyebrow, SunMark } from "./primitives/Wordmark";
 export { Chip, type ChipTone } from "./primitives/Chip";
 export { Tabs } from "./primitives/Tabs";

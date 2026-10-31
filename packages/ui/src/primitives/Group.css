@@ -1,0 +1,92 @@
+/* The Cradle (theme spec 2.4, ADR-0048): a group you act in has no fill and no top, a 2px --line-raised base and 1px
+   sides that rise from it and fade before the top. While the pointer or focus is inside, the base lights cyan from
+   the middle outward. The shape is the Cup's in grey; the Cup alone holds a horizon. */
+.nh-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0 14px 12px;
+  border: 0;
+  background: none;
+}
+.nh-group::before {
+  content: "";
+  position: absolute;
+  inset: 6px 0 0;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: var(--cradle-base);
+  border-image: var(--cradle-sides) 1;
+}
+.nh-group::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--cradle-base);
+  background: var(--cyan);
+  box-shadow: var(--glow-on);
+  transform: scaleX(0);
+  transition: transform 280ms var(--ease-travel);
+  pointer-events: none;
+}
+.nh-group:is(:hover, :focus-within)::after {
+  transform: scaleX(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nh-group::after {
+    transition: none;
+  }
+}
+/* The heading sits in the open top, 14px in, as the one eyebrow. */
+.nh-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+}
+.nh-group-title {
+  margin: 0;
+  font: inherit;
+}
+.nh-group-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.nh-group-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Rows inside a group are divided by 1px --line (rule 6). */
+.nh-group-body > :is(.nh-group-row, li) + :is(.nh-group-row, li) {
+  border-top: 1px solid var(--line);
+}
+/* A group you only read is open: its heading and content with a 1px rule above, no box and no side padding. */
+.nh-group--read {
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line-strong);
+}
+.nh-group--read::before,
+.nh-group--read::after {
+  display: none;
+}
+/* Never a box in a box: a group inside another draws no box of its own. */
+.nh-group .nh-group {
+  padding-inline: 0;
+}
+.nh-group .nh-group::before,
+.nh-group .nh-group::after {
+  display: none;
+}
+/* Groups stand 18 to 22px apart. */
+.nh-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
