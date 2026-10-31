@@ -25,7 +25,7 @@ import {
   preparedState,
   slotPools,
   spellEffectAt,
-  spellLine,
+  spellColumns,
   type CastOption,
   type SheetSpellEntry,
   type SlotPool
@@ -33,6 +33,7 @@ import {
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
 import { PipRow } from "./PipRow";
+import { HitOrDc } from "./ActionList";
 
 /** "book" is the laptop's and the GM's list (Prepared, Spellbook, Rituals); "list" is a player's phone list (All,
  *  Prepared, Rituals) with a circle that says where each spell stands. */
@@ -49,7 +50,7 @@ type SpellRow = Readonly<{
   spell: SheetSpellEntry | null;
   content: ContentSpellSummary | undefined;
   state: RowState;
-  line: string;
+  columns: ReturnType<typeof spellColumns>;
   concentration: boolean;
   ritual: boolean;
   free: { left: number | null } | null;
@@ -209,7 +210,7 @@ export function SpellsTab({
         spell,
         content,
         state: preparedState(spell, actor, definition),
-        line: spellLine(spell, content, actionOf(spell.actionId), level),
+        columns: spellColumns(spell, content, actionOf(spell.actionId), level),
         concentration: content?.concentration === true,
         ritual: spell.ritualActionId !== undefined || content?.ritual === true,
         free: freeCastOf(spell, definition, actor)
@@ -226,7 +227,7 @@ export function SpellsTab({
           spell: null,
           content,
           state: "book",
-          line: spellLine({ level: content?.level ?? 1 }, content, null, level),
+          columns: spellColumns({ level: content?.level ?? 1 }, content, null, level),
           concentration: content?.concentration === true,
           ritual: content?.ritual === true,
           free: null
@@ -630,7 +631,18 @@ export function SpellsTab({
           />
         </div>
       )}
-      {shown.length === 0 && <p className="cs-note">{view === "rituals" ? "No Ritual spells." : "No spells here."}</p>}
+      {shown.length === 0 ? (
+        <p className="cs-note">{view === "rituals" ? "No Ritual spells." : "No spells here."}</p>
+      ) : (
+        <div className={`cs-spell-th${look === "list" ? " has-circle" : ""}`} aria-hidden="true">
+          <span>Name</span>
+          <span className="is-time">Time</span>
+          <span className="is-range">Range</span>
+          <span className="is-hit">Hit / DC</span>
+          <span className="is-effect">Effect</span>
+          <span />
+        </div>
+      )}
       {levels.map((spellLevel) => {
         const pool = slots.find((entry) => entry.level === spellLevel);
         const group = shown
@@ -691,8 +703,18 @@ export function SpellsTab({
                         </span>
                       )}
                     </span>
-                    {row.line && <span className="cs-spell-line">{row.line}</span>}
+                    {(row.columns.time || row.columns.range) && (
+                      <span className="cs-spell-line">
+                        {[row.columns.time, row.columns.range].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
                   </span>
+                  <span className="cs-spell-col is-time">{row.columns.time}</span>
+                  <span className="cs-spell-col is-range">{row.columns.range}</span>
+                  <span className="cs-spell-col is-hit">
+                    <HitOrDc value={row.columns.hitOrDc} />
+                  </span>
+                  <span className="cs-spell-col is-effect">{row.columns.effect}</span>
                   <span className="cs-spell-act">{rowAction(row)}</span>
                 </li>
               ))}

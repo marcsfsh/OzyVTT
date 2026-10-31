@@ -243,6 +243,7 @@ export function SheetActionList({
     <>
       <ActionList
         options={filter ? options.filter(filter.option) : options}
+        table
         myTurn
         busy={false}
         {...(empty ? { empty } : {})}

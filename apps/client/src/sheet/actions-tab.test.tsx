@@ -129,33 +129,18 @@ describe("the sheet's Actions tab", () => {
     });
   });
 
-  it("lists each use under the subtab of its cost, and an attack under Attack too", async () => {
+  it("lists each use under the group of its cost, in one table with no subtabs", async () => {
     const user = userEvent.setup();
     mount(view({}));
     await user.click(await screen.findByRole("tab", { name: "Actions" }));
-    const subtabs = within(screen.getByRole("tablist", { name: "Actions" }));
-    expect(subtabs.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "All",
-      "Attack",
-      "Action",
-      "Bonus Action",
-      "Reaction",
-      "Other",
-      "Saving throws"
-    ]);
+    expect(screen.queryByRole("tablist", { name: "Actions" })).toBeNull();
     expect(await screen.findByRole("button", { name: /Mace/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Battle Surge/ })).toBeTruthy();
-
-    await user.click(subtabs.getByRole("tab", { name: "Attack" }));
-    expect(screen.getByRole("button", { name: /Mace/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Battle Surge/ })).toBeNull();
-
-    await user.click(subtabs.getByRole("tab", { name: "Bonus Action" }));
-    expect(screen.queryByRole("button", { name: /Mace/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /Battle Surge/ })).toBeTruthy();
-
-    await user.click(subtabs.getByRole("tab", { name: "Reaction" }));
-    expect(screen.getByText("No Reactions.")).toBeTruthy();
+    const groups = screen.getAllByRole("region").filter((region) => region.classList.contains("cs-action-group"));
+    expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual(["Action", "Bonus Action"]);
+    expect(within(screen.getByRole("region", { name: "Action" })).getByRole("button", { name: /Mace/ })).toBeTruthy();
+    expect(
+      within(screen.getByRole("region", { name: "Bonus Action" })).getByRole("button", { name: /Battle Surge/ })
+    ).toBeTruthy();
   });
 
   it("rolls an attack with its damage outside an encounter, as the Gear tab does", async () => {
@@ -168,7 +153,7 @@ describe("the sheet's Actions tab", () => {
     ]);
   });
 
-  it("puts a save the character owes in its ability's row, and rolls the others freely", async () => {
+  it("puts a save the character owes in its ability's Save cell, and rolls the others freely", async () => {
     const user = userEvent.setup();
     const owed = {
       id: "60000000-0000-4000-8000-000000000001",
@@ -184,9 +169,9 @@ describe("the sheet's Actions tab", () => {
       createdAt: 0
     };
     mount(view({ pendingSaves: [owed] }));
-    await user.click(await screen.findByRole("tab", { name: "Actions" }));
-    await user.click(screen.getByRole("tab", { name: "Saving throws" }));
-    expect(screen.getByText("A save waits for Mira. Answer it below.")).toBeTruthy();
+    // The saving throws are the Abilities card's Save cells, on Main.
+    await user.click(await screen.findByRole("tab", { name: "Main" }));
+    expect(screen.getByText("A save waits for Mira. Answer it in its Save cell.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Roll a Wisdom saving throw/ })).toBeNull();
     expect(screen.getAllByRole("button", { name: /saving throw, / })).toHaveLength(5);
     await user.click(screen.getByRole("button", { name: /Roll a Dexterity saving throw/ }));

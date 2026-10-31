@@ -1855,6 +1855,142 @@ button.cs-lastroll-open {
   white-space: nowrap;
 }
 
+/* The sheet's action table (ADR-0047): each row stays one button, with the range, hit or DC and damage in columns
+   inside it and no box around the numbers. One header row per list. A phone keeps Name, Hit / DC and the dice. */
+.cs-actions.is-table {
+  gap: var(--space-3);
+}
+.cs-actions.is-table .cs-action-list,
+.cs-actions.is-table .cs-action-children {
+  gap: 0;
+}
+.cs-action-th,
+.cs-action.is-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px 92px;
+  align-items: center;
+  gap: 10px;
+}
+.cs-action-th {
+  padding: 0 4px 6px;
+  border-bottom: 1px solid var(--line-strong);
+  font: 600 var(--fs-2xs) / 1.2 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cs-action-th .is-range,
+.cs-action.is-table .is-range {
+  display: none;
+}
+.cs-action-th .is-hit,
+.cs-action.is-table .is-hit {
+  text-align: center;
+}
+.cs-action-th .is-dmg,
+.cs-action.is-table .is-dmg {
+  text-align: right;
+}
+.cs-action.is-table {
+  min-height: 48px;
+  padding: 6px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  box-shadow: none;
+}
+.cs-action.is-table:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+.cs-action.is-table:hover:not(:disabled) :is(.cs-action-col.is-hit, .cs-action-dice) {
+  color: var(--cyan-hi);
+}
+.cs-action.is-table:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.cs-action.is-table .cs-action-name {
+  font: 600 15px / 1.2 var(--font-body);
+}
+.cs-action.is-table .cs-action-line {
+  font: 500 12.5px / 1.3 var(--font-body);
+  color: var(--text-muted);
+}
+.cs-action-line.is-wide {
+  display: none;
+}
+.cs-action-col {
+  margin: 0;
+  color: var(--text);
+  white-space: nowrap;
+}
+.cs-action-col.is-range {
+  font: 500 13px / 1.2 var(--font-body);
+  color: var(--text-dim);
+}
+.cs-action-col.is-hit {
+  font: 400 20px / 1 var(--font-numeric);
+}
+.cs-dc {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.cs-dc-ab {
+  font: 600 9px / 1 var(--font-label);
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.cs-actions-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cs-action-dice {
+  font: 400 19px / 1 var(--font-numeric);
+  color: var(--text);
+}
+.cs-action-type {
+  display: none;
+  font: 500 11px / 1 var(--font-body);
+  color: var(--text-muted);
+}
+.cs-action.is-table .cs-action-verb {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+}
+.cs-action.is-table .cs-action-verb,
+.cs-action-th > :last-child {
+  display: none;
+}
+.cs--wide :is(.cs-action-th, .cs-action.is-table) {
+  grid-template-columns: minmax(0, 1fr) 76px 52px 136px 84px;
+}
+.cs--wide .cs-action.is-table .cs-action-verb {
+  justify-content: flex-end;
+}
+.cs--wide :is(.cs-action-th .is-range, .cs-action.is-table .is-range) {
+  display: block;
+}
+.cs--wide .cs-action-line.is-wide,
+.cs--wide .cs-action-type {
+  display: inline;
+}
+.cs--wide .cs-action-line.is-narrow {
+  display: none;
+}
+.cs--wide :is(.cs-action.is-table .cs-action-verb, .cs-action-th > :last-child) {
+  display: inline-flex;
+}
+.cs-action.is-table :is(span, strong, b, small) {
+  margin-top: 0;
+}
+
 /* ---- The cast ---- */
 .cs-cast {
   display: flex;
@@ -2261,6 +2397,68 @@ button.cs-circle::after {
 }
 .cs-book .spell-choice-list {
   max-height: none;
+}
+
+/* The spell table (ADR-0047): Name, Time, Range, Hit / DC, Effect and the row's button. A phone puts the time and
+   range on the name's line. */
+.cs-spell-th,
+.cs-spell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px minmax(0, 96px) 64px;
+  align-items: center;
+  gap: 10px;
+}
+.cs-spell-th.has-circle,
+.cs-spell:has(> .cs-circle) {
+  grid-template-columns: 20px minmax(0, 1fr) 54px minmax(0, 96px) 64px;
+}
+.cs-spell-th.has-circle::before {
+  content: "";
+}
+.cs-spell-th {
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--line-strong);
+  font: 600 var(--fs-2xs) / 1.2 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+:is(.cs-spell-th, .cs-spell) :is(.is-time, .is-range) {
+  display: none;
+}
+.cs-spell-th .is-hit,
+.cs-spell-col.is-hit {
+  text-align: center;
+}
+.cs-spell-col {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-dim);
+  font: 500 13px / 1.25 var(--font-body);
+}
+.cs-spell-col.is-hit {
+  font: 400 19px / 1 var(--font-numeric);
+  color: var(--text);
+  white-space: nowrap;
+}
+.cs-spell-col.is-effect {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.cs--wide :is(.cs-spell-th, .cs-spell) {
+  grid-template-columns: minmax(0, 1fr) 96px 76px 64px minmax(0, 150px) 96px;
+}
+.cs--wide :is(.cs-spell-th.has-circle, .cs-spell:has(> .cs-circle)) {
+  grid-template-columns: 20px minmax(0, 1fr) 96px 76px 64px minmax(0, 150px) 96px;
+}
+.cs-spell-act {
+  justify-self: end;
+}
+.cs--wide :is(.cs-spell-th, .cs-spell) :is(.is-time, .is-range) {
+  display: block;
+}
+.cs--wide .cs-spell-line {
+  display: none;
 }
 
 /* ---- Gear ---- */

@@ -29,6 +29,11 @@ export type TurnOption = Readonly<{
   line: string;
   /** The same line without the level, which a turn card's tile names above it. */
   effect: string;
+  /** The action table's columns (ADR-0047): its range ("20/60 ft", "reach 5 ft", "Self"), its attack bonus or save
+   *  ("+5", "DC 15 Dex"), and what it rolls ("1d4 + 2" with "piercing", a spell's effect, or healing). */
+  range?: string | null;
+  hitOrDc?: string | null;
+  damage?: Readonly<{ dice: string; type: string | null }> | null;
   concentration: boolean;
   /** The spell it casts from the character's list, which picks its slot in the cast detail. */
   spell: SheetSpellEntry | null;
@@ -193,6 +198,25 @@ export function turnOptions({
         : null
     ].filter((part): part is string => Boolean(part));
     const effect = effectParts.join(" · ");
+    const range = reachWords(summary) ?? (content?.rangeText ? content.rangeText.replace(/\bfeet\b/, "ft") : null);
+    const hitOrDc =
+      summary.attackBonus !== null
+        ? signed(summary.attackBonus)
+        : summary.saveAbility
+          ? `DC ${summary.saveDc} ${titleAbility(summary.saveAbility)}`
+          : null;
+    const spellEffect = kind === "spell" ? spellEffectAt(content, level ?? 0, level ?? 0, characterLevel).label : null;
+    const damage =
+      summary.damage.length > 0
+        ? {
+            dice: summary.damage.map((part) => part.formula).join(" + "),
+            type: [...new Set(summary.damage.map((part) => part.type))].join(", ") || null
+          }
+        : summary.healing
+          ? { dice: summary.healing.formula, type: "healing" }
+          : spellEffect
+            ? { dice: spellEffect, type: null }
+            : null;
     const costWord =
       cost === "magic"
         ? "Magic action"
@@ -218,6 +242,9 @@ export function turnOptions({
       costWords: kind === "spell" && levelWords ? `${costWord} · ${levelWords.toLowerCase()}` : costWord,
       line: [kind === "spell" ? levelWords : null, effect].filter(Boolean).join(" · "),
       effect,
+      range,
+      hitOrDc,
+      damage,
       concentration: content?.concentration ?? false,
       spell,
       freeLeft: free ? free.left : undefined,

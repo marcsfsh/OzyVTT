@@ -50,3 +50,70 @@ describe("an item's rows in the turn list", () => {
     expect(optionsWith([row({ id: "item-rope-knot", name: "Tie a knot" })])).toEqual([]);
   });
 });
+
+describe("the action table's columns", () => {
+  const columns = (option: ReturnType<typeof optionsWith>[number] | undefined) =>
+    option ? { range: option.range, hitOrDc: option.hitOrDc, damage: option.damage } : null;
+
+  it("reads a weapon's range, attack bonus and damage", () => {
+    const dagger = row({
+      id: "item-dagger",
+      name: "Dagger",
+      attackBonus: 5,
+      reachFeet: 5,
+      rangeNormalFeet: 20,
+      rangeFeet: 60,
+      damage: [{ formula: "1d4+2", type: "piercing" }]
+    });
+    expect(columns(optionsWith([dagger])[0])).toEqual({
+      range: "reach 5 ft, 20/60 ft",
+      hitOrDc: "+5",
+      damage: { dice: "1d4+2", type: "piercing" }
+    });
+  });
+
+  it("reads a spell attack's bonus and damage", () => {
+    const bolt = row({
+      id: "item-wand-cast-fire-bolt",
+      name: "Fire Bolt",
+      attackBonus: 7,
+      rangeFeet: 120,
+      damage: [{ formula: "2d10", type: "fire" }]
+    });
+    expect(columns(optionsWith([bolt])[0])).toEqual({
+      range: "120 ft",
+      hitOrDc: "+7",
+      damage: { dice: "2d10", type: "fire" }
+    });
+  });
+
+  it("reads a save spell's DC and ability", () => {
+    const fireball = row({
+      id: "item-necklace-cast-fireball",
+      name: "Fireball",
+      saveAbility: "dex",
+      saveDc: 15,
+      rangeFeet: 150,
+      damage: [{ formula: "8d6", type: "fire" }]
+    });
+    expect(columns(optionsWith([fireball])[0])).toEqual({
+      range: "150 ft",
+      hitOrDc: "DC 15 Dex",
+      damage: { dice: "8d6", type: "fire" }
+    });
+  });
+
+  it("reads a heal as its dice and the word healing", () => {
+    const potion = row({
+      id: "item-potion-of-healing-drink",
+      name: "Drink Potion of Healing",
+      usesLimit: 1,
+      healing: { formula: "2d4+2" }
+    } as Partial<ContentActionSummary>);
+    expect(columns(optionsWith([potion])[0])).toEqual({
+      range: null,
+      hitOrDc: null,
+      damage: { dice: "2d4+2", type: "healing" }
+    });
+  });
+});

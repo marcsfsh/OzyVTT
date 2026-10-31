@@ -119,26 +119,39 @@ export function preparedState(spell: SheetSpellEntry, actor: SheetActor, definit
   return "unprepared";
 }
 
-/** The spell's one line: casting time, range and what it does, the numbers from the character's own action. */
-export function spellLine(
+/** A casting time as the table's Time column reads it: Action, Bonus Action or Reaction, or the time itself. */
+export function castingTimeWords(castingTime: string | undefined | null): string | null {
+  if (!castingTime) return null;
+  if (/bonus action/i.test(castingTime)) return "Bonus Action";
+  if (/reaction/i.test(castingTime)) return "Reaction";
+  if (/^(1 )?action$/i.test(castingTime.trim())) return "Action";
+  return castingTime;
+}
+
+/** The spell table's columns (ADR-0047): Time, Range, Hit or DC and Effect, in the character's own numbers. */
+export function spellColumns(
   spell: Pick<SheetSpellEntry, "level">,
   content: ContentSpellSummary | undefined,
   action: Pick<ContentActionSummary, "attackBonus" | "saveAbility" | "saveDc" | "damage"> | null,
   characterLevel: number
-): string {
-  const parts: string[] = [];
-  if (content?.castingTime) parts.push(content.castingTime);
-  const range = shortRange(content?.rangeText);
-  if (range) parts.push(range);
-  if (action?.attackBonus !== null && action?.attackBonus !== undefined) parts.push(signed(action.attackBonus));
-  if (action?.saveAbility) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()}`);
-  const damage =
+): Readonly<{ time: string | null; range: string | null; hitOrDc: string | null; effect: string | null }> {
+  const hitOrDc =
+    action?.attackBonus !== null && action?.attackBonus !== undefined
+      ? signed(action.attackBonus)
+      : action?.saveAbility
+        ? `DC ${action.saveDc} ${action.saveAbility.toUpperCase()}`
+        : null;
+  const effect =
     action && action.damage.length > 0
       ? action.damage.map((part) => `${part.formula} ${part.type}`).join(" + ")
-      : spellEffectAt(content, spell.level, spell.level, characterLevel).label;
-  if (damage) parts.push(damage);
-  else if (content?.duration && content.duration !== "instantaneous") parts.push(content.duration);
-  return parts.join(" · ");
+      : spellEffectAt(content, spell.level, spell.level, characterLevel).label ||
+        (content?.duration && content.duration !== "instantaneous" ? content.duration : null);
+  return {
+    time: castingTimeWords(content?.castingTime),
+    range: shortRange(content?.rangeText) ?? null,
+    hitOrDc,
+    effect: effect || null
+  };
 }
 
 /** One way to cast a spell now, as the cast detail offers it. */
