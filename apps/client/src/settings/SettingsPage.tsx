@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { IconButton, IconSearch, IconX } from "@vtt/ui";
-import { useConfirm } from "../components/feedback";
 import { ApiReference } from "../integrations/ApiReference";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { navigate, useRoute } from "../router";
 import { SectionBar } from "../shell/SectionBar";
+import { useLeaveTable } from "../shell/useLeaveTable";
 import { AccessSection } from "./AccessSection";
 import { CharactersSection } from "./CharactersSection";
 import { DeviceSection } from "./DeviceSection";
@@ -86,21 +86,9 @@ export function SettingsPage({
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const [searching, setSearching] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
-  const { confirm, dialog } = useConfirm();
 
-  const mine = (state?.actors ?? []).find(
-    (actor) => "claimStatus" in actor && actor.claimStatus === "mine" && actor.kind === "player-character"
-  );
-  const leave = async () => {
-    const ok = await confirm({
-      title: "Leave the table?",
-      body: mine
-        ? `${mine.name} stays yours. Join again on this device to pick up where you left off.`
-        : "Join again on this device whenever you are ready.",
-      confirmLabel: "Leave table"
-    });
-    if (ok) onLeave?.();
-  };
+  // Leaving is asked first, as the frame's menu asks it.
+  const { leave, dialog } = useLeaveTable(state && !("definitions" in state) ? state : null, onLeave);
 
   // A pick in the search opens its section, then brings the setting into view and marks it.
   useEffect(() => {

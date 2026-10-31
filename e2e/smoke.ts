@@ -262,21 +262,27 @@ export const gmSection = (page: Page, name: "Play" | "Prep" | "Codex" | "Compend
  * Table screen controls, Settings).
  */
 export async function openGmSection(page: Page, name: string) {
-  // On a phone Play's strip stands in for the top bar, so the utilities are a section away.
-  const utility =
-    name === "Table screen"
-      ? page.getByLabel(/^Table screen,/)
-      : page.getByRole("button", { name: "Settings", exact: true });
   if (name === "Table screen" || name === "Settings") {
+    // On a laptop both live in the GM's menu (frame spec 2.1); on a phone the bar's utilities, a section away from
+    // Play, whose strip stands in for the top bar.
+    const menu = page.getByLabel(/^GM menu,/);
+    if (await menu.isVisible()) {
+      await press(menu);
+      await press(
+        page.getByRole("menuitem", {
+          name: name === "Table screen" ? "Table screen settings" : "Settings",
+          exact: true
+        })
+      );
+      return;
+    }
+    const utility =
+      name === "Table screen"
+        ? page.getByLabel(/^Table screen,/)
+        : page.getByRole("button", { name: "Settings", exact: true });
     if (!(await utility.isVisible())) await press(gmSection(page, "Prep"));
-  }
-  if (name === "Table screen") {
     await press(utility);
-    await press(page.getByRole("menuitem", { name: "Table screen settings" }));
-    return;
-  }
-  if (name === "Settings") {
-    await press(utility);
+    if (name === "Table screen") await press(page.getByRole("menuitem", { name: "Table screen settings" }));
     return;
   }
   if (PREP_PAGES.includes(name)) {

@@ -71,20 +71,23 @@ describe("the GM's top bar", () => {
   it("shows Play, Prep, Codex and Compendium, lighting Prep on each of its pages", async () => {
     setViewport(1280);
     goTo("/encounters/maps");
-    render(<GmTopBar state={gmView()} token="gm" />);
+    render(<GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />);
     expect(sectionNames("GM sections")).toEqual(["Play", "Prep", "Codex", "Compendium"]);
     expect(screen.getByRole("tab", { name: "Prep" })).toHaveAttribute("aria-selected", "true");
-    expect(await screen.findByLabelText("Table screen, on")).toBeInTheDocument();
-    // Who is connected is the claimed characters whose players are online, as the projection says.
-    expect(screen.getByRole("img", { name: "1 character online" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Search, Ctrl K" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
+    // The one menu (frame spec 2.1): its face counts the players online, as the projection says; the table screen,
+    // who is here, the theme and Settings live inside it.
+    expect(screen.getByLabelText("GM menu, 1 player online")).toBeInTheDocument();
+    expect(await screen.findByRole("group", { name: "Table screen, on" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /^Who is here, 1 of / })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
   });
 
   it("lights no section on a utility page, and the bar stays reachable from the keyboard", () => {
     setViewport(1280);
     goTo("/viewer-controls");
-    render(<GmTopBar state={gmView()} token="gm" />);
+    render(<GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />);
     const tabs = screen.getAllByRole("tab");
     expect(tabs.every((tab) => tab.getAttribute("aria-selected") === "false")).toBe(true);
     expect(tabs[0]).toHaveAttribute("tabindex", "0");
@@ -95,7 +98,7 @@ describe("the GM's top bar", () => {
     setViewport(1280);
     localStorage.setItem("vtt.gm-last-location.section.prep", "/prep/tokens");
     goTo("/table");
-    render(<GmTopBar state={gmView()} token="gm" />);
+    render(<GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />);
     await user.click(screen.getByRole("tab", { name: "Prep" }));
     expect(window.location.pathname).toBe("/prep/tokens");
     await user.click(screen.getByRole("tab", { name: "Prep" }));
@@ -106,7 +109,7 @@ describe("the GM's top bar", () => {
     const user = userEvent.setup();
     setViewport(1280);
     goTo("/table");
-    render(<GmTopBar state={gmView()} token="gm" />);
+    render(<GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />);
     expect(screen.getByLabelText("Encounters")).toHaveTextContent("No encounter live");
     await user.click(await screen.findByLabelText("Table screen, on"));
     await user.click(screen.getByRole("menuitem", { name: "Table screen settings" }));
@@ -116,7 +119,7 @@ describe("the GM's top bar", () => {
   it("gives Play's strip the top of a phone, where Play is its own header", () => {
     setViewport(390);
     goTo("/table");
-    const { container } = render(<GmTopBar state={gmView()} token="gm" />);
+    const { container } = render(<GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />);
     expect(container.querySelector(".app-bar")).toBeNull();
   });
 
@@ -125,7 +128,7 @@ describe("the GM's top bar", () => {
     goTo("/codex");
     render(
       <>
-        <GmTopBar state={gmView()} token="gm" />
+        <GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />
         <GmBottomTabs />
       </>
     );
@@ -140,7 +143,7 @@ describe("the search launcher", () => {
     const user = userEvent.setup();
     setViewport(1280);
     goTo("/table");
-    render(<GmTopBar state={gmView()} token="gm" />);
+    render(<GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />);
     await user.keyboard("{Control>}k{/Control}");
     const dialog = screen.getByRole("dialog", { name: "Search" });
     await user.click(within(dialog).getByRole("button", { name: /Search the Compendium/ }));
@@ -151,7 +154,7 @@ describe("the search launcher", () => {
     const user = userEvent.setup();
     setViewport(1280);
     goTo("/codex");
-    render(<GmTopBar state={gmView()} token="gm" />);
+    render(<GmTopBar state={gmView()} token="gm" onSignOut={() => {}} />);
     await user.keyboard("{Control>}k{/Control}");
     expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
   });
@@ -160,7 +163,7 @@ describe("the search launcher", () => {
     const user = userEvent.setup();
     setViewport(1280);
     goTo("/table");
-    render(<PlayerTopBar state={playerView()} codexUnread={0} onCodexSeen={vi.fn()} />);
+    render(<PlayerTopBar state={playerView()} codexUnread={0} onCodexSeen={vi.fn()} onLeave={() => {}} />);
     await user.click(screen.getByRole("button", { name: "Search, Ctrl K" }));
     const dialog = screen.getByRole("dialog", { name: "Search" });
     expect(within(dialog).queryByRole("button", { name: /Compendium/ })).toBeNull();
@@ -169,19 +172,20 @@ describe("the search launcher", () => {
 });
 
 describe("a player's bars", () => {
-  it("shows Table, Sheet and Codex on a laptop, with the character they play", () => {
+  it("shows Table, Sheet and Codex on a laptop, with the character they play as the menu's face", () => {
     setViewport(1280);
     goTo("/me");
-    render(<PlayerTopBar state={playerView()} codexUnread={2} onCodexSeen={vi.fn()} />);
+    render(<PlayerTopBar state={playerView()} codexUnread={2} onCodexSeen={vi.fn()} onLeave={() => {}} />);
     expect(sectionNames("Player sections")).toEqual(["Table", "Sheet", "Codex, 2 new"]);
     expect(screen.getByRole("tab", { name: "Sheet" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("button", { name: "Playing Lyra" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Menu, playing Lyra")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Leave the table" })).toBeInTheDocument();
   });
 
   it("says when no character is claimed yet", () => {
     setViewport(1280);
     goTo("/table");
-    render(<PlayerTopBar state={playerView(false)} codexUnread={0} onCodexSeen={vi.fn()} />);
+    render(<PlayerTopBar state={playerView(false)} codexUnread={0} onCodexSeen={vi.fn()} onLeave={() => {}} />);
     expect(screen.getByText("No character yet")).toBeInTheDocument();
   });
 

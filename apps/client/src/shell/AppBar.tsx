@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import {
   IconButton,
@@ -10,19 +10,11 @@ import {
   IconPage,
   IconScene,
   IconUser,
-  Portrait,
   Tabs,
   Wordmark,
-  canMove,
   cx,
-  ghostOut,
-  pop,
-  rel,
-  useOnChange,
-  warm,
-  type PictureSource
+  useOnChange
 } from "@vtt/ui";
-import { pictureOf } from "../actors/actor-picture";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import {
   GM_SECTIONS,
@@ -45,6 +37,7 @@ import { TvControl } from "../table/TvControl";
 import { pageLight } from "./pageLight";
 import { tabTrip } from "./tabLight";
 import { SearchLauncher } from "./SearchLauncher";
+import { FrameMenu } from "./FrameMenu";
 import { SectionBar, SectionBarSlot } from "./SectionBar";
 import "./app-bar.css";
 
@@ -140,64 +133,6 @@ function TopBar({ children, className }: Readonly<{ children: ReactNode; classNa
   );
 }
 
-/** Who is connected, as the projection says it: the claimed characters whose players are online. */
-function Connected({ state }: Readonly<{ state: GmView }>) {
-  // Marked once it has rendered, so only a face that joins afterwards lights up.
-  const row = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (row.current) row.current.dataset.settled = "true";
-  });
-  const online = state.actors.filter(
-    (actor) =>
-      actor.kind === "player-character" && !actor.archived && actor.ownerSessionId && actor.presence === "online"
-  );
-  if (online.length === 0) return null;
-  const label = `${online.length} ${online.length === 1 ? "character" : "characters"} online`;
-  return (
-    <span
-      ref={row}
-      className="app-bar-connected"
-      role="img"
-      aria-label={label}
-      title={online.map((a) => a.name).join(", ")}
-    >
-      {online.slice(0, 4).map((actor) => (
-        <PresenceFace key={actor.id} picture={pictureOf(actor, null, state.definitions)} />
-      ))}
-      {online.length > 4 && <span className="app-bar-connected-more">+{online.length - 4}</span>}
-    </span>
-  );
-}
-
-/**
- * One player at the table (ADR-0045, group 14): their face warms with a burst as they connect, and fades where it was
- * as they drop. Leaving the page plays nothing: the copy shows only when the face left a row that stayed.
- */
-function PresenceFace({ picture }: Readonly<{ picture: PictureSource }>) {
-  const face = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const el = face.current;
-    if (!el) return;
-    if (canMove() && arrivedLate(el)) {
-      warm(el, { dur: 220 });
-      const box = rel(el, el.parentElement ?? el);
-      if (el.parentElement) pop(el.parentElement, { x: box.cx, y: box.cy, size: 36, tone: "cyan" });
-    }
-    return () => ghostOut(el, { leave: "fade", whenGone: true, within: el.parentElement });
-  }, []);
-  return (
-    <span ref={face} className="app-bar-connected-face">
-      <Portrait size="xs" frame="party" picture={picture} />
-    </span>
-  );
-}
-
-/** A face joining a row already on the page, so the row's first render (and a reload) shows its faces at rest. */
-function arrivedLate(face: HTMLElement): boolean {
-  const row = face.parentElement;
-  return row !== null && row.dataset.settled === "true";
-}
-
 function SettingsButton() {
   return (
     <IconButton label="Settings" className="app-bar-icon" onClick={() => void navigate("/settings")}>
@@ -207,10 +142,15 @@ function SettingsButton() {
 }
 
 /**
- * The GM's top bar. On a laptop: the wordmark, Play, Prep, Codex and Compendium, then the table screen lamp, who is
- * connected, search and settings. On a phone the sections are the bottom tabs, so the bar keeps the utilities alone.
+ * The GM's top bar (frame spec 2.1). On a laptop: the wordmark, Play, Prep, Codex and Compendium, then search and the
+ * one menu, which holds who is here, the table screen, the theme, Settings and Sign out. On a phone the sections are
+ * the bottom tabs, so the bar keeps the utilities alone until More takes them.
  */
-export function GmTopBar({ state, token }: Readonly<{ state: GmView; token: string }>) {
+export function GmTopBar({
+  state,
+  token,
+  onSignOut
+}: Readonly<{ state: GmView; token: string; onSignOut: () => void }>) {
   const route = useRoute();
   const phone = usePhoneShell();
   const section = litGmSection(route.path);
@@ -234,8 +174,7 @@ export function GmTopBar({ state, token }: Readonly<{ state: GmView; token: stri
         </>
       )}
       <span className="app-bar-grow" />
-      <TvControl gmToken={token} state={state} compact={phone} />
-      {!phone && <Connected state={state} />}
+      {phone && <TvControl gmToken={token} state={state} compact />}
       <SearchLauncher
         role="gm"
         route={route}
@@ -249,8 +188,14 @@ export function GmTopBar({ state, token }: Readonly<{ state: GmView; token: stri
           { label: "Settings", path: "/settings" }
         ]}
       />
-      <ThemeSwitch className="app-bar-theme" />
-      <SettingsButton />
+      {phone ? (
+        <>
+          <ThemeSwitch className="app-bar-theme" />
+          <SettingsButton />
+        </>
+      ) : (
+        <FrameMenu role="gm" state={state} token={token} onSignOut={onSignOut} />
+      )}
     </TopBar>
   );
 }
@@ -288,30 +233,23 @@ function openPlayerSection(section: PlayerSection, current: PlayerSection | null
   void navigate(entry.path);
 }
 
-/** The character this player plays, beside the bar's end: their portrait and first name. */
-function Playing({ state }: Readonly<{ state: PlayerView }>) {
-  const mine = state.actors.filter((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
-  const actor = mine[0];
-  if (!actor) return <span className="app-bar-playing is-none">No character yet</span>;
-  const name = actor.name.split(/\s+/)[0] ?? actor.name;
-  return (
-    <button type="button" className="app-bar-playing interactive" onClick={() => void navigate("/me")}>
-      <Portrait size="xs" frame="party" picture={pictureOf(actor, null)} />
-      <span>Playing {mine.length > 1 ? `${name} and ${mine.length - 1} more` : name}</span>
-    </button>
-  );
-}
-
 /**
- * A player's top bar. On a laptop: the wordmark, Table, Sheet and Codex, the character they play, search and settings.
- * On a phone the sections, with Log, are the bottom tabs.
+ * A player's top bar (frame spec 2.1). On a laptop: the wordmark, Table, Sheet and Codex, then search and the one
+ * menu, whose face is the character they play. On a phone the sections, with Log, are the bottom tabs.
  */
 export function PlayerTopBar({
   state,
   token,
   codexUnread,
-  onCodexSeen
-}: Readonly<{ state: PlayerView; token?: string; codexUnread: number; onCodexSeen: () => void }>) {
+  onCodexSeen,
+  onLeave
+}: Readonly<{
+  state: PlayerView;
+  token?: string;
+  codexUnread: number;
+  onCodexSeen: () => void;
+  onLeave: () => void;
+}>) {
   const route = useRoute();
   const phone = usePhoneShell();
   const section = litPlayerSection(route);
@@ -335,7 +273,6 @@ export function PlayerTopBar({
         />
       )}
       <span className="app-bar-grow" />
-      {!phone && <Playing state={state} />}
       <SearchLauncher
         role="player"
         route={route}
@@ -347,8 +284,14 @@ export function PlayerTopBar({
           { label: "Settings", path: "/settings" }
         ]}
       />
-      <ThemeSwitch className="app-bar-theme" />
-      <SettingsButton />
+      {phone ? (
+        <>
+          <ThemeSwitch className="app-bar-theme" />
+          <SettingsButton />
+        </>
+      ) : (
+        <FrameMenu role="player" state={state} onLeave={onLeave} />
+      )}
     </TopBar>
   );
 }

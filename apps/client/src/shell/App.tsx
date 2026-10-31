@@ -91,13 +91,16 @@ export function App() {
     <main className={entry.phase === "settle" ? "anim-cascade" : undefined}>
       {signedIn && <TableEventToasts />}
       {/* Row 1: the top bar. It stays up while a full-page layer is open. */}
-      {shell?.role === "gm" && <GmTopBar state={shell.state as GmView} token={shell.token} />}
+      {shell?.role === "gm" && (
+        <GmTopBar state={shell.state as GmView} token={shell.token} onSignOut={() => void session.signOutGm()} />
+      )}
       {shell?.role === "player" && (
         <PlayerTopBar
           state={shell.state as PlayerView}
           token={shell.token}
           codexUnread={recap.unread}
           onCodexSeen={recap.markSeen}
+          onLeave={session.leavePlayer}
         />
       )}
       {/* Row 2: the reconnecting bar. A real frame row, so it never paints over a surface. */}
