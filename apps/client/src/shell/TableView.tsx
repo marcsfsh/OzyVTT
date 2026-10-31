@@ -23,7 +23,9 @@ import { NeedsYou } from "../table/NeedsYou";
 import { useScrollPast } from "../table/scrollPast";
 import { hasPlayerPrompt, PromptSlot } from "../table/PromptSlot";
 import { StripEndContext } from "../table/stripSlot";
-import { TableStrip } from "../table/TableStrip";
+import { MeButton, TableStrip } from "../table/TableStrip";
+import { TableDock } from "../table/TableDock";
+import { NowPlaying } from "../sound/NowPlaying";
 import { usePhoneShell } from "./AppBar";
 import { TokenTab } from "../table/TokenTab";
 import { useCodexNotice } from "../table/useCodexNotice";
@@ -92,12 +94,19 @@ export function TableView(props: TableViewProps) {
     .filter((actor) => actor.kind === "player-character" && !("archived" in actor && actor.archived))
     .map((actor) => ({ id: actor.id, name: actor.name }));
 
-  const header =
+  // A laptop's table is Two docks (table spec 2.1): the dock with the order, the map, the panel. A phone keeps the
+  // strip as its header until the Switch (C5).
+  const header = !phone ? (
     props.role === "gm" ? (
-      <TableStrip role="gm" state={props.state} token={token} phone={phoneShell} endRef={setStripEnd} />
+      <TableDock role="gm" state={props.state} token={token} />
     ) : (
-      <TableStrip role="player" state={props.state} token={token} phone={phoneShell} />
-    );
+      <TableDock role="player" state={props.state} token={token} tools={<MeButton state={props.state} />} />
+    )
+  ) : props.role === "gm" ? (
+    <TableStrip role="gm" state={props.state} token={token} phone={phoneShell} endRef={setStripEnd} />
+  ) : (
+    <TableStrip role="player" state={props.state} token={token} phone={phoneShell} />
+  );
 
   const map = state.combat.mapAssetId ? (
     <EncounterMap
@@ -166,6 +175,14 @@ export function TableView(props: TableViewProps) {
         phone={phone}
         token={token}
         slots={{
+          // On a laptop the Encounter tab's head holds what the strip did: the sound and, before a fight on a live
+          // map, the join address (the Encounter menu joins them during a fight).
+          head: phone ? undefined : (
+            <>
+              <NowPlaying token={token} compact />
+              {!state.combat.active && state.combat.mapAssetId && <JoinAddress token={token} layout="strip" />}
+            </>
+          ),
           needs: <NeedsYou state={props.state} token={token} />,
           needsCount: needsItems(props.state).length,
           dice,

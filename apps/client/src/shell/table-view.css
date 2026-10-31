@@ -1,21 +1,24 @@
-/* The table's frame: a docked workbench. On a laptop (980px and up) the header bar and the map share the left
-   column and the panel takes the right; below 980px the header, the map pane and the panel stack, and the panel's
-   footer is the bar under the thumb. The frame fills the pane exactly and never scrolls: each region fits or
-   scrolls itself. */
+/* The table's frame (table spec 2.1, ADR-0050): on a laptop Two docks, the turn order's dock at the left, the map,
+   and the panel docked at the right at 380px; the dock is 232px from 1280px and 72px from 980px. Below 980px the
+   header, the map pane and the panel stack, and the panel's footer is the bar under the thumb. The frame fills the
+   pane exactly and never scrolls: each region fits or scrolls itself. */
 .table-bench {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 24.5rem;
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-areas:
-    "head panel"
-    "map panel";
+  grid-template-columns: 72px minmax(0, 1fr) 380px;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "dock map panel";
   height: 100%;
   min-height: 0;
   overscroll-behavior: contain;
   background: var(--void);
 }
-.table-bench > .table-strip {
-  grid-area: head;
+@media (min-width: 1280px) {
+  .table-bench {
+    grid-template-columns: 232px minmax(0, 1fr) 380px;
+  }
+}
+.table-bench > .table-dock {
+  grid-area: dock;
 }
 /* On a laptop the split is no box of its own: the map and the panel are cells of the bench's grid. */
 .table-bench-split {
@@ -77,9 +80,10 @@
 /* A player who has claimed nobody while no map is live: the picker takes the whole table, no map pane. */
 .table-bench.is-claiming {
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas:
-    "head"
-    "panel";
+  grid-template-areas: "panel";
+}
+.table-bench.is-claiming > .table-dock {
+  display: none;
 }
 .table-bench.is-claiming .table-bench-panel {
   border-left: 0;
@@ -134,4 +138,11 @@
 .table-claim {
   height: 100%;
   min-height: 0;
+}
+
+/* On the laptop table a toast keeps the corner but rises over the panel's foot, so End turn is never under it. */
+@media (min-width: 980px) {
+  body:has(.table-bench .table-panel-foot) .nh-toast-viewport {
+    bottom: 120px;
+  }
 }

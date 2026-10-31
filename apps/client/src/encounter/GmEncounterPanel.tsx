@@ -52,6 +52,8 @@ const TURN_SETTLE_MS = 500;
 
 /** What the table puts in the GM's panel besides the fight: Needs you, the dice, the log, the token, the party. */
 export type GmPanelSlots = Readonly<{
+  /** The Encounter tab's head on a laptop: the sound and the join address that the strip over the map once held. */
+  head?: ReactNode;
   needs?: ReactNode;
   needsCount?: number;
   dice?: ReactNode;
@@ -549,6 +551,19 @@ export function GmEncounterPanel({
     </p>
   ) : null;
 
+  // Adding to the fight, its settings and ending it: the Encounter menu.
+  const fightMenu = (
+    <FightMenu
+      state={state}
+      busy={busy}
+      run={run}
+      onFeedback={setMessage}
+      onAddMonsters={() => setBrowsing(true)}
+      onEnd={() => void end()}
+      labelled
+      {...(fightExperience ? { onAwardExperience: (inLair: boolean) => void awardFightExperience(inLair) } : {})}
+    />
+  );
   // Who acts after this turn, as the strip's NEXT marks it.
   const nextUp = turnTiles({ role: "gm", state }).find((tile) => tile.next);
   const turnControls = (
@@ -575,19 +590,8 @@ export function GmEncounterPanel({
         </Button>
       </div>
       {nextUp && !reviewing && <p className="start-fight-count">Next: {nextUp.name}</p>}
-      {/* Adding to the fight, its settings and ending it are in the Fight menu at the strip's end. */}
-      <InStripEnd>
-        <FightMenu
-          state={state}
-          busy={busy}
-          run={run}
-          onFeedback={setMessage}
-          onAddMonsters={() => setBrowsing(true)}
-          onEnd={() => void end()}
-          labelled
-          {...(fightExperience ? { onAwardExperience: (inLair: boolean) => void awardFightExperience(inLair) } : {})}
-        />
-      </InStripEnd>
+      {/* On a phone the Encounter menu sits at the end of Play's header; a laptop has it in the tab's head. */}
+      {phone && <InStripEnd>{fightMenu}</InStripEnd>}
     </div>
   );
   const startControls = (
@@ -613,8 +617,16 @@ export function GmEncounterPanel({
       )}
     </>
   );
+  const head =
+    slots?.head || (!phone && fighting) ? (
+      <div className="encounter-tab-head">
+        {slots?.head}
+        {!phone && fighting && fightMenu}
+      </div>
+    ) : null;
   const fightBody = fighting ? (
     <>
+      {head}
       {slots?.needs}
       {actBody}
       {/* The order with each row's tools (score, HP, conditions, the sheet); a phone has an Order tab for it. */}
@@ -627,6 +639,7 @@ export function GmEncounterPanel({
     </>
   ) : (
     <>
+      {head}
       {slots?.needs}
       {setupBody}
     </>

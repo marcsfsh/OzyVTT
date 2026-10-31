@@ -114,7 +114,7 @@ export function TableStrip(props: StripProps) {
 }
 
 /** A player's Me: brings their own token into view once it is on the map. */
-function MeButton({ state }: Readonly<{ state: PlayerView }>) {
+export function MeButton({ state }: Readonly<{ state: PlayerView }>) {
   const mine = state.actors.find((actor) => actor.claimStatus === "mine");
   const placed = mine && state.combat.tokens.some((entry) => entry.actorId === mine.id && entry.position);
   if (!mine || !placed) return null;

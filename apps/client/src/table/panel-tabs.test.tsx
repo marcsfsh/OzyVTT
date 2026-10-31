@@ -17,6 +17,7 @@ vi.mock("../lib/command", () => ({
 import { EncounterPanel } from "../encounter/EncounterPanel";
 import { InFooter } from "./footerSlot";
 import { TablePanel } from "./TablePanel";
+import { TableDock } from "./TableDock";
 
 // The panel beside the map is one tablist per role and moment: its tabs are real tabs tied to their panels, the
 // chosen one is remembered per device, and the footer holds the view's one primary.
@@ -132,6 +133,8 @@ describe("the GM's panel", () => {
     expect(within(fight).getByRole("region", { name: "Now acting · Lyra" })).toBeTruthy();
     // The order and its row tools fold under the acting creature.
     expect(within(fight).getByText("Turn order and tools")).toBeTruthy();
+    // With no strip over the map, the Encounter menu heads the tab (table spec 2.1).
+    expect(within(fight).getByRole("button", { name: "Encounter options" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "End turn" })).toBeTruthy();
     expect(screen.getByText("Next: Borin")).toBeTruthy();
     // A tab shows its own panel and is remembered on this device.
@@ -285,5 +288,16 @@ describe("the bar under the thumb", () => {
   it("leaves the Roll in the tab on a laptop", () => {
     render(panel(false));
     expect(screen.getByRole("button", { name: "Roll Fire Bolt" }).closest("[role=tabpanel]")).not.toBeNull();
+  });
+});
+
+describe("the laptop dock (table spec 2.1)", () => {
+  it("heads the order with the round and drops the line about the table once a fight runs", () => {
+    const { rerender } = render(<TableDock role="gm" state={gmView(false)} token="gm" />);
+    const dock = screen.getByRole("complementary", { name: "Turn order and tools" });
+    expect(dock.querySelector(".table-dock-status")).not.toBeNull();
+    rerender(<TableDock role="gm" state={gmView(true)} token="gm" />);
+    expect(dock.querySelector(".table-dock-status")).toBeNull();
+    expect(dock.querySelector(".table-dock-counter")).not.toBeNull();
   });
 });

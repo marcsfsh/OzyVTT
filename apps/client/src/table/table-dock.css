@@ -1,0 +1,82 @@
+/* The laptop table's left dock (table spec 2.1 and 4): the round at its head (12px 14px), the order filling the dock and
+   scrolling itself, the tools under it. Positioned: the order's light runs down its left edge (ADR-0045). */
+.table-dock {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: var(--rim-w) solid var(--line-strong);
+  background: var(--surface-1);
+}
+.table-dock-head {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.table-dock-status {
+  flex: none;
+  margin: 0;
+  padding: var(--space-2) 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+}
+.table-dock-status b {
+  color: var(--text);
+  font-weight: 700;
+}
+.table-dock-order {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Until the Ladder (C2), today's tiles stand one under another. */
+.table-dock-order .turn-tiles {
+  flex-direction: column;
+  overflow: visible;
+}
+.table-dock-order .turn-tile {
+  flex-direction: row;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 52px;
+  height: auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+}
+/* Padded so a control's 44px hit area (`.tap-target`) stays inside the dock and never stretches the page. */
+.table-dock-tools {
+  flex: none;
+  padding: 6px 8px;
+  border-top: 1px solid var(--line-strong);
+}
+/* From 980 to 1279px the dock is 72px: each row its face and initiative. From 1280px it is the full dock. */
+.table-dock-head {
+  padding: 12px 6px;
+}
+.table-dock-status,
+.table-dock-order .turn-tile-text {
+  display: none;
+}
+.table-dock-order .turn-tile {
+  justify-content: center;
+  padding: 6px 4px;
+}
+@media (min-width: 1280px) {
+  .table-dock-head {
+    padding: 12px 14px;
+  }
+  .table-dock-status {
+    display: block;
+  }
+  .table-dock-order .turn-tile-text {
+    display: inline-flex;
+  }
+  .table-dock-order .turn-tile {
+    justify-content: flex-start;
+    padding: 6px 12px;
+  }
+}

@@ -1240,3 +1240,18 @@
   max-height: none;
   overflow: visible;
 }
+
+/* The Encounter tab's head on a laptop (table spec 2.1): the sound, the join address before a fight and the Encounter
+   menu during one, which the strip over the map used to hold. */
+.encounter-tab-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.encounter-tab-head > .encounter-menu-toggle {
+  margin-left: auto;
+}
