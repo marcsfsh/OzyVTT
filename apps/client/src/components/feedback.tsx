@@ -1,5 +1,11 @@
 import { useCallback, useState } from "react";
 import { Modal, Button, Input, Switch } from "@vtt/ui";
+import { useMediaQuery } from "../lib/useMediaQuery";
+
+/** The Dialog pattern (frame rule 3.6): a sheet from the bottom on a phone, under the thumb. */
+function useDialogAlign() {
+  return useMediaQuery("(max-width: 760px)") ? ("bottom" as const) : ("center" as const);
+}
 
 export type NoticeTone = "success" | "error" | "info";
 export type NoticeMessage = { tone: NoticeTone; text: string } | null;
@@ -56,17 +62,19 @@ export function useConfirm() {
     request?.resolve(confirmed);
     setRequest(null);
   };
+  const align = useDialogAlign();
   const dialog = (
     <Modal
       open={!!request}
       onClose={() => settle(false)}
       size="sm"
+      align={align}
       title={request?.title}
       ariaLabel={request?.title ?? "Confirm"}
       footer={
         request && (
           <>
-            <Button variant="secondary" onClick={() => settle(false)}>
+            <Button variant="ghost" onClick={() => settle(false)}>
               {request.cancelLabel ?? "Cancel"}
             </Button>
             <Button variant={request.danger ? "destructive" : "primary"} autoFocus onClick={() => settle(true)}>
@@ -124,17 +132,19 @@ export function usePrompt() {
     const trimmed = value.trim();
     settle(trimmed ? trimmed : null);
   };
+  const align = useDialogAlign();
   const dialog = (
     <Modal
       open={!!request}
       onClose={() => settle(null)}
       size="sm"
+      align={align}
       title={request?.title}
       ariaLabel={request?.title ?? "Enter a value"}
       footer={
         request && (
           <>
-            <Button variant="secondary" onClick={() => settle(null)}>
+            <Button variant="ghost" onClick={() => settle(null)}>
               {request.cancelLabel ?? "Cancel"}
             </Button>
             <Button variant="primary" onClick={submit}>

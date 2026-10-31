@@ -185,7 +185,7 @@ export function MonsterActions({
       hasAnswers(action, draft) &&
       !(await confirm({
         title: `Make ${name} ${KIND_PHRASE[kind]}?`,
-        body: `Its ${KIND_WORDS[from].toLowerCase()} answers are kept while this monster is open. Change it back to ${KIND_WORDS[from]} to get them again.`,
+        body: `Its ${KIND_WORDS[from].toLowerCase()} answers are kept while this monster is open, so changing it back to ${KIND_WORDS[from]} brings them back.`,
         confirmLabel: `Make it ${KIND_PHRASE[kind]}`
       }))
     )

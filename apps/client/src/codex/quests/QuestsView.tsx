@@ -299,8 +299,8 @@ function GmQuest({ id }: Readonly<{ id: string }>) {
   const remove = async () => {
     if (!quest) return;
     const ok = await confirm({
-      title: "Delete quest",
-      body: `Delete "${quest.title}"? This cannot be undone.`,
+      title: `Delete "${quest.title}"?`,
+      body: "This cannot be undone.",
       confirmLabel: "Delete",
       danger: true
     });

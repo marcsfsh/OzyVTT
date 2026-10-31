@@ -155,8 +155,8 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
       if (
         shown &&
         !(await confirm({
-          title: "Hide this faction page",
-          body: "Your standing with them stops being shown to players as well. A standing is only shown while its faction page is.",
+          title: "Hide this faction page?",
+          body: "Players stop seeing your standing with them too, since a standing shows only while its faction page does.",
           confirmLabel: "Hide page"
         }))
       )
@@ -174,8 +174,8 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   const remove = async () => {
     if (!page) return;
     const ok = await confirm({
-      title: "Delete page",
-      body: `Delete "${page.title}"? This cannot be undone.`,
+      title: `Delete "${page.title}"?`,
+      body: "This cannot be undone.",
       confirmLabel: "Delete",
       danger: true
     });

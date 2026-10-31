@@ -150,6 +150,21 @@ describe("the GM's top bar", () => {
   });
 });
 
+describe("the More sheet's rows that ask", () => {
+  it("keeps the sheet while Sign out asks, so the question can open over it", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    goTo("/codex");
+    const onSignOut = vi.fn();
+    render(<GmBottomTabs state={gmView()} token="gm" onSignOut={onSignOut} />);
+    await user.click(screen.getByRole("button", { name: "More" }));
+    await user.click(within(screen.getByRole("dialog", { name: "More" })).getByRole("menuitem", { name: "Sign out" }));
+    const ask = screen.getByRole("dialog", { name: "Sign out on this device?" });
+    await user.click(within(ask).getByRole("button", { name: "Sign out" }));
+    await vi.waitFor(() => expect(onSignOut).toHaveBeenCalled());
+  });
+});
+
 describe("the one search", () => {
   const places = (dialog: HTMLElement) =>
     within(within(dialog).getByRole("group", { name: "Where to look" }))

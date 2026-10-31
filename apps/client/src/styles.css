@@ -75,6 +75,33 @@ main > :is(.app-bottom-tabs, .app-bottom-nav) {
 .notfound-stage {
   display: flex;
 }
+/* Loading (frame rule 3.9): after 400ms, one quiet line where the page will be. */
+.surface-loading {
+  display: grid;
+  place-items: center;
+}
+.surface-loading-line {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+/* Not found and a record that has gone (frame rule 3.7), here rather than in the Codex's styles so either is drawn
+   before the Codex loads. */
+.notfound-view {
+  display: grid;
+  place-items: center;
+  margin: auto;
+  padding: var(--space-6) var(--pane-gutter);
+}
+.codex-missing-record {
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-left: 2px solid var(--caution);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
 .pane-frame > .scroll-y {
   padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
   overscroll-behavior: contain;

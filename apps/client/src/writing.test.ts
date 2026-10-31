@@ -61,13 +61,13 @@ const EXEMPT: ReadonlyArray<readonly [file: string, text: string, rule: string, 
     "apps/client/src/codex/CodexSettings.tsx",
     "Delete all $ saved version$ across every page?",
     "question",
-    "The opening line of a confirm dialog's body, built in a variable before the confirm call."
+    "A confirm dialog's title, built in a variable before the confirm call."
   ],
   [
     "apps/client/src/codex/CodexSettings.tsx",
     "Delete saved versions older than $ day$, across every page?",
     "question",
-    "The opening line of a confirm dialog's body, built in a variable before the confirm call."
+    "A confirm dialog's title, built in a variable before the confirm call."
   ],
   [
     "apps/client/src/codex/autosave.ts",

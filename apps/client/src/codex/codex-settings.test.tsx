@@ -172,9 +172,10 @@ describe("Existing history can be deleted (owner decision, 2026-07-30)", () => {
     // The confirm says what is lost and what is not.
     expect(await screen.findByText(/older than 30 days, across every page/)).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Delete saved versions older than 30 days, across every page? Your pages are not changed. Only the earlier versions are deleted. This cannot be undone."
-      )
+      screen.getByRole("dialog", { name: "Delete saved versions older than 30 days, across every page?" })
+    ).toHaveTextContent("Your pages stay as they are and only their earlier versions go, so this cannot be undone.");
+    expect(
+      screen.getByText("Your pages stay as they are and only their earlier versions go, so this cannot be undone.")
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete them" }));
 

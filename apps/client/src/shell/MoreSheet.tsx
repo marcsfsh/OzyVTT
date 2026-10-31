@@ -24,9 +24,11 @@ export function MoreSheet({ onClose, children }: Readonly<{ onClose: () => void;
       opener?.focus?.();
     };
   }, [onClose]);
-  // Closing after a row is chosen, as a menu does.
+  // Closing after a row is chosen, as a menu does; a row that asks first (`data-asks`) keeps the sheet, because its
+  // question lives with the rows and would close with them.
   const closeAfterRow = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
+    if (target.closest("[data-asks]")) return;
     if (target.closest("[role='menuitem'], a")) onClose();
   };
   return createPortal(

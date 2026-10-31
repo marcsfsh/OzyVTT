@@ -91,7 +91,7 @@ export function PartyRosterTab({
   const remove = async (actor: GmActor) => {
     const ok = await confirm({
       title: `Delete ${actor.name}?`,
-      body: `${actor.name}'s sheet and token go for good. This cannot be undone.`,
+      body: `${actor.name}'s sheet and token go too, and this cannot be undone.`,
       confirmLabel: "Delete",
       danger: true
     });

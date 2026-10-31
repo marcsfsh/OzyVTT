@@ -31,6 +31,16 @@
   translate: -100% 0;
   border-right: var(--rim-w) solid var(--rim-color-hi);
 }
+/* From the bottom: a sheet under the thumb on a phone, its top edge the horizon. */
+.nh-drawer--bottom {
+  top: auto;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-height: min(88dvh, 48rem);
+  translate: 0 100%;
+  border-top: var(--rim-w) solid var(--rim-color-hi);
+}
 .nh-drawer.is-open {
   translate: 0 0;
   visibility: visible;

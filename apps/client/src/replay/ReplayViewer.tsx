@@ -82,7 +82,7 @@ function GmViewer({
   const launch = async () => {
     const ok = await confirm({
       title: "Launch from this moment?",
-      body: `The table becomes this replay at turn ${index + 1}. Your live encounter is parked in Encounters. Resume it anytime.`,
+      body: `The table becomes this replay at turn ${index + 1}, and your live encounter waits in Encounters to resume anytime.`,
       confirmLabel: "Launch"
     });
     if (!ok) return;

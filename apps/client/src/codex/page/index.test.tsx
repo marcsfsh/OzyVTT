@@ -163,7 +163,7 @@ describe("The GM's folders", () => {
       )
     );
     await user.click(
-      within(await screen.findByRole("dialog", { name: "Delete folder" })).getByRole("button", {
+      within(await screen.findByRole("dialog", { name: /^Delete the folder .*\?$/ })).getByRole("button", {
         name: "Delete folder"
       })
     );

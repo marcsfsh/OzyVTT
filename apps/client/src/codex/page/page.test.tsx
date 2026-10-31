@@ -193,7 +193,7 @@ describe("Reading a page as the GM", () => {
     await screen.findByRole("heading", { level: 1, name: "Ysolde Varn" });
     await user.click(screen.getByLabelText("More"));
     await user.click(screen.getByRole("menuitem", { name: "Delete page" }));
-    const confirm = await screen.findByRole("dialog", { name: "Delete page" });
+    const confirm = await screen.findByRole("dialog", { name: /^Delete ".*"\?$/ });
     expect(api.codexApi.deletePage).not.toHaveBeenCalled();
     await user.click(within(confirm).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(api.codexApi.deletePage).toHaveBeenCalledWith("gm", "p1"));
@@ -314,8 +314,8 @@ describe("Revealing", () => {
       const user = userEvent.setup();
       renderGmCodex("/codex/pages/p2");
       await hide(user);
-      const ask = await screen.findByRole("dialog", { name: "Hide this faction page" });
-      expect(ask).toHaveTextContent("Your standing with them stops being shown to players as well.");
+      const ask = await screen.findByRole("dialog", { name: "Hide this faction page?" });
+      expect(ask).toHaveTextContent("Players stop seeing your standing with them too");
       expect(api.codexApi.revealPage).not.toHaveBeenCalled();
     });
 
@@ -337,7 +337,7 @@ describe("Revealing", () => {
       renderGmCodex("/codex/pages/p2");
       await hide(user);
       await waitFor(() => expect(api.codexApi.revealPage).toHaveBeenCalledWith("gm", "p2", false));
-      expect(screen.queryByRole("dialog", { name: "Hide this faction page" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Hide this faction page?" })).not.toBeInTheDocument();
     });
   });
 });

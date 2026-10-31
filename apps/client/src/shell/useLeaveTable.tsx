@@ -11,7 +11,7 @@ export function useLeaveTable(state: PlayerView | null | undefined, onLeave: (()
     const ok = await confirm({
       title: "Leave the table?",
       body: mine
-        ? `${mine.name} stays yours. Join again on this device to pick up where you left off.`
+        ? `${mine.name} stays yours, so join again on this device to pick up where you left off.`
         : "Join again on this device whenever you are ready.",
       confirmLabel: "Leave table"
     });

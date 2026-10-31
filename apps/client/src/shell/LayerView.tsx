@@ -8,9 +8,12 @@ import { CharacterSheet } from "../sheet/CharacterSheet";
 import { navigate, pathForGmTab, type AddressLayer } from "../router";
 import type { Connection } from "./useSession";
 
-const CharacterBuilder = lazySurface(() => import("../builder/CharacterBuilder").then((m) => m.CharacterBuilder));
-const LevelFlow = lazySurface(() => import("../builder/LevelFlow").then((m) => m.LevelFlow));
-const ReplayViewer = lazySurface(() => import("../replay/ReplayViewer").then((m) => m.ReplayViewer));
+const CharacterBuilder = lazySurface(
+  () => import("../builder/CharacterBuilder").then((m) => m.CharacterBuilder),
+  "character builder"
+);
+const LevelFlow = lazySurface(() => import("../builder/LevelFlow").then((m) => m.LevelFlow), "level-up steps");
+const ReplayViewer = lazySurface(() => import("../replay/ReplayViewer").then((m) => m.ReplayViewer), "replay");
 
 /** The layers that take the whole pane: one at each address, so a refresh keeps them and Back closes them. */
 export type FullPageLayer = Extract<AddressLayer, { kind: "builder" | "level" | "replay" | "sheet" }>;

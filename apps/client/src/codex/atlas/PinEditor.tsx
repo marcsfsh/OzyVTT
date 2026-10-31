@@ -120,8 +120,8 @@ export function PinEditor({
   const remove = async () => {
     if (
       !(await confirm({
-        title: "Delete pin",
-        body: "Delete this pin? This cannot be undone.",
+        title: "Delete this pin?",
+        body: "This cannot be undone.",
         confirmLabel: "Delete",
         danger: true
       }))

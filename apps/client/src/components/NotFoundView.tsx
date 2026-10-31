@@ -1,24 +1,24 @@
-import { Button } from "@vtt/ui";
+import { Button, EmptyState } from "@vtt/ui";
 import { navigate } from "../router";
 import { PhoneHeader } from "../shell/SectionBar";
 
 /**
- * What an address that names nothing renders. A player asking for a GM-only address gets exactly
- * this too, so the response never confirms that the surface exists (the 404-not-403 rule).
+ * What an address that names nothing renders (frame rule 3.7): the empty state's one line and one secondary button,
+ * under the frame you came from. A player asking for a GM-only address gets exactly this too, so the response never
+ * confirms that the surface exists (the 404-not-403 rule). Both roles go to `/table`.
  */
 export function NotFoundView({ role: _role }: Readonly<{ role: "gm" | "player" }>) {
   return (
-    <div className="codex-main-empty anim-view" role="status">
-      <h3>Nothing lives at this address.</h3>
-      <p>Check the link, or head back to the table.</p>
-      <div className="codex-notfound-actions">
-        <Button variant="primary" onClick={() => navigate("/codex")}>
-          Go to the Codex
-        </Button>
-        <Button variant="secondary" onClick={() => navigate("/table")}>
-          Go to the table
-        </Button>
-      </div>
+    <div className="notfound-view anim-view" role="status">
+      <EmptyState
+        action={
+          <Button variant="secondary" onClick={() => navigate("/table")}>
+            Go to the table
+          </Button>
+        }
+      >
+        Nothing lives at this address.
+      </EmptyState>
     </div>
   );
 }

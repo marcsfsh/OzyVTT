@@ -124,8 +124,8 @@ export function PagesIndex() {
   const deleteFolder = async (path: string, count: number) => {
     if (!gm) return;
     const ok = await confirm({
-      title: "Delete folder",
-      body: `Delete the folder ${path}? Its ${count} ${count === 1 ? "page stays" : "pages stay"} in the Codex, unfiled.`,
+      title: `Delete the folder ${path}?`,
+      body: `Its ${count} ${count === 1 ? "page stays" : "pages stay"} in the Codex, unfiled.`,
       confirmLabel: "Delete folder",
       danger: true
     });

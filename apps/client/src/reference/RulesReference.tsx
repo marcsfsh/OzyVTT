@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ContentGlossaryEntry } from "@vtt/domain";
 import { Badge, Button, Drawer, Input } from "@vtt/ui";
 import { read } from "../lib/command";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import "./rules-reference.css";
 
 type Glossary = Readonly<{ entries: readonly ContentGlossaryEntry[]; attribution: string }>;
@@ -33,6 +34,7 @@ export function RulesReference({
   /** A term search's Rules place opened: the drawer searches for it and opens it. */
   entry?: string;
 }>) {
+  const phone = useMediaQuery("(max-width: 760px)");
   const [loaded, setLoaded] = useState<Glossary | null>(null);
   const [error, setError] = useState("");
   const openedName = entry;
@@ -57,7 +59,14 @@ export function RulesReference({
   }, [loaded, search]);
 
   return (
-    <Drawer open={open} onClose={onClose} title="Rules" className="rules-reference">
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title="Rules"
+      // A drawer on the right on a laptop, where the page behind stays usable; a sheet from the bottom on a phone.
+      side={phone ? "bottom" : "right"}
+      className="rules-reference"
+    >
       <Input
         type="search"
         aria-label="Search the rules"

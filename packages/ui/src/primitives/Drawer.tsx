@@ -14,7 +14,7 @@ interface DrawerProps {
   title: ReactNode;
   children: ReactNode;
   /** Which edge it slides from; "right" reads as an inspector beside the work. */
-  side?: "right" | "left";
+  side?: "right" | "left" | "bottom";
   /** Accessible name override. Defaults to the visible title. */
   ariaLabel?: string;
   className?: string;
@@ -35,8 +35,8 @@ export function Drawer({ open, onClose, title, children, side = "right", ariaLab
   // The light starts at the side the drawer comes from, and the edge drains back there.
   useOnChange(open, (_was, now) => {
     if (!panel.current || !edge.current) return;
-    if (now) edgeIn(panel.current, edge.current, { sweep: side === "right" ? "left" : "right" });
-    else drain(edge.current, { origin: side === "right" ? "100%" : "0%", fill: "forwards" });
+    if (now) edgeIn(panel.current, edge.current, { sweep: side === "left" ? "right" : "left" });
+    else drain(edge.current, { origin: side === "left" ? "0%" : side === "right" ? "100%" : "50%", fill: "forwards" });
   });
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== "Escape") return;

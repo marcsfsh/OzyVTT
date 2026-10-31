@@ -83,8 +83,8 @@ export function CodexSettingsView({
         : `Delete saved versions older than ${olderThanDays} day${olderThanDays === 1 ? "" : "s"}, across every page?`;
     if (
       !(await confirm({
-        title: olderThanDays === 0 ? "Delete all version history" : "Delete old versions",
-        body: `${what} Your pages are not changed. Only the earlier versions are deleted. This cannot be undone.`,
+        title: what,
+        body: "Your pages stay as they are and only their earlier versions go, so this cannot be undone.",
         confirmLabel: olderThanDays === 0 ? "Delete all versions" : "Delete them",
         danger: true
       }))

@@ -24,17 +24,24 @@ import { isFullPageLayer, LayerView } from "./LayerView";
 import { TableView } from "./TableView";
 import type { Connection } from "./useSession";
 
-const CodexShell = lazySurface(() => import("../codex/CodexShell").then((m) => m.CodexShell));
-const CompendiumShell = lazySurface(() => import("../compendium/CompendiumShell").then((m) => m.CompendiumShell));
-const SettingsPage = lazySurface(() => import("../settings/SettingsPage").then((m) => m.SettingsPage));
-const ScenesShell = lazySurface(() => import("../scenes/ScenesShell").then((m) => m.ScenesShell));
-const ReplayList = lazySurface(() => import("../replay/ReplayList").then((m) => m.ReplayList));
-const ViewerControls = lazySurface(() => import("../viewer/ViewerControls").then((m) => m.ViewerControls));
-const SoundBoard = lazySurface(() => import("../sound/SoundBoard").then((m) => m.SoundBoard));
-const TokensPage = lazySurface(() => import("../tokens/TokensPage").then((m) => m.TokensPage));
+const CodexShell = lazySurface(() => import("../codex/CodexShell").then((m) => m.CodexShell), "Codex");
+const CompendiumShell = lazySurface(
+  () => import("../compendium/CompendiumShell").then((m) => m.CompendiumShell),
+  "Compendium"
+);
+const SettingsPage = lazySurface(() => import("../settings/SettingsPage").then((m) => m.SettingsPage), "settings");
+const ScenesShell = lazySurface(() => import("../scenes/ScenesShell").then((m) => m.ScenesShell), "encounters");
+const ReplayList = lazySurface(() => import("../replay/ReplayList").then((m) => m.ReplayList), "replays");
+const ViewerControls = lazySurface(
+  () => import("../viewer/ViewerControls").then((m) => m.ViewerControls),
+  "table screen settings"
+);
+const SoundBoard = lazySurface(() => import("../sound/SoundBoard").then((m) => m.SoundBoard), "sound board");
+const TokensPage = lazySurface(() => import("../tokens/TokensPage").then((m) => m.TokensPage), "token library");
 // A floating panel over the table: nothing to hold its place while it loads.
 const ViewerPreviewPanel = lazySurface(
   () => import("../viewer/ViewerPreviewPanel").then((m) => m.ViewerPreviewPanel),
+  "table screen preview",
   null
 );
 
@@ -143,7 +150,7 @@ export function GmShell({
   const revokeAll = async () => {
     const ok = await confirm({
       title: "Revoke every GM session?",
-      body: "This signs out every GM browser, including this one. Everyone will need to sign in again.",
+      body: "Every GM browser signs out, this one included, and each must sign in again.",
       confirmLabel: "Revoke all",
       danger: true
     });

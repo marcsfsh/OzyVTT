@@ -181,7 +181,7 @@ describe("Reading and running a quest as the GM", () => {
     await screen.findByRole("heading", { level: 1, name: "The Sunless Crown" });
     await user.click(screen.getByLabelText("More"));
     await user.click(screen.getByRole("menuitem", { name: "Delete quest" }));
-    const ask = await screen.findByRole("dialog", { name: "Delete quest" });
+    const ask = await screen.findByRole("dialog", { name: /^Delete ".*"\?$/ });
     expect(api.questApi.remove).not.toHaveBeenCalled();
     await user.click(within(ask).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(api.questApi.remove).toHaveBeenCalledWith("gm", "q1"));

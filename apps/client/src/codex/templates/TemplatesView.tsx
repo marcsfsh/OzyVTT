@@ -117,8 +117,15 @@ export function TemplatesView({
     const used = sessions.filter((session) => session.prepTemplateId === template.id).length;
     if (
       !(await confirm({
-        title: "Delete template",
-        body: `Delete ${template.name}?${used > 0 ? " Sessions made from it keep their prep." : ""}${template.isDefault ? " The starting template becomes the default." : ""}`,
+        title: `Delete ${template.name}?`,
+        body:
+          used > 0 && template.isDefault
+            ? "Sessions made from it keep their prep, and the starting template becomes the default."
+            : used > 0
+              ? "Sessions made from it keep their prep."
+              : template.isDefault
+                ? "The starting template becomes the default."
+                : "This cannot be undone.",
         confirmLabel: "Delete",
         danger: true
       }))

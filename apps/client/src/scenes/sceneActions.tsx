@@ -28,8 +28,8 @@ export function useSceneActions(
     if (
       options.combatActive &&
       !(await confirm({
-        title: "Make encounter live?",
-        body: `Make "${scene.name}" live? Players and the shared screen switch now. The current encounter is parked and resumes when you switch back.`,
+        title: `Make "${scene.name}" live?`,
+        body: "Players and the shared screen switch now, and the current encounter waits until you switch back.",
         confirmLabel: "Make live"
       }))
     )
@@ -54,8 +54,8 @@ export function useSceneActions(
   const remove = async (scene: Scene) => {
     if (
       await confirm({
-        title: "Delete encounter?",
-        body: `Delete "${scene.name}"? Its staged tokens, fog, walls and lights go with it. This cannot be undone.`,
+        title: `Delete "${scene.name}"?`,
+        body: "Its staged tokens, fog, walls and lights go with it, and this cannot be undone.",
         confirmLabel: "Delete",
         danger: true
       })

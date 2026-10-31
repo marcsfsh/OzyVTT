@@ -143,27 +143,6 @@
   gap: var(--space-3);
   position: relative;
 }
-.codex-main-empty {
-  margin: auto;
-  max-width: 46ch;
-  text-align: center;
-  color: var(--text-dim);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  align-items: center;
-  border: 1px solid transparent;
-  padding: var(--space-6);
-}
-.codex-main-empty h3 {
-  font-family: var(--font-display);
-  font-weight: var(--fw-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text);
-  margin: 0;
-}
-
 /* The back link is a `Button`, which carries the tap floor; this only controls when it shows. */
 .codex-back {
   display: none;
@@ -906,22 +885,6 @@
 }
 
 /* The not-found view's actions. */
-.codex-notfound-actions {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.codex-missing-record {
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-left: 2px solid var(--caution);
-  border-radius: 0;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: var(--fs-sm);
-}
-
 .codex-search-truncated {
   margin: var(--space-2) 0 0;
   padding: var(--space-2);
@@ -990,7 +953,6 @@
 /* Panel material: edge and fill on a `::before` backing layer behind the content. Outermost panels take the
    chrome lip; nested ones a flat plate. Never put it on a scroller: the layer would scroll with the content. */
 
-.codex-main-empty,
 .codex-inspector,
 .codex-icon-btn,
 .codex-settings-danger {
@@ -1000,7 +962,6 @@
   background: none;
 }
 
-.codex-main-empty::before,
 .codex-inspector::before,
 .codex-icon-btn::before,
 .codex-settings-danger::before {
@@ -1022,7 +983,6 @@
 }
 /* Outermost: the texture. */
 
-.codex-main-empty,
 .codex-inspector {
   --material-fill: var(--material-lip), var(--material-plate);
 }
@@ -1031,11 +991,6 @@
 .codex-icon-btn,
 .codex-settings-danger {
   --material-fill: var(--material-plate);
-}
-
-/* The empty Codex is a hero surface, glow included. */
-.codex-main-empty::before {
-  filter: var(--rim-glow);
 }
 /* The danger fence keeps its own severity edge. */
 .codex-settings-danger::before {

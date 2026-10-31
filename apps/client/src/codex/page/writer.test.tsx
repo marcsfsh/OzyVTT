@@ -201,7 +201,7 @@ describe("Changing a page's kind", () => {
     await user.selectOptions(kind(), "character");
     const box = within(await dialog());
     expect(box.getByText("Change kind to Character?")).toBeInTheDocument();
-    expect(box.getByText(/Nothing you have written is lost/)).toBeInTheDocument();
+    expect(box.getByText(/nothing you have written is lost/)).toBeInTheDocument();
   });
 
   it("names the fields at risk when text would be dropped, and says Version history can restore them", async () => {
@@ -211,7 +211,7 @@ describe("Changing a page's kind", () => {
     await user.selectOptions(kind(), "item");
     const box = within(await dialog());
     expect(box.getByText(/Role \/ occupation, Status/)).toBeInTheDocument();
-    expect(box.getByText(/restore them from Version history/)).toBeInTheDocument();
+    expect(box.getByText(/Version history can restore them/)).toBeInTheDocument();
   });
 
   it("counts only fields that hold text: an empty field loses nothing", async () => {
@@ -223,7 +223,7 @@ describe("Changing a page's kind", () => {
     write();
     await screen.findByLabelText("Page title");
     await user.selectOptions(kind(), "item");
-    expect(within(await dialog()).getByText(/Nothing you have written is lost/)).toBeInTheDocument();
+    expect(within(await dialog()).getByText(/nothing you have written is lost/)).toBeInTheDocument();
   });
 
   it("promises no recovery when version history is off", async () => {
@@ -237,7 +237,7 @@ describe("Changing a page's kind", () => {
     await waitFor(() => expect(api.codexApi.getSettings).toHaveBeenCalled());
     await user.selectOptions(kind(), "item");
     const box = within(await dialog());
-    expect(box.getByText(/Version history is off, so this cannot be undone/)).toBeInTheDocument();
+    expect(box.getByText(/removed for good, since Version history is off/)).toBeInTheDocument();
     expect(box.queryByText(/restore them/)).not.toBeInTheDocument();
   });
 

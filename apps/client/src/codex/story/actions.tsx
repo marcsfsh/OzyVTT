@@ -42,8 +42,8 @@ export function useChronicleActions(
         (record.inWorldDate && calendar ? formatWorldDate(calendar, record.inWorldDate) : "a later date");
       const seen = calendar?.publishedDate ? formatWorldDate(calendar, calendar.publishedDate) : "no date yet";
       const proceed = await confirm({
-        title: "This is dated ahead of the players",
-        body: `Players' date is still ${seen}. Showing this record tells them the date has reached ${dated}. Publish the date first if you don't want that.`,
+        title: "Show a record dated ahead of the players?",
+        body: `Players' date is still ${seen}, so showing this record tells them it has reached ${dated}; publish the date first if you don't want that.`,
         confirmLabel: "Show anyway",
         suppress: {
           label: "Stop warning me about this",
@@ -69,8 +69,8 @@ export function useChronicleActions(
   const remove = async (record: CodexChronicleRecord) => {
     if (
       !(await confirm({
-        title: "Delete record",
-        body: "Delete this record from the chronicle? This cannot be undone.",
+        title: "Delete this record from the chronicle?",
+        body: "This cannot be undone.",
         confirmLabel: "Delete",
         danger: true
       }))

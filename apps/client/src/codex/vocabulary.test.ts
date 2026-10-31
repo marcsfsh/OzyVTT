@@ -81,9 +81,9 @@ describe("The canonical glossary", () => {
   it("sees the object-literal copy the old scanner was blind to", () => {
     // Object-key strings (e.g. `useConfirm` title/body) must be scanned; named so a narrowing fails here.
     const at = (file: string, text: string) => strings.some((entry) => entry.file === file && entry.text === text);
-    expect(at("page/PagesIndex.tsx", "Delete folder")).toBe(true);
-    expect(at("story/actions.tsx", "Delete record")).toBe(true);
-    expect(at("story/actions.tsx", "Delete this record from the chronicle? This cannot be undone.")).toBe(true);
+    expect(at("atlas/PinEditor.tsx", "Delete this pin?")).toBe(true);
+    expect(at("story/actions.tsx", "Delete this record from the chronicle?")).toBe(true);
+    expect(at("story/actions.tsx", "This cannot be undone.")).toBe(true);
     expect(
       strings.some(
         (entry) => entry.file === "StandingAdjuster.tsx" && entry.text.startsWith("Optional. Players never see")

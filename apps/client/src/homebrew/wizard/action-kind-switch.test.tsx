@@ -46,7 +46,9 @@ describe("changing an action's kind", () => {
 
     await user.click(within(kind).getByRole("button", { name: "Attack" }));
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("Its saving throw answers are kept while this monster is open.");
+    expect(dialog).toHaveTextContent(
+      "Its saving throw answers are kept while this monster is open, so changing it back"
+    );
     await user.click(within(dialog).getByRole("button", { name: "Make it an attack" }));
     expect(actionsOf(last)[0]!.attack).toBeDefined();
     expect(actionsOf(last)[0]!.save).toBeUndefined();

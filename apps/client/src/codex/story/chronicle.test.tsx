@@ -776,7 +776,7 @@ describe("Showing a record dated ahead of the players", () => {
 
     expect(
       await screen.findByText(
-        "Players' date is still Hammer 10, 1492 DR. Showing this record tells them the date has reached Alturiak 28, 1492 DR. Publish the date first if you don't want that."
+        "Players' date is still Hammer 10, 1492 DR, so showing this record tells them it has reached Alturiak 28, 1492 DR; publish the date first if you don't want that."
       )
     ).toBeInTheDocument();
     expect(api.reveal).not.toHaveBeenCalled();

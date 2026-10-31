@@ -212,14 +212,14 @@ export function PageWriter({
     // A kind-changing save keeps a version on the server, so the promise holds unless the GM turned history off.
     const historyOn = feeds.settingsFeed.data?.revisionHistory.enabled ?? true;
     const recovery = historyOn
-      ? "They will be removed. You can restore them from Version history."
-      : "They will be removed. Version history is off, so this cannot be undone.";
+      ? "they will be removed, and Version history can restore them."
+      : "they will be removed for good, since Version history is off.";
     const ok = await confirm({
       title: `Change kind to ${ENTITY_DEFS[nextType].label}?`,
       body:
         lost.length > 0
-          ? `These ${ENTITY_DEFS[draft.entityType].label} fields hold text that ${ENTITY_DEFS[nextType].label} does not use: ${lost.join(", ")}. ${recovery}`
-          : `Its fields become ${ENTITY_DEFS[nextType].label} fields. Nothing you have written is lost.`,
+          ? `These ${ENTITY_DEFS[draft.entityType].label} fields hold text that ${ENTITY_DEFS[nextType].label} does not use, ${lost.join(", ")}, and ${recovery}`
+          : `Its fields become ${ENTITY_DEFS[nextType].label} fields, and nothing you have written is lost.`,
       confirmLabel: "Change kind"
     });
     if (!ok) return;

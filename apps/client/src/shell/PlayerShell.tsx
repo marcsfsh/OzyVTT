@@ -9,9 +9,9 @@ import { PlayerIdentity } from "../table/PlayerIdentity";
 import { usePhoneShell } from "./AppBar";
 import type { Connection } from "./useSession";
 
-const PlayerCodex = lazySurface(() => import("../codex/PlayerCodex").then((m) => m.PlayerCodex));
-const SettingsPage = lazySurface(() => import("../settings/SettingsPage").then((m) => m.SettingsPage));
-const ReplayList = lazySurface(() => import("../replay/ReplayList").then((m) => m.ReplayList));
+const PlayerCodex = lazySurface(() => import("../codex/PlayerCodex").then((m) => m.PlayerCodex), "Codex");
+const SettingsPage = lazySurface(() => import("../settings/SettingsPage").then((m) => m.SettingsPage), "settings");
+const ReplayList = lazySurface(() => import("../replay/ReplayList").then((m) => m.ReplayList), "replays");
 
 /** The player's four views, and the tab each address lights (see `litPlayerTab`). */
 const viewOf = (route: Route) => litPlayerTab(route.path);

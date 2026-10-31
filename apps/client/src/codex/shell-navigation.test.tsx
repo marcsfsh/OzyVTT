@@ -85,7 +85,10 @@ describe("The laptop's section bar", () => {
 
   it("shows the not-found view for a codex address that does not exist, with nothing lit", async () => {
     renderShell("/codex/notebook");
-    expect(await screen.findByRole("heading", { name: /Nothing lives at this address/i })).toBeInTheDocument();
+    // The empty state's one line and one secondary button (frame rule 3.7).
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/^Nothing lives at this address\.Go to the table$/);
+    expect(within(status).getByRole("button", { name: "Go to the table" })).toBeInTheDocument();
     expect(lit()).toHaveLength(0);
   });
 });

@@ -202,8 +202,8 @@ export function SessionPage({
   const remove = async () => {
     if (
       !(await confirm({
-        title: "Delete session",
-        body: `Delete ${sessionTitle(session).toLowerCase()}? Its prep and recap are lost. Records filed under it are kept.`,
+        title: `Delete ${sessionTitle(session).toLowerCase()}?`,
+        body: "Its prep and recap are lost; records filed under it are kept.",
         confirmLabel: "Delete",
         danger: true
       }))

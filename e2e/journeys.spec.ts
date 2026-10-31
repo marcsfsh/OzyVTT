@@ -48,7 +48,7 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
   await expectPageFits(gm);
   await press(gm.getByRole("button", { name: "Make live" }));
   // With a fight running, making another scene live parks it, which the GM confirms.
-  const confirm = gm.getByRole("dialog", { name: "Make encounter live?" });
+  const confirm = gm.getByRole("dialog", { name: /^Make ".*" live\?$/ });
   const table = gm.getByRole("button", { name: "Go to the table", exact: true });
   await expect(confirm.or(table)).toBeVisible();
   if (await confirm.isVisible()) await press(confirm.getByRole("button", { name: "Make live" }));

@@ -30,8 +30,8 @@ import { useCodexNotice } from "../table/useCodexNotice";
 import "./table-view.css";
 
 // The Codex's two table tabs load on first use, like the Codex itself, so the table's first paint stays small.
-const TonightTab = lazySurface(() => import("../table/TonightTab").then((m) => m.TonightTab), null);
-const CodexTab = lazySurface(() => import("../table/CodexTab").then((m) => m.CodexTab), null);
+const TonightTab = lazySurface(() => import("../table/TonightTab").then((m) => m.TonightTab), "Tonight tab", null);
+const CodexTab = lazySurface(() => import("../table/CodexTab").then((m) => m.CodexTab), "Codex tab", null);
 
 /** What only the GM's table has: the map choice and the shared-screen preview. Scenes are prepared on the Scenes tab. */
 export type GmTable = Readonly<{

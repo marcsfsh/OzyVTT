@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Button, IconArrow, Input, Modal, Switch, ThemeToggle, Wordmark } from "@vtt/ui";
 import { Notice, type NoticeMessage } from "../components/feedback";
 import { useMediaQuery } from "../lib/useMediaQuery";
+import { LandingScene } from "./LandingScene";
 import "./landing.css";
+
+export { LandingScene };
 
 /**
  * The landing→app entry animation, one-shot. The choreography is CSS (`.landing--drive` in
@@ -51,24 +54,6 @@ export function useEntryAnimation() {
  * The landing page: one centred column with the wordmark and the two ways in. The GM password card
  * replaces the buttons in place. While the entry drives, it stays mounted as the curtain.
  */
-/** The title screen's art, layer by layer: star field, the slatted sun behind the horizon, the mountains on it, the
- *  receding grid and grain. Colours are --landing-* tokens, re-skinned per theme. The picker reuses it. */
-export function LandingScene() {
-  return (
-    <div className="landing-scene" aria-hidden="true">
-      <span className="landing-stars-far" />
-      <span className="landing-stars" />
-      <span className="landing-skyband">
-        <span className="landing-sun" />
-      </span>
-      <span className="landing-mountains" />
-      <span className="landing-horizon" />
-      <span className="landing-grid" />
-      <span className="landing-noise" />
-    </div>
-  );
-}
-
 export function Landing({
   driving,
   bootstrapped,

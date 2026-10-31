@@ -215,7 +215,7 @@ export function useHomebrewRecord({
         : "";
     const confirmed = await confirm({
       title: "Archive this?",
-      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.${breaksLine}`,
+      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists until you restore it later; characters already built from it are unaffected.${breaksLine}`,
       confirmLabel: "Archive",
       // A plain archive is a reversible caution; it is a danger only when it breaks a published record.
       danger: breaks.length > 0

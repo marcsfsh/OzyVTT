@@ -69,10 +69,11 @@ export function GmMenuRows({
         Settings
       </MenuItem>
       <MenuItem
+        data-asks=""
         onClick={() =>
           void confirm({
             title: "Sign out on this device?",
-            body: "The table keeps running. Sign in again with the GM password to come back.",
+            body: "The table keeps running, and the GM password signs you back in.",
             confirmLabel: "Sign out"
           }).then((ok) => ok && onSignOut())
         }
@@ -111,7 +112,7 @@ export function PlayerMenuRows({
       </div>
       {afterWho}
       {mine.length === 1 && first && (
-        <MenuItem tone="danger" disabled={releasing} onClick={() => void release(first.name)}>
+        <MenuItem tone="danger" data-asks="" disabled={releasing} onClick={() => void release(first.name)}>
           Release {first.name}
         </MenuItem>
       )}
@@ -122,7 +123,9 @@ export function PlayerMenuRows({
       <MenuItem icon={<IconCog />} onClick={() => void navigate("/settings")}>
         Settings
       </MenuItem>
-      <MenuItem onClick={() => void leave()}>Leave the table</MenuItem>
+      <MenuItem data-asks="" onClick={() => void leave()}>
+        Leave the table
+      </MenuItem>
       {releaseDialog}
       {leaveDialog}
     </>

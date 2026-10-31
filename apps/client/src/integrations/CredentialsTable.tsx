@@ -70,7 +70,7 @@ export function CredentialsTable({
   const rotate = async (credential: IntegrationCredentialMetadata) => {
     const ok = await confirm({
       title: `Rotate ${credential.name}?`,
-      body: "The current secret stops working now. Every tool that uses it needs the new one.",
+      body: "The current secret stops working now, so every tool that uses it needs the new one.",
       confirmLabel: "Rotate",
       danger: true
     });
@@ -87,7 +87,7 @@ export function CredentialsTable({
   const revoke = async (credential: IntegrationCredentialMetadata) => {
     const ok = await confirm({
       title: `Revoke ${credential.name}?`,
-      body: "Every tool that uses it loses access now, and a revoked credential can't be used again. Create a new one if a tool needs access later.",
+      body: "Every tool that uses it loses access now and for good; create a new credential if a tool needs access later.",
       confirmLabel: "Revoke",
       danger: true
     });

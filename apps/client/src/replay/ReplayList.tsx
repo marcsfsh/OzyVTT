@@ -73,7 +73,7 @@ export function ReplayList({
   const remove = async (archive: ArchiveSummary) => {
     const ok = await confirm({
       title: "Delete this replay?",
-      body: `${replayTitle(archive)} is gone, with every turn, roll and line of it. This cannot be undone.`,
+      body: `Every turn, roll and line of ${replayTitle(archive)} goes, and this cannot be undone.`,
       confirmLabel: "Delete",
       danger: true
     });

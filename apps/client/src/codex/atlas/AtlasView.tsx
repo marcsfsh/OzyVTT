@@ -288,8 +288,8 @@ export function AtlasView({
     if (
       !currentMap ||
       !(await confirm({
-        title: "Delete map",
-        body: `Delete map "${currentMap.name}"? Its pins are removed.`,
+        title: `Delete map "${currentMap.name}"?`,
+        body: "Its pins are removed with it.",
         confirmLabel: "Delete",
         danger: true
       }))

@@ -65,7 +65,7 @@ describe("the live encounter picker", () => {
     await user.click(screen.getByLabelText("Encounters · Crypt ambush is live"));
     await user.click(screen.getByRole("menuitem", { name: "Make Tunnel chase live" }));
     expect(command).not.toHaveBeenCalled();
-    const dialog = screen.getByRole("dialog", { name: "Make encounter live?" });
+    const dialog = screen.getByRole("dialog", { name: /^Make ".*" live\?$/ });
     await user.click(within(dialog).getByRole("button", { name: "Make live" }));
     expect(command).toHaveBeenCalledWith("encounter:activate", { encounterId: IDS.chase });
   });
