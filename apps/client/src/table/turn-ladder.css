@@ -159,3 +159,44 @@
   box-shadow: var(--shadow-2);
   pointer-events: none;
 }
+
+/* The phone's cards (table spec 2.2 and 4): 150 by 64px in one line that scrolls sideways under the Switch, the acting
+   card inked along its bottom. */
+.ladder-cards {
+  position: relative;
+  border-bottom: 1px solid var(--line);
+}
+.turn-ladder--cards {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.turn-ladder--cards::-webkit-scrollbar {
+  display: none;
+}
+.turn-ladder--cards .ladder-item {
+  flex: none;
+  width: 150px;
+  border-bottom: 0;
+  border-right: 1px solid var(--line);
+}
+.turn-ladder--cards .ladder-row {
+  gap: 8px;
+  height: 64px;
+  min-height: 64px;
+  padding: 6px 10px;
+}
+.turn-ladder--cards .ladder-row.is-acting::before {
+  top: auto;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan) 0%, var(--violet) 30%, var(--magenta) 60%, var(--caution) 100%);
+}
+.turn-ladder--cards .ladder-bar {
+  max-width: none;
+}
+.turn-ladder--cards .ladder-cond:nth-child(n + 3) {
+  display: none;
+}

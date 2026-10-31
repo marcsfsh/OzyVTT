@@ -18,6 +18,7 @@ import { isDying, owesDeathSave } from "../table/playerPrompts";
 import { hasPlayerPrompt } from "../table/PromptSlot";
 import { LogComposer } from "../table/LogComposer";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
+import { useMapView, useSwitchMoments } from "../table/phoneSwitch";
 import { usePlayerTargetRows } from "../table/targetRows";
 import { useTargeting } from "./targeting";
 import { revealInRegion } from "../lib/reveal";
@@ -294,11 +295,16 @@ export function PlayerEncounterPanel({
     revealInRegion(activeRowRef.current, "nearest", "smooth");
   }, [combat.turnActorId]);
   const fighting = combat.active;
-  const tabIds = fighting ? ["turn", "sheet", "log", "party"] : ["me", "log", "party"];
+  // On a phone the tabs are the Switch: Map, Turn (Me before a fight), Log and Party; the sheet is its own bottom tab.
+  const mapView = useMapView(phone);
+  const tabIds = [
+    ...(mapView ? ["map"] : []),
+    ...(fighting ? ["turn", ...(mapView ? [] : ["sheet"]), "log", "party"] : ["me", "log", "party"])
+  ];
   const [rememberedTab, setRememberedTab] = useRememberedTab(
     `vtt.table-tab.player.${phone ? "phone" : "laptop"}`,
     tabIds,
-    fighting ? "turn" : "me",
+    fighting ? "turn" : mapView && combat.mapAssetId ? "map" : "me",
     `${fighting}|${phone}`
   );
   // The Log section is this panel at `/table?panel=log`: the address opens the Log tab, and choosing another tab
@@ -634,32 +640,50 @@ export function PlayerEncounterPanel({
     </div>
   );
   const party = slots?.party ?? <p className="table-panel-empty">The party is hidden.</p>;
-  const tabs: PanelTab[] = fighting
-    ? [
-        {
-          id: "turn",
-          label: "Turn",
-          content: (
-            <>
-              {turnBody}
-              {/* The order with what the player can do from it: break a tie, swap with Alert, let go of a hold. */}
-              <details className="encounter-order-tools">
-                <summary>Turn order</summary>
-                {orderBody}
-              </details>
-            </>
-          )
-        },
-        // The sheet holds its own row and strip above the one region that scrolls.
-        { id: "sheet", label: "Sheet", content: sheet(true), scrolls: !myActor },
-        { id: "log", label: "Log", content: logBody, scrolls: false },
-        { id: "party", label: "Party", content: party }
-      ]
-    : [
-        { id: "me", label: "Me", content: sheet(false), scrolls: !myActor },
-        { id: "log", label: "Log", content: logBody, scrolls: false },
-        { id: "party", label: "Party", content: party }
-      ];
+  const tabs: PanelTab[] = [
+    ...(mapView ? [mapView] : []),
+    ...(fighting
+      ? [
+          {
+            id: "turn",
+            label: "Turn",
+            // Kept mounted on a phone while the map shows, so a target chosen there keeps its picker in the foot.
+            ...(mapView ? { keep: true } : {}),
+            content: (
+              <>
+                {turnBody}
+                {/* The order with what the player can do from it: break a tie, swap with Alert, let go of a hold. */}
+                <details className="encounter-order-tools">
+                  <summary>Turn order</summary>
+                  {orderBody}
+                </details>
+              </>
+            )
+          },
+          // The sheet holds its own row and strip above the one region that scrolls.
+          ...(mapView ? [] : [{ id: "sheet", label: "Sheet", content: sheet(true), scrolls: !myActor }]),
+          { id: "log", label: "Log", content: logBody, scrolls: false },
+          { id: "party", label: "Party", content: party }
+        ]
+      : [
+          { id: "me", label: "Me", content: sheet(false), scrolls: !myActor },
+          { id: "log", label: "Log", content: logBody, scrolls: false },
+          { id: "party", label: "Party", content: party }
+        ])
+  ];
+  // The Switch's moments: this player's target choice turns to Map, and an owed prompt or the start of their turn
+  // turns to Turn.
+  useSwitchMoments({
+    enabled: mapView !== null,
+    tab,
+    setTab,
+    // The session outlives the roll while its result shows, and the result is read on the Turn view.
+    choosing:
+      targeting !== null &&
+      jumpAttackResult === null &&
+      (targeting.attackerId === myId || targeting.attackerId === actingFor?.id),
+    turnTo: { when: fighting && (hasPlayerPrompt(state) || myTurn || actingFor !== null), view: "turn" }
+  });
 
   // End turn under the thumb, on this player's turn or the turn of a creature they command.
   const footer =

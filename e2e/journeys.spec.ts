@@ -10,6 +10,7 @@ import {
   battleMap,
   drag,
   expectTokenUncovered,
+  showView,
   expectUncovered,
   ensureGmPassword,
   expect,
@@ -53,6 +54,9 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
   await expect(confirm.or(table)).toBeVisible();
   if (await confirm.isVisible()) await press(confirm.getByRole("button", { name: "Make live" }));
   await press(table);
+  // On a phone the table's map is the Switch's Map view.
+  await expect(gm.getByRole("tablist", { name: /^The (table|encounter)/ })).toBeVisible();
+  await showView(gm, "Map");
 }
 
 /** A new scene on a freshly uploaded map, made from the Scenes tab's steps and made live; the GM ends at the table. */
@@ -267,6 +271,8 @@ test("the GM runs an encounter on a new map and the player moves their token", a
   // A scene with a freshly uploaded battle map, made live. A different image from the first evening's, which the
   // library would recognise and reuse with its grid.
   await liveSceneOnNewMap(gm, "Smoke crossing.png", battleMap(700, 504));
+  // A phone opens on the map before a fight; the encounter's setup is on the Encounter view.
+  await showView(gm, /^Encounter/);
   await expect(gm.getByRole("heading", { name: "Start an encounter" })).toBeVisible();
 
   // The fight: the player's character and one monster.
@@ -288,16 +294,13 @@ test("the GM runs an encounter on a new map and the player moves their token", a
   await expect(yourTurn).toBeVisible();
   await expectUncovered(player.getByRole("button", { name: "End turn" }));
   if (hasTouch) {
-    // On a phone the map scrolls away above the panel: scrolled to the end, the panel's tabs sit right under the turn
-    // order, and scrolled back the map is whole again.
-    const column = player.locator(".table-bench-split");
-    await column.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
-    const [stripBottom, tabsTop] = await player.evaluate(() => [
-      document.querySelector(".table-strip")!.getBoundingClientRect().bottom,
-      document.querySelector(".table-bench-panel [role=tablist]")!.getBoundingClientRect().top
-    ]);
-    expect(Math.abs(tabsTop - stripBottom), "the panel's tabs sit under the turn order").toBeLessThan(80);
-    await column.evaluate((element) => element.scrollTo({ top: 0 }));
+    // On a phone the table is a Switch: the player's turn opens on Turn, Map shows the map with its tray chip, and End
+    // turn stays in reach in both.
+    const views = player.getByRole("tablist", { name: "The encounter · round 1" });
+    await expect(views.getByRole("tab", { name: "Turn", selected: true })).toBeVisible();
+    await press(views.getByRole("tab", { name: "Map", exact: true }));
+    await expect(player.getByRole("button", { name: /^Tray\b/ })).toBeVisible();
+    await expectUncovered(player.getByRole("button", { name: "End turn" }));
     await expectPageFits(player);
   }
 
@@ -433,6 +436,8 @@ test("a player takes a turn on a phone: a tile, its cast, a target and the roll"
   const gm = await open("/");
   await signInAsGm(gm);
   await liveSceneOnNewMap(gm, "Smoke ford.png", battleMap(700, 490));
+  // A phone opens on the map before a fight; the encounter's setup is on the Encounter view.
+  await showView(gm, /^Encounter/);
   await expect(gm.getByRole("heading", { name: "Start an encounter" })).toBeVisible();
   await stageFight(
     gm,

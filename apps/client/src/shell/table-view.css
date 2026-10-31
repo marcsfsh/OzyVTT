@@ -54,8 +54,8 @@
   }
 }
 
-/* On a phone the header stays and the map and panel stack under it in one column that scrolls the map away
-   (`table/scroll-past.css`). */
+/* On a phone the header stays and the panel fills the rest: the Switch, the turn order's cards, the chosen view (the
+   map is the Map view) and the foot pinned above the bottom tabs (table spec 2.4). */
 @media (max-width: 979px) {
   .table-bench {
     display: flex;
@@ -68,11 +68,12 @@
     min-height: 0;
   }
   .table-bench-map {
-    flex: none;
+    flex: 1 1 0;
+    min-height: 0;
   }
   .table-bench-panel {
     flex: 1 1 0;
-    min-height: 9rem;
+    min-height: 0;
     border-left: 0;
   }
 }

@@ -180,13 +180,24 @@ export async function expectUncovered(control: Locator) {
   expect.soft(found.hit, `${control} is uncovered (the centre hits ${found.at})`).toBe(true);
 }
 
+/** On a phone the table's panel is the Switch: turn it to a view. A laptop shows every part at once. */
+export async function showView(page: Page, name: string | RegExp) {
+  const view = page
+    .locator(".table-panel-tabs.is-switch")
+    .getByRole("tab", typeof name === "string" ? { name, exact: true } : { name });
+  if ((await view.count()) > 0 && (await view.getAttribute("aria-selected")) !== "true") await press(view);
+}
+
+/** The Switch's Map view, which shows the map. */
+export const showMap = (page: Page) => showView(page, "Map");
+
 /** Nothing covers a token on the map: `elementFromPoint` at its centre lands on the token. */
 export async function expectTokenUncovered(page: Page, tokenId: string) {
+  // On a phone a person turns the Switch to Map to see the token.
+  await showMap(page);
   const token = page.locator(`g.encounter-token[data-token-id="${tokenId}"]`);
   await expect(token).toBeVisible();
   const found = await token.evaluate((element: SVGGElement) => {
-    // On a phone the map scrolls away above the panel; a person scrolls back to it to see the token.
-    element.closest(".table-bench-split")?.scrollTo({ top: 0 });
     const box = element.getBoundingClientRect();
     const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
     return {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { Button, IconScene, cx } from "@vtt/ui";
+import { Button, IconScene } from "@vtt/ui";
 import { ClaimCharacter } from "../actors/ClaimCharacter";
 import { JoinAddress } from "../components/JoinAddress";
 import { partyVisibilityOf } from "../actors/MyCharacter";
@@ -8,7 +8,6 @@ import { PartyStrip } from "../actors/PartyStrip";
 import { DicePanel } from "../dice/DicePanel";
 import { CombatLogPanel } from "../encounter/CombatLog";
 import { EncounterPanel } from "../encounter/EncounterPanel";
-import { useTargeting } from "../encounter/targeting";
 import { lazySurface } from "../components/lazySurface";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import type { MapSelection } from "../maps/map-catalog";
@@ -20,11 +19,12 @@ import { PartyRest } from "../rest/PartyRest";
 import { RestPrompt } from "../rest/RestPrompt";
 import { needsItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
-import { useScrollPast } from "../table/scrollPast";
-import { hasPlayerPrompt, PromptSlot } from "../table/PromptSlot";
+import { PromptSlot } from "../table/PromptSlot";
 import { StripEndContext } from "../table/stripSlot";
 import { TableStrip } from "../table/TableStrip";
 import { DockToolsTarget } from "../table/dockTools";
+import { PhoneSwitch } from "../table/phoneSwitch";
+import { LadderCards } from "../table/TurnLadder";
 import { TableDock } from "../table/TableDock";
 import { NowPlaying } from "../sound/NowPlaying";
 import { usePhoneShell } from "./AppBar";
@@ -79,17 +79,6 @@ export function TableView(props: TableViewProps) {
   // A player who has claimed nobody while no map is live sees the picker across the whole table, never under an empty
   // map box.
   const claimingOnly = props.role === "player" && !playerHasClaimed && !state.combat.mapAssetId;
-  // On a phone the map scrolls away above the panel. Choosing a target scrolls back to the map, and the player's sheet
-  // or a prompt they owe scrolls past it to the panel.
-  const targeting = useTargeting();
-  const myId =
-    props.role === "player" ? (props.state.actors.find((actor) => actor.claimStatus === "mine")?.id ?? null) : null;
-  const choosing = phone && targeting !== null && (role === "gm" || targeting.attackerId === myId);
-  const [sheetShown, setSheetShown] = useState(false);
-  // A prompt the player owes takes the panel's room too, so its answer and End turn stay on screen.
-  const promptWaits = props.role === "player" && hasPlayerPrompt(props.state);
-  const moment = choosing ? "choosing" : phone && (sheetShown || promptWaits) && playerHasClaimed ? "sheet" : null;
-  const column = useScrollPast(phone && !claimingOnly, moment);
   const liveMapName = gm?.selectedMap?.id === state.combat.mapAssetId ? (gm?.selectedMap?.name ?? null) : null;
   // A player hears, in the status line, when the Codex gives them something new.
   useCodexNotice(role === "player" ? token : null);
@@ -98,7 +87,7 @@ export function TableView(props: TableViewProps) {
     .map((actor) => ({ id: actor.id, name: actor.name }));
 
   // A laptop's table is Two docks (table spec 2.1): the dock with the order, the map, the panel. A phone keeps the
-  // strip as its header until the Switch (C5).
+  // strip as its header, and the panel is the Switch (table spec 2.4) with the map as its Map view.
   const header = !phone ? (
     props.role === "gm" ? (
       <TableDock role="gm" state={props.state} token={token} toolsRef={setDockTools} />
@@ -219,7 +208,6 @@ export function TableView(props: TableViewProps) {
         role="player"
         state={props.state}
         phone={phone}
-        onSheetShown={setSheetShown}
         slots={{
           top: (
             <>
@@ -247,6 +235,16 @@ export function TableView(props: TableViewProps) {
     );
   }
 
+  // A phone's panel is the Switch once a character is claimed (or for the GM): the map is its Map view, and the turn
+  // order's cards sit under the Switch.
+  const switching = phone && (role === "gm" || playerHasClaimed);
+  const ladder =
+    props.role === "gm" ? (
+      <LadderCards role="gm" state={props.state} token={token} />
+    ) : (
+      <LadderCards role="player" state={props.state} token={token} />
+    );
+  const switchParts = switching && map ? { map: <div className="table-bench-map is-view">{map}</div>, ladder } : null;
   // With no map live the picker is the whole table, beside the title screen's sunset.
   if (claimingOnly && props.role === "player")
     return (
@@ -257,14 +255,16 @@ export function TableView(props: TableViewProps) {
   return (
     <div className={`table-bench anim-view ${role}${claimingOnly ? " is-claiming" : ""}`}>
       {header}
-      <div className={cx("table-bench-split", column.className)} ref={column.columnRef}>
-        {map && (
+      <div className="table-bench-split">
+        {map && !switching && (
           <div className="table-bench-map">
-            <DockToolsTarget.Provider value={phone ? null : dockTools}>{map}</DockToolsTarget.Provider>
+            <DockToolsTarget.Provider value={dockTools}>{map}</DockToolsTarget.Provider>
           </div>
         )}
         <div className="table-bench-panel">
-          <StripEndContext.Provider value={stripEnd}>{panel}</StripEndContext.Provider>
+          <PhoneSwitch.Provider value={switchParts}>
+            <StripEndContext.Provider value={stripEnd}>{panel}</StripEndContext.Provider>
+          </PhoneSwitch.Provider>
         </div>
       </div>
     </div>

@@ -229,3 +229,51 @@
   max-height: none;
   margin: 0;
 }
+
+/* The phone's Switch (table spec 2.4 and 4): the panel's tabs drawn as a segmented control, equal options 6px apart on
+   their Base lines with 44px faces, the chosen one on the 2px cyan line. Under it, the turn order's cards. */
+.table-panel-tabs.is-switch.nh-tabs--horizontal {
+  display: flex;
+  gap: 6px;
+  padding: var(--space-2) var(--space-3);
+  box-shadow: none;
+}
+.table-panel-tabs.is-switch .nh-tab,
+.table-panel-tabs.is-switch .nh-tab:hover {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--tap-min);
+  padding: 0 2px;
+  box-shadow: var(--base-line);
+  font-size: 13.5px;
+}
+.table-panel-tabs.is-switch .nh-tab--active,
+.table-panel-tabs.is-switch .nh-tab--active:hover {
+  box-shadow: var(--base-line-on);
+  text-shadow: none;
+}
+.table-panel-tabs.is-switch .nh-tabs-ink {
+  display: none;
+}
+.table-switch-ladder {
+  flex: none;
+}
+/* The Map view: the map at full height with its tools as one row over it, and no padding round it. */
+.table-panel-body.is-map {
+  padding: 0;
+  gap: 0;
+}
+.table-bench-map.is-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+/* A target picker in the bar: its list scrolls on its own, with Cancel and Roll kept under it. */
+.table-panel-foot-pick {
+  order: 1;
+  max-height: 14rem;
+}
+.table-panel-foot-slot .action-targeting-buttons {
+  order: 2;
+}

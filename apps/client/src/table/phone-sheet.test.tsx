@@ -155,9 +155,9 @@ describe("the player's sheet in the table's panel", () => {
     await user.click(await sheet.findByText("Mace"));
     await user.click(await sheet.findByRole("button", { name: "Attack with the Mace" }));
     expect(screen.getByRole("tab", { name: "Turn", selected: true })).toBeTruthy();
-    const picker = await within(screen.getByRole("tabpanel", { name: "Turn" })).findByRole("group", {
-      name: "Targets for Mace"
-    });
+    // On a phone the picker sits in the bar under the thumb.
+    const picker = await screen.findByRole("group", { name: "Targets for Mace" });
+    expect(picker.closest(".table-panel-foot")).toBeTruthy();
     expect(within(picker).getByText("Wolf")).toBeTruthy();
   });
 

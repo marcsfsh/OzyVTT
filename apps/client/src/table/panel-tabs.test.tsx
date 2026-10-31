@@ -18,6 +18,7 @@ import { EncounterPanel } from "../encounter/EncounterPanel";
 import { InFooter } from "./footerSlot";
 import { TablePanel } from "./TablePanel";
 import { TableDock } from "./TableDock";
+import { PhoneSwitch } from "./phoneSwitch";
 
 // The panel beside the map is one tablist per role and moment: its tabs are real tabs tied to their panels, the
 // chosen one is remembered per device, and the footer holds the view's one primary.
@@ -155,17 +156,41 @@ describe("the GM's panel", () => {
     expect(screen.getByText("The Codex")).toBeTruthy();
   });
 
-  it("on a phone: Encounter with the acting creature, then Order, Log and Party", () => {
+  it("on a phone: the Switch, Map first, then Encounter with the acting creature and the order, Log and Party", () => {
     render(
       <ToastProvider>
-        <EncounterPanel role="gm" state={gmView(true)} selectedMap={null} phone slots={slots} />
+        <PhoneSwitch.Provider value={{ map: <p>The map</p>, ladder: <p>The cards</p> }}>
+          <EncounterPanel role="gm" state={gmView(true)} selectedMap={null} phone slots={slots} />
+        </PhoneSwitch.Provider>
       </ToastProvider>
     );
     const list = screen.getByRole("tablist", { name: "The encounter · round 2" });
-    expect(tabNames(list)).toEqual([fightTab, "Order", "Log", "Party"]);
+    expect(tabNames(list)).toEqual(["Map", fightTab, "Log", "Party"]);
+    expect(screen.getByText("The cards")).toBeTruthy();
+    // A fight opens on the Encounter view; the map stays mounted behind it.
     const fight = screen.getByRole("tabpanel", { name: /^Encounter/ });
     expect(within(fight).getByText("Needs you · 2")).toBeTruthy();
     expect(within(fight).getByRole("region", { name: "Now acting · Lyra" })).toBeTruthy();
+    expect(within(fight).getByText("Turn order and tools")).toBeTruthy();
+    expect(screen.getByText("The map")).toBeTruthy();
+  });
+
+  it("on a phone before a fight: the Switch opens on the map", () => {
+    render(
+      <ToastProvider>
+        <PhoneSwitch.Provider value={{ map: <p>The map</p>, ladder: null }}>
+          <EncounterPanel
+            role="gm"
+            state={{ ...gmView(false), combat: { ...gmView(false).combat, mapAssetId: "map-1" } } as GmView}
+            selectedMap={null}
+            phone
+            slots={slots}
+          />
+        </PhoneSwitch.Provider>
+      </ToastProvider>
+    );
+    expect(screen.getByRole("tab", { name: "Map", selected: true })).toBeTruthy();
+    expect(within(screen.getByRole("tabpanel", { name: "Map" })).getByText("The map")).toBeTruthy();
   });
 
   it("between encounters: Start an encounter on the Encounter tab, with Start the encounter and who rolls in the footer", () => {

@@ -3,6 +3,7 @@ import { Tabs } from "@vtt/ui";
 import { onLogEntry } from "../encounter/logArrivals";
 import { tabTrip } from "../shell/tabLight";
 import { FooterSlotContext } from "./footerSlot";
+import { useSwitchLadder } from "./phoneSwitch";
 import "./table-panel.css";
 
 export type PanelTab = Readonly<{
@@ -11,12 +12,15 @@ export type PanelTab = Readonly<{
   content: ReactNode;
   /** The tab's content scrolls as one region; false when it brings its own regions (the GM's order and console). */
   scrolls?: boolean;
+  /** Stays mounted while hidden: the phone's Map view, and the turn while a target is chosen on the map. */
+  keep?: boolean;
 }>;
 
 /**
- * The panel beside the map (under it on a phone): what must be answered first, then one tablist whose panels hold
- * the turn, the order, the sheet, the dice and the log, then a footer with the view's one primary button. Only the
- * chosen panel's content is mounted, so a long fight's log and sheets cost nothing while hidden.
+ * The panel beside the map: what must be answered first, then one tablist whose panels hold the turn, the sheet, the
+ * log and the rest, then a footer with the view's one primary button. On a phone the tablist is the Switch, the map is
+ * its Map view and the turn order's cards sit under it. Only the chosen panel's content is mounted, so a long fight's
+ * log and sheets cost nothing while hidden, except a tab that keeps its place (the map).
  */
 export function TablePanel({
   label,
@@ -38,6 +42,9 @@ export function TablePanel({
   phone?: boolean;
 }>) {
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  // On a phone the tabs are the Switch (table spec 2.4), with the turn order's cards under them in every view.
+  const ladder = useSwitchLadder(phone);
+  const switcher = tabs.some((tab) => tab.id === "map");
   const idBase = `table-panel-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
   const current = tabs.find((tab) => tab.id === active) ?? tabs[0];
   // A line reaching the log while another tab shows runs light along the strip to Log (ADR-0045).
@@ -59,28 +66,30 @@ export function TablePanel({
   return (
     <section ref={panel} className="table-panel" aria-label={label}>
       <FooterSlotContext.Provider value={phone ? slot : null}>
-        {top}
+        {!switcher && top}
         <Tabs
-          className="table-panel-tabs"
+          className={`table-panel-tabs${switcher ? " is-switch" : ""}`}
           ariaLabel={label}
           idBase={idBase}
           activeId={current.id}
           onChange={onActive}
           tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label }))}
         />
+        {ladder && <div className="table-switch-ladder">{ladder}</div>}
+        {switcher && top}
         {tabs.map((tab) => {
           const shown = tab.id === current.id;
           return (
             <div
               key={tab.id}
-              className={`table-panel-body${tab.scrolls === false ? "" : " scroll-y"}`}
+              className={`table-panel-body${tab.scrolls === false ? "" : " scroll-y"}${tab.id === "map" ? " is-map" : ""}`}
               role="tabpanel"
               id={`${idBase}-panel-${tab.id}`}
               aria-labelledby={`${idBase}-tab-${tab.id}`}
               hidden={!shown}
               tabIndex={tab.scrolls === false ? undefined : 0}
             >
-              {shown ? tab.content : null}
+              {shown || tab.keep ? tab.content : null}
             </div>
           );
         })}

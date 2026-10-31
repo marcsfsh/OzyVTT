@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/map-catalog";
-import { Button, IconChevronLeft } from "@vtt/ui";
+import { Button, Drawer, IconChevronLeft } from "@vtt/ui";
 import { command } from "../lib/command";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { MonsterBrowser } from "./MonsterBrowser";
@@ -22,7 +22,8 @@ import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel
 import { revealInRegion } from "../lib/reveal";
 import { InStripEnd } from "../table/stripSlot";
 import { turnTiles } from "../table/TurnTiles";
-import { useSelectedToken } from "../scene/selectedToken";
+import { selectToken, useSelectedToken } from "../scene/selectedToken";
+import { useMapView, useSwitchMoments } from "../table/phoneSwitch";
 import { NotesTab } from "../table/NotesTab";
 import { rollsLine, StartFight } from "./StartFight";
 
@@ -629,13 +630,12 @@ export function GmEncounterPanel({
       {head}
       {slots?.needs}
       {actBody}
-      {/* The order with each row's tools (score, HP, conditions, the sheet); a phone has an Order tab for it. */}
-      {!phone && (
-        <details className="encounter-order-tools">
-          <summary>Turn order and tools</summary>
-          {orderBody}
-        </details>
-      )}
+      {/* The order with each row's tools (score, HP, conditions, the sheet), on every size until the row tools get
+          their own design. */}
+      <details className="encounter-order-tools">
+        <summary>Turn order and tools</summary>
+        {orderBody}
+      </details>
     </>
   ) : (
     <>
@@ -664,10 +664,12 @@ export function GmEncounterPanel({
       {slots?.party}
     </>
   );
+  // On a phone the tabs are the Switch, with the map as its first view (table spec 2.4).
+  const mapView = useMapView(phone);
   const tabs: PanelTab[] = [
-    { id: "fight", label: fightLabel, content: fightBody },
-    // A phone has no room beside the acting card, so the order is its own tab there.
-    ...(phone && fighting ? [{ id: "order", label: "Order", content: orderBody, scrolls: false }] : []),
+    ...(mapView ? [mapView] : []),
+    // The turn stays mounted on a phone while the map shows, so a target chosen there keeps its picker in the foot.
+    { id: "fight", label: fightLabel, content: fightBody, ...(mapView ? { keep: true } : {}) },
     { id: "log", label: "Log", content: logBody, scrolls: false },
     { id: "party", label: "Party", content: partyBody },
     ...(slots?.tonight || slots?.codex
@@ -680,16 +682,24 @@ export function GmEncounterPanel({
           }
         ]
       : []),
-    // The token last pressed on the map, with the same controls as its menu there.
-    ...(selectedTokenId && slots?.token ? [{ id: "token", label: "Token", content: slots.token }] : [])
+    // The token last pressed on the map, with the same controls as its menu there; a phone opens it over the map.
+    ...(selectedTokenId && slots?.token && !mapView ? [{ id: "token", label: "Token", content: slots.token }] : [])
   ];
-  const fallback = "fight";
+  // A phone opens on the map before a fight and on the Encounter view during one.
+  const fallback = mapView && !fighting ? "map" : "fight";
   const [tab, setTab] = useRememberedTab(
     `vtt.table-tab.gm.${phone ? "phone" : "laptop"}`,
     tabs.map((entry) => entry.id),
     fallback,
     `${fighting}|${phone}`
   );
+  // The session outlives the roll while its result shows, and the result is read on the Encounter view.
+  useSwitchMoments({
+    enabled: mapView !== null,
+    tab,
+    setTab,
+    choosing: targeting !== null && targetingResult === null
+  });
 
   return (
     <>
@@ -706,6 +716,17 @@ export function GmEncounterPanel({
           </>
         }
       />
+      {mapView && slots?.token && (
+        <Drawer
+          open={selectedTokenId !== null}
+          onClose={() => selectToken(null)}
+          side="bottom"
+          title="Token"
+          className="table-token-sheet"
+        >
+          {slots.token}
+        </Drawer>
+      )}
       {/* Mid-fight reinforcements: one command adds the monster to the roster and the turn order,
         its token waiting in the staging tray at the table's "new tokens" visibility. */}
       {browsing && <MonsterBrowser visibility={stagingVisibility} joinEncounter onClose={() => setBrowsing(false)} />}

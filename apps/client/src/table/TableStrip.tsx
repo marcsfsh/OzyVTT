@@ -20,8 +20,9 @@ type StripProps = Readonly<{
 /**
  * The strip above the map: the VCR counter, then what the table is doing. Before a fight that is "No fight running"
  * with who is on the map and, for the GM, the join address; in a fight, the turn order and the GM's Fight menu. The
- * newest notice shows in the strip, so a toast never floats over the map. On a GM's phone the strip is Play's
- * header, with the live scene picker and Join, and the turn order as its second row.
+ * newest notice shows in the strip, so a toast never floats over the map. On a phone the strip is the table's header:
+ * the round with the live scene picker, the sound and Join for the GM, the newest notice for a player. The turn order
+ * is the Switch's cards under it (table spec 2.4).
  */
 export function TableStrip(props: StripProps) {
   const { state, phone } = props;
@@ -41,7 +42,8 @@ export function TableStrip(props: StripProps) {
     counter: () => strip.current?.querySelector<HTMLElement>(".table-strip-counter") ?? null,
     axis: "x",
     rail: (host) => host.clientHeight - 1,
-    lamps: true
+    // On a phone the Ladder's cards light the lamps.
+    lamps: !phone
   });
   const view =
     props.role === "gm" ? { role: "gm" as const, state: props.state } : { role: "player" as const, state: props.state };
@@ -75,7 +77,17 @@ export function TableStrip(props: StripProps) {
           {!fighting && <JoinButton token={props.token} />}
           {end}
         </div>
-        {fighting && <div className="table-strip-row is-tiles">{tiles}</div>}
+      </header>
+    );
+  // A player's phone header: the round and the table's newest notice; the order is the Switch's cards.
+  if (phone)
+    return (
+      <header ref={strip} className={`table-strip is-header${fighting ? " is-fighting" : ""}`} aria-label="The table">
+        <div className="table-strip-row">
+          {counter}
+          {/* During a fight the cards say who acts, so the line holds only the newest notice. */}
+          <p className="table-status">{fighting ? <ToastOutlet /> : <ToastOutlet fallback={status} />}</p>
+        </div>
       </header>
     );
   if (fighting)
