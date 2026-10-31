@@ -72,9 +72,10 @@
   padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--line);
 }
+/* A dialog's title is 20px display capitals (theme 2.2, ADR-0075). */
 .nh-modal-title {
   margin: 0;
-  font: var(--fw-display) var(--fs-h1) / var(--lh-snug) var(--font-display);
+  font: var(--fw-display) 20px / var(--lh-snug) var(--font-display);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--heading-ink);

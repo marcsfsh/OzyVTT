@@ -13,9 +13,10 @@
   text-align: left;
   border-bottom: 1px solid var(--line);
 }
+/* A table's column heads are the one eyebrow. */
 .nh-table thead th {
   color: var(--text-muted);
-  font: 700 var(--fs-xs) / 1.4 var(--font-label);
+  font: 600 var(--fs-xs) / 1.4 var(--font-label);
   text-transform: uppercase;
   letter-spacing: var(--tracking-eyebrow);
   border-bottom-color: var(--line-strong);

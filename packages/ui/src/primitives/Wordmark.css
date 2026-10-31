@@ -42,9 +42,10 @@
   height: 13px;
 }
 
+/* One eyebrow (theme 2.4, ADR-0075): Bai Jamjuree 600, 11px capitals at 0.12em, --text-muted. */
 .nh-eyebrow {
   display: inline-block;
-  font: 700 var(--fs-xs) / 1.4 var(--font-label);
+  font: 600 var(--fs-xs) / 1.4 var(--font-label);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
   color: var(--text-muted);

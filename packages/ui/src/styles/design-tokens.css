@@ -367,7 +367,7 @@
   --lh-snug: 1.3;
   --lh-body: 1.5;
 
-  --tracking-eyebrow: 0.08em;
+  --tracking-eyebrow: 0.12em;
   --tracking-display: 0.01em;
 
   /* Spacing. Step names are ordinal and never pixel values (`--space-4` is the fourth step). The two smallest

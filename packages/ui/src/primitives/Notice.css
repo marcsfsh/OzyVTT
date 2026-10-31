@@ -1,0 +1,22 @@
+/* One notice (consistency values): a frame of its colour at 45% over --line-strong, a 3px edge at its left, no fill. */
+.nh-notice {
+  --nh-notice-tone: var(--info);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--nh-notice-tone) 45%, var(--line-strong));
+  box-shadow: inset 3px 0 0 var(--nh-notice-tone);
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.nh-notice--caution {
+  --nh-notice-tone: var(--caution);
+}
+.nh-notice--danger {
+  --nh-notice-tone: var(--danger);
+}
+.nh-notice--success {
+  --nh-notice-tone: var(--success);
+}
+.nh-notice--violet {
+  --nh-notice-tone: var(--violet);
+}

@@ -648,11 +648,6 @@
 .cp-seeas .cp-hint {
   flex: 1 1 16rem;
 }
-.cp-notsent {
-  padding: var(--space-3);
-  border: 1px dashed var(--line-strong);
-  color: var(--text-dim);
-}
 .cp-notsent p {
   margin: 0;
 }

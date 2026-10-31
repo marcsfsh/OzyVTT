@@ -288,12 +288,16 @@ textarea:focus {
   margin-bottom: var(--space-4);
 }
 
+/* One notice (theme rule 21): a frame of its colour at 45% over --line-strong, a 3px edge at its left, no fill. */
 .notice {
+  --notice-tone: var(--info);
   margin-top: var(--space-6);
   padding: 0.8rem var(--space-4);
-  border-left: 3px solid var(--primary);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--notice-tone) 45%, var(--line-strong));
+  border-radius: 0;
+  box-shadow: inset 3px 0 0 var(--notice-tone);
+  background: none;
+  color: var(--text);
 }
 .danger {
   background: transparent;
@@ -308,14 +312,13 @@ textarea:focus {
 }
 
 .notice-success {
-  border-left-color: var(--success);
+  --notice-tone: var(--success);
 }
 .notice-error {
-  border-left-color: var(--danger);
-  background: color-mix(in srgb, var(--surface-2) 85%, var(--danger));
+  --notice-tone: var(--danger);
 }
 .notice-info {
-  border-left-color: var(--info);
+  --notice-tone: var(--info);
 }
 .confirm-suppress {
   margin-top: var(--space-4);

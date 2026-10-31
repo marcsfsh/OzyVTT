@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Select, type PartyCharacter } from "@vtt/ui";
+import { Select, type PartyCharacter, Notice } from "@vtt/ui";
 import { homebrewApi, type HomebrewRecordDocument, type SeeAs } from "../../homebrew/api";
 import { CompendiumCard, cardOfEntry, type Card } from "../CompendiumCard";
 import { kindLabel, type Kind, type Names } from "../kinds";
@@ -110,14 +110,15 @@ export function CardTab({
       {shown === undefined ? (
         <p className="cp-hint">Reading what {audienceName} gets.</p>
       ) : shown === null ? (
-        <div className="cp-notsent" role="status">
+        // One notice (theme rule 21): violet, since what a player never gets is the GM's to know.
+        <Notice tone="violet" className="cp-notsent" role="status">
           <p>
             <strong>
               {as === "everyone" ? "Players don't" : `${who}'s player doesn't`} receive this {kindLabel(kind)}.
             </strong>{" "}
             {read?.error ?? whyNot(doc, kind, party)}
           </p>
-        </div>
+        </Notice>
       ) : (
         <div className="cp-cardframe">
           <CompendiumCard card={shown} names={names} />
