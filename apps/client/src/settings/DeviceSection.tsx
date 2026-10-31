@@ -22,7 +22,7 @@ export function DeviceSection({
   const pinchZoom = usePinchZoom();
   const transparency = useReduceTransparency();
   return (
-    <SettingsSection id="device" gmOnly={false}>
+    <SettingsSection id="device">
       <SettingRow setting={SETTING.theme} stacked>
         <ThemeToggle />
       </SettingRow>

@@ -8,6 +8,7 @@ import {
 import { Badge, Button, EmptyState, Input, Menu, MenuItem, Modal, useToast, type BadgeTone, Tick } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
+import { publishCredentials } from "./credentialCount";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import "./integrations-panel.css";
 import { formatWhen } from "../lib/formatWhen";
@@ -64,7 +65,10 @@ export function CredentialsTable({
 
   const load = useCallback(() => {
     apiRequest<{ credentials: IntegrationCredentialMetadata[] }>(CREDENTIALS, { token: gmToken })
-      .then((data) => setCredentials(data.credentials))
+      .then((data) => {
+        setCredentials(data.credentials);
+        publishCredentials(data.credentials);
+      })
       .catch(fail);
   }, [gmToken, fail]);
   useEffect(load, [load]);

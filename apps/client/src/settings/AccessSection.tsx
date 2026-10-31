@@ -25,7 +25,7 @@ export function AccessSection({
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   return (
-    <SettingsSection id="access" gmOnly>
+    <SettingsSection id="access">
       <SettingsPrimary>
         <BarPrimary label="New credential" onClick={() => setCreating(true)} />
       </SettingsPrimary>

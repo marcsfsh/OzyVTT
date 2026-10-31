@@ -136,13 +136,18 @@ export function SectionBar({
                 </>
               )}
             </header>
-            {phoneStrip && tabs}
+            {phoneStrip && pages.length > 0 && tabs}
           </div>
         ) : (
           <div className="secbar" ref={setBar}>
             <h1 className="secbar-name">{name}</h1>
-            <span className="secbar-divider" aria-hidden="true" />
-            {tabs}
+            {/* A section whose pages are a side list (Settings) has a title row with no strip of pages. */}
+            {pages.length > 0 && (
+              <>
+                <span className="secbar-divider" aria-hidden="true" />
+                {tabs}
+              </>
+            )}
             <span className="secbar-grow" />
             {search}
             {end}

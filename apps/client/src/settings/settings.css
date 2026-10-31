@@ -41,9 +41,6 @@
   align-items: center;
   min-width: 0;
 }
-.settings-bar .settings-search {
-  width: 15rem;
-}
 .settings-search-icon {
   position: absolute;
   left: var(--space-3);
@@ -56,11 +53,6 @@
   width: 100%;
   margin: 0;
   padding-left: calc(var(--space-3) * 2 + 1em);
-}
-.settings-search-kbd {
-  position: absolute;
-  right: var(--space-2);
-  pointer-events: none;
 }
 .settings-search-results {
   position: absolute;
@@ -340,5 +332,106 @@
   }
   .setting-control {
     align-items: flex-start;
+  }
+}
+
+/* ----- The laptop's frame (settings spec 2.1 and 4): the list of sections at 290px, the section beside it ----- */
+.settings-split {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.settings-split > .settings-content {
+  padding: 18px 28px calc(var(--space-10) + env(safe-area-inset-bottom));
+}
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--line-strong);
+}
+.settings-list-search {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-height: 0;
+  padding: 12px 12px 8px;
+}
+/* While the field holds words its matches fill the list. */
+.settings-list-search:has(.settings-search-list) {
+  flex: 1 1 auto;
+}
+.settings-list-search .settings-search {
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 0;
+}
+.settings-list-search .settings-search-icon {
+  top: 14px;
+}
+.settings-list-search .settings-list-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 6px var(--space-3);
+}
+.settings-list-nav[hidden] {
+  display: none;
+}
+.settings-list-nav .nh-sidelist-leading svg {
+  width: 18px;
+  height: 18px;
+}
+/* The matches, as the list's rows: the setting with the words searched for marked, its section under it. */
+.settings-search-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: var(--space-2) -6px 0;
+}
+.settings-search-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.settings-search-list .settings-search-option {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 16px;
+}
+.settings-search-list .settings-search-option.is-active {
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.settings-search-mark {
+  background: color-mix(in srgb, var(--cyan) 28%, transparent);
+  color: inherit;
+}
+
+/* A section's head: its name in display capitals at 24px, its hint at 13.5px, and what it holds now. */
+.settings-head {
+  display: grid;
+  gap: 4px;
+}
+.settings-head-title {
+  margin: 0;
+  color: var(--text);
+  font: 600 24px / 1.1 var(--font-display);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.settings-head .settings-section-line {
+  font-size: 13.5px;
+}
+.settings-head-now {
+  margin: 0;
+  color: var(--text-muted);
+  font: 500 12.5px / 1.4 var(--font-body);
+}
+@media (max-width: 760px) {
+  .settings-head-title {
+    font-size: 20px;
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { IconButton, IconSearch, IconX } from "@vtt/ui";
+import { IconButton, IconSearch, IconX, useTheme } from "@vtt/ui";
 import { ApiReference } from "../integrations/ApiReference";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { navigate, useRoute } from "../router";
@@ -21,7 +21,13 @@ import {
   type SettingEntry,
   type SettingsSectionId
 } from "./sections";
-import { PrimarySlot, SettingsSection } from "./SettingRow";
+import { PrimarySlot, SectionLine, SettingsSection } from "./SettingRow";
+import { SettingsList } from "./SettingsList";
+import { sectionLine } from "./sectionLines";
+import { FAMILY_COPY } from "./FightsSection";
+import { usePinchZoom } from "./preferences";
+import { useRollPreference } from "../dice/roll-preference";
+import { useActiveCredentialCount } from "../integrations/credentialCount";
 import { SettingsSearch } from "./SettingsSearch";
 import "../codex/shell/shell.css";
 import "./settings.css";
@@ -85,7 +91,15 @@ export function SettingsPage({
       : homeSection(role);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const [searching, setSearching] = useState(false);
+  const [listQuery, setListQuery] = useState("");
   const [focus, setFocus] = useState<string | null>(null);
+  // What each section holds now, for its head and the list's counts (settings spec 2.1).
+  const { theme } = useTheme();
+  const { rollInput } = useRollPreference();
+  const pinchZoom = usePinchZoom();
+  const activeCredentials = useActiveCredentialCount(gm ? (gmToken ?? null) : null);
+  const facts = { theme, rollInput, pinchZoom, activeCredentials };
+  const lineOf = (id: SettingsSectionId) => sectionLine(id, gm, facts);
 
   // Leaving is asked first, as the frame's menu asks it.
   const { leave, dialog } = useLeaveTable(state && !("definitions" in state) ? state : null, onLeave);
@@ -110,10 +124,26 @@ export function SettingsPage({
   const go = (id: SettingsSectionId) => void navigate(pathForSection(id));
 
   const search = <SettingsSearch entries={settingsFor(role)} onPick={pick} autoFocus={phone && searching} />;
+  const listSearch = (
+    <SettingsSearch entries={settingsFor(role)} onPick={pick} variant="list" onQueryChange={setListQuery} />
+  );
+  const counts = gm
+    ? {
+        players: gm.actors.filter(
+          (actor) => actor.kind === "player-character" && !actor.archived && actor.ownerSessionId !== null
+        ).length,
+        fights:
+          gm.rulesPolicy.dial === "freeform"
+            ? null
+            : FAMILY_COPY.filter(({ family }) => gm.rulesPolicy.exceptions[family] !== "freeform").length,
+        access: activeCredentials
+      }
+    : {};
 
   // A section's content fades in as the bar's light lands on it.
   const content = useRef<HTMLDivElement>(null);
   let body: ReactNode = null;
+  const line = role === "gm" ? lineOf(section) : undefined;
   if (section === "device") body = <DeviceSection role={role} onLeave={onLeave ? () => void leave() : undefined} />;
   else if (gm && gmToken) {
     if (section === "players")
@@ -132,7 +162,7 @@ export function SettingsPage({
       );
     else if (section === "api")
       body = (
-        <SettingsSection id="api" gmOnly wide>
+        <SettingsSection id="api" wide>
           <ApiReference
             gmToken={gmToken}
             openKey={route.segments[2] ?? null}
@@ -154,9 +184,50 @@ export function SettingsPage({
       </div>
     );
 
+  // A laptop: the title row with the section's primary at its right, the list of sections, and the section beside it
+  // (settings spec 2.1). A phone keeps the bar until its own phase.
+  if (!phone)
+    return (
+      <PrimarySlot.Provider value={slot}>
+        <SectionLine.Provider value={line}>
+          <div className="settings cx-shell is-laptop">
+            <SectionBar
+              name="Settings"
+              navLabel="Settings"
+              pages={[]}
+              activeId=""
+              onChange={() => undefined}
+              end={<span ref={setSlot} className="settings-primary-slot" />}
+            >
+              <div className="settings-split">
+                <SettingsList
+                  sections={sections}
+                  current={section}
+                  counts={counts}
+                  search={listSearch}
+                  searching={listQuery.trim() !== ""}
+                  onGo={go}
+                />
+                {/* The reference is a frame of its own, with its results as the one scroller, so its filter flyout
+                    spans what is on screen. Every other section scrolls as one page. */}
+                <div
+                  ref={content}
+                  className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
+                  key={section}
+                >
+                  {body}
+                </div>
+              </div>
+            </SectionBar>
+            {dialog}
+          </div>
+        </SectionLine.Provider>
+      </PrimarySlot.Provider>
+    );
+
   return (
     <PrimarySlot.Provider value={slot}>
-      <div className={`settings cx-shell ${phone ? "is-phone" : "is-laptop"}`}>
+      <div className="settings cx-shell is-phone">
         <SectionBar
           name="Settings"
           navLabel="Settings sections"

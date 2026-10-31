@@ -1,34 +1,57 @@
 import { useId, useMemo, useRef, useState } from "react";
-import { IconSearch, Input, Kbd, cx } from "@vtt/ui";
-import { currentDevice, shortcutLabel } from "../lib/shortcut";
+import { IconSearch, Input, cx } from "@vtt/ui";
 import { SETTINGS_SECTIONS, searchSettings, type SettingEntry } from "./sections";
 
 const sectionLabel = (entry: SettingEntry) =>
   SETTINGS_SECTIONS.find((section) => section.id === entry.section)?.label ?? entry.section;
 
+/** The label with the words searched for marked, as the list's results show them. */
+function marked(label: string, query: string) {
+  const words = query.trim();
+  const at = words ? label.toLowerCase().indexOf(words.toLowerCase()) : -1;
+  if (at === -1) return label;
+  return (
+    <>
+      {label.slice(0, at)}
+      <mark className="settings-search-mark">{label.slice(at, at + words.length)}</mark>
+      {label.slice(at + words.length)}
+    </>
+  );
+}
+
 /**
  * The search over settings: a combobox whose list names each match and its section. Typing searches labels, hints
  * and the other words a setting is known by; Enter or a tap opens the section and brings the setting into view.
- * Ctrl K (Command K on a Mac) focuses it from anywhere on the page.
+ * Ctrl K belongs to the app's one search (frame rule 4), which finds settings too.
  */
 export function SettingsSearch({
   entries,
   onPick,
   autoFocus = false,
-  className
+  className,
+  variant = "popover",
+  onQueryChange
 }: Readonly<{
   entries: readonly SettingEntry[];
   onPick: (entry: SettingEntry) => void;
   autoFocus?: boolean;
   className?: string;
+  /** "list": the matches fill Settings' list under the field, as its rows (settings spec 2.1); "popover" floats them. */
+  variant?: "popover" | "list";
+  /** Whether the field holds words, for the list to give way to the matches. */
+  onQueryChange?: (query: string) => void;
 }>) {
-  const [query, setQuery] = useState("");
+  const [query, setQueryState] = useState("");
+  const setQuery = (next: string) => {
+    setQueryState(next);
+    onQueryChange?.(next);
+  };
+  const inList = variant === "list";
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const listId = useId();
-  const shortcut = useMemo(() => shortcutLabel("K", currentDevice()), []);
   const matches = useMemo(() => searchSettings(entries, query).slice(0, 8), [entries, query]);
 
   const pick = (entry: SettingEntry) => {
@@ -37,7 +60,8 @@ export function SettingsSearch({
     setActive(0);
     onPick(entry);
   };
-  const showing = open && query.trim() !== "";
+  // In the list the matches stay while the field holds words; a popover closes when the field loses focus.
+  const showing = (inList || open) && query.trim() !== "";
 
   return (
     <div
@@ -57,7 +81,6 @@ export function SettingsSearch({
         aria-expanded={showing}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-keyshortcuts="Control+K Meta+K"
         aria-activedescendant={showing && matches[active] ? `${listId}-${matches[active].id}` : undefined}
         autoComplete="off"
         autoFocus={autoFocus}
@@ -80,13 +103,13 @@ export function SettingsSearch({
             event.preventDefault();
             pick(matches[active]);
           } else if (event.key === "Escape") {
+            if (inList) setQuery("");
             setOpen(false);
           }
         }}
       />
-      {shortcut && !query && <Kbd className="settings-search-kbd">{shortcut}</Kbd>}
       {showing && (
-        <div className="settings-search-results anim-popover">
+        <div className={inList ? "settings-search-list scroll-y" : "settings-search-results anim-popover"}>
           {matches.length === 0 ? (
             <p className="settings-search-empty" role="status">
               No setting matches "{query.trim()}".
@@ -104,7 +127,7 @@ export function SettingsSearch({
                   onMouseEnter={() => setActive(index)}
                   onClick={() => pick(entry)}
                 >
-                  <span className="settings-search-label">{entry.label}</span>
+                  <span className="settings-search-label">{inList ? marked(entry.label, query) : entry.label}</span>
                   <span className="settings-search-section">{sectionLabel(entry)}</span>
                 </li>
               ))}

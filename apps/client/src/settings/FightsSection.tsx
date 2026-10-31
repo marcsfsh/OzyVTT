@@ -23,7 +23,7 @@ import { useTableWrites } from "./table-writes";
  * One toggle per server rule family, never finer: the engine classifies every rule into these six
  * (`apps/server/src/rules-families.ts`). On means the family follows the dial; off pins it Off.
  */
-const FAMILY_COPY: ReadonlyArray<Readonly<{ family: RuleFamily; label: string }>> = [
+export const FAMILY_COPY: ReadonlyArray<Readonly<{ family: RuleFamily; label: string }>> = [
   { family: "movement", label: "Check movement" },
   { family: "economy", label: "Check the action economy" },
   { family: "resources", label: "Check limited uses" },
@@ -52,7 +52,7 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
   };
 
   return (
-    <SettingsSection id="fights" gmOnly>
+    <SettingsSection id="fights">
       <SettingRow setting={SETTING.rulesAssistant} stacked>
         <SegmentedControl
           ariaLabel="Rules assistant"

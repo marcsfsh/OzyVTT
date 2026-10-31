@@ -31,7 +31,7 @@ export function CharactersSection({ state }: Readonly<{ state: GmView }>) {
   };
 
   return (
-    <SettingsSection id="characters" gmOnly>
+    <SettingsSection id="characters">
       <SettingRow setting={SETTING.playerBuilder}>
         <Switch
           checked={builder.playerBuilder === "open"}

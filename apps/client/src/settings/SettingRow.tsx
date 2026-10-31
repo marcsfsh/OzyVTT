@@ -14,31 +14,37 @@ export function SettingsPrimary({ children }: Readonly<{ children: ReactNode }>)
   return slot ? createPortal(children, slot) : null;
 }
 
+/** What the section shown holds now ("Enforce · six checks · hits applied by the GM"), for its head (ADR-0071). */
+export const SectionLine = createContext<string | undefined>(undefined);
+
 /**
- * One section: its heading and one-sentence hint over its rows in one Cradle group (ADR-0048). A GM section carries the
- * GM only tag beside its heading, so the GM can tell at a glance that players never see it.
+ * One section: its head (the name in display capitals, its one-sentence hint and what it holds now) over its rows in
+ * one Cradle group (ADR-0048). A player never sees a GM section, so a GM section's head carries no GM only tag
+ * (settings rule 3.3); a GM row inside a section players see keeps it.
  */
 export function SettingsSection({
   id,
-  gmOnly,
   children,
   wide = false
-}: Readonly<{ id: SettingsSectionId; gmOnly: boolean; children: ReactNode; wide?: boolean }>) {
+}: Readonly<{
+  id: SettingsSectionId;
+  children: ReactNode;
+  wide?: boolean;
+}>) {
   const section = SETTINGS_SECTIONS.find((candidate) => candidate.id === id)!;
+  const line = useContext(SectionLine);
   return (
     <section
       className={cx("settings-section", `settings-section--${id}`, wide && "is-wide")}
       aria-labelledby={`settings-${id}-title`}
     >
-      {/* The bar names the section, so it opens with its one description line, the GM only tag in front of it on a GM
-          section (theme spec 2.2). The name stays as a hidden heading for the outline. */}
-      <h2 id={`settings-${id}-title`} className="nh-sr-only">
-        {section.label}
-      </h2>
-      <p className="settings-section-line">
-        {gmOnly && <GmOnlyTag />}
-        {section.hint}
-      </p>
+      <header className="settings-head">
+        <h2 id={`settings-${id}-title`} className="settings-head-title">
+          {section.label}
+        </h2>
+        <p className="settings-section-line">{section.hint}</p>
+        {line && <p className="settings-head-now">{line}</p>}
+      </header>
       <Group className="settings-panel">{children}</Group>
     </section>
   );

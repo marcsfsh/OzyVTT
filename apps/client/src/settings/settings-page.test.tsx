@@ -16,7 +16,7 @@ import { GameStateSchema, type GmView } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { useRoute } from "../router";
-import { SETTING, SETTINGS_SECTIONS, type SettingsSectionId } from "./sections";
+import { SETTING, type SettingsSectionId } from "./sections";
 import { SettingsPage } from "./SettingsPage";
 
 function gmView(change: (state: GmView) => void = () => {}): GmView {
@@ -44,18 +44,29 @@ beforeEach(() => {
 });
 
 describe("the GM's Settings", () => {
-  it("lists the sections in a bar and opens Players at /settings", async () => {
+  it("lists the sections in the side list and opens Players at /settings", async () => {
     const user = userEvent.setup();
     renderAt("/settings");
-    const bar = screen.getByRole("navigation", { name: "Settings sections" });
-    const sections = within(bar).getAllByRole("tab");
-    expect(sections.map((section) => section.textContent)).toEqual(SETTINGS_SECTIONS.map((section) => section.label));
-    expect(within(bar).getByRole("tab", { name: "Players" })).toHaveAttribute("aria-selected", "true");
+    const list = screen.getByRole("navigation", { name: "Settings sections" });
+    const sections = within(list).getAllByRole("link");
+    // Each row is its name with a count where one helps: who is at the table, the checks the assistant makes.
+    expect(sections.map((section) => section.textContent)).toEqual([
+      "Players0",
+      "Encounters6",
+      "Characters",
+      "Device",
+      "Access",
+      "API"
+    ]);
+    expect(within(list).getByRole("link", { name: /^Players/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("heading", { name: "Players", level: 2 })).toBeInTheDocument();
+    // The head says what the section holds now.
+    expect(screen.getByText("Join address · name and class · 0 at the table")).toBeInTheDocument();
 
-    await user.click(within(bar).getByRole("tab", { name: "Encounters" }));
+    await user.click(within(list).getByRole("link", { name: /^Encounters/ }));
     expect(window.location.pathname).toBe("/settings/fights");
     expect(screen.getByRole("heading", { name: "Rules assistant", level: 3 })).toBeInTheDocument();
+    expect(within(list).getByRole("link", { name: /^Encounters/ })).toHaveAttribute("aria-current", "page");
   });
 
   it.each(["players", "fights", "characters", "device", "access"] as const)(
@@ -73,17 +84,16 @@ describe("the GM's Settings", () => {
     }
   );
 
-  it("marks every GM section GM only, and the GM's own row in Device", async () => {
+  it("drops the GM only tag from GM sections, which players never see, and keeps it on the GM's row in Device", async () => {
     renderAt("/settings/fights");
-    // The tag stands in front of the section's description line, under its hidden heading.
-    expect(screen.getByRole("heading", { name: /^Encounters/, level: 2 }).nextElementSibling).toHaveTextContent(
+    expect(screen.getByRole("heading", { name: "Encounters", level: 2 }).closest("header")).not.toHaveTextContent(
       "GM only"
     );
     act(() => goTo("/settings/device"));
     expect(await screen.findByRole("heading", { name: /^Arrange new encounters/, level: 3 })).toHaveTextContent(
       "GM only"
     );
-    expect(screen.getByRole("heading", { name: /^Device/, level: 2 }).nextElementSibling).not.toHaveTextContent(
+    expect(screen.getByRole("heading", { name: "Device", level: 2 }).closest("header")).not.toHaveTextContent(
       "GM only"
     );
   });

@@ -16,7 +16,7 @@ import { ActorAvatar } from "../actors/ActorAvatar";
  * enforces them, and nothing here filters (`PartyStrip` only uses the tier to decide whether to
  * mount). A `Select`: four labels this long are unreadable as a segmented control at 320px.
  */
-const PARTY_VISIBILITY_OPTIONS = [
+export const PARTY_VISIBILITY_OPTIONS = [
   { value: "off", label: "Off" },
   { value: "name-and-class", label: "Name and class" },
   { value: "full-sheet", label: "Full sheet" },
@@ -67,7 +67,7 @@ export function PlayersSection({
     });
 
   return (
-    <SettingsSection id="players" gmOnly>
+    <SettingsSection id="players">
       <SettingRow setting={SETTING.joinAddress} stacked>
         <JoinAddress token={gmToken} />
       </SettingRow>

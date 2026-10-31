@@ -1047,6 +1047,11 @@ test("a chosen tab's ink lies on its strip's line, with no second line beside it
   }
   await openGmSection(gm, "Settings");
   await look("Settings");
+  // Settings has no strip of pages on a laptop: its side list lights the section shown.
+  if ((await gm.locator(".settings.is-laptop").count()) > 0)
+    await expect(
+      gm.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: /^Players/ })
+    ).toHaveAttribute("aria-current", "page");
 });
 
 test("under reduced motion the sections and tabs change with no light", async ({ open, request }) => {

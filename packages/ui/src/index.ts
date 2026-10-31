@@ -12,6 +12,7 @@ export {
   useReduceTransparency
 } from "./theme/transparency";
 export { ThemeSwitch, ThemeToggle } from "./theme/ThemeToggle";
+export { useTheme } from "./theme/useTheme";
 export {
   colourDistance,
   composite,
