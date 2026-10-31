@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Tabs } from "@vtt/ui";
+import { Button, IconPlus, Tabs } from "@vtt/ui";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import "./section-bar.css";
 
@@ -11,6 +11,44 @@ const SectionBarEnd = createContext<HTMLElement | null>(null);
 export function SectionBarSlot({ children }: Readonly<{ children: ReactNode }>) {
   const target = useContext(SectionBarEnd);
   return target ? createPortal(children, target) : null;
+}
+
+/** Whether the page under the bar shows a Cup of its own, so the bar's New steps down (theme rule 2). */
+const PageHasCup = createContext(false);
+
+/**
+ * The section bar's New (theme rule 2, ADR-0073): the Cup, words only, while the page shows none of its own; a Base
+ * line button with its + when it does, so one Cup is in view. A dialog's Cup sits over a scrim and doesn't count.
+ */
+export function BarPrimary({ label, onClick }: Readonly<{ label: string; onClick: () => void }>) {
+  const stepDown = useContext(PageHasCup);
+  return stepDown ? (
+    <Button size="sm" onClick={onClick}>
+      <IconPlus /> {label}
+    </Button>
+  ) : (
+    <Button variant="primary" size="sm" onClick={onClick}>
+      {label}
+    </Button>
+  );
+}
+
+/** Watches what is beside the bar for a Cup of the page's own, as the mockups' `oneCup()` does after a page renders. */
+function usePageHasCup(bar: HTMLElement | null) {
+  const [has, setHas] = useState(false);
+  useEffect(() => {
+    const root = bar?.parentElement;
+    if (!bar || !root) return;
+    const check = () =>
+      setHas(
+        [...root.querySelectorAll(".nh-btn--primary")].some((cup) => !bar.contains(cup) && !cup.closest("dialog"))
+      );
+    check();
+    const watch = new MutationObserver(check);
+    watch.observe(root, { childList: true, subtree: true });
+    return () => watch.disconnect();
+  }, [bar]);
+  return has;
 }
 
 export type SectionPage = Readonly<{ id: string; label: string }>;
@@ -65,6 +103,8 @@ export function SectionBar({
   // The phone shell's width (`PHONE_SHELL_QUERY` in AppBar.tsx): the bottom tabs below it, the bar above.
   const phone = useMediaQuery("(max-width: 760px)");
   const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const [bar, setBar] = useState<HTMLElement | null>(null);
+  const pageHasCup = usePageHasCup(bar);
   const tabs = (
     <nav className="secbar-nav" aria-label={navLabel}>
       <Tabs
@@ -79,33 +119,35 @@ export function SectionBar({
   );
   return (
     <SectionBarEnd.Provider value={slot}>
-      {phone && phoneHidden ? null : phone ? (
-        <div className="secbar-phone">
-          <header className="secbar-head" data-horizon="">
-            {phoneHead ?? (
-              <>
-                <h1 className="secbar-name">{name}</h1>
-                <span className="secbar-icons">
-                  <span className="secbar-slot" ref={setSlot} />
-                  {phoneIcons}
-                </span>
-              </>
-            )}
-          </header>
-          {tabs}
-        </div>
-      ) : (
-        <div className="secbar">
-          <h1 className="secbar-name">{name}</h1>
-          <span className="secbar-divider" aria-hidden="true" />
-          {tabs}
-          <span className="secbar-grow" />
-          {search}
-          {end}
-          <span className="secbar-slot" ref={setSlot} />
-        </div>
-      )}
-      {children}
+      <PageHasCup.Provider value={pageHasCup}>
+        {phone && phoneHidden ? null : phone ? (
+          <div className="secbar-phone">
+            <header className="secbar-head" data-horizon="">
+              {phoneHead ?? (
+                <>
+                  <h1 className="secbar-name">{name}</h1>
+                  <span className="secbar-icons">
+                    <span className="secbar-slot" ref={setSlot} />
+                    {phoneIcons}
+                  </span>
+                </>
+              )}
+            </header>
+            {tabs}
+          </div>
+        ) : (
+          <div className="secbar" ref={setBar}>
+            <h1 className="secbar-name">{name}</h1>
+            <span className="secbar-divider" aria-hidden="true" />
+            {tabs}
+            <span className="secbar-grow" />
+            {search}
+            {end}
+            <span className="secbar-slot" ref={setSlot} />
+          </div>
+        )}
+        {children}
+      </PageHasCup.Provider>
     </SectionBarEnd.Provider>
   );
 }

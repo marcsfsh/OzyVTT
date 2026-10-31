@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GmView } from "@vtt/domain";
-import { Button, IconButton, IconPlus, IconSearch, Kbd, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
+import { IconButton, IconPlus, IconSearch, Kbd, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
 import { CodexIcon } from "../codex/icons";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -28,6 +28,7 @@ import { SourcesView } from "./SourcesView";
 import { TablesView } from "./TablesView";
 import "../codex/shell/shell.css";
 import "./compendium.css";
+import { BarPrimary } from "../shell/SectionBar";
 
 /* Browse is the tables and Homebrew the overview of what you made; the addresses stay as they were. */
 const SECTIONS: ReadonlyArray<Readonly<{ id: CompendiumSection; label: string; path: string }>> = [
@@ -166,9 +167,7 @@ export function CompendiumShell({
             end={
               <>
                 <RulesButton />
-                <Button variant="primary" size="sm" onClick={() => openNew({ kind: kindInView })}>
-                  New homebrew
-                </Button>
+                <BarPrimary label="New homebrew" onClick={() => openNew({ kind: kindInView })} />
               </>
             }
             phoneIcons={

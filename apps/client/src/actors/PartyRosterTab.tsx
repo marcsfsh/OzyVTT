@@ -15,6 +15,7 @@ import { useForceRelease } from "./useForceRelease";
 import { atTableBlocked, setPlayedAtTable } from "./playedAtTable";
 import "./party-roster.css";
 import { ActorAvatar } from "./ActorAvatar";
+import { BarPrimary } from "../shell/SectionBar";
 
 /** Never claimed and never in a fight: a character the GM made and can take back without archiving it first. */
 export const neverPlayed = (actor: GmActor) =>
@@ -270,9 +271,7 @@ export function PartyRosterTab({
       {/* A list has no title row: Prep's bar names the page and holds its primary (theme spec 2.2). */}
       {onCreateCharacter && (
         <PrepBarSlot>
-          <Button variant="primary" size="sm" onClick={onCreateCharacter}>
-            Create a character
-          </Button>
+          <BarPrimary label="Create a character" onClick={onCreateCharacter} />
         </PrepBarSlot>
       )}
       <div className="party-heading">

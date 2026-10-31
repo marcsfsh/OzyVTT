@@ -15,6 +15,7 @@ import { MapList } from "../maps/MapList";
 import { MapDocument } from "../maps/MapDocument";
 import { MapEditor } from "../maps/MapEditor";
 import "./scenes.css";
+import { BarPrimary } from "../shell/SectionBar";
 
 /** The front page's two views, in the order they are drawn. */
 const LIST_TABS: ReadonlyArray<{ id: ScenesSection; label: string; path: string }> = [
@@ -190,9 +191,7 @@ export function ScenesShell({
                 <Button variant="secondary" size="sm" onClick={() => void navigate(SCENES_PATHS.newMap)}>
                   <IconPlus /> New map
                 </Button>
-                <Button variant="primary" size="sm" onClick={() => void navigate(SCENES_PATHS.newScene)}>
-                  New encounter
-                </Button>
+                <BarPrimary label="New encounter" onClick={() => void navigate(SCENES_PATHS.newScene)} />
               </>
             )
           ) : phone ? (
@@ -200,9 +199,7 @@ export function ScenesShell({
               <IconPlus />
             </IconButton>
           ) : (
-            <Button variant="secondary" size="sm" onClick={() => void navigate(primary.path)}>
-              <IconPlus /> {primary.label}
-            </Button>
+            <BarPrimary label={primary.label} onClick={() => void navigate(primary.path)} />
           )}
         </PrepBarSlot>
         <div className="sc-content">{content}</div>

@@ -3,6 +3,7 @@ import { Button, Input, Modal, Switch, useToast } from "@vtt/ui";
 import { CredentialsTable } from "../integrations/CredentialsTable";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsPrimary, SettingsSection } from "./SettingRow";
+import { BarPrimary } from "../shell/SectionBar";
 
 /**
  * Access: who can sign in as the GM and which tools can reach the table. Its one primary, New credential, sits in
@@ -26,9 +27,7 @@ export function AccessSection({
   return (
     <SettingsSection id="access" gmOnly>
       <SettingsPrimary>
-        <Button variant="primary" onClick={() => setCreating(true)}>
-          New credential
-        </Button>
+        <BarPrimary label="New credential" onClick={() => setCreating(true)} />
       </SettingsPrimary>
       <SettingRow setting={SETTING.gmPassword}>
         <Button variant="secondary" onClick={() => setPasswordOpen(true)} disabled={busy}>
