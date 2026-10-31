@@ -62,7 +62,7 @@
   flex: 1 1 auto;
   min-width: var(--space-4);
 }
-.secbar > :is(.secbar-slot, .secbar-search) {
+.secbar > .secbar-slot {
   display: flex;
   flex: none;
   align-items: center;

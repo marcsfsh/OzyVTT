@@ -42,7 +42,7 @@ Neon appears only where it means something, and each 80s element has one job.
 | Sunset scene                             | Arrival                                        | The title and join screens only. Dusk paints it at night; Dawn paints it as daybreak.                                                                                                                                                                                                                 |
 | Horizon line (`--grad-horizon`, 2px)     | The top of the app, and of what opens above it | The bottom edge of every top bar, laptop and phone, and the top edge of a dialog, menu, drawer or toast, which lights from the control that opened it and casts a faint light down into the surface (`--ink-cast`). The primary's lines and the chosen tab's ink are the same horizon (`--hz-paint`). |
 | Chrome lettering (`.chrome`)             | Who is acting                                  | The wordmark, the acting creature's name and YOUR TURN. Nowhere else. Dawn prints it as solid ink with the same pink and cyan split.                                                                                                                                                                  |
-| Cabinet lamp                             | Available, or on                               | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live encounter                                                                                                                                                                                                         |
+| Cabinet lamp                             | Available, or on                               | Action, Bonus, Reaction and Move on the turn panel; the table screen status; a live encounter (the live chip and the phone's Play or Table tab, amber on a player's turn)                                                                                                                             |
 | Life bar                                 | Hit points                                     | Every hit point readout                                                                                                                                                                                                                                                                               |
 | VCR counter                              | The round                                      | PLAY and RND 03 during an encounter, STOP and RND -- between encounters, at the start of the turn order and beside YOUR TURN                                                                                                                                                                          |
 | The Cup (`--hz-paint` in a plate)        | Press this                                     | The one primary action in a view                                                                                                                                                                                                                                                                      |
@@ -170,22 +170,26 @@ surround, a control over the map is a plate in the theme's surface, and lamps st
 
 The shells:
 
-- GM, laptop. A 56px top bar: the wordmark; Play, Prep, Codex and Compendium; the live encounter picker on Play; then, on
-  the right, the table screen lamp, who is connected, search (Ctrl K), the theme switch (the current theme's mark,
-  which opens Dusk and Dawn) and settings (a toothed gear, so it never reads as the theme's sun). Each section with pages
+- GM, laptop. A 56px top bar, the same on every page (ADR-0049): the wordmark; Play, Prep, Codex and Compendium; the live
+  chip (a lamp, the live encounter's name and its round, which opens the encounter picker); then, on the right, search
+  (Ctrl K) and the one menu. The menu's face is the GM mark with the count of players online; it holds the table screen
+  and its actions, who is here, the theme (Dusk and Dawn), Settings and Sign out. Each section with pages
   has the Titled section bar under it (`shell/SectionBar.tsx`, ADR-0048): 52px, the section's name in Chakra Petch 600
   capitals at 17px, a divider, the pages as words with the horizon ink, then the section's search and its primary
   (the Cup at 42px) at the right end. No icons on the pages.
-- GM, phone. The same four sections as a bottom tab bar. The top bar belongs to the page on screen: a section's page
+- GM, phone. No top bar. The four sections and More are the bottom tabs (64px, five equal tabs); More opens a sheet
+  above them with the menu's rows and Search. Play or Table carries the live lamp while an encounter runs. The header
+  row belongs to the page on screen: a section's page
   has a header row with the section's name at 18px and up to two icons, then its pages as one strip of words that
   scrolls sideways with a fade; a record's header is Back and where it goes, with no strip. In an encounter, Play
   stacks the VCR counter and encounter picker, the turn order, the map, and the acting creature's card (portrait and
   chrome name, life bar, pending card, lamps, an Actions row that opens the full list) above End turn. Under the strips
   the map (its tools above it) has a fixed height and scrolls away; the panel below is one screen tall, so scrolled to
   the end its tabs sit under the turn order. Its content scrolls only once the map has gone. No handle resizes the map.
-- Player, laptop. The wordmark; Table, Sheet and Codex; the claimed character on the right; settings.
-- Player, phone. Bottom tabs Table, Sheet, Codex and Log on every screen. In an encounter, Table holds the turn card and a
-  small map with Open map.
+- Player, laptop. The wordmark; Table, Sheet and Codex; the live chip while an encounter runs (amber on the player's turn);
+  search; and the menu, its face the character they play, holding Release, the theme, Settings and Leave the table.
+- Player, phone. Bottom tabs Table, Sheet, Codex, Log and More on every screen, the character's plate at the top of Table
+  and Log. In an encounter, Table holds the turn card and a small map with Open map.
 
 Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. On its
 front page New encounter is the bar's primary with New map before it as a Base line button; the Maps and Encounters
@@ -196,7 +200,9 @@ most one description line (14px, `--text-dim`, the GM only tag in front of it on
 record opens with its title row: the title in Chakra Petch 600 capitals at 24px (20px on a phone), its tags, one 13px
 line and its actions as secondary controls. Widths: workbenches, lists and tables use the full width; settings and
 forms keep an 880px column, centred, or beside their side list; reading text keeps a 680px measure. The table screen's controls open from the
-table screen button in the top bar. The rules reference opens from search and from the Compendium. Settings is the gear.
+menu. The rules reference opens from search's Rules place and from the Compendium: a drawer on the right of a laptop, a
+sheet from the bottom on a phone. Search is one dialog for the whole app (Ctrl K): Codex, Compendium (the GM's), Rules
+and Go to, starting at the section you are in.
 
 The table (Play), as a docked workbench (ADR-0025):
 
@@ -347,16 +353,22 @@ from the mockups.
   again.
 - Focus: every control shows a 2px `--focus-ring` outline with a 2px offset on keyboard focus (`:focus-visible`). It is never
   removed or hidden.
-- Toast: bottom right on a laptop, just above the bottom tabs on a phone, with a horizon line along its top. A `--surface-2` plate with a 1px
+- Toast: bottom right on a laptop (420px wide, 16px in), just above the bottom tabs on a phone (8px in from each side),
+  with a horizon line along its top. At least 52px high, its close a 36px square. A `--surface-2` plate with a 1px
   `--line-raised` edge, a VT323 tag for its kind (DONE, or ERROR in `--danger-text`), one line of text, and Undo when the
   action can be undone. It stays 5 seconds, pauses on hover or focus, and is announced politely (`aria-live="polite"`).
   Destructive actions are labelled and confirmed.
-- Reconnecting: when the connection drops, show a bar under the top bar with a WAIT tag and "Reconnecting. Wait before
-  making changes." Controls that need the server are disabled with that reason; reading the last snapshot still
+- Reconnecting: when the connection drops, show a band under the top bar (the first row on a phone): at least 48px of
+  glass with a 3px amber edge, the WAIT tag and "Reconnecting. Wait before making changes." Controls that need the server are disabled with that reason; reading the last snapshot still
   works. Preserve unsent text as a local draft. Existing in-flight commands may time out; do not automatically
   replay them with new command IDs or announce success before an acknowledgement. The bar's own line is grey and
   unlit while it waits. When the connection returns a comet lights that line in the horizon's colours and the bar
   says "Back at the table" for 2 seconds, then goes.
+- Roll calls away from the table: an amber band in the same row, each call one band with the ROLL tag, what the GM asks
+  for and the roll as its button (the check's name and its bonus in VT323 on a 2px amber base). It stays until rolled.
+- Not found: the empty state's one line, "Nothing lives at this address.", and Go to the table, under the frame you came
+  from. Something broke: the arrival's sunset with one card, the message in a box with Copy, and Reload. Loading: the
+  frame draws at once; after 400ms one `--text-muted` line says what is loading.
 - Empty states (`EmptyState`): one line saying what is missing and one secondary button that fixes it, in the space the
   content would fill, with no heading, icon or box. For example, the log says "No rolls yet." above the dice, and an
   encounter without a map says "No map yet." with Pick a map. No illustrations; the sunset belongs to arrival screens.
@@ -535,6 +547,8 @@ mouse is a bug.
 - On a touch screen every field a person types in or picks from is at least 16px (`--fs-field-touch`), because
   iOS zooms the page into a focused field with smaller text. The floor in `design-tokens.css` sees to it, so a
   field's own rule may stay smaller for a laptop.
+- A phone has no top bar: five bottom tabs (the sections and More) on every screen, and a header row that belongs to the
+  page. Dialogs, confirms and the rules reference open from the bottom, under the thumb.
 - A focused input inside a locked region must stay visible above the on-screen keyboard.
 - `prefers-reduced-motion` freezes animations and skips the light; reduced transparency replaces
   blur with a solid surface.

@@ -174,29 +174,6 @@
   line-height: 1;
 }
 
-@media (max-width: 760px) {
-  .app-bar {
-    gap: var(--space-2);
-    height: 48px;
-    padding: 0 var(--space-1) 0 var(--space-4);
-  }
-  .app-bar-mark .nh-wordmark-ozy {
-    font-size: 18px;
-  }
-  .app-bar-mark .nh-wordmark-vtt {
-    font-size: 24px;
-  }
-}
-/* In the bar the theme switch is an icon like its neighbours: no plate until it is hovered or open. */
-.app-bar-theme .nh-theme-switch-trigger::before {
-  border-color: transparent;
-  background: transparent;
-}
-.app-bar-theme .nh-theme-switch-trigger:hover::before,
-.app-bar-theme[open] .nh-theme-switch-trigger::before {
-  border-color: var(--line-raised);
-  background: var(--surface-2);
-}
 .app-bar-screen-lamp {
   position: relative;
   display: inline-flex;

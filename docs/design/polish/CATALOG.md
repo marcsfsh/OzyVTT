@@ -25,7 +25,7 @@ Status words: Designed (plan written), Built, Next (the next design round), Open
 | Step | What                                                                              | Why this order                                             |
 | ---- | --------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | 1    | T, the theme spec (Built; its shared parts Designed)                               | Gathers the rules D1 proved so every area starts from them |
-| 2    | A, the frame (Designed)                                                           | Every surface sits in it                                   |
+| 2    | A, the frame (Built)                                                              | Every surface sits in it                                   |
 | 3    | C, the table (frame, C2 to C6 Designed)                                           | Combat first: the surface used most, by everyone           |
 | 4    | D, characters (D2, D3 Designed)                                                   | Finishes what D1 started                                   |
 | 5    | B, arrival (Designed)                                                             | The first thing a new player sees                          |
@@ -84,7 +84,7 @@ Designed; its plan builds each shared part once in the kit.
 
 ## A. Frame and wayfinding
 
-Job: get anyone to any surface and tell them what is happening. Status: Designed (`A-frame/SPEC.md`, `A-frame/PLAN.md`,
+Job: get anyone to any surface and tell them what is happening. Status: Built (`A-frame/SPEC.md`, `A-frame/PLAN.md`,
 ADR-0049). The laptop top bar is One menu, a phone has More as its fifth tab and no top bar, search is one Scoped field,
 and news stays in the corner, with eleven rules for the frame's other surfaces.
 

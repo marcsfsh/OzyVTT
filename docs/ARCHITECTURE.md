@@ -1081,9 +1081,13 @@ Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib
 calls through `lib/api.ts`. The table viewer is a separate bundle that never loads the game client.
 Rules checks on the client are hints only; the server decides.
 
-The frame (ADR-0037, `shell/AppBar.tsx`) groups the addresses without moving them. The GM's top bar has Play, Prep,
-Codex and Compendium (`GM_SECTIONS` in `router.ts`), then the table screen lamp (`table/presentation.ts`, one poll
-for the page), the characters online, search and Settings; a phone moves the sections to bottom tabs. Prep's section
+The frame (ADR-0037, changed by ADR-0049; `shell/AppBar.tsx`) groups the addresses without moving them. The GM's top bar
+has Play, Prep, Codex and Compendium (`GM_SECTIONS` in `router.ts`), the live chip (`shell/LiveChip.tsx`: the live lamp,
+the encounter and its round, opening the picker), search and the one menu (`shell/FrameMenu.tsx`, its face
+`shell/MenuButton.tsx`): the table screen (`useTableScreen` in `table/TvControl.tsx`, one poll of
+`table/presentation.ts` for the page) and its actions, who is here, the theme, Settings and Sign out. A player's menu
+holds Release, the theme, Settings and Leave the table (`shell/useLeaveTable.tsx`). A phone has no top bar: the
+sections and More are the bottom tabs, and More opens `shell/MoreSheet.tsx` with the menu's rows. Prep's section
 bar (`PrepFrame`) holds Encounters, Party, Maps, Tokens, Sound and Replays (`PREP_PAGES`) over their existing addresses
 (`/encounters`, `/roster`, `/encounters/maps`, the new `/prep/tokens`, `/viewer-controls/sound`, `/replays`); a page puts its
 search or primary at the bar's end through `PrepBarSlot`. Every section with pages (Prep, the Codex, the Compendium
@@ -1091,16 +1095,24 @@ and Settings) draws the one Titled section bar, `shell/SectionBar.tsx` (ADR-0048
 `h1`, its pages as the kit's tab list inside a navigation landmark, and an end slot (`SectionBarSlot`, which
 `PrepBarSlot` is) a page portals its primary into; on a phone it is the header row and the strip of pages. `litGmSection` and `prepPageFor` say what lights, and
 `lastLocationForSection` returns a section to where the GM was. A player has Table, Sheet (`/me`) and Codex, and a
-phone adds Log, which is the table at `/table?panel=log`. The search (`shell/SearchLauncher.tsx`) is a launcher: Search
-the Codex and Search the Compendium go to that section with a one-shot `openSearch=1` that opens its own dialog, and a
-section with its own search keeps Ctrl K. While the connection is down, or until a snapshot arrives after it returns,
-`shell/ReconnectBar.tsx` says to wait and `useTableCurrent()` is false for the controls that read it.
+phone adds Log, which is the table at `/table?panel=log`. Search is one dialog (`shell/SearchDialog.tsx`, opened
+through `shell/search-store.ts`), mounted by `App.tsx` while someone is signed in and the only holder of Ctrl K. Its
+places are the Codex (the Codex's search for the viewer's token, `searchAsPlayer` for a player, then the Codex
+commands from `codex/CommandPalette.tsx`'s `useCodexActions`, with the creates the GM's mounted Codex registers in
+`codex/codex-commands.ts`), the Compendium (the GM's), Rules (the glossary, opening `RulesReference` at an entry) and
+Go to (the bars' pages and the settings index). It starts at the section on screen; the Codex's and Compendium's bar
+boxes and an old `openSearch=1` open it at their place. While the connection is down, or until a snapshot arrives
+after it returns, `shell/ReconnectBar.tsx` draws its band and `useTableCurrent()` is false for the controls that read
+it. Away from the table a player's roll calls are bands in the pane's first row (`RollCallPrompts`); the band's bonus
+is the server's number from the character's derived sheet. Toasts keep the bottom right of a laptop and sit above the
+bottom tabs on a phone. A confirm or prompt (`components/feedback.tsx`) opens from the bottom on a phone. Not found
+(`components/NotFoundView.tsx`) is an `EmptyState`; `AppErrorBoundary` draws `SomethingBroke` on `shell/LandingScene.tsx`.
 
 The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a strip over the map with the VCR counter and the
 status line (`table/TableStrip.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
 (`table/TablePanel.tsx`) whose tabs are Encounter, Log, Party and Notes for the GM, and whose footer holds the view's one
-primary. The live encounter picker (`table/LiveScenePicker.tsx`) sits in the GM's top bar on Play, and in the strip on a
-phone, where the strip is Play's header. In an encounter the strip holds the turn order (`table/TurnTiles.tsx`, the real
+primary. The live encounter picker (`table/LiveScenePicker.tsx`) opens from the live chip in the GM's top bar, and sits
+in the strip on a phone, where the strip is Play's header. In an encounter the strip holds the turn order (`table/TurnTiles.tsx`, the real
 order for the GM and the projected one for a player) and, through `table/stripSlot.tsx`, the GM's Encounter menu. The GM's
 Needs you leads the Encounter tab, above the acting creature's card and lamps (`encounter/ActingConsole.tsx`) and the
 order with its row tools; Start an encounter (`encounter/StartFight.tsx`) lists the staged characters and monsters to tick.
@@ -1108,14 +1120,14 @@ A player's tabs are Turn, Sheet, Log and Party in an encounter (Me, Log and Part
 the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts, the round and the four lamps; End turn is the
 footer's one primary. On a phone the map and panel share one column (`table/scrollPast.ts`): the map keeps a fixed
 height and scrolls away, the panel is one screen tall, and its regions scroll only once the map has gone; choosing a
-target scrolls back to the map. Prep's encounter and map pages do the same below 980px. On a phone the table and its log
-head with the character being played
-(`table/PlayerIdentity.tsx`) in place of the top bar. The Log tab is the persisted combat log, rolls drawn as cards,
+target scrolls back to the map. Prep's encounter and map pages do the same below 980px. On a phone a player's table and
+log head with the character being played (`table/PlayerIdentity.tsx`, the sheet's `BandPlate`) at the top of the pane,
+since a phone has no top bar. The Log tab is the persisted combat log, rolls drawn as cards,
 over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the field rolls the formula after
 `/roll` (or `/r`), both through `dice:roll` at the visibility the dice options chose (`dice/roll-visibility.ts`);
 any other text is a chat line through `chat:send`, to everyone or whispered as Who hears it says, and an unknown
 `/` word is refused before anything is sent. Dice options opens the full `DicePanel`, the GM's calls for a roll
-included. The table screen lamp
+included. The table screen's row in the menu
 (`table/TvControl.tsx`) pauses or resumes the screen and opens its preview (`viewer/preview-open.ts`). The screen
 itself (`viewer/ViewerApp.tsx`, with `viewer/ScreenParts.tsx`) draws a strip of the turn order with the VCR counter,
 the map fitted whole unless the screen chose Follow GM view or zoomed, and a column with who acts now and the
@@ -1195,8 +1207,9 @@ The themes are Dusk and Dawn (`dusk` and `dawn` on `<html data-theme>`, ADR-0037
 `packages/ui/src/styles/design-tokens.css` with Dusk in `:root`. Each HTML entry decides the theme before first paint
 with the rules of `resolveTheme` (`packages/ui/src/theme/theme.ts`): a saved `dusk` or `dawn` wins, a retired `dark` or
 `light` becomes Dusk or Dawn and is rewritten, and anything else follows `prefers-color-scheme`.
-`apps/client/src/shell/theme-startup.test.ts` runs each entry's script against it. `ThemeToggle` in Settings > Device and
-the standalone sheet's `ThemeSwitch` share `useTheme`, which hears every change on the page. Reduce transparency
+`apps/client/src/shell/theme-startup.test.ts` runs each entry's script against it. The theme lives in the menu, More,
+Settings > Device and the landing page (`ThemeToggle`), and in the standalone sheet's `ThemeSwitch`; all share
+`useTheme`, which hears every change on the page. Reduce transparency
 (`theme/transparency.ts`, Settings > Device) is the device setting `vtt.reduce-transparency` or the system's request;
 while it is on, `<html data-transparency="reduced">` turns the glass tokens solid and drops the glows. The
 same script sets it before first paint, and each entry calls `initTransparency` to follow the system after that.
@@ -1256,18 +1269,19 @@ A new log line fades in with a comet along its lower edge (from the Send side fo
 `noteChatSent` marks), and `onLogEntry` lets the table panel run light along its tabs to Log while another tab shows
 (`shell/tabLight.ts`); the same trip takes a player's section strip to Codex when its count of new pages rises. A block
 revealed to a player while their page is open arrives under a comet with a wash; player blocks have no ids, so one is
-known by when it reached the reader and its title. A player's face in the top bar warms as they connect and fades as
-they drop, the table screen's lamp lights or cools with ON and OFF rolling, and picking a character lights its card.
+known by when it reached the reader and its title. The live lamp lights as an encounter starts, the table screen's
+lamp in the menu lights or cools with ON and OFF rolling, and picking a character lights its card.
 Resources are pips: `usePipLight` in `@vtt/ui` (through the sheet's `PipRow`) cools a pip as it is spent and relights
 them in order as a rest brings them back, for uses, spell slots, Hit Point Dice and Exhaustion. Counters that change
 roll over with `Roll` (an effect's time left, Heroic Inspiration, the level, the replay's position, a track's title,
 Copy and Copied) or count with `countUp` (experience, the encounter budget, rolled ability scores). An effect that ends
 comes apart like Concentration. The small controls light at a smaller size: `Switch`, `Checklist`, `Steps` and a
-`RowEditor` reorder. `Skeleton` runs one comet over a group of plates and never loops, and the reconnect bar has its
+`RowEditor` reorder. `Skeleton` runs one comet over a group of plates and never loops, and the reconnect band has its
 own still grey line, lit by a comet when the table is back.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 the Compendium, settings and the API reference, the character builder and level flow, replays, the map
-library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets
+library, the shared-screen controls and the sound board. Each names itself, and after 400ms its fallback says
+"Loading the" and that name. pdf.js loads with the first imported PDF. The build targets
 current phone and laptop browsers (Chrome and Edge 111, Firefox 121, Safari 16.4; `build.target` in
 `apps/client/vite.config.ts`), the floor the stylesheets' `:has()` and `dvh` already set.
