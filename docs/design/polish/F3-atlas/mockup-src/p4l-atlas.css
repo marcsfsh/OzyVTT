@@ -1,0 +1,54 @@
+
+/* =========================================================================
+   F3 the Atlas, and the Downtime tab. Classes start with z-. Every part reuses a settled one: the Codex's frame, the
+   ring's glass (F story and people), A's menu and dialog, the side column's swap, the folders at the side, G's panes.
+   ========================================================================= */
+.z-map { position: absolute; overflow: hidden; background-color: #17221d; background-size: cover; background-position: center; }
+.z-pin { position: absolute; z-index: 2; display: grid; justify-items: center; gap: 4px; transform: translate(-50%, -100%); }
+.z-pin i { display: grid; place-items: center; width: var(--zs, 30px); height: var(--zs, 30px); box-sizing: border-box; border: 2px solid var(--zc); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: color-mix(in srgb, var(--zc) 22%, #0b0f14); box-shadow: 0 0 10px color-mix(in srgb, var(--zc) 55%, transparent); }
+.z-pin i svg { width: 58%; height: 58%; transform: rotate(45deg); fill: none; stroke: var(--zc); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.z-pin b { padding: 2px 6px; font: 600 12px/1.2 var(--f-label); color: #eef3f7; background: rgba(8, 11, 16, 0.72); white-space: nowrap; }
+.z-pin.hid i { border-style: dashed; }
+.z-pin.hid b { color: var(--violet-text); }
+.z-pin.on i { box-shadow: 0 0 0 4px color-mix(in srgb, var(--zc) 30%, transparent), 0 0 18px var(--zc); }
+.z-pin.party::after { content: ""; position: absolute; left: 50%; bottom: -10px; width: 10px; height: 10px; transform: translateX(-50%); background: var(--caution); box-shadow: 0 0 8px var(--caution); }
+.z-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 44px; padding: 0 8px; box-shadow: inset 0 -1px 0 var(--line); }
+.z-row b { display: block; font: 600 13.5px/1.2 var(--f-label); }
+.z-row small { display: block; margin-top: 2px; font-size: 12px; color: var(--text-dim); }
+.z-row.on { background: color-mix(in srgb, var(--cyan) 8%, transparent); box-shadow: inset 2px 0 0 var(--cyan), inset 0 -1px 0 var(--line); }
+.z-row.hid b { color: var(--violet-text); }
+.z-dot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--zc); background: color-mix(in srgb, var(--zc) 20%, transparent); }
+.z-dot svg { width: 12px; height: 12px; fill: none; stroke: var(--zc); stroke-width: 2.2; }
+.z-card { position: absolute; z-index: 4; width: 300px; box-sizing: border-box; display: grid; gap: 10px; padding: 14px 16px; }
+.z-card h3 { margin: 0; font: 600 18px/1.1 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase; }
+.z-crumbs { display: flex; align-items: center; gap: 6px; font: 600 13px/1 var(--f-label); color: var(--text-dim); white-space: nowrap; }
+.z-crumbs b { color: var(--text); }
+.z-crumbs svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
+.z-tree { display: grid; gap: 2px; }
+.z-tree .u-ri { min-height: 40px; }
+.z-sw { display: flex; gap: 6px; flex-wrap: wrap; }
+.z-sw i { width: 26px; height: 26px; box-sizing: border-box; border: 2px solid transparent; background: var(--zc); }
+.z-sw i.on { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg) inset; }
+.z-ic { display: inline-grid; place-items: center; width: 36px; height: 36px; box-shadow: inset 0 -1px 0 var(--line-raised); color: var(--text-dim); }
+.z-ic.on { color: var(--cyan-hi); box-shadow: inset 0 -2px 0 var(--cyan); }
+.z-ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.z-stack { position: relative; width: 220px; height: 150px; }
+.z-stack > div { position: absolute; width: 170px; height: 104px; border: 1px solid var(--line-strong); background-size: cover; background-position: center; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45); }
+.z-stack small { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; font: 600 11px/1.2 var(--f-label); color: #eef3f7; background: rgba(8, 11, 16, 0.75); }
+
+/* The Downtime tab. */
+.z-pc { display: grid; gap: 10px; align-content: start; padding: 14px 16px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.z-pc .big { font: 400 46px/1 var(--f-num); color: var(--cyan-hi); }
+.z-pc .big small { margin-left: 8px; font: 600 12px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.z-wait { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; border: 1px solid color-mix(in srgb, var(--caution) 45%, var(--line-strong)); box-shadow: inset 3px 0 0 var(--caution); font-size: 13px; }
+.z-led { display: grid; grid-template-columns: 110px minmax(0, 1fr) 70px minmax(0, 1.4fr) auto; align-items: center; gap: 12px; min-height: 48px; padding: 0 8px; box-shadow: inset 0 -1px 0 var(--line); font-size: 13.5px; }
+.z-led.h { min-height: 30px; font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.z-led.wait { background: color-mix(in srgb, var(--caution) 6%, transparent); box-shadow: inset 2px 0 0 var(--caution), inset 0 -1px 0 var(--line); }
+.z-cal { display: grid; grid-template-columns: 110px repeat(14, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.z-cal > span { position: relative; min-height: 46px; box-sizing: border-box; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); font: 400 15px/1 var(--f-num); color: var(--text-muted); padding: 4px 5px; }
+.z-cal > span.h { min-height: 30px; }
+.z-cal > span.who { display: flex; align-items: center; font: 600 13px/1.2 var(--f-label); color: var(--text); }
+.z-cal > span.today { background: color-mix(in srgb, var(--cyan) 8%, transparent); }
+.z-bar { position: absolute; left: 0; right: 0; top: 14px; height: 16px; background: color-mix(in srgb, var(--cyan) 35%, transparent); box-shadow: inset 0 1px 0 var(--cyan), inset 0 -1px 0 var(--cyan); }
+.z-bar.wait { background: color-mix(in srgb, var(--caution) 30%, transparent); box-shadow: inset 0 1px 0 var(--caution), inset 0 -1px 0 var(--caution); }
+.z-due { position: absolute; top: 2px; bottom: 2px; left: 50%; width: 2px; background: var(--caution); box-shadow: 0 0 8px color-mix(in srgb, var(--caution) 60%, transparent); }

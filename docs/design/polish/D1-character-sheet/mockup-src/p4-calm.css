@@ -1,0 +1,264 @@
+/* =========================================================================
+   Round 3 parts. One plate, one roll button, one table row and one heading, used by every layout. The horizon
+   appears only on the bar and under the chosen tab. Gold is hit points, blue is spell slots, cyan is proficiency.
+   ========================================================================= */
+.c3 { min-width: 0; border: 1px solid var(--line-strong); background: var(--glass-s1); }
+.c3-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 8px 12px 2px; }
+.c3-b { padding: 2px 12px 10px; }
+.c3.fill { display: flex; flex-direction: column; min-height: 0; }
+.c3.fill > .c3-b { flex: 1 1 auto; min-height: 0; overflow: auto; scrollbar-width: thin; }
+
+/* A bonus you can roll: tap it and the toast shows the roll */
+.rb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: none;
+  min-width: 46px;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--void) 70%, transparent);
+  color: var(--text);
+  font: 400 21px/1 var(--f-num);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rb:hover { border-color: var(--cyan); color: var(--cyan-hi); }
+.rb:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.rb.sm { min-width: 40px; height: 26px; font-size: 19px; }
+.rb.lg { min-width: 56px; height: 38px; font-size: 30px; }
+.rb.dmg { min-width: 0; font-size: 19px; }
+.rb.dmg small { font: 500 11px/1 var(--f-label); color: var(--text-muted); }
+.dc3 { display: inline-grid; justify-items: center; gap: 1px; min-width: 46px; }
+.dc3 small { font: 600 9px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.dc3 .sh-num { font-size: 20px; }
+.dim3 { display: inline-block; min-width: 46px; text-align: center; color: var(--text-muted); }
+.eff3 { font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+
+/* Abilities */
+.ab3 { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.ab3 > div { display: grid; justify-items: center; align-content: center; gap: 5px; min-width: 0; padding: 10px 4px; }
+.ab3 > div + div { border-left: 1px solid var(--line); }
+.ab3 .l { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 600 10px/1 var(--f-label); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.ab3 .sc { font: 400 17px/1 var(--f-num); color: var(--text-muted); }
+.ab3 .sv { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11px; color: var(--text-muted); }
+.ab3.grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ab3.grid > div:nth-child(3n + 1) { border-left: 0; }
+.ab3.grid > div:nth-child(n + 4) { border-top: 1px solid var(--line); }
+.ab3.col { grid-template-columns: minmax(0, 1fr); }
+.ab3.col > div + div { border-left: 0; border-top: 1px solid var(--line); }
+.ab3.col > div { padding-block: 9px; }
+.ab3.tight > div { padding: 8px 2px; gap: 4px; }
+.ab3.tight .rb.lg { min-width: 46px; height: 32px; font-size: 25px; }
+
+/* Stats in one plate, divided by lines */
+.sts3 { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.sts3 > div { display: grid; justify-items: center; align-content: center; gap: 6px; min-width: 0; padding: 10px 6px; text-align: center; }
+.sts3 > div + div { border-left: 1px solid var(--line); }
+.sts3 .l, .mv3 .l, .hpb3 .l { font: 600 10px/1.15 var(--f-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.sts3 .v { font: 400 30px/1 var(--f-num); }
+.sts3 .v small { font-size: 0.55em; color: var(--text-muted); }
+.sts3.left > div { justify-items: start; text-align: left; padding-inline: 12px; }
+
+.insp3 { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line-raised); background: var(--void); color: var(--text-on-neon); cursor: pointer; }
+.insp3 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: square; opacity: 0; }
+.insp3.on { border-color: var(--cyan); background: var(--cyan); }
+.insp3.on svg { opacity: 1; }
+.sh-chips .sh-chip { font-weight: 500; }
+.sh-chip .du3 { font: 400 16px/1 var(--f-num); color: var(--cyan-hi); }
+.hd3 { font-size: 13px; color: var(--text-muted); }
+.hd3 .sh-num { font-size: 22px; color: var(--text); }
+.rest3 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rest3.stack { grid-template-columns: 1fr; }
+.ds3 { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: start; gap: 6px 12px; font-size: 13px; color: var(--text-muted); }
+.ds3 .bx { display: inline-flex; gap: 5px; }
+.ds3 .bx i { width: 13px; height: 13px; box-shadow: inset 0 0 0 1px var(--line-raised); }
+
+/* Saves, skills and senses */
+.sks3.c2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 22px; }
+/* A skill or save is one row you tap to roll; the bonus lights on hover instead of sitting in its own box */
+.sk3 {
+  display: grid;
+  grid-template-columns: 10px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 4px 0 2px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: 400 14px/1.2 var(--f-label);
+  text-align: left;
+  cursor: pointer;
+}
+.sk3:hover { background: color-mix(in srgb, var(--s2) 55%, transparent); }
+.sk3:hover .b { color: var(--cyan-hi); }
+.sk3:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.sk3 .b { min-width: 30px; font: 400 21px/1 var(--f-num); text-align: right; }
+.sks3 > .sk3:first-child, .sks3 > div > .sk3:first-child { border-top: 0; }
+.sk3 .ab { font: 600 10px/1 var(--f-label); letter-spacing: 0.1em; color: var(--text-muted); }
+.sk3 .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sk3.is-prof .n { font-weight: 600; }
+.sv3 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 14px; }
+.sv3 .sk3 { grid-template-columns: 10px minmax(0, 1fr) auto; min-height: 32px; }
+.sv3 .sk3:nth-child(-n + 2) { border-top: 0; }
+.sn3 > div { display: flex; align-items: center; gap: 10px; min-height: 29px; border-top: 1px solid var(--line); font-size: 14px; }
+.sn3 > div:first-child { border-top: 0; }
+.sn3 .sh-num { min-width: 28px; font-size: 22px; text-align: center; }
+.sn3 .tx { color: var(--text-dim); }
+.c3 .sh-facts dt:first-of-type, .c3 .sh-facts dt:first-of-type + dd { border-top: 0; }
+.c3 .sh-facts dt, .c3 .sh-facts dd { padding-block: 6px; }
+
+/* Hit points, D&D Beyond's box */
+.hpb3 { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 14px; height: 100%; box-sizing: border-box; padding: 10px 14px 8px 10px; }
+.hpb3 .ed { display: grid; gap: 4px; }
+.hpb3 .ed .sh-btn { min-height: 26px; font-size: 12px; }
+.hpb3 .nm { display: grid; gap: 7px; min-width: 0; }
+.hpb3 .nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; text-align: center; }
+.hpb3 .nums > div { display: grid; gap: 4px; }
+.hpb3 .v { font: 400 36px/0.9 var(--f-num); }
+.hpb3 .v.cur { color: var(--hp-text); }
+.hpb3 .v.tmp { color: var(--text-muted); }
+.hpb3 .sh-life { height: 8px; }
+.hpb3 .cap { font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); text-align: center; }
+.amt3 {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 4px;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+  color: var(--text);
+  font: 400 20px/1 var(--f-num);
+  text-align: center;
+}
+.amt3:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.sh-btn.dmg { color: var(--danger-text); }
+
+/* Hit points, Foundry's sidebar */
+.hps3 { display: grid; gap: 8px; }
+.hps3 .top { display: flex; align-items: baseline; justify-content: space-between; }
+.hps3 .tmp { font-size: 12px; color: var(--text-muted); }
+.hps3 .tmp .sh-num { font-size: 18px; color: var(--text-dim); }
+.hps3 .big { display: flex; align-items: baseline; gap: 8px; }
+.hps3 .cur { font: 400 50px/0.8 var(--f-num); color: var(--hp-text); }
+.hps3 .max { font: 400 24px/1 var(--f-num); color: var(--text-muted); }
+.hps3 .sh-life { height: 12px; }
+.hps3 .row, .hpp3 .row, .mv3-ed { display: grid; grid-template-columns: 52px repeat(3, minmax(0, 1fr)); gap: 5px; }
+.hps3 .row .sh-btn, .hpp3 .row .sh-btn, .mv3-ed .sh-btn { min-height: 32px; padding: 0 4px; }
+
+/* Hit points, the printed sheet */
+.hpp3 { display: grid; gap: 6px; }
+.hpp3 .mx { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 6px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--text-muted); }
+.hpp3 .mx .sh-num { font-size: 22px; color: var(--text); }
+.hpp3 .cur { padding-top: 4px; font: 400 54px/0.85 var(--f-num); text-align: center; color: var(--hp-text); }
+.hpp3 .cap { font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); text-align: center; }
+.hpp3 .sh-life { height: 8px; margin-top: 4px; }
+
+/* The phone's pinned bar */
+.mv3 { position: sticky; top: 0; z-index: 3; padding: 10px 12px; background: var(--bg); }
+.mv3-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mv3-id .sh-port { width: 40px; height: 40px; border-width: 1px; }
+.mv3-id .nm { flex: 1 1 auto; min-width: 0; }
+.mv3-id .nm b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 18px/1.15 var(--f-display); letter-spacing: 0.03em; text-transform: uppercase; }
+.mv3-id .nm span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-dim); }
+.mv3-id .sh-btn { flex: none; min-height: 36px; padding: 0 10px; }
+.mv3-row { display: grid; grid-template-columns: 50px minmax(0, 1fr) 58px 54px; margin-top: 10px; }
+.mv3-row > * + * { border-left: 1px solid var(--line); }
+.mv3 .cell { display: grid; justify-items: center; align-content: center; gap: 5px; min-width: 0; padding: 7px 4px; }
+.mv3 .cell .v { font: 400 26px/0.9 var(--f-num); }
+.mv3 .cell.hp { justify-items: stretch; gap: 4px; padding: 7px 10px; border: 0; border-left: 1px solid var(--line); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.mv3 .cell.hp .l { display: flex; justify-content: space-between; }
+.mv3 .cell.hp .chg { color: var(--cyan-hi); letter-spacing: 0.04em; text-transform: none; font-size: 11px; }
+.mv3 .cell.hp[aria-expanded="true"] .chg { color: var(--text-muted); }
+.mv3 .hpn { display: flex; align-items: baseline; gap: 5px; }
+.mv3 .hpn .cur { font: 400 26px/0.9 var(--f-num); color: var(--hp-text); }
+.mv3 .hpn .max { font: 400 17px/1 var(--f-num); color: var(--text-muted); }
+.mv3 .hpn .tmp { margin-left: auto; font: 400 15px/1 var(--f-num); color: var(--text-muted); }
+.mv3 .sh-life { height: 6px; padding: 1px; gap: 1px; }
+.mv3-ed { margin-top: 8px; }
+.mv3-ed[hidden] { display: none; }
+.mt3 { position: sticky; top: var(--mv-h, 0px); z-index: 2; padding: 0 6px; background: var(--bg); }
+.mt3 .sh-tabs { gap: 0; }
+.mt3 .sh-tab { flex: 1 1 auto; padding: 0 6px; font-size: 14px; }
+.mc3 { display: grid; gap: 12px; padding: 12px 12px 28px; }
+.mc3 > .tp > .c3 + *, .mc3 > .tp > * + .c3 { margin-top: 12px; }
+
+/* Tables: one row for actions, spells and gear */
+.t3 { display: grid; }
+.t3-h, .t3-r { display: grid; grid-template-columns: var(--cols); align-items: center; column-gap: 12px; }
+.t3-h > * { white-space: nowrap; }
+.t3-h { padding: 0 4px 6px; border-bottom: 1px solid var(--line-strong); font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.t3-r { min-height: 50px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.t3-r:hover { background: color-mix(in srgb, var(--s2) 40%, transparent); }
+.t3 .nm { min-width: 0; }
+.t3 .nm b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 15px; }
+.t3 .nm span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-muted); }
+.t3 .nm .sh-tag { display: inline-grid; margin-left: 2px; }
+.t3 .c { font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+.t3 .r { justify-self: end; text-align: right; }
+.t3.acts { --cols: minmax(0, 1fr) 76px 52px 136px; }
+.t3.sps { --cols: minmax(0, 1fr) 34px 64px 52px 136px; }
+.t3.acts.n, .t3.sps.n { --cols: minmax(0, 1fr) 54px 92px; column-gap: 8px; }
+.t3.atk { --cols: minmax(0, 1fr) 64px 128px; }
+.t3.gr { --cols: minmax(0, 1fr) 36px 56px; }
+.t3.ft, .t3.lim { --cols: minmax(0, 1fr) auto; }
+.t3.ft .t3-r, .t3.lim .t3-r { min-height: 46px; }
+.t3.ft .nm span, .t3.lim .nm span { white-space: normal; }
+.uses3 { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.g3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 18px 4px 8px; }
+.tp > .g3:first-child, .c3-b > .g3:first-child { padding-top: 6px; }
+.std3 { margin: 0; padding: 8px 4px 0; font-size: 12.5px; color: var(--text-muted); }
+.att3 { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+.att3 .sh-num { font-size: 17px; color: var(--text-dim); }
+.sp3 { margin-bottom: 4px; }
+.sp3 > div { padding-block: 8px; }
+.sp3 .v { font-size: 26px; }
+.sh-coins.c3 { margin-bottom: 2px; }
+
+/* Spell slots: tap a box to use it, as on D&D Beyond */
+.sl3 { display: inline-flex; align-items: center; }
+.sl3 button { display: grid; place-items: center; width: 22px; height: 24px; padding: 0; border: 0; background: none; cursor: pointer; }
+.sl3 button i { display: block; width: 13px; height: 13px; background: var(--party); }
+.sl3 button.used i { background: transparent; box-shadow: inset 0 0 0 1px var(--line-raised); }
+.slotx { display: inline-flex; align-items: center; gap: 6px; font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+
+/* Features in brief, and notes */
+.ftb3 { display: grid; gap: 8px; }
+.ftb3 p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--text-dim); }
+.ftb3 b { font-weight: 600; color: var(--text); }
+.note3 { margin: 0; max-width: 62ch; font-size: 14px; color: var(--text-dim); }
+
+/* The roll toast, like the app's own toasts */
+.rt3 {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  bottom: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 20px;
+  width: 300px;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
+  padding: 10px 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  transform: translateX(-50%);
+}
+.rt3::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; background: var(--hz-paint); }
+.rt3[hidden] { display: none; }
+.rt3 .w { font: 600 11px/1.2 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.rt3 .d { font-size: 13px; color: var(--text-dim); }
+.rt3 .t { grid-row: 1 / span 2; grid-column: 2; font: 400 42px/1 var(--f-num); }
+.rt3.is-crit .t { color: var(--hp-text); }
+.ap.is-phone .rt3 { bottom: 78px; }
+.ab3.tight .sv { gap: 4px; font-size: 0; }
+.ab3.tight .sv .rb.sm { min-width: 34px; height: 24px; padding: 0 4px; font-size: 17px; }

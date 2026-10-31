@@ -1,0 +1,101 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; C, the table &middot; approved</p>
+  <h1>The table</h1>
+  <p>Approved. On a laptop the table is Two docks: the turn order as a Ladder in a dock at the left with the tools under it, the map in the middle and the panel on the right. A turn is taken through Cost tabs, and a phone shows one view at a time through a Switch. The switches still show the options that were compared; the chosen ones are marked. The map's menus, setting up an encounter, the log and dice come in later rounds, inside this frame.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; Workbench, laptop</span>
+      <div class="seg" role="group" aria-label="Workbench" id="d1-seg">
+        <button type="button" data-v="bench" aria-pressed="true">Bench</button>
+        <button type="button" data-v="float" aria-pressed="false">Float</button>
+        <button type="button" data-v="docks" aria-pressed="false">Two docks · chosen</button>
+        <button type="button" data-v="stage" aria-pressed="false">Stage</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; Turn order</span>
+      <div class="seg" role="group" aria-label="Turn order" id="d2-seg">
+        <button type="button" data-v="tiles" aria-pressed="true">Tiles</button>
+        <button type="button" data-v="faces" aria-pressed="false">Faces</button>
+        <button type="button" data-v="ladder" aria-pressed="false">Ladder · chosen</button>
+        <button type="button" data-v="ticker" aria-pressed="false">Ticker</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; The turn</span>
+      <div class="seg" role="group" aria-label="The turn" id="d3-seg">
+        <button type="button" data-v="card" aria-pressed="true">Card</button>
+        <button type="button" data-v="costs" aria-pressed="false">Cost tabs · chosen</button>
+        <button type="button" data-v="favs" aria-pressed="false">Favourites</button>
+        <button type="button" data-v="hotbar" aria-pressed="false">Hotbar</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; Phone table</span>
+      <div class="seg" role="group" aria-label="Phone table" id="d4-seg">
+        <button type="button" data-v="stack" aria-pressed="true">Stack</button>
+        <button type="button" data-v="sheet" aria-pressed="false">Map and sheet</button>
+        <button type="button" data-v="switch" aria-pressed="false">Switch · chosen</button>
+        <button type="button" data-v="split" aria-pressed="false">Split</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:0 1 150px"><span>Who</span>
+      <div class="seg" role="group" aria-label="Who" id="who-seg">
+        <button type="button" data-v="gm" aria-pressed="true">GM</button>
+        <button type="button" data-v="pl" aria-pressed="false">Player</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:1 1 420px"><span>Moment</span>
+      <div class="seg" role="group" aria-label="Moment" id="mo-seg">
+        <button type="button" data-v="lyra" aria-pressed="true">Lyra's turn</button>
+        <button type="button" data-v="boss" aria-pressed="false">Goblin Boss's turn</button>
+        <button type="button" data-v="prep" aria-pressed="false">Before the fight</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p>1280 by 800, shown to fit</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p>390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f during a fight on the Old road: Goblin Boss, Borin, Lyra, two Goblin Warriors and Mirena.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Proposed for every option</h2>
+    <p>These hold whichever options you pick; say if any should be a choice instead.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

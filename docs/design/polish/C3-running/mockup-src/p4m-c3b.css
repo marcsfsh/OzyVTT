@@ -1,0 +1,191 @@
+
+/* =========================================================================
+   C3 round 2. Every part here is a settled one, drawn to its spec: the Cradle (T 2.4), the open group (T 2.3), Base line
+   controls and fields (T 2.5), ready lines (E 3.2), the stat block (G 3.5), Settings' rows (I 2.2). Classes start
+   with q-.
+   ========================================================================= */
+
+/* The Cradle: no fill and no top, a 2 px base, sides that rise from it and fade before the top */
+.q-cr { position: relative; display: grid; gap: 0; padding: 0 14px 12px; }
+.q-cr::before { content: ""; position: absolute; inset: 6px 0 0; pointer-events: none; border: 1px solid transparent; border-top: 0; border-bottom-width: 2px; border-image: linear-gradient(to bottom, transparent, var(--line-raised) 55%) 1; }
+.q-cr.lit::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--cyan); box-shadow: var(--glow-on); }
+.q-cr + .q-cr, .q-og + .q-cr, .q-cr + .q-og { margin-top: 18px; }
+.q-h { display: flex; align-items: center; gap: 8px; min-height: 24px; font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.q-h .sp { flex: 1; }
+.q-h .tag { letter-spacing: 0.04em; }
+/* The open group: a heading and its content, a rule between one and the next */
+.q-og { display: grid; gap: 6px; }
+.q-og + .q-og { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-strong); }
+.q-line { font-size: 13px; color: var(--text-dim); }
+.q-line b { color: var(--text); font-weight: 600; }
+.q-mut { font-size: 12px; color: var(--text-muted); }
+
+/* Rows inside a box, divided by 1 px lines */
+.q-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 48px; box-shadow: inset 0 -1px 0 var(--line); }
+.q-row:last-child { box-shadow: none; }
+.q-row.compact { min-height: 40px; }
+.q-row .fc { width: 30px; height: 30px; font-size: 11px; }
+.q-row b { display: block; font: 600 13.5px/1.2 var(--f-label); }
+.q-row small { display: block; margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+.q-row .end { display: flex; align-items: center; gap: 6px; }
+.q-row.out { color: var(--text-muted); }
+.q-row.out b { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--line-raised); }
+
+/* Base line controls: a label on a 1 px base; chosen on 2 px cyan; danger in its red */
+.q-bl { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0 9px; font: 600 13px/1 var(--f-label); color: var(--text-dim); box-shadow: inset 0 -1px 0 var(--line-raised); white-space: nowrap; }
+.q-bl.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--cyan); }
+.q-bl.danger { color: var(--danger-text); }
+.q-bl.hid { color: var(--violet-text); box-shadow: inset 0 -2px 0 var(--violet); }
+.q-bl svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.q-bl b { font: 400 17px/1 var(--f-num); }
+.q-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.q-chk { display: inline-grid; place-items: center; width: 22px; height: 22px; box-sizing: border-box; border: 1px solid var(--line-raised); }
+.q-chk.on { border-color: var(--cyan); background: var(--cyan); color: var(--text-on-neon); }
+.q-chk svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.6; }
+/* Fields keep their box */
+.q-fld { display: inline-flex; align-items: center; gap: 6px; height: 38px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--line-raised); background: var(--void); font: 500 13.5px/1 var(--f-label); color: var(--text); }
+.q-fld.num { justify-content: center; width: 64px; font: 400 22px/1 var(--f-num); }
+.q-fld.hint { color: var(--text-muted); }
+.q-fld svg { width: 15px; height: 15px; fill: none; stroke: var(--text-dim); stroke-width: 1.8; }
+
+/* Ready lines (E 3.2): a lamp, the line, Change */
+.q-ready { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 48px; box-shadow: inset 0 -1px 0 var(--line); }
+.q-ready:last-child { box-shadow: none; }
+.q-ready i { width: 9px; height: 9px; background: var(--cyan); box-shadow: var(--glow-lamp-reaction); }
+.q-ready i.amber { background: var(--caution); box-shadow: 0 0 8px color-mix(in srgb, var(--caution) 60%, transparent); }
+.q-ready b { display: block; font: 600 13.5px/1.2 var(--f-label); }
+.q-ready small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-dim); }
+.q-ready.open { box-shadow: none; }
+.q-open { display: grid; gap: 8px; padding: 2px 0 12px 19px; box-shadow: inset 0 -1px 0 var(--line); }
+
+/* The difficulty, as the encounter's page says it */
+.q-diff { display: grid; gap: 6px; }
+.q-meter { position: relative; height: 6px; background: var(--s3); }
+.q-meter i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--hp, var(--caution)); }
+.q-meter u { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--line-raised); }
+.q-diff .marks { display: flex; justify-content: space-between; font: 400 14px/1 var(--f-num); color: var(--text-muted); }
+
+/* The order in the dock, with its choices in place */
+.q-dockrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; align-items: center; gap: 3px 8px; min-height: 52px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.q-dockrow .fc { grid-row: 1 / span 2; width: 30px; height: 30px; font-size: 11px; }
+.q-dockrow b { font: 600 13px/1.15 var(--f-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-dockrow .opts { grid-column: 2 / span 2; display: flex; gap: 4px; flex-wrap: wrap; }
+.q-dockrow .opts .q-bl { min-height: 24px; padding: 0 5px; font-size: 11px; }
+.q-dockrow .q-chk { grid-row: 1; grid-column: 3; }
+.q-dockrow.chosen { background: color-mix(in srgb, var(--cyan) 8%, transparent); box-shadow: inset 2px 0 0 var(--cyan); }
+
+/* A creature's tools */
+.q-head { display: flex; align-items: center; gap: 12px; }
+.q-head .fc { width: 44px; height: 44px; font-size: 15px; }
+.q-head h3 { margin: 0; font: 600 20px/1.05 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; }
+.q-head p { margin: 3px 0 0; font-size: 12.5px; color: var(--text-muted); }
+.q-head .hp { margin-left: auto; text-align: right; }
+.q-head .hp b { display: block; font: 400 26px/1 var(--f-num); color: var(--hp-text); }
+.q-head .hp span { font-size: 11px; color: var(--text-muted); }
+.q-hp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 8px; }
+.q-hpbar { height: 5px; background: var(--s3); margin-top: 8px; }
+.q-hpbar i { display: block; height: 100%; background: var(--hostile); }
+.q-cond { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; }
+.q-pop { position: absolute; z-index: 7; width: 340px; box-sizing: border-box; padding: 14px 16px; border: 1px solid var(--line-strong); background: var(--bg); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); display: grid; gap: 12px; }
+.q-pop::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.q-step { display: inline-flex; align-items: stretch; height: 32px; border: 1px solid var(--line-raised); background: var(--void); }
+.q-step span { display: grid; place-items: center; width: 30px; color: var(--text-dim); font-size: 16px; }
+.q-step b { display: grid; place-items: center; min-width: 40px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); font: 400 19px/1 var(--f-num); color: var(--hp-text); }
+
+/* The sheet and the menu */
+.q-sheet { position: absolute; z-index: 6; left: 0; right: 0; bottom: 0; top: 44px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--bg); border-top: 2px solid transparent; border-image: var(--grad-horizon) 1; box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.45); }
+.q-sheet .qs-h { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--line); }
+.q-sheet .qs-h b { flex: 1; font: 600 20px/1 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase; }
+.q-sheet .qs-b { overflow: hidden; padding: 12px 16px; display: grid; align-content: start; gap: 0; }
+.q-sheet .qs-f { padding: 10px 16px 12px; border-top: 1px solid var(--line-strong); display: flex; gap: 8px; justify-content: space-between; }
+.q-menu { position: absolute; z-index: 7; width: 330px; box-sizing: border-box; padding: 6px 0; border: 1px solid var(--line-strong); background: var(--bg); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); }
+.q-menu::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.q-mh { padding: 10px 16px 4px; font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.q-mi { display: flex; align-items: center; gap: 10px; box-sizing: border-box; min-height: 48px; padding: 0 16px; font: 600 13.5px/1.2 var(--f-label); color: var(--text); }
+.q-mi .end { margin-left: auto; font-weight: 500; color: var(--text-dim); font-size: 12.5px; }
+.q-mi.danger { color: var(--danger-text); border-top: 1px solid var(--line); }
+.q-mi svg { width: 16px; height: 16px; fill: none; stroke: var(--text-dim); stroke-width: 1.8; }
+.q-srow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px 0; box-shadow: inset 0 -1px 0 var(--line); }
+.q-srow:last-child { box-shadow: none; }
+.q-srow b { font: 600 13.5px/1.2 var(--f-label); }
+.q-srow small { font-size: 12px; color: var(--text-dim); }
+.q-srow.side { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+
+/* Adding monsters: G's list rows, filters and stat block */
+.q-dlg { position: absolute; z-index: 8; box-sizing: border-box; border: 1px solid var(--line-strong); background: var(--bg); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.q-dlg::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.q-dlg .dh { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 10px 0 18px; border-bottom: 1px solid var(--line); }
+.q-dlg .dh b { flex: 1; font: 600 20px/1 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase; }
+.q-dlg .df { display: flex; align-items: center; gap: 10px; padding: 10px 18px 12px; border-top: 1px solid var(--line-strong); }
+.q-scrim { position: absolute; inset: 0; z-index: 7; background: color-mix(in srgb, var(--void) 62%, transparent); }
+.q-mrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 46px; padding: 0 10px; box-shadow: inset 0 -1px 0 var(--line); }
+.q-mrow b { display: block; font: 600 13.5px/1.2 var(--f-label); }
+.q-mrow small { display: block; margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+.q-mrow .cr { font: 400 18px/1 var(--f-num); color: var(--text-dim); }
+.q-mrow.on { background: color-mix(in srgb, var(--cyan) 8%, transparent); box-shadow: inset 2px 0 0 var(--cyan), inset 0 -1px 0 var(--line); }
+.q-panes { display: grid; grid-template-columns: 220px 300px minmax(0, 1fr); min-height: 0; }
+.q-panes > * { min-height: 0; overflow: hidden; border-right: 1px solid var(--line-strong); }
+.q-panes > :last-child { border-right: 0; }
+.q-fpane { padding: 12px 14px; display: grid; align-content: start; gap: 10px; }
+.q-facet { display: grid; gap: 2px; }
+.q-fo { display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 13px; color: var(--text-dim); }
+.q-fo .q-chk { width: 16px; height: 16px; }
+.q-fo .q-chk svg { width: 11px; height: 11px; }
+.q-fo span:last-child { margin-left: auto; font: 400 15px/1 var(--f-num); color: var(--text-muted); }
+.q-fo.on { color: var(--text); }
+/* The stat block (G 3.5): the SRD's order, the name in capitals, the abilities as cells, section heads over magenta */
+.q-sb { display: grid; gap: 6px; padding: 14px 18px; font-size: 13px; color: var(--text-dim); overflow: hidden; }
+.q-sb h3 { margin: 0; font: 600 20px/1.1 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text); }
+.q-sb .ty { font-style: italic; font-size: 12.5px; }
+.q-sb .hr { height: 2px; background: var(--magenta); opacity: 0.7; }
+.q-sb .ln b { color: var(--text); margin-right: 6px; }
+.q-sb .ab { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border: 1px solid var(--line); }
+.q-sb .ab div { display: grid; justify-items: center; gap: 2px; padding: 5px 0; border-right: 1px solid var(--line); }
+.q-sb .ab div:last-child { border-right: 0; }
+.q-sb .ab small { font: 600 10px/1 var(--f-label); letter-spacing: 0.1em; color: var(--text-muted); }
+.q-sb .ab b { font: 400 18px/1 var(--f-num); color: var(--text); }
+.q-sb h4 { margin: 6px 0 0; padding-bottom: 3px; border-bottom: 1px solid var(--magenta); font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text); }
+.q-sb p { margin: 0; }
+.q-sb p b { color: var(--text); font-style: italic; }
+
+/* The prompts' own controls inside a card */
+.q-rollrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 52px; padding: 0 12px; margin: 2px 0; background: color-mix(in srgb, var(--cyan) 6%, transparent); box-shadow: inset 0 -2px 0 var(--cyan); }
+.q-rollrow b { display: block; font: 600 13.5px/1.2 var(--f-label); }
+.q-rollrow small { display: block; font-size: 12px; color: var(--text-dim); }
+.q-rollrow .n { font: 400 32px/1 var(--f-num); color: var(--text); }
+.q-res { display: flex; align-items: baseline; gap: 10px; font-size: 13px; color: var(--text-dim); }
+.q-res .n { font: 400 30px/1 var(--f-num); color: var(--text); }
+.q-res .ok { font: 600 12px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan-hi); }
+.q-pips { display: inline-flex; gap: 4px; }
+.q-pips i { width: 11px; height: 11px; box-sizing: border-box; border: 1px solid var(--line-raised); }
+.q-pips i.s { background: var(--cyan); border-color: var(--cyan); box-shadow: var(--glow-lamp-reaction); }
+.q-pips i.f { background: var(--hostile); border-color: var(--hostile); }
+.q-dying { display: flex; align-items: center; gap: 14px; font: 600 11px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--danger-text); }
+.q-dying span { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); }
+.q-more { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+.q-card { position: relative; display: grid; gap: 8px; padding: 10px 12px 12px 14px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.q-card::before { content: ""; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 3px; background: var(--caution); }
+.q-card.danger::before { background: var(--hostile); }
+.q-card .t { display: flex; align-items: center; gap: 8px; font: 600 14px/1.25 var(--f-label); }
+.q-card .t .fc { width: 22px; height: 22px; font-size: 10px; }
+.q-card .l { font-size: 12.5px; color: var(--text-dim); }
+.q-fold { display: inline-flex; align-items: center; gap: 4px; font: 600 12.5px/1 var(--f-label); color: var(--text-dim); }
+.q-fold svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+/* The carried-in list on the page */
+.carried { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px 24px; margin-top: 12px; }
+.carried div { padding-top: 10px; border-top: 1px solid var(--line-strong); }
+.carried h3 { margin: 0 0 4px; font: 600 14px/1.2 var(--f-label); }
+.carried p { margin: 0; font-size: 13.5px; color: var(--text-dim); }
+.carried .from { font: 400 15px/1 var(--f-num); color: var(--text-muted); margin-left: 6px; }
+/* A chosen creature: cyan, as chosen reads everywhere (T rule 9) */
+.c-ent.q-chosenrow { background: color-mix(in srgb, var(--cyan) 9%, transparent); box-shadow: inset 2px 0 0 var(--cyan); }
+.ttok.q-chosen { box-shadow: 0 0 0 3px var(--void), 0 0 0 5px var(--cyan), 0 0 16px var(--cyan); }
+.q-dockopen { padding: 10px 10px 12px; border-bottom: 1px solid var(--line-strong); background: color-mix(in srgb, var(--cyan) 4%, transparent); }
+.q-pop .q-srow.side, .q-dockopen .q-srow.side { grid-template-columns: minmax(0, 1fr); }
+.q-srow > span > b, .q-srow > span > small { display: block; }
+
+/* A menu about one thing opens with its name in display capitals and its line, as the map's menus do. */
+.q-mt { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 16px 6px; }
+.q-mt b { font: 600 15px/1.2 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text); }
+.q-mt span { font-size: 12px; color: var(--text-muted); }

@@ -1,0 +1,150 @@
+
+/* =========================================================================
+   Sound and the screen, round 1. Classes start with w-. Every part reuses a settled one: H's Table screen page and
+   its bar, cards and picture in picture, E's workbench, Base line controls and switches, A's menu and dialog, the
+   folders at the side (E2), G's panes, F's preview line.
+   ========================================================================= */
+.carried { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px 24px; margin-top: 12px; }
+.carried div { padding-top: 10px; border-top: 1px solid var(--line-strong); }
+.carried h3 { margin: 0 0 4px; font: 600 14px/1.2 var(--f-label); }
+.carried p { margin: 0; font-size: 13.5px; color: var(--text-dim); }
+.carried .from { font: 400 15px/1 var(--f-num); color: var(--text-muted); margin-left: 6px; }
+
+.w-page { position: absolute; inset: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
+.w-body { min-height: 0; overflow: hidden; }
+.w-h { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+.w-h .e-eb { flex: 1; }
+.w-h svg { width: 15px; height: 15px; fill: none; stroke: var(--text-dim); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.w-sec { display: grid; align-content: start; gap: 0; }
+.w-hint { margin: 0 0 6px; font-size: 12.5px; color: var(--text-muted); }
+
+/* A sound's row: play, its name and length, its level, its tools. */
+.w-row { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr) 150px auto; align-items: center; gap: 10px; min-height: 50px; padding: 0 8px 0 4px; box-shadow: inset 0 -1px 0 var(--line); }
+.w-row b { display: block; font: 600 14px/1.2 var(--f-label); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-row small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.w-row small .n { font: 400 15px/1 var(--f-num); color: var(--text-dim); }
+.w-row.on { background: color-mix(in srgb, var(--cyan) 7%, transparent); box-shadow: inset 2px 0 0 var(--cyan), inset 0 -1px 0 var(--line); }
+.w-row.on small { color: var(--cyan-hi); }
+.w-row .w-tools { display: flex; gap: 4px; }
+.w-row .e-ico { width: 36px; height: 36px; }
+.w-row.lib { grid-template-columns: minmax(0, 1fr) auto; }
+.w-row.lay { grid-template-columns: 40px minmax(0, 1fr) 150px auto; }
+.w-play { display: inline-grid; place-items: center; width: 36px; height: 36px; color: var(--text-dim); box-shadow: inset 0 -1px 0 var(--line-raised); }
+.w-play svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.w-row.on .w-play { color: var(--cyan-hi); }
+
+/* A level: a Base line track, the cyan fill, a square thumb and the value in VT323. */
+.w-lvl { display: grid; grid-template-columns: minmax(0, 1fr) 30px; align-items: center; gap: 8px; }
+.w-lvl .t { position: relative; height: 3px; background: var(--line-raised); }
+.w-lvl .t i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--cyan); }
+.w-lvl .t b { position: absolute; top: 50%; width: 12px; height: 12px; transform: translate(-50%, -50%); background: var(--text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 35%, transparent); }
+.w-lvl > span { font: 400 15px/1 var(--f-num); color: var(--text-dim); text-align: right; }
+
+/* Effects as pads. */
+.w-pads { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.w-pad { position: relative; display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.w-pad b { display: flex; align-items: center; gap: 8px; font: 600 14px/1.2 var(--f-label); }
+.w-pad b svg { width: 14px; height: 14px; fill: none; stroke: var(--cyan); stroke-width: 2; stroke-linejoin: round; flex: none; }
+.w-pad .k { position: absolute; top: 8px; right: 10px; font: 400 16px/1 var(--f-num); color: var(--text-muted); }
+.w-pad.fired { border-color: var(--cyan); box-shadow: 0 0 14px color-mix(in srgb, var(--cyan) 30%, transparent); }
+.w-pad.sq { aspect-ratio: 1 / 0.72; align-content: space-between; }
+
+/* The mixing desk's strips. */
+.w-desk { display: flex; gap: 10px; align-items: stretch; }
+.w-strip { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; justify-items: center; gap: 8px; width: 96px; padding: 10px 6px 10px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.w-strip.master { border-color: var(--line-raised); }
+.w-strip .e-eb { font-size: 10px; text-align: center; }
+.w-strip b { font: 600 12.5px/1.2 var(--f-label); text-align: center; min-height: 30px; }
+.w-fader { position: relative; width: 4px; height: 100%; min-height: 120px; background: var(--line-raised); }
+.w-fader i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--cyan); }
+.w-fader b { position: absolute; left: 50%; width: 26px; height: 12px; min-height: 0; transform: translate(-50%, 50%); background: var(--text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 35%, transparent); }
+.w-strip .v { font: 400 18px/1 var(--f-num); color: var(--text-dim); }
+.w-strip.on .v { color: var(--cyan-hi); }
+.w-strip .e-sw i { width: 48px; height: 28px; }
+.w-strip .e-sw i::after { width: 18px; height: 18px; }
+.w-strip .e-sw.on i::after { left: 23px; }
+
+/* What is playing. */
+.w-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 24px; border-bottom: 1px solid var(--line); }
+.w-now { display: flex; align-items: baseline; gap: 8px; min-width: 0; font: 600 15px/1.2 var(--f-label); white-space: nowrap; }
+.w-now small { font: 500 13px/1 var(--f-body, inherit); color: var(--text-dim); }
+.w-vcr { display: inline-grid; grid-template-columns: auto auto; align-items: baseline; gap: 2px 12px; padding: 6px 12px; border: 1px solid var(--line-strong); background: var(--void); }
+.w-vcr small { font: 400 15px/1 var(--f-num); color: var(--cyan-hi); letter-spacing: 0.08em; }
+.w-vcr b { font: 400 26px/1 var(--f-num); color: var(--cyan-hi); letter-spacing: 0.06em; text-shadow: 0 0 10px color-mix(in srgb, var(--cyan) 45%, transparent); }
+.w-prog { position: relative; height: 3px; background: var(--line-raised); }
+.w-prog i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.w-np { display: grid; align-content: start; gap: 12px; padding: 16px 18px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.w-np h3 { margin: 0; font: 600 22px/1.1 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; }
+.w-np .t { display: flex; justify-content: space-between; font: 400 16px/1 var(--f-num); color: var(--text-dim); }
+.w-foot { display: flex; align-items: center; gap: 14px; padding: 10px 24px; border-top: 1px solid var(--line-strong); background: var(--glass-bg); }
+.w-room { display: inline-flex; align-items: center; gap: 8px; font: 600 13px/1 var(--f-label); color: var(--text-dim); white-space: nowrap; }
+.w-room i { width: 9px; height: 9px; background: var(--cyan); box-shadow: var(--glow-lamp-reaction); }
+.w-room i.wait { background: var(--caution); box-shadow: 0 0 8px color-mix(in srgb, var(--caution) 70%, transparent); }
+.w-badge { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; font: 600 12px/1 var(--f-label); color: var(--text-dim); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.w-badge svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+/* The side list (E2's folders). */
+.w-rail { display: grid; align-content: start; gap: 2px; padding: 14px 0 14px 14px; border-right: 1px solid var(--line-strong); overflow: hidden; }
+.w-rail .e-eb { padding: 12px 12px 6px; }
+.w-ri { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px; font: 600 13.5px/1.2 var(--f-label); color: var(--text-dim); }
+.w-ri .n { margin-left: auto; font: 400 16px/1 var(--f-num); color: var(--text-muted); }
+.w-ri.on { color: var(--text); background: color-mix(in srgb, var(--cyan) 8%, transparent); box-shadow: inset 2px 0 0 var(--cyan); }
+.w-ri svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; flex: none; }
+.w-ri .e-lamp { margin-left: 2px; }
+
+/* A's menu and dialog. */
+.w-menu { position: absolute; z-index: 7; width: 270px; box-sizing: border-box; padding: 6px 0; border: 1px solid var(--line-strong); background: var(--bg); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); }
+.w-menu::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.w-mh { padding: 10px 16px 4px; font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.w-mi { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 16px; font: 600 13.5px/1.2 var(--f-label); color: var(--text); }
+.w-mi .end { margin-left: auto; font-weight: 500; font-size: 12.5px; color: var(--text-dim); }
+.w-mi.on { color: var(--cyan-hi); }
+.w-mi.danger { color: var(--danger, #ff5a6e); }
+.w-mi svg { width: 15px; height: 15px; fill: none; stroke: var(--text-dim); stroke-width: 1.8; flex: none; }
+.w-sep { height: 1px; margin: 6px 0; background: var(--line); }
+.w-pick { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; box-shadow: inset 0 -1px 0 var(--line); }
+.w-pick b { display: block; font: 600 14px/1.2 var(--f-label); }
+.w-pick small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-muted); }
+.w-pick.on { background: color-mix(in srgb, var(--cyan) 7%, transparent); }
+.w-dfoot { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line-strong); }
+
+/* Dragging a sound onto the board. */
+.w-drop { outline: 2px dashed color-mix(in srgb, var(--cyan) 75%, transparent); outline-offset: 4px; background: color-mix(in srgb, var(--cyan) 6%, transparent); }
+.w-ghost { position: absolute; z-index: 7; display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 10px; width: 260px; min-height: 46px; padding: 0 12px; border: 1px solid var(--cyan); background: var(--bg); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 14px color-mix(in srgb, var(--cyan) 30%, transparent); transform: rotate(-2deg); }
+.w-ghost b { font: 600 14px/1.2 var(--f-label); }
+.w-grip { width: 10px; height: 18px; background-image: radial-gradient(var(--text-muted) 1.2px, transparent 1.4px); background-size: 5px 6px; }
+
+/* An encounter's sound. */
+.w-enc { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 12px; min-height: 58px; padding: 6px 4px; box-shadow: inset 0 -1px 0 var(--line); }
+.w-enc b { display: flex; align-items: center; gap: 8px; font: 600 14px/1.2 var(--f-label); }
+.w-enc small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--text-muted); }
+.w-enc .acts { display: flex; align-items: center; gap: 8px; }
+.w-swl { display: inline-flex; align-items: center; gap: 8px; font: 600 12.5px/1 var(--f-label); color: var(--text-dim); white-space: nowrap; }
+.w-chipe { display: grid; gap: 4px; min-width: 210px; padding: 8px 12px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.w-chipe b { display: flex; align-items: center; gap: 8px; font: 600 13.5px/1.2 var(--f-label); white-space: nowrap; }
+.w-chipe small { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.w-chipe.on { border-color: var(--cyan); }
+.w-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+
+/* Seeing an encounter as the table screen. */
+.w-pvline { display: flex; align-items: center; gap: 10px; padding: 7px 18px; border-bottom: 1px solid color-mix(in srgb, var(--cyan) 55%, transparent); background: color-mix(in srgb, var(--cyan) 8%, var(--bg)); font: 600 13px/1.3 var(--f-label); color: var(--cyan-hi); }
+.w-pvline .e-grow { flex: 1; }
+.w-screen { position: absolute; overflow: hidden; background: var(--void); }
+.w-screen > .h-thumb { border: 0; }
+.w-corners i { position: absolute; z-index: 2; width: 22px; height: 22px; border-color: var(--cyan); border-style: solid; opacity: 0.8; }
+
+/* The Playing bar, as approved: the lamp, the track, the scrubber, three icon buttons and Master. */
+.w-bar.ph { display: grid; gap: 8px; padding: 10px 12px; }
+.w-bar .w-now { flex: none; }
+.w-scrub { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; flex: 1 1 300px; max-width: 460px; }
+.w-scrub .n { font: 400 16px/1 var(--f-num); color: var(--text-dim); }
+.w-scrub .t, .w-vol .t { position: relative; height: 3px; background: var(--line-raised); }
+.w-scrub .t i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--cyan); }
+.w-scrub .t b { position: absolute; top: 50%; width: 12px; height: 12px; transform: translate(-50%, -50%); background: var(--text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 35%, transparent); }
+.w-ctl { display: inline-flex; gap: 6px; margin-left: auto; }
+.w-bar.ph .w-ctl { margin-left: 0; }
+.w-ctl .e-ico { width: 40px; height: 40px; }
+.w-bar.ph .w-ctl .e-ico { width: 44px; height: 44px; }
+.w-vol { display: inline-grid; grid-template-columns: 18px 130px; align-items: center; gap: 8px; color: var(--text-dim); }
+.w-bar.ph .w-vol { flex: 1; grid-template-columns: 18px minmax(0, 1fr); }
+.w-vol svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }

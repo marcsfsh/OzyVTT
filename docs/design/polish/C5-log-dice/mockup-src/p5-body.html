@@ -1,0 +1,123 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; C5, log and dice &middot; approved</p>
+  <h1>Log and dice</h1>
+  <p>Approved after one round. The log is one line per entry, and pressing a roll's line opens it as a card in place; who hears it leads the composer's row, with the dice under it; the dice options are a sheet over the panel; and the GM calls for a roll from the waiting list's head, the open call waiting there as a card with each answer. Every part is one already settled (Carried in). The switches still show the options that were compared; the chosen ones are marked. On a phone, the bar at the top switches pages and options, and the laptop view opens close up: swipe it sideways.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; The log</span>
+      <div class="seg" role="group" aria-label="The log" id="l1-seg">
+        <button type="button" data-v="list" aria-pressed="false">One list</button>
+        <button type="button" data-v="turns" aria-pressed="false">By turn</button>
+        <button type="button" data-v="lines" aria-pressed="true">One line each · chosen</button>
+        <button type="button" data-v="latest" aria-pressed="false">Latest roll on top</button>
+        <button type="button" data-v="filter" aria-pressed="false">With filters</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; One roll in the log</span>
+      <div class="seg" role="group" aria-label="One roll in the log" id="l2-seg">
+        <button type="button" data-v="card" aria-pressed="true">Card · chosen</button>
+        <button type="button" data-v="row" aria-pressed="false">Row</button>
+        <button type="button" data-v="tv" aria-pressed="false">As the TV shows it</button>
+        <button type="button" data-v="dice" aria-pressed="false">Dice first</button>
+        <button type="button" data-v="first" aria-pressed="false">Total first</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; Saying and rolling</span>
+      <div class="seg" role="group" aria-label="Saying and rolling" id="l3-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today's composer</button>
+        <button type="button" data-v="line" aria-pressed="true">Field first · chosen</button>
+        <button type="button" data-v="switch" aria-pressed="false">Say or Roll</button>
+        <button type="button" data-v="tray" aria-pressed="false">The tray in place</button>
+        <button type="button" data-v="ondemand" aria-pressed="false">Dice on demand</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; The dice options</span>
+      <div class="seg" role="group" aria-label="The dice options" id="l4-seg">
+        <button type="button" data-v="dialog" aria-pressed="false">The dialog</button>
+        <button type="button" data-v="sheet" aria-pressed="true">A sheet over the panel · chosen</button>
+        <button type="button" data-v="panes" aria-pressed="false">Two panes</button>
+        <button type="button" data-v="inplace" aria-pressed="false">In place</button>
+        <button type="button" data-v="recent" aria-pressed="false">Recent rolls first</button>
+      </div>
+    </div>
+    <div class="ctl"><span>5 &middot; Calling for a roll</span>
+      <div class="seg" role="group" aria-label="Calling for a roll" id="l5-seg">
+        <button type="button" data-v="mode" aria-pressed="false">In the dice options</button>
+        <button type="button" data-v="menu" aria-pressed="false">In the encounter's menu</button>
+        <button type="button" data-v="list" aria-pressed="true">From the waiting list · chosen</button>
+        <button type="button" data-v="party" aria-pressed="false">From the Party tab</button>
+        <button type="button" data-v="composer" aria-pressed="false">Beside the composer</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="log" aria-pressed="true">The log</button>
+        <button type="button" data-v="roll" aria-pressed="false">Its rolls</button>
+        <button type="button" data-v="compose" aria-pressed="false">Saying and whispering</button>
+        <button type="button" data-v="dice" aria-pressed="false">The dice options</button>
+        <button type="button" data-v="call" aria-pressed="false">Calling for a roll</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="spec" aria-labelledby="carried-h" style="margin-top:0">
+    <h2 id="carried-h">Carried in</h2>
+    <p>Every option on this page is built only from what is already settled. Nothing here picks a new look; the options differ in where things sit and how they are arranged.</p>
+    <div class="carried" id="carried"></div>
+  </section>
+
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only" id="sz-laptop">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p id="sz-phone">390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+      <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f in round 1 on the old road: the GM's Log tab, Dice options, Call for a roll, and a player's roll call and Log on a phone.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for the log and dice</h2>
+    <p>These hold across the log and dice, at the table and on the sheet.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

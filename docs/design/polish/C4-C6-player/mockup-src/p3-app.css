@@ -1,0 +1,289 @@
+
+/* =========================================================================
+   The app inside each frame: the top bar on its horizon, the pane, a phone's bottom tabs, and the Table panel's
+   own strip. Sizes are the app's own (56 px bar, 64 px bottom tabs, a 392 px Table panel).
+   ========================================================================= */
+.frame { font: 400 15px/1.45 var(--f-label); color: var(--text); }
+.ap {
+  box-sizing: border-box;
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--sky);
+  background-color: var(--ground);
+}
+.ap.is-phone { grid-template-rows: auto minmax(0, 1fr) auto; }
+.ap-bar {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  height: 56px;
+  padding: 0 12px 0 18px;
+  background: var(--glass-bg);
+}
+.ap.is-phone .ap-bar { height: 48px; padding: 0 6px 0 12px; }
+.ap-bar::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.wm { display: inline-flex; align-items: baseline; user-select: none; }
+.wm-ozy { font: 400 21px/1 var(--f-chrome); background: var(--grad-chrome); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: var(--chrome-split); }
+.wm-vtt { margin-left: -2px; font: 400 24px/1 var(--f-script); color: #ff5fae; text-shadow: 0 0 8px rgba(255, 47, 146, 0.7); }
+.ap.is-phone .wm-ozy { font-size: 18px; }
+.ap.is-phone .wm-vtt { font-size: 21px; }
+.ap-nav { display: flex; align-self: stretch; }
+.ap-nav span { position: relative; display: grid; place-items: center; padding: 0 14px; font: 600 15px/1 var(--f-label); color: var(--text-dim); }
+.ap-nav span.on { color: var(--cyan-hi); }
+.ap-nav span.on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 3px;
+  background: var(--grad-horizon) var(--win-x, 0) 0 / var(--win-w, 100%) 100% no-repeat;
+  filter: var(--ink-bright);
+}
+.ap-end { margin-left: auto; display: flex; align-items: center; gap: 4px; color: var(--text-dim); }
+.ap-who { display: inline-flex; align-items: center; gap: 8px; padding: 0 10px 0 4px; font: 600 14px/1 var(--f-label); color: var(--text); }
+.ap-who .sh-port { width: 26px; height: 26px; border-width: 1px; }
+.ico { display: grid; place-items: center; width: 40px; height: 40px; color: var(--text-dim); }
+.ico svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ap-pane { position: relative; min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong)) transparent; }
+.ap-pane.is-cols { overflow: hidden; }
+.ap-bottom {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: 64px;
+  border-top: 1px solid var(--line-strong);
+  background: var(--glass-bg);
+}
+.ap-bottom span { position: relative; display: grid; place-items: center; align-content: center; gap: 4px; font: 600 12px/1 var(--f-label); color: var(--text-dim); }
+.ap-bottom span svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ap-bottom span.on { color: var(--cyan-hi); }
+.ap-bottom span.on::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -1px;
+  height: 2px;
+  background: var(--hz-paint);
+  box-shadow: var(--ink-glow);
+}
+.ap-bottom span.on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1px;
+  height: 18px;
+  background: var(--hz-paint);
+  opacity: var(--ink-cast);
+  -webkit-mask-image: radial-gradient(50% 100% at 50% 0, #000 25%, transparent 100%);
+  mask-image: radial-gradient(50% 100% at 50% 0, #000 25%, transparent 100%);
+}
+/* The Table panel: its own strip on top (Me, Log, Party), then the sheet. A sliver of map at the left. */
+.ap.is-panel { grid-template-rows: auto minmax(0, 1fr); border-left: 6px solid #0b0d18; }
+.ap-paneltabs { padding: 6px 10px 0; background: var(--glass-bg); }
+
+/* =========================================================================
+   The sheet's parts. One set of parts; the layouts below only arrange them.
+   ========================================================================= */
+.sh-eb { margin: 0; font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.sh-num { font-family: var(--f-num); font-weight: 400; line-height: 1; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.sh-name { margin: 0; font: 600 26px/1.05 var(--f-display); letter-spacing: 0.03em; text-transform: uppercase; overflow-wrap: anywhere; }
+.sh-sub { margin: 0; font-size: 14px; color: var(--text-dim); }
+.sh-port {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border: 2px solid var(--party);
+  background: radial-gradient(70% 70% at 50% 35%, color-mix(in srgb, var(--party) 28%, var(--s2)), var(--void));
+}
+.sh-port svg { width: 62%; height: 62%; }
+.sh-plate { border: 1px solid var(--line-strong); background: var(--glass-s1); }
+.sh-sec { display: grid; gap: 8px; }
+.sh-sec + .sh-sec { margin-top: 18px; }
+.sh-sechead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sh-h { margin: 0; font: 600 18px/1.1 var(--f-display); letter-spacing: 0.03em; text-transform: uppercase; }
+
+/* Stat cells: a label over a VT323 value, divided by lines inside one plate (never a row of boxes) */
+.sh-stats { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.sh-stat { display: grid; align-content: center; gap: 4px; padding: 10px 14px; min-width: 0; }
+.sh-stat + .sh-stat { border-left: 1px solid var(--line); }
+.sh-stat .v { font: 400 32px/0.9 var(--f-num); color: var(--text); }
+.sh-stat .v small { font-size: 0.6em; color: var(--text-muted); }
+
+/* Hit points: the one place they show. The number in VT323, the life bar under it, and the quick change. */
+.sh-hp { display: grid; gap: 7px; min-width: 0; }
+.sh-hp-top { display: flex; align-items: baseline; gap: 8px; }
+.sh-hp-top .cur { font: 400 34px/0.85 var(--f-num); color: var(--hp-text); }
+.sh-hp-top .max { font: 400 20px/1 var(--f-num); color: var(--text-muted); }
+.sh-hp-top .tmp { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.sh-life { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; height: 10px; padding: 2px; border: 1px solid var(--line-raised); background: var(--void); }
+.sh-life i { display: block; background: var(--hp); }
+.sh-life i.lost { background: var(--hp-lost); }
+.sh-hpq { display: flex; gap: 6px; }
+.sh-hpq .amt { width: 52px; height: 32px; padding: 0 8px; border: 1px solid var(--line-raised); background: var(--void); color: var(--text); font: 400 20px/30px var(--f-num); text-align: center; }
+
+.sh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-raised);
+  background: var(--s2);
+  color: var(--text);
+  font: 600 13px/1 var(--f-label);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sh-btn:hover { background: var(--s3); border-color: var(--line-raised-hover); }
+.sh-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sh-btn.lg { min-height: 40px; padding: 0 14px; font-size: 14px; }
+.sh-iconbtn { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid transparent; color: var(--text-dim); }
+.sh-iconbtn svg { width: 18px; height: 18px; fill: currentColor; }
+.sh-link { min-height: 32px; padding: 0 2px; border: 0; background: none; color: var(--cyan-hi); font: 600 13px/1 var(--f-label); cursor: pointer; }
+.sh-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Lamps, chips, pips and the proficiency square */
+.sh-lamp { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }
+.sh-lamp i { width: 14px; height: 14px; border: 1px solid var(--line-raised); background: var(--s3); }
+.sh-lamp.is-lit i { border-color: transparent; background: var(--hp); box-shadow: var(--glow-lamp-bonus); }
+.sh-lamp.is-lit { color: var(--text); }
+.sh-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sh-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--line-raised); background: var(--s2); font: 600 13px/1 var(--f-label); color: var(--text); white-space: nowrap; }
+.sh-chip.is-effect { border-color: var(--cyan); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cyan) 30%, transparent); }
+.sh-chip .t { font: 400 16px/1 var(--f-num); color: var(--cyan-hi); }
+.sh-chip.is-pin .sh-num { font-size: 17px; color: var(--text); }
+.sh-chip.is-pin.is-prof { border-color: color-mix(in srgb, var(--cyan) 70%, var(--line-raised)); }
+.sh-pips { display: inline-flex; gap: 3px; align-items: center; }
+.sh-pips i { width: 10px; height: 10px; background: var(--party); }
+.sh-pips i.used { background: transparent; box-shadow: inset 0 0 0 1px var(--line-raised); }
+.sh-pf { display: inline-block; flex: none; width: 10px; height: 10px; box-shadow: inset 0 0 0 1px var(--line-raised); }
+.sh-pf.p { background: var(--cyan); box-shadow: none; }
+.sh-pf.x { background: var(--cyan); box-shadow: 0 0 0 2px var(--s1), 0 0 0 3px var(--cyan); }
+.sh-tag { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border: 1px solid var(--line-raised); font: 400 14px/1 var(--f-num); color: var(--text-dim); vertical-align: 2px; }
+.sh-tag.c { border-color: var(--cyan); color: var(--cyan-hi); }
+
+/* Rows: one look for every list (actions, spells, gear, features, skills) */
+.sh-list { display: grid; }
+.sh-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 14px; min-height: 52px; padding: 7px 4px; border-top: 1px solid var(--line); }
+.sh-list > .sh-row:last-child { border-bottom: 1px solid var(--line); }
+.sh-row:hover { background: color-mix(in srgb, var(--s2) 45%, transparent); }
+.sh-row .nm { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 600; font-size: 15px; }
+.sh-row .nm span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-row .mt { grid-column: 1; font-size: 13px; color: var(--text-muted); }
+.sh-row .end { grid-row: 1 / span 2; grid-column: 2; display: flex; align-items: center; gap: 10px; }
+.sh-row .end .sh-num { font-size: 22px; }
+.sh-row.is-tight { min-height: 34px; padding-block: 4px; }
+.sh-row.is-tight .nm { font-weight: 500; font-size: 14px; }
+.sh-grouphead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 4px 6px; }
+.sh-grouphead:first-child { padding-top: 2px; }
+.sh-seg + div > .sh-grouphead:first-child,
+.sh-plate + div > .sh-grouphead:first-child { padding-top: 14px; }
+
+/* Abilities: the save sits with its ability, as on the printed sheet */
+.sh-ab { display: grid; }
+.sh-abrow { display: grid; grid-template-columns: minmax(0, 1fr) 52px 92px; align-items: center; gap: 10px; min-height: 54px; padding: 4px 4px; border-top: 1px solid var(--line); }
+.sh-abrow:last-child { border-bottom: 1px solid var(--line); }
+.sh-abrow .n { display: grid; gap: 2px; }
+.sh-abrow .n b { font-weight: 600; font-size: 15px; }
+.sh-abrow .n .sh-num { font-size: 17px; color: var(--text-muted); }
+.sh-abrow .mod { font: 400 34px/1 var(--f-num); text-align: center; }
+.sh-abrow .sv { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12px; color: var(--text-muted); }
+.sh-abrow .sv .sh-num { font-size: 22px; color: var(--text); min-width: 28px; text-align: right; }
+.sh-abtiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px solid var(--line-strong); }
+.sh-abtiles.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.sh-abtile { display: grid; justify-items: center; gap: 2px; padding: 10px 4px 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.sh-abtiles:not(.six) .sh-abtile:nth-child(3n) { border-right: 0; }
+.sh-abtiles:not(.six) .sh-abtile:nth-child(n + 4) { border-bottom: 0; }
+.sh-abtiles.six .sh-abtile { border-bottom: 0; }
+.sh-abtiles.six .sh-abtile:last-child { border-right: 0; }
+.sh-abtile .a { font: 600 11px/1 var(--f-label); letter-spacing: 0.12em; color: var(--text-muted); }
+.sh-abtile .mod { font: 400 32px/1 var(--f-num); }
+.sh-abtile .sc { font: 400 16px/1 var(--f-num); color: var(--text-muted); }
+.sh-abtile .sv { display: flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 11px; color: var(--text-muted); }
+.sh-abtile .sv .sh-num { font-size: 18px; color: var(--text); }
+
+/* Skills: proficiency square, name, ability, bonus */
+.sh-skills { display: grid; column-gap: 22px; }
+.sh-skills.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sh-skills.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sh-sk { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-height: 32px; border-top: 1px solid var(--line); font-size: 14px; }
+.sh-sk .ab { font: 600 10px/1 var(--f-label); letter-spacing: 0.1em; color: var(--text-muted); }
+.sh-sk .sh-num { font-size: 19px; min-width: 26px; text-align: right; }
+.sh-sk.is-prof { font-weight: 600; }
+
+/* Facts: a definition list */
+.sh-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 18px; margin: 0; }
+.sh-facts dt, .sh-facts dd { margin: 0; padding: 8px 0; border-top: 1px solid var(--line); }
+.sh-facts dt { font: 600 11px/1.6 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.sh-facts dd { font-size: 14px; }
+
+/* Coins and the pack meter */
+.sh-coins { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line-strong); }
+.sh-coins div { display: grid; justify-items: center; gap: 3px; padding: 8px 4px; }
+.sh-coins div + div { border-left: 1px solid var(--line); }
+.sh-coins .sh-num { font-size: 26px; }
+.sh-coins span:last-child { font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; color: var(--text-muted); }
+.sh-meter { height: 6px; background: var(--void); box-shadow: inset 0 0 0 1px var(--line-raised); }
+.sh-meter i { display: block; height: 100%; background: var(--party); }
+
+/* Segmented filter (a choice of view, never a tab strip inside a tab strip) */
+.sh-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border: 1px solid var(--line-raised); background: var(--void); }
+.sh-seg span { display: inline-grid; place-items: center; min-height: 30px; padding: 0 10px; font: 600 13px/1 var(--f-label); color: var(--text-dim); cursor: pointer; }
+.sh-seg span.on { color: var(--text); background: var(--tab-on); box-shadow: inset 0 -2px 0 var(--state-on-edge); }
+
+/* Tabs: words on the strip's line; the chosen tab's ink is a horizon lying on that line, with an elliptical cast */
+/* A strip scrolls sideways on a phone, and a scroll container may shrink to nothing in a fixed-height column, so it
+   keeps its own height. */
+.sh-tabs { position: relative; display: flex; flex: none; gap: 2px; min-height: 45px; border-bottom: 1px solid var(--line-strong); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.sh-tabs::-webkit-scrollbar { display: none; }
+.sh-tabs.is-scroll { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+.sh-tab { position: relative; flex: none; min-height: 44px; padding: 0 14px; border: 0; background: none; color: var(--text-dim); font: 600 14px/1 var(--f-label); cursor: pointer; white-space: nowrap; }
+.sh-tab:hover { color: var(--text); }
+.sh-tab.on { color: var(--text); }
+.sh-ink { position: absolute; bottom: -1px; left: 0; width: 0; height: 2px; background: var(--hz-paint); box-shadow: var(--ink-glow); pointer-events: none; transition: none; }
+.sh-ink::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  bottom: 100%;
+  height: 18px;
+  background: var(--hz-paint);
+  opacity: var(--ink-cast);
+  -webkit-mask-image: radial-gradient(50% 100% at 50% 100%, #000 25%, transparent 100%);
+  mask-image: radial-gradient(50% 100% at 50% 100%, #000 25%, transparent 100%);
+}
+.sh-comet { position: absolute; bottom: -2px; height: 3px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--tail, #9a5cff) 60%, var(--spark)); }
+.sh-comet.l { background: linear-gradient(270deg, transparent, var(--tail, #9a5cff) 60%, var(--spark)); }
+.sh-vtabs { position: relative; display: grid; border-left: 1px solid var(--line-strong); }
+.sh-vtab { position: relative; display: block; min-height: 38px; padding: 0 14px; border: 0; background: none; text-align: left; color: var(--text-dim); font: 600 14px/38px var(--f-label); cursor: pointer; }
+.sh-vtab.on { color: var(--text); }
+.sh-vink { position: absolute; left: -2px; top: 0; width: 3px; height: 0; background: var(--hz-paint-v); box-shadow: var(--ink-glow); transition: top 220ms var(--ease-travel), height 220ms var(--ease-travel); }
+.sh-vink::before {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: -8px;
+  bottom: -8px;
+  width: 22px;
+  background: var(--hz-paint-v);
+  opacity: var(--ink-cast);
+  -webkit-mask-image: radial-gradient(100% 50% at 0 50%, #000 25%, transparent 100%);
+  mask-image: radial-gradient(100% 50% at 0 50%, #000 25%, transparent 100%);
+}
+.tp[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .sh-vink { transition: none; } }

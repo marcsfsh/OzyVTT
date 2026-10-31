@@ -1,0 +1,112 @@
+/* =========================================================================
+   Beyond, refined. All three share the vitals band and the tabbed box; they differ in where the checks live.
+   ========================================================================= */
+/* ---- The vitals band ---- */
+.vb { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line-strong); background: var(--glass-bg); }
+.vb-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.vb-id .sh-port { width: 52px; height: 52px; }
+.vb-id .sh-name { font-size: 22px; }
+.vb-id .sh-sub { margin-top: 2px; font-size: 13px; }
+.vb-id .sh-chips { margin-top: 6px; }
+.vb-id .sh-chip { min-height: 24px; padding: 0 8px; font-size: 12px; }
+.vb-id .sh-link { min-height: 24px; font-size: 12px; }
+.vb-stats { display: grid; grid-template-columns: 62px 396px 84px 80px 84px 92px; }
+.vb-c { display: grid; justify-items: center; align-content: center; gap: 6px; min-width: 0; padding: 8px; }
+.vb-c + .vb-c { border-left: 1px solid var(--line); }
+.vb-c .l { font: 600 10px/1.15 var(--f-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); text-align: center; }
+.vb-c .v { font: 400 32px/0.9 var(--f-num); }
+.vb-c .v small { font-size: 0.5em; color: var(--text-muted); }
+/* A number you roll is its own button: the whole cell or row, with no box drawn around the number */
+.vb-c.roll, .mv3 .cell.roll { border: 0; border-left: 1px solid var(--line); background: none; color: inherit; font: inherit; cursor: pointer; }
+.vb-c.roll:hover, .mv3 .cell.roll:hover { background: color-mix(in srgb, var(--s2) 55%, transparent); }
+.vb-c.roll:hover .v, .mv3 .cell.roll:hover .v { color: var(--cyan-hi); }
+.vb-c.roll:focus-visible, .mv3 .cell.roll:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.vb-c.hp { justify-items: stretch; gap: 5px; padding: 7px 12px; }
+.vb-c.hp .l { text-align: left; }
+.hp-top { display: flex; align-items: baseline; justify-content: space-between; }
+.hp-top .tmp { font-size: 11px; color: var(--text-muted); }
+.hp-top .tmp .sh-num { font-size: 16px; color: var(--text-dim); }
+.hp-mid { display: flex; align-items: baseline; gap: 6px; }
+.hp-mid .cur { font: 400 34px/0.85 var(--f-num); color: var(--hp-text); }
+.hp-mid .max { font: 400 20px/1 var(--f-num); color: var(--text-muted); }
+.hp-mid .ctl { margin-left: auto; align-self: center; display: grid; grid-template-columns: 46px repeat(3, auto); gap: 4px; }
+.hp-mid .ctl .amt3 { height: 28px; font-size: 18px; }
+.hp-mid .ctl .sh-btn { min-height: 28px; padding: 0 9px; font-size: 12px; }
+.vb-c.hp .sh-life { height: 8px; }
+.vb-rest { display: grid; justify-items: end; gap: 6px; }
+.vb-rest .sh-btn { min-height: 36px; }
+.vb-rest .hd { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.vb-rest .hd .sh-num { font-size: 17px; color: var(--text-dim); }
+.mv3 .cell.roll { border-left: 1px solid var(--line); }
+.mv3-id .rs svg:last-child { margin-right: -4px; }
+
+/* ---- Abilities across: Strip ---- */
+.abx { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.abx-c { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; }
+.abx-c + .abx-c { border-left: 1px solid var(--line); }
+.abx-m, .abx-s, .abl-m, .abl-s, .abg-h { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.abx-m { display: grid; justify-items: center; gap: 3px; padding: 9px 4px 7px; }
+.abx-m .l { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 600 10px/1.1 var(--f-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.abx-m .m { font: 400 38px/0.9 var(--f-num); }
+.abx-m .sc { font: 400 16px/1 var(--f-num); color: var(--text-muted); }
+.abx-s { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 30px; border-top: 1px solid var(--line); font-size: 11px; color: var(--text-muted); }
+.abx-s .b, .abl-s .b { font: 400 20px/1 var(--f-num); color: var(--text); }
+.abx-m:hover, .abx-s:hover, .abl-m:hover, .abl-s:hover, .abg-h:hover { background: color-mix(in srgb, var(--s2) 55%, transparent); }
+.abx-m:hover .m, .abx-s:hover .b, .abl-m:hover .m, .abl-s:hover .b, .abg-h:hover .m { color: var(--cyan-hi); }
+.abx-m:focus-visible, .abx-s:focus-visible, .abl-m:focus-visible, .abl-s:focus-visible, .abg-h:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.abx.grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.abx.grid .abx-c:nth-child(3n + 1) { border-left: 0; }
+.abx.grid .abx-c:nth-child(n + 4) { border-top: 1px solid var(--line); }
+.sts3.pv .v { font-size: 28px; }
+.sts3.pv .l { max-width: 12ch; }
+.dv { margin: 0; padding: 8px 0 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--text-dim); text-align: center; }
+
+/* ---- Abilities down: Ledger ---- */
+.abl-h { display: grid; grid-template-columns: minmax(0, 1fr) 60px 76px; padding: 0 4px 6px; border-bottom: 1px solid var(--line-strong); font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.abl-h span + span { text-align: center; }
+.abl-r { display: grid; grid-template-columns: minmax(0, 1fr) 76px; border-bottom: 1px solid var(--line); }
+.abl-r:last-child { border-bottom: 0; }
+.abl-m { display: grid; grid-template-columns: minmax(0, 1fr) 60px; align-items: center; min-height: 50px; padding: 0 4px; text-align: left; }
+.abl-m .n b { display: block; font-weight: 600; font-size: 15px; }
+.abl-m .n .sc { font: 400 17px/1 var(--f-num); color: var(--text-muted); }
+.abl-m .m { font: 400 34px/1 var(--f-num); text-align: center; }
+.abl-s { display: flex; align-items: center; justify-content: center; gap: 8px; border-left: 1px solid var(--line); }
+
+/* ---- Abilities as blocks: Grouped ---- */
+.abg-h { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 4px 12px; border-bottom: 1px solid var(--line-strong); text-align: left; }
+.abg-h .n { font: 600 12px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; }
+.abg-h .sc { font: 400 17px/1 var(--f-num); color: var(--text-muted); }
+.abg-h .m { min-width: 34px; font: 400 32px/1 var(--f-num); text-align: right; }
+.abg-b { padding: 2px 12px 6px; }
+.abg-b > .sk3:first-child { border-top: 0; }
+.sk3.g { grid-template-columns: 10px minmax(0, 1fr) auto; min-height: 26px; }
+.sk3.g.sv .n { color: var(--text-dim); }
+
+/* ---- Layouts ---- */
+.rf { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.rf-b { display: grid; gap: 12px; min-height: 0; padding: 12px 20px 14px; }
+.rf-col { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.rf-col > .c3 { flex: none; }
+.rs { grid-template-rows: auto minmax(0, 1fr); }
+.rs-body { display: grid; grid-template-columns: 460px minmax(0, 1fr); gap: 12px; min-height: 0; }
+.rs .sk3 { min-height: 28px; }
+.rg { grid-template-columns: 232px 232px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.rl { grid-template-columns: 250px 250px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.rl .sk3 { min-height: 30px; }
+.rf .sn3 > div { min-height: 28px; }
+/* Sized so each column fits 1280 by 800 exactly, with nothing hidden behind a scrollbar */
+.rf .vb { padding-block: 10px; }
+.rf .vb-id .sh-chips { margin-top: 4px; }
+.rs .sk3 { min-height: 27px; }
+.rg .sk3.g { min-height: 25px; }
+.rg .abg-h { min-height: 38px; }
+.rf-col { overflow: auto; scrollbar-width: thin; }
+
+/* Handoff values: rows you tap are 44px (--row-h) on a phone and with touch. On a laptop with a mouse the skill rows are
+   compact (30px, --row-h-dense) so all eighteen fit beside the abilities at 1280 by 800. */
+.mc3 .sk3, .mc3 .sv3 .sk3 { min-height: 44px; }
+.rl .sk3 { min-height: 30px; }
+.rl .abl-m, .mc3 .abl-m { min-height: 52px; }
+.hp-mid .ctl { grid-template-columns: 52px repeat(3, auto); }
+.hp-mid .ctl .amt3, .hp-mid .ctl .sh-btn { height: 36px; min-height: 36px; }
+.mv3-ed .amt3, .mv3-ed .sh-btn { min-height: 44px; height: 44px; }

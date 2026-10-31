@@ -1,0 +1,108 @@
+
+/* =========================================================================
+   C5 round 1: the log and dice. Classes start with w-. Every part reuses a settled one: open groups for what is read
+   (T 2.3), Cradles for what takes input (T 2.4), Base line controls and fields (T 2.5), VT323 numbers, the GM ONLY tag
+   (T rule 7), colour's one meaning (T rule 9), the TV's latest roll (H 2.1), the roll row (C3 2.5).
+   ========================================================================= */
+
+/* The log: read, so it is open (no boxes), rows on 1 px lines */
+.w-log { display: flex; flex-direction: column; justify-content: flex-end; min-height: 0; height: 100%; overflow: hidden; }
+.w-e { display: block; padding: 7px 0; box-shadow: inset 0 -1px 0 var(--line); font-size: 13px; line-height: 1.4; color: var(--text-dim); }
+.w-e:last-child { box-shadow: none; }
+.w-e b { color: var(--text); font-weight: 600; }
+.w-e .num { font: 400 17px/1 var(--f-num); }
+.w-e .dmg { color: var(--danger-text); }
+.w-e .heal { color: var(--hp-text); }
+.w-e.turn { padding: 9px 0 5px; font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.w-e.turn.now { color: var(--caution-text); }
+.w-e.chat b { margin-right: 6px; }
+.w-e.whisper { box-shadow: inset 2px 0 0 var(--violet), inset 0 -1px 0 var(--line); padding-left: 10px; }
+.w-e .tag { margin-right: 6px; vertical-align: 1px; height: 18px; font-size: 14px; }
+.w-e .tag.gm, .w-line .tag.gm { height: 20px; font-size: 16px; }
+.tag.nat { border: 1px solid var(--cyan); color: var(--cyan-hi); }
+.tag.one { border: 1px solid var(--danger-text); color: var(--danger-text); }
+.tag.wh { border: 1px solid var(--violet); color: var(--violet-text); }
+
+/* One roll, five ways */
+.w-card { display: grid; gap: 4px; margin: 4px 0; padding: 8px 10px; border: 1px solid var(--line-strong); background: color-mix(in srgb, var(--s2) 45%, transparent); }
+.w-card .n { display: flex; align-items: baseline; gap: 10px; }
+.w-tot { font: 400 30px/1 var(--f-num); color: var(--text); }
+.w-die { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 3px; box-sizing: border-box; border: 1px solid var(--line-raised); font: 400 15px/1 var(--f-num); color: var(--text-dim); }
+.w-die.k { border-color: var(--cyan); color: var(--text); }
+.w-die.x { color: var(--text-muted); text-decoration: line-through; }
+.w-f { font: 400 14px/1 var(--f-num); color: var(--text-muted); }
+.w-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.w-row small { display: block; margin-top: 3px; font: 400 14px/1.1 var(--f-num); color: var(--text-muted); }
+.w-row .w-tot { font-size: 26px; }
+.w-tv { display: grid; gap: 4px; }
+.w-tv .eb2 { font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.w-tv .n { display: flex; align-items: baseline; gap: 10px; }
+.w-tv .w-tot { font-size: 34px; }
+.w-tv .words { font: 400 16px/1 var(--f-num); color: var(--text-dim); }
+.w-dice { display: grid; gap: 5px; }
+.w-dice .n { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.w-dice .n .op { font: 400 16px/1 var(--f-num); color: var(--text-muted); margin: 0 2px; }
+.w-dice .n .w-tot { font-size: 24px; margin-left: 4px; }
+.w-first { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 10px; }
+.w-first .w-tot { font-size: 30px; text-align: right; }
+.w-first small { display: block; margin-top: 3px; font: 400 14px/1.1 var(--f-num); color: var(--text-muted); }
+
+/* The log arranged */
+.w-turnh { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 10px 0 4px; }
+.w-turnh .fc { width: 24px; height: 24px; font-size: 10px; }
+.w-turnh b { font: 600 13px/1.2 var(--f-label); color: var(--text); }
+.w-turnh span { font: 400 14px/1 var(--f-num); color: var(--text-muted); }
+.w-turnh.now { margin: 6px -16px 0; padding: 8px 16px 4px; background: color-mix(in srgb, var(--caution) 7%, transparent); box-shadow: inset 2px 0 0 var(--caution); }
+.w-grp { padding-left: 32px; }
+.w-grp .w-e:last-child { box-shadow: inset 0 -1px 0 var(--line); }
+.w-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 34px; box-shadow: inset 0 -1px 0 var(--line); font-size: 13px; color: var(--text-dim); }
+.w-line .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-line b { color: var(--text); font-weight: 600; }
+.w-line .v { font: 400 20px/1 var(--f-num); color: var(--text); }
+.w-line.turn { min-height: 26px; font: 600 11px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.w-latest { display: grid; gap: 4px; padding: 10px 0 12px; border-bottom: 1px solid var(--line-strong); }
+.w-latest .w-tot { font-size: 48px; }
+.w-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line-strong); }
+.w-chips .q-bl b { font-size: 15px; margin-left: 4px; color: var(--text-muted); }
+
+/* The composer and the dice */
+.w-comp { display: grid; gap: 8px; padding: 10px 16px 10px; border-top: 1px solid var(--line-strong); }
+.w-comp .r { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.w-comp .r .q-fld { flex: 1; min-width: 0; }
+.w-comp .r .q-fld.sel { flex: none; }
+.w-comp .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
+.w-dz { display: flex; gap: 6px; flex-wrap: wrap; }
+.w-dz .q-bl { min-width: 40px; font: 400 17px/1 var(--f-num); }
+.w-dz.boxed .q-bl { box-shadow: inset 0 0 0 1px var(--line-raised); }
+.w-send { display: grid; place-items: center; width: 40px; height: 38px; color: var(--cyan-hi); box-shadow: inset 0 -2px 0 var(--cyan); }
+.w-send svg, .w-ico svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.w-ico { display: grid; place-items: center; width: 40px; height: 38px; color: var(--text-dim); box-shadow: inset 0 -1px 0 var(--line-raised); font: 400 17px/1 var(--f-num); }
+.w-ico.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--cyan); }
+.w-pop { position: absolute; z-index: 6; display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line-strong); background: var(--bg); box-shadow: 0 -14px 32px rgba(0, 0, 0, 0.5); }
+.w-pop::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.w-armed { padding: 8px 12px 8px 14px; border: 1px solid color-mix(in srgb, var(--caution) 45%, var(--line-strong)); box-shadow: inset 3px 0 0 var(--caution); font-size: 12.5px; color: var(--text); }
+
+/* Calls for a roll */
+.w-call { display: grid; gap: 0; }
+.w-call .q-row { min-height: 44px; }
+.w-res { font: 400 18px/1 var(--f-num); color: var(--text); }
+.w-res .ok { margin-left: 6px; font: 600 11px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan-hi); }
+.w-res .no { margin-left: 6px; font: 600 11px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--danger-text); }
+.w-wait { font: 600 11px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--caution-text); }
+.w-fields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding-top: 6px; }
+.w-fields.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.w-fields label { display: grid; gap: 4px; min-width: 0; font: 600 11.5px/1.2 var(--f-label); color: var(--text-muted); }
+.w-fields .q-fld { width: 100%; justify-content: space-between; }
+.w-callh { display: flex; align-items: center; gap: 8px; }
+.w-callh .sp { flex: 1; }
+.P .w-turnh.now { margin: 6px -12px 0; padding: 8px 12px 4px; }
+.w-dz { flex-wrap: nowrap; }
+.w-dz .q-bl { flex: 1 1 0; min-width: 0; padding: 0 2px; }
+.w-comp .q-fld { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 36px; }
+.w-comp .q-fld.sel { display: inline-flex; line-height: 1; }
+.w-comp .q-fld.sel svg { margin-left: 6px; }
+.w-line .tag { margin-right: 6px; vertical-align: 1px; height: 18px; font-size: 14px; }
+.w-comp .q-bl.hid { color: var(--violet-text); }
+.w-line.open { box-shadow: inset 2px 0 0 var(--cyan), inset 0 -1px 0 transparent; padding-left: 8px; background: color-mix(in srgb, var(--cyan) 6%, transparent); }
+.w-opencard { padding: 0 0 6px 8px; box-shadow: inset 2px 0 0 var(--cyan), inset 0 -1px 0 var(--line); background: color-mix(in srgb, var(--cyan) 6%, transparent); }
+.w-opencard .w-card { margin: 0; }

@@ -1,0 +1,123 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; E2, maps and tokens &middot; approved</p>
+  <h1>Maps and tokens</h1>
+  <p>Approved after one round. Maps are filed in folders listed at the side; a map opens beside the list, inside that layout; a map's menu files it in a folder, and Choose files several at once. The Tokens page groups creatures into Party, Monsters and any group the GM makes; choosing a token's picture is a wide dialog of folders, the library and a preview. Every part is one already settled (Carried in). The switches still show the options that were compared; the chosen ones are marked. Scroll past the switches and a compact bar keeps the page and its options in reach.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; The map list</span>
+      <div class="seg" role="group" aria-label="The map list" id="x1-seg">
+        <button type="button" data-v="table" aria-pressed="false">Today&#39;s table</button>
+        <button type="button" data-v="shelf" aria-pressed="false">The shelf</button>
+        <button type="button" data-v="folders" aria-pressed="false">The shelf by folder</button>
+        <button type="button" data-v="rail" aria-pressed="true">Folders at the side · chosen</button>
+        <button type="button" data-v="rows" aria-pressed="false">Rows with pictures</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; A map&#39;s page</span>
+      <div class="seg" role="group" aria-label="A map&#39;s page" id="x2-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s page</button>
+        <button type="button" data-v="bench" aria-pressed="false">The workbench</button>
+        <button type="button" data-v="record" aria-pressed="false">The record</button>
+        <button type="button" data-v="panes" aria-pressed="true">Beside the list, in the folders · chosen</button>
+        <button type="button" data-v="uses" aria-pressed="false">What uses it first</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; Folders</span>
+      <div class="seg" role="group" aria-label="Folders" id="x3-seg">
+        <button type="button" data-v="menu" aria-pressed="true">In its menu · chosen</button>
+        <button type="button" data-v="field" aria-pressed="false">On its page</button>
+        <button type="button" data-v="drag" aria-pressed="false">Drag onto a folder</button>
+        <button type="button" data-v="select" aria-pressed="false">Choose several · chosen</button>
+        <button type="button" data-v="chips" aria-pressed="false">The folder on the card</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; The tokens page</span>
+      <div class="seg" role="group" aria-label="The tokens page" id="x4-seg">
+        <button type="button" data-v="table" aria-pressed="false">Today&#39;s table</button>
+        <button type="button" data-v="faces" aria-pressed="false">Faces</button>
+        <button type="button" data-v="groups" aria-pressed="true">Party, Monsters and your groups · chosen</button>
+        <button type="button" data-v="library" aria-pressed="false">The library</button>
+        <button type="button" data-v="panes" aria-pressed="false">Two panes</button>
+      </div>
+    </div>
+    <div class="ctl"><span>5 &middot; The token picker</span>
+      <div class="seg" role="group" aria-label="The token picker" id="x5-seg">
+        <button type="button" data-v="dialog" aria-pressed="false">A&#39;s dialog</button>
+        <button type="button" data-v="side" aria-pressed="false">A side sheet</button>
+        <button type="button" data-v="row" aria-pressed="false">Under its row</button>
+        <button type="button" data-v="panes" aria-pressed="true">Folders and a preview · chosen</button>
+        <button type="button" data-v="recent" aria-pressed="false">Theirs first</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="maps" aria-pressed="true">The map list</button>
+        <button type="button" data-v="map" aria-pressed="false">A map's page</button>
+        <button type="button" data-v="folders" aria-pressed="false">Folders</button>
+        <button type="button" data-v="tokens" aria-pressed="false">The tokens page</button>
+        <button type="button" data-v="picker" aria-pressed="false">The token picker</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="spec" aria-labelledby="carried-h" style="margin-top:0">
+    <h2 id="carried-h">Carried in</h2>
+    <p>Every option on this page is built only from what is already settled. Nothing here picks a new look; the options differ in where things sit and how they are arranged.</p>
+    <div class="carried" id="carried"></div>
+  </section>
+
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only" id="sz-laptop">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p id="sz-phone">390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+      <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f with five maps and eight token images in the library: the Maps page, a map's page, the Tokens page and the token picker, on a laptop and on a phone.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for maps and tokens</h2>
+    <p>These hold for every map and token list, page and picker.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

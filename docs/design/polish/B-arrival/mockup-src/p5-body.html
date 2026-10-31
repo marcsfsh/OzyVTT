@@ -1,0 +1,112 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; B, arrival &middot; round 2</p>
+  <h1>Arrival</h1>
+  <p>Approved. The title screen keeps the sunset with the logo in the night sky above a smaller setting sun and the two buttons on the grid. The GM signs in on a card that takes the buttons' place. A player picks from the party standing before the sunset as tall cards. While no map is live, the GM's empty table is a lobby with the join code and the party filling in. The switches still show the options that were compared; the chosen ones are marked. On a phone, the bar at the top switches pages and options, and the laptop view opens close up: swipe it sideways.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; Title screen</span>
+      <div class="seg" role="group" aria-label="Title screen" id="d1-seg">
+        <button type="button" data-v="sky" aria-pressed="true">Sky · chosen</button>
+        <button type="button" data-v="marquee" aria-pressed="false">Marquee</button>
+        <button type="button" data-v="ground" aria-pressed="false">Ground</button>
+        <button type="button" data-v="beside" aria-pressed="false">Beside</button>
+        <button type="button" data-v="corner" aria-pressed="false">Corner</button>
+        <button type="button" data-v="night" aria-pressed="false">After sunset</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; GM sign-in</span>
+      <div class="seg" role="group" aria-label="GM sign-in" id="d2-seg">
+        <button type="button" data-v="place" aria-pressed="true">In place · chosen</button>
+        <button type="button" data-v="console" aria-pressed="false">Console</button>
+        <button type="button" data-v="page" aria-pressed="false">Own page</button>
+        <button type="button" data-v="side" aria-pressed="false">Beside</button>
+        <button type="button" data-v="drop" aria-pressed="false">Drop-down</button>
+        <button type="button" data-v="strip" aria-pressed="false">Horizon strip</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; Picking a character</span>
+      <div class="seg" role="group" aria-label="Picking a character" id="d3-seg">
+        <button type="button" data-v="panel" aria-pressed="false">Panel</button>
+        <button type="button" data-v="lineup" aria-pressed="true">Lineup · chosen</button>
+        <button type="button" data-v="roll" aria-pressed="false">Roll call</button>
+        <button type="button" data-v="app" aria-pressed="false">In the app</button>
+        <button type="button" data-v="preview" aria-pressed="false">Preview</button>
+        <button type="button" data-v="seats" aria-pressed="false">Seats</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; Inviting players</span>
+      <div class="seg" role="group" aria-label="Inviting players" id="d4-seg">
+        <button type="button" data-v="lobby" aria-pressed="true">Lobby · chosen</button>
+        <button type="button" data-v="who" aria-pressed="false">Who is here</button>
+        <button type="button" data-v="chip" aria-pressed="false">Address chip</button>
+        <button type="button" data-v="screen" aria-pressed="false">Table screen</button>
+        <button type="button" data-v="banner" aria-pressed="false">Banner</button>
+        <button type="button" data-v="card" aria-pressed="false">Join card</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 520px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="title" aria-pressed="true">Title screen</button>
+        <button type="button" data-v="signin" aria-pressed="false">GM sign-in</button>
+        <button type="button" data-v="setup" aria-pressed="false">First run</button>
+        <button type="button" data-v="pick" aria-pressed="false">Pick a character</button>
+        <button type="button" data-v="invite" aria-pressed="false">Invite players</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p>390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f on a fresh server.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Proposed for every option</h2>
+    <p>These hold whichever options you pick; say if any should be a choice instead.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

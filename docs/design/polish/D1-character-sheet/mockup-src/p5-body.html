@@ -1,0 +1,55 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; design options</p>
+  <h1>Character sheet: Ledger</h1>
+  <p>The approved layout, drawn to the values in the implementation plan. A vitals band runs across the top on every screen. On a laptop, abilities and their saves run down the first column, skills fill the second and the tabbed box the third. On a phone the band and the tabs stay pinned and Main holds the abilities and skills. The controls work: tap a number to roll it, and Damage and Heal change the hit points. The toast stands in for the app's own roll feedback.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row">
+    <div class="seg opt-seg" role="group" aria-label="Layout" id="opt-seg">
+      <button type="button" data-opt="ledger" aria-pressed="true">Ledger</button>
+    </div>
+    <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+      <button type="button" data-show="all" aria-pressed="true">All</button>
+      <button type="button" data-show="laptop" aria-pressed="false">Laptop</button>
+      <button type="button" data-show="phone" aria-pressed="false">Phone</button>
+      <button type="button" data-show="panel" aria-pressed="false">Table panel</button>
+    </div>
+    <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+      <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+      <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="idea" aria-labelledby="idea-name">
+    <div>
+      <p class="eyebrow">The layout</p>
+      <h2 id="idea-name">Ledger</h2>
+      <p id="idea-text"></p>
+      <p class="eyebrow" id="idea-elsewhere-eb" style="margin-top:14px">Phone and Table panel</p>
+      <p id="idea-elsewhere" style="font-size:14px"></p>
+      <p class="eyebrow" id="idea-watch-eb" style="margin-top:14px">Watch for</p>
+      <p id="idea-watch" style="font-size:14px"></p>
+    </div>
+    <div class="side" id="idea-lists"></div>
+  </section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="view v-laptop" id="v-laptop">
+      <div class="view-cap"><p class="eyebrow">Laptop, the Sheet page</p><p>1280 by 800, shown to fit</p></div>
+      <div class="fit"></div>
+    </div>
+    <div class="stage-row">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow">Phone, the Sheet page</p><p>390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+      <div class="view v-panel is-narrow" id="v-panel">
+        <div class="view-cap"><p class="eyebrow">Table panel</p><p>The 392 px column beside the map, on its Me tab</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+</main>

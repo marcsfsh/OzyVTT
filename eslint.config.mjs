@@ -13,7 +13,9 @@ export default tseslint.config(
       "e2e/test-results/**",
       "e2e/playwright-report/**",
       // The Light rail handoff's mockup: script fragments that build.sh stitches into one page.
-      "docs/design/light-rail/**"
+      "docs/design/light-rail/**",
+      // The polish handoff's mockups, kept as written.
+      "docs/design/polish/**"
     ]
   },
   js.configs.recommended,

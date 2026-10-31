@@ -1,0 +1,83 @@
+
+/* =========================================================================
+   F round 3: the story and people. Classes start with y-. Every part reuses a settled one: the Codex's frame and Wiki
+   page, the side column's swap (F2), the folders at the side (E2), G's panes, E's shelf cards, A's menu and dialog.
+   ========================================================================= */
+.y-n { font: 400 16px/1 var(--f-num); color: var(--text-dim); white-space: nowrap; }
+.y-qrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) 120px auto 36px; align-items: center; gap: 14px; min-height: 58px; padding: 0 10px; box-shadow: inset 0 -1px 0 var(--line); }
+.y-qrow b { display: block; font: 600 14.5px/1.25 var(--f-label); color: var(--text); }
+.y-qrow small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.y-qrow.on { background: color-mix(in srgb, var(--cyan) 8%, transparent); box-shadow: inset 2px 0 0 var(--cyan), inset 0 -1px 0 var(--line); }
+.y-qrow.hidden b { color: var(--violet-text); }
+.y-prog { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.y-obj { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; box-shadow: inset 0 -1px 0 var(--line); font-size: 14px; }
+.y-obj.done span:nth-child(2) { color: var(--text-dim); text-decoration: line-through; text-decoration-color: var(--line-raised); }
+.y-obj.hid span:nth-child(2) { color: var(--violet-text); }
+.y-qcard { position: relative; display: grid; gap: 8px; align-content: start; padding: 12px 14px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.y-qcard b { font: 600 15px/1.2 var(--f-label); }
+.y-qcard p { margin: 0; font-size: 13px; color: var(--text-dim); }
+.y-qcard.hidden { border-style: dashed; border-color: color-mix(in srgb, var(--violet) 70%, transparent); background: color-mix(in srgb, var(--violet) 6%, var(--bg)); }
+.y-qcard.hidden b { color: var(--violet-text); }
+.y-qcard .y-obj { min-height: 32px; font-size: 13px; box-shadow: none; }
+.y-col { display: grid; gap: 10px; align-content: start; padding: 10px; border: 1px solid var(--line); background: color-mix(in srgb, var(--void) 25%, transparent); min-height: 0; }
+.y-col.on { border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
+
+/* The relationships web. */
+.y-web { position: absolute; inset: 0; }
+.y-web svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.y-web svg.lines line { stroke: color-mix(in srgb, var(--cyan) 55%, transparent); stroke-width: 1.5; }
+.y-web svg.lines line.hid { stroke: color-mix(in srgb, var(--violet) 70%, transparent); stroke-dasharray: 5 4; }
+.y-node { position: absolute; display: grid; justify-items: center; gap: 6px; transform: translate(-50%, -50%); text-align: center; }
+.y-node b { font: 600 13px/1.2 var(--f-label); white-space: nowrap; }
+.y-node.hid b { color: var(--violet-text); }
+.y-lab { position: absolute; transform: translate(-50%, -50%); padding: 2px 6px; font: 600 11.5px/1 var(--f-label); color: var(--text-dim); background: var(--bg); white-space: nowrap; }
+.y-tie { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; padding: 0 8px; box-shadow: inset 0 -1px 0 var(--line); }
+.y-tie b { display: block; font: 600 14px/1.2 var(--f-label); }
+.y-tie small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-dim); }
+.y-tie.hid b { color: var(--violet-text); }
+.y-tie.on { background: color-mix(in srgb, var(--cyan) 8%, transparent); box-shadow: inset 2px 0 0 var(--cyan), inset 0 -1px 0 var(--line); }
+.y-mx { display: grid; border-top: 1px solid var(--line-strong); border-left: 1px solid var(--line-strong); }
+.y-mx > span { display: flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 8px; box-sizing: border-box; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--text-dim); text-align: center; }
+.y-mx > span.h { justify-content: flex-start; font: 600 13px/1.2 var(--f-label); color: var(--text); background: color-mix(in srgb, var(--s1) 60%, transparent); }
+.y-mx > span.self { background: color-mix(in srgb, var(--void) 45%, transparent); }
+.y-mx > span.t { color: var(--text); font-weight: 600; }
+.y-mx > span.hid { color: var(--violet-text); font-style: italic; }
+.y-mx > span.lit { box-shadow: inset 0 0 0 1px var(--cyan); }
+
+/* Standing reads as a word. */
+.y-word { font: 600 26px/1.1 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase; }
+.y-word small { margin-left: 10px; font: 400 22px/1 var(--f-num); letter-spacing: 0.02em; color: var(--text-dim); }
+.y-tiers { display: grid; gap: 0; }
+.y-tier { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; box-shadow: inset 0 -1px 0 var(--line); font: 600 13.5px/1.2 var(--f-label); color: var(--text-dim); }
+.y-tier .y-n { font-size: 15px; color: var(--text-muted); }
+.y-tier.on { color: var(--text); background: color-mix(in srgb, var(--cyan) 8%, transparent); box-shadow: inset 2px 0 0 var(--cyan), inset 0 -1px 0 var(--line); }
+.y-steps { display: flex; gap: 6px; }
+.y-steps .e-btn { flex: 1; justify-content: center; font: 400 17px/1 var(--f-num); }
+.y-hist { display: grid; grid-template-columns: 90px 60px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 44px; box-shadow: inset 0 -1px 0 var(--line); font-size: 13.5px; }
+.y-hist .y-n { color: var(--text); }
+
+/* Adding to the chronicle. */
+.y-comp { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); position: relative; }
+.y-comp::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--cyan); box-shadow: var(--glow-on); }
+.y-area { min-height: 84px; padding: 10px 12px; border: 1px solid var(--line-raised); background: var(--void); font-size: 14px; color: var(--text-muted); }
+.y-area.hid { border-color: color-mix(in srgb, var(--violet) 55%, transparent); border-left-width: 3px; }
+.y-line { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 8px 0 14px; border: 1px solid var(--line-raised); background: var(--void); font-size: 14.5px; color: var(--text-muted); }
+.y-more { display: inline-flex; align-items: center; gap: 6px; font: 600 12.5px/1 var(--f-label); color: var(--text-dim); }
+
+/* Downtime and deadlines. */
+.y-dt { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; box-shadow: inset 0 -1px 0 var(--line); }
+.y-dt b { display: block; font: 600 14px/1.2 var(--f-label); }
+.y-dt small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-dim); }
+.y-days { font: 400 22px/1 var(--f-num); color: var(--cyan-hi); text-align: right; }
+.y-days small { display: block; margin-top: 2px; font: 600 10.5px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.y-dl { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; box-shadow: inset 0 -1px 0 var(--line); }
+.y-dl b { display: block; font: 600 14px/1.2 var(--f-label); }
+.y-dl small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-dim); }
+.y-dl .y-days { color: var(--text); }
+.y-dl.soon .y-days { color: var(--caution-text); }
+.y-tbl { display: grid; grid-template-columns: minmax(0, 1.2fr) 90px minmax(0, 1.6fr) auto; }
+.y-tbl > span { display: flex; align-items: center; min-height: 48px; padding: 0 10px; box-shadow: inset 0 -1px 0 var(--line); font-size: 13.5px; }
+.y-tbl > span.h { min-height: 32px; font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.y-span { position: absolute; height: 8px; background: color-mix(in srgb, var(--cyan) 35%, transparent); box-shadow: inset 0 0 0 1px var(--cyan); }
+.y-dmark { position: absolute; width: 2px; background: var(--caution); box-shadow: 0 0 8px color-mix(in srgb, var(--caution) 60%, transparent); }
+.y-more svg, .y-line svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }

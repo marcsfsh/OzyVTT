@@ -1,0 +1,124 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; E, replays &middot; approved</p>
+  <h1>Replays</h1>
+  <p>Approved after one round. The replays list is a table with the chosen replay beside it, a mix of two of the round&#39;s options. Watching puts the whole fight beside the map, every turn a row with the current one lit. Moving through it is a line of rounds with each turn a tick and marks for big hits, heals and a creature going down. Launch from turn 8 sits at the end of that line, the rest in More, and the replay&#39;s name has when it was fought to its right. A player finds the shared fights as cards under the sheet. Every part is one already settled (Carried in). The switches still show the options that were compared; the chosen ones are marked. Scroll past the switches and a compact bar keeps the page and its options in reach.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; The replays list</span>
+      <div class="seg" role="group" aria-label="The replays list" id="r1-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s rows</button>
+        <button type="button" data-v="shelf" aria-pressed="false">A card per replay</button>
+        <button type="button" data-v="side" aria-pressed="false">Who sees it at the side</button>
+        <button type="button" data-v="table" aria-pressed="false">A table</button>
+        <button type="button" data-v="beside" aria-pressed="false">A replay beside the list</button>
+        <button type="button" data-v="mix" aria-pressed="true">A table, the replay beside it · chosen</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; Watching a replay</span>
+      <div class="seg" role="group" aria-label="Watching a replay" id="r2-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s map and side</button>
+        <button type="button" data-v="docks" aria-pressed="false">As the table</button>
+        <button type="button" data-v="glass" aria-pressed="false">The map on glass</button>
+        <button type="button" data-v="log" aria-pressed="true">The whole fight beside · chosen</button>
+        <button type="button" data-v="stack" aria-pressed="false">Map above, the rest under</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; Moving through the turns</span>
+      <div class="seg" role="group" aria-label="Moving through the turns" id="r3-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s buttons and slider</button>
+        <button type="button" data-v="bar" aria-pressed="false">The Playing bar</button>
+        <button type="button" data-v="ladder" aria-pressed="false">The order is the ladder</button>
+        <button type="button" data-v="line" aria-pressed="true">A line of rounds · chosen</button>
+        <button type="button" data-v="chips" aria-pressed="false">Rounds and turns as chips</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; The GM&#39;s actions</span>
+      <div class="seg" role="group" aria-label="The GM's actions" id="r4-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s buttons</button>
+        <button type="button" data-v="menu" aria-pressed="false">A&#39;s menu at More</button>
+        <button type="button" data-v="title" aria-pressed="false">The title row</button>
+        <button type="button" data-v="side" aria-pressed="false">In the side column</button>
+        <button type="button" data-v="foot" aria-pressed="true">Launch at the transport · chosen</button>
+      </div>
+    </div>
+    <div class="ctl"><span>5 &middot; A player&#39;s replays</span>
+      <div class="seg" role="group" aria-label="A player's replays" id="r5-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s shelf</button>
+        <button type="button" data-v="cards" aria-pressed="true">Cards under the sheet · chosen</button>
+        <button type="button" data-v="log" aria-pressed="false">In the Log tab</button>
+        <button type="button" data-v="more" aria-pressed="false">In the frame&#39;s menu</button>
+        <button type="button" data-v="last" aria-pressed="false">The last fight</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="list" aria-pressed="true">The list</button>
+        <button type="button" data-v="viewer" aria-pressed="false">Watching</button>
+        <button type="button" data-v="moving" aria-pressed="false">A player watching</button>
+        <button type="button" data-v="actions" aria-pressed="false">The GM&#39;s actions</button>
+        <button type="button" data-v="player" aria-pressed="false">A player&#39;s replays</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="spec" aria-labelledby="carried-h" style="margin-top:0">
+    <h2 id="carried-h">Carried in</h2>
+    <p>Every option on this page is built only from what is already settled. Nothing here picks a new look; the options differ in where things sit and how they are arranged.</p>
+    <div class="carried" id="carried"></div>
+  </section>
+
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only" id="sz-laptop">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p id="sz-phone">390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+      <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f with a fight of eight turns and eight earlier ones: the GM&#39;s list, a replay&#39;s More and Rename, watching, Launch&#39;s confirm, and a player&#39;s shelf and view, on a laptop and on a phone.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for replays</h2>
+    <p>These hold for every option.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

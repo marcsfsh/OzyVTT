@@ -1,0 +1,99 @@
+/* =========================================================================
+   The three layouts. They only arrange the parts above.
+   ========================================================================= */
+.who3 { min-width: 0; }
+.who3 .sh-name { font-size: 24px; }
+.who3 .sh-sub { margin-top: 3px; }
+
+/* ---- Beyond: identity, then the stat row, then saves | skills | the tabbed box ---- */
+.lb { box-sizing: border-box; height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; padding: 12px 20px 14px; }
+.lb-top { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.lb-top .sh-port { width: 54px; height: 54px; }
+.lb-top .end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.lb-stats .ab3 > div { padding-block: 9px; }
+.lb-stats { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 2.6fr) minmax(0, 3.7fr); gap: 12px; }
+.lb-body { display: grid; grid-template-columns: 230px 250px minmax(0, 1fr); gap: 12px; min-height: 0; }
+.lb-col { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; scrollbar-width: thin; }
+.lb-col > .c3 { flex: none; }
+.lb-main { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; min-height: 0; }
+.lb-def { display: grid; grid-template-columns: 76px 92px minmax(0, 1fr) minmax(0, 1.5fr); }
+.lb-def > div { display: grid; align-content: center; gap: 6px; min-width: 0; padding: 9px 12px; }
+.lb-def > div + div { border-left: 1px solid var(--line); }
+.lb-def .v { font: 400 30px/1 var(--f-num); }
+.lb-def .t { font-size: 13px; color: var(--text-dim); }
+.lb-box { display: flex; flex-direction: column; min-height: 0; }
+.lb-box > .sh-tabs { padding: 0 8px; }
+.lb-tp { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px 14px 16px; scrollbar-width: thin; }
+
+/* ---- Foundry: a sidebar for staying alive, the main side for everything else ---- */
+.lf { height: 100%; display: grid; grid-template-columns: 296px minmax(0, 1fr); }
+.lf-side { min-height: 0; overflow: auto; display: grid; align-content: start; border-right: 1px solid var(--line-strong); background: var(--glass-s1); scrollbar-width: thin; }
+.lf-sec { padding: 12px 16px; }
+.lf-sec + .lf-sec { border-top: 1px solid var(--line); }
+.lf-art { position: relative; display: grid; place-items: center; height: 118px; border: 1px solid var(--line-strong); background: radial-gradient(70% 70% at 50% 35%, color-mix(in srgb, var(--party) 24%, var(--s2)), var(--void)); }
+.lf-art svg { width: 72px; height: 72px; }
+.lf-art .lv { position: absolute; right: -1px; bottom: -1px; padding: 5px 9px; border: 1px solid var(--line-strong); background: var(--bg); font: 600 12px/1 var(--f-label); letter-spacing: 0.08em; text-transform: uppercase; }
+.lf-art .lv .sh-num { font-size: 18px; margin-left: 4px; }
+.lf-side .sts3 { border: 1px solid var(--line-strong); }
+.lf-list { display: grid; }
+.lf-list > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 34px; border-top: 1px solid var(--line); font-size: 14px; }
+.lf-list > div:first-child { border-top: 0; }
+.lf-list .k { font: 600 11px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.lf-main { min-height: 0; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); gap: 12px; padding: 16px 20px 0; }
+.lf-head { display: flex; align-items: flex-end; gap: 18px; min-width: 0; }
+.lf-xp { margin-left: auto; display: grid; gap: 6px; width: 220px; font-size: 12px; color: var(--text-muted); }
+.lf-xp .row { display: flex; justify-content: space-between; align-items: baseline; }
+.lf-xp .sh-num { font-size: 17px; color: var(--text-dim); }
+.lf-main > .sh-tabs { margin-top: -2px; }
+.lf-tp { min-height: 0; overflow: auto; padding: 2px 0 18px; scrollbar-width: thin; }
+.lf-two { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.lf-two > div { display: grid; gap: 12px; }
+
+/* ---- Paper: the front page of the printed sheet, four columns ---- */
+.lp { padding: 0 20px 28px; }
+.lp-tabs { position: sticky; top: 0; z-index: 2; margin: 0 -20px; padding: 6px 20px 0; background: var(--bg); }
+.lp-head { display: grid; grid-template-columns: 330px minmax(0, 1fr); margin-top: 14px; }
+.lp-head .id { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 12px 14px; border-right: 1px solid var(--line); }
+.lp-head .id .sh-port { width: 52px; height: 52px; }
+.lp-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lp-facts > div { display: grid; align-content: center; gap: 4px; padding: 9px 14px; }
+.lp-facts > div:nth-child(3n + 2), .lp-facts > div:nth-child(3n) { border-left: 1px solid var(--line); }
+.lp-facts > div:nth-child(n + 4) { border-top: 1px solid var(--line); }
+.lp-facts b { font-weight: 600; font-size: 14px; }
+.lp-facts span { font: 600 10px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.lp-grid { display: grid; grid-template-columns: 104px 262px 380px minmax(0, 1fr); gap: 12px; align-items: start; margin-top: 12px; }
+.lp-col { display: grid; gap: 12px; min-width: 0; }
+.lp-mini { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 10px; font-size: 13px; color: var(--text-dim); }
+.lp-mini .bx { display: grid; place-items: center; width: 40px; height: 34px; border: 1px solid var(--line-strong); font: 400 24px/1 var(--f-num); color: var(--text); }
+.lp-mini .insp3 { width: 34px; height: 34px; }
+.lp-pair { display: grid; grid-template-columns: 1fr 1fr; }
+.lp-pair > div { display: grid; gap: 8px; align-content: start; padding: 10px 12px; }
+.lp-pair > div + div { border-left: 1px solid var(--line); }
+.lp-wide { display: grid; gap: 12px; max-width: 980px; }
+.lp-wide.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; max-width: none; }
+
+/* ---- Narrow: phone and Table panel ---- */
+.ln { min-height: 100%; }
+.ln .ab3.grid > div { padding: 9px 4px; }
+.ln .sv3 { column-gap: 14px; }
+.ln .lf-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 0 12px 12px; font-size: 13px; color: var(--text-muted); }
+.ln .lf-strip .sh-chips { flex: 1 1 100%; }
+.ln .lf-ab { padding: 2px 12px 12px; }
+.ln .lp-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ln .lp-trio > div { display: grid; justify-items: center; gap: 6px; padding: 9px 4px; text-align: center; }
+.ln .lp-trio > div + div { border-left: 1px solid var(--line); }
+.ln .lp-trio .l { font: 600 10px/1.15 var(--f-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.ln .lp-trio .v { font: 400 26px/1 var(--f-num); }
+/* Beyond fits saves, senses, proficiencies and all eighteen skills in 1280 by 800 without a scrollbar */
+.lb-top .sh-port { width: 48px; height: 48px; }
+.lb-top .sh-name { font-size: 22px; }
+.lb .ab3 > div { padding-block: 7px; gap: 4px; }
+.lb .hpb3 { padding-block: 7px 6px; }
+.lb .sts3 > div { padding-block: 7px; }
+.lb .c3-h { min-height: 30px; }
+.lb .sk3 { min-height: 27px; }
+.lb .sv3 .sk3 { min-height: 30px; }
+.lb .sn3 > div { min-height: 26px; }
+.lb .c3 .sh-facts dt, .lb .c3 .sh-facts dd { padding-block: 5px; }
+.lb .c3 .sh-facts dd { font-size: 13.5px; }
+.lb .c3-b { padding-bottom: 8px; }

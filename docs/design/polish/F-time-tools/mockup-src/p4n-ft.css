@@ -1,0 +1,48 @@
+/* ---------- Time and tools round ---------- */
+.t-page { position: absolute; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.t-head { display: flex; align-items: center; gap: 12px; padding: 14px 24px 12px; border-bottom: 1px solid var(--line); min-width: 0; }
+.t-head .crumb { display: flex; align-items: center; gap: 6px; font: 600 12px/1 var(--f-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.t-head h1 { margin: 0; font: 600 24px/1.1 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text); white-space: nowrap; }
+.t-kind { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--line-raised); font: 600 11px/1 var(--f-label); letter-spacing: 0.04em; color: var(--text-dim); white-space: nowrap; }
+.t-kind svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.t-def { display: inline-flex; align-items: center; padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--cyan) 60%, transparent); font: 600 11px/1 var(--f-label); letter-spacing: 0.06em; text-transform: uppercase; color: var(--cyan-hi); }
+.t-sec { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; min-height: 52px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.t-sec .h { color: var(--text-muted); }
+.t-sec .h svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.t-sec b { display: block; font: 600 14.5px/1.25 var(--f-label); color: var(--text); }
+.t-sec small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-sec.on { background: color-mix(in srgb, var(--cyan) 8%, transparent); box-shadow: inset 3px 0 0 var(--cyan); }
+.t-card { position: relative; display: grid; gap: 8px; align-content: start; padding: 14px 16px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.t-card.on { border-color: var(--cyan); box-shadow: inset 0 -2px 0 var(--cyan); }
+.t-card b { font: 600 16px/1.2 var(--f-label); color: var(--text); }
+.t-card .n { font: 400 26px/1 var(--f-num); color: var(--text); }
+.t-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.t-field { display: grid; gap: 6px; }
+.t-field > span:first-child { font: 600 11px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.t-month { display: grid; gap: 6px; align-content: start; min-height: 74px; padding: 10px 12px; border: 1px solid var(--line-strong); background: var(--s1); }
+.t-month b { font: 600 13.5px/1.2 var(--f-label); color: var(--text); }
+.t-month .n { font: 400 18px/1 var(--f-num); color: var(--text-dim); }
+.t-month.on { border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 8%, var(--s1)); }
+.t-month.edit { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan); }
+.t-erarail { position: relative; height: 40px; }
+.t-erarail .rail { position: absolute; left: 0; right: 0; top: 20px; height: 2px; background: var(--grad-horizon); }
+.t-erarail .era { position: absolute; top: 0; font: 600 11px/1 var(--f-label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); padding-left: 6px; border-left: 2px solid var(--cyan); height: 34px; display: grid; align-content: space-between; }
+.t-erarail .era .n { font: 400 15px/1 var(--f-num); color: var(--cyan-hi); letter-spacing: 0; }
+.t-tl { display: grid; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1.4fr); gap: 0 12px; align-content: start; }
+.t-tl .hd { font: 600 11px/1 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); padding: 6px 0; }
+.t-day { display: grid; place-items: center; align-content: center; height: 54px; border: 1px solid var(--line-strong); background: var(--s1); font: 400 18px/1 var(--f-num); color: var(--text); }
+.t-day small { font: 500 10.5px/1 var(--f-label); color: var(--text-muted); }
+.t-ent { display: grid; gap: 4px; align-content: center; min-height: 54px; padding: 8px 12px; border: 1px solid var(--line); border-left: 3px solid var(--line-raised); background: var(--s1); font-size: 13.5px; color: var(--text); margin-bottom: 8px; }
+.t-ent small { font: 600 11px/1 var(--f-label); letter-spacing: 0.04em; color: var(--text-muted); }
+.t-ent.on { border-color: var(--cyan); border-left-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 8%, var(--s1)); }
+.t-line { grid-column: 1 / -1; position: relative; height: 26px; margin: 4px 0 10px; }
+.t-line::before { content: ""; position: absolute; left: 0; right: 0; top: 12px; height: 2px; background: var(--cyan); }
+.t-line.you::before { background: var(--violet); }
+.t-line span { position: absolute; left: 50%; top: 2px; transform: translateX(-50%); padding: 3px 8px; border: 1px solid var(--cyan); background: var(--bg); font: 600 11.5px/1.2 var(--f-label); color: var(--cyan-hi); white-space: nowrap; }
+.t-line.you span { border-color: var(--violet); color: var(--violet-text); }
+.t-tool { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; min-height: 64px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.t-tool b { display: block; font: 600 14.5px/1.25 var(--f-label); color: var(--text); }
+.t-tool small { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.45; color: var(--text-dim); }
+.t-tool .t-ctl { display: flex; gap: 8px; align-items: center; }
+.t-n { font: 400 17px/1 var(--f-num); color: var(--text-dim); }
+.t-prompt { padding: 10px 12px; border: 1px dashed var(--line-raised); color: var(--text-muted); font-size: 13.5px; font-style: italic; }

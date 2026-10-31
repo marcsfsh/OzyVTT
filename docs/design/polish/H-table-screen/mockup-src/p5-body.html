@@ -1,0 +1,98 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; H, the table screen &middot; approved</p>
+  <h1>The table screen</h1>
+  <p>Approved after two rounds. In a fight the TV shows the turn ladder, refined: the order down the left with the acting row grown into a card and the latest roll at its foot, and the map beside it; with no fight running, the ladder names the map instead. Pairing, paused and waiting use the horizon line. The GM's page opens on the screens, each with its live picture, and a screen opens as a remote to point at the map. The preview docks as a picture in picture. In the GM's frames, press a screen's card to open it, and Back to return. The first switch still shows the ladders that were compared; the chosen one is marked. On a phone, the bar at the top switches pages and options, and the laptop view opens close up: swipe it sideways.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl" style="flex:2 1 420px"><span>1 &middot; The TV in a fight</span>
+      <div class="seg" role="group" aria-label="The TV in a fight" id="d1-seg">
+        <button type="button" data-v="refined" aria-pressed="true">Ladder, refined · chosen</button>
+        <button type="button" data-v="rolling" aria-pressed="false">Rolling ladder</button>
+        <button type="button" data-v="glass" aria-pressed="false">Ladder over the map</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; Pairing and waiting</span>
+      <div class="seg" role="group" aria-label="Pairing and waiting" id="d2-seg">
+        <button type="button" data-v="horizon" aria-pressed="true">Horizon line · chosen</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; Screen controls</span>
+      <div class="seg" role="group" aria-label="The GM's screen controls" id="d3-seg">
+        <button type="button" data-v="combo" aria-pressed="true">Screens first, then Remote · chosen</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; The preview</span>
+      <div class="seg" role="group" aria-label="In the menu, and the preview" id="d4-seg">
+        <button type="button" data-v="pip" aria-pressed="true">Picture in picture · chosen</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="fight" aria-pressed="true">The TV in a fight</button>
+        <button type="button" data-v="calm" aria-pressed="false">A map, no fight</button>
+        <button type="button" data-v="pair" aria-pressed="false">Pairing a TV</button>
+        <button type="button" data-v="paused" aria-pressed="false">Paused</button>
+        <button type="button" data-v="waiting" aria-pressed="false">Waiting for a map</button>
+        <button type="button" data-v="screens" aria-pressed="false">The screens</button>
+        <button type="button" data-v="screen" aria-pressed="false">A screen open</button>
+        <button type="button" data-v="menu" aria-pressed="false">In the menu</button>
+        <button type="button" data-v="pip" aria-pressed="false">The preview</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only" id="sz-laptop">1280 by 720, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p id="sz-phone">390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f on a fresh server: a TV paired through the GM's Shared screen page, the old road presented, an encounter started and a roll made.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for the table screen</h2>
+    <p>These hold across the table screen, and for its pages that come in later rounds.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

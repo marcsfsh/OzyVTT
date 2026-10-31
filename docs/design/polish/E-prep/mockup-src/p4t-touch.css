@@ -1,0 +1,16 @@
+/* Phones: a control's face is its 44 px hit area (T 2.5), and a menu in a sheet has 52 px rows (A 2.4). Sizes written
+   inline in the markup give way, so every phone frame reads one way. */
+.ap.is-phone :is(.e-btn, .d-btn, .k-btn, .q-bl, .b-base, .b-ghost, .btn, .lnk2, .show, .h-open, .cup, .g-pill, .g-mf, .e-trayc, .tray, .u-tagc, .chips2 span:not(.eb)) { min-height: 44px !important; }
+.ap.is-phone :is(.e-ico, .d-ico, .z-ic, .z-ghost, .ico, .w-play, .r-eye, .w-send, .toast .x) { min-width: 44px !important; min-height: 44px !important; }
+.ap.is-phone :is(.e-seg, .segc, .g-segs, .k-segs) > span { min-height: 44px !important; }
+.ap.is-phone :is(.q-mi, .u-mi, .x-mi) { min-height: 52px !important; }
+.ap.is-phone :is(.f-row, .g-fo, .y-tier, .r-step, .q-row) { min-height: 44px; }
+/* Parts drawn with their own classes meet the same floor: steppers, segments, a toolbar, an add link, a chip's × and the
+   phone rows that were 34 to 40 px (T 2.5, rule 8). */
+.ap.is-phone .sfield .lnk { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; }
+.ap.is-phone :is(.b-theme span, .composer .dz, .q-step, .e-numf, .i-step, .f-tb span) { height: 44px; }
+.ap.is-phone .composer .dz { min-width: 44px; }
+.ap.is-phone :is(.d-segc span, .g-aud span, .g-add, .g-chip, .g-pill, .g-mf, .u-opt, .i-sw) { min-height: 44px; }
+.ap.is-phone .z-opts .q-seg:has(> .q-line) { display: flex; align-items: center; min-height: 44px; }
+.ap.is-phone .w-row { min-height: 44px !important; }
+.ap.is-phone .g-chip .x { align-self: stretch; display: inline-grid; place-items: center; min-width: 32px; }

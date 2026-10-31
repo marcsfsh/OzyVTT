@@ -1,0 +1,95 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; G, the Compendium &middot; approved</p>
+  <h1>The Compendium</h1>
+  <p>Approved after three rounds. The Compendium opens on its shelves; browsing and records are three panes (the filter panel, the results and the record, with the open records as tabs over the record); and homebrew is made in the studio, whose steps show their answers. In the frames, press the open records, a record's Card, Sharing and History, Filters on a phone, and Edit. The switches still show the options that were compared; the chosen ones are marked. On a phone, the bar at the top switches pages and options, and the laptop view opens close up: swipe it sideways.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; The Compendium's home</span>
+      <div class="seg2" role="group" aria-label="1 The Compendium's home" id="d1-seg">
+        <div class="fam"><em>Shelves</em><div class="seg"><button type="button" data-v="shelves" aria-pressed="true">Refined · chosen</button><button type="button" data-v="twoshelves" aria-pressed="false">Two shelves</button><button type="button" data-v="hbshelf" aria-pressed="false">Homebrew shelf</button></div></div>
+        <div class="fam"><em>Search first</em><div class="seg"><button type="button" data-v="find" aria-pressed="false">Refined</button><button type="button" data-v="pins" aria-pressed="false">Pinned</button><button type="button" data-v="findshelves" aria-pressed="false">Search over shelves</button></div></div>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; Browsing and records</span>
+      <div class="seg" role="group" aria-label="Browsing and records" id="d2-seg">
+        <button type="button" data-v="panes" aria-pressed="true">Three panes · chosen</button>
+        <button type="button" data-v="sidebar" aria-pressed="false">One sidebar</button>
+        <button type="button" data-v="summary" aria-pressed="false">Filters fold into the list</button>
+        <button type="button" data-v="preview" aria-pressed="false">Preview, then keep</button>
+        <button type="button" data-v="walk" aria-pressed="false">Walk the results</button>
+        <button type="button" data-v="lanes" aria-pressed="false">Side by side</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; Making homebrew</span>
+      <div class="seg2" role="group" aria-label="4 Making homebrew" id="d4-seg">
+        <div class="fam"><em>Studio</em><div class="seg"><button type="button" data-v="studio" aria-pressed="true">Refined · chosen</button><button type="button" data-v="cardrail" aria-pressed="false">Card as the steps</button><button type="button" data-v="topsteps" aria-pressed="false">Steps across the top</button></div></div>
+        <div class="fam"><em>One form</em><div class="seg"><button type="button" data-v="form" aria-pressed="false">Refined</button><button type="button" data-v="folds" aria-pressed="false">Folding sections</button><button type="button" data-v="paired" aria-pressed="false">Paired with the card</button></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="home" aria-pressed="true">Home</button>
+        <button type="button" data-v="browse" aria-pressed="false">Browsing</button>
+        <button type="button" data-v="srd" aria-pressed="false">An SRD monster</button>
+        <button type="button" data-v="hb" aria-pressed="false">Your copy</button>
+        <button type="button" data-v="filter" aria-pressed="false">Ticking a filter</button>
+        <button type="button" data-v="make" aria-pressed="false">Editing</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p>390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f on a fresh server, as the GM, after making a homebrew copy of the SRD's Goblin Boss. The mockups add three more homebrew records so the lists have something in them.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for the Compendium</h2>
+    <p>These hold across the Compendium, and for its pages that come in later rounds.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

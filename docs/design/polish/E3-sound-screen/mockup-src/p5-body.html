@@ -1,0 +1,123 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; the sound board and the table screen&#39;s leftovers &middot; approved</p>
+  <h1>Sound and the screen</h1>
+  <p>Approved after one round. The sound board puts Playlist, Ambience, Effects and the library at the side, the chosen one at the right. One Playing bar sits under the title row: the room&#39;s lamp, the track, a scrubber, three icon buttons and Master, with one kind of control and one kind of slider. A library sound goes on the board with its kind chips. Each encounter keeps its sound on its own page, under Light and sound. See as the table screen swaps the map in place under the cyan line, as today. Every part is one already settled (Carried in). The switches still show the options that were compared; the chosen ones are marked. Scroll past the switches and a compact bar keeps the page and its options in reach.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; The board</span>
+      <div class="seg" role="group" aria-label="The board" id="s1-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s board</button>
+        <button type="button" data-v="desk" aria-pressed="false">A mixing desk</button>
+        <button type="button" data-v="rail" aria-pressed="true">Kinds at the side · chosen</button>
+        <button type="button" data-v="panes" aria-pressed="false">Board and library</button>
+        <button type="button" data-v="decks" aria-pressed="false">Three decks</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; What is playing</span>
+      <div class="seg" role="group" aria-label="What is playing" id="s2-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s bar</button>
+        <button type="button" data-v="onscreen" aria-pressed="true">A bar like On the screen · chosen</button>
+        <button type="button" data-v="vcr" aria-pressed="false">The VCR counter</button>
+        <button type="button" data-v="card" aria-pressed="false">A now playing card</button>
+        <button type="button" data-v="foot" aria-pressed="false">Pinned at the foot</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; Putting a sound on</span>
+      <div class="seg" role="group" aria-label="Putting a sound on" id="s3-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s buttons</button>
+        <button type="button" data-v="chips" aria-pressed="true">Kind chips · chosen</button>
+        <button type="button" data-v="menu" aria-pressed="false">A&#39;s menu at the sound</button>
+        <button type="button" data-v="drag" aria-pressed="false">Drag onto the board</button>
+        <button type="button" data-v="dialog" aria-pressed="false">Add from the section</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; An encounter&#39;s sound</span>
+      <div class="seg" role="group" aria-label="An encounter's sound" id="s4-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s rows</button>
+        <button type="button" data-v="cards" aria-pressed="false">Encounter cards</button>
+        <button type="button" data-v="side" aria-pressed="false">In the side list</button>
+        <button type="button" data-v="strip" aria-pressed="false">A strip under the head</button>
+        <button type="button" data-v="page" aria-pressed="true">On the encounter&#39;s page · chosen</button>
+      </div>
+    </div>
+    <div class="ctl"><span>5 &middot; See as the table screen</span>
+      <div class="seg" role="group" aria-label="See as the table screen" id="s5-seg">
+        <button type="button" data-v="today" aria-pressed="true">Today&#39;s swap · chosen</button>
+        <button type="button" data-v="inplace" aria-pressed="false">The screen in place</button>
+        <button type="button" data-v="pip" aria-pressed="false">Picture in picture</button>
+        <button type="button" data-v="side" aria-pressed="false">Side by side</button>
+        <button type="button" data-v="full" aria-pressed="false">The whole screen</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="board" aria-pressed="true">The board</button>
+        <button type="button" data-v="now" aria-pressed="false">What is playing</button>
+        <button type="button" data-v="add" aria-pressed="false">Putting a sound on</button>
+        <button type="button" data-v="enc" aria-pressed="false">An encounter&#39;s sound</button>
+        <button type="button" data-v="seeas" aria-pressed="false">See as the screen</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="spec" aria-labelledby="carried-h" style="margin-top:0">
+    <h2 id="carried-h">Carried in</h2>
+    <p>Every option on this page is built only from what is already settled. Nothing here picks a new look; the options differ in where things sit and how they are arranged.</p>
+    <div class="carried" id="carried"></div>
+  </section>
+
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only" id="sz-laptop">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p id="sz-phone">390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+      <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f with eleven sounds in the library, three tracks, three ambient layers and five effects on the board, and three encounters: the sound board, an encounter seen as the table screen, and Settings' Players section, on a laptop and on a phone.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for sound and the screen</h2>
+    <p>These hold for every option.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

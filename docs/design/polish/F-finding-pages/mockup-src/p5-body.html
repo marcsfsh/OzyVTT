@@ -1,0 +1,123 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; F, finding and pages &middot; approved</p>
+  <h1>Finding and pages</h1>
+  <p>Approved after one round. All the results open as panes: the kinds and who sees them at the left, the results, and the chosen page. The pages index puts the kinds and tags at the side, as the maps' folders do. On a page, a tag, revealing something to players and the page's versions each take the side column in turn, the versions one compact line each. Every part is one already settled (Carried in). The switches still show the options that were compared; the chosen ones are marked. Scroll past the switches and a compact bar keeps the page and its options in reach.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; All the results</span>
+      <div class="seg" role="group" aria-label="All the results" id="f1-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s table</button>
+        <button type="button" data-v="rows" aria-pressed="false">Rows with their line</button>
+        <button type="button" data-v="grouped" aria-pressed="false">By kind</button>
+        <button type="button" data-v="panes" aria-pressed="true">Results and the page · chosen</button>
+        <button type="button" data-v="dialog" aria-pressed="false">Only the dialog</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; The pages index</span>
+      <div class="seg" role="group" aria-label="The pages index" id="f2-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s index</button>
+        <button type="button" data-v="shelf" aria-pressed="false">Cards by kind</button>
+        <button type="button" data-v="rail" aria-pressed="true">Kinds at the side · chosen</button>
+        <button type="button" data-v="table" aria-pressed="false">One table</button>
+        <button type="button" data-v="alpha" aria-pressed="false">A to Z</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; A tag</span>
+      <div class="seg" role="group" aria-label="A tag" id="f3-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s page</button>
+        <button type="button" data-v="filter" aria-pressed="false">A filter on the index</button>
+        <button type="button" data-v="record" aria-pressed="false">A record</button>
+        <button type="button" data-v="menu" aria-pressed="false">A menu at the tag</button>
+        <button type="button" data-v="panes" aria-pressed="true">In the side column · chosen</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; Revealing to players</span>
+      <div class="seg" role="group" aria-label="Revealing to players" id="f4-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s dialog</button>
+        <button type="button" data-v="menu" aria-pressed="false">A menu at Reveal</button>
+        <button type="button" data-v="inplace" aria-pressed="false">In place</button>
+        <button type="button" data-v="preview" aria-pressed="false">Beside the preview</button>
+        <button type="button" data-v="side" aria-pressed="true">In the side column · chosen</button>
+      </div>
+    </div>
+    <div class="ctl"><span>5 &middot; Version history</span>
+      <div class="seg" role="group" aria-label="Version history" id="f5-seg">
+        <button type="button" data-v="today" aria-pressed="false">Today&#39;s dialog</button>
+        <button type="button" data-v="side" aria-pressed="true">In the side column · chosen</button>
+        <button type="button" data-v="compare" aria-pressed="false">Side by side</button>
+        <button type="button" data-v="timeline" aria-pressed="false">A line of versions</button>
+        <button type="button" data-v="menu" aria-pressed="false">A&#39;s menu</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="search" aria-pressed="true">All the results</button>
+        <button type="button" data-v="index" aria-pressed="false">The pages index</button>
+        <button type="button" data-v="tag" aria-pressed="false">A tag</button>
+        <button type="button" data-v="reveal" aria-pressed="false">Revealing</button>
+        <button type="button" data-v="history" aria-pressed="false">Version history</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="spec" aria-labelledby="carried-h" style="margin-top:0">
+    <h2 id="carried-h">Carried in</h2>
+    <p>Every option on this page is built only from what is already settled. Nothing here picks a new look; the options differ in where things sit and how they are arranged.</p>
+    <div class="carried" id="carried"></div>
+  </section>
+
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only" id="sz-laptop">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p id="sz-phone">390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+      <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f with twelve Codex pages: the search page, the pages index, a tag, Ctrl K's palette, revealing a block, and version history, on a laptop and on a phone.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for finding and pages</h2>
+    <p>These hold for every option, for the GM and for players.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

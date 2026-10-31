@@ -1,0 +1,190 @@
+<title>OzyVTT Running the Encounter</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=Bungee&family=Chakra+Petch:wght@500;600&family=Mr+Dafoe&family=VT323&display=swap">
+<style>
+/* Layout: the app's own Dusk glass over its sky. A sticky switcher picks one option for each open decision, the page
+   to show it on, the view and the theme. Each view is a scaled frame holding a working page drawn from one set of
+   parts, so the options differ only where the decision applies. Dusk is :root, Dawn the light override. */
+:root {
+  color-scheme: dark;
+  --sky: radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%), linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%);
+  --ground: #1b1d33;
+  --bg: #151728;
+  --glass-bg: rgba(18, 20, 34, 0.82);
+  --void: #131524;
+  --s1: #1b1e31;
+  --s2: #25283f;
+  --s3: #2b2f49;
+  --glass-s1: rgba(26, 29, 46, 0.72);
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-raised: rgba(255, 255, 255, 0.2);
+  --line-raised-hover: rgba(255, 255, 255, 0.32);
+  --text: #eef0f8;
+  --text-dim: #c3c7d9;
+  --text-muted: #b0b4ca;
+  --magenta: #ff2f92;
+  --cyan: #4fe3ff;
+  --cyan-hi: #6fe8ff;
+  --party: #7aa2ff;
+  --hp: #ffd54d;
+  --hp-text: #ffd54d;
+  --hp-lost: rgba(120, 30, 50, 0.6);
+  --hostile: #ff5d50;
+  --violet: #bb90ff;
+  --caution: #ffb733;
+  --caution-text: #ffb733;
+  --violet-text: #bb90ff;
+  --magenta-text: #ff2f92;
+  --tab-on: #353a55;
+  --state-on-edge: #4fe3ff;
+  --focus-ring: #4fe3ff;
+  --text-on-neon: #04141c;
+  --grad-horizon: linear-gradient(90deg, #4fe3ff 0%, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d 100%);
+  --hz-paint: linear-gradient(90deg, #4fe3ff, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d);
+  --hz-paint-v: linear-gradient(180deg, #4fe3ff, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d);
+  --glow-horizon: 0 0 12px rgba(255, 47, 146, 0.6);
+  --ink-glow: 0 0 8px rgba(255, 47, 146, 0.45);
+  --ink-cast: 0.24;
+  --ink-bright: brightness(1.35) saturate(1.15);
+  --grad-chrome: linear-gradient(180deg, #eaf8ff 0%, #9fdcff 42%, #ffffff 49%, #3b2163 51%, #ff5fae 75%, #ffd6ea 100%);
+  --chrome-split: -1.5px 0 rgba(43, 228, 255, 0.55), 1.5px 0 rgba(255, 47, 146, 0.55);
+  --glow-lamp-bonus: 0 0 10px rgba(255, 210, 63, 0.8);
+  --glow-on: 0 0 8px rgba(43, 228, 255, 0.6);
+  --primary-veil: 66%;
+  --primary-drop: drop-shadow(0 0 4px rgba(255, 47, 146, 0.8));
+  --spark: #ffffff;
+
+  --glow-lamp-action: 0 0 10px rgba(255, 47, 146, 0.85);
+  --glow-lamp-reaction: 0 0 10px rgba(43, 228, 255, 0.8);
+  --grad-sun: linear-gradient(180deg, #ffe14d 0%, #ff8a1f 50%, #ff2f92 100%);
+  --glow-sun: 0 0 14px rgba(255, 138, 31, 0.55);
+  --danger-text: #ff9d94;
+  --gold-tail: rgba(255, 213, 77, 0.65);
+  --red-tail: rgba(255, 93, 80, 0.7);
+  --well-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+
+  --f-display: "Chakra Petch", "Bai Jamjuree", system-ui, sans-serif;
+  --f-chrome: "Bungee", "Arial Black", system-ui, sans-serif;
+  --f-label: "Bai Jamjuree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num: "VT323", ui-monospace, "SFMono-Regular", monospace;
+  --f-script: "Mr Dafoe", "Brush Script MT", cursive;
+  --ease-travel: cubic-bezier(0.45, 0, 0.25, 1);
+  --ease-settle: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --sky: #ebe7ef;
+    --ground: #ebe7ef;
+    --bg: #ebe7ef;
+    --glass-bg: #ebe7ef;
+    --void: #e3dee8;
+    --s1: #f3f0f5;
+    --s2: #f7f5f9;
+    --s3: #e8e3ee;
+    --glass-s1: #f3f0f5;
+    --line: #e0dbe6;
+    --line-strong: #d3ccdc;
+    --line-raised: #b9b0c8;
+    --line-raised-hover: #9c92ae;
+    --text: #2a2537;
+    --text-dim: #4f4862;
+    --text-muted: #655d77;
+    --magenta: #f0559b;
+    --cyan: #2a8fa8;
+    --cyan-hi: #1d6a80;
+    --party: #4a72d9;
+    --hp: #d9a43a;
+    --hp-text: #7a5718;
+    --hp-lost: #ecd6dc;
+    --hostile: #d9493f;
+    --violet: #8a62d6;
+    --caution: #d08a2a;
+    --caution-text: #875400;
+    --violet-text: #6a44bf;
+    --magenta-text: #a3246b;
+    --tab-on: #fbfafc;
+    --state-on-edge: #1d6a80;
+    --focus-ring: #1d6a80;
+    --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+    --hz-paint: linear-gradient(90deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+    --hz-paint-v: linear-gradient(180deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+    --glow-horizon: 0 0 #0000;
+    --ink-glow: 0 0 #0000;
+    --ink-cast: 0.14;
+    --ink-bright: brightness(0.8) saturate(1.2);
+    --grad-chrome: linear-gradient(#2a2537, #2a2537);
+    --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+    --glow-lamp-bonus: 0 0 #0000;
+    --glow-on: 0 0 #0000;
+    --primary-veil: 80%;
+    --primary-drop: none;
+    --spark: #b0306e;
+    --glow-lamp-action: 0 0 #0000;
+    --glow-lamp-reaction: 0 0 #0000;
+    --glow-sun: 0 0 10px rgba(255, 138, 31, 0.35);
+    --danger-text: #a8352c;
+    --gold-tail: rgba(217, 164, 58, 0.6);
+    --red-tail: rgba(217, 73, 63, 0.6);
+    --well-shadow: inset 0 2px 5px rgba(60, 40, 80, 0.12);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --sky: #ebe7ef;
+  --ground: #ebe7ef;
+  --bg: #ebe7ef;
+  --glass-bg: #ebe7ef;
+  --void: #e3dee8;
+  --s1: #f3f0f5;
+  --s2: #f7f5f9;
+  --s3: #e8e3ee;
+  --glass-s1: #f3f0f5;
+  --line: #e0dbe6;
+  --line-strong: #d3ccdc;
+  --line-raised: #b9b0c8;
+  --line-raised-hover: #9c92ae;
+  --text: #2a2537;
+  --text-dim: #4f4862;
+  --text-muted: #655d77;
+  --magenta: #f0559b;
+  --cyan: #2a8fa8;
+  --cyan-hi: #1d6a80;
+  --party: #4a72d9;
+  --hp: #d9a43a;
+  --hp-text: #7a5718;
+  --hp-lost: #ecd6dc;
+  --hostile: #d9493f;
+  --violet: #8a62d6;
+  --caution: #d08a2a;
+  --caution-text: #875400;
+  --violet-text: #6a44bf;
+  --magenta-text: #a3246b;
+  --tab-on: #fbfafc;
+  --state-on-edge: #1d6a80;
+  --focus-ring: #1d6a80;
+  --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+  --hz-paint: linear-gradient(90deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+  --hz-paint-v: linear-gradient(180deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+  --glow-horizon: 0 0 #0000;
+  --ink-glow: 0 0 #0000;
+  --ink-cast: 0.14;
+  --ink-bright: brightness(0.8) saturate(1.2);
+  --grad-chrome: linear-gradient(#2a2537, #2a2537);
+  --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+  --glow-lamp-bonus: 0 0 #0000;
+  --glow-on: 0 0 #0000;
+  --primary-veil: 80%;
+  --primary-drop: none;
+  --spark: #b0306e;
+  --glow-lamp-action: 0 0 #0000;
+  --glow-lamp-reaction: 0 0 #0000;
+  --glow-sun: 0 0 10px rgba(255, 138, 31, 0.35);
+  --danger-text: #a8352c;
+  --gold-tail: rgba(217, 164, 58, 0.6);
+  --red-tail: rgba(217, 73, 63, 0.6);
+  --well-shadow: inset 0 2px 5px rgba(60, 40, 80, 0.12);
+}

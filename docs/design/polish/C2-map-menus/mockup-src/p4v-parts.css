@@ -1,0 +1,61 @@
+/* The fifth sweep's shared values, drawn once for every mockup (T 2.2, 2.4, 2.5, rules 4, 19 and 21). Sizes written in
+   an area's own rules or inline give way, so every mockup reads one way; the kit builds each part once. */
+/* A kind card: its icon and name, the count under them, its line (rule 19). */
+.g-kc2 { grid-template-columns: auto minmax(0, 1fr) !important; gap: 6px 8px !important; }
+.g-kc2 .em { grid-row: auto !important; width: auto !important; height: auto !important; border: 0 !important; background: none !important; color: inherit; }
+.g-kc2 .em svg { width: 15px !important; height: 15px !important; stroke-width: 1.8 !important; }
+.g-kc2 b { font: 600 14px/1 var(--f-label) !important; }
+.g-kc2 .n { grid-row: auto !important; grid-column: 1 / -1; font-size: 30px !important; }
+.g-kc2 .e-muted, .g-kc2 .smp { grid-column: 1 / -1; }
+/* The frame's turn order draws the table's faces: 38 px on a 2 px rim, 34 px on a phone. */
+.ini { grid-template-columns: 38px minmax(0, 1fr) auto !important; }
+.ini .face { box-sizing: border-box !important; width: 38px !important; height: 38px !important; border-width: 2px !important; font-size: 12px !important; }
+.ap.is-phone .ini { grid-template-columns: 34px minmax(0, 1fr) auto !important; }
+.ap.is-phone .ini .face { width: 34px !important; height: 34px !important; }
+/* Inside its record, the stat block starts with its line: the record's title already names it. */
+.g-sb .nm { display: none !important; }
+/* A bar you act in is a Cradle: no fill, a 2 px base, sides that fade before the top (T 2.4). */
+.f-dbar { position: relative; border: 0 !important; background: none !important; }
+.f-dbar::before { content: ""; position: absolute; inset: 0; pointer-events: none; border: 1px solid transparent; border-top: 0; border-bottom-width: 2px; border-image: linear-gradient(to bottom, transparent, var(--line-raised) 55%) 1; }
+/* A condition is a tag: VT323 16 px in its 22 px box. */
+.cond { display: inline-grid !important; place-items: center; height: 22px; box-sizing: border-box; padding: 0 6px !important; font: 400 16px/1 var(--f-num) !important; letter-spacing: 0.04em; text-transform: uppercase; }
+/* A sheet's or dialog's close: a plain icon, 18 px, 40 px on a laptop and 44 px on a phone, as A's dialog draws it. */
+:is(.e-dh, .ov-h, .i-sh, .qs-h, .q-head, .k-lhead, .sh) > .e-ico { box-shadow: none !important; width: 40px !important; height: 40px !important; }
+:is(.e-dh, .ov-h, .i-sh, .qs-h, .q-head, .k-lhead, .sh, .dh) > .e-ico svg { width: 18px !important; height: 18px !important; stroke-width: 1.7 !important; }
+.ap.is-phone :is(.e-dh, .ov-h, .i-sh, .qs-h, .q-head, .k-lhead, .sh, .dh) > .e-ico { width: 44px !important; height: 44px !important; }
+.qs-h > .e-ico { display: grid; place-items: center; flex: none; color: var(--text-dim); }
+.qs-h > .e-ico svg { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+/* The Dusk and Dawn switch: segments on base lines, 36 px on a laptop (44 px on a phone). */
+.mrow .segc span { min-height: 36px !important; }
+.ap:not(.is-phone) .b-theme span { height: 36px !important; }
+/* A stepper: 40 px (44 px on a phone), its number VT323 22 px. */
+.q-step { box-sizing: border-box !important; height: 40px !important; }
+.ap.is-phone .q-step { height: 44px !important; }
+.q-step b, .e-numf b, .i-step b { font-size: 22px !important; }
+/* A tag is VT323; a kind is its icon and word with no box (rule 19). Settings' methods row shares the class and is left be. */
+.b-tag, .i-meth:not(.sw-row) { display: inline-grid !important; place-items: center; height: 22px !important; box-sizing: border-box; font: 400 16px/1 var(--f-num) !important; letter-spacing: 0.04em !important; }
+.t-kind { border: 0 !important; background: none !important; padding: 0 !important; box-shadow: none !important; }
+.t-chips { gap: 4px 14px !important; }
+/* A title that opens a record or a pane: 22 px on a laptop, 20 px on a phone (T 2.2). */
+.ap:not(.is-phone) .e-h2 { font-size: 22px !important; }
+.ap.is-phone .e-h2 { font-size: 20px !important; }
+/* A step's mark: 24 px, its number VT323 17 px (rule 4). */
+.d-step .mk, .d-dlg .dsteps span .mk, .e-step i { width: 24px !important; height: 24px !important; box-sizing: border-box !important; font-size: 17px !important; }
+/* A tag: VT323 16 px in a 22 px box (rule 7's size, for every tag). The TV's tags are read across the room and keep theirs. */
+.tag:not(:is(.h-tile, .h-lr) > .tag), .e-st, .f-all, .f-hid, .g-src, .x-fold, .d-tag { height: 22px !important; box-sizing: border-box; font-size: 16px !important; }
+/* An icon in a content button: 15 px at a 1.8 stroke. */
+.g-aud svg, .b-base svg, .w-play svg, .r-eye svg, .t-sec .h svg { width: 15px !important; height: 15px !important; stroke-width: 1.8 !important; }
+/* A tab: 44 px, 14 px type (rule 1). */
+.sh-tabs .sh-tab, .e-tabs .e-tab { min-height: 44px !important; height: 44px !important; box-sizing: border-box; font-size: 14px !important; }
+/* Fields: the bar's search 38 px; a form field 40 px on a laptop and 44 px on a phone. */
+.find { box-sizing: border-box !important; height: 38px !important; }
+.e-field, .q-fld { min-height: 40px !important; height: auto !important; }
+.ap.is-phone :is(.e-field, .q-fld) { min-height: 44px !important; }
+/* A lamp: 8 px. */
+.lamp, .h-dot, .b-lamp, .e-lamp, .x-lamp { width: 8px !important; height: 8px !important; }
+/* A toast's close: a 36 px square, 44 px on a phone. */
+.toast .x { flex: none; display: inline-grid !important; place-items: center; width: 36px !important; height: 36px !important; }
+/* A template's drag handle meets the 44 px floor on a phone. */
+.ap.is-phone .t-sec .h { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; }
+/* The eyebrow, wherever one appears: 11 px, 0.12em, 600 (T 2.4). */
+.t-field > span:first-child, .t-tl .hd, .y-days small, .w-res .ok, .w-wait { font-size: 11px !important; letter-spacing: 0.12em !important; font-weight: 600 !important; }

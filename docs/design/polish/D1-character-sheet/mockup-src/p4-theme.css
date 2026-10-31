@@ -1,0 +1,20 @@
+/* =========================================================================
+   The theme spec (T), applied to the Ledger: a group you act in is a Cradle box, a group you only read is open,
+   and secondary controls sit on a Base line. Fields stay boxed.
+   ========================================================================= */
+.c3 { position: relative; border: 0; background: none; }
+.c3::before { content: ""; position: absolute; inset: 6px 0 0; pointer-events: none; border: 1px solid transparent; border-top: 0; border-bottom-width: 2px; border-image: linear-gradient(to bottom, transparent, var(--line-raised) 55%) 1; }
+.c3::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--cyan); box-shadow: var(--glow-on); transform: scaleX(0); transition: transform 280ms var(--ease-travel); pointer-events: none; }
+.c3:is(:hover, :focus-within)::after { transform: scaleX(1); }
+@media (prefers-reduced-motion: reduce) { .c3::after { transition: none; } }
+/* Open: read-only groups, and the tabbed box, which is a region rather than a group */
+.c3.read, .lb-box.c3 { background: none; }
+.c3.read::before, .c3.read::after, .lb-box.c3::before, .lb-box.c3::after { display: none; }
+.c3.read { border-top: 1px solid var(--line-strong); }
+.c3 > .c3-b { padding-bottom: 12px; }
+/* Base line: secondary buttons, chips and roll buttons in tables */
+.sh-btn, .sh-chip, .rb { border-color: transparent; background: none; box-shadow: inset 0 -1px 0 var(--line-raised); }
+.sh-btn:hover, .sh-chip:hover, .rb:hover { background: none; border-color: transparent; box-shadow: inset 0 -2px 0 var(--cyan); }
+.sh-chip.is-effect { box-shadow: inset 0 -2px 0 var(--cyan); }
+.sh-btn.dmg { color: var(--danger-text); }
+.vb-rest .sh-btn, .mv3-id .sh-btn { padding-inline: 8px; }

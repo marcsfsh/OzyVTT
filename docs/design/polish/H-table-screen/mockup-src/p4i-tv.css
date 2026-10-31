@@ -1,0 +1,155 @@
+
+/* =========================================================================
+   Area H, the table screen, round 1. Classes start with h-. The TV frames draw no app chrome; the GM's frames take the
+   frame (A) and reuse the e- and g- parts above.
+   ========================================================================= */
+.ap.h-tv { display: block; position: relative; overflow: hidden; background: var(--void); color: var(--text); }
+.h-tv .h-sky { position: absolute; inset: 0; background: radial-gradient(120% 70% at 50% 120%, color-mix(in srgb, var(--magenta) 30%, transparent), transparent 60%), linear-gradient(180deg, var(--void), var(--bg)); }
+
+/* The map and its tokens */
+.h-map { position: absolute; overflow: hidden; background-size: cover; background-position: center; background-color: #24331f; }
+.h-map::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.45); }
+.h-tok { position: absolute; z-index: 1; display: grid; place-items: center; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; border: 3px solid var(--party); background: radial-gradient(70% 70% at 50% 35%, #3b4a7a, #12152a); color: #fff; font: 600 15px/1 var(--f-label); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55); }
+.h-tok.foe { border-color: var(--hostile); background: radial-gradient(70% 70% at 50% 35%, #6a2a2a, #1a0d10); }
+.h-tok.act { box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.55), 0 0 0 7px var(--caution), 0 0 22px var(--caution); }
+.h-tok .nm { position: absolute; top: 100%; margin-top: 6px; padding: 2px 6px; background: rgba(8, 10, 22, 0.72); font: 600 13px/1.1 var(--f-label); white-space: nowrap; }
+.h-tok.small { width: 40px; height: 40px; margin: -20px 0 0 -20px; font-size: 12px; border-width: 2px; }
+.h-tok.small .nm { font-size: 11px; }
+.h-ping { position: absolute; z-index: 2; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%; border: 3px solid var(--cyan); box-shadow: 0 0 20px var(--cyan), inset 0 0 20px color-mix(in srgb, var(--cyan) 50%, transparent); }
+
+/* Portraits, the VCR counter and the wordmark at TV size */
+.h-port { display: grid; place-items: center; flex: none; box-sizing: border-box; width: var(--ps, 64px); height: var(--ps, 64px); border: 2px solid var(--pc, var(--party)); background: radial-gradient(75% 75% at 50% 32%, color-mix(in srgb, var(--pc, var(--party)) 30%, #12152a), #07080f); color: var(--pc, var(--party)); }
+.h-port svg { width: 58%; height: 58%; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 8px currentColor); }
+.h-port.gm { border-style: dashed; --pc: var(--violet); }
+.h-vcr { display: grid; gap: 2px; }
+.h-vcr small { font: 600 13px/1 var(--f-label); letter-spacing: 0.14em; color: var(--text-dim); }
+.h-vcr b { font: 400 40px/0.9 var(--f-num); color: var(--cyan-hi); letter-spacing: 0.06em; text-shadow: 0 0 12px color-mix(in srgb, var(--cyan) 60%, transparent); }
+.h-wm .wm-ozy { font-size: 30px; }
+.h-wm .wm-vtt { font-size: 34px; }
+.h-hz { height: 3px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+
+/* Turn tiles, cards */
+.h-tile { position: relative; display: grid; justify-items: center; gap: 6px; padding: 8px 10px 6px; min-width: 96px; }
+.h-tile b { font: 600 15px/1.1 var(--f-label); white-space: nowrap; }
+.h-tile i { font: 400 20px/1 var(--f-num); font-style: normal; color: var(--caution-text); }
+.h-tile.act { background: color-mix(in srgb, var(--caution) 12%, transparent); box-shadow: inset 0 -3px 0 var(--caution); }
+.h-tile .tag { position: absolute; top: 6px; right: 4px; padding: 2px 4px; border: 1px solid var(--line-raised); font: 400 13px/1 var(--f-num); color: var(--text-dim); background: var(--void); }
+.h-card { display: grid; gap: 10px; padding: 16px 18px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.h-eb { font: 600 13px/1.1 var(--f-label); letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-dim); }
+.h-name { font: 400 34px/1.02 var(--f-chrome); background: var(--grad-chrome); -webkit-background-clip: text; background-clip: text; color: transparent; text-wrap: balance; }
+.h-total { font: 400 72px/0.9 var(--f-num); color: var(--text); letter-spacing: 0.02em; }
+.h-dice { font: 400 24px/1 var(--f-num); color: var(--text-dim); }
+.h-glass { position: absolute; z-index: 3; box-sizing: border-box; border: 1px solid var(--line-strong); background: color-mix(in srgb, var(--void) 78%, transparent); backdrop-filter: blur(10px); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5); }
+.h-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 8px 14px; }
+.h-row b { font: 600 19px/1.15 var(--f-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h-row i { font: 400 30px/1 var(--f-num); font-style: normal; color: var(--text-dim); }
+.h-row.act { background: color-mix(in srgb, var(--caution) 13%, transparent); box-shadow: inset 4px 0 0 var(--caution); }
+.h-row.act i { color: var(--caution-text); }
+.h-row .tag { margin-left: 8px; padding: 2px 5px; border: 1px solid var(--line-raised); font: 400 15px/1 var(--f-num); color: var(--text-dim); vertical-align: 3px; }
+
+/* Waiting and pairing */
+.h-wait { position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; justify-items: center; gap: 18px; text-align: center; }
+.h-wait h1 { margin: 0; font: 600 60px/1.02 var(--f-display); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.h-wait p { margin: 0; font-size: 19px; color: var(--text-dim); max-width: 46ch; }
+.h-code { font: 400 132px/0.9 var(--f-num); letter-spacing: 0.08em; color: var(--text); text-shadow: 0 0 24px color-mix(in srgb, var(--cyan) 45%, transparent); }
+.h-code span { margin: 0 0.25em; }
+.h-sun { position: absolute; left: 50%; bottom: -150px; width: 520px; height: 520px; transform: translateX(-50%); border-radius: 50%; background: var(--grad-sun, linear-gradient(180deg, #ffd23f, #ff2f92)); -webkit-mask-image: repeating-linear-gradient(180deg, #000 0 22px, transparent 22px 30px); mask-image: repeating-linear-gradient(180deg, #000 0 22px, transparent 22px 30px); opacity: 0.85; }
+.h-grid { position: absolute; left: 0; right: 0; bottom: 0; height: 34%; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--magenta) 18%, transparent)), repeating-linear-gradient(90deg, color-mix(in srgb, var(--magenta) 40%, transparent) 0 1px, transparent 1px 80px); transform: perspective(400px) rotateX(55deg); transform-origin: bottom; opacity: 0.6; }
+.h-step { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 18px; min-height: 84px; padding: 0 24px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); text-align: left; }
+.h-step > i { display: grid; place-items: center; width: 52px; height: 52px; box-sizing: border-box; border: 2px solid var(--line-raised); font: 400 30px/1 var(--f-num); font-style: normal; color: var(--text-dim); }
+.h-step.on > i { border-color: var(--cyan); color: var(--cyan-hi); box-shadow: 0 0 14px color-mix(in srgb, var(--cyan) 50%, transparent); }
+.h-step b { display: block; font: 600 22px/1.2 var(--f-label); }
+.h-step small { display: block; margin-top: 4px; font-size: 16px; color: var(--text-dim); }
+.h-marq { position: relative; padding: 14px 40px; border: 3px solid var(--caution); box-shadow: 0 0 0 6px var(--void), 0 0 0 8px var(--magenta), 0 0 40px color-mix(in srgb, var(--magenta) 50%, transparent); background-image: radial-gradient(circle, #ffd23f 0 3px, transparent 3.5px); background-size: 22px 22px; background-position: 4px 4px; }
+.h-marq > span { display: block; padding: 10px 30px; background: var(--void); }
+.h-clock { font: 400 180px/0.9 var(--f-num); color: var(--text); letter-spacing: 0.04em; text-shadow: 0 0 30px color-mix(in srgb, var(--cyan) 35%, transparent); }
+
+/* The screen on a phone, held upright */
+.h-tv.is-portrait .h-wait h1 { font-size: 34px; white-space: normal; }
+.h-tv.is-portrait .h-code { font-size: 64px; }
+.h-tv.is-portrait .h-clock { font-size: 92px; }
+.h-tv.is-portrait .h-wait p { font-size: 15px; max-width: 30ch; }
+.h-tv.is-portrait .h-name { font-size: 24px; }
+.h-tv.is-portrait .h-total { font-size: 52px; }
+
+/* The GM's side */
+.h-lamp { display: inline-flex; align-items: center; gap: 8px; font: 600 14px/1 var(--f-label); white-space: nowrap; }
+.h-lamp i { width: 10px; height: 10px; background: var(--cyan); box-shadow: var(--glow-lamp-reaction); }
+.h-lamp i.off { background: var(--s3); box-shadow: inset 0 0 0 1px var(--line-raised); }
+.h-lamp b { font: 400 18px/1 var(--f-num); color: var(--cyan-hi); letter-spacing: 0.06em; }
+.h-thumb { position: relative; overflow: hidden; aspect-ratio: 16 / 9; box-sizing: border-box; border: 1px solid var(--line-strong); background: var(--void); }
+.h-thumb > .h-mini { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.h-pip { position: absolute; z-index: 6; box-sizing: border-box; border: 1px solid var(--line-strong); background: var(--bg); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); }
+.h-pip::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.h-pip .bar { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 6px 0 12px; border-bottom: 1px solid var(--line); font: 600 13px/1 var(--f-label); }
+.h-srow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; box-shadow: inset 0 -1px 0 var(--line); }
+.h-srow b { display: block; font: 600 14.5px/1.2 var(--f-label); }
+.h-srow small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-muted); }
+.h-dot { width: 9px; height: 9px; background: var(--cyan); box-shadow: var(--glow-lamp-reaction); }
+.h-dot.off { background: var(--s3); box-shadow: inset 0 0 0 1px var(--line-raised); }
+.h-take { display: grid; place-items: center; align-self: center; width: 92px; height: 92px; border: 2px solid var(--caution); color: var(--caution-text); font: 600 18px/1 var(--f-display); letter-spacing: 0.1em; box-shadow: 0 0 22px color-mix(in srgb, var(--caution) 35%, transparent); }
+.h-label { position: absolute; left: 10px; top: 10px; z-index: 2; padding: 3px 8px; font: 400 16px/1 var(--f-num); letter-spacing: 0.06em; }
+.h-label.prog { background: var(--hostile); color: #fff; }
+.h-label.prev { background: var(--s3); color: var(--text); }
+.frame [data-pg] { cursor: pointer; }
+.h-tvbox { position: relative; overflow: hidden; background: var(--void); color: var(--text); }
+
+/* =========================================================================
+   Round 2: the turn ladder, the screens and one screen open as a remote.
+   ========================================================================= */
+.h-lad { position: relative; z-index: 3; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; box-sizing: border-box; background: var(--bg); }
+.h-lad.glass { grid-template-rows: auto auto auto; align-content: start; border: 1px solid var(--line-strong); background: color-mix(in srgb, var(--void) 80%, transparent); backdrop-filter: blur(10px); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5); }
+.h-lad > .hd { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; }
+.h-rows { display: grid; align-content: start; }
+.h-lr { display: grid; grid-template-columns: 42px auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 70px; padding: 0 16px 0 8px; box-shadow: inset 0 -1px 0 var(--line); }
+.h-lr > i { font: 400 30px/1 var(--f-num); font-style: normal; color: var(--text-dim); text-align: right; }
+.h-lr > b { font: 600 20px/1.15 var(--f-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h-lr .tag { padding: 3px 6px; border: 1px solid var(--cyan); font: 400 17px/1 var(--f-num); color: var(--cyan-hi); letter-spacing: 0.06em; }
+.h-lr.gm > b { color: var(--text-dim); }
+.h-lr.act { min-height: 124px; background: color-mix(in srgb, var(--caution) 12%, transparent); box-shadow: inset 5px 0 0 var(--caution), inset 0 -1px 0 var(--line); }
+.h-lr.act > i { font-size: 36px; color: var(--caution-text); }
+.h-lr .who { display: grid; gap: 6px; min-width: 0; }
+.h-lr .who .h-eb { color: var(--caution-text); }
+.h-lr .h-name { font-size: 28px; word-break: keep-all; overflow-wrap: normal; }
+.h-rdiv { display: flex; align-items: center; gap: 10px; padding: 8px 16px; }
+.h-rdiv::before, .h-rdiv::after { content: ""; flex: 1; height: 2px; background: var(--grad-horizon); opacity: 0.8; }
+.h-rdiv::before { flex: 0 0 18px; }
+.h-rdiv span { font: 400 22px/1 var(--f-num); color: var(--cyan-hi); letter-spacing: 0.06em; }
+.h-rdiv small { font: 600 13px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+.h-lfoot { display: grid; gap: 6px; padding: 14px 18px 16px; border-top: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.h-lfoot .what { font: 600 18px/1.2 var(--f-label); }
+.h-lfoot .num { display: flex; align-items: baseline; gap: 12px; }
+.h-lfoot .h-total { font-size: 58px; }
+.h-tv.is-portrait .h-lad > .hd { padding: 10px 14px; }
+.h-tv.is-portrait .h-lr { grid-template-columns: 30px auto minmax(0, 1fr) auto; gap: 10px; min-height: 42px; padding: 0 12px 0 6px; }
+.h-tv.is-portrait .h-lr > i { font-size: 22px; }
+.h-tv.is-portrait .h-lr > b { font-size: 16px; }
+.h-tv.is-portrait .h-lr .tag { font-size: 14px; }
+.h-tv.is-portrait .h-lr.act { min-height: 84px; }
+.h-tv.is-portrait .h-lr.act > i { font-size: 26px; }
+.h-tv.is-portrait .h-lr .h-name { font-size: 22px; }
+.h-tv.is-portrait .h-rdiv { padding: 4px 12px; }
+.h-tv.is-portrait .h-rdiv span { font-size: 18px; }
+.h-tv.is-portrait .h-rdiv small { font-size: 11px; }
+.h-tv.is-portrait .h-lfoot { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px; padding: 10px 14px; }
+.h-tv.is-portrait .h-lfoot .num { grid-column: 2; grid-row: 1 / span 2; }
+.h-tv.is-portrait .h-lfoot .what { font-size: 15px; }
+.h-tv.is-portrait .h-lfoot .h-total { font-size: 46px; }
+.h-tv.is-portrait .h-lfoot .h-dice { display: none; }
+.h-snd { position: absolute; z-index: 4; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--magenta); background: color-mix(in srgb, var(--void) 85%, transparent); font: 600 15px/1 var(--f-label); color: var(--text-dim); }
+.h-snd svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.h-scard { padding: 12px; gap: 10px; }
+.h-scard .h-srow { box-shadow: none; min-height: 44px; }
+.h-open { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 4px; font: 600 13px/1 var(--f-label); color: var(--cyan-hi); }
+.h-open svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.h-back { grid-column: 1; justify-self: start; margin-bottom: 4px; min-height: 28px; }
+.h-back svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.h-remote { position: relative; cursor: crosshair; box-shadow: 0 0 0 1px var(--cyan), 0 0 18px color-mix(in srgb, var(--cyan) 30%, transparent); }
+.frame [data-go] { cursor: pointer; }
+.h-pip .e-ico { box-shadow: none; }
+.e-seg span svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; flex: none; }
+.h-lr.calm { grid-template-columns: minmax(0, 1fr); min-height: 112px; padding: 0 18px; background: none; box-shadow: inset 0 -1px 0 var(--line); }
+.h-lr.calm .who .h-eb { color: var(--text-dim); }
+.h-lfoot .what.none { font-weight: 500; color: var(--text-dim); }
+.h-tv.is-portrait .h-lr.calm { grid-template-columns: minmax(0, 1fr); min-height: 76px; padding: 0 14px; }
+.h-tv.is-portrait .h-lfoot .what.none { grid-column: 1; }

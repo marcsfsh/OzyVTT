@@ -1,0 +1,117 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; C3, running the encounter &middot; second round, approved</p>
+  <h1>Running the encounter</h1>
+  <p>Approved after one round. Starting an encounter is one form; a creature's tools open under its row in the order, which widens while open; the encounter's options are a menu at the end of the panel's tabs; adding monsters is the Compendium's three panes in a dialog; and a roll inside a waiting card is the button itself. Every part is one already settled (Carried in). The switches still show the options that were compared; the chosen ones are marked. On a phone, the bar at the top switches pages and options, and the laptop view opens close up: swipe it sideways.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; Starting an encounter</span>
+      <div class="seg" role="group" aria-label="Starting an encounter" id="r1-seg">
+        <button type="button" data-v="form" aria-pressed="true">One form · chosen</button>
+        <button type="button" data-v="ready" aria-pressed="false">Ready lines</button>
+        <button type="button" data-v="ladder" aria-pressed="false">In the order</button>
+        <button type="button" data-v="who" aria-pressed="false">Who is in it</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; A creature's tools</span>
+      <div class="seg" role="group" aria-label="A creature's tools" id="r2-seg">
+        <button type="button" data-v="token" aria-pressed="false">In the Token tab</button>
+        <button type="button" data-v="row" aria-pressed="true">Under its row · chosen</button>
+        <button type="button" data-v="pop" aria-pressed="false">Beside the order</button>
+        <button type="button" data-v="split" aria-pressed="false">Hit points in place</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; The encounter's options</span>
+      <div class="seg" role="group" aria-label="The encounter's options" id="r3-seg">
+        <button type="button" data-v="menu" aria-pressed="true">A menu on the tabs · chosen</button>
+        <button type="button" data-v="chip" aria-pressed="false">On the live chip</button>
+        <button type="button" data-v="sheet" aria-pressed="false">A sheet over the panel</button>
+        <button type="button" data-v="foot" aria-pressed="false">At the end of Encounter</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; Adding monsters</span>
+      <div class="seg" role="group" aria-label="Adding monsters" id="r4-seg">
+        <button type="button" data-v="dialog" aria-pressed="false">The dialog</button>
+        <button type="button" data-v="panes" aria-pressed="true">The Compendium's panes · chosen</button>
+        <button type="button" data-v="panel" aria-pressed="false">In the panel</button>
+        <button type="button" data-v="compendium" aria-pressed="false">The Compendium itself</button>
+      </div>
+    </div>
+    <div class="ctl"><span>5 &middot; The prompts' controls</span>
+      <div class="seg" role="group" aria-label="The prompts' controls" id="r5-seg">
+        <button type="button" data-v="buttons" aria-pressed="false">Today's controls</button>
+        <button type="button" data-v="rollrow" aria-pressed="true">The roll is the button · chosen</button>
+        <button type="button" data-v="fold" aria-pressed="false">One button, the rest folded</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="start" aria-pressed="true">Before the fight</button>
+        <button type="button" data-v="tools" aria-pressed="false">A creature chosen</button>
+        <button type="button" data-v="options" aria-pressed="false">The encounter's options</button>
+        <button type="button" data-v="monsters" aria-pressed="false">Adding monsters</button>
+        <button type="button" data-v="prompts" aria-pressed="false">Prompts waiting</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="spec" aria-labelledby="carried-h" style="margin-top:0">
+    <h2 id="carried-h">Carried in</h2>
+    <p>Every option on this page is built only from what is already settled. Nothing here picks a new look; the options differ in where things sit and how they are arranged.</p>
+    <div class="carried" id="carried"></div>
+  </section>
+
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only" id="sz-laptop">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p id="sz-phone">390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+      <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f as the GM on the old road: before the fight, a row's tools, the Encounter menu, Add monsters, and a monster's save, a hit and a death save waiting.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for running the encounter</h2>
+    <p>These hold across C3, and for the sub-areas that follow.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

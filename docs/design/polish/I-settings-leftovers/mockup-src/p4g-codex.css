@@ -1,0 +1,118 @@
+/* =========================================================================
+   Area F, the Codex, round 1. Classes start with f- (the e- parts above are E's and reused as they are). The frame
+   comes from the theme and frame parts: the Titled section bar, the phone's header, page strip and tabs.
+   ========================================================================= */
+.f-body { position: absolute; inset: 0; overflow: hidden; }
+.f-col { max-width: 1060px; margin: 0 auto; }
+.f-prose { max-width: 680px; font-size: 15px; line-height: 1.65; color: var(--text); }
+.f-prose p { margin: 0 0 12px; }
+.f-link { color: var(--cyan-hi); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--cyan) 55%, transparent); }
+.f-kind { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--f-label); color: var(--text-dim); white-space: nowrap; }
+.f-kind svg, .f-ic svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.f-ic { display: inline-grid; place-items: center; width: 20px; color: var(--text-dim); }
+.f-date { font: 400 20px/1 var(--f-num); color: var(--cyan-hi); letter-spacing: 0.02em; }
+
+/* Who sees it */
+.f-hid { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 6px; box-sizing: border-box; border: 1px dashed var(--violet); font: 400 16px/1 var(--f-num); letter-spacing: 0.04em; text-transform: uppercase; color: var(--violet-text); white-space: nowrap; }
+.f-all { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 6px; box-sizing: border-box; border: 1px solid var(--line-raised); font: 400 16px/1 var(--f-num); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+.f-block { position: relative; display: grid; gap: 6px; margin: 4px 0 14px; padding: 10px 14px 12px; border: 1px dashed color-mix(in srgb, var(--violet) 75%, transparent); background: color-mix(in srgb, var(--violet) 7%, transparent); }
+.f-block .h { display: flex; align-items: center; gap: 10px; }
+.f-block .h b { flex: 1; font: 600 12px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--violet-text); }
+.f-block p { margin: 0; }
+.f-block.margin { margin: 0; padding: 8px 10px; font-size: 13px; line-height: 1.5; }
+.f-reveal { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 8px; font: 600 12.5px/1 var(--f-label); color: var(--violet-text); box-shadow: inset 0 -1px 0 var(--violet); white-space: nowrap; }
+.f-reveal svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.f-hidval { color: var(--violet-text); }
+
+/* Portrait */
+.f-face { position: relative; display: grid; place-items: center; flex: none; box-sizing: border-box; width: var(--fs, 64px); height: var(--fs, 64px); border: 1px solid color-mix(in srgb, var(--fc) 65%, var(--line-raised)); background: radial-gradient(75% 75% at 50% 32%, color-mix(in srgb, var(--fc) 26%, var(--s1)), var(--void)); color: var(--fc); }
+.f-face svg { width: 56%; height: 56%; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--fc) 50%, transparent)); }
+
+/* Facts */
+.f-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 7px 14px; margin: 0; font-size: 13.5px; }
+.f-facts dt { font: 600 11px/1.6 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+.f-facts dd { margin: 0; color: var(--text); }
+.f-plate { display: flex; flex-wrap: wrap; border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); }
+.f-plate > div { display: grid; gap: 4px; padding: 8px 16px; min-width: 0; }
+.f-plate > div + div { box-shadow: inset 1px 0 0 var(--line); }
+.f-plate small { font: 600 10.5px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.f-plate span { font-size: 14px; }
+.f-rel { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; min-height: 44px; box-shadow: inset 0 -1px 0 var(--line); }
+.f-rel b { display: block; font: 600 14px/1.2 var(--f-label); }
+.f-rel small { display: block; margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+.f-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.f-tag { font: 600 12px/1 var(--f-label); color: var(--text-dim); padding: 4px 0; box-shadow: inset 0 -1px 0 var(--line-raised); }
+.f-jn { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 8px 0; box-shadow: inset 0 -1px 0 var(--line); font-size: 13px; }
+.f-jn .w { font: 400 16px/1.2 var(--f-num); color: var(--text-muted); }
+
+/* Home */
+.f-dbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px 14px; border: 1px solid var(--line); background: color-mix(in srgb, var(--void) 35%, transparent); font-size: 13px; color: var(--text-dim); }
+.f-kinds { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.f-kindc { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.f-kindc .n { font: 400 30px/1 var(--f-num); color: var(--text); }
+.f-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; min-height: 42px; box-shadow: inset 0 -1px 0 var(--line); font-size: 13.5px; }
+.f-row b { font-weight: 600; }
+.f-lead { display: grid; gap: 10px; padding: 18px 20px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 5%, var(--s1)), var(--bg)); position: relative; }
+.f-lead h2 { margin: 0; font: 600 26px/1.1 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase; }
+.f-idx { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0 18px; }
+.f-idx .c { display: grid; align-content: start; gap: 2px; padding-top: 10px; border-top: 2px solid var(--line-raised); }
+.f-idx .c .h { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; }
+.f-idx .it { display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 13.5px; }
+.f-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); }
+.f-card b { display: block; font: 600 14.5px/1.2 var(--f-label); }
+.f-card small { display: block; margin-top: 3px; font-size: 12px; color: var(--text-dim); }
+.f-big { display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 18px; border: 1px solid var(--cyan); box-shadow: 0 0 0 1px var(--cyan), 0 0 30px color-mix(in srgb, var(--cyan) 20%, transparent); background: var(--void); font: 500 19px/1 var(--f-label); color: var(--text-muted); }
+.f-big svg { width: 22px; height: 22px; fill: none; stroke: var(--cyan-hi); stroke-width: 1.8; }
+
+/* Writing */
+.f-tb { display: flex; align-items: center; gap: 2px; padding: 6px 8px; border: 1px solid var(--line-strong); background: var(--bg); }
+.f-tb span { display: inline-grid; place-items: center; min-width: 32px; height: 32px; padding: 0 6px; font: 600 13px/1 var(--f-label); color: var(--text-dim); }
+.f-tb span.v { color: var(--violet-text); box-shadow: inset 0 -1px 0 var(--violet); gap: 6px; display: inline-flex; }
+.f-tb i { width: 1px; height: 20px; margin: 0 6px; background: var(--line-raised); }
+.f-edit { padding: 14px 16px; border: 1px solid var(--line-raised); background: color-mix(in srgb, var(--void) 55%, transparent); }
+.f-caret { display: inline-block; width: 2px; height: 18px; margin-left: 1px; vertical-align: -3px; background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+.f-handle { position: absolute; left: -34px; top: 2px; display: grid; gap: 4px; }
+.f-handle span { display: grid; place-items: center; width: 24px; height: 24px; color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--line); }
+.f-handle span svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.f-fieldrow { display: grid; grid-template-columns: 150px minmax(0, 1fr) 118px; align-items: center; gap: 10px; min-height: 46px; box-shadow: inset 0 -1px 0 var(--line); }
+.f-who { display: inline-flex; gap: 4px; }
+.f-who span { display: inline-grid; place-items: center; min-height: 28px; padding: 0 7px; font: 600 11.5px/1 var(--f-label); color: var(--text-dim); box-shadow: inset 0 -1px 0 var(--line-raised); }
+.f-who span.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--cyan); }
+.f-who span.on.h { color: var(--violet-text); box-shadow: inset 0 -2px 0 var(--violet); }
+
+/* The story */
+.f-tl { position: relative; display: grid; gap: 14px; padding-left: 28px; }
+.f-tl::before { content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px; background: linear-gradient(180deg, var(--cyan), color-mix(in srgb, var(--violet) 60%, transparent)); }
+.f-node { position: relative; display: grid; gap: 4px; }
+.f-node::before { content: ""; position: absolute; left: -27px; top: 3px; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--cyan); background: var(--bg); }
+.f-node.next::before { border-color: var(--caution); background: color-mix(in srgb, var(--caution) 30%, var(--bg)); }
+.f-node.small::before { left: -24px; top: 5px; width: 6px; height: 6px; border: 0; background: var(--text-muted); }
+.f-node h3 { margin: 0; display: flex; align-items: center; gap: 10px; font: 600 16px/1.2 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase; }
+.f-node p { margin: 0; font-size: 13.5px; color: var(--text-dim); }
+.f-ent { display: flex; align-items: baseline; gap: 10px; font-size: 13.5px; color: var(--text); }
+.f-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.f-cal > div { min-height: 78px; padding: 6px; background: var(--bg); display: grid; align-content: start; gap: 4px; font-size: 11.5px; color: var(--text-dim); }
+.f-cal > div .d { font: 400 17px/1 var(--f-num); color: var(--text-muted); }
+.f-cal > div.today { box-shadow: inset 0 0 0 1px var(--cyan); }
+.f-cal > div.today .d { color: var(--cyan-hi); }
+.f-cal .ev { padding: 3px 5px; border-left: 2px solid var(--cyan); background: color-mix(in srgb, var(--cyan) 8%, transparent); color: var(--text); }
+.f-cal .ev.q { border-color: var(--caution); background: color-mix(in srgb, var(--caution) 8%, transparent); }
+.f-cal .ev.h { border-color: var(--violet); background: color-mix(in srgb, var(--violet) 8%, transparent); }
+.f-hl { position: relative; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.f-hl i { position: absolute; top: -6px; width: 14px; height: 14px; box-sizing: border-box; transform: translateX(-50%); border: 2px solid var(--cyan); background: var(--bg); }
+.f-hl i.next { border-color: var(--caution); }
+.f-scard { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--s1), var(--bg)); align-content: start; }
+.f-scard h3 { margin: 0; font: 600 16px/1.2 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase; }
+.f-scard p { margin: 0; font-size: 13.5px; color: var(--text-dim); }
+.f-qbar { height: 4px; background: var(--line); }
+.f-qbar i { display: block; height: 100%; background: var(--cyan); }
+.e-crumb svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; flex: none; }
+.e-crumb { white-space: nowrap; }
+.f-date { white-space: nowrap; }
+.f-fieldrow.stack { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; padding: 8px 0; }
+.f-fieldrow.stack > .e-eb { grid-column: 1 / -1; }
+.f-tb span { white-space: nowrap; } .f-tb { overflow: hidden; }
+
+/* The writer's preview */
+.f-pvbar { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 24px; border-bottom: 1px solid color-mix(in srgb, var(--violet) 55%, transparent); background: color-mix(in srgb, var(--violet) 8%, transparent); font: 600 13px/1.3 var(--f-label); color: var(--violet-text); }
+.frame [data-prev], .frame [data-d4] { cursor: pointer; }

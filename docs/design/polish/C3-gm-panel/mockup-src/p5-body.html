@@ -1,0 +1,112 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; C3, running the encounter &middot; first round, approved</p>
+  <h1>The GM's panel, and what waits on the GM</h1>
+  <p>Approved after one round. What waits on the GM sits at the top of the Encounter tab, or in its own tab: the GM switches between the two from the list's head, and Settings' Device section keeps the choice. Each item is a card. The panel's tabs are words with counts, and a count is what is new since the tab was last opened, so it drops when the tab opens. A bell with its count says something waits on the GM, everywhere it waits. In the frames, press the panel's tabs (and the phone's Switch) to watch their counts drop, and press Own tab or Over the turn in the list's head. The switches still show the options that were compared; the chosen ones are marked. On a phone, the bar at the top switches pages and options, and the laptop view opens close up: swipe it sideways.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; Where the waiting list sits</span>
+      <div class="seg" role="group" aria-label="Where the waiting list sits" id="d1-seg">
+        <button type="button" data-v="top" aria-pressed="true">Top of Encounter · chosen</button>
+        <button type="button" data-v="tab" aria-pressed="false">Its own tab · chosen</button>
+        <button type="button" data-v="above" aria-pressed="false">Above every tab</button>
+        <button type="button" data-v="foot" aria-pressed="false">By End turn</button>
+        <button type="button" data-v="dock" aria-pressed="false">In the left dock</button>
+        <button type="button" data-v="drawer" aria-pressed="false">A drawer</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; One waiting item</span>
+      <div class="seg" role="group" aria-label="One waiting item" id="d2-seg">
+        <button type="button" data-v="card" aria-pressed="true">Card · chosen</button>
+        <button type="button" data-v="row" aria-pressed="false">One line each</button>
+        <button type="button" data-v="ticket" aria-pressed="false">Ticket</button>
+        <button type="button" data-v="expand" aria-pressed="false">Fold out</button>
+        <button type="button" data-v="kind" aria-pressed="false">Grouped by what you do</button>
+        <button type="button" data-v="who" aria-pressed="false">Grouped by creature</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; The panel's tabs</span>
+      <div class="seg" role="group" aria-label="The panel's tabs" id="d3-seg">
+        <button type="button" data-v="words" aria-pressed="false">Words</button>
+        <button type="button" data-v="counts" aria-pressed="true">Words and counts · chosen</button>
+        <button type="button" data-v="icons" aria-pressed="false">Icons over words</button>
+        <button type="button" data-v="iconsonly" aria-pressed="false">Icons only</button>
+        <button type="button" data-v="rail" aria-pressed="false">Rail at the side</button>
+        <button type="button" data-v="menu" aria-pressed="false">Encounter and a menu</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; The attention signal</span>
+      <div class="seg" role="group" aria-label="The attention signal" id="d4-seg">
+        <button type="button" data-v="lamp" aria-pressed="false">Amber lamp</button>
+        <button type="button" data-v="words" aria-pressed="false">Needs attention</button>
+        <button type="button" data-v="bell" aria-pressed="true">Bell · chosen</button>
+        <button type="button" data-v="count" aria-pressed="false">Count only</button>
+        <button type="button" data-v="flag" aria-pressed="false">Diamond</button>
+        <button type="button" data-v="ink" aria-pressed="false">Amber ink</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="fight" aria-pressed="true">Two waiting</button>
+        <button type="button" data-v="items" aria-pressed="false">Four kinds waiting</button>
+        <button type="button" data-v="tabs" aria-pressed="false">On the Log tab</button>
+        <button type="button" data-v="signal" aria-pressed="false">Where the signal shows</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+  <div class="mb-row" id="mb-sigrow"><span class="mb-k">4</span><div class="mb-chips" id="mb-sig" role="group" aria-label="The attention signal"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only" id="sz-laptop">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p id="sz-phone">390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+    <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f as the GM, on Lyra's turn, with a player's Fire Bolt waiting for its target and a Magic Missile hit waiting to be applied.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for what waits on the GM</h2>
+    <p>These hold across the GM's panel, and for C3's second round.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

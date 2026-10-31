@@ -1,0 +1,123 @@
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; polish &middot; C2, the map's menus &middot; approved</p>
+  <h1>The map's menus</h1>
+  <p>Approved after one round. Everything on the map opens as A's menu at the thing: a token's menu with how it moves at its top, a door's ways through, and a drawing's colour and audience; a tool's options are A's menu from the tool's own button. Every part is one already settled (Carried in). The switches still show the options that were compared; the chosen ones are marked. On a phone, the bar at the top switches pages and options, and the laptop view opens close up: swipe it sideways.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row decide">
+    <div class="ctl"><span>1 &middot; A token&#39;s menu</span>
+      <div class="seg" role="group" aria-label="A token&#39;s menu" id="z1-seg">
+        <button type="button" data-v="menu" aria-pressed="true">A&#39;s menu at the token · chosen</button>
+        <button type="button" data-v="row" aria-pressed="false">Its row in the dock</button>
+        <button type="button" data-v="glass" aria-pressed="false">A card by the token</button>
+        <button type="button" data-v="sheet" aria-pressed="false">A sheet over the panel</button>
+        <button type="button" data-v="tab" aria-pressed="false">The Token tab</button>
+      </div>
+    </div>
+    <div class="ctl"><span>2 &middot; How it moves</span>
+      <div class="seg" role="group" aria-label="How it moves" id="z2-seg">
+        <button type="button" data-v="menu" aria-pressed="true">In the token&#39;s menu · chosen</button>
+        <button type="button" data-v="movetab" aria-pressed="false">In the Move tab</button>
+        <button type="button" data-v="drag" aria-pressed="false">While dragging</button>
+        <button type="button" data-v="chip" aria-pressed="false">A chip on the token</button>
+        <button type="button" data-v="row" aria-pressed="false">In its row</button>
+      </div>
+    </div>
+    <div class="ctl"><span>3 &middot; A door</span>
+      <div class="seg" role="group" aria-label="A door" id="z3-seg">
+        <button type="button" data-v="menu" aria-pressed="true">A&#39;s menu · chosen</button>
+        <button type="button" data-v="rollrows" aria-pressed="false">Roll rows</button>
+        <button type="button" data-v="groups" aria-pressed="false">By what it does</button>
+        <button type="button" data-v="turn" aria-pressed="false">In the turn</button>
+        <button type="button" data-v="glass" aria-pressed="false">A card by the door</button>
+      </div>
+    </div>
+    <div class="ctl"><span>4 &middot; A tool&#39;s options</span>
+      <div class="seg" role="group" aria-label="A tool&#39;s options" id="z4-seg">
+        <button type="button" data-v="beside" aria-pressed="false">Beside the tools</button>
+        <button type="button" data-v="dock" aria-pressed="false">In the dock</button>
+        <button type="button" data-v="strip" aria-pressed="false">A strip over the map</button>
+        <button type="button" data-v="sheet" aria-pressed="false">A sheet over the panel</button>
+        <button type="button" data-v="menu" aria-pressed="true">A menu from the tool · chosen</button>
+      </div>
+    </div>
+    <div class="ctl"><span>5 &middot; A drawing</span>
+      <div class="seg" role="group" aria-label="A drawing" id="z5-seg">
+        <button type="button" data-v="options" aria-pressed="false">Where the options are</button>
+        <button type="button" data-v="glass" aria-pressed="false">A card by the drawing</button>
+        <button type="button" data-v="tab" aria-pressed="false">A Drawing tab</button>
+        <button type="button" data-v="strip" aria-pressed="false">A strip over the map</button>
+        <button type="button" data-v="menu" aria-pressed="true">A&#39;s menu at the drawing · chosen</button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap switch-row">
+    <div class="ctl" style="flex:1 1 560px"><span>Page</span>
+      <div class="seg" role="group" aria-label="Page" id="pg-seg">
+        <button type="button" data-v="token" aria-pressed="true">A token's menu</button>
+        <button type="button" data-v="moving" aria-pressed="false">Moving</button>
+        <button type="button" data-v="door" aria-pressed="false">A door</button>
+        <button type="button" data-v="tools" aria-pressed="false">A tool's options</button>
+        <button type="button" data-v="drawing" aria-pressed="false">A drawing</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 190px"><span>View</span>
+      <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+        <button type="button" data-v="all" aria-pressed="true">All</button>
+        <button type="button" data-v="laptop" aria-pressed="false">Laptop</button>
+        <button type="button" data-v="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctl" style="flex:0 1 140px"><span>Theme</span>
+      <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+        <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+        <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbar" id="mbar" aria-label="Pages and options">
+  <div class="mb-row"><div class="mb-chips" id="mb-pages" role="group" aria-label="Page"></div><button type="button" class="mb-theme" id="mb-theme" aria-label="Theme">Dusk</button></div>
+  <div class="mb-row"><span class="mb-k" id="mb-k"></span><div class="mb-chips" id="mb-opts" role="group"></div></div>
+</div>
+
+<main class="wrap">
+  <section class="spec" aria-labelledby="carried-h" style="margin-top:0">
+    <h2 id="carried-h">Carried in</h2>
+    <p>Every option on this page is built only from what is already settled. Nothing here picks a new look; the options differ in where things sit and how they are arranged.</p>
+    <div class="carried" id="carried"></div>
+  </section>
+
+  <section class="idea" aria-label="The decisions" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="idea"></section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-laptop" id="v-laptop">
+        <div class="view-cap"><p class="eyebrow" id="cap-laptop">Laptop</p><p class="wide-only" id="sz-laptop">1280 by 800, shown to fit</p>
+          <div class="seg lz" id="lz-seg" role="group" aria-label="Laptop view size"><button type="button" data-v="close" aria-pressed="true">Close up</button><button type="button" data-v="whole" aria-pressed="false">Whole</button><button type="button" data-v="turned" aria-pressed="false">Turned</button></div></div>
+        <div class="pan" id="lap-pan"><div class="fit"></div></div>
+        <div class="lz-hint" id="lz-hint"><span class="lz-dots" id="lz-dots"><button type="button" aria-label="Left of the screen"></button><button type="button" aria-label="Middle of the screen"></button><button type="button" aria-label="Right of the screen"></button></span><span id="lz-text"></span></div>
+      </div>
+    </div>
+    <div class="stage-row" style="grid-template-columns:minmax(0,1fr)">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow" id="cap-phone">Phone</p><p id="sz-phone">390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+
+      <section class="spec" aria-labelledby="today-h">
+    <h2 id="today-h">Today</h2>
+    <p>Screenshots of the branch at f5e166f in round 1 on the old road: the GM's menus for the Goblin Boss, a door and the empty map, two tools' options, and Borin's player's menu and Draw on a phone.</p>
+    <div class="today-grid" id="today"></div>
+  </section>
+
+  <section class="spec" aria-labelledby="settled-h">
+    <h2 id="settled-h">Rules for the map's menus</h2>
+    <p>These hold for every menu and every tool on the map, at the table and in prep.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+</main>

@@ -1,0 +1,2005 @@
+<title>OzyVTT Cockpit Sheets</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=Bungee&family=Chakra+Petch:wght@500;600&family=Mr+Dafoe&family=VT323&display=swap">
+<style>
+/* Layout: the app's own Dusk glass over its sky. A sticky switcher picks a layout, a view (laptop, phone, both, or
+   the GM's drawer) and the theme. Each view is a scaled frame holding a working copy of the sheet, built from one
+   set of parts so the options differ only in arrangement. Dusk is :root, Dawn the light override. */
+:root {
+  color-scheme: dark;
+  --sky: radial-gradient(120% 55% at 78% 108%, rgba(255, 94, 120, 0.32), transparent 62%), linear-gradient(180deg, #151a2d 0%, #1d1f36 48%, #2a2140 100%);
+  --ground: #1b1d33;
+  --bg: #151728;
+  --glass-bg: rgba(18, 20, 34, 0.82);
+  --void: #131524;
+  --s1: #1b1e31;
+  --s2: #25283f;
+  --s3: #2b2f49;
+  --glass-s1: rgba(26, 29, 46, 0.72);
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-raised: rgba(255, 255, 255, 0.2);
+  --line-raised-hover: rgba(255, 255, 255, 0.32);
+  --text: #eef0f8;
+  --text-dim: #c3c7d9;
+  --text-muted: #b0b4ca;
+  --magenta: #ff2f92;
+  --cyan: #4fe3ff;
+  --cyan-hi: #6fe8ff;
+  --party: #7aa2ff;
+  --hp: #ffd54d;
+  --hp-text: #ffd54d;
+  --hp-lost: rgba(120, 30, 50, 0.6);
+  --hostile: #ff5d50;
+  --violet: #bb90ff;
+  --caution: #ffb733;
+  --tab-on: #353a55;
+  --state-on-edge: #4fe3ff;
+  --focus-ring: #4fe3ff;
+  --text-on-neon: #04141c;
+  --grad-horizon: linear-gradient(90deg, #4fe3ff 0%, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d 100%);
+  --hz-paint: linear-gradient(90deg, #4fe3ff, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d);
+  --hz-paint-v: linear-gradient(180deg, #4fe3ff, #9a5cff 30%, #ff2f92 60%, #ff8a1f 85%, #ffe14d);
+  --glow-horizon: 0 0 12px rgba(255, 47, 146, 0.6);
+  --ink-glow: 0 0 8px rgba(255, 47, 146, 0.45);
+  --ink-cast: 0.24;
+  --ink-bright: brightness(1.35) saturate(1.15);
+  --grad-chrome: linear-gradient(180deg, #eaf8ff 0%, #9fdcff 42%, #ffffff 49%, #3b2163 51%, #ff5fae 75%, #ffd6ea 100%);
+  --chrome-split: -1.5px 0 rgba(43, 228, 255, 0.55), 1.5px 0 rgba(255, 47, 146, 0.55);
+  --glow-lamp-bonus: 0 0 10px rgba(255, 210, 63, 0.8);
+  --glow-on: 0 0 8px rgba(43, 228, 255, 0.6);
+  --primary-veil: 66%;
+  --primary-drop: drop-shadow(0 0 4px rgba(255, 47, 146, 0.8));
+  --spark: #ffffff;
+
+  --glow-lamp-action: 0 0 10px rgba(255, 47, 146, 0.85);
+  --glow-lamp-reaction: 0 0 10px rgba(43, 228, 255, 0.8);
+  --grad-sun: linear-gradient(180deg, #ffe14d 0%, #ff8a1f 50%, #ff2f92 100%);
+  --glow-sun: 0 0 14px rgba(255, 138, 31, 0.55);
+  --danger-text: #ff9d94;
+  --gold-tail: rgba(255, 213, 77, 0.65);
+  --red-tail: rgba(255, 93, 80, 0.7);
+
+  --f-display: "Chakra Petch", "Bai Jamjuree", system-ui, sans-serif;
+  --f-chrome: "Bungee", "Arial Black", system-ui, sans-serif;
+  --f-label: "Bai Jamjuree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num: "VT323", ui-monospace, "SFMono-Regular", monospace;
+  --f-script: "Mr Dafoe", "Brush Script MT", cursive;
+  --ease-travel: cubic-bezier(0.45, 0, 0.25, 1);
+  --ease-settle: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --sky: #ebe7ef;
+    --ground: #ebe7ef;
+    --bg: #ebe7ef;
+    --glass-bg: #ebe7ef;
+    --void: #e3dee8;
+    --s1: #f3f0f5;
+    --s2: #f7f5f9;
+    --s3: #e8e3ee;
+    --glass-s1: #f3f0f5;
+    --line: #e0dbe6;
+    --line-strong: #d3ccdc;
+    --line-raised: #b9b0c8;
+    --line-raised-hover: #9c92ae;
+    --text: #2a2537;
+    --text-dim: #4f4862;
+    --text-muted: #655d77;
+    --magenta: #f0559b;
+    --cyan: #2a8fa8;
+    --cyan-hi: #1d6a80;
+    --party: #4a72d9;
+    --hp: #d9a43a;
+    --hp-text: #7a5718;
+    --hp-lost: #ecd6dc;
+    --hostile: #d9493f;
+    --violet: #8a62d6;
+    --caution: #d08a2a;
+    --tab-on: #fbfafc;
+    --state-on-edge: #1d6a80;
+    --focus-ring: #1d6a80;
+    --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+    --hz-paint: linear-gradient(90deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+    --hz-paint-v: linear-gradient(180deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+    --glow-horizon: 0 0 #0000;
+    --ink-glow: 0 0 #0000;
+    --ink-cast: 0.14;
+    --ink-bright: brightness(0.8) saturate(1.2);
+    --grad-chrome: linear-gradient(#2a2537, #2a2537);
+    --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+    --glow-lamp-bonus: 0 0 #0000;
+    --glow-on: 0 0 #0000;
+    --primary-veil: 80%;
+    --primary-drop: none;
+    --spark: #b0306e;
+    --glow-lamp-action: 0 0 #0000;
+    --glow-lamp-reaction: 0 0 #0000;
+    --glow-sun: 0 0 10px rgba(255, 138, 31, 0.35);
+    --danger-text: #a8352c;
+    --gold-tail: rgba(217, 164, 58, 0.6);
+    --red-tail: rgba(217, 73, 63, 0.6);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --sky: #ebe7ef;
+  --ground: #ebe7ef;
+  --bg: #ebe7ef;
+  --glass-bg: #ebe7ef;
+  --void: #e3dee8;
+  --s1: #f3f0f5;
+  --s2: #f7f5f9;
+  --s3: #e8e3ee;
+  --glass-s1: #f3f0f5;
+  --line: #e0dbe6;
+  --line-strong: #d3ccdc;
+  --line-raised: #b9b0c8;
+  --line-raised-hover: #9c92ae;
+  --text: #2a2537;
+  --text-dim: #4f4862;
+  --text-muted: #655d77;
+  --magenta: #f0559b;
+  --cyan: #2a8fa8;
+  --cyan-hi: #1d6a80;
+  --party: #4a72d9;
+  --hp: #d9a43a;
+  --hp-text: #7a5718;
+  --hp-lost: #ecd6dc;
+  --hostile: #d9493f;
+  --violet: #8a62d6;
+  --caution: #d08a2a;
+  --tab-on: #fbfafc;
+  --state-on-edge: #1d6a80;
+  --focus-ring: #1d6a80;
+  --grad-horizon: linear-gradient(90deg, #2a8fa8 0%, #9a5cff 30%, #f0559b 60%, #ff8a1f 85%, #ffe14d 100%);
+  --hz-paint: linear-gradient(90deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+  --hz-paint-v: linear-gradient(180deg, #1d6a80, #6a46b0 30%, #b0306e 60%, #c4610f 85%, #8a5612);
+  --glow-horizon: 0 0 #0000;
+  --ink-glow: 0 0 #0000;
+  --ink-cast: 0.14;
+  --ink-bright: brightness(0.8) saturate(1.2);
+  --grad-chrome: linear-gradient(#2a2537, #2a2537);
+  --chrome-split: -1px 0 rgba(42, 143, 168, 0.35), 1px 0 rgba(255, 47, 146, 0.35);
+  --glow-lamp-bonus: 0 0 #0000;
+  --glow-on: 0 0 #0000;
+  --primary-veil: 80%;
+  --primary-drop: none;
+  --spark: #b0306e;
+  --glow-lamp-action: 0 0 #0000;
+  --glow-lamp-reaction: 0 0 #0000;
+  --glow-sun: 0 0 10px rgba(255, 138, 31, 0.35);
+  --danger-text: #a8352c;
+  --gold-tail: rgba(217, 164, 58, 0.6);
+  --red-tail: rgba(217, 73, 63, 0.6);
+}
+
+html { background: var(--ground); }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--sky);
+  background-color: var(--ground);
+  background-attachment: fixed;
+  color: var(--text);
+  font: 400 15px/1.5 var(--f-label);
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--bg);
+}
+.wrap {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.eyebrow {
+  margin: 0;
+  font: 600 11px/1.2 var(--f-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.page-head { padding-block: 28px 18px; display: grid; gap: 10px; }
+.page-head h1 { margin: 0; font: 600 clamp(26px, 4vw, 36px) / 1.1 var(--f-display); letter-spacing: 0.03em; text-transform: uppercase; }
+.page-head > p { margin: 0; max-width: 72ch; color: var(--text-dim); }
+
+/* ---- Sticky switcher ---- */
+.switch-bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line-strong);
+}
+.switch-bar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.switch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-block: 8px; }
+.seg { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line-raised); background: var(--void); }
+.seg button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 14px/1 var(--f-label);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.seg button:hover { color: var(--text); background: color-mix(in srgb, var(--s2) 70%, transparent); }
+.seg button[aria-pressed="true"] { color: var(--text); background: var(--tab-on); box-shadow: inset 0 -2px 0 var(--state-on-edge); }
+.seg button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.opt-seg { flex: 1 1 520px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.opt-seg button { padding: 0 6px; }
+@media (max-width: 650px) {
+  .opt-seg, .view-seg { flex-basis: 100%; display: grid; }
+  .opt-seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .view-seg { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .seg button { font-size: 13px; padding: 0 6px; }
+}
+@media (any-pointer: coarse) { .seg button { min-height: 44px; } }
+
+/* ---- The idea ---- */
+main { display: grid; gap: 28px; padding-block: 22px 56px; }
+.idea {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 18px 32px;
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  background: var(--glass-s1);
+}
+@media (max-width: 849px) { .idea { grid-template-columns: minmax(0, 1fr); padding: 16px; } }
+.idea h2 { margin: 4px 0 8px; font: 600 24px/1.1 var(--f-display); letter-spacing: 0.03em; text-transform: uppercase; }
+.idea p { margin: 0; max-width: 64ch; color: var(--text-dim); }
+.idea ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; color: var(--text-dim); font-size: 14px; }
+.idea .side { display: grid; gap: 6px; align-content: start; }
+.idea .side .eyebrow + ul { margin-top: 2px; }
+.idea .side .eyebrow:not(:first-child) { margin-top: 10px; }
+
+/* ---- The stage: scaled frames ---- */
+.stage { display: grid; gap: 18px; }
+.stage-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 849px) { .stage-row { grid-template-columns: minmax(0, 1fr); } }
+.view { display: grid; gap: 8px; min-width: 0; }
+.view-cap { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.view-cap p:last-child { margin: 0; font-size: 13px; color: var(--text-muted); }
+.fit { position: relative; overflow: hidden; }
+.fit > .frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.view.is-narrow .fit { margin-inline: auto; }
+.stage[data-show="laptop"] .v-phone, .stage[data-show="laptop"] .v-panel,
+.stage[data-show="phone"] .v-laptop, .stage[data-show="phone"] .v-panel,
+.stage[data-show="panel"] .v-laptop, .stage[data-show="panel"] .v-phone { display: none; }
+.stage[data-show="phone"] .stage-row, .stage[data-show="panel"] .stage-row { grid-template-columns: minmax(0, 1fr); }
+
+/* Today: screenshots of the branch */
+.shot { display: block; width: 100%; height: auto; border: 1px solid var(--line-strong); }
+.today-note { margin: 0; padding: 12px 14px; border: 1px solid var(--line-strong); background: var(--glass-s1); color: var(--text-dim); font-size: 14px; }
+.v-phone .shot, .v-panel .shot { max-width: 390px; margin-inline: auto; }
+
+/* =========================================================================
+   The app inside each frame: the top bar on its horizon, the pane, a phone's bottom tabs, and the Table panel's
+   own strip. Sizes are the app's own (56 px bar, 64 px bottom tabs, a 392 px Table panel).
+   ========================================================================= */
+.frame { font: 400 15px/1.45 var(--f-label); color: var(--text); }
+.ap {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--sky);
+  background-color: var(--ground);
+}
+.ap.is-phone { grid-template-rows: auto minmax(0, 1fr) auto; }
+.ap-bar {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  height: 56px;
+  padding: 0 12px 0 18px;
+  background: var(--glass-bg);
+}
+.ap.is-phone .ap-bar { height: 48px; padding: 0 6px 0 12px; }
+.ap-bar::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.wm { display: inline-flex; align-items: baseline; user-select: none; }
+.wm-ozy { font: 400 21px/1 var(--f-chrome); background: var(--grad-chrome); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: var(--chrome-split); }
+.wm-vtt { margin-left: -2px; font: 400 24px/1 var(--f-script); color: #ff5fae; text-shadow: 0 0 8px rgba(255, 47, 146, 0.7); }
+.ap.is-phone .wm-ozy { font-size: 18px; }
+.ap.is-phone .wm-vtt { font-size: 21px; }
+.ap-nav { display: flex; align-self: stretch; }
+.ap-nav span { position: relative; display: grid; place-items: center; padding: 0 14px; font: 600 15px/1 var(--f-label); color: var(--text-dim); }
+.ap-nav span.on { color: var(--cyan-hi); }
+.ap-nav span.on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 3px;
+  background: var(--grad-horizon) var(--win-x, 0) 0 / var(--win-w, 100%) 100% no-repeat;
+  filter: var(--ink-bright);
+}
+.ap-end { margin-left: auto; display: flex; align-items: center; gap: 4px; color: var(--text-dim); }
+.ap-who { display: inline-flex; align-items: center; gap: 8px; padding: 0 10px 0 4px; font: 600 14px/1 var(--f-label); color: var(--text); }
+.ap-who .sh-port { width: 26px; height: 26px; border-width: 1px; }
+.ico { display: grid; place-items: center; width: 40px; height: 40px; color: var(--text-dim); }
+.ico svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ap-pane { position: relative; min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong)) transparent; }
+.ap-pane.is-cols { overflow: hidden; }
+.ap-bottom {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: 64px;
+  border-top: 1px solid var(--line-strong);
+  background: var(--glass-bg);
+}
+.ap-bottom span { position: relative; display: grid; place-items: center; align-content: center; gap: 4px; font: 600 12px/1 var(--f-label); color: var(--text-dim); }
+.ap-bottom span svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ap-bottom span.on { color: var(--cyan-hi); }
+.ap-bottom span.on::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -1px;
+  height: 2px;
+  background: var(--hz-paint);
+  box-shadow: var(--ink-glow);
+}
+.ap-bottom span.on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1px;
+  height: 18px;
+  background: var(--hz-paint);
+  opacity: var(--ink-cast);
+  -webkit-mask-image: radial-gradient(50% 100% at 50% 0, #000 25%, transparent 100%);
+  mask-image: radial-gradient(50% 100% at 50% 0, #000 25%, transparent 100%);
+}
+/* The Table panel: its own strip on top (Me, Log, Party), then the sheet. A sliver of map at the left. */
+.ap.is-panel { grid-template-rows: auto minmax(0, 1fr); border-left: 6px solid #0b0d18; }
+.ap-paneltabs { padding: 6px 10px 0; background: var(--glass-bg); }
+
+/* =========================================================================
+   The sheet's parts. One set of parts; the layouts below only arrange them.
+   ========================================================================= */
+.sh-eb { margin: 0; font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.sh-num { font-family: var(--f-num); font-weight: 400; line-height: 1; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.sh-name { margin: 0; font: 600 26px/1.05 var(--f-display); letter-spacing: 0.03em; text-transform: uppercase; overflow-wrap: anywhere; }
+.sh-sub { margin: 0; font-size: 14px; color: var(--text-dim); }
+.sh-port {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border: 2px solid var(--party);
+  background: radial-gradient(70% 70% at 50% 35%, color-mix(in srgb, var(--party) 28%, var(--s2)), var(--void));
+}
+.sh-port svg { width: 62%; height: 62%; }
+.sh-plate { border: 1px solid var(--line-strong); background: var(--glass-s1); }
+.sh-sec { display: grid; gap: 8px; }
+.sh-sec + .sh-sec { margin-top: 18px; }
+.sh-sechead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sh-h { margin: 0; font: 600 18px/1.1 var(--f-display); letter-spacing: 0.03em; text-transform: uppercase; }
+
+/* Stat cells: a label over a VT323 value, divided by lines inside one plate (never a row of boxes) */
+.sh-stats { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.sh-stat { display: grid; align-content: center; gap: 4px; padding: 10px 14px; min-width: 0; }
+.sh-stat + .sh-stat { border-left: 1px solid var(--line); }
+.sh-stat .v { font: 400 32px/0.9 var(--f-num); color: var(--text); }
+.sh-stat .v small { font-size: 0.6em; color: var(--text-muted); }
+
+/* Hit points: the one place they show. The number in VT323, the life bar under it, and the quick change. */
+.sh-hp { display: grid; gap: 7px; min-width: 0; }
+.sh-hp-top { display: flex; align-items: baseline; gap: 8px; }
+.sh-hp-top .cur { font: 400 34px/0.85 var(--f-num); color: var(--hp-text); }
+.sh-hp-top .max { font: 400 20px/1 var(--f-num); color: var(--text-muted); }
+.sh-hp-top .tmp { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.sh-life { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; height: 10px; padding: 2px; border: 1px solid var(--line-raised); background: var(--void); }
+.sh-life i { display: block; background: var(--hp); }
+.sh-life i.lost { background: var(--hp-lost); }
+.sh-hpq { display: flex; gap: 6px; }
+.sh-hpq .amt { width: 52px; height: 32px; padding: 0 8px; border: 1px solid var(--line-raised); background: var(--void); color: var(--text); font: 400 20px/30px var(--f-num); text-align: center; }
+
+.sh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-raised);
+  background: var(--s2);
+  color: var(--text);
+  font: 600 13px/1 var(--f-label);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sh-btn:hover { background: var(--s3); border-color: var(--line-raised-hover); }
+.sh-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sh-btn.lg { min-height: 40px; padding: 0 14px; font-size: 14px; }
+.sh-iconbtn { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid transparent; color: var(--text-dim); }
+.sh-iconbtn svg { width: 18px; height: 18px; fill: currentColor; }
+.sh-link { min-height: 32px; padding: 0 2px; border: 0; background: none; color: var(--cyan-hi); font: 600 13px/1 var(--f-label); cursor: pointer; }
+.sh-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Lamps, chips, pips and the proficiency square */
+.sh-lamp { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }
+.sh-lamp i { width: 14px; height: 14px; border: 1px solid var(--line-raised); background: var(--s3); }
+.sh-lamp.is-lit i { border-color: transparent; background: var(--hp); box-shadow: var(--glow-lamp-bonus); }
+.sh-lamp.is-lit { color: var(--text); }
+.sh-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sh-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--line-raised); background: var(--s2); font: 600 13px/1 var(--f-label); color: var(--text); white-space: nowrap; }
+.sh-chip.is-effect { border-color: var(--cyan); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cyan) 30%, transparent); }
+.sh-chip .t { font: 400 16px/1 var(--f-num); color: var(--cyan-hi); }
+.sh-chip.is-pin .sh-num { font-size: 17px; color: var(--text); }
+.sh-chip.is-pin.is-prof { border-color: color-mix(in srgb, var(--cyan) 70%, var(--line-raised)); }
+.sh-pips { display: inline-flex; gap: 3px; align-items: center; }
+.sh-pips i { width: 10px; height: 10px; background: var(--party); }
+.sh-pips i.used { background: transparent; box-shadow: inset 0 0 0 1px var(--line-raised); }
+.sh-pf { display: inline-block; flex: none; width: 10px; height: 10px; box-shadow: inset 0 0 0 1px var(--line-raised); }
+.sh-pf.p { background: var(--cyan); box-shadow: none; }
+.sh-pf.x { background: var(--cyan); box-shadow: 0 0 0 2px var(--s1), 0 0 0 3px var(--cyan); }
+.sh-tag { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border: 1px solid var(--line-raised); font: 400 14px/1 var(--f-num); color: var(--text-dim); vertical-align: 2px; }
+.sh-tag.c { border-color: var(--cyan); color: var(--cyan-hi); }
+
+/* Rows: one look for every list (actions, spells, gear, features, skills) */
+.sh-list { display: grid; }
+.sh-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 14px; min-height: 52px; padding: 7px 4px; border-top: 1px solid var(--line); }
+.sh-list > .sh-row:last-child { border-bottom: 1px solid var(--line); }
+.sh-row:hover { background: color-mix(in srgb, var(--s2) 45%, transparent); }
+.sh-row .nm { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 600; font-size: 15px; }
+.sh-row .nm span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-row .mt { grid-column: 1; font-size: 13px; color: var(--text-muted); }
+.sh-row .end { grid-row: 1 / span 2; grid-column: 2; display: flex; align-items: center; gap: 10px; }
+.sh-row .end .sh-num { font-size: 22px; }
+.sh-row.is-tight { min-height: 34px; padding-block: 4px; }
+.sh-row.is-tight .nm { font-weight: 500; font-size: 14px; }
+.sh-grouphead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 4px 6px; }
+.sh-grouphead:first-child { padding-top: 2px; }
+.sh-seg + div > .sh-grouphead:first-child,
+.sh-plate + div > .sh-grouphead:first-child { padding-top: 14px; }
+
+/* Abilities: the save sits with its ability, as on the printed sheet */
+.sh-ab { display: grid; }
+.sh-abrow { display: grid; grid-template-columns: minmax(0, 1fr) 52px 92px; align-items: center; gap: 10px; min-height: 54px; padding: 4px 4px; border-top: 1px solid var(--line); }
+.sh-abrow:last-child { border-bottom: 1px solid var(--line); }
+.sh-abrow .n { display: grid; gap: 2px; }
+.sh-abrow .n b { font-weight: 600; font-size: 15px; }
+.sh-abrow .n .sh-num { font-size: 17px; color: var(--text-muted); }
+.sh-abrow .mod { font: 400 34px/1 var(--f-num); text-align: center; }
+.sh-abrow .sv { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12px; color: var(--text-muted); }
+.sh-abrow .sv .sh-num { font-size: 22px; color: var(--text); min-width: 28px; text-align: right; }
+.sh-abtiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px solid var(--line-strong); }
+.sh-abtiles.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.sh-abtile { display: grid; justify-items: center; gap: 2px; padding: 10px 4px 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.sh-abtiles:not(.six) .sh-abtile:nth-child(3n) { border-right: 0; }
+.sh-abtiles:not(.six) .sh-abtile:nth-child(n + 4) { border-bottom: 0; }
+.sh-abtiles.six .sh-abtile { border-bottom: 0; }
+.sh-abtiles.six .sh-abtile:last-child { border-right: 0; }
+.sh-abtile .a { font: 600 11px/1 var(--f-label); letter-spacing: 0.12em; color: var(--text-muted); }
+.sh-abtile .mod { font: 400 32px/1 var(--f-num); }
+.sh-abtile .sc { font: 400 16px/1 var(--f-num); color: var(--text-muted); }
+.sh-abtile .sv { display: flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 11px; color: var(--text-muted); }
+.sh-abtile .sv .sh-num { font-size: 18px; color: var(--text); }
+
+/* Skills: proficiency square, name, ability, bonus */
+.sh-skills { display: grid; column-gap: 22px; }
+.sh-skills.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sh-skills.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sh-sk { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-height: 32px; border-top: 1px solid var(--line); font-size: 14px; }
+.sh-sk .ab { font: 600 10px/1 var(--f-label); letter-spacing: 0.1em; color: var(--text-muted); }
+.sh-sk .sh-num { font-size: 19px; min-width: 26px; text-align: right; }
+.sh-sk.is-prof { font-weight: 600; }
+
+/* Facts: a definition list */
+.sh-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 18px; margin: 0; }
+.sh-facts dt, .sh-facts dd { margin: 0; padding: 8px 0; border-top: 1px solid var(--line); }
+.sh-facts dt { font: 600 11px/1.6 var(--f-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.sh-facts dd { font-size: 14px; }
+
+/* Coins and the pack meter */
+.sh-coins { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line-strong); }
+.sh-coins div { display: grid; justify-items: center; gap: 3px; padding: 8px 4px; }
+.sh-coins div + div { border-left: 1px solid var(--line); }
+.sh-coins .sh-num { font-size: 26px; }
+.sh-coins span:last-child { font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; color: var(--text-muted); }
+.sh-meter { height: 6px; background: var(--void); box-shadow: inset 0 0 0 1px var(--line-raised); }
+.sh-meter i { display: block; height: 100%; background: var(--party); }
+
+/* Segmented filter (a choice of view, never a tab strip inside a tab strip) */
+.sh-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border: 1px solid var(--line-raised); background: var(--void); }
+.sh-seg span { display: inline-grid; place-items: center; min-height: 30px; padding: 0 10px; font: 600 13px/1 var(--f-label); color: var(--text-dim); cursor: pointer; }
+.sh-seg span.on { color: var(--text); background: var(--tab-on); box-shadow: inset 0 -2px 0 var(--state-on-edge); }
+
+/* Tabs: words on the strip's line; the chosen tab's ink is a horizon lying on that line, with an elliptical cast */
+/* A strip scrolls sideways on a phone, and a scroll container may shrink to nothing in a fixed-height column, so it
+   keeps its own height. */
+.sh-tabs { position: relative; display: flex; flex: none; gap: 2px; min-height: 45px; border-bottom: 1px solid var(--line-strong); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.sh-tabs::-webkit-scrollbar { display: none; }
+.sh-tabs.is-scroll { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+.sh-tab { position: relative; flex: none; min-height: 44px; padding: 0 14px; border: 0; background: none; color: var(--text-dim); font: 600 14px/1 var(--f-label); cursor: pointer; white-space: nowrap; }
+.sh-tab:hover { color: var(--text); }
+.sh-tab.on { color: var(--text); }
+.sh-ink { position: absolute; bottom: -1px; left: 0; width: 0; height: 2px; background: var(--hz-paint); box-shadow: var(--ink-glow); pointer-events: none; transition: none; }
+.sh-ink::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  bottom: 100%;
+  height: 18px;
+  background: var(--hz-paint);
+  opacity: var(--ink-cast);
+  -webkit-mask-image: radial-gradient(50% 100% at 50% 100%, #000 25%, transparent 100%);
+  mask-image: radial-gradient(50% 100% at 50% 100%, #000 25%, transparent 100%);
+}
+.sh-comet { position: absolute; bottom: -2px; height: 3px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--tail, #9a5cff) 60%, var(--spark)); }
+.sh-comet.l { background: linear-gradient(270deg, transparent, var(--tail, #9a5cff) 60%, var(--spark)); }
+.sh-vtabs { position: relative; display: grid; border-left: 1px solid var(--line-strong); }
+.sh-vtab { position: relative; display: block; min-height: 38px; padding: 0 14px; border: 0; background: none; text-align: left; color: var(--text-dim); font: 600 14px/38px var(--f-label); cursor: pointer; }
+.sh-vtab.on { color: var(--text); }
+.sh-vink { position: absolute; left: -2px; top: 0; width: 3px; height: 0; background: var(--hz-paint-v); box-shadow: var(--ink-glow); transition: top 220ms var(--ease-travel), height 220ms var(--ease-travel); }
+.sh-vink::before {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: -8px;
+  bottom: -8px;
+  width: 22px;
+  background: var(--hz-paint-v);
+  opacity: var(--ink-cast);
+  -webkit-mask-image: radial-gradient(100% 50% at 0 50%, #000 25%, transparent 100%);
+  mask-image: radial-gradient(100% 50% at 0 50%, #000 25%, transparent 100%);
+}
+.tp[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .sh-vink { transition: none; } }
+/* ---- Cockpit: built for play. Your body on the left (hit points, defences, resources, rests), what you can do in
+   the middle, what you can roll on the right. Each column scrolls on its own. ---- */
+.lk { display: grid; grid-template-columns: 284px minmax(0, 1fr) 304px; height: 100%; }
+.lk-rail { display: flex; flex-direction: column; gap: 16px; overflow: auto; padding: 18px 18px 20px; border-right: 1px solid var(--line-strong); background: var(--glass-s1); scrollbar-width: thin; }
+.lk-main { display: grid; align-content: start; gap: 14px; overflow: auto; padding: 16px 22px 28px; scrollbar-width: thin; }
+.lk-checks { display: grid; align-content: start; gap: 18px; overflow: auto; padding: 16px 18px 24px; border-left: 1px solid var(--line-strong); scrollbar-width: thin; }
+.lk-who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lk-who .sh-port { width: 52px; height: 52px; }
+.lk-who .sh-name { font-size: 20px; }
+.lk-who .sh-sub { font-size: 13px; }
+.lk-hp .sh-hp-top .cur { font-size: 56px; }
+.lk-hp .sh-hp-top .max { font-size: 26px; }
+.lk-hp .sh-life { height: 14px; }
+.lk-hp .sh-hpq { display: grid; grid-template-columns: 46px repeat(3, minmax(0, 1fr)); gap: 5px; }
+.lk-hp .sh-hpq .amt { width: auto; }
+.lk-hp .sh-hpq .sh-btn { padding: 0 4px; }
+.lk-stats { display: grid; grid-template-columns: 1fr 1fr; }
+.lk-stats .sh-stat { border-left: 0; border-top: 1px solid var(--line); }
+.lk-stats .sh-stat:nth-child(even) { border-left: 1px solid var(--line); }
+.lk-stats .sh-stat:nth-child(-n + 2) { border-top: 0; }
+.lk-res { display: grid; gap: 10px; }
+.lk-res .line { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--text-dim); }
+.lk-rests { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.lk.is-narrow { display: block; height: auto; }
+.lk-card { position: sticky; top: 0; z-index: 3; display: grid; gap: 8px; padding: 10px 12px 10px; border-bottom: 1px solid var(--line-strong); background: var(--glass-bg); }
+.lk-card .top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lk-card .sh-port { width: 34px; height: 34px; border-width: 1px; }
+.lk-card .sh-name { font-size: 16px; }
+.lk-card .sh-sub { font-size: 12px; }
+.lk-card .mid { display: grid; grid-template-columns: minmax(0, 1fr) 62px 62px; gap: 10px; align-items: end; }
+.lk-card .mid .sh-stat { padding: 0; gap: 3px; border: 0; justify-items: center; }
+.lk-card .mid .sh-stat .v { font-size: 28px; }
+.lk-card .sh-hp-top .cur { font-size: 36px; }
+.lk-card .bot { display: flex; align-items: center; gap: 6px; }
+.lk-card .bot .sh-chip { margin-left: auto; }
+.lk-narrowbody { display: grid; gap: 12px; padding: 0 12px 26px; }
+
+
+/* =========================================================================
+   Cockpit parts: the cabinet's own instruments, reused on the sheet. The shield for AC, the hit point gauge with
+   its keypad, the economy lamps, slot banks, the VCR counter, YOUR TURN in chrome, the Cup, action tiles and the
+   roll readout.
+   ========================================================================= */
+.ck-shield { position: relative; display: grid; place-items: center; flex: none; width: 66px; height: 74px; }
+.ck-shield svg { position: absolute; inset: 0; width: 100%; height: 100%; fill: color-mix(in srgb, var(--s2) 80%, transparent); stroke: var(--line-raised-hover); stroke-width: 1.5; }
+.ck-shield .v { position: relative; margin-top: -6px; font: 400 34px/1 var(--f-num); }
+.ck-shield .l { position: absolute; bottom: 9px; left: 0; right: 0; text-align: center; font: 600 9px/1 var(--f-label); letter-spacing: 0.14em; color: var(--text-muted); }
+.ck-shield.sm { width: 50px; height: 56px; }
+.ck-shield.sm .v { font-size: 26px; margin-top: -4px; }
+.ck-shield.sm .l { bottom: 6px; font-size: 8px; }
+
+.ck-gauge { display: grid; gap: 8px; min-width: 0; }
+.ck-gauge .top { display: flex; align-items: baseline; gap: 8px; }
+.ck-gauge .cur { font: 400 58px/0.8 var(--f-num); color: var(--hp-text); }
+.ck-gauge .max { font: 400 26px/1 var(--f-num); color: var(--text-muted); }
+.ck-gauge .tmp { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.ck-gauge .tmp .sh-num { font-size: 18px; color: var(--text-dim); }
+.ck-gauge .sh-life { position: relative; height: 16px; }
+.ck-gauge.md .cur { font-size: 42px; }
+.ck-gauge.md .max { font-size: 20px; }
+.ck-gauge.md .sh-life { height: 12px; }
+.ck-gauge.sm .cur { font-size: 30px; }
+.ck-gauge.sm .max { font-size: 16px; }
+.ck-gauge.sm .sh-life { height: 9px; }
+.sh-life { position: relative; }
+.ck-keys { display: grid; grid-template-columns: 54px repeat(3, minmax(0, 1fr)); gap: 5px; }
+.ck-keys input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 6px;
+  border: 1px solid var(--line-raised);
+  background: var(--void);
+  color: var(--text);
+  font: 400 22px/1 var(--f-num);
+  text-align: center;
+}
+.ck-keys input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.ck-keys .sh-btn { min-height: 34px; padding: 0 4px; }
+.ck-keys .dmg { color: var(--danger-text); }
+
+.ck-lamps { display: flex; align-items: flex-end; gap: 14px; }
+.ck-lamp { display: grid; justify-items: center; gap: 5px; font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.ck-lamp i { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--line-raised); background: var(--s3); font: 400 14px/1 var(--f-num); font-style: normal; color: var(--text-muted); }
+.ck-lamp.is-lit i { border-color: transparent; color: transparent; }
+.ck-lamp.k-action.is-lit i { background: var(--magenta); box-shadow: var(--glow-lamp-action); }
+.ck-lamp.k-bonus.is-lit i { background: var(--hp); box-shadow: var(--glow-lamp-bonus); }
+.ck-lamp.k-reaction.is-lit i { background: var(--cyan); box-shadow: var(--glow-lamp-reaction); }
+.ck-lamp.is-lit { color: var(--text); }
+.ck-move { display: grid; justify-items: center; gap: 5px; font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.ck-move span { display: flex; gap: 2px; height: 24px; align-items: center; }
+.ck-move b { width: 6px; height: 18px; background: var(--s3); box-shadow: inset 0 0 0 1px var(--line-raised); }
+.ck-lamps.is-on .ck-move b { background: var(--text); box-shadow: none; }
+.ck-lamps.sm { gap: 9px; }
+.ck-lamps.sm .ck-lamp i { width: 16px; height: 16px; font-size: 11px; }
+.ck-lamps.sm .ck-lamp, .ck-lamps.sm .ck-move { font-size: 8px; gap: 3px; }
+.ck-lamps.sm .ck-move span { height: 16px; }
+.ck-lamps.sm .ck-move b { width: 4px; height: 12px; }
+
+.ck-vcr { display: inline-flex; gap: 10px; padding: 4px 9px; border: 1px solid var(--line-raised); background: var(--void); font: 400 20px/1 var(--f-num); letter-spacing: 0.06em; color: var(--cyan-hi); white-space: nowrap; }
+.ck-vcr.is-stop { color: var(--text-muted); }
+.ck-yt { font: 400 24px/1 var(--f-chrome); background: var(--grad-chrome); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: var(--chrome-split); white-space: nowrap; }
+.sh-port.is-acting { border: 3px solid transparent; border-image: var(--grad-sun) 1; box-shadow: var(--glow-sun); }
+
+.cup {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 26px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 600 16px/1 var(--f-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cup::before, .cup::after { content: ""; position: absolute; inset: 0; z-index: -1; box-sizing: border-box; pointer-events: none; }
+.cup::before {
+  --plate: var(--s2);
+  border: 1px solid var(--line-raised);
+  background: linear-gradient(to top, transparent, var(--plate)), linear-gradient(color-mix(in srgb, var(--plate) var(--primary-veil), transparent), color-mix(in srgb, var(--plate) var(--primary-veil), transparent)), var(--hz-paint);
+}
+.cup:hover::before { --plate: var(--s3); border-color: var(--line-raised-hover); }
+.cup::after {
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: 3px;
+  border-image: var(--hz-paint) 1;
+  -webkit-mask-image: linear-gradient(to top, #000 40%, rgba(0, 0, 0, 0.6));
+  mask-image: linear-gradient(to top, #000 40%, rgba(0, 0, 0, 0.6));
+  filter: var(--primary-drop);
+}
+.cup:active { transform: translateY(1px); }
+.cup.sm { min-height: 42px; padding: 0 18px; font-size: 14px; }
+.cup.block { display: flex; width: 100%; }
+
+/* Action tiles: the deck. The cost lamp in the corner says which lamp it spends. */
+.ck-tiles { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 8px; }
+.ck-tile {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6px;
+  min-height: 96px;
+  padding: 10px 11px 9px;
+  border: 1px solid var(--line-raised);
+  background: var(--s2);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.ck-tile:hover { background: var(--s3); border-color: var(--line-raised-hover); }
+.ck-tile .tn { padding-right: 34px; font: 600 14px/1.15 var(--f-label); }
+.ck-tile .tv { display: flex; align-items: baseline; gap: 6px; font: 400 30px/1 var(--f-num); }
+.ck-tile .tv small { font-size: 15px; color: var(--text-muted); }
+.ck-tile .td { font: 400 17px/1 var(--f-num); color: var(--text-dim); }
+.ck-tile .tc { position: absolute; top: 9px; right: 9px; display: flex; align-items: center; gap: 5px; font: 400 15px/1 var(--f-num); color: var(--text-muted); }
+.ck-cost { display: inline-block; width: 9px; height: 9px; }
+.ck-cost.k-action { background: var(--magenta); }
+.ck-cost.k-bonus { background: var(--hp); }
+.ck-cost.k-reaction { background: var(--cyan); }
+.ck-tile.is-fav::after { content: ""; position: absolute; left: -1px; right: -1px; bottom: -1px; height: 2px; background: var(--hz-paint); }
+.ck-tiles.mini { gap: 6px; }
+.ck-tiles.mini .ck-tile { min-height: 62px; padding: 7px 8px 6px; gap: 3px; }
+.ck-tiles.mini .ck-tile .tn { padding-right: 18px; font-size: 12px; }
+.ck-tiles.mini .ck-tile .tv { font-size: 21px; }
+.ck-tiles.mini .ck-tile .td { display: none; }
+.ck-tiles.mini .ck-tile .tc { top: 7px; right: 7px; font-size: 12px; }
+.ck-tiles.mini .ck-tile .tc .lv { display: none; }
+.ck-more { display: grid; place-items: center; border-style: dashed; color: var(--cyan-hi); font: 600 13px/1 var(--f-label); }
+
+/* Slot banks: one row per level */
+.ck-banks { display: grid; gap: 7px; }
+.ck-bank { display: grid; grid-template-columns: 34px auto; align-items: center; gap: 8px; }
+.ck-bank .sh-num { font-size: 18px; color: var(--text-dim); }
+.ck-bank .sh-pips i { width: 13px; height: 13px; }
+.ck-banks.row { grid-auto-flow: column; justify-content: start; gap: 18px; }
+.ck-banks.row .ck-bank { grid-template-columns: auto auto; gap: 6px; }
+.ck-banks.row .sh-pips i { width: 11px; height: 11px; }
+
+/* The roll readout: the last roll, large */
+.ck-readout { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 2px 12px; padding: 10px 12px; border: 1px solid var(--line-strong); background: var(--void); }
+.ck-readout .what { grid-column: 1; font: 600 11px/1.2 var(--f-label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.ck-readout .detail { grid-column: 1; font: 400 17px/1.1 var(--f-num); color: var(--text-dim); }
+.ck-readout .total { grid-column: 2; grid-row: 1 / span 2; font: 400 48px/0.85 var(--f-num); color: var(--text); }
+.ck-readout.is-crit .total { color: var(--hp-text); }
+
+/* Quick-roll ability buttons and skill rows */
+.ck-abil { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ck-abil button { display: grid; justify-items: center; gap: 2px; padding: 8px 4px 7px; border: 1px solid var(--line-raised); background: var(--s2); color: var(--text); font: inherit; cursor: pointer; }
+.ck-abil button:hover { background: var(--s3); }
+.ck-abil .a { font: 600 10px/1 var(--f-label); letter-spacing: 0.12em; color: var(--text-muted); }
+.ck-abil .m { font: 400 28px/1 var(--f-num); }
+.ck-abil .s { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-muted); }
+.ck-abil .s .sh-num { font-size: 15px; color: var(--text-dim); }
+.ck-sks { display: grid; }
+.ck-sks button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-height: 32px; padding: 0 4px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--text); font: 400 14px/1 var(--f-label); text-align: left; cursor: pointer; }
+.ck-sks button:hover { background: color-mix(in srgb, var(--s2) 60%, transparent); }
+.ck-sks button.is-prof { font-weight: 600; }
+.ck-sks .ab { font: 600 10px/1 var(--f-label); letter-spacing: 0.1em; color: var(--text-muted); }
+.ck-sks .sh-num { font-size: 19px; min-width: 26px; text-align: right; }
+
+/* Light: parts the interactions spawn */
+.ck-comet { position: absolute; top: 50%; height: 4px; margin-top: -2px; pointer-events: none; }
+.ck-pop { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; pointer-events: none; background: radial-gradient(closest-side, var(--spark), color-mix(in srgb, var(--party) 70%, transparent) 50%, transparent); }
+
+/* =========================================================================
+   A. Console: an instrument cluster. Every number is a gauge or a lamp, along one band. Below, the deck of actions in
+   lanes by cost, and the rolls at the side.
+   ========================================================================= */
+.lA { display: grid; grid-template-rows: auto auto minmax(0, 1fr); height: 100%; }
+.lA-band { display: grid; grid-template-columns: minmax(230px, 1.05fr) minmax(310px, 1.5fr) auto minmax(110px, auto) minmax(150px, auto) minmax(190px, 1fr); border-bottom: 1px solid var(--line-strong); background: var(--glass-s1); }
+.lA-band > * { display: grid; align-content: center; gap: 8px; padding: 12px 16px; min-width: 0; }
+.lA-band > * + * { border-left: 1px solid var(--line); }
+.lA-id { display: flex !important; align-items: center; gap: 14px; }
+.lA-id .who { display: grid; gap: 6px; min-width: 0; }
+.lA-id .sh-name { font-size: 22px; }
+.lA-id .sh-sub { font-size: 13px; }
+.lA-pair { display: grid; gap: 10px; }
+.lA-pair .sh-stat { padding: 0; }
+.lA-strip { display: flex; align-items: center; gap: 18px; padding: 0 16px; border-bottom: 1px solid var(--line-strong); }
+.lA-strip .sh-tabs { border-bottom: 0; align-self: stretch; min-height: 54px; }
+.lA-strip .sh-tabs .sh-tab { min-height: 54px; }
+.lA-strip .sh-tabs .sh-ink { bottom: -1px; }
+.lA-strip .end { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.lA-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0; }
+.lA-deck { overflow: auto; padding: 14px 16px 24px; scrollbar-width: thin; }
+.lA-lanes { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.lA-lane { display: grid; gap: 8px; }
+.lA-lane .lh { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line-strong); }
+.lA-lane .lh .sh-eb { display: inline-flex; align-items: center; gap: 7px; }
+.lA-roll { display: grid; align-content: start; gap: 14px; overflow: auto; padding: 14px 16px 24px; border-left: 1px solid var(--line-strong); scrollbar-width: thin; }
+
+.lA.is-narrow { display: block; height: auto; }
+.lA-hud { position: sticky; top: 0; z-index: 3; display: grid; gap: 9px; padding: 10px 12px; border-bottom: 1px solid var(--line-strong); background: var(--glass-bg); }
+.lA-hud .r1 { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lA-hud .r1 .sh-port { width: 36px; height: 36px; }
+.lA-hud .r1 .sh-name { font-size: 16px; }
+.lA-hud .r2 { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
+.lA-hud .r3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lA-nbody { display: grid; gap: 14px; padding: 0 12px 24px; }
+.lA-nbody .lA-lanes { grid-template-columns: minmax(0, 1fr); }
+.lA-endbar { position: sticky; bottom: 0; z-index: 3; padding: 10px 12px; border-top: 1px solid var(--line-strong); background: var(--glass-bg); }
+
+/* =========================================================================
+   B. Hotbar: the character screen above, the HUD docked below, as in the games players know. On a phone the dock
+   sits above the bottom tabs, under the thumb.
+   ========================================================================= */
+.lB { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100%; }
+.lB-ref { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 0; }
+.lB-checks { display: grid; align-content: start; gap: 14px; overflow: auto; padding: 14px 16px 20px; border-right: 1px solid var(--line-strong); scrollbar-width: thin; }
+.lB-book { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+.lB-book > .sh-tabs { margin: 0 20px; }
+.lB-book .lB-pages { overflow: auto; padding: 14px 20px 24px; scrollbar-width: thin; }
+.lB-dock { display: grid; grid-template-columns: 330px minmax(0, 1fr) 210px; border-top: 1px solid var(--line-strong); background: var(--glass-bg); }
+.lB-dock > * { padding: 12px 16px; min-width: 0; }
+.lB-dock > * + * { border-left: 1px solid var(--line); }
+.lB-hud { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; align-items: center; }
+.lB-hud .sh-port { width: 74px; height: 74px; grid-row: span 2; }
+.lB-hud .nm { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lB-hud .nm .sh-name { font-size: 17px; }
+.lB-bar { display: grid; gap: 10px; align-content: center; }
+.lB-bar .r1 { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.lB-end { display: grid; gap: 10px; align-content: center; justify-items: stretch; }
+
+.lB.is-narrow { height: 100%; }
+.lB.is-narrow .lB-ref { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: none; }
+.lB.is-narrow .lB-ref > .sh-tabs { margin: 0 8px; }
+.lB.is-narrow .lB-pages { overflow: auto; padding: 12px 12px 18px; }
+.lB.is-narrow .lB-dock { grid-template-columns: minmax(0, 1fr); }
+.lB.is-narrow .lB-dock > * { padding: 9px 10px; }
+.lB.is-narrow .lB-dock > * + * { border-left: 0; border-top: 1px solid var(--line); }
+.lB-mhud { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
+.lB-mhud .sh-port { width: 34px; height: 34px; border-width: 1px; }
+.lB-mhud .sh-port.is-acting { border-width: 2px; }
+
+/* =========================================================================
+   C. Lanes: four columns, no tabs. Body, Act, Roll and Carry, each scrolling on its own. On a phone the lanes are
+   pages you swipe between, with the strip on top following.
+   ========================================================================= */
+.lC { display: grid; grid-template-columns: 252px minmax(0, 1.35fr) 268px 268px; height: 100%; }
+.lane { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--line-strong); }
+.lane:last-child { border-right: 0; }
+.lane-h { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 46px; padding: 0 14px; border-bottom: 1px solid var(--line-strong); background: var(--glass-bg); }
+.lane-h h3 { margin: 0; font: 600 15px/1 var(--f-display); letter-spacing: 0.08em; text-transform: uppercase; }
+.lane-b { display: grid; align-content: start; gap: 16px; overflow: auto; padding: 14px 14px 22px; scrollbar-width: thin; }
+.lC .lane-body { background: var(--glass-s1); }
+.lC-body-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lC-body-id .sh-port { width: 50px; height: 50px; }
+.lC-body-id .sh-name { font-size: 18px; }
+.lC-body-id .sh-sub { font-size: 12px; }
+.lC-def { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: 6px 12px; }
+.lC-def .sh-stat { padding: 0; }
+.lC-def .sh-stat .v { font-size: 26px; }
+
+.lC.is-narrow { display: grid; grid-template-columns: none; grid-template-rows: auto auto minmax(0, 1fr); height: 100%; }
+.lC-mini { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr) auto; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line-strong); background: var(--glass-bg); }
+.lC-mini .sh-port { width: 30px; height: 30px; border-width: 1px; }
+.lC-mini .sh-port.is-acting { border-width: 2px; }
+.lC-mini .sh-name { font-size: 14px; }
+.lC-swipe { display: flex; min-height: 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.lC-swipe::-webkit-scrollbar { display: none; }
+.lC-swipe > .lane { flex: none; width: 100%; scroll-snap-align: start; border-right: 0; }
+.lC-swipe .lane-h { display: none; }
+.lC .lC-strip { padding: 0 6px; background: var(--glass-bg); }
+.lC .lC-strip .sh-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.lC .lC-strip .sh-tab { padding: 0 4px; }
+
+/* =========================================================================
+   D. Focus: a main display in the middle shows the one thing you're about to do, large, with its numbers and its
+   Cast. Your body on the left rail, your rolls on the right, every other action one tap below the display.
+   ========================================================================= */
+.lD { display: grid; grid-template-columns: 262px minmax(0, 1fr) 286px; height: 100%; }
+.lD-rail { display: grid; align-content: start; gap: 16px; overflow: auto; padding: 16px 16px 20px; border-right: 1px solid var(--line-strong); background: var(--glass-s1); scrollbar-width: thin; }
+.lD-rail .lD-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lD-rail .lD-id .sh-port { width: 50px; height: 50px; }
+.lD-rail .lD-id .sh-name { font-size: 18px; }
+.lD-rail .lD-id .sh-sub { font-size: 12px; }
+.lD-center { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+.lD-top { display: flex; align-items: center; gap: 18px; padding: 0 20px; border-bottom: 1px solid var(--line-strong); }
+.lD-top .sh-tabs { border-bottom: 0; align-self: stretch; min-height: 54px; }
+.lD-top .sh-tabs .sh-tab { min-height: 54px; }
+.lD-top .end { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.lD-main { overflow: auto; padding: 18px 20px 24px; display: grid; align-content: start; gap: 16px; scrollbar-width: thin; }
+.lD-checks { display: grid; align-content: start; gap: 14px; overflow: auto; padding: 16px 16px 20px; border-left: 1px solid var(--line-strong); scrollbar-width: thin; }
+.fc { position: relative; display: grid; gap: 14px; padding: 20px 22px 18px; border: 1px solid var(--line-strong); background: var(--glass-s1); }
+.fc::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.fc-head { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-muted); }
+.fc-title { margin: 0; font: 600 34px/1 var(--f-display); letter-spacing: 0.03em; text-transform: uppercase; }
+.fc-nums { display: flex; flex-wrap: wrap; gap: 10px 34px; align-items: flex-end; }
+.fc-num { display: grid; gap: 4px; }
+.fc-num .v { font: 400 64px/0.85 var(--f-num); }
+.fc-num .l { font-size: 13px; color: var(--text-muted); }
+.fc-facts { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--text-dim); }
+.fc-facts b { font-weight: 600; color: var(--text-muted); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; margin-right: 6px; }
+.fc-desc { margin: 0; max-width: 62ch; font-size: 14px; color: var(--text-dim); }
+.fc-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; }
+.qp { display: grid; gap: 10px; }
+.qp-row { display: grid; grid-template-columns: 118px minmax(0, 1fr); align-items: start; gap: 12px; }
+.qp-row .sh-eb { display: inline-flex; align-items: center; gap: 7px; padding-top: 9px; }
+.qp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.qp-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 11px; border: 1px solid var(--line-raised); background: var(--s2); color: var(--text); font: 600 13px/1 var(--f-label); cursor: pointer; }
+.qp-chip:hover { background: var(--s3); }
+.qp-chip .sh-num { font-size: 17px; color: var(--text-dim); }
+.qp-chip.on { border-color: var(--state-on-edge); box-shadow: inset 0 -2px 0 var(--state-on-edge); background: var(--tab-on); }
+
+.lD.is-narrow { display: block; height: auto; }
+.lD-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; gap: 12px; max-height: 76%; overflow: auto; padding: 18px 14px 16px; border-top: 1px solid var(--line-strong); background: var(--s1); box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.45); }
+.lD-sheet::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: var(--grad-horizon); box-shadow: var(--glow-horizon); }
+.lD-sheet .fc-title { font-size: 24px; }
+.lD-sheet .fc-num .v { font-size: 46px; }
+.lD-sheet .x { position: absolute; top: 10px; right: 8px; }
+.lD-scrim { position: absolute; inset: 0; z-index: 5; background: rgba(8, 9, 16, 0.55); }
+.sh-lamp.conc.is-lit i { border-color: transparent; background: var(--cyan); box-shadow: var(--glow-lamp-reaction); }
+.qp-row.qp-stack { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.qp-row.qp-stack .sh-eb { padding-top: 0; }
+.lD-scrim[hidden], .lD-sheet[hidden] { display: none; }
+/* Narrow rails: everything shrinks to the rail, and the keypad's words may tighten. */
+.lane-b > *, .lD-rail > *, .lB-hud > *, .lA-band > * { min-width: 0; }
+.lane-b .ck-keys, .lD-rail .ck-keys, .lB-hud .ck-keys { grid-template-columns: 44px repeat(3, minmax(0, 1fr)); }
+.ck-keys .sh-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lane-b .ck-keys .sh-btn, .lD-rail .ck-keys .sh-btn { font-size: 12px; }
+.lB-dock { grid-template-columns: 350px minmax(0, 1fr) 210px; }
+.lB-hud .ck-keys { grid-column: 1 / -1; }
+.ck-tiles.mini .ck-tile .tv { white-space: nowrap; overflow: hidden; }
+.ck-tiles.mini .ck-tile .tv small { font-size: 12px; }
+.tp > .sh-sec:first-child { margin-bottom: 14px; }
+.lC.is-narrow .lC-body-id { display: none; }
+.lD-sheet .fc { padding: 0; border: 0; background: none; }
+.lD-sheet .fc::before { display: none; }
+.lane-b .sh-btn.lg, .lD-rail .sh-btn.lg { min-width: 0; padding: 0 8px; }
+</style>
+
+<header class="wrap page-head">
+  <p class="eyebrow">OzyVTT &middot; design options</p>
+  <h1>Cockpit sheets</h1>
+  <p>Four layouts that take Cockpit further: built for the table, with the cabinet's own instruments on the sheet. Hit points never leave the screen, actions are grouped by what they cost, and every roll is one tap. Switch to Your turn to see each one in a fight. The buttons work: Damage and Heal move the gauge, Cast spends a slot and a lamp, and rolls land in the readout.</p>
+</header>
+
+<div class="switch-bar">
+  <div class="wrap switch-row">
+    <div class="seg opt-seg" role="group" aria-label="Layout" id="opt-seg">
+      <button type="button" data-opt="last" aria-pressed="false">Last round</button>
+      <button type="button" data-opt="console" aria-pressed="true">Console</button>
+      <button type="button" data-opt="hotbar" aria-pressed="false">Hotbar</button>
+      <button type="button" data-opt="lanes" aria-pressed="false">Lanes</button>
+      <button type="button" data-opt="focus" aria-pressed="false">Focus</button>
+    </div>
+    <div class="seg mode-seg" role="group" aria-label="Moment" id="mode-seg">
+      <button type="button" data-mode="calm" aria-pressed="true">Between fights</button>
+      <button type="button" data-mode="turn" aria-pressed="false">Your turn</button>
+    </div>
+    <div class="seg view-seg" role="group" aria-label="View" id="view-seg">
+      <button type="button" data-show="all" aria-pressed="true">All</button>
+      <button type="button" data-show="laptop" aria-pressed="false">Laptop</button>
+      <button type="button" data-show="phone" aria-pressed="false">Phone</button>
+      <button type="button" data-show="panel" aria-pressed="false">Table panel</button>
+    </div>
+    <div class="seg theme-seg" role="group" aria-label="Theme" id="theme-seg">
+      <button type="button" data-th="dark" aria-pressed="true">Dusk</button>
+      <button type="button" data-th="light" aria-pressed="false">Dawn</button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="idea" aria-labelledby="idea-name">
+    <div>
+      <p class="eyebrow">The layout</p>
+      <h2 id="idea-name">Console</h2>
+      <p id="idea-text"></p>
+      <p class="eyebrow" style="margin-top:14px">Where else it appears</p>
+      <p id="idea-elsewhere" style="font-size:14px"></p>
+    </div>
+    <div class="side">
+      <p class="eyebrow">Keeps from Cockpit</p>
+      <ul id="idea-keeps"></ul>
+      <p class="eyebrow" id="idea-changes-eb">What's new</p>
+      <ul id="idea-changes"></ul>
+      <p class="eyebrow" id="idea-watch-eb">Watch for</p>
+      <p id="idea-watch" style="font-size:14px"></p>
+    </div>
+  </section>
+
+  <div class="stage" id="stage" data-show="all">
+    <div class="view v-laptop" id="v-laptop">
+      <div class="view-cap"><p class="eyebrow">Laptop, the Sheet page</p><p>1280 by 800, shown to fit</p></div>
+      <div class="fit"></div>
+    </div>
+    <div class="stage-row">
+      <div class="view v-phone is-narrow" id="v-phone">
+        <div class="view-cap"><p class="eyebrow">Phone, the Sheet page</p><p>390 by 844</p></div>
+        <div class="fit"></div>
+      </div>
+      <div class="view v-panel is-narrow" id="v-panel">
+        <div class="view-cap"><p class="eyebrow">Table panel</p><p>The 392 px column beside the map</p></div>
+        <div class="fit"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- The character: Lyra Emberwise, from the app's own sheet mockups ---------- */
+  var D = {
+    name: "Lyra Emberwise",
+    sub: "Evoker Wizard 7 · Elf · Sage",
+    ac: 15, init: "+2", speed: 30, prof: "+3",
+    hp: 38, hpMax: 44, temp: 0,
+    hd: { left: 5, of: 7, die: "d6" },
+    abilities: [
+      ["Strength", "STR", 8, "−1", "−1", 0],
+      ["Dexterity", "DEX", 14, "+2", "+2", 0],
+      ["Constitution", "CON", 14, "+2", "+2", 0],
+      ["Intelligence", "INT", 18, "+4", "+7", 1],
+      ["Wisdom", "WIS", 12, "+1", "+4", 1],
+      ["Charisma", "CHA", 10, "+0", "+0", 0]
+    ],
+    skills: [
+      ["Acrobatics", "DEX", "+2", 0], ["Animal Handling", "WIS", "+1", 0], ["Arcana", "INT", "+10", 2],
+      ["Athletics", "STR", "−1", 0], ["Deception", "CHA", "+0", 0], ["History", "INT", "+7", 1],
+      ["Insight", "WIS", "+4", 1], ["Intimidation", "CHA", "+0", 0], ["Investigation", "INT", "+7", 1],
+      ["Medicine", "WIS", "+1", 0], ["Nature", "INT", "+4", 0], ["Perception", "WIS", "+4", 1],
+      ["Performance", "CHA", "+0", 0], ["Persuasion", "CHA", "+0", 0], ["Religion", "INT", "+4", 0],
+      ["Sleight of Hand", "DEX", "+2", 0], ["Stealth", "DEX", "+2", 0], ["Survival", "WIS", "+1", 0]
+    ],
+    pinned: [["Perception", "+4", 1], ["Arcana", "+10", 2], ["Investigation", "+7", 1], ["Insight", "+4", 1]],
+    slots: [[1, 4, 1], [2, 3, 0], [3, 3, 1], [4, 1, 0]],
+    actions: [
+      ["Attacks", [
+        ["Dagger", "", "+5 · 20/60 ft · 1d4 + 2 piercing · Finesse, Light, Thrown", "Attack"],
+        ["Quarterstaff", "", "+2 · 1d6 − 1 bludgeoning · Versatile (1d8)", "Attack"],
+        ["Fire Bolt", "", "Cantrip · +7 · 120 ft · 2d10 + 4 fire", "Cast"],
+        ["Ray of Frost", "", "Cantrip · +7 · 60 ft · 2d8 + 4 cold", "Cast"]
+      ]],
+      ["Actions", [
+        ["Magic Missile", "", "Level 1 · 120 ft · three darts, 1d4 + 1 force each", "Cast"],
+        ["Scorching Ray", "", "Level 2 · +7 · 120 ft · three rays, 2d6 fire each", "Cast"],
+        ["Web", "C", "Level 2 · DC 15 Dex · 60 ft · 1 hour", "Cast"],
+        ["Fireball", "", "Level 3 · DC 15 Dex · 150 ft · 8d6 fire", "Cast"],
+        ["Dimension Door", "", "Level 4 · 500 ft · you and one willing creature", "Cast"]
+      ]],
+      ["Bonus actions", [["Misty Step", "", "Level 2 · Self · teleport 30 ft", "Cast"]]],
+      ["Reactions", [
+        ["Shield", "", "Level 1 · Self · +5 AC until your next turn", "Cast"],
+        ["Counterspell", "", "Level 3 · 60 ft · Con save or the spell fails", "Cast"]
+      ]]
+    ],
+    spells: [
+      ["Cantrips", null, [
+        ["Fire Bolt", "", "Action · 120 ft · +7 · 2d10 + 4 fire"],
+        ["Light", "", "Action · Touch · 1 hour"],
+        ["Mage Hand", "", "Action · 30 ft · 1 minute"],
+        ["Prestidigitation", "", "Action · 10 ft · up to 1 hour"],
+        ["Ray of Frost", "", "Action · 60 ft · +7 · 2d8 + 4 cold"]
+      ]],
+      ["Level 1", 0, [
+        ["Detect Magic", "CR", "Action · Self · 10 minutes"],
+        ["Mage Armor", "", "Action · Touch · 8 hours"],
+        ["Magic Missile", "", "Action · 120 ft · 1d4 + 1 force × 3"],
+        ["Shield", "", "Reaction · Self · +5 AC"]
+      ]],
+      ["Level 2", 1, [
+        ["Misty Step", "", "Bonus action · Self · 30 ft"],
+        ["Scorching Ray", "", "Action · 120 ft · +7 · 2d6 fire × 3"],
+        ["Web", "C", "Action · 60 ft · DC 15 Dex"]
+      ]],
+      ["Level 3", 2, [
+        ["Counterspell", "", "Reaction · 60 ft · Con save"],
+        ["Fireball", "", "Action · 150 ft · DC 15 Dex · 8d6 fire"]
+      ]],
+      ["Level 4", 3, [
+        ["Dimension Door", "", "Action · 500 ft"],
+        ["Greater Invisibility", "C", "Action · Touch · 1 minute"]
+      ]]
+    ],
+    gear: {
+      coins: [["PP", 0], ["GP", 46], ["EP", 0], ["SP", 12], ["CP", 30]],
+      worn: [
+        ["Wand of the War Mage, +1", "Attuned · +1 to spell attack rolls"],
+        ["Quarterstaff", "Arcane focus · 1d6 bludgeoning · Versatile (1d8)"],
+        ["Dagger", "× 2 · 1d4 piercing · Finesse, Light, Thrown (20/60)"],
+        ["Robe", "Worn"]
+      ],
+      pack: [
+        ["Spellbook", "34 spells copied"],
+        ["Ink (1-ounce bottle)", "Enough for about 500 pages"],
+        ["Ink Pen", ""],
+        ["Parchment", "× 10"],
+        ["Book", "× 2 · Histories of the Thornwood"]
+      ]
+    },
+    features: [
+      ["Wizard 7 · Evoker", [
+        ["Spellcasting", "Intelligence · save DC 15 · attack +7"],
+        ["Ritual Adept", "Cast a ritual from your book without preparing it"],
+        ["Scholar", "Expertise in Arcana"],
+        ["Evocation Savant", "Copy evocation spells for half the time and gold"],
+        ["Potent Cantrip", "A damaging cantrip still deals half on a miss or a save"],
+        ["Sculpt Spells", "Choose allies who take no damage from your evocations"]
+      ]],
+      ["Elf · High Elf", [
+        ["Darkvision", "60 ft"],
+        ["Fey Ancestry", "Advantage on saves against being Charmed"],
+        ["Keen Senses", "Proficiency in Perception"],
+        ["Trance", "A Long Rest in 4 hours"]
+      ]],
+      ["Sage · Feats", [["Magic Initiate (Wizard)", "Two cantrips and a level 1 spell, once a day without a slot"]]]
+    ],
+    facts: [
+      ["Species and size", "Elf · Medium"],
+      ["Background", "Sage"],
+      ["Languages", "Common, Elvish, Draconic, Sylvan"],
+      ["Armor training", "None"],
+      ["Weapons", "Simple weapons"],
+      ["Tools", "Calligrapher's Supplies"]
+    ],
+    senses: [["Darkvision", "60 ft"], ["Passive Perception", "14"], ["Passive Insight", "14"], ["Passive Investigation", "17"]]
+  };
+
+  /* ---------- Icons ---------- */
+  var I = {
+    hat: '<svg viewBox="0 0 48 48" fill="none" stroke="var(--party)" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M24 6 33 32H15z"/><path d="M8 35c4 3.4 28 3.4 32 0"/><circle cx="22" cy="22" r="1.6" fill="var(--hp)" stroke="none"/></svg>',
+    search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>',
+    screen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h16"/><path d="M6 17a6 6 0 0 1 12 0"/><path d="M12 8V6"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg>',
+    dots: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>',
+    moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/></svg>',
+    down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>',
+    die: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16"/><circle cx="9" cy="9" r="0.8"/><circle cx="15" cy="15" r="0.8"/><circle cx="15" cy="9" r="0.8"/><circle cx="9" cy="15" r="0.8"/></svg>',
+    person: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1-4 4-6 7-6s6 2 7 6"/></svg>',
+    doc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h7M9 17h7"/></svg>',
+    lines: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h10"/></svg>'
+  };
+
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+  /* ---------- Parts ---------- */
+  var P = {};
+  P.port = function () { return '<div class="sh-port">' + I.hat + "</div>"; };
+  P.who = function (sub) {
+    return '<div class="who"><h2 class="sh-name">' + esc(D.name) + "</h2>" + (sub === false ? "" : '<p class="sh-sub">' + esc(D.sub) + "</p>") + "</div>";
+  };
+  P.life = function () {
+    var n = Math.max(1, Math.min(22, Math.ceil(D.hpMax / 2)));
+    var lit = Math.round((D.hp / D.hpMax) * n);
+    var s = "";
+    for (var i = 0; i < n; i++) s += i < lit ? "<i></i>" : '<i class="lost"></i>';
+    return '<div class="sh-life" role="img" aria-label="' + D.hp + " of " + D.hpMax + ' hit points">' + s + "</div>";
+  };
+  P.hp = function (o) {
+    o = o || {};
+    var top = '<div class="sh-hp-top">' + (o.label === false ? "" : '<span class="sh-eb" style="align-self:center;margin-right:2px">HP</span>') +
+      '<span class="cur">' + D.hp + '</span><span class="max">/ ' + D.hpMax + "</span>" + (o.temp === false ? "" : '<span class="tmp">Temp ' + D.temp + "</span>") + "</div>";
+    var quick = o.quick ? '<div class="sh-hpq"><span class="amt">0</span><button type="button" class="sh-btn">Damage</button><button type="button" class="sh-btn">Heal</button><button type="button" class="sh-btn">Temp</button></div>' : "";
+    return '<div class="sh-hp">' + top + P.life() + quick + "</div>";
+  };
+  P.stat = function (label, value, unit) {
+    return '<div class="sh-stat"><span class="sh-eb">' + label + '</span><span class="v">' + value + (unit ? "<small> " + unit + "</small>" : "") + "</span></div>";
+  };
+  P.stats4 = function () { return P.stat("AC", D.ac) + P.stat("Initiative", D.init) + P.stat("Speed", D.speed, "ft") + P.stat("Proficiency", D.prof); };
+  P.pips = function (of, used) {
+    var s = "";
+    for (var i = 0; i < of; i++) s += i < of - used ? "<i></i>" : '<i class="used"></i>';
+    return '<span class="sh-pips">' + s + "</span>";
+  };
+  P.hitDice = function () {
+    return '<span class="sh-eb">Hit dice</span><div style="display:flex;align-items:center;gap:8px"><span class="sh-num" style="font-size:22px">' + D.hd.left + "/" + D.hd.of + '</span><span style="font-size:12px;color:var(--text-muted)">' + D.hd.die + "</span>" + P.pips(D.hd.of, D.hd.of - D.hd.left) + "</div>";
+  };
+  P.effects = function (o) {
+    o = o || {};
+    return '<div class="sh-chips"><span class="sh-chip is-effect">Mage Armor <span class="t">8 h</span></span>' + (o.add === false ? "" : '<button type="button" class="sh-link">Add condition</button>') + "</div>";
+  };
+  P.insp = function () { return '<span class="sh-lamp is-lit"><i></i>Heroic Inspiration</span>'; };
+  P.exh = function () { return '<span class="sh-lamp"><span>Exhaustion</span>' + P.pips(6, 6).replace('class="sh-pips"', 'class="sh-pips" style="opacity:.9"') + "</span>"; };
+  P.rest = function () { return '<button type="button" class="sh-btn lg">' + I.moon + "Rest" + I.down + "</button>"; };
+  P.more = function () { return '<span class="sh-iconbtn" aria-label="Sheet menu">' + I.dots + "</span>"; };
+
+  P.abRows = function () {
+    return '<div class="sh-ab">' + D.abilities.map(function (a) {
+      return '<div class="sh-abrow"><div class="n"><b>' + a[0] + '</b><span class="sh-num">' + a[2] + '</span></div><div class="mod">' + a[3] +
+        '</div><div class="sv"><span class="sh-pf' + (a[5] ? " p" : "") + '"></span>Save<span class="sh-num">' + a[4] + "</span></div></div>";
+    }).join("") + "</div>";
+  };
+  P.abTiles = function (six) {
+    return '<div class="sh-abtiles' + (six ? " six" : "") + '">' + D.abilities.map(function (a) {
+      return '<div class="sh-abtile"><span class="a">' + a[1] + '</span><span class="mod">' + a[3] + '</span><span class="sc">' + a[2] +
+        '</span><span class="sv"><span class="sh-pf' + (a[5] ? " p" : "") + '"></span>Save <span class="sh-num">' + a[4] + "</span></span></div>";
+    }).join("") + "</div>";
+  };
+  P.skills = function (cols) {
+    var list = D.skills.map(function (s) {
+      return '<div class="sh-sk' + (s[3] ? " is-prof" : "") + '"><span class="sh-pf' + (s[3] === 2 ? " x" : s[3] ? " p" : "") + '"></span><span>' + s[0] + '</span><span class="ab">' + s[1] + '</span><span class="sh-num">' + s[2] + "</span></div>";
+    });
+    if (!cols || cols === 1) return '<div class="sh-skills">' + list.join("") + "</div>";
+    var per = Math.ceil(list.length / cols);
+    var out = "";
+    for (var c = 0; c < cols; c++) out += "<div>" + list.slice(c * per, (c + 1) * per).join("") + "</div>";
+    return '<div class="sh-skills c' + cols + '">' + out + "</div>";
+  };
+  P.facts = function (rows) {
+    return '<dl class="sh-facts">' + rows.map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("") + "</dl>";
+  };
+  P.pinned = function () {
+    return '<div class="sh-chips">' + D.pinned.map(function (p) {
+      return '<button type="button" class="sh-chip is-pin' + (p[2] ? " is-prof" : "") + '"><span class="sh-pf' + (p[2] === 2 ? " x" : " p") + '"></span>' + p[0] + ' <span class="sh-num">' + p[1] + "</span></button>";
+    }).join("") + "</div>";
+  };
+  P.slots = function () {
+    return '<div class="slotline">' + D.slots.map(function (s) {
+      return '<span><span class="sh-num">' + ["", "1st", "2nd", "3rd", "4th"][s[0]] + "</span>" + P.pips(s[1], s[2]) + "</span>";
+    }).join("") + "</div>";
+  };
+  P.uses = function () {
+    return '<div class="sh-list">' + row("Arcane Recovery", "", "Back on a Long Rest · recover 4 levels of slots on a Short Rest", P.pips(1, 0) + '<button type="button" class="sh-btn">Use</button>') +
+      row("Magic Initiate", "", "Detect Magic without a slot · back on a Long Rest", P.pips(1, 0) + '<button type="button" class="sh-btn">Cast</button>') + "</div>";
+  };
+  function row(name, tags, meta, end, tight) {
+    var t = "";
+    if (tags) t = tags.split("").map(function (c) { return '<span class="sh-tag' + (c === "C" ? " c" : "") + '">' + c + "</span>"; }).join("");
+    return '<div class="sh-row' + (tight ? " is-tight" : "") + '"><div class="nm"><span>' + esc(name) + "</span>" + t + "</div>" + (meta ? '<div class="mt">' + esc(meta) + "</div>" : "") + '<div class="end">' + (end || "") + "</div></div>";
+  }
+  P.row = row;
+  P.actions = function (o) {
+    o = o || {};
+    var head = o.filter ? '<div class="sh-seg" role="group" aria-label="Show"><span class="on">All</span><span>Attacks</span><span>Actions</span><span>Bonus</span><span>Reactions</span></div>' : "";
+    var groups = D.actions.map(function (g) {
+      return '<div class="sh-grouphead"><span class="sh-eb">' + g[0] + '</span><span class="sh-eb">' + g[1].length + '</span></div><div class="sh-list">' +
+        g[1].map(function (a) { return row(a[0], a[1], a[2], '<button type="button" class="sh-btn">' + a[3] + "</button>"); }).join("") + "</div>";
+    }).join("");
+    return head + "<div>" + groups + "</div>";
+  };
+  P.spells = function () {
+    var top = '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px"><div class="sh-seg" role="group" aria-label="Show"><span class="on">Prepared</span><span>Spellbook</span><span>Rituals</span></div>' +
+      '<span style="font-size:13px;color:var(--text-muted)">Save DC <span class="sh-num" style="font-size:19px;color:var(--text)">15</span> · Attack <span class="sh-num" style="font-size:19px;color:var(--text)">+7</span> · INT</span></div>';
+    var groups = D.spells.map(function (g) {
+      var slot = g[1] === null ? "" : P.pips(D.slots[g[1]][1], D.slots[g[1]][2]);
+      return '<div class="sh-grouphead"><span class="sh-eb">' + g[0] + "</span>" + slot + '</div><div class="sh-list">' +
+        g[2].map(function (s) { return row(s[0], s[1], s[2], '<button type="button" class="sh-btn">Cast</button>'); }).join("") + "</div>";
+    }).join("");
+    return top + "<div>" + groups + "</div>";
+  };
+  P.gear = function () {
+    var coins = '<div class="sh-coins">' + D.gear.coins.map(function (c) { return '<div><span class="sh-num">' + c[1] + "</span><span>" + c[0] + "</span></div>"; }).join("") + "</div>";
+    var att = '<div class="sh-grouphead"><span class="sh-eb">Attunement</span><span style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)"><span class="sh-num" style="font-size:17px">1 of 3</span>' + P.pips(3, 2) + "</span></div>";
+    var worn = '<div class="sh-grouphead"><span class="sh-eb">Worn and held</span></div><div class="sh-list">' + D.gear.worn.map(function (g) { return row(g[0], "", g[1], '<span class="sh-iconbtn" style="width:24px">›</span>'); }).join("") + "</div>";
+    var pack = '<div class="sh-grouphead"><span class="sh-eb">In the backpack</span><span style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)"><span class="sh-num" style="font-size:17px">12 / 30 lb</span><span class="sh-meter" style="width:80px"><i style="width:40%"></i></span></span></div><div class="sh-list">' +
+      D.gear.pack.map(function (g) { return row(g[0], "", g[1], '<span class="sh-iconbtn" style="width:24px">›</span>'); }).join("") + "</div>";
+    return att + coins + worn + pack + '<div style="padding-top:12px"><button type="button" class="sh-btn lg">Add an item</button></div>';
+  };
+  P.features = function () {
+    var xp = '<div class="sh-grouphead"><span class="sh-eb">Experience</span><span class="sh-num" style="font-size:17px;color:var(--text-dim)">23,000 / 34,000 XP</span></div><div class="sh-meter"><i style="width:68%"></i></div>';
+    var uses = '<div class="sh-grouphead"><span class="sh-eb">Uses</span></div>' + P.uses();
+    var groups = D.features.map(function (g) {
+      return '<div class="sh-grouphead"><span class="sh-eb">' + g[0] + '</span></div><div class="sh-list">' + g[1].map(function (f) { return row(f[0], "", f[1], ""); }).join("") + "</div>";
+    }).join("");
+    return xp + uses + groups;
+  };
+  P.notes = function () {
+    return P.facts(D.facts) + '<div class="sh-grouphead"><span class="sh-eb">Notes</span><button type="button" class="sh-link">Edit</button></div>' +
+      '<p style="margin:0;font-size:14px;color:var(--text-dim);max-width:62ch">Owes Grukk Twotooth a favour for the safe passage through the warren. The second book is on loan from the Hollins farm and should go back before winter.</p>';
+  };
+  P.senses = function () { return P.facts(D.senses); };
+
+  /* ---------- Tabs ---------- */
+  P.tabs = function (gid, items, on, o) {
+    o = o || {};
+    return '<div class="sh-tabs' + (o.scroll ? " is-scroll" : "") + '" role="tablist" data-tabs="' + gid + '"' + (o.style ? ' style="' + o.style + '"' : "") + ">" +
+      items.map(function (t) { return '<button type="button" role="tab" class="sh-tab' + (t[0] === on ? " on" : "") + '" data-tab="' + t[0] + '" aria-selected="' + (t[0] === on) + '">' + t[1] + "</button>"; }).join("") +
+      '<span class="sh-ink" aria-hidden="true"></span></div>';
+  };
+  P.panel = function (gid, key, on, html, extra) {
+    return '<section class="tp" data-group="' + gid + '" data-panel="' + key + '"' + (key === on ? "" : " hidden") + (extra ? " " + extra : "") + ">" + html + "</section>";
+  };
+
+  window.SHEET = { D: D, I: I, P: P, esc: esc };
+})();
+(function () {
+  "use strict";
+  var S = window.SHEET;
+  var D = S.D, P = S.P, I = S.I, esc = S.esc;
+
+  /* Every action Lyra can take, with what it costs, its numbers and a line to read before casting. */
+  var ACTS = [
+    { k: "dagger", n: "Dagger", cost: "action", lvl: 0, hit: "+5", hitl: "to hit", dmg: "1d4 + 2", dt: "piercing", range: "20/60 ft", fav: 1, desc: "Finesse, Light and Thrown. Throw it, or use it in melee." },
+    { k: "staff", n: "Quarterstaff", cost: "action", lvl: 0, hit: "+2", hitl: "to hit", dmg: "1d6 − 1", dt: "bludgeoning", range: "Melee", fav: 0, desc: "Versatile (1d8). It is also your arcane focus." },
+    { k: "firebolt", n: "Fire Bolt", cost: "action", lvl: 0, hit: "+7", hitl: "to hit", dmg: "2d10 + 4", dt: "fire", range: "120 ft", fav: 1, desc: "A mote of fire at a creature or object. A flammable object it hits catches fire if nobody is wearing or carrying it." },
+    { k: "frost", n: "Ray of Frost", cost: "action", lvl: 0, hit: "+7", hitl: "to hit", dmg: "2d8 + 4", dt: "cold", range: "60 ft", fav: 0, desc: "On a hit, the target's speed drops by 10 feet until the start of your next turn." },
+    { k: "missile", n: "Magic Missile", cost: "action", lvl: 1, hit: "Auto", hitl: "always hits", dmg: "3 × 1d4 + 1", dt: "force", range: "120 ft", fav: 1, desc: "Three darts of force, each at a creature you can see. One more dart for each slot level above 1." },
+    { k: "ray", n: "Scorching Ray", cost: "action", lvl: 2, hit: "+7", hitl: "to hit", dmg: "3 × 2d6", dt: "fire", range: "120 ft", fav: 0, desc: "Three rays of fire, a spell attack for each. One more ray for each slot level above 2." },
+    { k: "web", n: "Web", cost: "action", lvl: 2, hit: "DC 15", hitl: "Dex save", dmg: "Restrained", dt: "", range: "60 ft", area: "20 ft cube", conc: 1, fav: 0, desc: "Sticky webbing fills a 20-foot cube. A creature that starts its turn there or enters it makes a Dexterity save or is Restrained." },
+    { k: "fireball", n: "Fireball", cost: "action", lvl: 3, hit: "DC 15", hitl: "Dex save", dmg: "8d6", dt: "fire", range: "150 ft", area: "20 ft sphere", fav: 1, desc: "Each creature in a 20-foot sphere around a point you choose makes a Dexterity save: 8d6 fire on a failure, half on a success. One more d6 for each slot level above 3." },
+    { k: "door", n: "Dimension Door", cost: "action", lvl: 4, hit: "500", hitl: "ft teleport", dmg: "", dt: "", range: "500 ft", fav: 0, desc: "You and one willing creature beside you step to a place within 500 feet." },
+    { k: "misty", n: "Misty Step", cost: "bonus", lvl: 2, hit: "30", hitl: "ft teleport", dmg: "", dt: "", range: "Self", fav: 1, desc: "Silver mist, then you are somewhere you can see within 30 feet." },
+    { k: "shield", n: "Shield", cost: "reaction", lvl: 1, hit: "+5", hitl: "AC", dmg: "", dt: "", range: "Self", fav: 1, desc: "When you're hit or Magic Missile targets you: +5 AC until the start of your next turn, and Magic Missile can't harm you." },
+    { k: "counter", n: "Counterspell", cost: "reaction", lvl: 3, hit: "Con", hitl: "save", dmg: "", dt: "", range: "60 ft", fav: 1, desc: "When you see a creature within 60 feet casting a spell: it makes a Constitution save, or the spell fails and is wasted." }
+  ];
+  var BY = {};
+  ACTS.forEach(function (a) { BY[a.k] = a; });
+  var COSTS = [["action", "Action"], ["bonus", "Bonus action"], ["reaction", "Reaction"]];
+  var ORD = ["", "1st", "2nd", "3rd", "4th"];
+
+  P.shield = function (sm) {
+    return '<div class="ck-shield' + (sm ? " sm" : "") + '" aria-label="Armor class ' + D.ac + '"><svg viewBox="0 0 66 74" aria-hidden="true"><path d="M33 2 63 12v20c0 20-13 32-30 40C16 64 3 52 3 32V12z"/></svg><span class="v">' + D.ac + '</span><span class="l">AC</span></div>';
+  };
+  P.gauge = function (size, o) {
+    o = o || {};
+    var keys = o.keys === false ? "" : '<div class="ck-keys"><input type="number" inputmode="numeric" value="7" min="0" aria-label="Amount" data-amt><button type="button" class="sh-btn dmg" data-hpdo="dmg">Damage</button><button type="button" class="sh-btn" data-hpdo="heal">Heal</button><button type="button" class="sh-btn" data-hpdo="temp">Temp</button></div>';
+    return '<div class="ck-gauge ' + (size || "") + '">' + (o.label === false ? "" : '<span class="sh-eb">Hit points</span>') +
+      '<div class="top"><span class="cur" data-hpcur>' + D.hp + '</span><span class="max">/ ' + D.hpMax + '</span><span class="tmp">Temp <span class="sh-num" data-hptemp>' + D.temp + "</span></span></div>" +
+      P.life() + keys + "</div>";
+  };
+  P.keys = function () {
+    return '<div class="ck-keys"><input type="number" inputmode="numeric" value="7" min="0" aria-label="Amount" data-amt><button type="button" class="sh-btn dmg" data-hpdo="dmg">Damage</button><button type="button" class="sh-btn" data-hpdo="heal">Heal</button><button type="button" class="sh-btn" data-hpdo="temp">Temp</button></div>';
+  };
+  P.lamps = function (turn, sm) {
+    function lamp(k, label) { return '<span class="ck-lamp k-' + k + (turn ? " is-lit" : "") + '" data-lamp="' + k + '"><i>' + (turn ? "" : "--") + "</i>" + label + "</span>"; }
+    return '<div class="ck-lamps' + (turn ? " is-on" : "") + (sm ? " sm" : "") + '" aria-label="' + (turn ? "Action, bonus action, reaction and 30 ft of movement available" : "Between fights: the lamps light on your turn") + '">' +
+      lamp("action", "Action") + lamp("bonus", "Bonus") + lamp("reaction", "Reaction") +
+      '<span class="ck-move"><span><b></b><b></b><b></b><b></b><b></b><b></b></span>Move</span></div>';
+  };
+  P.banks = function (row) {
+    return '<div class="ck-banks' + (row ? " row" : "") + '">' + D.slots.map(function (s) {
+      return '<div class="ck-bank"><span class="sh-num">' + ORD[s[0]] + '</span><span class="sh-pips" data-bank="' + s[0] + '">' + pipsHtml(s[1], s[2]) + "</span></div>";
+    }).join("") + "</div>";
+  };
+  function pipsHtml(of, used) {
+    var s = "";
+    for (var i = 0; i < of; i++) s += i < of - used ? "<i></i>" : '<i class="used"></i>';
+    return s;
+  }
+  P.pipsHtml = pipsHtml;
+  P.vcr = function (turn) {
+    return '<span class="ck-vcr' + (turn ? "" : " is-stop") + '" data-vcr>' + (turn ? "PLAY ▸" : "STOP") + ' <span data-round>RND ' + (turn ? "03" : "--") + "</span></span>";
+  };
+  P.yt = function () { return '<span class="ck-yt">YOUR TURN</span>'; };
+  P.portT = function (turn) { return '<div class="sh-port' + (turn ? " is-acting" : "") + '">' + I.hat + "</div>"; };
+  P.cup = function (label, attrs, cls) { return '<button type="button" class="cup' + (cls ? " " + cls : "") + '"' + (attrs ? " " + attrs : "") + ">" + label + "</button>"; };
+  P.restOrEnd = function (turn, o) {
+    o = o || {};
+    if (turn) return P.cup("End turn", "data-endturn", o.block ? "block" : "");
+    return '<div style="display:grid;grid-template-columns:' + (o.stack ? "1fr" : "1fr 1fr") + ';gap:8px"><button type="button" class="sh-btn lg">' + I.moon + 'Short rest</button><button type="button" class="sh-btn lg">' + I.moon + "Long rest</button></div>";
+  };
+  P.concLamp = function (turn) {
+    return '<span class="sh-lamp conc' + (turn ? " is-lit" : "") + '"><i></i>' + (turn ? "Concentrating on Web" : "Concentration") + "</span>";
+  };
+  P.tile = function (a) {
+    var lv = a.lvl ? '<span class="lv">' + ORD[a.lvl] + "</span>" : "";
+    return '<button type="button" class="ck-tile' + (a.fav ? " is-fav" : "") + '" data-act="' + a.k + '"><span class="tn">' + esc(a.n) + (a.conc ? ' <span class="sh-tag c">C</span>' : "") + "</span>" +
+      '<span class="tv">' + esc(a.hit) + "<small>" + esc(a.hitl) + "</small></span>" +
+      '<span class="td">' + esc(a.dmg ? a.dmg + (a.dt ? " " + a.dt : "") : a.range) + "</span>" +
+      '<span class="tc"><span class="ck-cost k-' + a.cost + '"></span>' + lv + "</span></button>";
+  };
+  P.lanes = function (o) {
+    o = o || {};
+    return '<div class="lA-lanes">' + COSTS.map(function (c) {
+      var list = ACTS.filter(function (a) { return a.cost === c[0]; });
+      return '<div class="lA-lane"><div class="lh"><span class="sh-eb"><span class="ck-cost k-' + c[0] + '"></span>' + c[1] + '</span><span class="sh-eb">' + list.length + "</span></div>" +
+        '<div class="ck-tiles" style="--cols:' + (c[0] === "action" ? o.actionCols || 2 : 1) + '">' + list.map(P.tile).join("") + "</div></div>";
+    }).join("") + "</div>";
+  };
+  P.favTiles = function (n, more) {
+    var favs = ACTS.filter(function (a) { return a.fav; }).slice(0, n);
+    return favs.map(P.tile).join("") + (more ? '<button type="button" class="ck-tile ck-more" data-allacts>All ' + ACTS.length + "</button>" : "");
+  };
+  P.actRows = function () {
+    return COSTS.map(function (c) {
+      var list = ACTS.filter(function (a) { return a.cost === c[0]; });
+      return '<div class="sh-grouphead"><span class="sh-eb" style="display:inline-flex;align-items:center;gap:7px"><span class="ck-cost k-' + c[0] + '"></span>' + c[1] + '</span><span class="sh-eb">' + list.length + '</span></div><div class="sh-list">' +
+        list.map(function (a) {
+          return '<div class="sh-row"><div class="nm"><span>' + esc(a.n) + "</span>" + (a.conc ? '<span class="sh-tag c">C</span>' : "") + '</div><div class="mt">' + esc((a.lvl ? "Level " + a.lvl : a.k === "dagger" || a.k === "staff" ? "Weapon" : "Cantrip") + " · " + a.hit + (a.hitl === "to hit" ? "" : " " + a.hitl) + " · " + a.range + (a.dmg ? " · " + a.dmg + (a.dt ? " " + a.dt : "") : "")) +
+            '</div><div class="end"><button type="button" class="sh-btn" data-act="' + a.k + '">' + (a.lvl || a.k === "firebolt" || a.k === "frost" ? "Cast" : "Attack") + "</button></div></div>";
+        }).join("") + "</div>";
+    }).join("");
+  };
+  P.readout = function () {
+    return '<div class="ck-readout" data-readout aria-live="polite"><span class="what">Last roll · Perception</span><span class="detail">d20 14 + 4</span><span class="total">18</span></div>';
+  };
+  P.abilQuick = function () {
+    return '<div class="ck-abil">' + D.abilities.map(function (a) {
+      return '<button type="button" data-roll="' + a[0] + " check|" + a[3] + '"><span class="a">' + a[1] + '</span><span class="m">' + a[3] + '</span><span class="s"><span class="sh-pf' + (a[5] ? " p" : "") + '"></span>save <span class="sh-num">' + a[4] + "</span></span></button>";
+    }).join("") + "</div>";
+  };
+  P.saveChips = function () {
+    return '<div class="sh-chips">' + D.abilities.map(function (a) {
+      return '<button type="button" class="sh-chip is-pin' + (a[5] ? " is-prof" : "") + '" data-roll="' + a[0] + " save|" + a[4] + '">' + a[1] + ' <span class="sh-num">' + a[4] + "</span></button>";
+    }).join("") + "</div>";
+  };
+  P.skQuick = function () {
+    return '<div class="ck-sks">' + D.skills.map(function (s) {
+      return '<button type="button" class="' + (s[3] ? "is-prof" : "") + '" data-roll="' + s[0] + "|" + s[2] + '"><span class="sh-pf' + (s[3] === 2 ? " x" : s[3] ? " p" : "") + '"></span><span>' + s[0] + '</span><span class="ab">' + s[1] + '</span><span class="sh-num">' + s[2] + "</span></button>";
+    }).join("") + "</div>";
+  };
+  P.pinnedQuick = function () {
+    return '<div class="sh-chips">' + D.pinned.map(function (p) {
+      return '<button type="button" class="sh-chip is-pin is-prof" data-roll="' + p[0] + "|" + p[1] + '"><span class="sh-pf' + (p[2] === 2 ? " x" : " p") + '"></span>' + p[0] + ' <span class="sh-num">' + p[1] + "</span></button>";
+    }).join("") + "</div>";
+  };
+  P.focusCard = function (k, turn, o) {
+    o = o || {};
+    var a = BY[k];
+    var head = '<div class="fc-head"><span class="ck-cost k-' + a.cost + '"></span>' + (a.cost === "action" ? "Action" : a.cost === "bonus" ? "Bonus action" : "Reaction") + " · " + (a.lvl ? "Level " + a.lvl + " evocation" : a.k === "dagger" || a.k === "staff" ? "Weapon" : "Cantrip") + (a.conc ? " · Concentration" : "") + "</div>";
+    var nums = '<div class="fc-nums"><div class="fc-num"><span class="v">' + esc(a.hit) + '</span><span class="l">' + esc(a.hitl) + "</span></div>" +
+      (a.dmg ? '<div class="fc-num"><span class="v">' + esc(a.dmg) + '</span><span class="l">' + esc(a.dt || "on a failed save") + "</span></div>" : "") + "</div>";
+    var facts = '<div class="fc-facts"><span><b>Range</b>' + esc(a.range) + "</span>" + (a.area ? "<span><b>Area</b>" + esc(a.area) + "</span>" : "") + (a.lvl ? "<span><b>Slot</b>" + ORD[a.lvl] + ' <span class="sh-pips" data-bank="' + a.lvl + '">' + pipsHtml(D.slots[a.lvl - 1][1], D.slots[a.lvl - 1][2]) + "</span></span>" : "") + "</div>";
+    var up = a.lvl && a.lvl < 4 ? '<div class="sh-seg" role="group" aria-label="Slot level"><span class="on">' + ORD[a.lvl] + "</span>" + [a.lvl + 1, a.lvl + 2].filter(function (l) { return l <= 4; }).map(function (l) { return "<span>" + ORD[l] + "</span>"; }).join("") + "</div>" : "<span></span>";
+    var cast = turn ? P.cup(a.lvl || a.k === "firebolt" || a.k === "frost" ? "Cast " + a.n : "Attack", 'data-act="' + a.k + '"') : '<button type="button" class="sh-btn lg" data-act="' + a.k + '">' + (a.lvl || a.k === "firebolt" || a.k === "frost" ? "Cast" : "Attack") + "</button>";
+    return '<div class="fc" data-focus="' + a.k + '">' + head + '<h3 class="fc-title">' + esc(a.n) + "</h3>" + nums + facts + '<p class="fc-desc">' + esc(a.desc) + '</p><div class="fc-foot">' + up + cast + "</div>" + (o.close ? '<span class="sh-iconbtn x" data-closesheet aria-label="Close">✕</span>' : "") + "</div>";
+  };
+  P.quickPicks = function (on) {
+    return '<div class="qp">' + COSTS.map(function (c) {
+      var list = ACTS.filter(function (a) { return a.cost === c[0]; });
+      return '<div class="qp-row"><span class="sh-eb"><span class="ck-cost k-' + c[0] + '"></span>' + c[1] + '</span><div class="qp-chips">' + list.map(function (a) {
+        return '<button type="button" class="qp-chip' + (a.k === on ? " on" : "") + '" data-pick="' + a.k + '">' + esc(a.n) + ' <span class="sh-num">' + esc(a.hit) + "</span></button>";
+      }).join("") + "</div></div>";
+    }).join("") + "</div>";
+  };
+
+  S.ACTS = ACTS;
+  S.BY = BY;
+  S.ORD = ORD;
+})();
+(function () {
+  "use strict";
+  var S = window.SHEET;
+  var D = S.D, I = S.I, P = S.P, BY = S.BY, ORD = S.ORD;
+  var uid = 0;
+  function gid(p) { uid += 1; return p + uid; }
+  function panels(g, on, list) { return list.map(function (p) { return P.panel(g, p[0], on, p[1]); }).join(""); }
+
+  /* ---------- A. Console ---------- */
+  function consoleL(narrow, turn) {
+    var g = gid("a");
+    var who = turn ? '<div class="who"><h2 class="sh-name">' + D.name + '</h2><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' + P.yt() + P.vcr(true) + "</div></div>" : P.who();
+    var roll = P.readout() + '<div class="sh-sec"><span class="sh-eb">Ability checks</span>' + P.abilQuick() + '</div><div class="sh-sec"><span class="sh-eb">Saving throws</span>' + P.saveChips() + '</div><div class="sh-sec"><div class="sh-sechead"><span class="sh-eb">Skills</span><button type="button" class="sh-link">Edit</button></div>' + P.skQuick() + '</div><div class="sh-sec"><span class="sh-eb">Senses</span>' + P.senses() + "</div>";
+    if (!narrow) {
+      var band = '<div class="lA-band"><div class="lA-id">' + P.portT(turn) + who + "</div>" +
+        "<div>" + P.gauge("") + "</div>" +
+        "<div>" + P.shield() + "</div>" +
+        '<div class="lA-pair">' + P.stat("Initiative", D.init) + P.stat("Speed", D.speed, "ft") + "</div>" +
+        '<div><span class="sh-eb">Spell slots</span>' + P.banks() + "</div>" +
+        '<div style="gap:10px"><span class="sh-eb">Hit dice</span><span style="display:flex;align-items:center;gap:8px"><span class="sh-num" style="font-size:20px">5/7</span>' + P.pips(7, 2) + "</span>" + P.insp() + P.concLamp(turn) + P.effects({ add: false }) + "</div></div>";
+      var strip = '<div class="lA-strip">' + P.tabs(g, [["deck", "Deck"], ["book", "Spellbook"], ["gear", "Gear"], ["features", "Features"], ["notes", "Notes"]], "deck") +
+        '<div class="end">' + P.lamps(turn) + (turn ? P.cup("End turn", "data-endturn") : P.rest()) + "</div></div>";
+      var body = '<div class="lA-body"><div class="lA-deck">' + panels(g, "deck", [["deck", P.lanes()], ["book", P.spells()], ["gear", P.gear()], ["features", P.features()], ["notes", P.notes()]]) +
+        '</div><aside class="lA-roll">' + roll + "</aside></div>";
+      return { html: '<div class="lA">' + band + strip + body + "</div>", cols: true };
+    }
+    var hud = '<div class="lA-hud"><div class="r1">' + P.portT(turn) + (turn ? '<div class="who" style="display:grid;gap:4px"><h2 class="sh-name">' + D.name + "</h2>" + P.yt().replace('class="ck-yt"', 'class="ck-yt" style="font-size:16px"') + "</div>" : P.who(false)) +
+      '<span style="margin-left:auto">' + P.more() + "</span></div>" +
+      '<div class="r2">' + P.gauge("sm", { label: false, keys: false }) + P.shield(true) + P.stat("Init", D.init) + "</div>" +
+      '<div class="r3">' + P.lamps(turn, true) + '<span style="display:flex;gap:5px"><button type="button" class="sh-btn dmg" data-hpdo="dmg" data-amount="7">− 7</button><button type="button" class="sh-btn" data-hpdo="heal" data-amount="7">+ 7</button></span></div></div>';
+    var body2 = '<div class="lA-nbody">' + P.tabs(g, [["deck", "Deck"], ["roll", "Roll"], ["book", "Spells"], ["gear", "Gear"], ["more", "More"]], "deck", { scroll: true }) +
+      panels(g, "deck", [["deck", '<div class="sh-sec"><span class="sh-eb">Spell slots</span>' + P.banks(true) + "</div>" + P.lanes({ actionCols: 2 })], ["roll", roll], ["book", P.spells()], ["gear", P.gear()], ["more", P.features() + P.notes()]]) + "</div>";
+    return { html: '<div class="lA is-narrow">' + hud + body2 + (turn ? '<div class="lA-endbar">' + P.cup("End turn", "data-endturn", "block") + "</div>" : "") + "</div>" };
+  }
+
+  /* ---------- B. Hotbar ---------- */
+  function hotbarL(narrow, turn) {
+    var g = gid("b");
+    var checks = P.readout() + '<div class="sh-sec"><span class="sh-eb">Ability checks</span>' + P.abilQuick() + '</div><div class="sh-sec"><span class="sh-eb">Saving throws</span>' + P.saveChips() + '</div><div class="sh-sec"><div class="sh-sechead"><span class="sh-eb">Skills</span><button type="button" class="sh-link">Edit</button></div>' + P.skQuick() + "</div>";
+    if (!narrow) {
+      var ref = '<div class="lB-ref"><aside class="lB-checks">' + checks + '</aside><div class="lB-book">' + P.tabs(g, [["spells", "Spells"], ["gear", "Gear"], ["features", "Features"], ["notes", "Notes"]], "spells") +
+        '<div class="lB-pages">' + panels(g, "spells", [["spells", P.spells()], ["gear", P.gear()], ["features", P.features()], ["notes", P.notes()]]) + "</div></div></div>";
+      var dock = '<div class="lB-dock"><div class="lB-hud">' + P.portT(turn) + '<div class="nm"><h2 class="sh-name">' + D.name + "</h2>" + P.shield(true) + "</div>" + P.gauge("md", { label: false, keys: false }) + P.keys() + "</div>" +
+        '<div class="lB-bar"><div class="r1">' + P.lamps(turn, true) + P.banks(true) + '</div><div class="ck-tiles mini" style="--cols:6">' + S.ACTS.map(P.tile).join("") + "</div></div>" +
+        '<div class="lB-end">' + (turn ? '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">' + P.yt().replace('class="ck-yt"', 'class="ck-yt" style="font-size:17px"') + "</div>" + P.vcr(true) + P.cup("End turn", "data-endturn", "block") : P.insp() + P.concLamp(false) + P.restOrEnd(false, { stack: true })) + "</div></div>";
+      return { html: '<div class="lB">' + ref + dock + "</div>", cols: true };
+    }
+    var ref2 = '<div class="lB-ref">' + P.tabs(g, [["checks", "Checks"], ["spells", "Spells"], ["gear", "Gear"], ["features", "Features"], ["notes", "Notes"]], "checks", { scroll: true }) +
+      '<div class="lB-pages">' + panels(g, "checks", [["checks", checks], ["spells", P.spells()], ["gear", P.gear()], ["features", P.features()], ["notes", P.notes()]]) + "</div></div>";
+    var dock2 = '<div class="lB-dock"><div class="lB-mhud">' + P.portT(turn) + P.gauge("sm", { label: false, keys: false }) + P.shield(true) + P.more() + "</div>" +
+      '<div><div class="ck-tiles mini" style="--cols:4">' + P.favTiles(3, true) + "</div></div>" +
+      (turn ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">' + P.lamps(true, true) + P.cup("End turn", "data-endturn", "sm") + "</div>" : "") + "</div>";
+    return { html: '<div class="lB is-narrow">' + ref2 + dock2 + "</div>", cols: true };
+  }
+
+  /* ---------- C. Lanes ---------- */
+  function lanesL(narrow, turn) {
+    var g = gid("c");
+    var body = '<div class="lC-body-id">' + P.portT(turn) + P.who() + "</div>" + (turn ? '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">' + P.yt().replace('class="ck-yt"', 'class="ck-yt" style="font-size:18px"') + P.vcr(true) + "</div>" : "") +
+      P.gauge("md") + '<div class="lC-def">' + P.shield(true) + P.stat("Init", D.init) + P.stat("Speed", D.speed, "ft") + "</div>" +
+      '<div class="sh-sec"><span class="sh-eb">Hit dice</span><span style="display:flex;align-items:center;gap:8px"><span class="sh-num" style="font-size:20px">5/7</span>' + P.pips(7, 2) + "</span></div>" +
+      '<div style="display:grid;gap:8px">' + P.insp() + P.concLamp(turn) + P.exh() + "</div>" +
+      '<div class="sh-sec"><span class="sh-eb">Effects and conditions</span>' + P.effects() + "</div>" + P.restOrEnd(turn, { block: true });
+    var act = (turn ? P.lamps(true, true) : "") + '<div class="sh-sec"><span class="sh-eb">Spell slots</span>' + P.banks(true) + "</div><div>" + P.actRows() + "</div>";
+    var roll = P.readout() + '<div class="sh-sec"><span class="sh-eb">Ability checks</span>' + P.abilQuick() + '</div><div class="sh-sec"><span class="sh-eb">Saving throws</span>' + P.saveChips() + '</div><div class="sh-sec"><span class="sh-eb">Skills</span>' + P.skQuick() + '</div><div class="sh-sec"><span class="sh-eb">Senses</span>' + P.senses() + "</div>";
+    var carry = P.gear() + "<div>" + P.features() + "</div><div>" + P.notes() + "</div>";
+    function lane(key, title, aside, html, extra) {
+      return '<section class="lane' + (extra || "") + '" data-lane="' + key + '"><div class="lane-h"><h3>' + title + "</h3>" + (aside || "") + '</div><div class="lane-b">' + html + "</div></section>";
+    }
+    var lanes = lane("body", "Body", "", body, " lane-body") + lane("act", "Act", turn ? '<span class="sh-eb">Your turn</span>' : '<span class="sh-eb">Between fights</span>', act) + lane("roll", "Roll", "", roll) + lane("carry", "Carry", '<span class="sh-num" style="font-size:16px;color:var(--text-muted)">12 / 30 lb</span>', carry);
+    if (!narrow) return { html: '<div class="lC">' + lanes + "</div>", cols: true };
+    var mini = '<div class="lC-mini">' + P.portT(turn) + '<h2 class="sh-name">' + D.name + "</h2>" + P.gauge("sm", { label: false, keys: false }) + P.shield(true) + "</div>";
+    var strip = '<div class="lC-strip">' + P.tabs(g, [["body", "Body"], ["act", "Act"], ["roll", "Roll"], ["carry", "Carry"]], "body").replace('data-tabs="' + g + '"', 'data-tabs="' + g + '" data-swipe="' + g + '"') + "</div>";
+    return { html: '<div class="lC is-narrow">' + mini + strip + '<div class="lC-swipe" data-swipe-body="' + g + '">' + lanes + "</div></div>", cols: true };
+  }
+
+  /* ---------- D. Focus ---------- */
+  function focusL(narrow, turn) {
+    var g = gid("d");
+    var rail = '<div class="lD-id">' + P.portT(turn) + P.who() + "</div>" + (turn ? '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">' + P.yt().replace('class="ck-yt"', 'class="ck-yt" style="font-size:18px"') + P.vcr(true) + "</div>" : "") +
+      P.gauge("md") + '<div class="lC-def">' + P.shield(true) + P.stat("Init", D.init) + P.stat("Speed", D.speed, "ft") + "</div>" +
+      '<div class="sh-sec"><span class="sh-eb">Spell slots</span>' + P.banks() + "</div>" +
+      '<div style="display:grid;gap:8px">' + P.insp() + P.concLamp(turn) + "</div>" + '<div class="sh-sec"><span class="sh-eb">Effects and conditions</span>' + P.effects() + "</div>" + P.restOrEnd(turn, { block: true });
+    var checks = P.readout() + '<div class="sh-sec"><span class="sh-eb">Pinned checks</span>' + P.pinnedQuick() + '</div><div class="sh-sec"><span class="sh-eb">Ability checks</span>' + P.abilQuick() + '</div><div class="sh-sec"><span class="sh-eb">Saving throws</span>' + P.saveChips() + '</div><div class="sh-sec"><span class="sh-eb">Skills</span>' + P.skQuick() + "</div>";
+    if (!narrow) {
+      var center = '<div class="lD-center"><div class="lD-top">' + P.tabs(g, [["do", "Do"], ["book", "Spellbook"], ["gear", "Gear"], ["features", "Features"], ["notes", "Notes"]], "do") + '<div class="end">' + P.lamps(turn, true) + "</div></div>" +
+        '<div class="lD-main">' + panels(g, "do", [["do", P.focusCard("fireball", turn) + P.quickPicks("fireball")], ["book", P.spells()], ["gear", P.gear()], ["features", P.features()], ["notes", P.notes()]]) + "</div></div>";
+      return { html: '<div class="lD"><aside class="lD-rail">' + rail + "</aside>" + center + '<aside class="lD-checks">' + checks + "</aside></div>", cols: true };
+    }
+    var hud = '<div class="lA-hud"><div class="r1">' + P.portT(turn) + P.who(false) + '<span style="margin-left:auto">' + P.more() + "</span></div>" +
+      '<div class="r2">' + P.gauge("sm", { label: false, keys: false }) + P.shield(true) + P.stat("Init", D.init) + "</div>" + (turn ? '<div class="r3">' + P.lamps(true, true) + P.vcr(true) + "</div>" : "") + "</div>";
+    var body = '<div class="lA-nbody">' + P.tabs(g, [["do", "Do"], ["roll", "Roll"], ["book", "Spells"], ["gear", "Gear"], ["more", "More"]], "do", { scroll: true }) +
+      panels(g, "do", [["do", '<div class="sh-sec"><span class="sh-eb">Spell slots</span>' + P.banks(true) + "</div>" + P.quickPicks("fireball").replace(/qp-row/g, "qp-row qp-stack")], ["roll", checks], ["book", P.spells()], ["gear", P.gear()], ["more", P.features() + P.notes()]]) + "</div>";
+    var overlay = '<div class="lD-scrim" data-closesheet></div><div class="lD-sheet" data-sheet>' + P.focusCard("fireball", turn, { close: true }) + "</div>";
+    return { html: '<div class="lD is-narrow">' + hud + body + "</div>", overlay: overlay };
+  }
+
+  /* ---------- Last round's Cockpit, for reference ---------- */
+  var TABS5 = [["actions", "Actions"], ["spells", "Spells"], ["gear", "Gear"], ["features", "Features"], ["notes", "Notes"]];
+  function lastL(narrow) {
+    var g = gid("k");
+    var actions = '<div class="sh-plate" style="padding:10px 14px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 18px"><span class="sh-eb">Spell slots</span>' + P.slots() + "</div>" + P.actions();
+    var checks = '<div class="sh-sec"><div class="sh-sechead"><span class="sh-eb">Pinned checks</span><button type="button" class="sh-link">Edit</button></div>' + P.pinned() + "</div>" +
+      '<div class="sh-sec"><span class="sh-eb">Abilities and saves</span>' + P.abTiles() + "</div>" +
+      '<div class="sh-sec"><div class="sh-sechead"><span class="sh-eb">Skills</span><button type="button" class="sh-link">Edit</button></div>' + P.skills(1) + "</div>";
+    if (!narrow) {
+      return {
+        html: '<div class="lk"><aside class="lk-rail"><div class="lk-who">' + P.port() + P.who() + "</div>" +
+          '<div class="lk-hp"><span class="sh-eb">Hit points</span>' + P.hp({ quick: true, label: false }) + "</div>" +
+          '<div class="lk-stats sh-plate">' + P.stats4() + "</div>" +
+          '<div class="lk-res"><div class="line">' + P.hitDice() + '</div><div class="line">' + P.insp() + '</div><div class="line">' + P.exh() + "</div></div>" +
+          '<div class="sh-sec"><span class="sh-eb">Effects and conditions</span>' + P.effects() + "</div>" +
+          '<div class="lk-rests"><button type="button" class="sh-btn lg">' + I.moon + 'Short rest</button><button type="button" class="sh-btn lg">' + I.moon + "Long rest</button></div></aside>" +
+          '<div class="lk-main">' + P.tabs(g, TABS5, "actions") + panels(g, "actions", [["actions", actions], ["spells", P.spells()], ["gear", P.gear()], ["features", P.features()], ["notes", P.notes()]]) + "</div>" +
+          '<aside class="lk-checks">' + checks + "</aside></div>",
+        cols: true
+      };
+    }
+    var tabs = [["actions", "Actions"], ["checks", "Checks"], ["spells", "Spells"], ["gear", "Gear"], ["features", "Features"], ["notes", "Notes"]];
+    return {
+      html: '<div class="lk is-narrow"><div class="lk-card"><div class="top">' + P.port() + P.who(false) + '<span style="margin-left:auto">' + P.more() + "</span></div>" +
+        '<div class="mid">' + P.hp({ temp: false }) + P.stat("AC", D.ac) + P.stat("Init", D.init) + "</div>" +
+        '<div class="bot"><span class="sh-hpq" style="display:contents"><span class="amt">0</span><button type="button" class="sh-btn">Damage</button><button type="button" class="sh-btn">Heal</button></span><span class="sh-chip is-effect">Mage Armor <span class="t">8 h</span></span></div></div>' +
+        '<div class="lk-narrowbody">' + P.tabs(g, tabs, "actions", { scroll: true }) + panels(g, "actions", [["actions", actions], ["checks", checks], ["spells", P.spells()], ["gear", P.gear()], ["features", P.features()], ["notes", P.notes()]]) + "</div></div>"
+    };
+  }
+
+  var LAYOUTS = { last: lastL, console: consoleL, hotbar: hotbarL, lanes: lanesL, focus: focusL };
+
+  /* ---------- Frames ---------- */
+  function laptop(L) {
+    return '<div class="frame" style="width:1280px;height:800px"><div class="ap">' +
+      '<header class="ap-bar"><span class="wm"><span class="wm-ozy">OZY</span><span class="wm-vtt">vtt</span></span>' +
+      '<nav class="ap-nav" aria-hidden="true"><span>Table</span><span class="on" data-seat>Sheet</span><span>Codex</span></nav>' +
+      '<div class="ap-end"><span class="ap-who">' + P.port() + "Playing Lyra</span>" + '<span class="ico">' + I.search + '</span><span class="ico">' + I.screen + '</span><span class="ico">' + I.gear + "</span></div></header>" +
+      '<div class="ap-pane' + (L.cols ? " is-cols" : "") + '">' + L.html + "</div>" + (L.overlay || "") + "</div></div>";
+  }
+  function phone(L) {
+    return '<div class="frame" style="width:390px;height:844px"><div class="ap is-phone">' +
+      '<header class="ap-bar"><span class="wm"><span class="wm-ozy">OZY</span><span class="wm-vtt">vtt</span></span><div class="ap-end"><span class="ico">' + I.search + '</span><span class="ico">' + I.screen + '</span><span class="ico">' + I.gear + "</span></div></header>" +
+      '<div class="ap-pane' + (L.cols ? " is-cols" : "") + '">' + L.html + "</div>" +
+      '<nav class="ap-bottom" aria-hidden="true"><span>' + I.die + "Table</span><span class=\"on\">" + I.person + "Sheet</span><span>" + I.doc + "Codex</span><span>" + I.lines + "Log</span></nav>" + (L.overlay || "") + "</div></div>";
+  }
+  function panel(L, turn) {
+    var g = gid("pt");
+    var tabs = turn ? [["turn", "Turn"], ["me", "Sheet"], ["log", "Log"], ["party", "Party"]] : [["me", "Me"], ["log", "Log"], ["party", "Party"]];
+    return '<div class="frame" style="width:392px;height:800px"><div class="ap is-panel">' +
+      '<div class="ap-paneltabs">' + P.tabs(g, tabs, "me") + "</div>" +
+      '<div class="ap-pane' + (L.cols ? " is-cols" : "") + '">' + L.html + "</div>" + (L.overlay || "") + "</div></div>";
+  }
+
+  /* ---------- What each option is ---------- */
+  var IDEAS = {
+    last: {
+      name: "Cockpit, last round",
+      text: "Last round's Cockpit, the starting point: hit points, defences and rests on a left rail, actions in the middle grouped by cost, rolls on the right, and a sticky card on a phone.",
+      keeps: ["Hit points never leave the screen", "Actions grouped by what they cost", "Each column scrolls on its own"],
+      changes: ["Still reads as a form: a list of rows with buttons", "The cabinet's instruments (lamps, the VCR counter, the Cup) don't appear", "Nothing on the sheet changes when it's your turn"],
+      elsewhere: "The Table panel and the phone use the sticky card and tabs.",
+      watch: ""
+    },
+    console: {
+      name: "Console",
+      text: "An instrument cluster. Everything you check in a fight is a gauge or a lamp along one band: hit points as a big gauge with its keypad, AC in a shield, initiative and speed, a lamp bank for each slot level, hit dice, inspiration and concentration. Under it sit the economy lamps and your actions as a deck of tiles in lanes by cost, with the numbers on each tile. Rolls sit at the side, one tap each.",
+      keeps: ["Cockpit's rule that hit points never leave the screen", "Actions grouped by what they cost", "The quick Damage, Heal and Temp keypad"],
+      changes: ["Numbers become instruments: a hit point gauge, AC in a shield, a lamp bank per slot level", "Actions are tiles with their to-hit or DC and damage on the face, so you compare without opening one", "The economy lamps sit on the sheet and go out as you spend them", "On your turn the band shows YOUR TURN and the VCR counter, and End turn takes Rest's place"],
+      elsewhere: "On a phone and in the Table panel the band folds into a sticky HUD with quick − 7 and + 7, and the deck becomes a stack of lanes with End turn pinned at the bottom. The GM's dialog uses the laptop form with the violet edge.",
+      watch: "The band is dense. Between 980 and 1180 px it has to drop to two rows, and tiles take more room than rows once a character knows thirty spells."
+    },
+    hotbar: {
+      name: "Hotbar",
+      text: "The layout players know from games like Baldur's Gate 3, which is itself D&D 5e. The character screen fills the space above, and a HUD is docked along the bottom: portrait, hit points and AC on the left, the economy lamps, slot banks and a hotbar of every action in the middle, and End turn on the right. On a phone the dock sits above the bottom tabs, under the thumb.",
+      keeps: ["Hit points and AC in one fixed place on every screen", "Actions by cost, now as hotbar tiles with their cost lamp", "Checks one tap each, down the left of the character screen"],
+      changes: ["The HUD is docked along the bottom, so the body and the actions share one strip", "Spells, gear, features and notes are the character screen's tabs, kept apart from play", "On a phone the dock holds three favourite actions and All, with End turn beside the lamps on your turn"],
+      elsewhere: "The Table panel docks the same HUD at the foot of its column, so the hotbar sits beside the map. The GM's dialog keeps the dock.",
+      watch: "A docked HUD takes 150 to 190 px of height all the time. On a 1280 by 800 laptop the character screen above it gets about 550 px."
+    },
+    lanes: {
+      name: "Lanes",
+      text: "Four columns and no tabs: Body, Act, Roll and Carry. On a laptop everything is on screen at once, each lane scrolling on its own. On a phone each lane is a page you swipe between, with the strip on top following your finger and hit points staying in the bar above.",
+      keeps: ["Hit points never leave the screen", "Actions grouped by cost, with spells among them", "Quick rolls on every check and save"],
+      changes: ["No tabs on a laptop: four lanes side by side", "Spells live in the Act lane with the slot banks on top, sorted by what they cost", "On a phone the lanes are pages you swipe, and the strip follows"],
+      elsewhere: "The Table panel shows one lane at a time with the same swipe. The GM's dialog shows all four lanes.",
+      watch: "Four lanes need the full 1280 px. Below that, Carry has to fold under Roll. On a phone, which lane holds what is hidden until the strip is learned."
+    },
+    focus: {
+      name: "Focus",
+      text: "A main display. Pick an action and it fills the middle with its numbers large, its range and area, the slot it spends with an upcast choice, and its Cast. Your body runs down the left rail, your rolls down the right, and every other action is one tap below the display. On a phone the display is a sheet that rises from the bottom.",
+      keeps: ["Hit points never leave the screen", "Actions grouped by cost, as quick picks under the display", "Quick rolls on the right"],
+      changes: ["One thing at a time, large: what it does, what it costs and what it rolls, before you commit", "Upcasting is a choice on the display, beside the slot it spends", "On your turn, Cast is the Cup: the one primary action in view"],
+      elsewhere: "In the Table panel the display is the same rising sheet, which leaves the map in view for picking a target. The GM's dialog uses the three columns.",
+      watch: "It adds a step: pick, then cast. A cantrip cast every turn would be quicker straight from its chip."
+    }
+  };
+
+  /* ---------- Page ---------- */
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  var state = { opt: "console", show: "all", mode: "calm" };
+
+  function renderIdea() {
+    var d = IDEAS[state.opt];
+    $("#idea-name").textContent = d.name;
+    $("#idea-text").textContent = d.text;
+    $("#idea-keeps").innerHTML = d.keeps.map(function (k) { return "<li>" + S.esc(k) + "</li>"; }).join("");
+    $("#idea-changes-eb").textContent = state.opt === "last" ? "Why it didn't go far enough" : "What's new";
+    $("#idea-changes").innerHTML = d.changes.map(function (k) { return "<li>" + S.esc(k) + "</li>"; }).join("");
+    $("#idea-elsewhere").textContent = d.elsewhere;
+    $("#idea-watch").textContent = d.watch || "";
+    $("#idea-watch-eb").hidden = !d.watch;
+    $("#idea-watch").hidden = !d.watch;
+  }
+
+  function renderStage() {
+    var turn = state.mode === "turn";
+    var L = LAYOUTS[state.opt];
+    $("#v-laptop .fit").innerHTML = laptop(L(false, turn));
+    $("#v-phone .fit").innerHTML = phone(L(true, turn));
+    $("#v-panel .fit").innerHTML = panel(L(true, turn), turn);
+    $("#v-panel .view-cap p:last-child").textContent = turn ? "The 392 px column beside the map, on its Sheet tab" : "The 392 px column beside the map, on its Me tab";
+    wire();
+    fit();
+  }
+
+  function fit() {
+    $$(".fit").forEach(function (box) {
+      var fr = box.querySelector(".frame");
+      if (!fr) return;
+      var fw = parseFloat(fr.style.width), fh = parseFloat(fr.style.height);
+      var k = Math.min(1, box.parentElement.clientWidth / fw);
+      fr.style.transform = "scale(" + k + ")";
+      box.style.width = fw * k + "px";
+      box.style.height = fh * k + "px";
+    });
+    $$(".ap-nav [data-seat]").forEach(function (el) {
+      el.style.setProperty("--win-w", el.closest(".ap-bar").offsetWidth + "px");
+      el.style.setProperty("--win-x", -el.offsetLeft + "px");
+    });
+    $$(".sh-tabs").forEach(placeInk);
+  }
+
+  /* ---------- Light ---------- */
+  function canMove() { return !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) && !!document.body.animate; }
+  function placeInk(strip) {
+    var on = strip.querySelector(".sh-tab.on"), ink = strip.querySelector(".sh-ink");
+    if (!on || !ink) return;
+    ink.style.left = on.offsetLeft + "px";
+    ink.style.width = on.offsetWidth + "px";
+  }
+  function switchTab(strip, tab, quiet) {
+    var before = strip.querySelector(".sh-tab.on");
+    if (before === tab) return;
+    $$(".sh-tab", strip).forEach(function (t) { t.classList.toggle("on", t === tab); t.setAttribute("aria-selected", String(t === tab)); });
+    var ink = strip.querySelector(".sh-ink");
+    placeInk(strip);
+    if (!canMove() || !before || quiet) return;
+    var from = before.offsetLeft + before.offsetWidth / 2, to = tab.offsetLeft + tab.offsetWidth / 2, dir = to > from ? 1 : -1;
+    ink.style.transformOrigin = dir > 0 ? "0 50%" : "100% 50%";
+    ink.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 140, delay: 170, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)", fill: "backwards" });
+    var len = Math.min(120, Math.abs(to - from));
+    var c = document.createElement("span");
+    c.className = "sh-comet" + (dir < 0 ? " l" : "");
+    c.style.width = len + "px";
+    c.style.left = (dir > 0 ? from - len : from) + "px";
+    strip.appendChild(c);
+    var a = c.animate([{ transform: "translateX(0)", opacity: 1 }, { transform: "translateX(" + (to - from) + "px)", opacity: 1, offset: 0.85 }, { transform: "translateX(" + (to - from) + "px)", opacity: 0 }], { duration: 230, easing: "cubic-bezier(0.45, 0, 0.25, 1)" });
+    var rm = function () { c.remove(); };
+    a.finished.then(rm, rm);
+  }
+  function countUp(el, from, to, dur) {
+    if (!canMove()) { el.textContent = to; return; }
+    var t0 = performance.now();
+    (function step(now) {
+      var p = Math.min(1, (now - t0) / dur);
+      el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+
+  /* ---------- Each frame keeps its own character state ---------- */
+  var FS = new WeakMap();
+  function fstate(ap) {
+    var s = FS.get(ap);
+    if (!s) {
+      var turn = state.mode === "turn";
+      s = { hp: D.hp, max: D.hpMax, temp: D.temp, slots: D.slots.map(function (x) { return [x[1], x[2]]; }), lamps: { action: turn, bonus: turn, reaction: turn }, round: 3 };
+      FS.set(ap, s);
+    }
+    return s;
+  }
+  function lifeHtml(s) {
+    var n = Math.max(1, Math.min(22, Math.ceil(s.max / 2)));
+    var lit = Math.round((s.hp / s.max) * n);
+    var out = "";
+    for (var i = 0; i < n; i++) out += i < lit ? "<i></i>" : '<i class="lost"></i>';
+    return out;
+  }
+  function setHp(ap, s, next, kind) {
+    var old = s.hp;
+    s.hp = Math.max(0, Math.min(s.max, next));
+    $$("[data-hpcur]", ap).forEach(function (el) { countUp(el, old, s.hp, 300); });
+    $$(".sh-life", ap).forEach(function (bar) {
+      if (canMove() && old !== s.hp) {
+        var w = bar.clientWidth, a = (old / s.max) * w, b = (s.hp / s.max) * w;
+        var c = document.createElement("span");
+        c.className = "ck-comet";
+        var len = Math.max(18, Math.abs(a - b));
+        var tail = kind === "heal" ? "var(--gold-tail)" : "var(--red-tail)";
+        c.style.width = len + "px";
+        c.style.left = Math.min(a, b) + "px";
+        c.style.background = b < a ? "linear-gradient(270deg, transparent, " + tail + " 60%, var(--spark))" : "linear-gradient(90deg, transparent, " + tail + " 60%, var(--spark))";
+        bar.appendChild(c);
+        var an = c.animate([{ transform: "scaleX(0)", transformOrigin: b < a ? "100% 50%" : "0 50%", opacity: 1 }, { transform: "scaleX(1)", opacity: 1, offset: 0.7 }, { transform: "scaleX(1)", opacity: 0 }], { duration: 300, easing: "cubic-bezier(0.45, 0, 0.25, 1)" });
+        var rm = function () { c.remove(); };
+        an.finished.then(rm, rm);
+        setTimeout(function () { renderLife(bar, s); }, 150);
+      } else renderLife(bar, s);
+    });
+  }
+  function renderLife(bar, s) {
+    var keep = $$(".ck-comet", bar);
+    bar.innerHTML = lifeHtml(s);
+    keep.forEach(function (k) { bar.appendChild(k); });
+    bar.setAttribute("aria-label", s.hp + " of " + s.max + " hit points");
+  }
+  function spendSlot(ap, s, lvl) {
+    for (var l = lvl; l <= 4; l++) {
+      var sl = s.slots[l - 1];
+      if (sl[0] - sl[1] > 0) {
+        sl[1] += 1;
+        $$('[data-bank="' + l + '"]', ap).forEach(function (pips) {
+          var lit = $$("i:not(.used)", pips);
+          var pip = lit[lit.length - 1];
+          if (pip && canMove()) pip.animate([{ transform: "scale(1.7)", boxShadow: "0 0 10px var(--party)" }, { transform: "scale(1)", boxShadow: "0 0 0 transparent" }], { duration: 260, easing: "ease-out" });
+          if (pip) pip.classList.add("used");
+        });
+        return l;
+      }
+    }
+    return 0;
+  }
+  function coolLamp(ap, s, cost) {
+    if (!s.lamps[cost]) return;
+    s.lamps[cost] = false;
+    $$('[data-lamp="' + cost + '"]', ap).forEach(function (l) {
+      var i = l.querySelector("i");
+      if (canMove()) i.animate([{ filter: "brightness(1.6)" }, { filter: "brightness(1)" }], { duration: 300, easing: "ease-out" });
+      l.classList.remove("is-lit");
+      i.textContent = "--";
+    });
+  }
+  function relight(ap, s) {
+    ["action", "bonus", "reaction"].forEach(function (k) {
+      s.lamps[k] = true;
+      $$('[data-lamp="' + k + '"]', ap).forEach(function (l, n) {
+        l.classList.add("is-lit");
+        l.querySelector("i").textContent = "";
+        if (canMove()) l.querySelector("i").animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 200, delay: n * 60 + ["action", "bonus", "reaction"].indexOf(k) * 70, easing: "ease-out", fill: "backwards" });
+      });
+    });
+    s.round += 1;
+    $$("[data-round]", ap).forEach(function (r) { r.textContent = "RND " + (s.round < 10 ? "0" : "") + s.round; });
+  }
+
+  /* Dice for the readout */
+  function d(n) { return 1 + Math.floor(Math.random() * n); }
+  function rollExpr(expr) {
+    var m = /^(?:(\d+) × )?(\d+)d(\d+)(?: ([+−]) (\d+))?$/.exec(expr);
+    if (!m) return null;
+    var times = +(m[1] || 1), total = 0;
+    for (var t = 0; t < times; t++) {
+      for (var i = 0; i < +m[2]; i++) total += d(+m[3]);
+      if (m[4]) total += (m[4] === "+" ? 1 : -1) * +m[5];
+    }
+    return total;
+  }
+  function readout(ap, what, detail, total, crit) {
+    $$("[data-readout]", ap).forEach(function (r) {
+      r.querySelector(".what").textContent = what;
+      r.querySelector(".detail").textContent = detail;
+      r.classList.toggle("is-crit", !!crit);
+      var t = r.querySelector(".total");
+      var from = parseInt(t.textContent, 10) || 0;
+      if (typeof total === "number") countUp(t, from, total, 300); else t.textContent = total;
+      if (canMove()) r.animate([{ boxShadow: "inset 0 -2px 0 var(--state-on-edge)" }, { boxShadow: "inset 0 0 0 transparent" }], { duration: 500, easing: "ease-out" });
+    });
+  }
+  function useAct(ap, k) {
+    var a = BY[k], s = fstate(ap);
+    var lvl = 0;
+    if (a.lvl) {
+      lvl = spendSlot(ap, s, a.lvl);
+      if (!lvl) { readout(ap, a.n, "No slot of level " + a.lvl + " or higher left", "--"); return; }
+    }
+    if (state.mode === "turn") coolLamp(ap, s, a.cost);
+    var spent = lvl ? " · " + ORD[lvl] + " slot" : "";
+    if (/^\+\d/.test(a.hit)) {
+      var r = d(20), mod = parseInt(a.hit, 10), dmg = rollExpr(a.dmg);
+      readout(ap, a.n + " · to hit" + spent, "d20 " + r + " + " + mod + (dmg !== null ? " · " + (r === 20 ? "critical, " : "") + dmg + " " + a.dt : ""), r + mod, r === 20);
+    } else if (a.dmg && rollExpr(a.dmg) !== null) {
+      var dm = rollExpr(a.dmg);
+      readout(ap, a.n + " · " + a.hit + " " + a.hitl + spent, a.dmg + " " + a.dt + (a.hitl === "Dex save" ? ", half on a save" : ""), dm);
+    } else {
+      readout(ap, a.n + spent, a.hitl + (a.range ? " · " + a.range : ""), a.hit);
+    }
+  }
+
+  function wire() {
+    // Lanes on a phone: the strip follows the swipe.
+    $$("[data-swipe-body]").forEach(function (sw) {
+      var strip = $('[data-swipe="' + sw.dataset.swipeBody + '"]');
+      sw.addEventListener("scroll", function () {
+        var i = Math.round(sw.scrollLeft / sw.clientWidth);
+        var tab = $$(".sh-tab", strip)[i];
+        if (tab && !tab.classList.contains("on")) switchTab(strip, tab, true);
+      }, { passive: true });
+    });
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest ? e.target : null;
+    if (!t) return;
+    var ap = t.closest(".ap");
+    var tab = t.closest(".sh-tab");
+    if (tab) {
+      var strip = tab.closest(".sh-tabs");
+      if (strip.dataset.swipe) {
+        var sw = $('[data-swipe-body="' + strip.dataset.swipe + '"]');
+        var i = $$(".sh-tab", strip).indexOf(tab);
+        switchTab(strip, tab);
+        sw.scrollTo({ left: i * sw.clientWidth, behavior: canMove() ? "smooth" : "auto" });
+        return;
+      }
+      switchTab(strip, tab);
+      $$('.tp[data-group="' + strip.dataset.tabs + '"]').forEach(function (p) { p.hidden = p.dataset.panel !== tab.dataset.tab; });
+      return;
+    }
+    if (!ap) return;
+    var hp = t.closest("[data-hpdo]");
+    if (hp) {
+      var s = fstate(ap);
+      var keys = hp.closest(".ck-keys");
+      var amt = hp.dataset.amount ? +hp.dataset.amount : Math.max(0, parseInt(keys && keys.querySelector("input").value, 10) || 0);
+      if (hp.dataset.hpdo === "dmg") {
+        var soak = Math.min(s.temp, amt);
+        s.temp -= soak;
+        $$("[data-hptemp]", ap).forEach(function (el) { el.textContent = s.temp; });
+        setHp(ap, s, s.hp - (amt - soak), "dmg");
+      } else if (hp.dataset.hpdo === "heal") setHp(ap, s, s.hp + amt, "heal");
+      else {
+        s.temp = Math.max(s.temp, amt);
+        $$("[data-hptemp]", ap).forEach(function (el) { el.textContent = s.temp; });
+      }
+      return;
+    }
+    var pick = t.closest("[data-pick]");
+    if (pick) {
+      var k = pick.dataset.pick;
+      $$(".qp-chip", pick.closest(".qp") || ap).forEach(function (c) { c.classList.toggle("on", c.dataset.pick === k); });
+      var sheet = ap.querySelector("[data-sheet]");
+      if (sheet) {
+        sheet.innerHTML = P.focusCard(k, state.mode === "turn", { close: true });
+        sheet.hidden = false;
+        ap.querySelector(".lD-scrim").hidden = false;
+        if (canMove()) sheet.animate([{ transform: "translateY(24px)", opacity: 0 }, { transform: "translateY(0)", opacity: 1 }], { duration: 200, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" });
+      } else {
+        var fc = ap.querySelector(".fc");
+        if (fc) {
+          fc.outerHTML = P.focusCard(k, state.mode === "turn");
+          var nfc = ap.querySelector(".fc");
+          if (canMove()) nfc.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 200, delay: 60, easing: "ease-out", fill: "backwards" });
+        }
+      }
+      return;
+    }
+    if (t.closest("[data-closesheet]")) {
+      ap.querySelector("[data-sheet]").hidden = true;
+      ap.querySelector(".lD-scrim").hidden = true;
+      return;
+    }
+    var act = t.closest("[data-act]");
+    if (act) { useAct(ap, act.dataset.act); return; }
+    var roll = t.closest("[data-roll]");
+    if (roll) {
+      var parts = roll.dataset.roll.split("|");
+      var mod = parseInt(parts[1].replace("−", "-"), 10), r = d(20);
+      readout(ap, parts[0], "d20 " + r + " " + (mod < 0 ? "− " + -mod : "+ " + mod), r + mod, r === 20);
+      return;
+    }
+    if (t.closest("[data-endturn]")) { relight(ap, fstate(ap)); return; }
+    if (t.closest("[data-allacts]")) {
+      var str = ap.querySelector(".sh-tabs");
+      if (str) { var sp = str.querySelector('[data-tab="spells"]'); if (sp) sp.click(); }
+      return;
+    }
+    var seg = t.closest(".sh-seg span");
+    if (seg) $$("span", seg.parentElement).forEach(function (x) { x.classList.toggle("on", x === seg); });
+  });
+
+  function setOpt(k, fromHash) {
+    if (!IDEAS[k]) return;
+    state.opt = k;
+    $$("#opt-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.opt === k)); });
+    renderIdea();
+    renderStage();
+    if (!fromHash) { try { history.replaceState(null, "", "#" + k + (state.mode === "turn" ? "-turn" : "")); } catch (e) { /* the frame may refuse it */ } }
+  }
+  function setMode(m) {
+    state.mode = m;
+    $$("#mode-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === m)); });
+    renderStage();
+    try { history.replaceState(null, "", "#" + state.opt + (m === "turn" ? "-turn" : "")); } catch (e) { /* the frame may refuse it */ }
+  }
+  function setShow(v) {
+    state.show = v;
+    $("#stage").dataset.show = v;
+    $$("#view-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.show === v)); });
+    fit();
+  }
+  $$("#opt-seg button").forEach(function (b) { b.addEventListener("click", function () { setOpt(b.dataset.opt); }); });
+  $$("#mode-seg button").forEach(function (b) { b.addEventListener("click", function () { setMode(b.dataset.mode); }); });
+  $$("#view-seg button").forEach(function (b) { b.addEventListener("click", function () { setShow(b.dataset.show); }); });
+
+  var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+  function paintTheme() {
+    var t = document.documentElement.getAttribute("data-theme");
+    var eff = t === "light" || t === "dark" ? t : mq && mq.matches ? "light" : "dark";
+    $$("#theme-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.th === eff)); });
+  }
+  $$("#theme-seg button").forEach(function (b) {
+    b.addEventListener("click", function () { document.documentElement.setAttribute("data-theme", b.dataset.th); paintTheme(); });
+  });
+  if (mq && mq.addEventListener) mq.addEventListener("change", paintTheme);
+
+  var lastW = 0;
+  if (window.ResizeObserver) new ResizeObserver(function (entries) {
+    var w = Math.round(entries[0].contentRect.width);
+    if (w !== lastW) { lastW = w; fit(); }
+  }).observe($("#stage"));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+
+  window.addEventListener("hashchange", function () {
+    var hh = location.hash.slice(1).split("-");
+    if (!IDEAS[hh[0]]) return;
+    state.mode = hh[1] === "turn" ? "turn" : "calm";
+    $$("#mode-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode)); });
+    setOpt(hh[0], true);
+  });
+  var h = location.hash.slice(1).split("-");
+  if (h[1] === "turn") state.mode = "turn";
+  $$("#mode-seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode)); });
+  setShow(window.matchMedia && window.matchMedia("(max-width: 650px)").matches ? "phone" : "all");
+  setOpt(IDEAS[h[0]] ? h[0] : "console", true);
+  paintTheme();
+})();
+</script>
