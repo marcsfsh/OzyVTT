@@ -468,6 +468,9 @@ mouse is a bug.
 - Every interactive control has a hit area of at least `--tap-min` (44px). All `@vtt/ui`
   primitives meet it; compose from them before hand-rolling a control. Map tokens and Codex
   graph nodes are the accepted exceptions: their size is data, and the canvas zooms.
+- The one exception outside GM data regions (ADR-0047): on a laptop with a mouse, the character
+  sheet's skill rows use `--row-h-dense` (30px) so all eighteen fit at 1280 by 800. Any coarse
+  pointer restores 44px.
 - Draggable or zoomable surfaces use Pointer Events with `setPointerCapture` and set
   `touch-action: none`. On the encounter map a second finger aborts the gesture in progress and
   commits nothing.

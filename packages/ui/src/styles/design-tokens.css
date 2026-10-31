@@ -424,6 +424,7 @@
   --dock-w: 22rem; /* the table's side dock */
   --row-h: var(--tap-min); /* comfortable rows, the default everywhere */
   --row-h-compact: 36px; /* compact row paint for GM data regions only, never on a phone; .tap-target keeps the hit area */
+  --row-h-dense: 30px; /* the character sheet's skill rows on a laptop with a mouse only (ADR-0047) */
 
   /* Touch-target floor: every interactive control presents at least this hit area. Controls painted smaller
      keep their visual weight and grow the area with `.tap-target`. */
