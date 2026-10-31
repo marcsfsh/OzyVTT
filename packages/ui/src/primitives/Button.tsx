@@ -72,18 +72,35 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Accessible name; required because icon-only buttons have no text. */
   label: string;
   size?: ButtonSize;
+  /** An icon button in content (a record's More), on its Base line with a 36px face (ADR-0048). */
+  base?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
 
 /** Square icon-only control (map tools, close buttons). Uses aria-pressed for
     toggles; the pressed state carries the magenta active glow. */
-export function IconButton({ label, size = "md", className, type = "button", children, ...rest }: IconButtonProps) {
+export function IconButton({
+  label,
+  size = "md",
+  base = false,
+  className,
+  type = "button",
+  children,
+  ...rest
+}: IconButtonProps) {
   return (
     <button
       type={type}
       aria-label={label}
       title={rest.title ?? label}
-      className={cx("nh-iconbtn", size === "sm" && "nh-iconbtn--sm", "tap-target", "interactive", className)}
+      className={cx(
+        "nh-iconbtn",
+        size === "sm" && "nh-iconbtn--sm",
+        base && "nh-iconbtn--base",
+        "tap-target",
+        "interactive",
+        className
+      )}
       {...rest}
     >
       {children as ReactNode}

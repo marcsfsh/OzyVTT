@@ -41,6 +41,18 @@
   --line-raised: rgba(255, 255, 255, 0.2);
   /* A control's edge under the pointer: a step lighter, with no hue (cyan means selected). */
   --line-raised-hover: rgba(255, 255, 255, 0.32);
+  /* The theme spec (ADR-0048): a secondary control sits on a Base line, and a group you act in is a Cradle box. */
+  --base-line: inset 0 -1px 0 var(--line-raised);
+  --base-line-hover: inset 0 -2px 0 var(--cyan);
+  --base-line-on: inset 0 -2px 0 var(--cyan);
+  /* A hidden choice's dashed violet base, as a background image: an inset shadow cannot dash. */
+  --base-line-hidden: repeating-linear-gradient(90deg, var(--violet) 0 6px, transparent 6px 10px) left bottom / 100% 2px
+    no-repeat;
+  --cradle-base: 2px;
+  --cradle-sides: linear-gradient(to bottom, transparent, var(--line-raised) 55%);
+  /* A lit line's glow (a Cradle's base, a Base line's hover): gone in Dawn and under reduced transparency. */
+  --glow-on: 0 0 8px rgba(43, 228, 255, 0.55);
+  --glow-drop-on: drop-shadow(0 0 4px rgba(43, 228, 255, 0.6));
   --line-hover: color-mix(in srgb, var(--cyan) 55%, transparent); /* adapts per theme via --cyan */
 
   /* One meaning per hue (DESIGN.md, Colour and themes). Each hue has an ink for words where the hue itself, meant
@@ -584,6 +596,8 @@
   --glow-drop-magenta: drop-shadow(0 0 0 transparent);
   --glow-drop-magenta-strong: drop-shadow(0 0 0 transparent);
   --glow-drop-cyan: drop-shadow(0 0 0 transparent);
+  --glow-on: none;
+  --glow-drop-on: drop-shadow(0 0 0 transparent);
   --glow-drop-violet: drop-shadow(0 0 0 transparent);
   --glow-drop-danger: drop-shadow(0 0 0 transparent);
   --turn-wash: linear-gradient(90deg, rgba(255, 138, 31, 0.2) 0%, rgba(240, 85, 155, 0.1) 45%, transparent 100%);
@@ -704,6 +718,8 @@
   --glow-drop-magenta: drop-shadow(0 0 0 transparent);
   --glow-drop-magenta-strong: drop-shadow(0 0 0 transparent);
   --glow-drop-cyan: drop-shadow(0 0 0 transparent);
+  --glow-on: none;
+  --glow-drop-on: drop-shadow(0 0 0 transparent);
   --glow-drop-violet: drop-shadow(0 0 0 transparent);
   --glow-drop-danger: drop-shadow(0 0 0 transparent);
   --glow-sun: 0 0 #0000;

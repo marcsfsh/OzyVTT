@@ -366,9 +366,6 @@
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
-.choices .nh-btn--secondary {
-  --nh-sheen: var(--raised-sheen), inset 4px 0 0 var(--rim-gm);
-}
 .choices .nav-arrow {
   color: currentColor;
 }

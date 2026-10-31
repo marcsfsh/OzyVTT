@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { IconButton, Kbd, StripInk } from "@vtt/ui";
+import { IconButton, Kbd, SegmentedControl, StripInk } from "@vtt/ui";
 import { currentDevice, shortcutLabel } from "../../lib/shortcut";
 import { CodexIcon } from "../icons";
 import {
@@ -214,19 +214,17 @@ export function CodexFrame({
         )}
         {phone && part && (
           <nav className="cx-campaign" aria-label="Campaign">
-            <div className="nh-segmented nh-segmented--sm">
-              {CAMPAIGN_PARTS.map((candidate) => (
-                <button
-                  key={candidate.id}
-                  type="button"
-                  className="nh-segmented-option tap-target interactive"
-                  aria-current={candidate.id === part ? "page" : undefined}
-                  onClick={() => go(candidate.path)}
-                >
-                  {candidate.label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              size="sm"
+              current
+              ariaLabel="Campaign parts"
+              value={part}
+              onChange={(id) => {
+                const target = CAMPAIGN_PARTS.find((candidate) => candidate.id === id);
+                if (target) go(target.path);
+              }}
+              options={CAMPAIGN_PARTS.map((candidate) => ({ value: candidate.id, label: candidate.label }))}
+            />
           </nav>
         )}
 

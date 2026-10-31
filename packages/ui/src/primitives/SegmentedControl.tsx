@@ -24,6 +24,9 @@ interface SegmentedControlProps {
   className?: string;
   /** Every option off at once; say why beside the control. */
   disabled?: boolean;
+  /** The options are places (a phone's parts of a section): the chosen one says `aria-current="page"` instead of
+      being pressed. */
+  current?: boolean;
 }
 
 /** Inline "pick exactly one" control for filters and mode switches (a
@@ -36,7 +39,8 @@ export function SegmentedControl({
   ariaLabel,
   size = "md",
   className,
-  disabled = false
+  disabled = false,
+  current = false
 }: SegmentedControlProps) {
   return (
     <div
@@ -49,7 +53,8 @@ export function SegmentedControl({
           key={option.value}
           type="button"
           className="nh-segmented-option tap-target interactive"
-          aria-pressed={value === option.value}
+          aria-pressed={current ? undefined : value === option.value}
+          aria-current={current && value === option.value ? "page" : undefined}
           aria-label={option.ariaLabel}
           disabled={disabled}
           title={option.title}

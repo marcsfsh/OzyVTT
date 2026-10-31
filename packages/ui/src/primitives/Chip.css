@@ -42,11 +42,14 @@
 .nh-chip--at-risk {
   box-shadow: var(--glow-violet);
 }
-/* A removable filter chip: a cyan edge and its x, at the 36px face. */
+/* A removable filter chip, a choice standing: its words on the 2px cyan Base line, with its x, at the 36px face. */
 .nh-chip:has(> .nh-chip-remove) {
   min-height: 36px;
   padding-inline: var(--space-3) var(--space-1);
-  border-color: var(--state-on-edge);
+  border-color: transparent;
+  background-color: transparent;
+  box-shadow: var(--base-line-on);
+  color: var(--text);
   font-size: 13px;
 }
 
@@ -91,6 +94,11 @@
 .nh-chip--pressable {
   min-height: 36px;
   padding-inline: calc(var(--space-3) + 0.55rem) var(--space-3);
+  /* A chip you choose from sits on a Base line (ADR-0048): no edge, no tint, the words dim until chosen. */
+  border-color: transparent;
+  background-color: transparent;
+  box-shadow: var(--base-line);
+  color: var(--text-dim);
   font-size: 13px;
   cursor: pointer;
 }
@@ -103,12 +111,13 @@
 /* `:active` says what `:hover` says. */
 .nh-chip--pressable:hover:not(:disabled),
 .nh-chip--pressable:active:not(:disabled) {
-  background-color: color-mix(in srgb, var(--nh-chip-tone) var(--nh-chip-mix), var(--surface-3));
+  background-color: transparent;
+  box-shadow: var(--base-line-hover);
+  color: var(--text);
 }
-/* Pressed = selected: the cyan edge and tint, plus the leading tick, the same "on" mark the cue draws elsewhere. */
+/* Pressed = chosen: the words in --text on the 2px cyan Base line, with the leading tick the cue draws elsewhere. */
 .nh-chip--pressable[aria-pressed="true"] {
-  --nh-chip-tone: var(--state-on-edge);
-  --nh-chip-mix: 14%;
+  box-shadow: var(--base-line-on);
   color: var(--text);
   background-image: var(--cue-mark);
   background-repeat: no-repeat;
@@ -116,6 +125,7 @@
   background-position: var(--space-2) center;
 }
 .nh-chip--pressable:disabled {
-  opacity: 0.6;
+  box-shadow: inset 0 -1px 0 var(--line);
+  color: var(--text-muted);
   cursor: not-allowed;
 }

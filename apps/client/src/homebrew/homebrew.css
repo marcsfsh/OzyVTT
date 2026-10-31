@@ -48,10 +48,11 @@
   min-width: 2.75rem;
   justify-content: center;
 }
-/* A class feature's last level is disabled but on; the primitive's disabled opacity would
-   misstate that and fail AA, so keep full contrast. */
+/* A class feature's last level is disabled but on: it keeps the chosen chip's cyan line and full contrast, since the
+   primitive's disabled look would misstate it. */
 .hb-levels .nh-chip--pressable[aria-pressed="true"]:disabled {
-  opacity: 1;
+  box-shadow: var(--base-line-on);
+  color: var(--text);
   cursor: default;
 }
 

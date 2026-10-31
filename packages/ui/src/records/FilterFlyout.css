@@ -1,7 +1,6 @@
 /* A list's filters: the Filters button, the flyout it opens and the chips inside. */
 .nh-filters-button.is-on {
-  border-color: var(--cyan);
-  box-shadow: inset 0 -2px 0 var(--cyan);
+  --nh-sheen: var(--base-line-on);
 }
 .nh-flyout {
   position: absolute;
@@ -42,26 +41,36 @@
   flex-wrap: wrap;
   gap: var(--space-1);
 }
+/* A chip you choose from, on its Base line (ADR-0048): the words dim until chosen, then --text on the 2px cyan line. */
 .nh-filterchip {
   position: relative;
-  min-height: 2rem;
+  min-height: 36px;
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--line-raised);
+  border: 0;
   border-radius: 0;
-  background: var(--surface-2);
+  background: none;
+  box-shadow: var(--base-line);
   color: var(--text-dim);
-  font: 600 var(--fs-xs) / 1 var(--font-label);
+  font: 600 13px / 1 var(--font-label);
   cursor: pointer;
 }
-/* The chip paints 2rem; its hit area reaches the 44px floor. */
+/* The chip paints 36px; its hit area reaches the 44px floor. A touch screen paints the 44. */
 .nh-filterchip::after {
   content: "";
   position: absolute;
-  inset: -6px 0;
+  inset: -4px 0;
+}
+@media (any-pointer: coarse) {
+  .nh-filterchip {
+    min-height: var(--tap-min);
+  }
+}
+.nh-filterchip:hover {
+  box-shadow: var(--base-line-hover);
+  color: var(--text);
 }
 .nh-filterchip.is-on {
-  border-color: var(--cyan);
-  background: var(--tab-on);
+  box-shadow: var(--base-line-on);
   color: var(--text);
 }
 .nh-filters-glyph {

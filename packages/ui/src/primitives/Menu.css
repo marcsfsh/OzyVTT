@@ -22,8 +22,10 @@
   font: 600 var(--fs-sm) / 1 var(--font-label);
   cursor: pointer;
   list-style: none;
-  --nh-fill: var(--raised);
-  --nh-rim: var(--line-raised);
+  /* On a Base line (ADR-0048): the label over a 1px line, no edge or fill. */
+  --nh-fill: transparent;
+  --nh-rim: transparent;
+  --nh-sheen: var(--base-line);
 }
 .nh-menu-trigger::before {
   content: "";
@@ -34,10 +36,11 @@
   pointer-events: none;
   border: 1px solid var(--nh-rim);
   background: var(--nh-fill);
-  box-shadow: var(--raised-sheen);
+  box-shadow: var(--nh-sheen);
   transition:
     border-color var(--dur-hover),
-    background-color var(--dur-hover);
+    background-color var(--dur-hover),
+    box-shadow var(--dur-hover);
 }
 .nh-menu-trigger::-webkit-details-marker {
   display: none;
@@ -47,9 +50,9 @@
 }
 /* `:active` says what `:hover` says. */
 .nh-menu-trigger:hover,
-.nh-menu-trigger:active {
-  --nh-fill: var(--raised-hover);
-  --nh-rim: var(--rim-color-hi);
+.nh-menu-trigger:active,
+.nh-menu[open] > .nh-menu-trigger {
+  --nh-sheen: var(--base-line-hover);
 }
 
 /* ---- Icon-square trigger ----
@@ -70,8 +73,17 @@
   border-radius: 0;
   font-size: 1rem;
   line-height: 1;
-  --nh-rim: var(--rim-color);
-  --nh-fill: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  /* The icon trigger stays a plain square like `.nh-iconbtn`: no box at rest, a fill on hover. */
+  --nh-rim: transparent;
+  --nh-fill: transparent;
+  --nh-sheen: none;
+}
+.nh-menu-trigger--icon:hover,
+.nh-menu-trigger--icon:active,
+.nh-card-tools .nh-menu-trigger:hover,
+.nh-card-tools .nh-menu-trigger:active {
+  --nh-fill: var(--surface-3);
+  --nh-sheen: none;
 }
 .nh-menu-trigger--icon::after,
 .nh-card-tools .nh-menu-trigger::after {

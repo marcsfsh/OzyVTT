@@ -68,15 +68,20 @@
     filter var(--dur-hover);
 }
 
-/* Small keeps its light paint; `.tap-target` grows the hit area to 44px. The width floor is scoped so `--sm` and
-   the icon button keep their paint. */
+/* Small is a 36px face on a laptop (theme spec 2.5); `.tap-target` grows the hit area to 44px. On a touch screen the
+   face is the hit area. The width floor is scoped so `--sm` and the icon button keep their paint. */
 .nh-btn:not(.nh-btn--sm) {
   min-width: var(--tap-min);
 }
 .nh-btn--sm {
-  min-height: 2rem;
+  min-height: 36px;
   padding: var(--space-2) var(--space-3);
   font-size: var(--fs-sm);
+}
+@media (any-pointer: coarse) {
+  .nh-btn--sm {
+    min-height: var(--tap-min);
+  }
 }
 .nh-btn--block {
   display: flex;
@@ -147,10 +152,9 @@
   transform: translateY(1px);
 }
 
-/* Secondary: the resting default, a flat control with a 1px edge. */
+/* Secondary: the resting default, on a Base line (ADR-0048): the label over a 1px line with no edge and no fill. */
 .nh-btn--secondary {
-  --nh-fill: var(--surface-2);
-  --nh-rim: var(--line-raised);
+  --nh-sheen: var(--base-line);
 }
 
 /* Link: cyan words with no box, at the 44px height. The room beside the words matches the room above them, so a
@@ -160,16 +164,14 @@
   color: var(--cyan-hi);
 }
 
-/* Ghost: text only; a quiet fill is its interaction. */
+/* Ghost: no line until hover, for Cancel or Back beside a Cup. */
 .nh-btn--ghost {
   color: var(--text-dim);
 }
 
-/* Destructive: a danger edge on a plain panel fill at rest, filled on hover, always with a clear label. */
+/* Destructive: the danger words on a danger Base line, lit 2px on hover. */
 .nh-btn--destructive {
-  --nh-fill: var(--surface-1);
-  --nh-rim: var(--danger);
-  --nh-rim-w: 2px;
+  --nh-sheen: inset 0 -1px 0 var(--danger);
   color: var(--danger-text);
 }
 
@@ -182,9 +184,10 @@
   --nh-fade: 10%;
 }
 .nh-btn--secondary:hover:not(:disabled),
-.nh-btn--secondary:active:not(:disabled) {
-  --nh-fill: var(--surface-3);
-  --nh-rim: var(--line-raised-hover);
+.nh-btn--secondary:active:not(:disabled),
+.nh-btn--secondary:focus-visible {
+  --nh-sheen: var(--base-line-hover);
+  --nh-glow: var(--glow-drop-on);
 }
 .nh-btn--link:hover:not(:disabled),
 .nh-btn--link:active:not(:disabled) {
@@ -195,18 +198,24 @@
 .nh-btn--ghost:active:not(:disabled),
 .nh-btn--ghost:focus-visible {
   color: var(--text);
-  --nh-fill: color-mix(in srgb, var(--surface-3) 60%, transparent);
+  --nh-sheen: var(--base-line-hover);
+  --nh-glow: var(--glow-drop-on);
 }
 .nh-btn--destructive:hover:not(:disabled),
 .nh-btn--destructive:active:not(:disabled),
 .nh-btn--destructive:focus-visible {
-  --nh-fill: color-mix(in srgb, var(--danger) 22%, var(--surface-1));
+  --nh-sheen: inset 0 -2px 0 var(--danger);
   --nh-glow: var(--glow-drop-danger);
+}
+/* A Base line control that is open or chosen (a menu's trigger, the Dropdown and Filters while open) keeps the 2px
+   cyan line. */
+.nh-btn:is(.is-on, [aria-expanded="true"]):not(.nh-btn--primary, .nh-btn--link, :disabled) {
+  --nh-sheen: var(--base-line-on);
   color: var(--text);
 }
 
-/* Disabled is a flat box: no edge, no sheen, no glow. The primary loses its frame too, so a disabled primary can't
-   read as the thing to press. It dims each property and never the whole button: the client's bare
+/* Disabled is the muted words on a --line base, with no hover. The primary loses its frame too, so a disabled
+   primary can't read as the thing to press. It dims each property and never the whole button: the client's bare
    `button:disabled { opacity }` would take the label under 4.5:1. */
 .nh-btn:disabled {
   opacity: 1;
@@ -214,10 +223,13 @@
   --nh-ink: var(--text-muted);
   text-shadow: none;
   cursor: not-allowed;
-  --nh-fill: var(--surface-2);
+  --nh-fill: transparent;
   --nh-rim: transparent;
-  --nh-sheen: none;
+  --nh-sheen: inset 0 -1px 0 var(--line);
   --nh-glow: none;
+}
+.nh-btn--ghost:disabled {
+  --nh-sheen: none;
 }
 .nh-btn--primary:disabled::before {
   border: var(--rim-w) solid var(--line);
@@ -282,6 +294,24 @@
   --nh-fill: var(--state-on);
   --nh-rim: var(--state-on-edge);
   --nh-sheen: none;
+}
+/* An icon button in content (a record's More) sits on its Base line, a 36px face on a laptop. The top bar's and the
+   map's icon buttons stay plain icons. */
+.nh-iconbtn--base {
+  width: 36px;
+  height: 36px;
+  --nh-sheen: var(--base-line);
+}
+.nh-iconbtn--base:hover:not(:disabled),
+.nh-iconbtn--base:active:not(:disabled) {
+  --nh-fill: transparent;
+  --nh-sheen: var(--base-line-hover);
+}
+@media (any-pointer: coarse) {
+  .nh-iconbtn--base {
+    width: var(--tap-min);
+    height: var(--tap-min);
+  }
 }
 .nh-iconbtn:disabled {
   opacity: 1;

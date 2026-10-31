@@ -142,13 +142,6 @@
   flex: 1 1 auto;
   padding-inline: var(--space-1);
 }
-.cx-campaign .nh-segmented-option[aria-current="page"] {
-  color: var(--text);
-  background: var(--tab-on);
-  box-shadow:
-    var(--tab-on-sheen),
-    inset 0 -2px 0 var(--cyan);
-}
 /* A phone lists a section's own views as a strip under its header (the app's sections are the bottom tabs): words
    with a small icon, the chosen one underlined by the ink. It scrolls sideways when the views outgrow a narrow phone,
    so its bottom line is drawn inside it, where the ink can lie on it. */

@@ -2,9 +2,9 @@
 .nh-dropdown {
   position: relative;
 }
+/* Open, the button keeps the 2px cyan Base line, painted through the button's own layer so it shows above it. */
 .nh-dropdown-button.is-on {
-  border-color: var(--cyan);
-  box-shadow: inset 0 -2px 0 var(--cyan);
+  --nh-sheen: var(--base-line-on);
 }
 .nh-dropdown-panel {
   position: absolute;
