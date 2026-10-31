@@ -1,5 +1,5 @@
 import type { DiceMode, GmView, RuleExceptions, RuleFamily, RuleMode, Targeting } from "@vtt/domain";
-import { Badge, RevealSwitch, SegmentedControl, Select, Switch } from "@vtt/ui";
+import { Badge, RevealSwitch, SegmentedControl, Select, Tick } from "@vtt/ui";
 import { HealthStyleOptions } from "../encounter/health-display";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
@@ -74,7 +74,7 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
             const stored = policy.exceptions[family];
             return (
               <div key={family} className="settings-check">
-                <Switch
+                <Tick
                   checked={policy.dial !== "freeform" && stored !== "freeform"}
                   disabled={policy.dial === "freeform"}
                   onChange={(checks) => setException(family, !checks)}

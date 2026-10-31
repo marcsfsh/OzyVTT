@@ -89,7 +89,7 @@ describe("the integration credentials", () => {
     expect(create).toBeDisabled();
     await user.type(within(dialog).getByRole("textbox"), "Dice bot");
     expect(create).toBeDisabled();
-    await user.click(within(dialog).getByRole("switch", { name: "roll:create" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "roll:create" }));
     await user.click(create);
     expect(apiRequest).toHaveBeenCalledWith(
       "/api/v1/gm/integration-credentials",

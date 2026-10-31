@@ -5,7 +5,7 @@ import {
   type IntegrationCredentialMetadata,
   type IntegrationScope
 } from "@vtt/api-contract";
-import { Badge, Button, EmptyState, Input, Menu, MenuItem, Modal, Switch, useToast, type BadgeTone } from "@vtt/ui";
+import { Badge, Button, EmptyState, Input, Menu, MenuItem, Modal, useToast, type BadgeTone, Tick } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -339,7 +339,7 @@ function NewCredentialDialog({
           <p className="settings-note">Pick the fewest scopes the tool needs. Pick at least one.</p>
           <div className="credentials-scope-grid">
             {SCOPES.map((scope) => (
-              <Switch key={scope} checked={scopes.has(scope)} onChange={(on) => toggle(scope, on)} label={scope} />
+              <Tick key={scope} checked={scopes.has(scope)} onChange={(on) => toggle(scope, on)} label={scope} />
             ))}
           </div>
         </fieldset>

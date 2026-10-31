@@ -86,6 +86,7 @@ export { EmptyState } from "./primitives/EmptyState";
 export { SideList, SideListGroup, SideListRow } from "./primitives/SideList";
 export { Crumb, TitleLine } from "./primitives/Crumb";
 export { FindField, Kind, ListToolbar } from "./primitives/ListToolbar";
+export { Tick } from "./primitives/Tick";
 export type { SideListGroupSpec, SideListRowProps } from "./primitives/SideList";
 export { Wordmark, Eyebrow, SunMark } from "./primitives/Wordmark";
 export { Chip, type ChipTone } from "./primitives/Chip";

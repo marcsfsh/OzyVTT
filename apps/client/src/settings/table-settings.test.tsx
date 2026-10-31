@@ -39,14 +39,14 @@ const renderSettings = (state: GmView) => {
 describe("the rules assistant's checks", () => {
   beforeEach(() => command.mockClear());
 
-  it("are switches that are on while the assistant checks the family", async () => {
+  it("are ticks, ticked while the assistant checks the family", async () => {
     const state = gmView((view) => {
       view.rulesPolicy = { dial: "strict", exceptions: { movement: "freeform" } };
     });
     renderSettings(state);
     expect(screen.queryByText(/Don't police/)).toBeNull();
-    expect(screen.getByRole("switch", { name: "Check movement" })).not.toBeChecked();
-    const economy = screen.getByRole("switch", { name: "Check the action economy" });
+    expect(screen.getByRole("checkbox", { name: "Check movement" })).not.toBeChecked();
+    const economy = screen.getByRole("checkbox", { name: "Check the action economy" });
     expect(economy).toBeChecked();
     const user = userEvent.setup();
     // Turning a check off pins that family Off, as the old "Don't police" switch did when turned on.
@@ -56,13 +56,13 @@ describe("the rules assistant's checks", () => {
       exceptions: { movement: "freeform", economy: "freeform" }
     });
     // Turning one back on hands it to the dial again.
-    await user.click(screen.getByRole("switch", { name: "Check movement" }));
+    await user.click(screen.getByRole("checkbox", { name: "Check movement" }));
     expect(command).toHaveBeenLastCalledWith("rules:set-policy", { dial: "strict", exceptions: {} });
   });
 
   it("can't be turned on while the assistant is Off, and say why", () => {
     renderSettings(gmView((view) => (view.rulesPolicy = { dial: "freeform", exceptions: {} })));
-    const movement = screen.getByRole("switch", { name: "Check movement" });
+    const movement = screen.getByRole("checkbox", { name: "Check movement" });
     expect(movement).toBeDisabled();
     expect(movement).not.toBeChecked();
     expect(

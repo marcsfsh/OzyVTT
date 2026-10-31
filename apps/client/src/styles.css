@@ -398,3 +398,8 @@ textarea:focus {
   font-size: clamp(3rem, 13vw, 8rem);
   line-height: 0.95;
 }
+
+/* A table's rows are 48px on a laptop and a phone (theme rule 8). */
+:is(.cx-table, .settings-table, .sc-table, .cp-table, .tokens-page-table) > tbody > tr {
+  height: 48px;
+}

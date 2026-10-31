@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { BuilderAbilityMethod, GmView } from "@vtt/domain";
-import { Button, Input, Stepper, Switch } from "@vtt/ui";
+import { Button, Input, Stepper, Switch, Tick } from "@vtt/ui";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import { useTableWrites } from "./table-writes";
@@ -53,7 +53,7 @@ export function CharactersSection({ state }: Readonly<{ state: GmView }>) {
       <SettingRow setting={SETTING.abilityMethods} stacked>
         <div className="settings-methods" role="group" aria-label="Ability score methods">
           {ABILITY_METHODS.map((method) => (
-            <Switch
+            <Tick
               key={method.id}
               checked={builder.allowedAbilityMethods.includes(method.id)}
               onChange={(on) => toggleMethod(method.id, on)}

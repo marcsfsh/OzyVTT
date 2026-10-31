@@ -159,7 +159,7 @@ describe("the GM's Settings", () => {
       expect.objectContaining({ playerRandom: "open", allowedAbilityMethods: ["standard-array"] })
     );
     command.mockClear();
-    await user.click(screen.getByRole("switch", { name: "Standard array" }));
+    await user.click(screen.getByRole("checkbox", { name: "Standard array" }));
     expect(command).not.toHaveBeenCalled();
     expect(await screen.findByText("Leave the players at least one way to set ability scores.")).toBeInTheDocument();
   });
