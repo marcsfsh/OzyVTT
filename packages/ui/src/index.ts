@@ -104,7 +104,7 @@ export { Badge, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarPresence } from "./primitives/Avatar";
 /* The 80s elements, each with one job: tags, lamps, the life bar, the VCR counter and framed pictures. */
 export { Tag, type TagTone } from "./primitives/Tag";
-export { Lamp, MoveLamp, StatusLamp, type LampKind } from "./primitives/Lamp";
+export { Lamp, LampLight, MoveLamp, StatusLamp, type LampKind } from "./primitives/Lamp";
 export { LifeBar, type ExactHp, type HpBand } from "./primitives/LifeBar";
 export { VcrCounter } from "./primitives/VcrCounter";
 export { Roll } from "./primitives/Roll";

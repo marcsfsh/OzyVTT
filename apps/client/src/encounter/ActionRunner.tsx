@@ -26,6 +26,7 @@ import { typedDie, useRollPreference } from "../dice/roll-preference";
 import { useTableCalibration } from "../scene/tableGeometry";
 import { caughtByArea } from "../table/targetHints";
 import { foesFirst, pickableTargets, targetRows } from "../table/targetRows";
+import type { CostTab } from "../sheet/turn-options";
 import "./action-runner.css";
 
 /** Per-definition action cache. Cleared on `homebrew:changed` (`content/invalidate.ts`), since a GM
@@ -41,8 +42,15 @@ registerContentCache(() => actionCache.clear());
 export function ActionRunner({
   state,
   actor,
-  onFeedback
-}: Readonly<{ state: GmView; actor: GmActor; onFeedback: (text: string) => void }>) {
+  onFeedback,
+  tab
+}: Readonly<{
+  state: GmView;
+  actor: GmActor;
+  onFeedback: (text: string) => void;
+  /** The acting console's chosen cost tab: the list shows what costs it. */
+  tab?: CostTab;
+}>) {
   // The combatant's own list, with what its items give: it moves with what it carries and the effects on it.
   const cacheKey = `${actor.definitionId ?? ""}:${actor.id}:${actor.inventory
     .map((item) => `${item.id}/${item.quantity}/${item.equipped}/${item.attuned}`)
@@ -252,6 +260,7 @@ export function ActionRunner({
           actor={actor}
           actions={actions}
           busy={busy}
+          {...(tab ? { tab } : {})}
           onUse={(action, targetless) =>
             targetless
               ? resolveActionDirect(actor.id, action.id, state.revision, onOutcome)

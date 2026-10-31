@@ -14,7 +14,16 @@ vi.mock("../lib/command", () => ({
   read: (...args: unknown[]) => read(...args)
 }));
 
-import { PlayerTurnEconomy } from "./PlayerEncounterPanel";
+import { useState } from "react";
+import type { CostTab } from "../sheet/turn-options";
+import { PlayerCostTabs, usePlayerEconomy } from "./PlayerEncounterPanel";
+
+/** The cost tabs as the panel wires them, with their own chosen tab. */
+function PlayerTurnEconomy(props: Parameters<typeof usePlayerEconomy>[0] & { myId: string }) {
+  const economy = usePlayerEconomy(props);
+  const [tab, setTab] = useState<CostTab>(props.myTurn ? "action" : "reaction");
+  return <PlayerCostTabs myId={props.myId} economy={economy} tab={tab} onTab={setTab} />;
+}
 
 const ME = "10000000-0000-4000-8000-000000000001";
 
@@ -36,8 +45,8 @@ const combat = {
 
 describe("a player's movement on their turn", () => {
   it("counts against this turn's movement, a Dash included, not the walking speed", async () => {
-    render(<PlayerTurnEconomy combat={combat} myId={ME} myTurn mySpeedFeet={30} revision={7} />);
-    expect(await screen.findByRole("group", { name: "Move: 50 of 60 feet left" })).toBeDefined();
+    render(<PlayerTurnEconomy combat={combat as never} myId={ME} myTurn mySpeedFeet={30} revision={7} />);
+    expect(await screen.findByRole("button", { name: "Move, 50 feet left" })).toBeDefined();
     expect(read).toHaveBeenCalledWith("actor:movement", { actorId: ME });
   });
 });

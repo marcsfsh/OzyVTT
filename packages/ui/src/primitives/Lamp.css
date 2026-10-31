@@ -57,6 +57,28 @@
   color: var(--text-muted);
 }
 
+/* A lamp's light alone (the cost tabs): 11px, with the tile's colours and glow. */
+.nh-lamp-dot {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+/* The kind classes above set the colours; :where() keeps these defaults under them. */
+:where(.nh-lamp-dot) {
+  --nh-lamp: var(--lamp-on);
+  --nh-lamp-glow: var(--glow-lamp-reaction);
+  --nh-lamp-afterglow: var(--use-afterglow);
+}
+.nh-lamp-dot .nh-lamp-light {
+  width: 11px;
+  height: 11px;
+}
+.nh-lamp-dot.is-lit .nh-lamp-light {
+  border-color: transparent;
+  background: var(--nh-lamp);
+  box-shadow: var(--nh-lamp-glow), var(--lamp-bevel);
+}
+
 /* The Move gauge: white squares in Dusk, ink squares in Dawn, one per 5 ft. */
 .nh-lamp-gauge {
   display: grid;

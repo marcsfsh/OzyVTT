@@ -1,4 +1,5 @@
-import { COST_GROUPS, optionsOf, type TurnOption } from "./turn-options";
+import { IconStar } from "@vtt/ui";
+import { COST_GROUPS, costTab, optionsOf, type CostTab, type TurnOption } from "./turn-options";
 
 /** What a row's button says it does. */
 const verbOf = (option: TurnOption) => (option.kind === "weapon" ? "Attack" : option.kind === "spell" ? "Cast" : "Use");
@@ -44,9 +45,12 @@ function OptionRow({
   plain,
   disabled,
   table,
+  favourite = false,
   onUse
 }: Readonly<{
   option: TurnOption;
+  /** A favourite, listed first in its cost tab with a small star. */
+  favourite?: boolean;
   /** What the row says on its right: its verb, Off turn, or why it waits. */
   note: string;
   /** The note is the row's plain verb (Attack, Cast, Use), which a phone's table leaves out. */
@@ -71,6 +75,12 @@ function OptionRow({
       >
         <span className="cs-action-text">
           <strong className="cs-action-name">
+            {favourite && (
+              <span className="cs-action-star" title="Favourite">
+                <IconStar aria-hidden="true" />
+                <span className="nh-sr-only">Favourite: </span>
+              </span>
+            )}
             {option.name}
             {option.mastery && (
               <>
@@ -145,9 +155,15 @@ export function ActionList({
   unavailable,
   empty,
   table = false,
+  tab,
+  pins = [],
   onUse
 }: Readonly<{
   options: readonly TurnOption[];
+  /** The table's cost tab (table spec 2.3): only the options that cost it, favourites first. */
+  tab?: Exclude<CostTab, "move" | "legendary">;
+  /** The favourites (the character's pins), first in their tab. */
+  pins?: readonly string[];
   /** The character acts now: its turn, or a readied action off it. Reactions are offered either way. */
   myTurn: boolean;
   busy: boolean;
@@ -159,13 +175,22 @@ export function ActionList({
   table?: boolean;
   onUse: (option: TurnOption) => void;
 }>) {
-  if (options.length === 0 && empty) return <p className="cs-note">{empty}</p>;
+  const listed = tab ? options.filter((option) => costTab(option.cost) === tab) : options;
+  if (listed.length === 0 && empty) return <p className="cs-note">{empty}</p>;
+  const favourites = tab ? pins.flatMap((id) => listed.filter((option) => option.id === id)) : [];
+  const groups = COST_GROUPS.map(([cost, label]) => ({
+    cost,
+    label,
+    group: optionsOf(listed, cost).filter((option) => !favourites.includes(option))
+  })).filter(({ group }) => group.length > 0);
+  // A tab with one cost of its own needs no heading: its name is on the tab.
+  const headed = !tab || groups.length > 1 || groups[0]?.cost !== tab;
   const note = (option: TurnOption) =>
     unavailable ? "Unavailable" : option.cost === "reaction" ? "Off turn" : !myTurn ? "On your turn" : verbOf(option);
   const off = (option: TurnOption) => busy || unavailable !== undefined || (!myTurn && option.cost !== "reaction");
   const plain = (option: TurnOption) => note(option) === verbOf(option);
   return (
-    <div className={`cs-actions${table ? " is-table" : ""}`}>
+    <div className={`cs-actions${table ? " is-table" : ""}${tab ? " is-turn" : ""}`}>
       {table && (
         <div className="cs-action-th" aria-hidden="true">
           <span>Name</span>
@@ -175,12 +200,29 @@ export function ActionList({
           <span />
         </div>
       )}
-      {COST_GROUPS.map(([cost, label]) => {
-        const group = optionsOf(options, cost);
-        if (group.length === 0) return null;
+      {favourites.length > 0 && (
+        <section className="cs-action-group" aria-label="Favourites">
+          <ul className="cs-action-list">
+            {favourites.map((option) => (
+              <li key={option.id}>
+                <OptionRow
+                  option={option}
+                  note={note(option)}
+                  plain={plain(option)}
+                  disabled={off(option)}
+                  table={table}
+                  favourite
+                  onUse={onUse}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {groups.map(({ cost, label, group }) => {
         return (
           <section key={cost} className="cs-action-group" aria-label={label}>
-            <span className="cs-eyebrow">{label}</span>
+            {(headed || favourites.length > 0) && <span className="cs-eyebrow">{label}</span>}
             <ul className="cs-action-list">
               {group.map((option) => (
                 <li key={option.id}>

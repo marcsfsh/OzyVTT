@@ -8,14 +8,16 @@ import {
   type ContentActionSummary
 } from "@vtt/domain";
 import type { CastShaping } from "@vtt/schemas";
+import { Button, IconPin, Modal } from "@vtt/ui";
 import { command, read } from "../lib/command";
 import { ActionList } from "../sheet/ActionList";
 import { CastDetail } from "../sheet/CastDetail";
 import { SheetDetail, type DetailPlace } from "../sheet/SheetDetail";
 import { TurnCard } from "../sheet/TurnCard";
+import { FavouritesEditor } from "../sheet/FavouritesEditor";
 import { characterLevel, pinsOf, optionCountsOf, type SheetActor } from "../sheet/sheet-model";
 import { castOptions, preparedState, type CastOption } from "../sheet/spell-model";
-import { NO_FACTS, turnOptions, type TurnFacts, type TurnOption } from "../sheet/turn-options";
+import { NO_FACTS, turnOptions, type CostTab, type TurnFacts, type TurnOption } from "../sheet/turn-options";
 import { useSpellReference } from "./spells";
 import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { ActionTargetPicker } from "./ActionTargetPicker";
@@ -208,7 +210,8 @@ export function PlayerActionRunner({
   turnTitle,
   pinnable = true,
   cardHead = true,
-  filter
+  filter,
+  tab = "action"
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -238,8 +241,11 @@ export function PlayerActionRunner({
   pickOnly?: Readonly<{ onDone: () => void }>;
   /** Where a spell's cast detail opens: in place of the list, or the sheet's right column on a laptop. */
   castPlace?: DetailPlace;
-  /** "card": a phone's turn card with favourite tiles; "list": every option grouped by what it costs. */
-  look?: "list" | "card";
+  /** "card": a phone's turn card with favourite tiles; "list": every option grouped by what it costs; "tabs": the
+   *  table's cost tabs, listing the chosen tab's options with favourites first. */
+  look?: "list" | "card" | "tabs";
+  /** The chosen cost tab, with `look="tabs"`. */
+  tab?: CostTab;
   /** The fight's round, and who acts off this character's turn, for the turn card's heading. */
   round?: number | null;
   acting?: string | null;
@@ -254,6 +260,7 @@ export function PlayerActionRunner({
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
+  const [editingFavourites, setEditingFavourites] = useState(false);
   // The Ready action asks what is readied when a spell could be: a spell is cast now and held.
   const [readying, setReadying] = useState(false);
   const readySpells = readyableSpells(definition);
@@ -504,6 +511,29 @@ export function PlayerActionRunner({
               {...(actor && pinnable ? { onSetPins: setPins } : {})}
               onUse={pickOption}
             />
+          ) : look === "tabs" ? (
+            <>
+              {header}
+              {tab !== "move" && tab !== "legendary" && (
+                <ActionList
+                  options={shownOptions}
+                  myTurn={myTurn}
+                  busy={busy}
+                  table
+                  tab={tab}
+                  pins={pinsOf(actor) ?? []}
+                  empty={
+                    tab === "bonus-action"
+                      ? "Nothing here costs a Bonus Action."
+                      : tab === "reaction"
+                        ? "Nothing here costs a Reaction."
+                        : "Nothing here costs an Action."
+                  }
+                  {...(unavailable ? { unavailable } : {})}
+                  onUse={pickOption}
+                />
+              )}
+            </>
           ) : (
             <>
               {header}
@@ -516,7 +546,7 @@ export function PlayerActionRunner({
               />
             </>
           )}
-          {hitExtras.length > 0 && (
+          {hitExtras.length > 0 && (look !== "tabs" || tab === "action") && (
             <p className="action-result-hint">
               {hitExtras.map((action) => action.name).join(", ")}: add {hitExtras.length === 1 ? "it" : "them"} to a hit
               on the attack's result, before you confirm it.
@@ -527,20 +557,44 @@ export function PlayerActionRunner({
               {castDetail}
             </SheetDetail>
           )}
-          {(filter?.common ?? true) && (
-            <CommonActionChips
-              actions={facts.common}
-              busy={busy || unavailable !== undefined || !myTurn}
-              effectTags={effectTags}
-              onUse={(action, targetless) => {
-                setTargetingResult(null);
-                if (action.id === "ready" && readySpells.length > 0) setReadying(true);
-                else if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
-                else aim(action);
-              }}
-            />
+          {(filter?.common ?? true) && (look !== "tabs" || tab === "action") && (
+            <>
+              {look === "tabs" && <span className="cs-eyebrow turn-anyone">Anyone can</span>}
+              <CommonActionChips
+                actions={facts.common}
+                busy={busy || unavailable !== undefined || !myTurn}
+                effectTags={effectTags}
+                onUse={(action, targetless) => {
+                  setTargetingResult(null);
+                  if (action.id === "ready" && readySpells.length > 0) setReadying(true);
+                  else if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
+                  else aim(action);
+                }}
+              />
+              {look === "tabs" && actor && pinnable && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="turn-edit-favourites"
+                  onClick={() => setEditingFavourites(true)}
+                >
+                  <IconPin /> Edit favourites
+                </Button>
+              )}
+            </>
           )}
         </>
+      )}
+      {look === "tabs" && actor && pinnable && (
+        <Modal
+          open={editingFavourites}
+          onClose={() => setEditingFavourites(false)}
+          title="Edit favourites"
+          size="sm"
+          footer={<Button onClick={() => setEditingFavourites(false)}>Done</Button>}
+        >
+          <FavouritesEditor options={options} pins={pinsOf(actor)} busy={busy} onSetPins={setPins} />
+        </Modal>
       )}
       {choosing && (
         <SpellPickChooser

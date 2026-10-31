@@ -2750,3 +2750,46 @@ button.cs-circle::after {
   font: 500 var(--fs-sm) / 1.25 var(--font-body);
   color: var(--text-dim);
 }
+
+/* The table's cost tabs (table spec 2.3 and 4): one header row, then Name and its line, Range, Hit / DC and Damage in
+   62, 48 and 84px; a favourite's small star before its name. Below 980px the range joins the line under the name. */
+.cs-actions.is-turn :is(.cs-action-th, .cs-action.is-table) {
+  grid-template-columns: minmax(0, 1fr) 62px 48px 84px;
+}
+.cs-actions.is-turn :is(.cs-action-th .is-range, .cs-action.is-table .is-range) {
+  display: block;
+}
+.cs-actions.is-turn .cs-action.is-table .cs-action-name {
+  font-size: 14px;
+}
+.cs-actions.is-turn .cs-action-line.is-wide,
+.cs-actions.is-turn .cs-action-type {
+  display: inline;
+}
+.cs-actions.is-turn .cs-action-line.is-narrow {
+  display: none;
+}
+.cs-action-star {
+  display: inline-flex;
+  margin-right: 5px;
+  color: var(--caution-text);
+  vertical-align: -1px;
+}
+.cs-action-star svg {
+  width: 12px;
+  height: 12px;
+}
+@media (max-width: 979px) {
+  .cs-actions.is-turn :is(.cs-action-th, .cs-action.is-table) {
+    grid-template-columns: minmax(0, 1fr) 48px 84px;
+  }
+  .cs-actions.is-turn :is(.cs-action-th .is-range, .cs-action.is-table .is-range) {
+    display: none;
+  }
+  .cs-actions.is-turn .cs-action-line.is-wide {
+    display: none;
+  }
+  .cs-actions.is-turn .cs-action-line.is-narrow {
+    display: inline;
+  }
+}

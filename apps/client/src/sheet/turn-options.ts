@@ -16,6 +16,13 @@ export const COST_GROUPS: ReadonlyArray<readonly [TurnCost, string]> = [
   ["other", "No action"]
 ];
 
+/** The turn's cost tabs (table spec 2.3): what a tab lists, and Move, which lists nothing. */
+export type CostTab = "action" | "bonus-action" | "reaction" | "move" | "legendary";
+
+/** The tab an option is listed under: a Magic action under Action, and what costs nothing after the Action's rows. */
+export const costTab = (cost: TurnCost): "action" | "bonus-action" | "reaction" =>
+  cost === "bonus-action" ? "bonus-action" : cost === "reaction" ? "reaction" : "action";
+
 export type TurnOption = Readonly<{
   id: string;
   /** What targeting and the resolve read: the server's numbers where it sent them. */

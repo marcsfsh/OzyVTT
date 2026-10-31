@@ -191,6 +191,44 @@ describe("legendary actions on the GM's console", () => {
       expect(command).toHaveBeenCalledWith("turn:use-legendary", { actorId: MONSTER, spent: 2, expectedRevision: 4 })
     );
   });
+  it("gives the acting legendary creature a Legendary tab with its pool, spent from the tab's line", async () => {
+    command.mockClear();
+    const run = vi.fn(async (operation: () => Promise<unknown>) => {
+      await operation();
+    });
+    render(
+      <ActingConsole
+        state={view({ turnActorId: MONSTER, legendaryUsed: { [MONSTER]: 1 } })}
+        actorsById={
+          new Map([
+            [MONSTER, dragon],
+            [HERO, hero]
+          ])
+        }
+        busy={false}
+        run={run as never}
+        onFeedback={() => {}}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Legendary, 2 of 3 left" }));
+    fireEvent.click(screen.getByRole("button", { name: "Spend one" }));
+    await waitFor(() =>
+      expect(command).toHaveBeenCalledWith("turn:use-legendary", { actorId: MONSTER, spent: 2, expectedRevision: 4 })
+    );
+  });
+
+  it("lists a legendary action under Legendary only", () => {
+    const bite = summary("bite", "Bite", { attackBonus: 14 });
+    const props = { state: view({ turnActorId: MONSTER }), actor: dragon, actions: [bite, presence], busy: false };
+    const { rerender } = render(<GmActionList {...props} tab="action" onUse={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /Commanding Presence/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Bite/ })).toBeTruthy();
+    rerender(<GmActionList {...props} tab="legendary" onUse={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /Commanding Presence/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Bite/ })).toBeNull();
+    rerender(<GmActionList {...props} tab="bonus-action" onUse={vi.fn()} />);
+    expect(screen.getByText("Nothing here costs a Bonus Action.")).toBeTruthy();
+  });
 });
 
 describe("a stat block's spell list", () => {

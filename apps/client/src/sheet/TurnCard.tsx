@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, IconList, IconPin } from "@vtt/ui";
+import { FavouritesEditor } from "./FavouritesEditor";
 import { revealInRegion } from "../lib/reveal";
 import { ActionList, ConcentrationTag } from "./ActionList";
 import { COST_GROUPS, type TurnOption } from "./turn-options";
@@ -7,8 +8,7 @@ import { PipRow } from "./PipRow";
 
 /** How many tiles the card shows before anything is pinned. */
 const TILES = 6;
-/** The most pins the server keeps. */
-export const MOST_PINS = 8;
+export { MOST_PINS } from "./FavouritesEditor";
 
 /** Rolls something at a creature: an attack, a save or damage. */
 const strikes = (option: TurnOption) =>
@@ -144,12 +144,6 @@ export function TurnCard({
     revealInRegion(cardRef.current, "nearest");
   }, [view]);
   const tiles = tilesOf(options, pins, counts);
-  const pinned = (pins ?? []).filter((id) => options.some((option) => option.id === id));
-  const togglePin = (id: string) => {
-    if (!onSetPins) return;
-    const next = pinned.includes(id) ? pinned.filter((entry) => entry !== id) : [...pinned, id].slice(0, MOST_PINS);
-    onSetPins(next);
-  };
   return (
     <section ref={cardRef} className="cs-turn" aria-label={title ?? (myTurn ? "Your turn" : "The turn")}>
       {head && (
@@ -179,24 +173,8 @@ export function TurnCard({
           />
         </div>
       ) : view === "edit" ? (
-        <div className="cs-turn-edit" role="group" aria-label="Choose the favourites">
-          <p className="cs-sub">Pin up to {MOST_PINS}. The card shows the pinned ones in the order you pin them.</p>
-          <ul className="cs-pin-list">
-            {options.map((option) => (
-              <li key={option.id}>
-                <button
-                  type="button"
-                  className={`cs-toggle interactive${pinned.includes(option.id) ? " is-on" : ""}`}
-                  aria-pressed={pinned.includes(option.id)}
-                  disabled={busy || (!pinned.includes(option.id) && pinned.length >= MOST_PINS)}
-                  onClick={() => togglePin(option.id)}
-                >
-                  <IconPin /> {option.name}
-                  <span className="cs-pin-cost">{option.costWords}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+        <div className="cs-turn-edit-wrap">
+          <FavouritesEditor options={options} pins={pins} busy={busy} onSetPins={onSetPins ?? (() => undefined)} />
           <Button size="sm" onClick={() => setView("tiles")}>
             Done
           </Button>

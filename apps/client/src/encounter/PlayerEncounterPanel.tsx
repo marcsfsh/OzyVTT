@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { type MutationResult, type PlayerView } from "@vtt/domain";
-import { Button, Lamp, MoveLamp, useToast } from "@vtt/ui";
+import { Button, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
 import { MyPendingAsks } from "./RuleAsk";
@@ -21,7 +21,8 @@ import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel
 import { usePlayerTargetRows } from "../table/targetRows";
 import { useTargeting } from "./targeting";
 import { revealInRegion } from "../lib/reveal";
-import { LampToggle } from "./LampToggle";
+import { TurnTabs, useCostTab, type TurnEconomy } from "./TurnTabs";
+import type { CostTab } from "../sheet/turn-options";
 import { PlayerTurnCard } from "./PlayerTurnCard";
 import { navigate, replaceQuery, useRoute } from "../router";
 import { useOrderLight } from "../table/orderLight";
@@ -113,10 +114,9 @@ function OwnFeedback({
   );
 }
 
-/** A player's own economy as the turn card's four lamps: Action and Bonus lit only on their turn, the Reaction
- *  markable any time, Move from the server's budget. Pressed = spent. Only the GM gives a spent one back while the
- *  table polices the action economy, so a pressed lamp is locked then. */
-export function PlayerTurnEconomy({
+/** A player's own economy for the cost tabs: Action and Bonus Action only on their turn, the Reaction any time, Move
+ *  from the server's budget. Only the GM gives a spent one back while the table polices the action economy. */
+export function usePlayerEconomy({
   combat,
   myId,
   myTurn,
@@ -125,17 +125,56 @@ export function PlayerTurnEconomy({
   unconscious = false
 }: Readonly<{
   combat: PlayerView["combat"];
-  myId: string;
+  myId: string | null;
   myTurn: boolean;
-  mySpeedFeet?: number;
+  mySpeedFeet?: number | undefined;
   /** The game's revision: this turn's movement budget (Dash and Slow included) is asked again as it changes. */
   revision?: number;
-  /** The character is Unconscious, so it can't take a reaction. */
+  /** The character is Unconscious, so it can take nothing, a reaction included. */
+  unconscious?: boolean;
+}>): TurnEconomy {
+  const budget = useMovementBudget(myTurn && myId !== null && revision !== undefined ? myId : null, revision ?? 0);
+  const moveBudget = budget?.speedFeet ?? mySpeedFeet;
+  const reactionUsed = myId !== null && combat.reactionsUsed.includes(myId);
+  const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
+  const locked = (used: boolean) => (used && giveBackLocked ? LOCKED_TITLE : undefined);
+  return {
+    action: {
+      used: myTurn && combat.turn.actionUsed,
+      now: myTurn && !unconscious,
+      locked: locked(combat.turn.actionUsed)
+    },
+    bonus: {
+      used: myTurn && combat.turn.bonusActionUsed,
+      now: myTurn && !unconscious,
+      locked: locked(combat.turn.bonusActionUsed)
+    },
+    reaction: { used: reactionUsed, now: !unconscious, locked: locked(reactionUsed) },
+    move:
+      myTurn && moveBudget !== undefined && moveBudget !== null
+        ? { speedFeet: moveBudget, usedFeet: combat.turn.movementUsedFeet }
+        : null,
+    extraActionReady: myTurn && combat.turn.extraActionReady === true
+  };
+}
+
+const LOCKED_TITLE = "Spent. Only the GM can give it back.";
+
+/** The player's cost tabs: Mark used or Mark ready sends today's `turn:use` or `turn:use-reaction`. */
+export function PlayerCostTabs({
+  myId,
+  economy,
+  tab,
+  onTab,
+  unconscious = false
+}: Readonly<{
+  myId: string;
+  economy: TurnEconomy;
+  tab: CostTab;
+  onTab: (tab: CostTab) => void;
   unconscious?: boolean;
 }>) {
   const [busy, setBusy] = useState(false);
-  const budget = useMovementBudget(myTurn && revision !== undefined ? myId : null, revision ?? 0);
-  const moveBudget = budget?.speedFeet ?? mySpeedFeet;
   const [feedback, setFeedback] = useState("");
   const emit = (run: () => Promise<MutationResult>, failure: string) => {
     setBusy(true);
@@ -144,84 +183,23 @@ export function PlayerTurnEconomy({
       setFeedback(result.ok ? "" : (result.message ?? failure));
     });
   };
-  const reactionUsed = combat.reactionsUsed.includes(myId);
-  const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
-  const lockedTitle = "Spent. Only the GM can give it back.";
-  const usedFeet = Math.round(combat.turn.movementUsedFeet);
   return (
-    <div
-      className={`turn-economy lamp-row${unconscious ? " is-unconscious" : ""}`}
-      role="group"
-      aria-label={unconscious ? "Your turn resources · Unconscious" : "Your turn resources"}
-    >
-      <LampToggle
-        kind="action"
-        label="Action"
-        used={myTurn && combat.turn.actionUsed}
-        lit={myTurn && !combat.turn.actionUsed && !unconscious}
-        disabled={!myTurn || busy || unconscious || (combat.turn.actionUsed && giveBackLocked)}
-        title={!myTurn ? "On your turn" : combat.turn.actionUsed && giveBackLocked ? lockedTitle : undefined}
-        onToggle={() =>
-          emit(
-            () => command("turn:use", { slot: "action", used: !combat.turn.actionUsed }),
-            "The action could not be updated."
-          )
-        }
-      />
-      <LampToggle
-        kind="bonus"
-        label="Bonus"
-        used={myTurn && combat.turn.bonusActionUsed}
-        lit={myTurn && !combat.turn.bonusActionUsed && !unconscious}
-        disabled={!myTurn || busy || unconscious || (combat.turn.bonusActionUsed && giveBackLocked)}
-        title={!myTurn ? "On your turn" : combat.turn.bonusActionUsed && giveBackLocked ? lockedTitle : undefined}
-        onToggle={() =>
-          emit(
-            () => command("turn:use", { slot: "bonus-action", used: !combat.turn.bonusActionUsed }),
-            "The Bonus Action could not be updated."
-          )
-        }
-      />
-      <LampToggle
-        kind="reaction"
-        label="Reaction"
-        used={reactionUsed}
-        lit={!reactionUsed && !unconscious}
-        disabled={busy || unconscious || (reactionUsed && giveBackLocked)}
-        title={
-          unconscious
-            ? "Unconscious: no reactions"
-            : reactionUsed && giveBackLocked
-              ? lockedTitle
-              : "Reactions refresh when your turn starts"
-        }
-        onToggle={() =>
-          emit(
-            () => command("turn:use-reaction", { actorId: myId, used: !reactionUsed }),
-            "The reaction could not be updated."
-          )
-        }
-      />
-      {myTurn && moveBudget !== undefined && moveBudget !== null ? (
-        <MoveLamp feetLeft={moveBudget - usedFeet} speedFeet={moveBudget} />
-      ) : (
-        <Lamp kind="on" lit={false} label="Move" unavailableReason="On your turn" />
-      )}
-      {myTurn && combat.turn.extraActionReady && (
-        <span className="economy-extra" title="Action Surge or Haste gives you another action this turn">
-          +1 action
-        </span>
-      )}
-      {myTurn && moveBudget !== undefined && moveBudget !== null && usedFeet > moveBudget && (
-        // Past the budget the gauge sits empty; the feet over it still read exactly.
-        <span className="economy-extra">{usedFeet - moveBudget} ft over</span>
-      )}
-      {feedback && (
-        <span className="economy-feedback" role="status">
-          {feedback}
-        </span>
-      )}
-    </div>
+    <TurnTabs
+      label={unconscious ? "Your turn resources · Unconscious" : "Your turn resources"}
+      economy={economy}
+      tab={tab}
+      onTab={onTab}
+      busy={busy}
+      feedback={feedback}
+      onMark={(cost, used) =>
+        cost === "reaction"
+          ? emit(() => command("turn:use-reaction", { actorId: myId, used }), "The reaction could not be updated.")
+          : emit(
+              () => command("turn:use", { slot: cost, used }),
+              cost === "action" ? "The action could not be updated." : "The Bonus Action could not be updated."
+            )
+      }
+    />
   );
 }
 
@@ -360,6 +338,19 @@ export function PlayerEncounterPanel({
   const myTurn = myId !== null && combat.turnActorId === myId;
   const inFight = myId !== null && combat.initiative.some((entry) => entry.actorId === myId);
   const targets = combat.initiative.map((entry) => ({ actorId: entry.actorId, name: entry.name }));
+  // The cost tabs are the commanded creature's on its turn, the character's own otherwise.
+  const economyId = actingFor ? actingFor.id : inFight ? myId : null;
+  const economyTurn = actingFor ? true : myTurn;
+  const unconscious = !actingFor && myActor !== null && isDying(myActor);
+  const economy = usePlayerEconomy({
+    combat,
+    myId: economyId,
+    myTurn: economyTurn,
+    mySpeedFeet: actingFor ? actingFor.speedFeet : myActor?.speedFeet,
+    revision: state.revision,
+    unconscious
+  });
+  const [costTab, setCostTab] = useCostTab(`${combat.round}:${combat.turnActorId ?? ""}`, economy, !economyTurn);
 
   const sheet = (inCombat: boolean) =>
     myActor ? (
@@ -422,7 +413,8 @@ export function PlayerEncounterPanel({
       targets={targets}
       actor={actingFor}
       myTurn
-      look={phone ? "card" : "list"}
+      look="tabs"
+      tab={costTab}
       round={combat.round}
       acting={acting}
       turnTitle={`${actingFor.name}'s turn`}
@@ -439,7 +431,8 @@ export function PlayerEncounterPanel({
       targets={targets}
       actor={myActor}
       myTurn={myTurn}
-      look={phone ? "card" : "list"}
+      look="tabs"
+      tab={costTab}
       round={combat.round}
       acting={acting}
       targetRows={targetHints.rows}
@@ -447,25 +440,11 @@ export function PlayerEncounterPanel({
       cardHead={false}
     />
   ) : null;
-  // The turn card's lamps: the commanded creature's on its turn, the character's own otherwise.
-  const economy = actingFor ? (
-    <PlayerTurnEconomy
-      combat={combat}
-      myId={actingFor.id}
-      myTurn
-      mySpeedFeet={actingFor.speedFeet}
-      revision={state.revision}
-    />
-  ) : inFight && myId !== null ? (
-    <PlayerTurnEconomy
-      combat={combat}
-      myId={myId}
-      myTurn={myTurn}
-      mySpeedFeet={myActor?.speedFeet}
-      revision={state.revision}
-      unconscious={myActor !== null && isDying(myActor)}
-    />
-  ) : null;
+  // The turn card's cost tabs: the commanded creature's on its turn, the character's own otherwise.
+  const economyTabs =
+    economyId !== null ? (
+      <PlayerCostTabs myId={economyId} economy={economy} tab={costTab} onTab={setCostTab} unconscious={unconscious} />
+    ) : null;
   const turnBody = (
     <section
       className="player-turn"
@@ -477,7 +456,7 @@ export function PlayerEncounterPanel({
           myId={myId}
           myTurn={myTurn}
           {...(actingFor ? { title: `${actingFor.name}'s turn` } : {})}
-          lamps={economy}
+          lamps={economyTabs}
         >
           {actingFor && (
             <p className="encounter-quiet-note">

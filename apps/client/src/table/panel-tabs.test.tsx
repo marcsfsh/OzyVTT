@@ -205,19 +205,23 @@ describe("a player's panel", () => {
       expect(document.getElementById(tab.getAttribute("aria-controls")!)?.getAttribute("role")).toBe("tabpanel");
   });
 
-  it("on their turn: the four lamps on the turn card, and End turn alone under the thumb", () => {
+  it("on their turn: the cost tabs on the turn card, opening on Action, and End turn alone under the thumb", () => {
     render(
       <ToastProvider>
         <EncounterPanel role="player" state={playerView(true)} phone slots={slots} />
       </ToastProvider>
     );
-    const lamps = screen.getByRole("group", { name: "Your turn resources" });
+    const tabs = screen.getByRole("group", { name: "Your turn resources" });
     expect(
-      within(lamps)
+      within(tabs)
         .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label"))
-    ).toEqual(["Action", "Bonus", "Reaction"]);
-    expect(within(lamps).getByRole("group", { name: /^Move/ })).toBeTruthy();
+        .map((button) => button.getAttribute("aria-label")?.split(",")[0])
+    ).toEqual(["Action", "Bonus Action", "Reaction", "Move"]);
+    expect(
+      within(tabs)
+        .getByRole("button", { name: /^Action/ })
+        .getAttribute("aria-pressed")
+    ).toBe("true");
     const foot = screen.getByRole("button", { name: "End turn" }).closest(".table-panel-foot")!;
     expect(
       within(foot as HTMLElement)
@@ -226,7 +230,7 @@ describe("a player's panel", () => {
     ).toEqual(["End turn"]);
   });
 
-  it("while someone else acts: who acts and when this player is next, only the Reaction ready, and no End turn", () => {
+  it("while someone else acts: who acts and when this player is next, the Reaction chosen, and no End turn", () => {
     render(
       <ToastProvider>
         <EncounterPanel role="player" state={playerView(true, false)} slots={slots} />
@@ -236,9 +240,11 @@ describe("a player's panel", () => {
     // Two in the order: after the goblin, the round wraps to Lyra.
     expect(screen.getByText("Your turn is next")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "End turn" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Action" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Reaction" })).toBeEnabled();
-    expect(screen.getByRole("group", { name: "Reaction: ready" })).toBeTruthy();
+    // Action and Bonus Action wait, and the Reaction tab is chosen.
+    expect(screen.getByRole("button", { name: "Action, not now" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Bonus Action, not now" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Reaction, ready" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Mark used" })).toBeEnabled();
   });
 
   it("between encounters: Me, Log and Party", async () => {

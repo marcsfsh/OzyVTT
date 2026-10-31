@@ -1,16 +1,17 @@
-import { IconStar, MoveLamp, Roll } from "@vtt/ui";
+import { Button, IconStar, Roll } from "@vtt/ui";
 import { useEffect, useState } from "react";
 import type { GmActor, GmView, MutationResult } from "@vtt/domain";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
 import { ActingCard } from "./ActingCard";
-import { LampToggle } from "./LampToggle";
+import { TurnTabs, useCostTab, type TurnEconomy } from "./TurnTabs";
 import { ActionRunner } from "./ActionRunner";
 import "./acting-console.css";
 
 /**
- * The acting creature's console: its card, its turn's lamps and its action runner. An off-turn legendary actor takes
- * the card and offers its pool in place of the lamps.
+ * The acting creature's console: its card, its turn's cost tabs and its action runner, which lists what the chosen tab
+ * costs. An off-turn legendary actor takes the card, offers its pool in place of the tabs and lists its legendary
+ * actions.
  */
 export function ActingConsole({
   state,
@@ -59,6 +60,17 @@ export function ActingConsole({
         (candidate.legendary!.actionsPerRound ?? 0) - (state.combat.legendaryUsed[candidate.id] ?? 0)
       )
     }));
+  const spentKey = state.combat.turnActorId ?? "";
+  const [tab, setTab] = useCostTab(
+    `${state.combat.round}:${spentKey}`,
+    {
+      action: { used: state.combat.turn.actionUsed, now: true },
+      bonus: { used: state.combat.turn.bonusActionUsed, now: true },
+      reaction: { used: turnActor ? state.combat.reactionsUsed.includes(turnActor.id) : false, now: true },
+      move: null
+    },
+    false
+  );
   if (!actor) return null;
   // At 0 HP a creature is down: its death saves (PCs) show above a dimmed console, and the server
   // rejects its actions (condition.down) unless the GM forces one through the audited override.
@@ -66,6 +78,50 @@ export function ActingConsole({
   const legendaryPool = legendaryActor?.legendary?.actionsPerRound;
   const legendarySpent = legendaryActor ? (state.combat.legendaryUsed[legendaryActor.id] ?? 0) : 0;
   const speedFeet = legendaryActor ? undefined : (movement?.speedFeet ?? actor.speedFeet);
+  const turnPool = turnActor?.legendary?.actionsPerRound ?? undefined;
+  const economy: TurnEconomy = {
+    action: { used: state.combat.turn.actionUsed, now: true },
+    bonus: { used: state.combat.turn.bonusActionUsed, now: true },
+    reaction: { used: state.combat.reactionsUsed.includes(actor.id), now: true },
+    move: speedFeet !== undefined ? { speedFeet, usedFeet: state.combat.turn.movementUsedFeet } : null,
+    ...(turnActor && turnPool
+      ? {
+          legendary: {
+            left: Math.max(0, turnPool - (state.combat.legendaryUsed[turnActor.id] ?? 0)),
+            max: turnPool
+          }
+        }
+      : {})
+  };
+  /** Spend one legendary action run by hand, or give one back (a GM correction). */
+  const legendaryButtons = (who: GmActor, pool: number) => {
+    const spent = state.combat.legendaryUsed[who.id] ?? 0;
+    const spend = (next: number, words: string) =>
+      void run(
+        () => command("turn:use-legendary", { actorId: who.id, spent: next, expectedRevision: state.revision }),
+        words
+      );
+    return (
+      <span className="legendary-marks">
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={busy || spent >= pool}
+          onClick={() => spend(Math.min(pool, spent + 1), "Legendary action spent.")}
+        >
+          Spend one
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={busy || spent === 0}
+          onClick={() => spend(Math.max(0, spent - 1), "Legendary action restored.")}
+        >
+          Give one back
+        </Button>
+      </span>
+    );
+  };
   return (
     <>
       <ActingCard state={state} actor={actor} token={token} speedFeet={speedFeet} />
@@ -168,69 +224,26 @@ export function ActingConsole({
               </button>
             </div>
           ) : (
-            <div className="lamp-row" role="group" aria-label="This turn">
-              <LampToggle
-                kind="action"
-                label="Action"
-                used={state.combat.turn.actionUsed}
-                disabled={busy}
-                onToggle={() =>
-                  void run(
-                    () =>
-                      command("turn:use", {
-                        slot: "action",
-                        used: !state.combat.turn.actionUsed,
-                        expectedRevision: state.revision
-                      }),
-                    state.combat.turn.actionUsed ? "Action restored." : "Action spent."
-                  )
-                }
-              />
-              <LampToggle
-                kind="bonus"
-                label="Bonus"
-                used={state.combat.turn.bonusActionUsed}
-                disabled={busy}
-                onToggle={() =>
-                  void run(
-                    () =>
-                      command("turn:use", {
-                        slot: "bonus-action",
-                        used: !state.combat.turn.bonusActionUsed,
-                        expectedRevision: state.revision
-                      }),
-                    state.combat.turn.bonusActionUsed ? "Bonus Action restored." : "Bonus Action spent."
-                  )
-                }
-              />
-              {/* Reactions refresh on the creature's own turn. */}
-              <LampToggle
-                kind="reaction"
-                label="Reaction"
-                used={state.combat.reactionsUsed.includes(actor.id)}
-                disabled={busy}
-                onToggle={() =>
-                  void run(
-                    () =>
-                      command("turn:use-reaction", {
-                        actorId: actor.id,
-                        used: !state.combat.reactionsUsed.includes(actor.id),
-                        expectedRevision: state.revision
-                      }),
-                    state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent."
-                  )
-                }
-              />
-              {speedFeet !== undefined && (
-                <MoveLamp
-                  feetLeft={Math.max(0, speedFeet - Math.round(state.combat.turn.movementUsedFeet))}
-                  speedFeet={speedFeet}
-                />
-              )}
-            </div>
+            <TurnTabs
+              label="This turn"
+              economy={economy}
+              tab={tab}
+              onTab={setTab}
+              busy={busy}
+              onMark={(cost, used) =>
+                void run(
+                  () =>
+                    cost === "reaction"
+                      ? command("turn:use-reaction", { actorId: actor.id, used, expectedRevision: state.revision })
+                      : command("turn:use", { slot: cost, used, expectedRevision: state.revision }),
+                  `${cost === "action" ? "Action" : cost === "bonus-action" ? "Bonus Action" : "Reaction"} ${used ? "spent" : "restored"}.`
+                )
+              }
+              legendaryControls={turnPool !== undefined && legendaryButtons(turnActor!, turnPool)}
+            />
           )}
         </header>
-        <ActionRunner state={state} actor={actor} onFeedback={onFeedback} />
+        <ActionRunner state={state} actor={actor} onFeedback={onFeedback} tab={legendaryActor ? "legendary" : tab} />
       </section>
     </>
   );

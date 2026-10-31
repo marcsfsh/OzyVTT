@@ -445,22 +445,21 @@ test("a player takes a turn on a phone: a tile, its cast, a target and the roll"
   if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "End turn" }));
   await expect(yourTurn).toBeVisible();
 
-  // The Turn tab is the turn card alone: the favourite tiles, each saying what it costs.
+  // The Turn tab: the cost tabs open on Action and list what it costs; another tab lists its own.
   const card = player.getByRole("region", { name: "Your turn" });
-  await expect(card.getByText("Action · cantrip").first()).toBeVisible();
+  const costs = card.getByRole("group", { name: "Your turn resources" });
+  await expect(costs.getByRole("button", { name: /^Action,/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(card.getByRole("button", { name: /Guiding Bolt/ }).first()).toBeVisible();
   await expectPageFits(player);
-  // Every option is a tap away. A levelled spell opens its cast card in place with its top in view, however far down
-  // the list was scrolled, and Back gives the card back the same way.
-  const allOptions = card.getByRole("button", { name: /^All \d+ options$/ });
-  await press(allOptions);
+  await press(costs.getByRole("button", { name: /^Reaction,/ }));
+  await expect(card.getByRole("button", { name: /Guiding Bolt/ })).toHaveCount(0);
+  await press(costs.getByRole("button", { name: /^Action,/ }));
+  // A levelled spell opens its cast card in place with its top in view, and Back gives the list back.
   await press(card.getByRole("button", { name: /Guiding Bolt/ }).first());
   const cast = player.getByRole("region", { name: "Cast Guiding Bolt" });
   await expect(cast.getByRole("button", { name: "Back" })).toBeInViewport({ ratio: 1 });
   await press(cast.getByRole("button", { name: "Back" }));
-  await expect(yourTurn).toBeInViewport({ ratio: 1 });
-  // A favourite tile opens the same cast card.
-  const tile = card.getByRole("button", { name: /Guiding Bolt/ }).first();
-  if (!(await tile.isVisible())) await press(allOptions);
+  await expect(card.getByRole("button", { name: /Guiding Bolt/ }).first()).toBeVisible();
   await press(card.getByRole("button", { name: /Guiding Bolt/ }).first());
   await expect(cast.getByRole("button", { name: /^Level 1/ })).toHaveAttribute("aria-pressed", "true");
   await expectPageFits(player);

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type RefObject } from "react";
 import { useOnChange } from "../motion/hooks";
 import { cool, pop, rel, warm } from "../motion/lightRail";
 import { cx } from "./util";
@@ -6,7 +6,7 @@ import "./Lamp.css";
 
 /** A lamp lighting warms up with a burst in its colour; one going out holds an afterglow as it cools (ADR-0045). */
 function useLampLight(lit: boolean) {
-  const lamp = useRef<HTMLDivElement>(null);
+  const lamp = useRef<HTMLElement>(null);
   useOnChange(lit, (_was, now) => {
     const tile = lamp.current;
     const light = tile?.querySelector<HTMLElement>(".nh-lamp-light, .nh-lamp-gauge");
@@ -50,7 +50,7 @@ export function Lamp({
   const spoken = lit ? `${label}: ${value ?? "ready"}` : `${label}: ${unavailableReason ?? "not available"}`;
   return (
     <div
-      ref={lamp}
+      ref={lamp as RefObject<HTMLDivElement>}
       className={cx("nh-lamp", `nh-lamp--${kind}`, lit && "is-lit", className)}
       role="group"
       aria-label={spoken}
@@ -63,6 +63,23 @@ export function Lamp({
         {shown}
       </span>
     </div>
+  );
+}
+
+/**
+ * A lamp's light alone, 11px, for a control that carries its own name and state (the turn's cost tabs). It lights and
+ * cools as a lamp tile does; the words beside it say the state.
+ */
+export function LampLight({ kind, lit, className }: Readonly<{ kind: LampKind; lit: boolean; className?: string }>) {
+  const lamp = useLampLight(lit);
+  return (
+    <span
+      ref={lamp as RefObject<HTMLSpanElement>}
+      className={cx("nh-lamp-dot", `nh-lamp--${kind}`, lit && "is-lit", className)}
+      aria-hidden="true"
+    >
+      <span className="nh-lamp-light" />
+    </span>
   );
 }
 
@@ -86,7 +103,7 @@ export function MoveLamp({
   const lamp = useLampLight(lit);
   return (
     <div
-      ref={lamp}
+      ref={lamp as RefObject<HTMLDivElement>}
       className={cx("nh-lamp", "nh-lamp--move", lit && "is-lit", className)}
       role="group"
       aria-label={`Move: ${left} of ${total} feet left`}

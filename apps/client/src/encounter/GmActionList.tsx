@@ -6,6 +6,7 @@ import { CommonActionChips } from "./CommonActionChips";
 import { actionSummaryParts, tagLabel } from "./action-summary";
 import { RichText } from "./RichText";
 import { SpellcastingText } from "./spells";
+import type { CostTab } from "../sheet/turn-options";
 
 /* A limited use is itself the mechanic (`resolveDefinitionAction`): Action Surge, Indomitable and
    similar have a counter and nothing to roll. Both predicates must mirror the server's. */
@@ -181,6 +182,25 @@ function SpellList({
   );
 }
 
+const TAB_WORDS: Record<CostTab, string> = {
+  action: "an Action",
+  "bonus-action": "a Bonus Action",
+  reaction: "a Reaction",
+  move: "movement",
+  legendary: "a Legendary Action"
+};
+
+/** The cost tab a stat block's action is listed under: a legendary action under Legendary, what costs nothing under
+ *  Action. */
+export const actionTab = (action: ContentActionSummary): CostTab =>
+  action.legendaryCost !== undefined
+    ? "legendary"
+    : action.activation === "bonus-action"
+      ? "bonus-action"
+      : action.activation === "reaction"
+        ? "reaction"
+        : "action";
+
 /**
  * A stat block's actions in four tiers: its own rollable actions as full rows, the shared builtins
  * (Dodge, Dash, Unarmed Strike...) as one cluster of chips, its spell lists with a row for each spell, and prose
@@ -192,25 +212,35 @@ export function GmActionList({
   actor,
   actions,
   busy,
+  tab,
   onUse
 }: Readonly<{
   state: GmView;
   actor: GmActor;
   actions: readonly ContentActionSummary[];
   busy: boolean;
+  /** The chosen cost tab (table spec 2.3): only what costs it; the traits close the Action tab. Absent lists all. */
+  tab?: CostTab;
   /** Resolves a targetless action at once, or starts targeting for the rest. */
   onUse: (action: ContentActionSummary, targetless: boolean) => void;
 }>) {
   const [openReference, setOpenReference] = useState<string | null>(null);
+  const inTab = (action: ContentActionSummary) => tab === undefined || actionTab(action) === tab;
+  const actionTabbed = tab === undefined || tab === "action";
   // A spell list heads its casts; neither is a row of its own.
-  const lists = actions.filter((action) => action.spellList !== undefined && action.builtin !== true);
+  const lists = actions.filter((action) => action.spellList !== undefined && action.builtin !== true && inTab(action));
   const listed = (action: ContentActionSummary) => action.spellList !== undefined || action.castFrom !== undefined;
-  const own = actions.filter((action) => isResolvable(action) && action.builtin !== true && !listed(action));
-  const builtins = actions.filter((action) => isResolvable(action) && action.builtin === true);
-  const reference = actions.filter((action) => !isResolvable(action) && !listed(action));
+  const own = actions.filter(
+    (action) => isResolvable(action) && action.builtin !== true && !listed(action) && inTab(action)
+  );
+  const builtins = actions.filter((action) => isResolvable(action) && action.builtin === true && inTab(action));
+  const reference = actionTabbed ? actions.filter((action) => !isResolvable(action) && !listed(action)) : [];
   // Spellcasting is the reference entry read mid-fight, so it is hoisted out and shown open.
   const spellcasting = reference.find((action) => action.id === "spellcasting" || /spellcasting/i.test(action.name));
   const otherReference = reference.filter((action) => action !== spellcasting);
+  if (tab === "move") return null;
+  if (own.length === 0 && builtins.length === 0 && lists.length === 0 && reference.length === 0)
+    return <p className="action-tab-empty">Nothing here costs {TAB_WORDS[tab ?? "action"]}.</p>;
   return (
     <>
       <ul className="action-list">
@@ -230,6 +260,7 @@ export function GmActionList({
           );
         })}
       </ul>
+      {tab !== undefined && builtins.length > 0 && <span className="cs-eyebrow turn-anyone">Anyone can</span>}
       <CommonActionChips
         actions={builtins}
         busy={busy}
@@ -257,7 +288,7 @@ export function GmActionList({
         </div>
       )}
       {otherReference.length > 0 && (
-        <details className="action-reference-group">
+        <details className="action-reference-group" open={tab !== undefined}>
           <summary>Traits &amp; reference ({otherReference.length})</summary>
           <ul className="action-list">
             {otherReference.map((action) => (
