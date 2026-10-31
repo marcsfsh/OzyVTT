@@ -5,7 +5,7 @@
    readable (AA) while its control is disabled. */
 .hb-blocked {
   margin: 0;
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font-size: var(--fs-sm);
 }
 

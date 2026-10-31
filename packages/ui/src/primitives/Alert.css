@@ -70,7 +70,7 @@
   --nh-rule: var(--caution);
 }
 .nh-alert--warning .nh-alert-icon {
-  color: var(--caution-hi);
+  color: var(--caution-text);
   background: color-mix(in srgb, var(--caution) 22%, transparent);
 }
 .nh-alert--danger {

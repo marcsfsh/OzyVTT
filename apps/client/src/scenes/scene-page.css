@@ -519,10 +519,10 @@
 }
 .sc-readiness.is-needs-map,
 .sc-readiness.is-map-unavailable {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .sc-list-col-extra {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .sc-scene-bench .sc-scene-title {
   font: var(--fw-display) 24px / 1.1 var(--font-display);

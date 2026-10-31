@@ -139,7 +139,7 @@
   line-height: 1.45;
 }
 .sc-caution {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .sc-missing {
   display: flex;
@@ -198,7 +198,7 @@
 }
 .sc-state.is-parked {
   border-left-color: var(--caution);
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .sc-state.is-replay {
   border-left-color: var(--info);

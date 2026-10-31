@@ -205,7 +205,7 @@
 }
 .action-target-reason {
   flex: 1 0 100%;
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font: 600 var(--fs-xs) / 1.2 var(--font-body);
 }
 /* A creature's avatar in a list: its initials in the token's colours, and its number among its kind. */
@@ -560,12 +560,12 @@
   align-items: center;
   gap: 0.35rem;
   margin: 0.35rem 0 0.1rem;
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font-size: var(--fs-sm);
   font-weight: 800;
 }
 .action-spellcasting-head span {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 /* A stat block's numbers wrap under the list's name on a phone, so they never crowd it. */
 .action-spellcasting-head .action-spellcasting-numbers {
@@ -619,7 +619,7 @@
   padding-left: 0.4rem;
 }
 .spellcasting-line strong {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .action-reference-group {
   margin-top: 0.35rem;

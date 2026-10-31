@@ -74,12 +74,13 @@
   background: var(--lamp-move);
 }
 
-/* The small status lamp beside a line of words. */
+/* The small status lamp beside a line of words: 8px, one lamp everywhere (theme rule 19, ADR-0076); the turn's action
+   lamps are their own part. */
 .nh-status-lamp {
   display: inline-block;
   flex: none;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   box-sizing: border-box;
   border: 1px solid var(--line-raised);
   background: var(--surface-3);

@@ -159,7 +159,7 @@
 .nh-roweditor-reason {
   margin: 0;
   font-size: var(--fs-sm);
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 
 /* The empty line sits close to the fields around it. */

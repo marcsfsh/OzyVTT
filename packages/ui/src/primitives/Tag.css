@@ -1,23 +1,24 @@
 /* A tag is a short VT323 word on a fill or inside an edge. The fill tones put dark ink on a pale fill in both themes;
    the outline tones print their word in the hue's text ink. */
+/* One tag (theme rule 19, ADR-0076): VT323 16px in a 22px box, for a state, a condition, a source and a folder. */
 .nh-tag {
   display: inline-flex;
   align-items: center;
   flex: none;
+  height: 22px;
+  box-sizing: border-box;
   padding: 0 6px;
   border: 1px solid transparent;
-  font: 400 16px / 1.2 var(--font-numeric);
+  font: 400 16px / 1 var(--font-numeric);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--text);
 }
-.nh-tag--sm {
-  font-size: 15px;
-  padding: 0 4px;
-}
+/* The sizes a caller may still pass draw the one tag. */
+.nh-tag--sm,
 .nh-tag--lg {
-  font-size: 18px;
+  font-size: 16px;
 }
 .nh-tag--next {
   background: var(--tag-next-bg);
@@ -47,7 +48,7 @@
 /* ROLL: a roll the GM calls for, outlined in the WAIT amber (frame rule 3.10). */
 .nh-tag--roll {
   border-color: var(--caution);
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .nh-tag--error {
   border-color: var(--hostile);
@@ -63,5 +64,5 @@
 }
 .nh-tag--hidden {
   border: 1px dashed var(--violet);
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }

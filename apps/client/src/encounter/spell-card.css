@@ -5,7 +5,7 @@
   border: 0;
   border-radius: 0;
   background: none;
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font: inherit;
   text-decoration: underline dotted var(--violet);
   text-underline-offset: 2px;
@@ -18,7 +18,7 @@
 }
 .spell-card-type {
   margin: -0.2rem 0 0;
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font-size: var(--fs-sm);
   font-style: italic;
 }
@@ -58,7 +58,7 @@
   line-height: 1.45;
 }
 .spell-card-higher strong {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .spell-card-attribution {
   margin: var(--space-4) 0 0;

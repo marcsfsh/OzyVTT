@@ -94,7 +94,7 @@
   min-width: clamp(6rem, 7vw, 9rem);
 }
 .screen-tile-gm {
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font: 400 clamp(20px, 1.4vw, 28px) / 1 var(--font-numeric);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -186,7 +186,7 @@
   font-size: clamp(16px, 1.05vw, 21px);
 }
 .screen-acting.is-gm-turn .screen-acting-name {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .screen-roll-who {
   margin: 0;

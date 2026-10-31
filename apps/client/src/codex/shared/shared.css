@@ -330,7 +330,7 @@ button.cx-datebar-date {
   text-decoration-color: var(--violet);
 }
 .cx-datebar-date.is-gm {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cx-datebar-hour {
   color: var(--text-muted);
@@ -340,7 +340,7 @@ button.cx-datebar-date {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font: 700 var(--fs-xs) / 1 var(--font-label);
 }
 .cx-datebar-actions {

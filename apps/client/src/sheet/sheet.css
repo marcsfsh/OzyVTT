@@ -162,7 +162,7 @@
   font: 500 var(--fs-xs) / 1.35 var(--font-body);
 }
 .cs-sub.is-caution {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .cs-note {
   margin: 0;
@@ -260,7 +260,7 @@
   border-color: var(--caution);
 }
 .cs-stat.is-caution .cs-stat-n {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 /* Boxes and pips: uses, Hit Point Dice, slots. Filled is what is left to spend. */
 .cs-boxes,
@@ -339,7 +339,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font: 600 var(--fs-xs) / 1 var(--font-label);
 }
 /* The GM's tools and the GM's Set Hit Points: a group under the GM only tag, with no violet bar (rule 7). */
@@ -566,7 +566,7 @@ span.cs-hd-open {
 }
 .cs-cell.is-caution .cs-cell-n,
 .cs-cell.is-caution .cs-cell-v {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .cs-cell-hp {
   flex: 3 1 18rem;
@@ -1345,7 +1345,7 @@ button.cs-lastroll-open {
   display: block;
   font-weight: 600;
   font-size: var(--fs-2xs);
-  color: var(--caution);
+  color: var(--caution-text);
 }
 .cs-tool-use-buttons {
   display: flex;
@@ -1651,7 +1651,7 @@ button.cs-lastroll-open {
   font: 500 var(--fs-xs) / 1.3 var(--font-body);
 }
 .cs-action-reason {
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font: 600 var(--fs-xs) / 1.3 var(--font-body);
 }
 .cs-action-verb {
@@ -1884,7 +1884,7 @@ button.cs-lastroll-open {
   color: var(--text-muted);
 }
 .cs-cast-option .cs-cast-reason {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 /* Transmuted Spell's new damage type, picked under its option. */
 .cs-cast-type {
@@ -2539,7 +2539,7 @@ button.cs-circle::after {
   font: 600 var(--fs-2xs) / 1 var(--font-label);
 }
 .cs-turntile .cs-turntile-reason {
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font: 600 var(--fs-2xs) / 1.3 var(--font-body);
 }
 .cs-turntile:disabled :is(.cs-turntile-name, .cs-turntile-line) {
@@ -2744,7 +2744,7 @@ button.cs-circle::after {
 
 /* The GM tab on the phone's strip keeps the violet of GM-only things. */
 .cs-strip .nh-tab.is-gm {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cs-band .cs-idline {
   font: 500 var(--fs-sm) / 1.25 var(--font-body);

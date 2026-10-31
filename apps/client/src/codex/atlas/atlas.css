@@ -95,7 +95,7 @@
 .atlas-layer.is-gm[aria-pressed="true"] {
   border-color: var(--violet);
   box-shadow: inset 3px 0 0 var(--violet);
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .atlas-layer-icon {
   width: 1.1em;
@@ -249,7 +249,7 @@
   stroke: currentColor;
 }
 .atlas-ground.is-hidden {
-  color: var(--violet);
+  color: var(--violet-text);
 }
 .atlas-ground-label {
   fill: var(--text);
@@ -488,7 +488,7 @@
 .atlas-hiddenmark,
 .atlas-shownmark {
   display: inline-flex;
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .atlas-shownmark {
   color: var(--text-dim);

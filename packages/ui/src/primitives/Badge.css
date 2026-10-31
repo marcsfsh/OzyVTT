@@ -31,7 +31,7 @@
 .nh-badge--caution {
   --nh-badge-tone: var(--caution);
   --nh-badge-mix: 15%;
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .nh-badge--danger {
   --nh-badge-tone: var(--danger);
@@ -60,5 +60,5 @@
 .nh-badge--violet {
   --nh-badge-tone: var(--violet);
   --nh-badge-mix: 20%;
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }

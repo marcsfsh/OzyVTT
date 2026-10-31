@@ -8,7 +8,7 @@
   min-width: 0;
 }
 .hb-field-error {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 /* "More powers": the full rider form, folded until opened. */
 .hb-wiz-more {

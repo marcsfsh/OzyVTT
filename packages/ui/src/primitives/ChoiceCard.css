@@ -153,7 +153,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font-size: var(--fs-sm);
 }
 .nh-choice-locked-icon {

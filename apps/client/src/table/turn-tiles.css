@@ -68,7 +68,7 @@
   align-self: center;
   width: 13px;
   height: 13px;
-  color: var(--violet);
+  color: var(--violet-text);
 }
 .turn-tile-name {
   overflow: hidden;
@@ -91,7 +91,7 @@
 }
 .turn-tile-gm {
   font: 400 18px / 1 var(--font-numeric);
-  color: var(--violet-hi);
+  color: var(--violet-text);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }

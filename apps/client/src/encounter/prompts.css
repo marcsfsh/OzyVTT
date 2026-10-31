@@ -199,7 +199,7 @@
   color: var(--text);
 }
 .spell-area-row.unplaced .spell-area-text {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .spell-area-row.is-placing .spell-area-text {
   color: var(--indigo-text);
@@ -284,7 +284,7 @@
   border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line));
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--surface-3) 78%, var(--violet));
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font-size: var(--fs-sm);
   font-weight: 700;
   cursor: pointer;
@@ -322,13 +322,13 @@
 .save-prompt-confirm .roll-answer {
   border-color: color-mix(in srgb, var(--violet) 45%, var(--line));
   background: color-mix(in srgb, var(--surface-3) 78%, var(--violet));
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .save-prompt-confirm .roll-answer:hover:not(:disabled) {
   border-color: var(--violet);
 }
 .roll-answered {
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font-size: var(--fs-sm);
 }
 .roll-waiting {

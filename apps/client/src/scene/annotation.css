@@ -78,7 +78,7 @@
 
 /* Pings: an expanding ring, core dot and sender's name. `color` is set inline per sender. */
 .annotation-ping {
-  color: var(--magenta);
+  color: var(--magenta-text);
   pointer-events: none;
   filter: drop-shadow(0 0 2px rgb(0 0 0 / 0.85));
 }

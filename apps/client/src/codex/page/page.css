@@ -187,7 +187,7 @@
   background: color-mix(in srgb, var(--rim-gm) 10%, transparent);
 }
 .cx-meta-row.is-hidden dd {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cx-meta-key {
   display: inline-flex;
@@ -213,7 +213,7 @@ dt.cx-meta-key .cx-meta-hidden {
   align-items: center;
   gap: 0.25em;
   margin-inline-start: auto;
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font-size: var(--fs-sm);
   font-weight: 400;
 }
@@ -336,7 +336,7 @@ dt.cx-meta-key .cx-meta-hidden {
 }
 .cx-timeline-row.is-hidden .cx-timeline-when b,
 .cx-timeline-row.is-hidden .cx-timeline-what {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 
 /* ----- A phone's page ----- */
@@ -469,7 +469,7 @@ dt.cx-meta-key .cx-meta-hidden {
 }
 .cx-write-hiddenbtn {
   border-color: var(--rim-gm);
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cx-write-hint {
   margin-left: var(--space-2);
@@ -570,7 +570,7 @@ dt.cx-meta-key .cx-meta-hidden {
 }
 .cx-writefield.is-hidden .nh-input {
   border-color: var(--rim-gm);
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cx-writefields-add {
   align-self: flex-start;
@@ -743,7 +743,7 @@ dt.cx-meta-key .cx-meta-hidden {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;

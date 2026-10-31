@@ -86,13 +86,13 @@
   color: var(--text-muted);
 }
 .cx-vis.is-hidden {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cx-matchline {
   color: var(--text-dim);
 }
 .cx-matchline.is-hidden {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cx-matchline-icon {
   width: 1em;

@@ -60,7 +60,6 @@
   /* Press this: the primary and the Action lamp. */
   --magenta: #ff2f92;
   --magenta-hi: #ff6bb0;
-  --magenta-text: #ff8cc0;
   /* Selection, focus, targeting, active effects and the Reaction lamp. */
   --cyan: #4fe3ff;
   --cyan-hi: #6fe8ff;
@@ -76,6 +75,12 @@
   --danger: var(--hostile);
   --danger-hi: #ff8a80;
   --danger-text: #ff9d94;
+  /* Text shades (theme rule 9, ADR-0076): an amber, magenta or violet word. Dusk keeps the light shades its colour
+     table already reads at 4.5:1; Dawn darkens them to read 5:1 on its grounds. Lamps, edges and fills keep the
+     colour. */
+  --caution-text: #ffcb7a;
+  --magenta-text: #ff8cc0;
+  --violet-text: #d9c2ff;
   /* Hit points left and the Bonus lamp share a value and not a meaning, so they stay two tokens. */
   --hp: #ffd54d;
   --lamp-bonus: #ffd54d;
@@ -551,7 +556,6 @@
 
   --magenta: #f0559b;
   --magenta-hi: #f27aae;
-  --magenta-text: #b0306e;
   --cyan: #2a8fa8;
   --cyan-hi: #1d6a80;
   --violet: #8a62d6;
@@ -561,6 +565,9 @@
   --hostile: #d9493f;
   --danger-hi: #e4706a;
   --danger-text: #a8352c;
+  --caution-text: #875400;
+  --magenta-text: #a3246b;
+  --violet-text: #6a44bf;
   --hp: #d9a43a;
   --lamp-bonus: #d9a43a;
   --hp-text: #7a5718;

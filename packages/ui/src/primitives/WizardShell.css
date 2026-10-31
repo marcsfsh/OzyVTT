@@ -142,7 +142,7 @@
   min-height: 1.2em;
   text-align: center;
   /* "Not finished yet" is caution: nothing has gone wrong. */
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font-size: var(--fs-sm);
 }
 .nh-wizard-blocked-icon {

@@ -239,7 +239,7 @@
 }
 .encounter-start-blocked {
   margin: 0;
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font-size: var(--fs-sm);
 }
 .encounter-primary,
@@ -804,7 +804,7 @@
 }
 .initiative-hp-text small {
   font-size: var(--fs-2xs);
-  color: var(--violet-hi);
+  color: var(--violet-text);
   margin-left: 0.12rem;
 }
 .initiative-hp-text.hp-healthy {
@@ -1134,7 +1134,7 @@
   padding: 0 var(--space-1);
   border-left: 3px solid var(--caution);
   background: color-mix(in srgb, var(--caution) 12%, var(--surface-2));
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font: 600 var(--fs-2xs) / 1.6 var(--font-label);
   white-space: nowrap;
 }

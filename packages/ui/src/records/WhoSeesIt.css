@@ -24,7 +24,7 @@
 .nh-aud.is-hidden {
   border-color: var(--rim-gm);
   background: color-mix(in srgb, var(--rim-gm) 14%, var(--surface-1));
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .nh-aud.is-characters {
   border-color: var(--cyan);
@@ -53,7 +53,7 @@
   background: transparent;
 }
 .nh-aud-item-hidden {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 
 /* A field's switch over its word: the word changes, the switch stays put. */
@@ -72,7 +72,7 @@
   font: 600 var(--fs-2xs) / 1 var(--font-label);
 }
 .nh-fieldaud.is-hidden .nh-fieldaud-word {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 
 /* ----- Who sees a whole record: three segments with the word under them ----- */
@@ -114,7 +114,7 @@
 }
 .nh-whoswitch-option.is-hidden.is-on {
   border-color: var(--rim-gm);
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .nh-whoswitch-option.is-everyone.is-on {
   border-color: var(--indigo);

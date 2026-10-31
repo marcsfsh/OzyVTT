@@ -80,7 +80,7 @@
   box-shadow: 0 0 0 1px var(--surface-1);
 }
 .init-row-dot-more {
-  color: var(--violet);
+  color: var(--violet-text);
   font-size: 0.7em;
   font-weight: 800;
 }

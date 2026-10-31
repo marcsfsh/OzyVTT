@@ -196,7 +196,7 @@
   width: var(--cue-w);
   height: var(--cue-h);
   transform: translateY(-50%);
-  color: var(--magenta);
+  color: var(--magenta-text);
   background: var(--cue-mark);
   pointer-events: none;
 }

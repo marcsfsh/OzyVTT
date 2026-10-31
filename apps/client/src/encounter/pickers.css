@@ -142,7 +142,7 @@ span.roll-mode-tag {
 .roll-mode-tag.is-disadvantage {
   border-left-color: var(--caution);
   background: color-mix(in srgb, var(--caution) 14%, transparent);
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .sheet-roll-notes {
   display: grid;

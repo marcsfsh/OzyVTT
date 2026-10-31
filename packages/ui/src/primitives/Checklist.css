@@ -139,5 +139,5 @@
 .nh-checklist-reason {
   margin: 0;
   font-size: var(--fs-sm);
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }

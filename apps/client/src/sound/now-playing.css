@@ -68,7 +68,7 @@
   flex: none;
 }
 .now-playing.is-waiting .now-playing-what .now-playing-screen {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .now-playing .sound-level {
   flex: 1 1 7rem;

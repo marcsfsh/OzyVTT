@@ -57,7 +57,7 @@
   letter-spacing: var(--tracking-eyebrow);
 }
 .story-eyebrow.is-gm {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .story-hint {
   margin: 0;
@@ -90,12 +90,12 @@
   align-items: center;
   gap: 2px;
   margin-left: var(--space-2);
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font: 700 var(--fs-xs) / 1 var(--font-label);
 }
 .story-hiddenmark {
   display: inline-flex;
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 
 /* ----- The chronicle: the spine and the calendar ----- */
@@ -182,7 +182,7 @@
   padding: 2px var(--space-2);
   border-left: 3px solid var(--violet);
   background: color-mix(in srgb, var(--violet) 14%, transparent);
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font: 700 var(--fs-xs) / 1.4 var(--font-label);
 }
 .story-spinedays {
@@ -227,7 +227,7 @@
   box-shadow: inset 3px 0 0 var(--cyan);
 }
 .story-spinerow.is-hidden .story-spinerow-line {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .story-spinerow-icon {
   width: 1.15em;
@@ -450,7 +450,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font: 700 var(--fs-xs) / 1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: var(--tracking-eyebrow);
@@ -695,7 +695,7 @@
 }
 .story-age.is-hidden .story-age-title,
 .story-age.is-hidden .story-age-line {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 
 /* Year: the months side by side on a laptop, stacked on a phone. */
@@ -777,7 +777,7 @@
 .story-month-yours,
 .story-month-clock.is-hidden,
 .story-month-event.is-hidden {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 /* A clock or event in a month cell is one line: the day and the start of what happens, the rest on its record. */
 .story-month-clock,
@@ -787,7 +787,7 @@
   white-space: nowrap;
 }
 .story-month-clock {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .story-month-event {
   color: var(--indigo-text);
@@ -901,7 +901,7 @@
 }
 .story-item.is-hidden .story-item-meta,
 .story-item.is-hidden .story-item-text {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .story-item-icon {
   width: 1em;
@@ -940,7 +940,7 @@
 }
 .story-nowline.is-gm span {
   border-color: var(--violet);
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .story-zoom {
   align-self: flex-start;
@@ -1303,7 +1303,7 @@
   color: var(--heading-ink);
 }
 .recap-title.is-gm {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 
 @media (max-width: 760px) {

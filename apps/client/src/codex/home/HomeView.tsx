@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, IconChevronRight, IconSparkle, Skeleton, cx, AudienceChip } from "@vtt/ui";
+import { Alert, Button, IconChevronRight, IconSparkle, Skeleton, cx, AudienceChip, KindCard } from "@vtt/ui";
 import type { CodexRecordKind } from "@vtt/domain";
 import { sessionApi } from "../api";
 import { findApi } from "../api-records";
@@ -337,26 +337,21 @@ export function GmHome() {
             {KIND_GROUPS.map((group) => {
               const counts = groupCounts(home, group);
               return (
-                <Card
+                <KindCard
                   key={group.id}
-                  title={group.label}
-                  icon={group.iconId}
-                  count={read.loading && !home ? undefined : counts.revealed + counts.hidden}
                   className="cx-tile"
-                >
-                  <button
-                    type="button"
-                    className="cx-tile-open"
-                    onClick={() => go(withQuery(pathForSection("pages"), { group: group.id }))}
-                  >
-                    <span className="nh-sr-only">Open {group.label}</span>
-                  </button>
-                  <RevealedCount
-                    revealed={counts.revealed}
-                    hidden={counts.hidden}
-                    onHidden={() => hiddenSearch(group)}
-                  />
-                </Card>
+                  icon={<CodexIcon iconId={group.iconId} className="cx-card-icon" />}
+                  name={group.label}
+                  count={read.loading && !home ? undefined : counts.revealed + counts.hidden}
+                  onOpen={() => go(withQuery(pathForSection("pages"), { group: group.id }))}
+                  line={
+                    <RevealedCount
+                      revealed={counts.revealed}
+                      hidden={counts.hidden}
+                      onHidden={() => hiddenSearch(group)}
+                    />
+                  }
+                />
               );
             })}
             <Card

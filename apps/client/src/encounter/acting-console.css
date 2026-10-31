@@ -96,7 +96,7 @@
   /* Fill, rim and corners come from the controls' material in encounter-panel.css. Only the border
      box is set here, so the paint does not depend on which stylesheet loads first. */
   border: 1px solid transparent;
-  color: var(--violet-hi);
+  color: var(--violet-text);
   font-size: var(--fs-sm);
   font-weight: 700;
   cursor: pointer;
@@ -113,11 +113,11 @@
   border-top-color: color-mix(in srgb, var(--violet) 60%, var(--line));
 }
 .acting-console.legendary-acting .acting-console-head strong {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .legendary-pill {
   cursor: default;
-  color: var(--violet-hi);
+  color: var(--violet-text);
   border-color: color-mix(in srgb, var(--violet) 45%, var(--line));
 }
 .legendary-done {

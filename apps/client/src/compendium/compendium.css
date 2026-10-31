@@ -30,7 +30,7 @@
   font-size: var(--fs-sm);
 }
 .cp-caution {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .cp-strong {
   font-weight: 700;
@@ -58,7 +58,7 @@
 }
 .cp-blocked {
   margin: 0;
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font-size: var(--fs-sm);
 }
 .cp-empty {
@@ -229,7 +229,7 @@
   cursor: pointer;
 }
 .cp-count.cp-caution {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .cp-action-cell {
   text-align: end;
@@ -842,7 +842,7 @@
 }
 .cp-todo-title {
   margin: 0;
-  color: var(--caution-hi);
+  color: var(--caution-text);
   font: 700 var(--fs-xs) / 1.3 var(--font-label);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
@@ -889,7 +889,7 @@
 }
 .cp-problem > svg {
   flex: none;
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 .cp-problem p {
   margin: 0;
@@ -930,7 +930,7 @@
   color: var(--cyan-hi);
 }
 .cp-stepchip.is-incomplete svg {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }
 
 /* The phone's preview: a bar over the tab bar that opens the card full screen. */
@@ -1223,7 +1223,7 @@
 .cp-gridbox.is-on.is-hidden {
   border-color: var(--rim-gm);
   background: color-mix(in srgb, var(--violet-hi) 18%, var(--surface-2));
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cp-gridbox.is-covered {
   opacity: 0.45;
@@ -1279,5 +1279,5 @@
   }
 }
 .cp-add-scene-list .cp-hint.is-caution {
-  color: var(--caution-hi);
+  color: var(--caution-text);
 }

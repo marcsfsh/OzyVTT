@@ -25,11 +25,12 @@
 }
 /* −/+ carry the 44px floor as real paint. `min-width`, because flex-shrink can shave a flex item's
    width below the floor. */
+/* One stepper (theme 2.5, ADR-0076): 40px, 44px under a finger, its number VT323 22px. */
 .nh-stepper-btn {
   display: grid;
   place-items: center;
-  min-width: var(--tap-min);
-  min-height: var(--tap-min);
+  min-width: 40px;
+  min-height: 40px;
   padding: var(--space-2) 0;
   border: 0;
   background: transparent;
@@ -53,7 +54,13 @@
   display: grid;
   place-items: center;
   color: var(--text);
-  font-size: var(--fs-body);
-  font-weight: 700;
+  font: 400 22px / 1 var(--font-numeric);
   border-inline: 1px solid var(--line);
+}
+
+@media (any-pointer: coarse), (max-width: 760px) {
+  .nh-stepper-btn {
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
+  }
 }

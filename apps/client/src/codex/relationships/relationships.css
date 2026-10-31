@@ -110,7 +110,7 @@
 .cx-grid td.is-hidden {
   outline: 1px dashed var(--rim-gm);
   outline-offset: -4px;
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cx-grid-self {
   background: var(--surface-2);
@@ -125,7 +125,7 @@
   color: var(--cyan-hi);
 }
 .cx-grid-party.is-hidden {
-  color: var(--violet-hi);
+  color: var(--violet-text);
 }
 .cx-grid-adjust {
   min-height: var(--tap-min);

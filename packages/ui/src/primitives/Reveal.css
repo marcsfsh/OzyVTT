@@ -43,7 +43,7 @@
 /* Magenta is the state, but never colour alone: the glyph changes too. */
 .nh-reveal-toggle.is-revealed,
 .nh-reveal-mark.is-revealed {
-  color: var(--magenta);
+  color: var(--magenta-text);
   filter: var(--glow-drop-magenta);
 }
 /* `:active` carries what `:hover` carries. */
