@@ -77,7 +77,7 @@ describe("the integration credentials", () => {
   it("names what to do when there are none", async () => {
     serve([]);
     renderTable();
-    expect(await screen.findByText("No credentials yet")).toBeInTheDocument();
+    expect(await screen.findByText(/^No credentials yet\./)).toBeInTheDocument();
   });
 
   it("creates one with a name and at least one scope, and shows its secret once", async () => {

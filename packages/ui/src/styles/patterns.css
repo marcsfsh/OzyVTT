@@ -56,35 +56,22 @@
   font-family: var(--font-numeric);
 }
 
-/* ---- Empty state (no data yet / no results) ----
-   A solid `--line` hairline, never dashed: a dashed outline reads as a placeholder or something half-built. */
+/* ---- Empty state (theme spec rule 3) ----
+   One line in --text-dim saying what is missing, and an optional secondary button under it, where the content would be.
+   No heading, icon or box. */
 .nh-empty {
-  display: grid;
-  place-items: center;
-  gap: var(--space-2);
-  min-height: 12rem;
-  padding: var(--space-6);
-  text-align: center;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
   color: var(--text-dim);
 }
-.nh-empty-icon {
-  font-size: 1.8rem;
-  line-height: 1;
-  opacity: 0.8;
-}
-.nh-empty-title {
-  color: var(--text);
-  font-family: var(--font-display);
-  font-weight: var(--fw-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-size: var(--fs-h3);
-}
-.nh-empty-text {
-  max-width: 26rem;
-  font-size: var(--fs-sm);
+.nh-empty-line {
+  max-width: 40rem;
+  margin: 0;
+  font: 500 14px / 1.45 var(--font-body);
+  color: var(--text-dim);
 }
 
 /* ---- Card gallery (scene library, map library: any browse-and-pick grid of thumbnail cards) ----

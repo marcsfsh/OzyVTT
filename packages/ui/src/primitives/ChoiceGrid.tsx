@@ -3,6 +3,7 @@ import { cx } from "./util";
 import { Input } from "./forms";
 import { IconInfo, IconSearch, IconWarning } from "./icons";
 import { ChoiceCard } from "./ChoiceCard";
+import { EmptyState } from "./EmptyState";
 import { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
 import "./ChoiceGrid.css";
 
@@ -254,14 +255,9 @@ export function ChoiceGrid({
         )}
 
         {shown.length === 0 ? (
-          <div className="nh-empty">
-            <span className="nh-empty-icon" aria-hidden="true">
-              <IconSearch />
-            </span>
-            <span className="nh-empty-title">{emptyTitle}</span>
-            <span className="nh-empty-text">{emptyText}</span>
-            {emptyAction}
-          </div>
+          <EmptyState action={emptyAction}>
+            {/[.!?]$/.test(emptyTitle) ? emptyTitle : `${emptyTitle}.`} {emptyText}
+          </EmptyState>
         ) : (
           // `.scroll-y` declares the scroll region in the markup.
           <div

@@ -32,11 +32,11 @@
   border: 1px solid var(--line);
   overflow: hidden;
 }
-/* The one neon moment in the indicator: how far you are. */
+/* How far you are, in cyan like the current step (rule 4: no magenta in Steps). */
 .nh-steps-bar-fill {
   height: 100%;
   border-radius: inherit;
-  background: var(--primary);
+  background: var(--cyan);
   transition: width var(--dur-base) var(--ease-settle);
 }
 
@@ -69,17 +69,18 @@
   border-radius: 1px;
   background: var(--line-strong);
 }
+/* One mark everywhere (theme spec rule 4): a 24px square with its number in VT323 17px. */
 .nh-step-marker {
   display: grid;
   place-items: center;
   flex: none;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
   border: 1px solid var(--line-strong);
-  background: var(--surface-2);
+  background: none;
   color: var(--text-muted);
-  font: 700 var(--fs-xs) / 1 var(--font-label);
+  font: 400 17px / 1 var(--font-numeric);
 }
 .nh-step-label {
   color: var(--text-muted);
@@ -87,19 +88,21 @@
   white-space: nowrap;
 }
 
+/* Done is a cyan check. */
 .nh-step--done .nh-step-marker {
-  border-color: var(--cyan);
-  background: color-mix(in srgb, var(--cyan) 22%, transparent);
-  color: var(--cyan-hi);
+  border-color: var(--state-on-edge);
+  background: var(--state-on);
+  color: var(--state-on-ink);
 }
 .nh-step--done .nh-step-label {
   color: var(--text-dim);
 }
+/* Current is a cyan outline with its number, no fill and no glow. */
 .nh-step--current .nh-step-marker {
-  border-color: transparent;
-  background: var(--primary);
-  color: var(--text-on-neon);
-  box-shadow: var(--glow-magenta);
+  border: 2px solid var(--cyan);
+  background: none;
+  color: var(--text);
+  box-shadow: none;
 }
 .nh-step--current .nh-step-label {
   color: var(--text);

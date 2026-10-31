@@ -162,10 +162,7 @@
   color: var(--caution-hi);
 }
 
-/* `.nh-empty` without its 12rem min-height, which would outweigh the fields around it. */
+/* The empty line sits close to the fields around it. */
 .nh-roweditor-empty {
-  min-height: 0;
-  margin: 0;
-  padding: var(--space-4);
-  font-size: var(--fs-sm);
+  padding: var(--space-2) 0;
 }

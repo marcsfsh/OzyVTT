@@ -222,18 +222,7 @@
   flex: none;
   padding: var(--space-3) var(--pane-gutter) 0;
 }
-/* Side by side while both labels fit; a button never gets narrower than its label, so on a narrow phone they stack. */
-.sc-front-new {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  max-width: 34rem;
-}
-.sc-front-new > .nh-btn {
-  flex: 1 1 0;
-  min-width: max-content;
-  justify-content: center;
-}
+
 .sc-front-tabs {
   align-self: flex-start;
 }
@@ -272,15 +261,6 @@
 }
 .sc-list-none {
   padding: var(--space-4) 0;
-}
-.sc-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-  max-width: 32rem;
-  margin: var(--space-6) auto;
-  color: var(--text-dim);
 }
 .sc-table {
   width: 100%;

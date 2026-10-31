@@ -5,7 +5,7 @@ import {
   type IntegrationCredentialMetadata,
   type IntegrationScope
 } from "@vtt/api-contract";
-import { Badge, Button, IconPlug, Input, Menu, MenuItem, Modal, Switch, useToast, type BadgeTone } from "@vtt/ui";
+import { Badge, Button, EmptyState, Input, Menu, MenuItem, Modal, Switch, useToast, type BadgeTone } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -146,15 +146,10 @@ export function CredentialsTable({
   return (
     <div className="credentials">
       {credentials === null ? null : credentials.length === 0 ? (
-        <div className="nh-empty credentials-empty">
-          <span className="nh-empty-icon" aria-hidden="true">
-            <IconPlug />
-          </span>
-          <span className="nh-empty-title">No credentials yet</span>
-          <span className="nh-empty-text">
-            Use New credential to name one and pick what it may reach. Its secret is shown once, when you create it.
-          </span>
-        </div>
+        <EmptyState>
+          No credentials yet. Use New credential to name one and pick what it may reach. Its secret is shown once, when
+          you create it.
+        </EmptyState>
       ) : phone ? (
         <ul className="settings-list" aria-label="Integration credentials">
           {credentials.map((credential) => (

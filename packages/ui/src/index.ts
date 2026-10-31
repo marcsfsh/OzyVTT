@@ -82,6 +82,7 @@ export { cx } from "./primitives/util";
 export { Button, IconButton } from "./primitives/Button";
 export { Field, Input, Select, Textarea } from "./primitives/forms";
 export { Group } from "./primitives/Group";
+export { EmptyState } from "./primitives/EmptyState";
 export { Wordmark, Eyebrow, SunMark } from "./primitives/Wordmark";
 export { Chip, type ChipTone } from "./primitives/Chip";
 export { Tabs } from "./primitives/Tabs";

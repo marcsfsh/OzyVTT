@@ -1,5 +1,16 @@
 import { useState } from "react";
-import { Button, Field, IconChevronLeft, Input, Menu, MenuItem, Modal, RevealSwitch, useToast } from "@vtt/ui";
+import {
+  Button,
+  Field,
+  IconChevronLeft,
+  Input,
+  Menu,
+  MenuItem,
+  Modal,
+  RevealSwitch,
+  useToast,
+  EmptyState
+} from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
 import {
@@ -104,13 +115,11 @@ export function ReplayList({
         {archives === null && <p>Loading replays…</p>}
         {/* No door: the list fills itself when a fight ends. */}
         {archives !== null && archives.length === 0 && !error && (
-          <div className="scene-empty">
-            <p>
-              {role === "gm"
-                ? "No replays yet. Every encounter that ends is kept here."
-                : "Your GM hasn't shared an encounter yet."}
-            </p>
-          </div>
+          <EmptyState>
+            {role === "gm"
+              ? "No replays yet. Every encounter that ends is kept here."
+              : "Your GM hasn't shared an encounter yet."}
+          </EmptyState>
         )}
         {archives !== null && archives.length > 0 && (
           <ul className="replay-rows">

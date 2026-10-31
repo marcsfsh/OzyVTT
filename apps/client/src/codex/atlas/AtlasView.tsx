@@ -12,7 +12,8 @@ import {
   useToast,
   EVERYONE,
   HIDDEN,
-  AudienceChip
+  AudienceChip,
+  EmptyState
 } from "@vtt/ui";
 import {
   countOf,
@@ -420,16 +421,10 @@ export function AtlasView({
       ))}
     </div>
   ) : (
-    <div className="atlas-firstmap">
-      <h3>No map yet</h3>
-      <p>
-        An atlas is built from uploaded map images. Add a map, drop pins on it, and link each pin to a page or a map
-        inside it.
-      </p>
-      <Button variant="primary" onClick={() => setPicking(true)}>
-        New map
-      </Button>
-    </div>
+    <EmptyState className="atlas-firstmap" action={<Button onClick={() => setPicking(true)}>New map</Button>}>
+      No map yet. An atlas is built from uploaded map images. Add a map, drop pins on it, and link each pin to a page or
+      a map inside it.
+    </EmptyState>
   );
 
   const pinSide = selected ? (

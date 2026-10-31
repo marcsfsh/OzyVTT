@@ -23,20 +23,12 @@ const LIST_TABS: ReadonlyArray<{ id: ScenesSection; label: string; path: string 
 ];
 
 /**
- * Prep's front page above its lists: New map and New scene side by side, then the Maps and Scenes views. The lists
- * under it keep their own filters and sort.
+ * Prep's front page above its lists: the Maps and Encounters views. New map and New encounter sit in Prep's bar, the
+ * one primary in a fixed place (theme spec rule 2). The lists under it keep their own filters and sort.
  */
 function ListHead({ section }: Readonly<{ section: ScenesSection }>) {
   return (
     <div className="sc-front-head">
-      <div className="sc-front-new">
-        <Button variant="secondary" onClick={() => void navigate(SCENES_PATHS.newMap)}>
-          <IconMap /> New map
-        </Button>
-        <Button variant="primary" onClick={() => void navigate(SCENES_PATHS.newScene)}>
-          <IconScene /> New encounter
-        </Button>
-      </div>
       <Tabs
         ariaLabel="Maps and encounters"
         className="sc-front-tabs"
@@ -192,16 +184,36 @@ export function ScenesShell({
         {/* Prep's section bar names the page; its right end holds this page's views, the find box and the primary. */}
         <PrepBarSlot>
           {!phone && <FindBox state={state} maps={library.maps} />}
-          {!listing &&
-            (phone ? (
-              <IconButton label={primary.label} onClick={() => void navigate(primary.path)}>
-                <IconPlus />
-              </IconButton>
+          {listing ? (
+            phone ? (
+              // A phone's header has room for two icons: New map, then the primary as its icon.
+              <>
+                <IconButton label="New map" onClick={() => void navigate(SCENES_PATHS.newMap)}>
+                  <IconMap />
+                </IconButton>
+                <IconButton label="New encounter" onClick={() => void navigate(SCENES_PATHS.newScene)}>
+                  <IconPlus />
+                </IconButton>
+              </>
             ) : (
-              <Button variant="secondary" size="sm" onClick={() => void navigate(primary.path)}>
-                <IconPlus /> {primary.label}
-              </Button>
-            ))}
+              <>
+                <Button variant="secondary" size="sm" onClick={() => void navigate(SCENES_PATHS.newMap)}>
+                  <IconPlus /> New map
+                </Button>
+                <Button variant="primary" size="sm" onClick={() => void navigate(SCENES_PATHS.newScene)}>
+                  New encounter
+                </Button>
+              </>
+            )
+          ) : phone ? (
+            <IconButton label={primary.label} onClick={() => void navigate(primary.path)}>
+              <IconPlus />
+            </IconButton>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={() => void navigate(primary.path)}>
+              <IconPlus /> {primary.label}
+            </Button>
+          )}
         </PrepBarSlot>
         <div className="sc-content">{content}</div>
       </div>

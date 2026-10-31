@@ -1,6 +1,7 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { burst, canMove, flipFrom } from "../motion/lightRail";
+import { EmptyState } from "./EmptyState";
 import { cx } from "./util";
 import { useDragSurface } from "./dragSurface";
 import { Button } from "./Button";
@@ -150,10 +151,7 @@ export function RowEditor<T>({
 
   return (
     <div className={cx("nh-roweditor", dragFrom !== null && "is-reordering", className)}>
-      {rows.length === 0 && emptyText != null && (
-        /* `.nh-empty` without its 12rem min-height, which would dwarf the fields in a form section. */
-        <p className="nh-empty nh-roweditor-empty">{emptyText}</p>
-      )}
+      {rows.length === 0 && emptyText != null && <EmptyState className="nh-roweditor-empty">{emptyText}</EmptyState>}
 
       {rows.length > 0 && (
         <ul className="nh-roweditor-rows" role="list" aria-label={ariaLabel} ref={listRef}>

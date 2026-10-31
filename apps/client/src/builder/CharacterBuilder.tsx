@@ -1,7 +1,18 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { BuilderAbilityMethod, BuilderOffer, GmView, PlayerView } from "@vtt/domain";
 import type { Ability } from "@vtt/rules-5e";
-import { Alert, Button, Field, NameField, ReviewSummary, Select, Stepper, useToast, WizardShell } from "@vtt/ui";
+import {
+  Alert,
+  Button,
+  EmptyState,
+  Field,
+  NameField,
+  ReviewSummary,
+  Select,
+  Stepper,
+  useToast,
+  WizardShell
+} from "@vtt/ui";
 import type { DiceEntryMode, StepItem } from "@vtt/ui";
 import { useBuilderCatalogs, type BuilderCatalogs } from "../content/catalogs";
 import { command } from "../lib/command";
@@ -644,14 +655,12 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
               </p>
             ))}
             {stepOffers("features").length === 0 ? (
-              <div className="nh-empty">
-                <span className="nh-empty-title">Nothing to choose yet</span>
-                <span className="nh-empty-text">
-                  {multiclass
-                    ? `These classes ask for no decisions at level ${draft.level}. Carry on.`
-                    : `This class asks for no decisions at level ${draft.level}. Carry on.`}
-                </span>
-              </div>
+              <EmptyState>
+                Nothing to choose yet.{" "}
+                {multiclass
+                  ? `These classes ask for no decisions at level ${draft.level}. Carry on.`
+                  : `This class asks for no decisions at level ${draft.level}. Carry on.`}
+              </EmptyState>
             ) : (
               stepOffers("features").map(renderOffer)
             )}
@@ -706,10 +715,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
         );
       case "equipment":
         return stepOffers("equipment").length === 0 ? (
-          <div className="nh-empty">
-            <span className="nh-empty-title">No starting equipment</span>
-            <span className="nh-empty-text">Neither this class nor this background prints a starting kit.</span>
-          </div>
+          <EmptyState>No starting equipment. Neither this class nor this background prints a starting kit.</EmptyState>
         ) : (
           <>{stepOffers("equipment").map(renderOffer)}</>
         );

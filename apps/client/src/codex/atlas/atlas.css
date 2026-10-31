@@ -762,27 +762,10 @@
   border-color: var(--magenta);
 }
 .atlas-loading,
+/* An atlas with no map yet: the empty line where the map would be. */
 .atlas-firstmap {
   flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--space-3);
   padding: var(--space-6);
-  border: 1px solid var(--line);
-}
-.atlas-firstmap h3 {
-  margin: 0;
-  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.atlas-firstmap p {
-  margin: 0;
-  color: var(--text-dim);
-}
-.atlas-firstmap .nh-btn {
-  align-self: flex-start;
 }
 
 /* ----- A phone: the map, the pins, the maps inside and the details as one switch ----- */

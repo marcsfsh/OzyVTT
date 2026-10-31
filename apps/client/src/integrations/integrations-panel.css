@@ -7,9 +7,6 @@
   gap: var(--space-3);
   min-width: 0;
 }
-.credentials-empty {
-  padding: var(--space-5) 0;
-}
 .credentials-scopes {
   display: flex;
   flex-wrap: wrap;

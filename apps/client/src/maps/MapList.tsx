@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, IconMap, IconPencil, IconPlus, IconScene, Menu, MenuItem, cx } from "@vtt/ui";
+import { Button, IconMap, IconPencil, IconPlus, IconScene, Menu, MenuItem, cx, EmptyState } from "@vtt/ui";
 import { useScenes } from "../scenes/context";
 import { MapThumb } from "../scenes/pieces";
 import { pathForMap, SCENES_PATHS } from "../scenes/routes";
@@ -97,12 +97,9 @@ export function MapList() {
           {maps === null ? (
             <p className="sc-hint sc-list-none">Reading the map library…</p>
           ) : library.length === 0 ? (
-            <div className="sc-empty">
-              <p>No maps yet. Upload an image, then set its grid so tokens snap to it.</p>
-              <Button variant="primary" onClick={() => go(SCENES_PATHS.newMap)}>
-                Add a map
-              </Button>
-            </div>
+            <EmptyState action={<Button onClick={() => go(SCENES_PATHS.newMap)}>Add a map</Button>}>
+              No maps yet. Upload an image, then set its grid so tokens snap to it.
+            </EmptyState>
           ) : shown.length === 0 ? (
             <p className="sc-hint sc-list-none">No map matches. Change the filters to see more.</p>
           ) : phone ? (

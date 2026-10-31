@@ -268,8 +268,8 @@
   }
 }
 
-/* The side column's steps read like the drawn builder: 60px rows with a square marker (a cyan tick for done, the
-   caution mark for unfinished, the number for upcoming), and the current row tinted with a cyan bar on its edge. */
+/* The side column's steps read like the drawn builder: 60px rows with the kit's square marks (Steps.css), and the
+   current row tinted with a cyan bar on its edge. */
 .nh-wizard-side .nh-steps--vertical .nh-step {
   min-height: 60px;
   padding: 0 var(--space-4);
@@ -281,28 +281,9 @@
   min-height: 60px;
   padding: 0 var(--space-4);
 }
-.nh-wizard-side .nh-step-marker {
-  width: 26px;
-  height: 26px;
-  border-radius: 0;
-}
-.nh-wizard-side .nh-step--done .nh-step-marker {
-  border-color: var(--state-on-edge);
-  background: var(--state-on);
-  color: var(--state-on-ink);
-}
 .nh-wizard-side .nh-step--current {
   background: color-mix(in srgb, var(--state-on) 12%, transparent);
   box-shadow: inset 3px 0 0 var(--state-on-edge);
-}
-.nh-wizard-side .nh-step--current .nh-step-marker {
-  border-color: var(--state-on-edge);
-  background: none;
-  color: var(--text);
-  box-shadow: none;
-}
-.nh-wizard-side .nh-step--incomplete .nh-step-marker {
-  border-style: solid;
 }
 .nh-wizard-side .nh-step-label {
   font-size: 15px;

@@ -143,12 +143,13 @@
   overscroll-behavior: contain;
   padding: var(--space-3) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
 }
+/* The Codex's empty lines read as the kit's EmptyState: one line in --text-dim where the content would be. */
 .cx-empty {
-  margin: var(--space-6) auto;
-  max-width: 32rem;
+  max-width: 40rem;
+  margin: 0;
+  padding: var(--space-4) 0;
   color: var(--text-dim);
-  font: 500 var(--fs-body) / var(--lh-body) var(--font-body);
-  text-align: center;
+  font: 500 14px / 1.45 var(--font-body);
 }
 .cx-notices {
   display: flex;

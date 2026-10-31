@@ -3,6 +3,7 @@ import { rosterActors, type PlayerActor, type PlayerView } from "@vtt/domain";
 import {
   Alert,
   Button,
+  EmptyState,
   IconUser,
   StatusLamp,
   Tag,
@@ -114,12 +115,9 @@ export function ClaimCharacter({ state, art = false }: Readonly<{ state: PlayerV
         </Alert>
       )}
       {characters.length === 0 ? (
-        <div className="nh-empty">
-          <span className="nh-empty-title">Nothing to claim yet</span>
-          <span className="nh-empty-text">
-            Your GM is setting up the party. You can send them a character sheet in the meantime.
-          </span>
-        </div>
+        <EmptyState>
+          Nothing to claim yet. Your GM is setting up the party. You can send them a character sheet in the meantime.
+        </EmptyState>
       ) : (
         <ul ref={list} className="claim-list" role="radiogroup" aria-labelledby="claim-heading">
           {characters.map((actor) => {

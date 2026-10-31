@@ -251,31 +251,6 @@ textarea:focus {
   border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
-.empty {
-  margin-top: var(--space-8);
-  min-height: 14rem;
-  display: grid;
-  place-content: center;
-  text-align: center;
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-md);
-  color: var(--text-dim);
-}
-.empty strong,
-.empty span {
-  display: block;
-}
-.empty strong {
-  color: var(--text);
-  font-family: var(--font-display);
-  font-weight: var(--fw-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.empty span {
-  margin-top: 0.4rem;
-}
-
 .danger {
   background: transparent;
   border: 1px solid var(--danger);

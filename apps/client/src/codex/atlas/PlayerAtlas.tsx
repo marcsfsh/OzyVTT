@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { IconChevronLeft, SegmentedControl, Tabs } from "@vtt/ui";
+import { IconChevronLeft, SegmentedControl, Tabs, EmptyState } from "@vtt/ui";
 import type { PlayerCodexMap, PlayerCodexPageSummary } from "@vtt/domain";
 import { playerCodexApi } from "../api";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -96,10 +96,7 @@ export function PlayerAtlas({
       onPinClick={select}
     />
   ) : (
-    <div className="atlas-firstmap">
-      <h3>No maps yet</h3>
-      <p>Maps your GM shares appear here.</p>
-    </div>
+    <EmptyState className="atlas-firstmap">No maps yet. Maps your GM shares appear here.</EmptyState>
   );
   const pinSide = selected && (
     <PinView

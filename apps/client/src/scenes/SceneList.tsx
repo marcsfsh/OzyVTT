@@ -11,7 +11,8 @@ import {
   Menu,
   MenuItem,
   cx,
-  useDragSurface
+  useDragSurface,
+  EmptyState
 } from "@vtt/ui";
 import { replaceQuery, useRoute } from "../router";
 import { useSoundBoard } from "../sound/sound-data";
@@ -209,12 +210,9 @@ export function SceneList() {
         />
         <div className="sc-list-body scroll-y frame-fill">
           {scenes.length === 0 ? (
-            <div className="sc-empty">
-              <p>No encounters yet. An encounter is a map and who is on it, made live when the table is ready.</p>
-              <Button variant="primary" onClick={() => go(SCENES_PATHS.newScene)}>
-                New encounter
-              </Button>
-            </div>
+            <EmptyState action={<Button onClick={() => go(SCENES_PATHS.newScene)}>New encounter</Button>}>
+              No encounters yet. An encounter is a map and who is on it, made live when the table is ready.
+            </EmptyState>
           ) : shown.length === 0 ? (
             <p className="sc-hint sc-list-none">No encounter matches. Change the filters to see more.</p>
           ) : phone ? (
