@@ -153,6 +153,8 @@ export function Modal({
               }}
             />
           )}
+          {/* The phone sheet's handle (theme rule 16): drawn by the CSS only when the dialog opens as a sheet. */}
+          <span className="nh-sheet-handle" aria-hidden="true" />
           {title != null && (
             <header className="nh-modal-head">
               <h2 className="nh-modal-title" id={titleId}>

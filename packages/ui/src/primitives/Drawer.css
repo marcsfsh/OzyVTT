@@ -137,6 +137,30 @@
   }
 }
 
+/* The phone sheet's handle (theme rule 16): on a drawer from the bottom, and on any drawer that a phone draws full
+   width. */
+.nh-drawer .nh-sheet-handle {
+  display: none;
+}
+.nh-drawer--bottom .nh-sheet-handle {
+  display: block;
+  flex: none;
+  width: 40px;
+  height: 4px;
+  margin: 7px auto 0;
+  background: var(--line-raised);
+}
+@media (max-width: 760px) {
+  .nh-drawer .nh-sheet-handle {
+    display: block;
+    flex: none;
+    width: 40px;
+    height: 4px;
+    margin: 7px auto 0;
+    background: var(--line-raised);
+  }
+}
+
 /* State the cut here so a later transition edit can't reintroduce a slide under reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   .nh-drawer {

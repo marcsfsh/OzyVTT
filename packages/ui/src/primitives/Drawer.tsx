@@ -58,6 +58,7 @@ export function Drawer({ open, onClose, title, children, side = "right", ariaLab
       onKeyDown={onKeyDown}
     >
       <OverlayEdge ref={edge} />
+      <span className="nh-sheet-handle" aria-hidden="true" />
       <header className="nh-drawer-head">
         <h2 className="nh-drawer-title" id={titleId}>
           {title}

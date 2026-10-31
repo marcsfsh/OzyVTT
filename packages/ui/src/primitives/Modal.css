@@ -188,3 +188,23 @@
 .nh-modal--bottom .nh-modal-body {
   padding: var(--space-4);
 }
+
+/* One way a phone sheet opens (theme rule 16, consistency values): the handle, 40 by 4px in --line-raised, centred 7px
+   from the top, above the title and the close over a hairline. Hidden on a dialog that opens in the middle. */
+.nh-sheet-handle {
+  display: none;
+}
+.nh-modal--bottom .nh-sheet-handle {
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 7px auto 0;
+  background: var(--line-raised);
+}
+.nh-modal--bottom .nh-modal-head {
+  min-height: 48px;
+  padding-top: var(--space-2);
+}
+.nh-modal--bottom .nh-modal-title {
+  font-size: 20px;
+}

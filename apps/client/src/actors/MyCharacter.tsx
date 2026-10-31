@@ -1,3 +1,4 @@
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { useState } from "react";
 import type { ActorDefinition, PartyVisibility, PlayerActor, PlayerView } from "@vtt/domain";
 import { abilityModifier } from "@vtt/rules-5e";
@@ -54,8 +55,17 @@ function PartyMemberSheet({
   const identity = definition?.character;
   // The server derives `classLine` for other players' characters; your own falls back to the stored sheet.
   const line = actor.classLine ?? classLine(definition);
+  // A sheet from the bottom on a phone (theme rule 16), its head the member's name with the close at its right.
+  const phone = useMediaQuery("(max-width: 760px)");
   return (
-    <Modal open onClose={onClose} size="md" title={actor.name} ariaLabel={`${actor.name}'s sheet`}>
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      align={phone ? "bottom" : "center"}
+      title={actor.name}
+      ariaLabel={`${actor.name}'s sheet`}
+    >
       <div className="party-sheet">
         <p className="party-sheet-line">
           {line ?? "No class recorded"}
