@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { IconButton, IconSearch, IconX, useTheme } from "@vtt/ui";
+import { IconButton, IconChevronLeft, IconSearch, useTheme } from "@vtt/ui";
 import { ApiReference } from "../integrations/ApiReference";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { navigate, useRoute } from "../router";
@@ -33,8 +33,9 @@ import "../codex/shell/shell.css";
 import "./settings.css";
 
 /**
- * Settings: the GM's areas in a section bar with the search (Ctrl K) and the view's one primary at its right end, or
- * on a phone in a tab bar at the bottom with the search in the top bar. Each section is its own address
+ * Settings (settings spec 2.1, ADR-0057): on a laptop a title row with the view's one primary at its right, the side
+ * list of sections with its search, and the section beside it; on a phone the list first, and each section full
+ * screen under a header with Back. Each section is its own address
  * (`/settings/<section>`, and `/settings/api/<operation id>` for one operation of the reference). A player's page is
  * the Device section alone. Who sees what is structural: `sectionsFor` lists a role's sections and only those
  * mount, so GM controls are never in a player's tree. The GM sections take `state` as a `GmView`, which a player
@@ -90,7 +91,6 @@ export function SettingsPage({
       ? requested
       : homeSection(role);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
-  const [searching, setSearching] = useState(false);
   const [listQuery, setListQuery] = useState("");
   const [focus, setFocus] = useState<string | null>(null);
   // What each section holds now, for its head and the list's counts (settings spec 2.1).
@@ -117,13 +117,11 @@ export function SettingsPage({
     return () => window.clearTimeout(timer);
   }, [focus, section]);
   const pick = (entry: SettingEntry) => {
-    setSearching(false);
     if (entry.section !== section) void navigate(pathForSection(entry.section));
     setFocus(entry.id);
   };
   const go = (id: SettingsSectionId) => void navigate(pathForSection(id));
 
-  const search = <SettingsSearch entries={settingsFor(role)} onPick={pick} autoFocus={phone && searching} />;
   const listSearch = (
     <SettingsSearch entries={settingsFor(role)} onPick={pick} variant="list" onQueryChange={setListQuery} />
   );
@@ -185,7 +183,7 @@ export function SettingsPage({
     );
 
   // A laptop: the title row with the section's primary at its right, the list of sections, and the section beside it
-  // (settings spec 2.1). A phone keeps the bar until its own phase.
+  // (settings spec 2.1).
   if (!phone)
     return (
       <PrimarySlot.Provider value={slot}>
@@ -225,52 +223,70 @@ export function SettingsPage({
       </PrimarySlot.Provider>
     );
 
+  // A phone (settings spec 2.1): `/settings` is the list of sections under the header, its search a field over it; a
+  // section opens full screen under a header with Back and its name, Access's New credential as the header's icon.
+  const listShown = requested === undefined;
+  const sectionName = sections.find((item) => item.id === section)?.label ?? "Settings";
   return (
     <PrimarySlot.Provider value={slot}>
-      <div className="settings cx-shell is-phone">
-        <SectionBar
-          name="Settings"
-          navLabel="Settings sections"
-          pagesLabel="Settings pages"
-          pages={sections.map((item) => ({ id: item.id, label: item.label }))}
-          activeId={section}
-          onChange={(id) => go(id as SettingsSectionId)}
-          panel={() => content.current}
-          search={search}
-          end={<span ref={setSlot} className="settings-primary-slot" />}
-          phoneIcons={
-            <>
-              <span ref={setSlot} className="settings-primary-slot" />
-              <IconButton label="Search settings" onClick={() => setSearching(true)}>
-                <IconSearch />
-              </IconButton>
-            </>
-          }
-          {...(phone && searching
-            ? {
-                phoneHead: (
-                  <>
-                    {search}
-                    <IconButton label="Close the search" onClick={() => setSearching(false)}>
-                      <IconX />
+      <SectionLine.Provider value={line}>
+        <div className={`settings cx-shell is-phone${listShown ? " is-list" : ""}`}>
+          <SectionBar
+            name="Settings"
+            navLabel="Settings"
+            pages={[]}
+            activeId=""
+            onChange={() => undefined}
+            phoneHead={
+              listShown ? (
+                <>
+                  <h1 className="secbar-name">Settings</h1>
+                  <span className="secbar-icons">
+                    <IconButton
+                      label="Search settings"
+                      onClick={() =>
+                        document.querySelector<HTMLInputElement>(".settings-list .settings-search-input")?.focus()
+                      }
+                    >
+                      <IconSearch />
                     </IconButton>
-                  </>
-                )
-              }
-            : {})}
-        >
-          {/* The reference is a frame of its own, with its results as the one scroller, so its filter flyout spans
-          what is on screen. Every other section scrolls as one page. */}
-          <div
-            ref={content}
-            className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
-            key={section}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <IconButton label="Back to Settings" size="sm" onClick={() => void navigate("/settings")}>
+                    <IconChevronLeft />
+                  </IconButton>
+                  <h1 className="secbar-name">{sectionName}</h1>
+                  <span className="secbar-icons">
+                    <span ref={setSlot} className="settings-primary-slot" />
+                  </span>
+                </>
+              )
+            }
           >
-            {body}
-          </div>
-        </SectionBar>
-        {dialog}
-      </div>
+            {listShown ? (
+              <SettingsList
+                sections={sections}
+                current={null}
+                counts={counts}
+                search={listSearch}
+                searching={listQuery.trim() !== ""}
+                onGo={go}
+              />
+            ) : (
+              <div
+                ref={content}
+                className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
+                key={section}
+              >
+                {body}
+              </div>
+            )}
+          </SectionBar>
+          {dialog}
+        </div>
+      </SectionLine.Provider>
     </PrimarySlot.Provider>
   );
 }

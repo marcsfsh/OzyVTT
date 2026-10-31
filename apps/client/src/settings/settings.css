@@ -435,3 +435,15 @@
     font-size: 20px;
   }
 }
+
+/* A phone (settings spec 2.1 and 4): the list is the first page, its rows 52px; a section's column is 12px 14px. */
+.settings.is-phone .settings-list {
+  flex: 1 1 auto;
+  border-right: 0;
+}
+.settings.is-phone .settings-list .nh-sidelist-hit {
+  min-height: 52px;
+}
+.settings.is-phone .settings-content:not(.is-frame) {
+  padding: 12px 14px calc(var(--space-10) + env(safe-area-inset-bottom));
+}

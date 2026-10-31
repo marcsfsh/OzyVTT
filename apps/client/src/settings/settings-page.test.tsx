@@ -15,6 +15,7 @@ vi.mock("../components/JoinAddress", () => ({ JoinAddress: () => <p>The join add
 import { GameStateSchema, type GmView } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
+import { setViewport } from "../../test/viewport";
 import { useRoute } from "../router";
 import { SETTING, type SettingsSectionId } from "./sections";
 import { SettingsPage } from "./SettingsPage";
@@ -41,6 +42,35 @@ const renderAt = (path: string, props: Partial<Parameters<typeof SettingsPage>[0
 
 beforeEach(() => {
   command.mockClear();
+});
+
+describe("the GM's Settings on a phone", () => {
+  it("opens on the list of sections, opens one with Back, and Back returns to the list", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    renderAt("/settings");
+    expect(screen.getByRole("heading", { name: "Settings", level: 1 })).toBeInTheDocument();
+    const list = screen.getByRole("navigation", { name: "Settings sections" });
+    expect(within(list).getAllByRole("link")).toHaveLength(6);
+    expect(screen.getByRole("combobox", { name: "Search settings" })).toBeInTheDocument();
+
+    await user.click(within(list).getByRole("link", { name: /^Encounters/ }));
+    expect(window.location.pathname).toBe("/settings/fights");
+    expect(screen.getByRole("heading", { name: "Encounters", level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Settings sections" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Rules assistant", level: 3 })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Back to Settings" }));
+    expect(window.location.pathname).toBe("/settings");
+    expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeInTheDocument();
+  });
+
+  it("puts New credential in Access's header as its icon", () => {
+    setViewport(390);
+    renderAt("/settings/access");
+    const header = screen.getByRole("heading", { name: "Access", level: 1 }).parentElement!;
+    expect(within(header).getByRole("button", { name: "New credential" })).toBeInTheDocument();
+  });
 });
 
 describe("the GM's Settings", () => {

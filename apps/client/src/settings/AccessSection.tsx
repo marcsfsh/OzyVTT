@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Button, Input, Modal, Switch, useToast } from "@vtt/ui";
+import { Button, IconButton, IconPlus, Input, Modal, Switch, useToast } from "@vtt/ui";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { CredentialsTable } from "../integrations/CredentialsTable";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsPrimary, SettingsSection } from "./SettingRow";
@@ -24,10 +25,18 @@ export function AccessSection({
 }>) {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const phone = useMediaQuery("(max-width: 760px)");
   return (
     <SettingsSection id="access">
       <SettingsPrimary>
-        <BarPrimary label="New credential" onClick={() => setCreating(true)} />
+        {/* A phone's header carries it as its icon (settings spec 2.1). */}
+        {phone ? (
+          <IconButton label="New credential" onClick={() => setCreating(true)}>
+            <IconPlus />
+          </IconButton>
+        ) : (
+          <BarPrimary label="New credential" onClick={() => setCreating(true)} />
+        )}
       </SettingsPrimary>
       <SettingRow setting={SETTING.gmPassword}>
         <Button variant="secondary" onClick={() => setPasswordOpen(true)} disabled={busy}>
