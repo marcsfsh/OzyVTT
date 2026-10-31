@@ -134,8 +134,12 @@ export function PlayerAtlas({
     return (
       <div className="atlas is-phone">
         <CodexPhoneBar
-          title={currentMap?.name ?? "Atlas"}
-          onBack={chain.length > 1 ? () => enter(chain[chain.length - 2].id) : undefined}
+          title="Codex"
+          back={
+            chain.length > 1
+              ? { label: chain[chain.length - 2].name, onClick: () => enter(chain[chain.length - 2].id) }
+              : undefined
+          }
           actions={<LayersMenu layers={layers} onToggle={toggleLayer} gm={false} />}
         />
         <SegmentedControl

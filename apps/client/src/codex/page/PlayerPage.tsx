@@ -9,7 +9,7 @@ import { atlasPath, journalEntryPath, pagePath, questPath, sessionPath, tagPath 
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { PlayerCodexContext, useCodexShell, usePlayerCodex } from "../shell/context";
 import { useCodexQuery } from "../useCodexQuery";
-import { playerDocument } from "./document";
+import { playerDocument, kindGroupOf } from "./document";
 import {
   FieldList,
   MentionedOn,
@@ -272,8 +272,10 @@ export function PlayerPage({ id }: Readonly<{ id: string }>) {
     return (
       <div className="cx-page is-phone scroll-y">
         <CodexPhoneBar
-          title={summary?.title ?? "Page"}
-          onBack={() => go(summary ? groupPath(summary.entityType) : "/codex/pages")}
+          back={{
+            label: summary ? kindGroupOf(summary.entityType).label : "Pages",
+            onClick: () => go(summary ? groupPath(summary.entityType) : "/codex/pages")
+          }}
         />
         {banner}
         {body}

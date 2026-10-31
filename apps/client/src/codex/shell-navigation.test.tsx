@@ -190,8 +190,8 @@ describe("The phone's tab bar under the thumb", () => {
   beforeEach(() => setViewport(390));
 
   it("has Home, Pages, Atlas, Campaign and Search, with the section's tab on", async () => {
-    renderShell("/codex/pages/p1");
-    await waitFor(() => expect(getPage).toHaveBeenCalled());
+    renderShell("/codex/pages");
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
     expect(
       bar()
         .getAllByRole("tab")

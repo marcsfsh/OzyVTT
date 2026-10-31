@@ -160,6 +160,7 @@ export function CodexFrame({
             else go(CODEX_BAR.find((item) => item.id === id)!.path);
           }}
           panel={() => shell.current?.querySelector(":scope > .cx-content")}
+          phoneStrip={!recordId}
           search={searchBox}
           end={laptopActions}
           phoneHead={

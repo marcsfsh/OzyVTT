@@ -575,8 +575,9 @@ function GmQuest({ id }: Readonly<{ id: string }>) {
   if (phone)
     return (
       <div className="cx-page is-phone scroll-y">
-        <CodexPhoneBar title={quest.title} onBack={() => go(pathForSection("quests"))} actions={actions} />
+        <CodexPhoneBar back={{ label: "Quests", onClick: () => go(pathForSection("quests")) }} actions={actions} />
         <div className="cx-page-phonebody">
+          <h1 className="cx-phone-recordtitle">{quest.title}</h1>
           {error && <Alert tone="danger">{error}</Alert>}
           <div className="cx-doc">{document}</div>
           {!seeAs.on && meta}
@@ -731,7 +732,7 @@ export function GmQuests() {
       <GmQuest key={recordId} id={recordId} />
     ) : (
       <div className="cx-page is-phone scroll-y">
-        <CodexPhoneBar title="Quests" />
+        <CodexPhoneBar title="Codex" />
         <div className="cx-page-phonebody">{list}</div>
       </div>
     );
@@ -778,10 +779,13 @@ export function PlayerQuests() {
     return (
       <div className="cx-page is-phone scroll-y">
         <CodexPhoneBar
-          title={quest?.title ?? "Quests"}
-          onBack={recordId ? () => go(pathForSection("quests")) : undefined}
+          title="Codex"
+          back={recordId ? { label: "Quests", onClick: () => go(pathForSection("quests")) } : undefined}
         />
-        <div className="cx-page-phonebody">{recordId ? body : list}</div>
+        <div className="cx-page-phonebody">
+          {recordId && quest && <h1 className="cx-phone-recordtitle">{quest.title}</h1>}
+          {recordId ? body : list}
+        </div>
       </div>
     );
   return (

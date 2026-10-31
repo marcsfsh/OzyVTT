@@ -606,8 +606,12 @@ export function AtlasView({
     return (
       <div className="atlas is-phone">
         <CodexPhoneBar
-          title={currentMap?.name ?? "Atlas"}
-          onBack={chain.length > 1 ? () => enterMap(chain[chain.length - 2].id) : undefined}
+          title="Codex"
+          back={
+            chain.length > 1
+              ? { label: chain[chain.length - 2].name, onClick: () => enterMap(chain[chain.length - 2].id) }
+              : undefined
+          }
           actions={<LayersMenu layers={layers} onToggle={toggleLayer} gm />}
         />
         <SegmentedControl

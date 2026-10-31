@@ -166,8 +166,8 @@ export function PagesIndex() {
   return (
     <div className="cx-index scroll-y">
       <CodexPhoneBar
-        title={group ? group.label : "Pages"}
-        onBack={group ? () => setFilter({ group: null }) : undefined}
+        title="Codex"
+        back={group ? { label: group.label, onClick: () => setFilter({ group: null }) } : undefined}
         actions={
           gm ? (
             <Button size="sm" onClick={() => gm.quickCreate({ entityType: group?.types[0] })}>

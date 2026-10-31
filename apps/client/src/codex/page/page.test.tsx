@@ -448,11 +448,14 @@ describe("Reading a page as a player (viewer safety)", () => {
 describe("A page on a phone", () => {
   beforeEach(() => setViewport(390));
 
-  it("titles the top bar with the page, and turns each hidden block into a card with its Who sees it control", async () => {
+  it("heads the page with Back and where it goes, and turns each hidden block into a card with its Who sees it control", async () => {
     const user = userEvent.setup();
     records.pageRecordApi.blocks.setAudience.mockResolvedValue(YSOLDE);
     renderGmCodex("/codex/pages/p1");
-    expect(await screen.findByRole("heading", { level: 2, name: "Ysolde Varn" })).toBeInTheDocument();
+    // A record's header is Back and where it goes, with no strip; its title opens the content (theme rule 12).
+    expect(await screen.findByRole("button", { name: "Back to People" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ysolde Varn" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "Codex pages" })).toBeNull();
     const debt = screen.getByRole("region", { name: "The debt · Hidden" });
     expect(debt).toHaveClass("is-card");
     await user.click(within(debt).getByLabelText(/Who sees The debt/));

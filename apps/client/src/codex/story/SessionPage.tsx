@@ -327,7 +327,10 @@ export function SessionPage({
   return (
     <article className={`session-page${phone ? " is-phone" : ""}`} aria-label={sessionTitle(session)}>
       {phone ? (
-        <CodexPhoneBar title={sessionTitle(session)} onBack={onBack} actions={primary} />
+        <>
+          <CodexPhoneBar back={{ label: "Sessions", onClick: onBack }} actions={primary} />
+          <h1 className="cx-phone-recordtitle">{sessionTitle(session)}</h1>
+        </>
       ) : (
         <header className="session-head">
           <div className="session-head-text">

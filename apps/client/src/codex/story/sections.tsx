@@ -675,7 +675,7 @@ export function GmSessionsSection() {
         {page ?? (
           <div className="scroll-y story-phonelist">
             <CodexPhoneBar
-              title="Sessions"
+              title="Codex"
               actions={
                 <Button size="sm" onClick={() => void create()}>
                   New session
@@ -952,12 +952,12 @@ export function PlayerSessionsSection() {
       <div className="story is-phone scroll-y">
         {session ? (
           <>
-            <CodexPhoneBar title={sessionTitle(session)} onBack={() => shell.go(pathForSection("sessions"))} />
+            <CodexPhoneBar back={{ label: "Sessions", onClick: () => shell.go(pathForSection("sessions")) }} />
             {page}
           </>
         ) : (
           <>
-            <CodexPhoneBar title="Sessions" />
+            <CodexPhoneBar title="Codex" />
             <RecapCards
               token={shell.token}
               sessions={feeds.sessions}

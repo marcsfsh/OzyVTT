@@ -22,6 +22,7 @@ export function CodexPhoneBar({
   title,
   content,
   onBack,
+  back,
   actions
 }: Readonly<{
   title?: ReactNode;
@@ -29,6 +30,8 @@ export function CodexPhoneBar({
   content?: ReactNode;
   /** Shows Back at the start of the bar. */
   onBack?: () => void;
+  /** A record's header (theme rule 12): Back and where it goes ("‹ PEOPLE") in place of a title. */
+  back?: Readonly<{ label: string; onClick: () => void }>;
   /**
    * Controls at the end of the bar. A section's bar without them keeps the shell's own, a record's bar has Back in
    * their place, and `false` leaves the bar to its content.
@@ -46,8 +49,15 @@ export function CodexPhoneBar({
           <IconChevronLeft />
         </IconButton>
       )}
-      {content ?? <h2 className="cx-phonebar-title">{title}</h2>}
-      {(actions ?? (onBack ? null : slot.defaults)) && (
+      {back ? (
+        <button type="button" className="cx-phonebar-back" aria-label={`Back to ${back.label}`} onClick={back.onClick}>
+          <IconChevronLeft />
+          <span className="cx-phonebar-back-label">{back.label}</span>
+        </button>
+      ) : (
+        (content ?? <h2 className="cx-phonebar-title">{title}</h2>)
+      )}
+      {(actions ?? (onBack || back ? null : slot.defaults)) && (
         <div className="cx-phonebar-actions">{actions ?? slot.defaults}</div>
       )}
     </>,

@@ -93,6 +93,37 @@
 .cx-phonebar-slot {
   display: contents;
 }
+/* A record's header (theme rule 12): Back and where it goes, in the header's display capitals. */
+.cx-phonebar-back {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: var(--tap-min);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--heading-ink);
+  font: var(--fw-display) 18px / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.cx-phonebar-back svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.cx-phonebar-back-label {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .cx-phonebar-title {
   flex: 1 1 auto;
   min-width: 0;
@@ -157,4 +188,12 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3) 0;
   flex: none;
+}
+
+/* A record's title at the top of its content on a phone, under the header's Back (theme rule 12): 20px. */
+.cx-phone-recordtitle {
+  margin: var(--space-3) 0 var(--space-2);
+  font: var(--fw-display) 20px / 1.2 var(--font-display);
+  text-transform: uppercase;
+  color: var(--text);
 }

@@ -467,14 +467,14 @@ export function RelationshipsView() {
   if (pages.length === 0 && loading)
     return (
       <div className="cx-rel">
-        <CodexPhoneBar title="Relationships" />
+        <CodexPhoneBar title="Codex" />
         <p className="cx-empty">Loading the pages.</p>
       </div>
     );
   if (pages.length === 0)
     return (
       <div className="cx-rel">
-        <CodexPhoneBar title="Relationships" />
+        <CodexPhoneBar title="Codex" />
         <p className="cx-empty">
           {role === "gm"
             ? "No pages yet. Relationships appear here once pages are tied to each other."
@@ -486,7 +486,7 @@ export function RelationshipsView() {
   if (phone)
     return (
       <div className="cx-rel is-phone scroll-y">
-        <CodexPhoneBar title="Relationships" />
+        <CodexPhoneBar title="Codex" />
         <div className="cx-rel-phonebody">
           {picker}
           {switcher}

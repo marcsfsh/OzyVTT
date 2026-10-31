@@ -41,7 +41,7 @@ import { HiddenBlock } from "../shared/HiddenBlock";
 import { RevealPanel } from "../shared/RevealPanel";
 import { linksSentence, stampOf } from "../shared/reveals";
 import { useCodexQuery } from "../useCodexQuery";
-import { gmDocument } from "./document";
+import { gmDocument, kindGroupOf } from "./document";
 import {
   FieldList,
   MentionedOn,
@@ -432,8 +432,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
     return (
       <div className="cx-page is-phone scroll-y" ref={docRef}>
         <CodexPhoneBar
-          title={page.title}
-          onBack={() => go(groupPath(page.entityType))}
+          back={{ label: kindGroupOf(page.entityType).label, onClick: () => go(groupPath(page.entityType)) }}
           actions={
             <>
               {seeAsControl}

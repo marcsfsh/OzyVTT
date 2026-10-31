@@ -208,7 +208,10 @@ export function TemplatesView({
   if (phone)
     return (
       <div className="tpl-view is-phone">
-        <CodexPhoneBar title="Prep templates" onBack={onBack} />
+        <CodexPhoneBar
+          back={onBack ? { label: "Prep templates", onClick: onBack } : undefined}
+          title="Prep templates"
+        />
         <p className="tpl-hint">Templates are edited on a laptop. A new session here can use any of them.</p>
         {error && <Alert tone="danger">{error}</Alert>}
         {library.error && <Alert tone="danger">{library.error}</Alert>}

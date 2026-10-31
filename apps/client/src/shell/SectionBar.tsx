@@ -73,6 +73,7 @@ export function SectionBar({
   phoneHead,
   panel,
   phoneHidden = false,
+  phoneStrip = true,
   children
 }: Readonly<{
   name: string;
@@ -97,6 +98,8 @@ export function SectionBar({
   panel?: () => Element | null | undefined;
   /** A record on a phone, whose own header is Back and where it goes, with no strip (rule 12). */
   phoneHidden?: boolean;
+  /** False on a record's page: the phone keeps the header and drops the strip of pages (rule 12). */
+  phoneStrip?: boolean;
   /** The page, which can reach the bar's end through `SectionBarSlot`. */
   children: ReactNode;
 }>) {
@@ -133,7 +136,7 @@ export function SectionBar({
                 </>
               )}
             </header>
-            {tabs}
+            {phoneStrip && tabs}
           </div>
         ) : (
           <div className="secbar" ref={setBar}>

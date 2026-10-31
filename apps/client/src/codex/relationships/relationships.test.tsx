@@ -217,7 +217,7 @@ describe("Relationships on a phone", () => {
 
   it("opens on the factions grid in a sideways scroller, with the ties below", async () => {
     renderGmCodex("/codex/relationships?focus=f1");
-    expect(await screen.findByRole("heading", { level: 2, name: "Relationships" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Codex" })).toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getByText("Swipe the grid sideways to see every column.")).toBeInTheDocument();
     expect(screen.getByText("Member of The Tidebound")).toBeInTheDocument();

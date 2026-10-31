@@ -114,7 +114,7 @@ function CodexCompendium({ gm }: Readonly<{ gm: boolean }>) {
     card && row ? (
       <article className={cx("cp-record", phone ? "is-phone" : "is-dock")} aria-label={cardName(card)}>
         {phone ? (
-          <CodexPhoneBar title={cardName(card)} onBack={close} />
+          <CodexPhoneBar back={{ label: "Compendium", onClick: close }} />
         ) : (
           <header className="cp-rec-head">
             <div className="cp-rec-titlerow">

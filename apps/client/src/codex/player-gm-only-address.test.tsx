@@ -80,13 +80,15 @@ describe("A player at a GM-only address", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Codex" })).toBeInTheDocument();
   });
 
-  it("still titles the phone's top bar with the section on an address a player MAY reach", async () => {
-    // Control: a guard that blanked every title would pass the tests above.
+  it("still names the page on an address a player MAY reach", async () => {
+    // Control: a guard that blanked every title would pass the tests above. The header names the section (theme
+    // rule 12) and the strip lights the page.
     setViewport(390);
     goTo("/codex/relationships");
     render(<PlayerCodex token="player" />);
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    expect(await screen.findByRole("heading", { level: 2, name: "Relationships" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Codex" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Campaign", selected: true })).toBeInTheDocument();
   });
 });
 

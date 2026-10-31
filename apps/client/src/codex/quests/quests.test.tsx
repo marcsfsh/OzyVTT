@@ -312,10 +312,11 @@ describe("Quests on a phone", () => {
   it("lists the quests under the top bar, and a quest opens with a way back", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/quests");
-    expect(await screen.findByRole("heading", { level: 2, name: "Quests" })).toBeInTheDocument();
+    // A section's page names the section; the strip names the page (theme rule 12).
+    expect(await screen.findByRole("heading", { level: 2, name: "Codex" })).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: /The Sunless Crown/ }));
-    expect(await screen.findByRole("heading", { level: 2, name: "The Sunless Crown" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "The Sunless Crown" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back to Quests" }));
     expect(window.location.pathname).toBe("/codex/quests");
   });
 });
