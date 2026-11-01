@@ -57,14 +57,19 @@ describe("the Roster", () => {
       pc({ id: "b", name: "Borin", ownerSessionId: "s1" }),
       pc({ id: "c", name: "Mirena", playedAtTable: true })
     ]);
-    await user.click(within(card("Lyra")).getByRole("switch", { name: "Played at the table" }));
+    // Played at the table lives in each band's More menu (characters rule 4).
+    const more = async (name: string) => {
+      await user.click(within(card(name)).getByLabelText(`More for ${name}`));
+      return within(card(name)).getByRole("menuitemcheckbox", { name: "Played at the table" });
+    };
+    await user.click(await more("Lyra"));
     expect(command).toHaveBeenCalledWith("actor:set-played-at-table", { actorId: "a", playedAtTable: true });
-    expect(within(card("Borin")).getByRole("switch", { name: "Played at the table" })).toBeDisabled();
-    expect(within(card("Mirena")).getByRole("switch", { name: "Played at the table" })).toHaveAttribute(
-      "aria-checked",
-      "true"
-    );
-    expect(card("Mirena")).toHaveTextContent("At the table · HP");
+    expect(await more("Borin")).toBeDisabled();
+    expect(await more("Mirena")).toHaveAttribute("aria-checked", "true");
+    // Who plays, with its lamp, in the roster's words.
+    expect(card("Mirena")).toHaveTextContent("At the table");
+    expect(card("Borin")).toHaveTextContent("On a player's device");
+    expect(card("Lyra")).toHaveTextContent("Open to claim");
   });
 
   it("tells a character nobody has played from one that has been", () => {
@@ -76,10 +81,18 @@ describe("the Roster", () => {
 
   it("deletes a never-played character outright and archives one that has been played", () => {
     roster([pc({ id: "a", name: "Fresh" }), pc({ id: "b", name: "Veteran", firstClaimedAt: 1 })]);
-    expect(within(card("Fresh")).getByRole("button", { name: "Delete" })).toBeInTheDocument();
-    expect(within(card("Fresh")).queryByRole("button", { name: "Archive" })).toBeNull();
-    expect(within(card("Veteran")).getByRole("button", { name: "Archive" })).toBeInTheDocument();
-    expect(within(card("Veteran")).queryByRole("button", { name: "Delete" })).toBeNull();
+    expect(within(card("Fresh")).getByRole("menuitem", { name: "Delete", hidden: true })).toBeInTheDocument();
+    expect(within(card("Fresh")).queryByRole("menuitem", { name: "Archive", hidden: true })).toBeNull();
+    expect(within(card("Veteran")).getByRole("menuitem", { name: "Archive", hidden: true })).toBeInTheDocument();
+    expect(within(card("Veteran")).queryByRole("menuitem", { name: "Delete", hidden: true })).toBeNull();
+  });
+
+  it("shows each band's AC, hit points and Speed", () => {
+    roster([pc({ id: "a", name: "Lyra" })]);
+    const plate = within(card("Lyra"));
+    expect(plate.getByText("AC")).toBeInTheDocument();
+    expect(plate.getByText("Hit points")).toBeInTheDocument();
+    expect(plate.getByText("Speed")).toBeInTheDocument();
   });
 
   it("badges the samples and removes them all on request", async () => {
@@ -124,7 +137,8 @@ describe("the Roster", () => {
       message: "Borin is in the encounter. Releasing Borin takes the player's turn controls away."
     } as never);
     roster([pc({ id: "b", name: "Borin", ownerSessionId: "s1", firstClaimedAt: 1 })]);
-    await user.click(screen.getByRole("button", { name: "Force release claim" }));
+    await user.click(screen.getByLabelText("More for Borin"));
+    await user.click(screen.getByRole("menuitem", { name: "Release" }));
     await user.click(
       within(screen.getByRole("dialog", { name: "Release Borin?" })).getByRole("button", { name: "Release" })
     );

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { rosterActors, type ActorDefinition, type GmActor, type GmView, type PendingImport } from "@vtt/domain";
-import { Badge, Button, Eyebrow, Modal, RevealSwitch, Switch, useToast } from "@vtt/ui";
+import { Badge, Button, Eyebrow, Modal, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { JoinAddress } from "../components/JoinAddress";
 import { navigate } from "../router";
@@ -9,12 +9,12 @@ import { CharacterSheet } from "../sheet/CharacterSheet";
 import { PdfImportModal } from "./PdfImportModal";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { identityOf, ledgerOf } from "../builder/level-ledger";
-import { CLAIM_WORD, claimStateOf, classLine, presenceDot } from "./actor-display";
+import { classLine } from "./actor-display";
 import { command } from "../lib/command";
 import { useForceRelease } from "./useForceRelease";
-import { atTableBlocked, setPlayedAtTable } from "./playedAtTable";
+import { setPlayedAtTable } from "./playedAtTable";
 import "./party-roster.css";
-import { ActorAvatar } from "./ActorAvatar";
+import { RosterBand } from "./RosterBand";
 import { BarPrimary } from "../shell/SectionBar";
 
 /** Never claimed and never in a fight: a character the GM made and can take back without archiving it first. */
@@ -182,88 +182,26 @@ export function PartyRosterTab({
     );
   };
 
-  const card = (actor: GmActor, isArchived: boolean) => {
-    const claim = claimStateOf(actor);
-    const playedWord = actor.playedAtTable ? "At the table" : CLAIM_WORD[claim];
-    const line = classLine(definitionOf(actor));
-    return (
-      <li key={actor.id} className={`nh-card party-card${isArchived ? " is-archived" : ""}`}>
-        <div className="nh-card-thumb party-card-thumb">
-          <ActorAvatar
-            actor={actor}
-            token={token}
-            definitions={definitions}
-            name={actor.name}
-            size="lg"
-            presence={actor.presence ? presenceDot(actor.presence) : undefined}
-          />
-        </div>
-        {(isArchived || actor.sample) && (
-          <span className="nh-card-status">
-            {isArchived ? <Badge>Archived</Badge> : <Badge tone="info">Sample</Badge>}
-          </span>
-        )}
-        <div className="nh-card-body">
-          <h3 className="nh-card-title">{actor.name}</h3>
-          {line && <span className="nh-card-meta">{line}</span>}
-          <span className="nh-card-meta">
-            {playedWord} · HP {actor.hp.current}/{actor.hp.maximum} · AC {actor.armorClass ?? "None"}
-          </span>
-        </div>
-        {!isArchived && (
-          <div className="party-card-preview">
-            <Switch
-              label="Played at the table"
-              checked={actor.playedAtTable === true}
-              disabled={busy || atTableBlocked(actor) !== null}
-              onChange={(next) => void markAtTable(actor, next)}
-            />
-          </div>
-        )}
-        {isArchived && (
-          <div className="party-card-preview">
-            <span className="party-card-preview-label">Sheet:</span>
-            <RevealSwitch
-              revealed={actor.sheetPreview}
-              ariaLabel={`Show ${actor.name}'s sheet to players`}
-              onChange={(next) => setSheetPreview(actor, next)}
-            />
-          </div>
-        )}
-        <div className="nh-card-actions">
-          <Button variant="secondary" disabled={busy} onClick={() => setSheetActorId(actor.id)}>
-            View sheet
-          </Button>
-          {!isArchived && levelable(actor) && (
-            <Button variant="secondary" disabled={busy} onClick={() => navigate(`/characters/${actor.id}/level`)}>
-              Level up or down
-            </Button>
-          )}
-          {/* A character never played is deleted outright; one that has been is archived first. */}
-          {!isArchived && !neverPlayed(actor) && (
-            <Button variant="secondary" disabled={busy} onClick={() => setArchived(actor, true)}>
-              Archive
-            </Button>
-          )}
-          {isArchived && (
-            <Button variant="secondary" disabled={busy} onClick={() => setArchived(actor, false)}>
-              Restore
-            </Button>
-          )}
-          {!isArchived && claim === "claimed" && (
-            <Button variant="secondary" disabled={busy} onClick={() => void forceRelease.release(actor)}>
-              Force release claim
-            </Button>
-          )}
-          {(isArchived || neverPlayed(actor)) && (
-            <Button variant="destructive" disabled={busy} onClick={() => remove(actor)}>
-              Delete
-            </Button>
-          )}
-        </div>
-      </li>
-    );
-  };
+  const band = (actor: GmActor, isArchived: boolean) => (
+    <RosterBand
+      key={actor.id}
+      actor={actor}
+      definition={definitionOf(actor)}
+      token={token}
+      definitions={definitions}
+      archived={isArchived}
+      levelable={levelable(actor)}
+      busy={busy}
+      neverPlayed={neverPlayed(actor)}
+      onOpen={() => setSheetActorId(actor.id)}
+      onLevel={() => navigate(`/characters/${actor.id}/level`)}
+      onAtTable={(on) => void markAtTable(actor, on)}
+      onRelease={() => void forceRelease.release(actor)}
+      onArchive={(next) => void setArchived(actor, next)}
+      onDelete={() => void remove(actor)}
+      onSheetPreview={(next) => void setSheetPreview(actor, next)}
+    />
+  );
 
   /* Heading and actions stay fixed; the queue, gallery and archived drawer share one region below. */
   return (
@@ -347,14 +285,14 @@ export function PartyRosterTab({
           </div>
         ) : (
           <>
-            <ul className="nh-gallery party-gallery">{active.map((actor) => card(actor, false))}</ul>
+            <ul className="roster-bands">{active.map((actor) => band(actor, false))}</ul>
             {archived.length > 0 && (
               <details className="party-archived">
                 <summary>Archived ({archived.length})</summary>
                 <p className="party-archived-note">
                   Archived characters are hidden from players and never appear in encounter prep.
                 </p>
-                <ul className="nh-gallery party-gallery">{archived.map((actor) => card(actor, true))}</ul>
+                <ul className="roster-bands">{archived.map((actor) => band(actor, true))}</ul>
               </details>
             )}
           </>

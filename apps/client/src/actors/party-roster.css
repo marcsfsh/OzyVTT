@@ -156,38 +156,151 @@
   margin-bottom: var(--space-4);
 }
 
-/* A phone gets compact cards: the portrait beside the name, and the actions two to a row under them, so the party
-   fits a screen without a tall portrait band per character. */
-@media (max-width: 560px) {
-  .party-gallery {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
+/* ----- The bands (characters spec 2.1, 4): each a Cradle, 12px apart ----- */
+.roster-bands {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.roster-band {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 10px 14px 12px;
+}
+/* The Cradle: no fill and no top, a 2px base and sides that fade before the top. */
+.roster-band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: var(--cradle-base);
+  border-image: var(--cradle-sides) 1;
+}
+.roster-band.is-archived {
+  opacity: 0.75;
+}
+.roster-band-face .nh-avatar,
+.roster-band-face .nh-portrait {
+  --nh-portrait: 64px;
+  width: 64px;
+  height: 64px;
+}
+.roster-band-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.roster-band-name {
+  margin: 0;
+  color: var(--text);
+  font: 600 16px / 1.2 var(--font-body);
+}
+.roster-band-line {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.roster-band-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.roster-band-sample {
+  color: var(--text-dim);
+}
+/* The plate: a label in the eyebrow style over a VT323 value, cells divided by 1px --line; hit points gold. */
+.roster-band-plate {
+  display: flex;
+  margin: 0;
+}
+.roster-band-plate > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 14px;
+}
+.roster-band-plate > div + div {
+  border-left: 1px solid var(--line);
+}
+.roster-band-plate dt {
+  color: var(--text-muted);
+  font: 600 11px / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.roster-band-plate dd {
+  margin: 0;
+  color: var(--text);
+  font: 400 26px / 1 var(--font-numeric);
+}
+.roster-band-plate .is-hp dd {
+  color: var(--caution-text);
+}
+.roster-band-plate dd small {
+  color: var(--text-muted);
+  font-size: 16px;
+}
+.roster-band-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+.roster-band-who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.roster-band-who .nh-status-lamp {
+  width: 8px;
+  height: 8px;
+}
+.roster-band-who.is-table .nh-status-lamp {
+  --lamp-on: var(--caution);
+}
+.roster-band-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.roster-band-up {
+  transform: rotate(-90deg);
+}
+@media (max-width: 979px) {
+  .roster-band-plate .is-passive {
+    display: none;
   }
-  .party-gallery .party-card {
-    display: grid;
+}
+/* A phone: identity, then the plate of AC, Hit points and Speed, then who plays and Open sheet with More. */
+@media (max-width: 650px) {
+  .roster-band {
     grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    min-height: 0;
+    gap: var(--space-2) var(--space-3);
   }
-  .party-gallery .party-card-thumb {
-    display: grid;
-    place-items: center;
-    aspect-ratio: auto;
-    padding: var(--space-3) 0 var(--space-3) var(--space-3);
-    background: transparent;
-  }
-  .party-gallery .party-card .nh-card-status {
-    left: auto;
-    right: var(--space-2);
-  }
-  .party-gallery .party-card .party-card-preview,
-  .party-gallery .party-card .nh-card-actions {
+  .roster-band-plate {
     grid-column: 1 / -1;
   }
-  .party-gallery .party-card .nh-card-actions {
-    flex-wrap: wrap;
+  .roster-band-plate > div:first-child {
+    padding-left: 0;
   }
-  .party-gallery .party-card .nh-card-actions > button {
-    flex: 1 1 calc(50% - var(--space-2));
+  .roster-band-end {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .roster-band-level {
+    display: none;
   }
 }
