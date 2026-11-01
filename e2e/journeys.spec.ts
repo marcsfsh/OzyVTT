@@ -695,12 +695,13 @@ test("the GM presents a map on a paired table screen", async ({ open, request })
   await expect(gm.getByRole("heading", { name: "Table screen", level: 2 })).toBeVisible();
   await expect(gm.getByText("Den TV", { exact: false }).first()).toBeVisible();
 
-  // The Table screen offers the GM's current map: the live scene's, when an earlier journey left one.
-  const present = gm.getByRole("button", { name: /^Present / });
+  // The Table screen offers the GM's current map (the live scene's, when an earlier journey left one) on the bar, beside
+  // the Present a map menu.
+  const present = gm.getByRole("button", { name: /^Present (?!a map$)/ });
   const shown = (await present.textContent())!.replace(/^Present /, "");
   await press(present);
   await expect(viewer.getByRole("img", { name: shown })).toBeVisible();
-  await expect(gm.getByRole("button", { name: "Pause presentation" })).toBeVisible();
+  await expect(gm.getByRole("button", { name: "Pause the table screen" })).toBeVisible();
   await expectPageFits(viewer);
   await expectPageFits(gm);
 });

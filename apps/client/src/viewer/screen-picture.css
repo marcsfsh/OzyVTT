@@ -1,0 +1,28 @@
+/* The table screen drawn small (table screen spec 2.3 and 4): the 1280 by 720 screen scaled into its box, inert. */
+.screen-picture {
+  position: relative;
+  overflow: hidden;
+  background: var(--void);
+}
+.screen-picture-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1280px;
+  height: 720px;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.screen-picture-frame .viewer-shell.is-picture :is(.viewer-zoom, .viewer-fullscreen, .viewer-connection) {
+  display: none;
+}
+.screen-picture-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font: 600 13px / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}

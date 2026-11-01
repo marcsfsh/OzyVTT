@@ -60,11 +60,6 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
 }
-/* In one column the screens come first: pairing the TV is the first thing done here, and the presentation tools
-   mean nothing until a screen is paired. Two columns put them back on the right. */
-.viewer-col-access {
-  order: -1;
-}
 .viewer-tools-head h3 {
   margin: 0.2rem 0 0;
   font: var(--fw-display) 1.15rem var(--font-display);
@@ -235,66 +230,6 @@
   width: min(18rem, 70vw);
 }
 
-.viewer-access-list h3 {
-  margin: 0;
-  font: var(--fw-display) 1rem var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.viewer-access-list ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.viewer-access-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: 0.8rem 0;
-  border-top: 1px solid var(--line);
-}
-.viewer-access-list li strong,
-.viewer-access-list li span {
-  display: block;
-}
-.viewer-access-list li span {
-  margin-top: 0.15rem;
-  color: var(--text-muted);
-  font-size: 0.78rem;
-}
-
-/* Two columns, each owning its height; the preview becomes the flex-fill canvas. */
-@media (min-width: 1280px) {
-  .viewer-controls-body {
-    display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(22rem, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    align-items: stretch;
-  }
-  /* Three classes so this beats `.pane-scene > .scroll-y` (styles.css); nothing scrolls here, so no
-     horizon reserve. */
-  .viewer-controls.pane-frame > .viewer-controls-body {
-    padding-bottom: 0;
-  }
-  .viewer-col {
-    min-height: 0;
-  }
-  .viewer-col-access {
-    order: 0;
-  }
-  /* Explicit tracks: a percentage max-height against a content-sized row is circular and overflowed. */
-  .viewer-tool-preview {
-    flex: 1;
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .viewer-tool-preview svg {
-    max-width: 100%;
-    max-height: 100%;
-  }
-}
-
 @media (max-width: 560px) {
   .viewer-controls-heading {
     display: block;
@@ -329,4 +264,128 @@
   .viewer-tool-fields > label:last-child input {
     width: 100%;
   }
+}
+
+/* ----- The screens page (table screen spec 2.3 and 4) ----- */
+/* What is on the screen, as one bar. */
+.viewer-onscreen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.viewer-onscreen-eyebrow {
+  color: var(--text-muted);
+  font: 600 11px / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.viewer-onscreen-state {
+  font: 400 18px / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
+}
+.viewer-onscreen-map {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.viewer-onscreen-map b {
+  color: var(--text);
+}
+.viewer-onscreen-grow {
+  flex: 1 1 auto;
+}
+/* The screens: three to a row, 16px apart; each a card with its live picture at 16:9 and a 44px row under it. */
+.viewer-screens {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.viewer-screen-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-1);
+}
+.viewer-screen-card.is-pair {
+  border-style: dashed;
+  border-color: var(--line-raised);
+  background: none;
+}
+.viewer-screen-card.is-pair h3 {
+  margin: 0;
+  font: 600 var(--fs-sm) / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.viewer-screen-card.is-pair p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.viewer-screen-picture {
+  aspect-ratio: 16 / 9;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--void);
+}
+.viewer-screen-off {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font: 600 12px / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.viewer-screen-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+.viewer-screen-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.viewer-screen-text span {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+@media (max-width: 979px) {
+  .viewer-screens {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .viewer-screens {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Inside Pair another screen the address and the form are the card's own lines, with no box of their own. */
+.viewer-screen-card.is-pair .viewer-address {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.viewer-screen-card.is-pair .viewer-pair-form {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.viewer-screen-card.is-pair .viewer-pair-form > :is(h3, h4, p:first-of-type) {
+  display: none;
 }

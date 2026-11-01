@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, SegmentedControl, Select, useToast } from "@vtt/ui";
+import { Button, Menu, MenuItem, SegmentedControl, Select, StatusLamp, useToast } from "@vtt/ui";
+import { formatDay } from "../lib/formatWhen";
+import { ScreenPicture } from "./ScreenPicture";
+import type { Presentation } from "./ViewerApp";
 import { useConfirm } from "../components/feedback";
 import { HOST_PATHS } from "@vtt/api-contract";
 import { apiRequest } from "../lib/api";
@@ -32,13 +35,6 @@ const SOUND_WORDS: Readonly<Record<ViewerConnection["sound"], string>> = {
   muted: "Preview, no sound",
   unknown: "Checking sound"
 };
-type PresentationSummary = Readonly<{
-  revision: number;
-  enabled: boolean;
-  activeMap: Readonly<{ assetId: string }> | null;
-  camera: Readonly<{ center: Point; zoom: number }> | null;
-  measurement: Readonly<{ points: readonly Point[]; distanceLabel: string }> | null;
-}>;
 type ViewerMap = Readonly<{
   assetId: string;
   width: number;
@@ -70,7 +66,7 @@ function measurementLabel(map: ViewerMap | undefined, points: readonly Point[]) 
 }
 
 export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps) {
-  const [presentation, setPresentation] = useState<PresentationSummary | null>(null);
+  const [presentation, setPresentation] = useState<Presentation | null>(null);
   const [viewers, setViewers] = useState<readonly ViewerMetadata[]>([]);
   const [connections, setConnections] = useState<readonly ViewerConnection[]>([]);
   const [busy, setBusy] = useState(false);
@@ -84,6 +80,8 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
   // The map's own image, so the click surface works whether or not the maps library was opened.
   const image = useAuthorizedMapImage(map?.assetId ?? null, gmToken);
   const previewUrl = image.status === "ready" ? image.url : null;
+  // The presented map's own image, for the screens' pictures.
+  const presentedImage = useAuthorizedMapImage(presentation?.activeMap?.assetId ?? null, gmToken);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
   const suggestedLabel = useMemo(() => measurementLabel(map, draftPoints), [map, draftPoints]);
@@ -91,7 +89,7 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
 
   const refresh = useCallback(async () => {
     const [state, access, addresses] = await Promise.all([
-      apiRequest<{ presentation: PresentationSummary }>("/api/v1/viewer/presentation", { token: gmToken }),
+      apiRequest<{ presentation: Presentation }>("/api/v1/viewer/presentation", { token: gmToken }),
       apiRequest<AccessList>("/api/v1/viewer/access", { token: gmToken }),
       apiRequest<{ viewerUrls: readonly string[] }>(HOST_PATHS.viewerUrls, { token: gmToken })
     ]);
@@ -192,14 +190,50 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
     }
   };
 
-  /* At 1280px+ the body becomes two columns: the map preview (the tools column's flex-fill canvas, so
-     it stays visible beside its coordinate fields) and the access column. */
+  const lastSeen = (viewer: ViewerMetadata) =>
+    viewer.lastUsedAt ? `Last seen ${formatDay(viewer.lastUsedAt)}` : "Not connected yet";
+  const paired = viewers
+    .filter((viewer) => !viewer.revokedAt)
+    .sort((left, right) => Number(connectedIds.has(right.id)) - Number(connectedIds.has(left.id)));
+  const present = () =>
+    void run(() =>
+      command({
+        type: "viewer.presentation.begin",
+        assetId: map!.assetId,
+        altText: map!.altText,
+        camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 }
+      })
+    );
+  const showInstead = () =>
+    void run(() =>
+      command({
+        type: "viewer.map.set",
+        assetId: map!.assetId,
+        altText: map!.altText,
+        camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 }
+      })
+    );
+  const revoke = async (viewer: ViewerMetadata) => {
+    if (
+      await confirm({
+        title: `Revoke ${viewer.name}?`,
+        body: "The screen loses access now and shows nothing more until it is paired again.",
+        confirmLabel: "Revoke",
+        danger: true
+      })
+    )
+      void run(async () => {
+        await apiRequest(`/api/v1/viewer/access/${viewer.id}`, { token: gmToken, method: "DELETE" });
+      });
+  };
+  const onTheScreen = presentationHasMap ? (presentation?.activeMap?.altText ?? map?.altText ?? "A map") : null;
+
   return (
     <section
       className="viewer-controls pane-frame pane-scene frame-col anim-view"
       aria-labelledby="viewer-controls-title"
     >
-      <header className="viewer-controls-heading neon-beam">
+      <header className="viewer-controls-heading">
         <div className="viewer-controls-title">
           <h2 id="viewer-controls-title">Table screen</h2>
           <p>Paired screens show the map you present, with only what players can see on it.</p>
@@ -213,8 +247,116 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
       </header>
 
       <div className="viewer-controls-body scroll-y frame-fill">
+        {/* What is on the screen, as one bar (table screen spec 2.3). */}
+        <section className="viewer-onscreen" aria-label="On the screen">
+          <span className="viewer-onscreen-eyebrow">On the screen</span>
+          <StatusLamp lit={presentationHasMap} />
+          <b className="viewer-onscreen-state">{presentationHasMap ? "ON" : "Paused"}</b>
+          <span className="viewer-onscreen-map">
+            {onTheScreen ? (
+              <>
+                <b>{onTheScreen}</b> {mapIsPresented ? "· the map you have open" : "· presented"}
+              </>
+            ) : (
+              "Nothing is presented"
+            )}
+          </span>
+          <span className="viewer-onscreen-grow" />
+          {presentationHasMap ? (
+            <Button
+              variant="secondary"
+              disabled={busy || !presentation}
+              onClick={() => void run(() => command({ type: "viewer.enabled.set", enabled: false }))}
+            >
+              Pause the table screen
+            </Button>
+          ) : (
+            map && (
+              <Button
+                variant={step === "present" ? "primary" : "secondary"}
+                disabled={busy || !presentation}
+                onClick={present}
+              >
+                Present {map.altText}
+              </Button>
+            )
+          )}
+          <Menu trigger="Present a map" label="Present a map" align="end">
+            <MenuItem disabled={busy || !map || presentationHasMap} onClick={present}>
+              {map ? `Present ${map.altText}` : "Present a map"}
+            </MenuItem>
+            <MenuItem disabled={busy || !presentation?.enabled || !map || mapIsPresented} onClick={showInstead}>
+              {mapIsPresented
+                ? "This map is on the screen"
+                : map
+                  ? `Show ${map.altText} instead`
+                  : "Show this map instead"}
+            </MenuItem>
+            {onPreview && <MenuItem onClick={onPreview}>Preview the screen</MenuItem>}
+          </Menu>
+        </section>
+
+        {/* The screens as cards, connected first, then Pair another screen. */}
+        <ul className="viewer-screens" aria-label="Paired screens">
+          {paired.map((viewer) => {
+            const connection = connections.find((entry) => entry.viewerId === viewer.id);
+            return (
+              <li key={viewer.id} className="viewer-screen-card">
+                <ScreenCardPicture
+                  connected={connection !== undefined}
+                  presentation={presentation}
+                  mapImageUrl={presentedImage.status === "ready" ? presentedImage.url : null}
+                  token={gmToken}
+                />
+                <div className="viewer-screen-row">
+                  <StatusLamp lit={connection !== undefined} />
+                  <span className="viewer-screen-text">
+                    <strong>{viewer.name}</strong>
+                    <span>{connection ? `Connected · ${SOUND_WORDS[connection.sound]}` : lastSeen(viewer)}</span>
+                  </span>
+                  <Button size="sm" variant="destructive" disabled={busy} onClick={() => void revoke(viewer)}>
+                    Revoke
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+          <li className="viewer-screen-card is-pair">
+            <h3>Pair another screen</h3>
+            <p>Open this address on the screen. It shows a six-digit code; type it here.</p>
+            <div className="viewer-address">
+              {viewerUrls.length > 1 ? (
+                <Select
+                  aria-label="Table screen address"
+                  value={viewerUrl}
+                  onChange={(event) => setSelectedViewerUrl(event.target.value)}
+                >
+                  {viewerUrls.map((url) => (
+                    <option key={url} value={url}>
+                      {url}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <code>{viewerUrl}</code>
+              )}
+              <Button variant="secondary" onClick={() => void copy(viewerUrl, "Address copied.")}>
+                Copy address
+              </Button>
+            </div>
+            <PairScreenForm
+              gmToken={gmToken}
+              primary={step === "pair"}
+              onPaired={() => void refresh().catch(() => {})}
+            />
+            <Button variant="secondary" disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>
+              Open a screen here
+            </Button>
+          </li>
+        </ul>
+
         <section
-          className="viewer-col viewer-col-tools surface-glass"
+          className="viewer-col viewer-col-tools"
           aria-labelledby={map ? "viewer-tools-title" : undefined}
           aria-label={map ? undefined : "Live presentation tools"}
         >
@@ -349,128 +491,36 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
             </>
           )}
         </section>
-
-        {/* At the two-column width this column is its own scroll region; below it, it is inert. */}
-        <div className="viewer-col viewer-col-access surface-glass scroll-y">
-          <div className="viewer-address">
-            <span>Open on the table screen</span>
-            {viewerUrls.length > 1 ? (
-              <Select
-                aria-label="Table screen address"
-                value={viewerUrl}
-                onChange={(event) => setSelectedViewerUrl(event.target.value)}
-              >
-                {viewerUrls.map((url) => (
-                  <option key={url} value={url}>
-                    {url}
-                  </option>
-                ))}
-              </Select>
-            ) : (
-              <code>{viewerUrl}</code>
-            )}
-            <Button variant="secondary" onClick={() => void copy(viewerUrl, "Address copied.")}>
-              Copy address
-            </Button>
-          </div>
-          <PairScreenForm gmToken={gmToken} primary={step === "pair"} onPaired={() => void refresh().catch(() => {})} />
-          <div className="viewer-control-actions">
-            <Button
-              variant={step === "present" && !presentationHasMap ? "primary" : "secondary"}
-              disabled={busy || !presentation || (!presentationHasMap && !map)}
-              onClick={() =>
-                void run(() =>
-                  presentationHasMap
-                    ? command({ type: "viewer.enabled.set", enabled: false })
-                    : command({
-                        type: "viewer.presentation.begin",
-                        assetId: map!.assetId,
-                        altText: map!.altText,
-                        camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 }
-                      })
-                )
-              }
-            >
-              {presentationHasMap ? "Pause presentation" : map ? `Present ${map.altText}` : "Present a map"}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={busy || !presentation?.enabled || !map || mapIsPresented}
-              onClick={() =>
-                void run(() =>
-                  command({
-                    type: "viewer.map.set",
-                    assetId: map!.assetId,
-                    altText: map!.altText,
-                    camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 }
-                  })
-                )
-              }
-            >
-              {mapIsPresented
-                ? "This map is on the screen"
-                : map
-                  ? `Show ${map.altText} instead`
-                  : "Show this map instead"}
-            </Button>
-            {onPreview && (
-              <Button variant="secondary" disabled={busy} onClick={onPreview}>
-                Preview the screen
-              </Button>
-            )}
-            <Button variant="secondary" disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>
-              Open a screen here
-            </Button>
-          </div>
-          {viewers.length > 0 && (
-            <div className="viewer-access-list">
-              <h3>Paired screens</h3>
-              <ul>
-                {viewers.map((viewer) => (
-                  <li key={viewer.id}>
-                    <div>
-                      <strong>{viewer.name}</strong>
-                      <span>
-                        {viewer.revokedAt
-                          ? "Revoked"
-                          : connectedIds.has(viewer.id)
-                            ? `Connected · ${SOUND_WORDS[connections.find((connection) => connection.viewerId === viewer.id)!.sound]}`
-                            : "Not connected"}
-                      </span>
-                    </div>
-                    {!viewer.revokedAt && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={busy}
-                        onClick={async () => {
-                          if (
-                            await confirm({
-                              title: `Revoke ${viewer.name}?`,
-                              body: "The screen loses access now and shows nothing more until it is paired again.",
-                              confirmLabel: "Revoke",
-                              danger: true
-                            })
-                          )
-                            void run(async () => {
-                              await apiRequest(`/api/v1/viewer/access/${viewer.id}`, {
-                                token: gmToken,
-                                method: "DELETE"
-                              });
-                            });
-                        }}
-                      >
-                        Revoke
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
       </div>
       {dialog}
     </section>
+  );
+}
+
+/** A screen card's picture: what the screens show at the card's width, or Not connected where it would be. */
+function ScreenCardPicture({
+  connected,
+  presentation,
+  mapImageUrl,
+  token
+}: Readonly<{ connected: boolean; presentation: Presentation | null; mapImageUrl: string | null; token: string }>) {
+  const box = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const element = box.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
+    observer.observe(element);
+    setWidth(element.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={box} className="viewer-screen-picture">
+      {!connected ? (
+        <p className="viewer-screen-off">Not connected</p>
+      ) : width > 0 ? (
+        <ScreenPicture presentation={presentation} mapImageUrl={mapImageUrl} token={token} width={width} />
+      ) : null}
+    </div>
   );
 }
