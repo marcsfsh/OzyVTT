@@ -12,7 +12,8 @@ export function KindCard({
   count,
   line,
   onOpen,
-  className
+  className,
+  children
 }: Readonly<{
   icon: ReactNode;
   name: string;
@@ -20,6 +21,8 @@ export function KindCard({
   line?: ReactNode;
   onOpen?: () => void;
   className?: string;
+  /** More under a hairline (a few of the kind's records); its links and buttons stay pressable. */
+  children?: ReactNode;
 }>) {
   return (
     <section className={cx("nh-kindcard", className)} aria-label={name}>
@@ -36,6 +39,7 @@ export function KindCard({
       </span>
       {count !== undefined && <span className="nh-kindcard-count">{count}</span>}
       {line != null && <span className="nh-kindcard-line">{line}</span>}
+      {children != null && <div className="nh-kindcard-more">{children}</div>}
     </section>
   );
 }

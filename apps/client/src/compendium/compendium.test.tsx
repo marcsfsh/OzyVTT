@@ -350,3 +350,18 @@ describe("importing a pack", () => {
     );
   });
 });
+
+describe("the Compendium's home", () => {
+  it("shelves each kind with its count, its homebrew in words and a few records, homebrew first", async () => {
+    const user = mount("/compendium");
+    const spells = await screen.findByRole("region", { name: "Spells" });
+    expect(within(spells).getByText("3")).toBeInTheDocument();
+    expect(within(spells).getByRole("button", { name: "Homebrew Spells: 1" })).toHaveTextContent("1 homebrew");
+    const records = await within(spells).findAllByRole("button", { name: /Brine Burst|Counterspell|Fireball/ });
+    expect(records.map((record) => record.textContent)).toEqual(["Brine Burst", "Counterspell", "Fireball"]);
+    // Nothing needs the GM, so the strip is one quiet line.
+    expect(screen.getByText("Nothing needs you. Every record is published as written.")).toBeInTheDocument();
+    await user.click(within(spells).getByRole("button", { name: "Open Spells" }));
+    expect(window.location.pathname).toBe("/compendium/tables/spells");
+  });
+});

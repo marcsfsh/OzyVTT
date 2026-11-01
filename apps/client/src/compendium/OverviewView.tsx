@@ -1,11 +1,10 @@
-import { Button, IconChevronRight } from "@vtt/ui";
-import { CodexIcon } from "../codex/icons";
+import { Button, Group, IconPlus, KindCard } from "@vtt/ui";
 import type { HomebrewOverview } from "../homebrew/api";
 import { useCompendium } from "./context";
-import { useOverview, usePacks } from "./data";
+import { useOverview, usePacks, useTable } from "./data";
 import { KindIcon, kindPlural, type Kind } from "./kinds";
-import { NameCell, PackSwitch, SourceMark, packName, whenLabel } from "./pieces";
-import { recordPath, tablePath } from "./routes";
+import { PackSwitch, packName, whenLabel } from "./pieces";
+import { COMPENDIUM_PATHS, recordPath, tablePath } from "./routes";
 
 type NeedsYou = HomebrewOverview["needsYou"][number];
 
@@ -29,13 +28,16 @@ function needWords(row: NeedsYou): Readonly<{ what: string; action: string; tab:
 }
 
 /**
- * The Compendium's front page: the sources with their counts and switches, what needs the GM with its button, and the
- * kinds with their counts, each count opening its table with that filter.
+ * The Compendium's home, as Shelves (compendium spec 2.1, ADR-0055): what needs the GM as a strip across the top, the
+ * nine kinds as cards (their counts, their homebrew and drafts in magenta, and a few of their records), and the
+ * sources on one line at the foot. A phone shows Needs you as a box and the kinds two to a row without records.
  */
 export function OverviewView() {
-  const { token, phone, go } = useCompendium();
+  const { token, phone, go, openNew } = useCompendium();
   const overview = useOverview(token);
   const packs = usePacks(token);
+  // Every row of every kind, which Browse reads too, for the cards' few records; the cards draw before it answers.
+  const rows = useTable(token, null, !phone);
   const data = overview.data;
   if (overview.error && !data)
     return (
@@ -48,216 +50,150 @@ export function OverviewView() {
   const packList = packs.data?.packs ?? data.packs;
   const open = (row: NeedsYou) => go(`${recordPath(row.kind, row.id)}?tab=${needWords(row).tab}`);
   const table = (kind: Kind, query: string) => go(`${tablePath(kind)}${query ? `?${query}` : ""}`);
+  const homebrewQuery = `source=${packList.map((pack) => pack.id).join(",")}`;
 
-  if (phone)
-    return (
-      <div className="cp-overview scroll-y">
-        <div className="cp-phone-body">
-          <h3 className="cp-h">Sources</h3>
-          <div className="cp-card-row">
-            <CodexIcon iconId="book" className="cp-kind-icon" />
-            <span className="cp-row-main">
-              <b>SRD 5.2.1</b>
-              <small>
-                {data.srd.records.toLocaleString("en")} records · Read only. Make a homebrew copy of anything.
-              </small>
-            </span>
-          </div>
-          {packList.map((pack) => (
-            <div key={pack.id} className="cp-card-row">
-              <CodexIcon iconId={pack.id === "table" ? "home" : "archive"} className="cp-kind-icon" />
-              <span className="cp-row-main">
-                <b>{packName(pack)}</b>
-                <small>
-                  {pack.counts.records} {pack.counts.records === 1 ? "record" : "records"}
-                  {pack.credit ? ` · ${pack.credit}` : ""}
-                </small>
-              </span>
-              <PackSwitch pack={pack} />
-            </div>
-          ))}
-          <h3 className="cp-h">Needs you</h3>
-          {data.needsYou.length === 0 ? (
-            <p className="cp-hint">Nothing needs you. Every record is published as written.</p>
-          ) : (
-            <ul className="cp-list">
-              {data.needsYou.map((row) => (
-                <li key={`${row.id}-${row.reason}`}>
-                  <button type="button" className="cp-row" onClick={() => open(row)}>
-                    <KindIcon kind={row.kind} />
-                    <span className="cp-row-main">
-                      <b>{row.name}</b>
-                      <small>{needWords(row).what}</small>
-                    </span>
-                    <IconChevronRight />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
+  /** A kind's few records: its homebrew first, newest first, then SRD records by name. */
+  const recordsOf = (kind: Kind) => {
+    const ofKind = (rows.data ?? []).filter((row) => row.kind === kind && !row.archived);
+    const homebrew = ofKind
+      .filter((row) => row.source !== "srd")
+      .sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? ""));
+    const srd = ofKind.filter((row) => row.source === "srd").sort((left, right) => left.name.localeCompare(right.name));
+    return [...homebrew, ...srd].slice(0, 3);
+  };
+
+  const needs =
+    data.needsYou.length === 0 ? (
+      <p className="cp-home-needs is-quiet">Nothing needs you. Every record is published as written.</p>
+    ) : (
+      <section className={phone ? "cp-home-needs is-box" : "cp-home-needs"} aria-label="Needs you">
+        <h3 className="cp-home-needs-head">
+          Needs you · <span className="cp-home-needs-count">{data.needsYou.length}</span>
+        </h3>
+        <ul className="cp-home-needs-list">
+          {data.needsYou.map((row) => {
+            const words = needWords(row);
+            return (
+              <li key={`${row.id}-${row.reason}`} className="cp-home-need">
+                <KindIcon kind={row.kind} />
+                <span className="cp-home-need-main">
+                  <b>{row.name}</b>
+                  <small>{words.what}</small>
+                </span>
+                {row.issueCount > 0 && (
+                  <span className="cp-home-need-problems">
+                    {row.issueCount} {row.issueCount === 1 ? "problem" : "problems"}
+                  </span>
+                )}
+                <Button size="sm" onClick={() => open(row)} aria-label={`${words.action} ${row.name}`}>
+                  {words.action}
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     );
 
-  return (
-    <div className="cp-overview cp-overview--laptop scroll-y">
-      <div className="cp-overview-col">
-        <h3 className="cp-h">Sources</h3>
-        <table className="cp-table cp-sources-table">
-          <thead>
-            <tr>
-              <th scope="col">Source</th>
-              <th scope="col" className="is-num">
-                Records
-              </th>
-              <th scope="col" className="is-num">
-                Published
-              </th>
-              <th scope="col" className="is-num">
-                Shared
-              </th>
-              <th scope="col">In pickers</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">SRD 5.2.1</th>
-              <td className="is-num tabular">{data.srd.records.toLocaleString("en")}</td>
-              <td className="is-num">All</td>
-              <td className="is-num">All</td>
-              <td>Always on</td>
-            </tr>
-            {packList.map((pack) => (
-              <tr key={pack.id}>
-                <th scope="row">{packName(pack)}</th>
-                <td className="is-num tabular">{pack.counts.records}</td>
-                <td className="is-num tabular">{pack.counts.published}</td>
-                <td className="is-num tabular">{pack.counts.shared}</td>
-                <td>
-                  <PackSwitch pack={pack} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <h3 className="cp-h">Needs you</h3>
-        {data.needsYou.length === 0 ? (
-          <p className="cp-hint">Nothing needs you. Every record is published as written.</p>
-        ) : (
-          <table className="cp-table cp-needs-table">
-            <thead>
-              <tr>
-                <th scope="col">Record</th>
-                <th scope="col">What</th>
-                <th scope="col">
-                  <span className="nh-sr-only">Action</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.needsYou.map((row) => {
-                const words = needWords(row);
-                return (
-                  <tr key={`${row.id}-${row.reason}`}>
-                    <td>
-                      <NameCell
-                        kind={row.kind}
-                        name={row.name}
-                        mark={<SourceMark row={{ source: "homebrew", packId: row.packId }} packs={packList} />}
-                      />
-                    </td>
-                    <td>{words.what}</td>
-                    <td className="cp-action-cell">
-                      <Button size="sm" onClick={() => open(row)} aria-label={`${words.action} ${row.name}`}>
-                        {words.action}
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-      <div className="cp-overview-col">
-        <h3 className="cp-h">By kind</h3>
-        <table className="cp-table cp-bykind-table">
-          <thead>
-            <tr>
-              <th scope="col">Kind</th>
-              <th scope="col" className="is-num">
-                SRD
-              </th>
-              <th scope="col" className="is-num">
-                Homebrew
-              </th>
-              <th scope="col" className="is-num">
-                Drafts
-              </th>
-              <th scope="col" className="is-num">
-                Shared
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.byKind.map((row) => (
-              <tr key={row.kind}>
-                <th scope="row">
-                  <button type="button" className="cp-rowlink" onClick={() => table(row.kind, "")}>
-                    <b>{kindPlural(row.kind)}</b>
-                  </button>
-                </th>
-                <CountCell
-                  value={row.srd}
-                  label={`SRD ${kindPlural(row.kind)}`}
-                  onOpen={() => table(row.kind, "source=srd")}
-                />
-                <CountCell
-                  value={row.homebrew}
-                  label={`Homebrew ${kindPlural(row.kind)}`}
-                  onOpen={() => table(row.kind, `source=${packList.map((pack) => pack.id).join(",")}`)}
-                />
-                <CountCell
-                  value={row.drafts}
-                  label={`${kindPlural(row.kind)} in draft`}
-                  caution
-                  onOpen={() => table(row.kind, "state=draft")}
-                />
-                <CountCell
-                  value={row.shared}
-                  label={`Shared ${kindPlural(row.kind)}`}
-                  onOpen={() => table(row.kind, "who=everyone,characters")}
-                />
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+  const cards = (
+    <div className="cp-shelves">
+      {data.byKind.map((row) => {
+        const count = row.srd + row.homebrew;
+        const line =
+          row.homebrew > 0 || row.drafts > 0 ? (
+            <span className="cp-shelf-homebrew">
+              {row.homebrew > 0 && (
+                <button
+                  type="button"
+                  className="cp-shelf-link"
+                  aria-label={`Homebrew ${kindPlural(row.kind)}: ${row.homebrew}`}
+                  onClick={() => table(row.kind, homebrewQuery)}
+                >
+                  {row.homebrew} homebrew
+                </button>
+              )}
+              {row.homebrew > 0 && row.drafts > 0 && " · "}
+              {row.drafts > 0 && (
+                <button
+                  type="button"
+                  className="cp-shelf-link"
+                  aria-label={`${kindPlural(row.kind)} in draft: ${row.drafts}`}
+                  onClick={() => table(row.kind, "state=draft")}
+                >
+                  {row.drafts} {row.drafts === 1 ? "draft" : "drafts"}
+                </button>
+              )}
+            </span>
+          ) : (
+            <span className="cp-shelf-quiet">{row.srd > 0 ? "SRD only" : "None yet"}</span>
+          );
+        const few = phone ? [] : recordsOf(row.kind);
+        return (
+          <KindCard
+            key={row.kind}
+            className="cp-shelf"
+            icon={<KindIcon kind={row.kind} />}
+            name={kindPlural(row.kind)}
+            count={count.toLocaleString("en")}
+            line={line}
+            onOpen={() => table(row.kind, "")}
+          >
+            {phone ? null : count === 0 ? (
+              <span className="cp-shelf-none">
+                No {kindPlural(row.kind).toLowerCase()} yet.
+                <Button size="sm" onClick={() => openNew({ kind: row.kind })}>
+                  <IconPlus /> New homebrew
+                </Button>
+              </span>
+            ) : (
+              few.map((record) => (
+                <button
+                  key={record.id}
+                  type="button"
+                  className={record.source === "srd" ? "cp-shelf-record" : "cp-shelf-record is-homebrew"}
+                  onClick={() => go(recordPath(record.kind, record.id))}
+                >
+                  {record.name}
+                </button>
+              ))
+            )}
+          </KindCard>
+        );
+      })}
     </div>
   );
-}
 
-/** A count that opens its table with that filter. Zero opens nothing. */
-function CountCell({
-  value,
-  label,
-  caution = false,
-  onOpen
-}: Readonly<{ value: number; label: string; caution?: boolean; onOpen: () => void }>) {
+  // The sources, one line at the foot in a Cradle (compendium spec 2.1).
+  const sources = (
+    <Group className="cp-home-sources" aria-label="Sources">
+      <span className="cp-home-source">
+        <b>SRD 5.2.1</b> <span className="cp-home-source-count">{data.srd.records.toLocaleString("en")}</span>
+        <small>Always in pickers</small>
+      </span>
+      {packList.map((pack) => (
+        <span key={pack.id} className="cp-home-source">
+          <b>{packName(pack)}</b> <span className="cp-home-source-count">{pack.counts.records}</span>
+          <PackSwitch pack={pack} />
+        </span>
+      ))}
+      <span className="cp-home-source-links">
+        <Button size="sm" onClick={() => go(COMPENDIUM_PATHS.sources)}>
+          Import a pack
+        </Button>
+        <Button size="sm" onClick={() => go(COMPENDIUM_PATHS.sources)}>
+          Export
+        </Button>
+      </span>
+    </Group>
+  );
+
   return (
-    <td className="is-num tabular">
-      {value === 0 ? (
-        <span className="cp-muted">0</span>
-      ) : (
-        <button
-          type="button"
-          className={caution ? "cp-count cp-caution" : "cp-count"}
-          aria-label={`${label}: ${value}`}
-          onClick={onOpen}
-        >
-          {value.toLocaleString("en")}
-        </button>
-      )}
-    </td>
+    <div className={phone ? "cp-home is-phone scroll-y" : "cp-home scroll-y"}>
+      <div className="cp-home-col">
+        {needs}
+        {cards}
+        {!phone && sources}
+      </div>
+    </div>
   );
 }
