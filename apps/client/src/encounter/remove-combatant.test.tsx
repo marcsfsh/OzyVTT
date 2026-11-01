@@ -57,9 +57,10 @@ describe("taking a combatant out of the encounter from its row", () => {
     const run = mount(fight([WORM, HERO]));
     await user.click(screen.getByRole("button", { name: "Take out of the encounter" }));
     expect(command).not.toHaveBeenCalled();
-    const confirm = screen.getByRole("alertdialog", { name: "Take Purple Worm out of the encounter" });
+    // A's dialog asks, with today's words.
+    const confirm = screen.getByRole("dialog", { name: "Take Purple Worm out of the encounter?" });
     expect(confirm.textContent).toContain(
-      "Take Purple Worm out of the encounter? Purple Worm's turn and token are removed, and anything Purple Worm is grappling or concentrating on ends."
+      "Purple Worm's turn and token are removed, and anything Purple Worm is grappling or concentrating on ends."
     );
     await user.click(screen.getByRole("button", { name: "Take out" }));
     await waitFor(() =>

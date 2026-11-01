@@ -241,7 +241,7 @@ describe("the turn-order row's tools popover carries the type too", () => {
   const openRowTools = async (user: ReturnType<typeof userEvent.setup>, name = "Aria") => {
     // By `title`: the row button's accessible name includes the avatar and HP readout.
     await user.click(screen.getByTitle(new RegExp(`^Manage ${name}`)));
-    return within(screen.getByRole("dialog", { name: `Tools for ${name}` }));
+    return within(screen.getByRole("region", { name: `Tools for ${name}` }));
   };
   const openPanel = async (user: ReturnType<typeof userEvent.setup>) => {
     render(<EncounterPanel role="gm" state={GM_STATE} selectedMap={null} />);
@@ -302,7 +302,7 @@ describe("the turn-order row's tools popover carries the type too", () => {
     await user.click(first.getByRole("button", { name: "Damage" }));
     lastHpCall()[2]({ ok: true }); // the panel stays `busy` until the first command is answered
     await user.click(screen.getByTitle(/^Manage Borin/));
-    const second = within(screen.getByRole("dialog", { name: "Tools for Borin" }));
+    const second = within(screen.getByRole("region", { name: "Tools for Borin" }));
     await user.type(second.getByLabelText("Amount"), "6");
     await user.click(second.getByRole("button", { name: "Damage" }));
     lastHpCall()[2]({ ok: true });

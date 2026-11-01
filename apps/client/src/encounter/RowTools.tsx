@@ -1,9 +1,8 @@
-import { useState } from "react";
 import { isDead, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
-import { Button, Field, Select } from "@vtt/ui";
+import { Button, Field, Group, Select } from "@vtt/ui";
+import { useConfirm } from "../components/feedback";
 import { command } from "../lib/command";
 import { ConditionEditor } from "./conditions";
-import { ConfirmRow } from "./ConfirmRow";
 import { CoverControl } from "./CoverControl";
 import { HpAdjust } from "./HpAdjust";
 import { LairControl } from "./LairControl";
@@ -11,8 +10,9 @@ import { PickControl } from "./PickControl";
 import { EffectChips } from "./EffectChips";
 
 /**
- * The tools card a turn-order row opens over the list (HP, conditions, effects, reaction, sheet), so
- * rows never shift while the GM works.
+ * A creature's tools, open under its row in the order (C3 running spec 2.2): Hit points, Conditions and effects and
+ * Position as Cradles, then This creature as an open group with its reaction, breath, sheet and Take out of the
+ * encounter, which asks first in A's dialog. A hit waiting to be applied to it says so in amber.
  */
 export function RowTools({
   actor,
@@ -37,16 +37,32 @@ export function RowTools({
   onClose: () => void;
   onFeedback: (text: string) => void;
 }>) {
-  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+  const { confirm, dialog } = useConfirm();
   // The last combatant ends the encounter instead, and a fight under review can't change its order.
   const removable =
     state.combat.initiative.length > 1 &&
     state.combat.historyCursor === null &&
     state.combat.initiative.some((entry) => entry.actorId === actor.id);
+  const waitingHit = (state.combat.pendingDamage ?? []).some((proposal) => proposal.targetActorId === actor.id);
+  const takeOut = async () => {
+    if (
+      !(await confirm({
+        title: `Take ${actor.name} out of the encounter?`,
+        body: `${actor.name}'s turn and token are removed, and anything ${actor.name} is grappling or concentrating on ends.`,
+        confirmLabel: "Take out",
+        danger: true
+      }))
+    )
+      return;
+    void run(
+      () => command("encounter:remove-combatant", { actorId: actor.id, expectedRevision: state.revision }),
+      `${actor.name} left the encounter.`
+    ).then(onClose);
+  };
   return (
-    <>
-      <div className="encounter-overlay-backdrop" onPointerDown={onClose} />
-      <div className="row-tools-popover" role="dialog" aria-label={`Tools for ${actor.name}`}>
+    <section className="row-tools" aria-label={`Tools for ${actor.name}`}>
+      {waitingHit && <p className="row-tools-waiting">A hit on {actor.name} waits in the waiting list.</p>}
+      <Group title="Hit points" className="row-tools-group">
         <HpAdjust
           actor={actor}
           controls={isDead(actor) ? ["revive", "max"] : ["damage", "nonlethal", "heal", "temp", "set", "max"]}
@@ -57,6 +73,8 @@ export function RowTools({
           onEscape={onClose}
           onFeedback={onFeedback}
         />
+      </Group>
+      <Group title="Conditions and effects" className="row-tools-group">
         <ConditionEditor
           actorId={actor.id}
           conditions={actor.conditions}
@@ -70,6 +88,10 @@ export function RowTools({
             }))}
           onFeedback={onFeedback}
         />
+        <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={onFeedback} />
+      </Group>
+      <Group title="Position" className="row-tools-group">
+        <CoverControl actor={actor} onFeedback={onFeedback} />
         {/* SRD Influence: a monster's attitude gives Influence checks Advantage (Friendly) or Disadvantage (Hostile). */}
         {actor.kind !== "player-character" && (
           <Field label="Attitude toward the party" htmlFor={`attitude-${actor.id}`}>
@@ -92,9 +114,9 @@ export function RowTools({
             </Select>
           </Field>
         )}
-        <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={onFeedback} />
-        <CoverControl actor={actor} onFeedback={onFeedback} />
         <LairControl actor={actor} onFeedback={onFeedback} />
+      </Group>
+      <Group kind="read" title={actor.name} className="row-tools-group">
         <PickControl
           actor={actor}
           definition={state.definitions.find((entry) => entry.id === actor.definitionId)?.definition}
@@ -220,34 +242,17 @@ export function RowTools({
           >
             Open sheet
           </Button>
-          {removable && !confirmingRemoval && (
-            <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirmingRemoval(true)}>
+          {removable && (
+            <Button type="button" variant="destructive" disabled={busy} onClick={() => void takeOut()}>
               Take out of the encounter
             </Button>
           )}
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={onClose}>
             Close
           </Button>
         </div>
-        {removable && confirmingRemoval && (
-          <ConfirmRow
-            ariaLabel={`Take ${actor.name} out of the encounter`}
-            confirmLabel="Take out"
-            busy={busy}
-            onCancel={() => setConfirmingRemoval(false)}
-            onConfirm={() => {
-              setConfirmingRemoval(false);
-              void run(
-                () => command("encounter:remove-combatant", { actorId: actor.id, expectedRevision: state.revision }),
-                `${actor.name} left the encounter.`
-              ).then(onClose);
-            }}
-          >
-            Take {actor.name} out of the encounter? {actor.name}'s turn and token are removed, and anything {actor.name}{" "}
-            is grappling or concentrating on ends.
-          </ConfirmRow>
-        )}
-      </div>
-    </>
+      </Group>
+      {dialog}
+    </section>
   );
 }
