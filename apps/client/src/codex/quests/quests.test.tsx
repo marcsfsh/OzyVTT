@@ -19,12 +19,15 @@ const LOST = quest({ id: "q3", title: "The Missing Caravan", status: "failed", o
 const FRESH = quest({ id: "q0", title: "A rumour in Vallaki", status: "not-started", objectives: [] });
 const SECRET = quest({ id: "q5", title: "The Amber Bargain", revealedToPlayers: false, objectives: [] });
 
-const list = () => within(screen.getByRole("complementary", { name: "Quests" }));
+const list = () => within(screen.getByRole("list", { name: "Quests" }));
 const rowTitles = () =>
-  list()
-    .queryAllByRole("button")
-    .map((row) => row.querySelector("b")?.textContent)
-    .filter(Boolean);
+  (screen.queryByRole("list", { name: "Quests" })
+    ? list()
+        .queryAllByRole("button")
+        .map((row) => row.querySelector("b")?.textContent)
+    : []
+  ).filter(Boolean);
+const statusGroup = () => within(screen.getByRole("group", { name: "Status" }));
 
 beforeEach(() => {
   localStorage.clear();
@@ -54,29 +57,34 @@ beforeEach(() => {
 });
 
 describe("The GM's quest list", () => {
-  it("lists the active quests at first, with progress in words, and marks a Hidden quest", async () => {
+  it("lists the active quests at first, with progress, and marks a Hidden quest", async () => {
     renderGmCodex("/codex/quests");
     await waitFor(() => expect(rowTitles()).toEqual(["The Sunless Crown", "The Amber Bargain"]));
-    expect(list().getByText("1 of 2 done")).toBeInTheDocument();
+    expect(list().getByLabelText("1 of 2 done")).toHaveTextContent("1 of 2");
     expect(list().getByRole("button", { name: /The Amber Bargain/ })).toHaveTextContent("Hidden");
-    expect(screen.getByText("Active quests")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("2 active quests");
+    expect(statusGroup().getByRole("button", { name: /^Active/ })).toHaveAttribute("aria-current", "true");
   });
 
-  it("filters by status in the address, and reads an older status address as its group", async () => {
+  it("counts each status at the side, filters by it in the address, and reads an older status address as its group", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/quests?status=completed");
     await waitFor(() => expect(rowTitles()).toEqual(["The Bell of Vallaki", "The Missing Caravan"]));
-    expect(screen.getByText("Done quests")).toBeInTheDocument();
+    expect(statusGroup().getByRole("button", { name: /^Done/ })).toHaveTextContent("2");
+    expect(statusGroup().getByRole("button", { name: /^All quests/ })).toHaveTextContent("5");
 
-    await user.click(list().getByRole("button", { name: "Not started" }));
-    expect(new URLSearchParams(window.location.search).get("status")).toBe("done,not-started");
-    await waitFor(() => expect(rowTitles()).toContain("A rumour in Vallaki"));
+    await user.click(statusGroup().getByRole("button", { name: /^Not started/ }));
+    expect(new URLSearchParams(window.location.search).get("status")).toBe("not-started");
+    await waitFor(() => expect(rowTitles()).toEqual(["A rumour in Vallaki"]));
   });
 
-  it("lists every quest once no status is chosen", async () => {
-    renderGmCodex("/codex/quests?status=none");
+  it("lists every quest under All quests", async () => {
+    const user = userEvent.setup();
+    renderGmCodex("/codex/quests");
+    await user.click(await screen.findByRole("button", { name: /^All quests/ }));
+    expect(new URLSearchParams(window.location.search).get("status")).toBe("none");
     await waitFor(() => expect(rowTitles()).toHaveLength(5));
-    expect(screen.getByText("Every quest")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("5 quests");
   });
 
   it("filters by who sees it, which only the GM has", async () => {
@@ -84,15 +92,16 @@ describe("The GM's quest list", () => {
     renderGmCodex("/codex/quests");
     await waitFor(() => expect(rowTitles()).toHaveLength(2));
     await user.click(
-      within(list().getByRole("group", { name: "Who sees it" })).getByRole("button", { name: "Hidden" })
+      within(screen.getByRole("group", { name: "Who sees it" })).getByRole("button", { name: /^Hidden/ })
     );
+    expect(new URLSearchParams(window.location.search).get("who")).toBe("hidden");
     await waitFor(() => expect(rowTitles()).toEqual(["The Amber Bargain"]));
   });
 
   it("opens a quest at its own address and writes nothing to get there", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/quests");
-    await user.click(await list().findByRole("button", { name: /The Sunless Crown/ }));
+    await user.click(await screen.findByRole("button", { name: /The Sunless Crown/ }));
     expect(window.location.pathname).toBe("/codex/quests/q1");
     expect(await screen.findByRole("heading", { level: 1, name: "The Sunless Crown" })).toBeInTheDocument();
     expect(records.questRecordApi.update).not.toHaveBeenCalled();
@@ -280,7 +289,9 @@ describe("A player's quests (viewer safety)", () => {
     const user = userEvent.setup();
     const view = renderPlayerCodex("/codex/quests");
     await waitFor(() => expect(rowTitles()).toEqual(["The Sunless Crown"]));
-    await user.click(list().getByRole("button", { name: "Done" }));
+    // A player's statuses have plain counts and there is no Who sees it.
+    expect(screen.queryByRole("group", { name: "Who sees it" })).not.toBeInTheDocument();
+    await user.click(statusGroup().getByRole("button", { name: /^Done/ }));
     await waitFor(() => expect(rowTitles()).toContain("The Bell of Vallaki"));
     view.unmount();
 

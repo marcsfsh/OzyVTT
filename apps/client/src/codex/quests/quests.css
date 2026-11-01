@@ -1,25 +1,15 @@
-/* Quests: the list in the filter flyout, the quest page with its objectives. */
+/* Quests: their statuses at the side and the rows (F story spec 2.1), the quest page with its objectives. */
 
 .cx-quests {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-}
-.cx-quests-main {
-  position: relative;
-  display: flex;
-  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
 }
-.cx-quests-main > .cx-page {
+.cx-quests > .cx-page,
+.cx-quests > .cx-index {
   flex: 1 1 auto;
-}
-/* On a wide screen the open flyout sits beside the quest and the quest moves over for it. */
-@media (min-width: 980px) {
-  .cx-quests-main:has(> .nh-flyout) > :not(.nh-flyout) {
-    margin-left: min(330px, 100%);
-  }
+  min-height: 0;
 }
 .cx-questlist {
   margin: 0;
@@ -29,10 +19,10 @@
 .cx-questrow {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   width: 100%;
-  min-height: 3.25rem;
-  padding: var(--space-1) var(--space-2);
+  min-height: 58px;
+  padding: var(--space-2);
   border: 0;
   border-bottom: 1px solid var(--line);
   background: transparent;
@@ -43,22 +33,60 @@
 .cx-questrow:hover {
   background: color-mix(in srgb, var(--surface-2) 70%, transparent);
 }
-.cx-questrow.is-on {
-  background: var(--tab-on);
-  box-shadow: inset 3px 0 0 var(--cyan);
+.cx-questrow-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--text-dim);
 }
 .cx-questrow-text {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 2px;
   flex: 1 1 auto;
   min-width: 0;
-  font: 500 var(--fs-xs) / 1.3 var(--font-body);
   color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.3 var(--font-body);
 }
 .cx-questrow-text b {
   color: var(--text);
-  font-size: var(--fs-sm);
+  font: 700 var(--fs-body) / 1.2 var(--font-body);
+}
+.cx-questrow-text b.is-hidden {
+  color: var(--violet-text);
+}
+/* The progress: a 4px line 120px long and "1 of 3" in VT323. */
+.cx-qprog {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+.cx-qprog-line {
+  position: relative;
+  width: 120px;
+  height: 4px;
+  background: var(--line-raised);
+}
+.cx-qprog-line > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--cyan);
+}
+.cx-qprog-n {
+  color: var(--text-dim);
+  font: 400 16px / 1 var(--font-numeric);
+  white-space: nowrap;
+}
+.cx-qprog-word {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+@media (max-width: 760px) {
+  .cx-qprog-line {
+    width: 64px;
+  }
 }
 .cx-quest-line {
   display: flex;

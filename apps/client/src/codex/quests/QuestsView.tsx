@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
   Button,
@@ -15,9 +15,10 @@ import {
   MenuItem,
   Skeleton,
   cx,
-  FilterChips,
-  FilterFlyout,
-  FiltersButton,
+  IconSort,
+  SideListGroup,
+  SideListRow,
+  Tag,
   WhoSeesItMenu,
   HIDDEN,
   sinceLabel,
@@ -30,7 +31,7 @@ import { playerCodexApi, questApi } from "../api";
 import { questRecordApi } from "../api-records";
 import type { CodexBlock, CodexQuest, CodexQuestObjective, PlayerCodexQuest } from "@vtt/domain";
 import { CodexMarkdown } from "../CodexMarkdown";
-import { EntityIcon } from "../icons";
+import { CodexIcon, EntityIcon } from "../icons";
 import { usePageLinks } from "../pageLinks";
 import { QUEST_STATUS_LABEL, questProgress } from "../quests";
 import { pagePath, pathForSection, questPath } from "../routes";
@@ -50,7 +51,6 @@ import { QuestsCrumb } from "./QuestsCrumb";
 import "../page/page.css";
 import "./quests.css";
 
-const FLYOUT_ID = "cx-quest-filters";
 const STATUS_CHIPS = [
   { value: "active", label: "Active" },
   { value: "not-started", label: "Not started" },
@@ -70,136 +70,184 @@ type ListQuest = Readonly<{
   status: CodexQuestStatus;
   objectives: readonly Readonly<{ done: boolean }>[];
   revealedToPlayers?: boolean;
+  updatedAt?: string;
 }>;
 
-/** The progress pips and words for a quest's objectives. */
+/** The quest's progress: a 4 px line and "1 of 3" in VT323, or its status's word with no objectives to count. */
 function Progress({
   objectives,
   status
 }: Readonly<{ objectives: readonly Readonly<{ done: boolean }>[]; status: CodexQuestStatus }>) {
   const progress = questProgress(objectives);
+  if (progress.total === 0) return <span className="cx-qprog-word">{QUEST_STATUS_LABEL[status]}</span>;
   return (
-    <span className="cx-progress">
-      {objectives.map((objective, index) => (
-        <i key={index} className={objective.done ? "is-on" : undefined} />
-      ))}
-      <span>
-        {status === "not-started" ? "Not started" : status === "active" ? progress.label : QUEST_STATUS_LABEL[status]}
+    <span className="cx-qprog" aria-label={progress.label}>
+      <span className="cx-qprog-line" aria-hidden="true">
+        <i style={{ width: `${(progress.done / progress.total) * 100}%` }} />
       </span>
+      <span className="cx-qprog-n" aria-hidden="true">{`${progress.done} of ${progress.total}`}</span>
     </span>
   );
 }
 
-/** The quest list as the filter flyout holds it: a filter box, the status chips and, for the GM, Who sees it. */
-function QuestList({
+const STATUS_COUNT_WORDS: Readonly<Record<string, string>> = {
+  active: "active",
+  "not-started": "not started",
+  done: "done"
+};
+
+/**
+ * Quests with their statuses at the side (F story spec 2.1): STATUS (All quests, Active, Not started, Done) and, for
+ * the GM, WHO SEES IT with counts at the left; the toolbar (Find a quest, the count in plain words, the order, New
+ * quest) over the quests as rows with their progress. The chosen group is the address (`?status=`, `?who=`), so a
+ * quest and Back return to it; no status chosen yet reads as Active, as before.
+ */
+function QuestIndex({
   quests,
-  openId,
   gm,
   go,
-  onPicked
-}: Readonly<{
-  quests: readonly ListQuest[];
-  openId: string | null;
-  gm: boolean;
-  go: (path: string) => void;
-  onPicked?: () => void;
-}>) {
-  const { query, setFilter } = useCodexShell();
-  // "none" is no status chosen, which lists every quest. A quest's own status (an older address) reads as its group.
-  const statuses = (query.get("status") ?? "active")
-    .split(",")
-    .filter((value) => value && value !== "none")
-    .map((value) => STATUS_GROUP[value as CodexQuestStatus] ?? value);
-  const audiences = (query.get("who") ?? "").split(",").filter(Boolean);
+  newQuest
+}: Readonly<{ quests: readonly ListQuest[]; gm: boolean; go: (path: string) => void; newQuest?: ReactNode }>) {
+  const { query, setFilter, phone } = useCodexShell();
+  const raw = query.get("status") ?? "active";
+  // "none" is every quest; a quest's own status (an older address) reads as its group.
+  const status = raw === "none" ? null : (STATUS_GROUP[raw as CodexQuestStatus] ?? raw);
+  const who = gm ? query.get("who") : null;
+  const byName = !gm || query.get("sort") === "name";
   const [text, setText] = useState("");
-  const listed = quests.filter(
-    (quest) =>
-      (statuses.length === 0 || statuses.includes(STATUS_GROUP[quest.status])) &&
-      (audiences.length === 0 ||
-        (audiences.includes("everyone") && quest.revealedToPlayers) ||
-        (audiences.includes("hidden") && quest.revealedToPlayers === false)) &&
-      (!text.trim() || quest.title.toLowerCase().includes(text.trim().toLowerCase()))
-  );
-  return (
+  const inStatus = (quest: ListQuest, value: string | null) => value === null || STATUS_GROUP[quest.status] === value;
+  const inWho = (quest: ListQuest, value: string | null) =>
+    value === null ||
+    (value === "everyone" && quest.revealedToPlayers === true) ||
+    (value === "hidden" && quest.revealedToPlayers === false);
+  const listed = quests
+    .filter((quest) => inStatus(quest, status) && inWho(quest, who))
+    .filter((quest) => !text.trim() || quest.title.toLowerCase().includes(text.trim().toLowerCase()))
+    .slice()
+    .sort((a, b) => (byName ? a.title.localeCompare(b.title) : (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "")));
+  const count = (value: string | null) => quests.filter((quest) => inStatus(quest, value) && inWho(quest, who)).length;
+  const words = `${listed.length} ${status ? `${STATUS_COUNT_WORDS[status] ?? status} ` : ""}${listed.length === 1 ? "quest" : "quests"}`;
+  const statuses: ReadonlyArray<readonly [string | null, string]> = [
+    [null, "All quests"],
+    ...STATUS_CHIPS.map((chip) => [chip.value, chip.label] as const)
+  ];
+  const chooseStatus = (value: string | null) => setFilter({ status: value ?? "none" });
+
+  const side = phone ? (
+    <div className="nh-filterchips" role="group" aria-label="Status">
+      {statuses.map(([value, label]) => (
+        <button
+          key={label}
+          type="button"
+          className={cx("nh-filterchip", "interactive", status === value && "is-on")}
+          aria-pressed={status === value}
+          onClick={() => chooseStatus(value)}
+        >
+          {label} <span className="cx-tag-n">{count(value)}</span>
+        </button>
+      ))}
+    </div>
+  ) : (
     <>
+      <SideListGroup eyebrow="Status">
+        {statuses.map(([value, label]) => (
+          <SideListRow
+            key={label}
+            label={label}
+            count={count(value)}
+            current={status === value}
+            onSelect={() => chooseStatus(value)}
+          />
+        ))}
+      </SideListGroup>
+      {gm && (
+        <SideListGroup eyebrow="Who sees it">
+          {(
+            [
+              ["everyone", "Everyone", <IconEye key="e" />],
+              ["hidden", "Hidden", <IconEyeOff key="h" />]
+            ] as const
+          ).map(([value, label, icon]) => (
+            <SideListRow
+              key={value}
+              label={label}
+              leading={icon}
+              count={quests.filter((quest) => inStatus(quest, status) && inWho(quest, value)).length}
+              current={who === value}
+              onSelect={() => setFilter({ who: who === value ? null : value })}
+            />
+          ))}
+        </SideListGroup>
+      )}
+    </>
+  );
+
+  const rows =
+    listed.length === 0 ? (
+      <p className="cx-hint">{text.trim() ? "No quest has that name." : "No quests here yet."}</p>
+    ) : (
+      <ul className="cx-questlist" aria-label="Quests">
+        {listed.map((quest) => {
+          const hidden = gm && quest.revealedToPlayers === false;
+          return (
+            <li key={quest.id}>
+              <button type="button" className="cx-questrow" onClick={() => go(questPath(quest.id))}>
+                <CodexIcon iconId="quest" className="cx-questrow-icon" />
+                <span className="cx-questrow-text">
+                  <b className={cx(hidden && "is-hidden")}>{quest.title}</b>
+                  <small>{QUEST_STATUS_LABEL[quest.status]}</small>
+                </span>
+                <Progress objectives={quest.objectives} status={quest.status} />
+                {hidden && <Tag tone="hidden">Hidden</Tag>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+
+  const toolbar = (
+    <div className="cx-index-toolbar">
       <FindField
-        aria-label="Filter quests"
-        placeholder="Filter quests"
+        aria-label="Find a quest"
+        placeholder="Find a quest"
         value={text}
         onChange={(event) => setText(event.target.value)}
       />
-      <Eyebrow>Status</Eyebrow>
-      <FilterChips
-        label="Status"
-        options={STATUS_CHIPS}
-        selected={statuses}
-        onChange={(next) => setFilter({ status: next.join(",") || "none" })}
-      />
+      <span className="cx-index-count" role="status">
+        {words}
+      </span>
       {gm && (
-        <>
-          <Eyebrow>Who sees it</Eyebrow>
-          <FilterChips
-            label="Who sees it"
-            options={[
-              { value: "everyone", label: "Everyone" },
-              { value: "hidden", label: "Hidden" }
-            ]}
-            selected={audiences}
-            onChange={(next) => setFilter({ who: next.join(",") || null })}
-          />
-        </>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={byName ? "Order: by name. Order by when it changed" : "Order: changed. Order by name"}
+          onClick={() => setFilter({ sort: byName ? null : "name" })}
+        >
+          <IconSort /> {byName ? "Name" : "Changed"}
+        </Button>
       )}
-      <Eyebrow>
-        {listed.length} {listed.length === 1 ? "quest" : "quests"}
-      </Eyebrow>
-      <ul className="cx-questlist">
-        {listed.map((quest) => (
-          <li key={quest.id}>
-            <button
-              type="button"
-              className={cx("cx-questrow", quest.id === openId && "is-on")}
-              aria-current={quest.id === openId ? "true" : undefined}
-              onClick={() => {
-                go(questPath(quest.id));
-                onPicked?.();
-              }}
-            >
-              <span className="cx-questrow-text">
-                <b>{quest.title}</b>
-                <Progress objectives={quest.objectives} status={quest.status} />
-              </span>
-              {gm && quest.revealedToPlayers === false && (
-                <span className="cx-meta-hidden">
-                  <IconEyeOff />
-                  Hidden
-                </span>
-              )}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </>
+      {!phone && newQuest}
+    </div>
   );
-}
 
-/** What the list shows, in words: "Active quests", or "Every quest" with no status chosen. */
-function statusSummary(status: string | null): string {
-  const chosen = [
-    ...new Set(
-      (status ?? "active")
-        .split(",")
-        .filter((value) => value !== "none" && value)
-        .map((value) => STATUS_GROUP[value as CodexQuestStatus] ?? value)
-    )
-  ];
-  if (chosen.length === 0 || chosen.length === STATUS_CHIPS.length) return "Every quest";
-  return `${chosen.map((value) => STATUS_CHIPS.find((chip) => chip.value === value)?.label ?? value).join(" and ")} quests`;
-}
-
-/** The flyout and the toolbar that opens it, shared by both roles. */
-function useQuestFlyout(defaultOpen: boolean) {
-  const [open, setOpen] = useState(defaultOpen);
-  return { open, setOpen };
+  return phone ? (
+    <div className="cx-index-body">
+      {side}
+      {toolbar}
+      {rows}
+    </div>
+  ) : (
+    <div className="cx-index cx-index-split">
+      <nav className="cx-index-side scroll-y" aria-label="Narrow the quests">
+        {side}
+      </nav>
+      <div className="cx-index-main">
+        {toolbar}
+        <div className="cx-index-rows scroll-y">{rows}</div>
+      </div>
+    </div>
+  );
 }
 
 /** A quest's linked pages and its numbers, beside the quest. */
@@ -706,11 +754,10 @@ function PlayerQuestPreview({
   return <PlayerQuestBody quest={read.data.quest} token={token ?? ""} pages={read.data.pages} phone={phone} go={go} />;
 }
 
-/** Quests for the GM: the list in the filter flyout, and the quest the address names. */
+/** Quests for the GM: the quests with their statuses at the side, or the quest the address names as a page. */
 export function GmQuests() {
-  const { recordId, go, phone, token, query } = useCodexShell();
+  const { recordId, go, phone, token } = useCodexShell();
   const gm = useGmCodex();
-  const flyout = useQuestFlyout(!recordId);
   const [creating, setCreating] = useState(false);
   const newQuest = async () => {
     setCreating(true);
@@ -724,52 +771,30 @@ export function GmQuests() {
       setCreating(false);
     }
   };
-  const list = (
-    <QuestList quests={gm.feeds.quests} openId={recordId} gm go={go} onPicked={() => flyout.setOpen(false)} />
+  // A Base line button: the Codex bar's New is the page's Cup (F story spec 2.1).
+  const newButton = (
+    <Button size="sm" variant="ghost" disabled={creating} onClick={() => void newQuest()}>
+      <IconPlus /> New quest
+    </Button>
   );
+  if (recordId) return <GmQuest key={recordId} id={recordId} />;
+  const list = <QuestIndex quests={gm.feeds.quests} gm go={go} newQuest={newButton} />;
   if (phone)
-    return recordId ? (
-      <GmQuest key={recordId} id={recordId} />
-    ) : (
+    return (
       <div className="cx-page is-phone scroll-y">
-        <CodexPhoneBar title="Codex" />
-        <div className="cx-page-phonebody">{list}</div>
+        <CodexPhoneBar title="Codex" actions={newButton} />
+        {list}
       </div>
     );
-  return (
-    <div className="cx-quests">
-      <div className="cx-sub">
-        <FiltersButton open={flyout.open} onToggle={() => flyout.setOpen(!flyout.open)} controls={FLYOUT_ID} />
-        <span className="cx-crumbs">{statusSummary(query.get("status"))}</span>
-        <span className="cx-grow" />
-        <Button size="sm" disabled={creating} onClick={() => void newQuest()}>
-          <IconPlus /> New quest
-        </Button>
-      </div>
-      <div className="cx-quests-main">
-        <FilterFlyout id={FLYOUT_ID} open={flyout.open} title="Quests" onClose={() => flyout.setOpen(false)}>
-          {list}
-        </FilterFlyout>
-        {recordId ? (
-          <GmQuest key={recordId} id={recordId} />
-        ) : (
-          <p className="cx-empty">Choose a quest from Filters, or make one with New.</p>
-        )}
-      </div>
-    </div>
-  );
+  return <div className="cx-quests">{list}</div>;
 }
 
 /** Quests for a player: the same list over their own projection, and the quest as they receive it. */
 export function PlayerQuests() {
-  const { recordId, go, phone, token, query } = useCodexShell();
+  const { recordId, go, phone, token } = useCodexShell();
   const { feeds } = usePlayerCodex();
-  const flyout = useQuestFlyout(!recordId);
   const quests = feeds.quests as unknown as readonly PlayerCodexQuest[];
   const quest = recordId ? (quests.find((candidate) => candidate.id === recordId) ?? null) : null;
-  const list = (
-    <QuestList quests={quests} openId={recordId} gm={false} go={go} onPicked={() => flyout.setOpen(false)} />
-  );
   const body = quest ? (
     <PlayerQuestBody quest={quest} token={token} pages={feeds.pages} phone={phone} go={go} />
   ) : recordId && !feeds.loading ? (
@@ -782,37 +807,38 @@ export function PlayerQuests() {
           title="Codex"
           back={recordId ? { label: "Quests", onClick: () => go(pathForSection("quests")) } : undefined}
         />
-        <div className="cx-page-phonebody">
-          {recordId && quest && <h1 className="cx-phone-recordtitle">{quest.title}</h1>}
-          {recordId ? body : list}
-        </div>
+        {recordId ? (
+          <div className="cx-page-phonebody">
+            {quest && <h1 className="cx-phone-recordtitle">{quest.title}</h1>}
+            {body}
+          </div>
+        ) : (
+          <QuestIndex quests={quests} gm={false} go={go} />
+        )}
+      </div>
+    );
+  if (!recordId)
+    return (
+      <div className="cx-quests">
+        <QuestIndex quests={quests} gm={false} go={go} />
       </div>
     );
   return (
     <div className="cx-quests">
-      <div className="cx-sub">
-        <FiltersButton open={flyout.open} onToggle={() => flyout.setOpen(!flyout.open)} controls={FLYOUT_ID} />
-        <span className="cx-crumbs">{statusSummary(query.get("status"))}</span>
-      </div>
-      <div className="cx-quests-main">
-        <FilterFlyout id={FLYOUT_ID} open={flyout.open} title="Quests" onClose={() => flyout.setOpen(false)}>
-          {list}
-        </FilterFlyout>
-        {quest ? (
-          <div className="cx-page">
-            <header className="cx-page-head">
-              <div className="cx-page-headmain">
-                <TitleLine crumb={<QuestsCrumb go={go} />}>
-                  <h1 className="cx-page-title">{quest.title}</h1>
-                </TitleLine>
-              </div>
-            </header>
-            {body}
-          </div>
-        ) : (
-          (body ?? <p className="cx-empty">Choose a quest from Filters.</p>)
-        )}
-      </div>
+      {quest ? (
+        <div className="cx-page">
+          <header className="cx-page-head">
+            <div className="cx-page-headmain">
+              <TitleLine crumb={<QuestsCrumb go={go} />}>
+                <h1 className="cx-page-title">{quest.title}</h1>
+              </TitleLine>
+            </div>
+          </header>
+          {body}
+        </div>
+      ) : (
+        body
+      )}
     </div>
   );
 }
