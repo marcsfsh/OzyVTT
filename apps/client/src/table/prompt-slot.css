@@ -142,3 +142,42 @@
 .prompt-card-numbers .is-on dd {
   color: var(--cyan-hi);
 }
+
+/* The prompt on glass over the map (C4 spec 2.1): centred at the map's foot, at most 420px wide and 60% of the map's
+   height, scrolling inside past that. The wrapper only places it, so the map pans and its tokens stay pressable around
+   the card; with no prompt nothing shows. */
+.table-bench-map {
+  position: relative;
+}
+.prompt-glass {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 6;
+  width: min(420px, calc(100% - 32px));
+  max-height: 60%;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.prompt-glass > .prompt-slot {
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  /* A's glass: the void glass and its blur, solid under reduced transparency (the tokens do that). */
+  background: var(--glass-void);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-2);
+  pointer-events: auto;
+}
+/* On a phone the glass sits at the foot of the open Switch view, above the panel's foot, with 10px gutters. */
+.prompt-glass.is-docked {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  width: auto;
+  max-height: 60%;
+  margin: 0 10px 10px;
+  transform: none;
+}

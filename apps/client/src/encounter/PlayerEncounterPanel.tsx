@@ -239,8 +239,10 @@ export function PlayerEndTurn({
 
 /** What the table puts in a player's panel besides the fight: the prompt slot, the dice, the log, the party. */
 export type PlayerPanelSlots = Readonly<{
-  /** The prompt slot (and a Short Rest to spend Hit Dice in), above the tabs. */
+  /** A Short Rest to spend Hit Dice in, and the prompt slot while no map is live, above the tabs. */
   top?: ReactNode;
+  /** On a phone, the prompt slot on glass at the foot of the open view, above the panel's foot. */
+  overlay?: ReactNode;
   dice?: ReactNode;
   log?: ReactNode;
   party?: ReactNode;
@@ -702,6 +704,7 @@ export function PlayerEncounterPanel({
     <TablePanel
       label={fighting ? `The encounter · round ${combat.round}` : "The table"}
       top={slots?.top}
+      overlay={slots?.overlay}
       tabs={tabs}
       active={tab}
       onActive={setTab}

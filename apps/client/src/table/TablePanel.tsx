@@ -30,6 +30,7 @@ export function TablePanel({
   onActive,
   footer,
   tabsEnd,
+  overlay,
   phone = false
 }: Readonly<{
   label: string;
@@ -39,6 +40,8 @@ export function TablePanel({
   active: string;
   onActive: (id: string) => void;
   footer?: ReactNode;
+  /** What sits on glass at the foot of the open view, above the footer: a player's prompt on a phone. */
+  overlay?: ReactNode;
   /** A control at the end of the row of tabs: the GM's More for the encounter's options (C3 running spec 2.3). */
   tabsEnd?: ReactNode;
   /** On a phone the footer is the bar under the thumb, and a target picker's Cancel and Roll move into it. */
@@ -100,6 +103,7 @@ export function TablePanel({
           );
         })}
       </FooterSlotContext.Provider>
+      {overlay && <div className="prompt-glass is-docked">{overlay}</div>}
       {(footer || phone) && (
         <div className="table-panel-foot">
           {phone && <div className="table-panel-foot-slot" ref={setSlot} />}

@@ -196,9 +196,12 @@ export function TableView(props: TableViewProps) {
             <>
               {/* The party's Short Rest on this player's own device: their Hit Dice to spend, and Done. */}
               <RestPrompt state={props.state} />
-              <PromptSlot state={props.state} />
+              {/* With no map live the prompt has no map to sit over, so it leads the panel. */}
+              {!map && <PromptSlot state={props.state} />}
             </>
           ),
+          // On a phone the prompt sits on glass at the foot of whichever Switch view is open (C4 spec 2.1).
+          ...(map && phone ? { overlay: <PromptSlot state={props.state} /> } : {}),
           dice,
           log,
           // The party is a party surface, so the `off` tier removes it for players.
@@ -242,6 +245,12 @@ export function TableView(props: TableViewProps) {
         {map && !switching && (
           <div className="table-bench-map">
             <DockToolsTarget.Provider value={dockTools}>{map}</DockToolsTarget.Provider>
+            {/* A player's prompt sits on glass at the map's foot; the map pans under it (C4 spec 2.1). */}
+            {props.role === "player" && !phone && (
+              <div className="prompt-glass">
+                <PromptSlot state={props.state} />
+              </div>
+            )}
           </div>
         )}
         <div className="table-bench-panel">
