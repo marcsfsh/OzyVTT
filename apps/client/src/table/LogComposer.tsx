@@ -1,7 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Button, IconArrow, IconButton, Input, Modal, Select, useToast } from "@vtt/ui";
+import { Button, Input, Modal, Select, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
-import { ROLL_VISIBILITY_WORD } from "../dice/DicePanel";
 import { useRollVisibility } from "../dice/roll-visibility";
 import { noteChatSent } from "../encounter/logArrivals";
 import "./log-composer.css";
@@ -92,22 +91,10 @@ export function LogComposer({ options, talk }: Readonly<{ options?: ReactNode; t
 
   return (
     <div className="log-composer">
-      <div className="log-composer-dice" role="group" aria-label="Quick rolls">
-        {QUICK_DICE.map((sides) => (
-          <button
-            key={sides}
-            type="button"
-            className="log-composer-die interactive"
-            aria-label={`Roll 1d${sides}`}
-            onClick={() => void roll(`1d${sides}`)}
-          >
-            d{sides}
-          </button>
-        ))}
-      </div>
+      {/* One row (log spec 2.3): who hears it first, lit violet while a whisper, then the field and Send. */}
       <form className="log-composer-row" onSubmit={submit}>
         <Select
-          className="log-composer-hears"
+          className={`log-composer-hears${hears ? " is-whisper" : ""}`}
           aria-label="Who hears it"
           value={hears}
           onChange={(event) => setHears(event.target.value)}
@@ -129,18 +116,34 @@ export function LogComposer({ options, talk }: Readonly<{ options?: ReactNode; t
             maxLength={600}
           />
         </span>
-        <IconButton type="submit" label="Send" disabled={busy || text.trim() === ""}>
-          <IconArrow />
-        </IconButton>
+        <Button type="submit" className="log-composer-send" disabled={busy || text.trim() === ""}>
+          Send
+        </Button>
       </form>
-      {options && (
-        <div className="log-composer-foot">
-          <span className="log-composer-audience">{ROLL_VISIBILITY_WORD[visibility]}</span>
-          <Button variant="link" size="sm" onClick={() => setOptionsOpen(true)}>
-            Dice options
+      {/* Under it the quick dice on one row, and More, which opens the dice options. */}
+      <div className="log-composer-dice" role="group" aria-label="Quick rolls">
+        {QUICK_DICE.map((sides) => (
+          <Button
+            key={sides}
+            size="sm"
+            className="log-composer-die"
+            aria-label={`Roll 1d${sides}`}
+            onClick={() => void roll(`1d${sides}`)}
+          >
+            d{sides}
           </Button>
-        </div>
-      )}
+        ))}
+        {options && (
+          <Button
+            size="sm"
+            className="log-composer-more"
+            aria-label="Dice options"
+            onClick={() => setOptionsOpen(true)}
+          >
+            More
+          </Button>
+        )}
+      </div>
       {options && (
         <Modal open={optionsOpen} onClose={() => setOptionsOpen(false)} title="Dice options" size="lg">
           {options}

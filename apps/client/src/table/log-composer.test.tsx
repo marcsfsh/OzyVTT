@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "@vtt/ui";
 
@@ -48,7 +48,7 @@ describe("the log's composer", () => {
       purpose: "manual",
       visibility: "gm-only"
     });
-    expect(screen.getByText("GM only")).toBeInTheDocument();
+    // Who sees a roll is said at the dice options' foot now (log spec 2.4), so the composer keeps to its one row.
   });
 
   it("rolls the formula after /roll on Enter and clears the field once the server takes it", async () => {
@@ -111,7 +111,12 @@ describe("the log's composer", () => {
   it("opens the full dice tools from Dice options", async () => {
     const user = userEvent.setup();
     composer();
-    await user.click(screen.getByRole("button", { name: "Dice options" }));
+    // More sits at the end of the quick dice' row and keeps the name Dice options.
+    const more = within(screen.getByRole("group", { name: "Quick rolls" })).getByRole("button", {
+      name: "Dice options"
+    });
+    expect(more).toHaveTextContent("More");
+    await user.click(more);
     expect(screen.getByRole("dialog", { name: "Dice options" })).toHaveTextContent("The dice options");
   });
 });
