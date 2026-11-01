@@ -274,6 +274,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
           onRevealBlock={(block) => setRevealing(block)}
           onBlockAudience={(block, next) => void setAudience(block, next)}
           onOpenConnection={openConnection}
+          onOpenPin={openPin}
         />
         {overlays}
       </>

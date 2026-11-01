@@ -31,7 +31,8 @@ export type CodexAutosave<TDraft> = Readonly<{
   status: SaveStatus;
   dirty: boolean;
   /** Save now, past the debounce. The explicit Save button calls this when autosave is off. */
-  flush: () => Promise<void>;
+  /** Saves what is pending now; false when that save failed or conflicted, so a caller can stay where it is. */
+  flush: () => Promise<boolean>;
   /** Adopt an external draft as already saved, e.g. after a revision restore. */
   markSaved: (draft: TDraft) => void;
 }>;
@@ -60,13 +61,13 @@ export function useCodexAutosave<TDraft>(options: UseCodexAutosaveOptions<TDraft
   const current = serialize(draft);
   const dirty = !disabled && current !== savedRef.current;
 
-  const flush = useCallback(async () => {
+  const flush = useCallback(async (): Promise<boolean> => {
     if (savingRef.current) {
       pendingRef.current = true;
-      return;
+      return true;
     }
     const snapshot = serializeRef.current(draftRef.current);
-    if (snapshot === savedRef.current) return;
+    if (snapshot === savedRef.current) return true;
     savingRef.current = true;
     setStatus("saving");
     try {
@@ -74,6 +75,7 @@ export function useCodexAutosave<TDraft>(options: UseCodexAutosaveOptions<TDraft
       // Compare against the pre-write snapshot so an edit made in flight stays dirty and re-runs.
       savedRef.current = snapshot;
       setStatus("saved");
+      return true;
     } catch (error) {
       if (error instanceof ApiError && error.isConflict) {
         setStatus("conflict");
@@ -81,6 +83,7 @@ export function useCodexAutosave<TDraft>(options: UseCodexAutosaveOptions<TDraft
       } else {
         setStatus("error");
       }
+      return false;
     } finally {
       savingRef.current = false;
       if (pendingRef.current) {

@@ -8,7 +8,7 @@ vi.mock("../api-records", async () => (await import("../../../test/codex-fakes")
 
 import type { CodexPage, CodexPageConnection } from "@vtt/domain";
 import { ApiError } from "../../lib/api";
-import { api, block, page, records, resetFakes, summary } from "../../../test/codex-fakes";
+import { api, block, page, playerPage, records, resetFakes, summary } from "../../../test/codex-fakes";
 import { renderGmCodex } from "../../../test/codex-render";
 
 const PAGE: CodexPage = page({
@@ -167,8 +167,9 @@ describe("Who sees each field", () => {
     const user = userEvent.setup();
     records.pageRecordApi.setFieldAudience.mockResolvedValue({ ...PAGE, hiddenFields: [] });
     write();
-    const toggle = await screen.findByRole("switch", { name: "Who sees Goals & motives: Hidden" });
-    await user.click(toggle);
+    const pair = within(await screen.findByRole("radiogroup", { name: "Who sees Goals & motives" }));
+    expect(pair.getByRole("radio", { name: "Hidden" })).toBeChecked();
+    await user.click(pair.getByRole("radio", { name: "Everyone" }));
     await waitFor(() =>
       expect(records.pageRecordApi.setFieldAudience).toHaveBeenCalledWith("gm", "p1", "goals", "everyone")
     );
@@ -374,5 +375,44 @@ describe("An event page is dated in the writer", () => {
     await user.type(await screen.findByLabelText("Page title"), "!");
     await waitFor(() => expect(records.pageRecordApi.update).toHaveBeenCalled(), { timeout: 4000 });
     expect(records.pageRecordApi.update.mock.calls.at(-1)![2]).not.toHaveProperty("inWorldDate");
+  });
+});
+
+describe("Preview while writing", () => {
+  it("saves first, reads the page through a player preview session, and goes back to the writer", async () => {
+    const user = userEvent.setup();
+    api.codexApi.createPreviewSession.mockResolvedValue("preview-token");
+    records.pageRecordApi.getForPlayer.mockResolvedValue({
+      page: playerPage({ fields: { role: "Harbourmaster", status: "Alive" } }),
+      connections: []
+    });
+    write();
+    await user.type(await screen.findByLabelText("Page title"), "!");
+    await user.click(screen.getByRole("switch", { name: "Preview" }));
+    // The text is saved before the preview reads it, as autosave does.
+    await waitFor(() => expect(records.pageRecordApi.update).toHaveBeenCalled());
+    await waitFor(() => expect(api.codexApi.createPreviewSession).toHaveBeenCalledWith("gm", null));
+    expect(await screen.findByText(/Preview: the page as players get it/)).toBeInTheDocument();
+    await waitFor(() => expect(records.pageRecordApi.getForPlayer).toHaveBeenCalledWith("preview-token", "p1"));
+    // The writer stays mounted, hidden, under the preview; what shows is the player's read alone.
+    const shown = (text: string) => screen.queryAllByText(text).filter((element) => !element.closest("[hidden]"));
+    await waitFor(() => expect(shown("The harbourmaster of Saltmere.")).toHaveLength(1));
+    expect(shown("She owes the Tidebound.")).toHaveLength(0);
+    expect(shown("Pay the Tidebound back.")).toHaveLength(0);
+
+    await user.click(screen.getByRole("switch", { name: "Preview" }));
+    expect(screen.getByLabelText("Page title")).toBeVisible();
+    expect(screen.queryByText(/Preview: the page as players get it/)).not.toBeInTheDocument();
+  });
+
+  it("stays in the writer when the save before it conflicts", async () => {
+    const user = userEvent.setup();
+    records.pageRecordApi.update.mockRejectedValueOnce(new ApiError("This page changed.", 409, "conflict"));
+    write();
+    await user.type(await screen.findByLabelText("Page title"), "!");
+    await user.click(screen.getByRole("switch", { name: "Preview" }));
+    expect(await screen.findByText(/Someone else changed this page/)).toBeInTheDocument();
+    expect(api.codexApi.createPreviewSession).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Preview: the page as players get it/)).not.toBeInTheDocument();
   });
 });

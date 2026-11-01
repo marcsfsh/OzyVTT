@@ -4,6 +4,7 @@ import {
   IconButton,
   IconChevron,
   IconEyeOff,
+  IconPin,
   IconList,
   IconMore,
   IconPlus,
@@ -350,15 +351,15 @@ export function DocEditor({
           <IconButton label="Link to another page" size="sm" onClick={() => format("wikilink")}>
             <span className="cx-write-letter">[[</span>
           </IconButton>
+          <span className="cx-write-sep" aria-hidden="true" />
           <Button size="sm" className="cx-write-hiddenbtn" onClick={() => addBlock()}>
             <IconEyeOff /> Hidden block
           </Button>
           {onOpenMap && (
-            <Button size="sm" onClick={onOpenMap}>
-              Put it on a map
-            </Button>
+            <IconButton label="Put it on a map" size="sm" onClick={onOpenMap}>
+              <IconPin />
+            </IconButton>
           )}
-          <span className="cx-hint cx-write-hint">Type / at the start of a line for a block.</span>
         </>
       )}
     </div>
@@ -437,7 +438,7 @@ export function DocEditor({
                     index === 0 && items.length === 1
                       ? "What players read on this page. Add a Hidden block for what only you know."
                       : lastText
-                        ? "Write more here."
+                        ? "Write more here. Type [[ to link a page, or / at the start of a line for a block."
                         : undefined
                   }
                   value={item.text}

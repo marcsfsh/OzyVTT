@@ -432,9 +432,6 @@
   border-color: var(--rim-gm);
   color: var(--violet-text);
 }
-.cx-write-hint {
-  margin-left: var(--space-2);
-}
 .cx-write-doc {
   display: flex;
   flex-direction: column;
@@ -740,4 +737,137 @@ form.cx-folderrow {
   color: var(--violet-text);
   font-size: var(--fs-sm);
   font-weight: 400;
+}
+
+/* ----- The writer, in place (Codex frame 2.3) ----- */
+/* The toolbar over the text: 6px 8px, 32px buttons, then Hidden block in violet and Put it on a map. */
+.cx-write:not(.is-phone) .cx-write-tools {
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-bottom: 0;
+  background: var(--surface-1);
+}
+.cx-write:not(.is-phone) .cx-write-tools .nh-iconbtn {
+  width: 32px;
+  height: 32px;
+}
+.cx-write-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--space-2);
+  background: var(--line-strong);
+}
+/* The text is one bordered field, 14px 16px. */
+.cx-write:not(.is-phone) .cx-write-doc {
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+}
+/* Saved: a cyan lamp while autosave has the latest. */
+.cx-write-saved.nh-savestate--rest .nh-savestate-icon svg {
+  display: none;
+}
+.cx-write-saved.nh-savestate--rest .nh-savestate-icon::before {
+  content: "";
+  display: block;
+  width: 8px;
+  height: 8px;
+  background: var(--cyan);
+  box-shadow: var(--glow-on);
+}
+/* The fields: a Cradle, each field's label, its value, and who sees it as a pair of Base line options. */
+.cx-writefields .cx-writefield {
+  grid-template-columns: minmax(0, 1fr) auto;
+  border-bottom: 1px solid var(--line);
+}
+.cx-whopair {
+  display: inline-flex;
+  gap: 4px;
+}
+.cx-whopair-option {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  box-shadow: var(--base-line);
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  cursor: pointer;
+}
+.cx-whopair-option:hover,
+.cx-whopair-option:active {
+  box-shadow: var(--base-line-hover);
+}
+.cx-whopair-option.is-on {
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+.cx-whopair-option.is-hidden.is-on {
+  color: var(--violet-text);
+  box-shadow: inset 0 -2px 0 var(--violet);
+}
+@media (pointer: coarse) {
+  .cx-whopair-option {
+    min-height: var(--tap-min);
+  }
+}
+/* Preview's line: 8px 24px, a violet wash and a violet line under it, 13px violet words. */
+.cx-preview-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  margin: 0;
+  padding: 8px 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--violet) 55%, transparent);
+  background: color-mix(in srgb, var(--violet) 8%, transparent);
+  color: var(--violet-text);
+  font: 600 13px / 1.35 var(--font-body);
+}
+.cx-preview-line svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.cx-page.is-writing > .cx-page-cols[hidden],
+.cx-write-body[hidden] {
+  display: none;
+}
+/* A phone: Write and Preview under the header, the text scrolling, and Done pinned at the foot. */
+.cx-page.is-phone.is-writing {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cx-page.is-phone.is-writing > .cx-page-phonebody {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: 0;
+}
+.cx-write-seg {
+  margin: var(--space-2) var(--space-3) 0;
+}
+.cx-write-seg.nh-segmented {
+  display: flex;
+}
+.cx-write-seg .nh-segmented-option {
+  flex: 1 1 0;
+}
+.cx-page.is-phone.is-writing > .cx-preview-line {
+  padding: 8px 14px;
+}
+.cx-write-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cx-write-foot {
+  display: flex;
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cx-write-foot .nh-btn {
+  flex: 1 1 auto;
 }

@@ -15,8 +15,10 @@ import {
   Textarea,
   cx,
   AudienceChip,
-  FieldAudienceToggle,
   EVERYONE,
+  Group,
+  IconEye,
+  SegmentedControl,
   HIDDEN,
   type Audience,
   TitleLine
@@ -38,6 +40,8 @@ import { useCodexQuery } from "../useCodexQuery";
 import { DocEditor } from "./DocEditor";
 import { draftDocument, saveShape, type DraftItem } from "./document";
 import { KindChip, PageCrumb } from "./pageParts";
+import { PlayerPageBody } from "./PlayerPage";
+import { SeeAsControl, usePreviewToken, type SeeAsViewer } from "./SeeAs";
 import type { AnyPageConnection } from "./MetaPanel";
 import { RelationshipEditor } from "./RelationshipEditor";
 
@@ -90,7 +94,8 @@ export function PageWriter({
   onReloadPage,
   onRevealBlock,
   onBlockAudience,
-  onOpenConnection
+  onOpenConnection,
+  onOpenPin
 }: Readonly<{
   page: CodexPage;
   connections: readonly CodexPageConnection[];
@@ -101,6 +106,7 @@ export function PageWriter({
   onRevealBlock: (block: CodexBlock) => void;
   onBlockAudience: (block: CodexBlock, next: Audience) => void;
   onOpenConnection: (kind: AnyPageConnection["otherKind"], id: string) => void;
+  onOpenPin: (markerId: string, mapId: string) => void;
 }>) {
   const { token, phone, go } = useCodexShell();
   const gm = useGmCodex();
@@ -111,6 +117,14 @@ export function PageWriter({
   const [busy, setBusy] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [shownKeys, setShownKeys] = useState<readonly string[]>([]);
+  // Preview shows the page as players get it, through the same read See as players uses (Codex frame 2.3).
+  const [preview, setPreview] = useState<{ on: boolean; viewer: SeeAsViewer }>({
+    on: false,
+    viewer: { characterId: null }
+  });
+  const previewToken = usePreviewToken(token, preview.on, preview.viewer);
+  /** Where the caret was when Preview came on, so turning it off goes back there. */
+  const caret = useRef<HTMLElement | null>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
   /** The page as the server last answered, so each write in a save carries the newest `rev`. */
   const latest = useRef(page);
@@ -260,6 +274,55 @@ export function PageWriter({
     setBusy(false);
     onDone();
   };
+  /** Preview saves what is written first, as autosave does; a save that fails or conflicts keeps the writer. */
+  const showPreview = async (on: boolean, viewer: SeeAsViewer) => {
+    if (!on) {
+      setPreview({ on: false, viewer });
+      const back = caret.current;
+      requestAnimationFrame(() => back?.isConnected && back.focus());
+      return;
+    }
+    if (!preview.on) {
+      const active = document.activeElement;
+      caret.current = active instanceof HTMLElement && active.closest(".cx-doc") ? active : null;
+      setBusy(true);
+      const ok = await autosave.flush();
+      setBusy(false);
+      if (!ok) return;
+    }
+    setPreview({ on: true, viewer });
+  };
+  const viewerName = preview.viewer.characterId
+    ? (party.find((character) => character.id === preview.viewer.characterId)?.name ?? "a character")
+    : null;
+  const previewSwitch = (
+    <SeeAsControl
+      label="Preview"
+      on={preview.on}
+      viewer={preview.viewer}
+      party={party}
+      onChange={(on, viewer) => void showPreview(on, viewer)}
+    />
+  );
+  const previewLine = preview.on && (
+    <p className="cx-preview-line" role="status">
+      <IconEye />
+      Preview: the page as players get it. Hidden blocks and hidden fields are left out. Turn Preview off to keep
+      writing.
+    </p>
+  );
+  const previewBody = preview.on && (
+    <PlayerPageBody
+      key={previewToken.token ?? "waiting"}
+      token={previewToken.token}
+      tokenError={previewToken.error}
+      pageId={page.id}
+      viewerName={viewerName}
+      phone={phone}
+      onOpenConnection={onOpenConnection}
+      onOpenPin={onOpenPin}
+    />
+  );
 
   const kindFields = entityDef(draft.entityType).fields;
   const shown = kindFields.filter(
@@ -268,11 +331,7 @@ export function PageWriter({
   const unshown = kindFields.filter((field) => !shown.includes(field));
 
   const fieldsPanel = (
-    <section className="cx-writefields" aria-label="Fields">
-      <div className="cx-writefields-head">
-        <Eyebrow>Fields</Eyebrow>
-        <Eyebrow className="cx-writefields-who">Who sees it</Eyebrow>
-      </div>
+    <Group title="Fields · who sees each" className="cx-writefields">
       {shown.map((field) => {
         const hidden = page.hiddenFields.includes(field.key);
         const id = `cx-field-${field.key}`;
@@ -297,7 +356,7 @@ export function PageWriter({
                 onChange={(event) => setField(field.key, event.target.value)}
               />
             )}
-            <FieldAudienceToggle
+            <WhoSeesField
               field={field.label}
               hidden={hidden}
               onChange={(next) => void setFieldHidden(field.key, next)}
@@ -322,7 +381,7 @@ export function PageWriter({
           ))}
         </Menu>
       )}
-    </section>
+    </Group>
   );
 
   const details = (
@@ -441,18 +500,25 @@ export function PageWriter({
     />
   );
 
-  const saveControls = (
+  const saveState = (
     <>
-      <SaveState status={autosave.status} onRetry={() => void autosave.flush()} onReload={() => void onReloadPage()} />
+      <SaveState
+        className="cx-write-saved"
+        status={autosave.status}
+        onRetry={() => void autosave.flush()}
+        onReload={() => void onReloadPage()}
+      />
       {!gm.autosave.enabled && (
         <Button size="sm" disabled={!autosave.dirty} onClick={() => void autosave.flush()}>
           Save
         </Button>
       )}
-      <Button variant="primary" size="sm" disabled={busy} onClick={() => void done()}>
-        Done
-      </Button>
     </>
+  );
+  const doneButton = (
+    <Button variant="primary" size="sm" disabled={busy} onClick={() => void done()}>
+      Done
+    </Button>
   );
   const more = (
     <Menu icon align="end" label="More" trigger={<IconMore />}>
@@ -476,21 +542,37 @@ export function PageWriter({
 
   if (phone)
     return (
-      <div className="cx-page is-phone is-writing scroll-y">
-        <CodexPhoneBar title={draft.title || "Untitled page"} actions={saveControls} />
-        <div className="cx-page-phonebody">
-          <Input
-            variant="title"
-            className="cx-write-title"
-            aria-label="Page title"
-            value={draft.title}
-            placeholder="Untitled page"
-            onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-          />
+      <div className="cx-page is-phone is-writing">
+        <CodexPhoneBar title={`Editing ${draft.title || "Untitled page"}`} actions={saveState} />
+        <SegmentedControl
+          ariaLabel="Write or preview"
+          className="cx-write-seg"
+          value={preview.on ? "preview" : "write"}
+          onChange={(value) => void showPreview(value === "preview", preview.viewer)}
+          options={[
+            { value: "write", label: "Write" },
+            { value: "preview", label: "Preview" }
+          ]}
+        />
+        {previewLine}
+        <div className="cx-page-phonebody scroll-y">
           {error && <Alert tone="danger">{error}</Alert>}
-          {editor}
-          {side}
+          {previewBody}
+          <div className="cx-write-body" hidden={preview.on}>
+            <Input
+              variant="title"
+              className="cx-write-title"
+              aria-label="Page title"
+              value={draft.title}
+              placeholder="Untitled page"
+              onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+            />
+            {editor}
+            {side}
+          </div>
         </div>
+        {/* Done stays at the foot on a phone (rule 3.9). */}
+        <div className="cx-write-foot">{doneButton}</div>
         {overlays}
       </div>
     );
@@ -508,23 +590,28 @@ export function PageWriter({
               placeholder="Untitled page"
               onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
             />
-            <KindChip type={draft.entityType} />
           </TitleLine>
           <div className="cx-visline">
+            <KindChip type={draft.entityType} />
             <AudienceChip value={page.revealedToPlayers ? EVERYONE : HIDDEN} party={party} />
           </div>
         </div>
         <div className="cx-page-actions">
-          {saveControls}
+          {previewSwitch}
+          {saveState}
+          {doneButton}
           {more}
         </div>
       </header>
+      {previewLine}
       {error && (
         <div className="cx-page-notice">
           <Alert tone="danger">{error}</Alert>
         </div>
       )}
-      <div className="cx-page-cols is-writing">
+      {previewBody}
+      {/* The writer stays mounted under Preview, so turning it off returns to the same text and caret. */}
+      <div className="cx-page-cols is-writing" hidden={preview.on}>
         <div className="cx-page-docscroll scroll-y">
           <div className="cx-doc">{editor}</div>
         </div>
@@ -534,5 +621,35 @@ export function PageWriter({
       </div>
       {overlays}
     </div>
+  );
+}
+
+/** A field's audience as a pair of Base line options, Everyone and Hidden, Hidden in violet (Codex frame 2.3). */
+function WhoSeesField({
+  field,
+  hidden,
+  onChange
+}: Readonly<{ field: string; hidden: boolean; onChange: (hidden: boolean) => void }>) {
+  return (
+    <span className="cx-whopair" role="radiogroup" aria-label={`Who sees ${field}`}>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={!hidden}
+        className={cx("cx-whopair-option", !hidden && "is-on")}
+        onClick={() => hidden && onChange(false)}
+      >
+        Everyone
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={hidden}
+        className={cx("cx-whopair-option", "is-hidden", hidden && "is-on")}
+        onClick={() => !hidden && onChange(true)}
+      >
+        Hidden
+      </button>
+    </span>
   );
 }

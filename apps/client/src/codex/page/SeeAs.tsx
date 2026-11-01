@@ -14,7 +14,8 @@ export function SeeAsControl({
   viewer,
   party,
   onChange,
-  compact = false
+  compact = false,
+  label = "See as players"
 }: Readonly<{
   on: boolean;
   viewer: SeeAsViewer;
@@ -22,6 +23,8 @@ export function SeeAsControl({
   onChange: (on: boolean, viewer: SeeAsViewer) => void;
   /** A phone's top bar: the menu alone, its first item turning the preview off. */
   compact?: boolean;
+  /** The switch's word: See as players on a page, Preview in the writer (rule 3.4: the same view). */
+  label?: string;
 }>) {
   const name = viewer.characterId
     ? (party.find((character) => character.id === viewer.characterId)?.name ?? "A character")
@@ -68,8 +71,13 @@ export function SeeAsControl({
     );
   return (
     <span className="cx-seeas">
-      <Switch checked={on} onChange={(next) => onChange(next, viewer)} label="See as players" />
-      <Menu align="end" label={`See as: ${name}`} trigger={name} className="cx-seeas-menu">
+      <Switch checked={on} onChange={(next) => onChange(next, viewer)} label={label} />
+      <Menu
+        align="end"
+        label={`${label === "Preview" ? "Preview as" : "See as"}: ${name}`}
+        trigger={name}
+        className="cx-seeas-menu"
+      >
         {items}
       </Menu>
     </span>
