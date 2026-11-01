@@ -16,20 +16,7 @@
 .player-actions {
   margin-top: 0.45rem;
 }
-.player-actions-label {
-  margin: 0 0 0.3rem;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.player-actions-label span {
-  color: var(--text-muted);
-  font-weight: 700;
-  text-transform: none;
-  letter-spacing: normal;
-}
+
 .action-list {
   list-style: none;
   margin: 0;

@@ -24,11 +24,7 @@
   color: var(--text-dim);
   font-size: var(--fs-xs);
 }
-.rule-ask-meta {
-  margin: 0.3rem 0 0;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-}
+
 .rule-ask-actions {
   display: flex;
   flex-wrap: wrap;

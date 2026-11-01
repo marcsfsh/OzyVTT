@@ -80,7 +80,10 @@ added rule 20 (dates, times and a chip's count) and amended 2.2, 2.5 and rules 2
 more, added rule 21 (one notice) and amended 2.2, 2.4, 2.5 and rules 8, 9, 19 and 20. A fifth sweep (ADR-0076) added
 tags, faces, closes, tabs, fields, lamps, cards and the contrast of every line, fixed twenty-five more, gave amber,
 magenta and violet words text shades that pass in Dawn, and amended 2.2, 2.4, 2.5 and rules 4, 9 and 19. Status:
-Designed; its plan builds each shared part once in the kit.
+Built in part (O0 to O13): each shared part is built once in the kit and the areas built in this pass use them. Left:
+a form field at 40px on a laptop (kept at 44px, the smoke suite's floor and DESIGN's touch rule), and Dusk's text shades
+kept at their lighter values for contrast; the surfaces each sweep listed as left to their areas are named in those
+areas' lines above.
 
 ## A. Frame and wayfinding
 

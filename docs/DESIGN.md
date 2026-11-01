@@ -73,6 +73,34 @@ Neon appears only where it means something, and each 80s element has one job.
 - A panel is a flat plate with a 1px edge. There is no chrome lip and no rim.
 - Legibility wins every conflict with mood. Reduced transparency turns Dusk's glass solid and drops the glows.
 
+The consistency sweeps (ADR-0072 to ADR-0076) added theme rules 13 to 21, which every area keeps:
+
+13. One side list. Every list of groups at the side is the kit's `SideListGroup` and `SideListRow`: an eyebrow, one
+    row a thing (its icon or a face, its name, a count in VT323), the chosen lit with the cyan edge, a quiet action at
+    the foot. A row that names a kind of thing leads with its icon, a person with a face; a row that filters has none.
+14. A crumb sits on the title's line (`TitleLine` with `Crumb`), before the title on its baseline; on a phone the
+    header's Back names where it goes.
+15. A menu about one thing names it: `MenuHead` gives its name and one muted line at the menu's top.
+16. A phone sheet opens one way: from the bottom with its handle, a 48 to 56px head with the title and a 44px close.
+17. A list's toolbar reads one way (`ListToolbar`): the find field, the count in plain words, then sort as a Base line
+    button with its icon and word. A list has no title row of its own.
+18. Fields: a choice field's caret at its right end; the find field (`FindField`) with its search icon and a muted
+    placeholder.
+19. A state is a boxed tag (`Tag`, VT323 16px in a 22px box), a kind is its icon and word (`Kind`), readiness is a lamp
+    and words; one kind card (`KindCard`) and one Saved.
+20. Dates and times read one way (`formatWhen`, `formatDay`): "Oct 30, 7:40 PM", "Today, 8:41 PM", the year only when
+    it isn't this one; a chip's count follows its label.
+21. A notice reads one way (`Notice`): a 1px frame of its colour over the line, a 3px edge at its left, no fill.
+
+The sweeps also amended earlier rules: one Cup in view with words only, and a section bar's Cup stepping down to a Base
+line while the page shows its own (rule 2); one mark (rule 4); a GM ONLY tag at one size where its description sits
+(rule 7); menu and table rows of 48px with the rule inside the row (rule 8); magenta's meanings, a harmful condition in
+red, no horizon on a card, and text shades for amber, magenta and violet words (`--caution-text`, `--magenta-text`,
+`--violet-text`; rule 9); heads inside a page (rule 10); a column beside a side list at 880px and the reading measure
+at 680px (rule 11); what a phone header names (rule 12). Title sizes: a title row 24px (20px on a phone), a dialog's
+and a sheet's title 20px, a title in a page 22px (20px on a phone). One eyebrow: Bai Jamjuree 600, 11px capitals,
+0.12em, `--text-muted`.
+
 ## Colour and themes
 
 Never hard-code a colour in a component; add a token first and use `var(--...)`. Both themes share one token set and
@@ -455,6 +483,17 @@ from the mockups.
   encounter without a map says "No map yet." with Pick a map. No illustrations; the sunset belongs to arrival screens.
   The GM's empty table is the lobby rather than an empty state (Arrival above).
 - Icons are 20px stroked SVG. Never render an emoji or a text symbol as an icon.
+- Shared parts from the consistency sweeps, each built once (in the kit, or in the shell for the bars' parts): the side list (`SideListGroup`, `SideListRow`;
+  rows 38px, 48px on a phone); the crumb (`Crumb`, `TitleLine`); a menu's head (`MenuHead`); a sheet's handle and head
+  (`Modal` and `Drawer` from the bottom); the section bar's primary that steps down when the page shows a Cup
+  (`BarPrimary` in `shell/SectionBar.tsx`); the phone header's Back (`CodexPhoneBar`); the list toolbar, the find field and a kind (`ListToolbar`,
+  `FindField`, `Kind`); ticks for several choices (`Tick`, 18px); the notice (`Notice`); the tag (`Tag`); the kind card
+  (`KindCard`); dates (`formatWhen`, `formatDay`). A dialog's close is a plain 18px icon in a 40px button (44px on a
+  phone); a stepper is 40px (44px on a phone) with its number in VT323 22px; a tab is 44px with 14px words; a form
+  field is 44px; the section bar's search 38px; a lamp 8px, the turn's action lamps 11px; an icon in a button 15px. With
+  touch every control's face is 44px. The ghost is only for Cancel or Back beside a Cup; a danger action is
+  `--danger-text` on the Base line, in a menu a `--danger-text` row with the bin icon; an icon button sits on its Base
+  line in content (`IconButton base`).
 
 ## Motion
 

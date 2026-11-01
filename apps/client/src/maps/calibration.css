@@ -165,14 +165,6 @@
   vector-effect: non-scaling-stroke;
 }
 
-/* The step body is bounded so it cannot push the canvas off screen. `.scroll-y` is in the markup.
-   No floor: in the one-column pane it is the row that yields, and a floor would push the action
-   row off the bottom instead. */
-.map-step-body {
-  flex: 0 1 auto;
-  min-height: 0;
-  max-height: 40%;
-}
 .map-step-panel {
   display: flex;
   flex-direction: column;
@@ -186,17 +178,6 @@
 }
 .map-step-hint strong {
   color: var(--text);
-}
-/* The action row: one primary per step, pinned to the pane's bottom. */
-.map-step-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding-top: var(--space-1);
-}
-.map-step-actions .nh-btn {
-  flex: 1 1 10rem;
-  justify-content: center;
 }
 
 .map-mode-choice {
@@ -438,18 +419,6 @@
   width: 7rem;
   height: var(--tap-min);
   margin: 0;
-}
-.map-point-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-}
-.map-point-summary strong {
-  color: var(--text);
-  font-family: var(--font-numeric);
 }
 
 /* On a phone each fieldset of the typed points takes the row, and the instruction line is tighter. */

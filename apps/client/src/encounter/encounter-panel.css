@@ -17,30 +17,7 @@
 .encounter-panel > p {
   color: var(--text-dim);
 }
-.encounter-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-.encounter-heading h2 {
-  font-size: var(--fs-h2);
-  line-height: var(--lh-tight);
-  font-family: var(--font-display);
-  font-weight: var(--fw-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.encounter-round {
-  flex: none;
-  padding: 0.4rem 0.7rem;
-  background: var(--surface-3);
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  font-weight: 800;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
+
 /* Inside the table's panel a tab's body is the frame: no margin, padding or plate of its own. */
 .table-panel-body .encounter-panel {
   margin: 0;
@@ -49,47 +26,14 @@
 .table-panel-body .encounter-panel::before {
   display: none;
 }
-/* The GM's Fight tab in a fight: the order on top and Now acting under it, each scrolling by itself. The order takes
-   at most two fifths of the height, so the console keeps the rest. */
-.encounter-fight {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  flex: 1 1 0;
-  min-height: 0;
-}
-/* Focus can scroll a box that hides its overflow, and a row's tools would move the whole section out of place;
-   `clip` cannot be scrolled. */
-.encounter-fight > .encounter-order {
-  display: flex;
-  flex-direction: column;
-  flex: 0 1 auto;
-  max-height: 42%;
-  min-height: 0;
-  overflow: clip;
-}
-.encounter-fight .encounter-region {
-  min-height: 2.75rem;
-}
-.encounter-fight > .encounter-acting {
-  flex: 1 1 0;
-  min-height: 0;
-}
+
 :is(.table-panel-body, .encounter-split-turn) > .encounter-order {
   display: flex;
   flex-direction: column;
   flex: 1 1 0;
   min-height: 0;
 }
-.encounter-order-head {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.encounter-order-head .encounter-place-nudge {
-  margin: 0;
-}
+
 .encounter-acting {
   display: flex;
   flex-direction: column;
@@ -107,12 +51,8 @@
 :is(.table-panel-body, .encounter-split-turn) > .encounter-order-tools {
   flex: none;
 }
-.encounter-acting-body {
-  flex: 1 1 auto;
-  min-height: 0;
-}
+
 /* While a target is chosen, Cancel and Roll stay at the foot of the scrolling console or tab. */
-.encounter-acting-body .action-targeting-buttons,
 .table-panel-body .action-targeting-buttons {
   position: sticky;
   bottom: 0;
@@ -120,23 +60,7 @@
   padding: var(--space-2) 0;
   background: var(--surface-1);
 }
-.encounter-acting-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-  margin: 0;
-  color: var(--text-muted);
-  font: 700 var(--fs-2xs) / 1.2 var(--font-label);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-}
-.encounter-acting-numbers {
-  color: var(--text-dim);
-  font-family: var(--font-numeric);
-  letter-spacing: 0;
-  text-transform: none;
-}
+
 /* The turn's controls in the panel's footer: Previous, Next turn taking the room, End fight and the fight menu. */
 .table-panel-foot .turn-controls {
   --control-h: var(--tap-min);
@@ -167,30 +91,13 @@
 .table-panel-foot .encounter-menu-toggle {
   flex: none;
 }
-/* The bar's readouts, after its buttons: the character's hit points and this turn's movement. */
-.economy-status {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-}
-.economy-hp {
-  color: var(--text-dim);
-  font: 700 var(--fs-sm) / 1 var(--font-numeric);
-  white-space: nowrap;
-}
+
 .player-turn {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
-.player-turn-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
+
 .player-turn-title {
   display: flex;
   align-items: center;
@@ -473,59 +380,7 @@
   color: var(--caution-text);
   font-size: var(--fs-sm);
 }
-/* Compact control bar: turn navigation + the ⋯ menu. `--control-h` sets every control's height on
-   the bar (the 44px floor) in one place. */
-.encounter-topbar {
-  --control-h: var(--tap-min);
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.6rem;
-}
-.encounter-topbar > .encounter-round {
-  display: inline-flex;
-  align-items: center;
-  height: var(--control-h);
-  margin: 0;
-  padding: 0 0.7rem;
-}
-.encounter-topbar .turn-controls {
-  flex: 1 1 auto;
-  margin-top: 0;
-  display: grid;
-  grid-template-columns: var(--control-h) 1fr;
-  gap: 0.35rem;
-}
-.encounter-topbar .turn-controls button {
-  height: var(--control-h);
-  padding: 0 0.6rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  font-size: var(--fs-sm);
-}
-.encounter-topbar .turn-controls button:first-child {
-  padding: 0;
-  font-size: 1.05rem;
-} /* the ‹ chevron is a centered square */
-/* Every control on the bar wears the panel's shared material (`background: none` hands paint to the
-   backing layer); only `Next turn` keeps the accent edge. */
-.encounter-topbar .turn-controls button,
-.encounter-topbar .turn-controls .encounter-primary {
-  background: none;
-  border: 1px solid transparent;
-  color: var(--text);
-  font-weight: 700;
-}
-/* Hover comes from the material (rim brightens, cue wedge appears). The generic
-   `.turn-controls .encounter-primary:hover` fill and glow stay off here. */
-.encounter-topbar .turn-controls button:hover:not(:disabled) {
-  background: none;
-  box-shadow: none;
-  color: var(--text);
-}
+
 /* The slots grow their paint to 44px: in a .3rem-gap row a `.tap-target` overhang would steal the
    neighbour's taps. Their radius is set by the material block near the end of this file. */
 .economy-slot {
@@ -554,16 +409,7 @@
   font-size: var(--fs-sm);
   font-weight: 700;
 }
-.economy-movement {
-  font-size: var(--fs-xs);
-  color: var(--text-dim);
-  align-self: center;
-  padding: 0 0.35rem;
-  white-space: nowrap;
-}
-.own-save-prompts {
-  margin-top: 0.4rem;
-}
+
 .initiative-list:not(.gm) > li {
   flex-direction: column;
   align-items: stretch;
@@ -581,40 +427,6 @@
 .initiative-list:not(.gm) .initiative-row-main > strong {
   color: var(--text);
   font-family: var(--font-numeric);
-}
-.player-sheet-door {
-  flex: 0 0 auto;
-}
-
-.party-heading h2 {
-  margin: 0.2rem 0 0.3rem;
-}
-.party-heading p {
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  margin: 0 0 1.1rem;
-}
-.party-card-thumb {
-  display: grid;
-  place-items: center;
-  aspect-ratio: 16 / 10;
-  background: linear-gradient(150deg, color-mix(in srgb, var(--violet) 22%, var(--surface-3)), var(--surface-3));
-}
-.party-card.is-archived {
-  opacity: 0.62;
-}
-/* Character cards have two or three actions, and the shared gallery row splits width equally, which
-   truncates labels. Here the row wraps and buttons keep their label width; cells are 15rem (not
-   13rem) so the two common actions share a line. */
-.nh-gallery.party-gallery {
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-}
-.party-gallery .nh-card-actions {
-  flex-wrap: wrap;
-}
-.party-gallery .nh-card-actions > button {
-  flex: 1 1 auto;
-  min-width: max-content;
 }
 
 .turn-review {
@@ -663,11 +475,6 @@
   font-weight: 800;
   text-decoration: line-through;
 }
-.encounter-topbar .encounter-round {
-  align-self: center;
-  font-size: var(--fs-xs);
-  padding: 0.3rem 0.55rem;
-}
 
 .initiative-list.player {
   margin-top: 0.6rem;
@@ -681,15 +488,7 @@
 .initiative-list.player .initiative-row-main {
   gap: var(--space-2);
 }
-.encounter-topbar.player {
-  align-items: center;
-  flex-wrap: wrap;
-}
-.your-turn-flag {
-  color: var(--cyan-hi);
-  font-size: var(--fs-sm);
-  font-weight: 800;
-}
+
 .encounter-quiet-note {
   color: var(--text-muted);
   font-size: var(--fs-xs);
@@ -809,7 +608,6 @@
    player reads a number from gets a flat plate. No rest glow: the active turn is the region's one glowing
    element, and a reaction prompt only appears during one. */
 .encounter-panel,
-.encounter-round,
 .condition-picker,
 .action-row,
 .action-targeting,
@@ -823,7 +621,6 @@
   background: none;
 }
 .encounter-panel::before,
-.encounter-round::before,
 .condition-picker::before,
 .action-row::before,
 .action-targeting::before,
@@ -850,7 +647,6 @@
 .save-prompt.reaction-prompt::before {
   box-shadow: var(--turn-glow);
 }
-.encounter-round,
 .condition-picker,
 .action-row,
 .action-targeting,
@@ -868,15 +664,10 @@
 .encounter-menu {
   position: fixed;
 }
-.encounter-round {
-  border-radius: 0;
-}
 
 /* Hand-rolled controls (bare buttons and inputs predating the primitives) are raised controls like
    `.nh-btn--secondary`: the raised fill, edge and top highlight on a backing layer, with `inset: -1px`
    keeping every control's size. A state repaints `--material-fill` on the element. */
-.dock-log-door,
-.encounter-dock-choice,
 .encounter-primary,
 .turn-controls button:not(.nh-btn),
 .encounter-menu-toggle,
@@ -902,8 +693,6 @@
   border-color: transparent;
   --material-fill: var(--raised);
 }
-.dock-log-door::before,
-.encounter-dock-choice::before,
 .encounter-primary::before,
 .turn-controls button:not(.nh-btn)::before,
 .encounter-menu-toggle::before,
@@ -937,12 +726,6 @@
 }
 /* Interaction for all of them: the fill steps up and the edge brightens. `:active` matters because touch
    devices have no hover. */
-.dock-log-door:hover:not(:disabled)::before,
-.dock-log-door:focus-visible::before,
-.dock-log-door:active:not(:disabled)::before,
-.encounter-dock-choice:hover:not(:disabled)::before,
-.encounter-dock-choice:focus-visible::before,
-.encounter-dock-choice:active:not(:disabled)::before,
 .encounter-primary:hover:not(:disabled)::before,
 .encounter-primary:focus-visible::before,
 .encounter-primary:active:not(:disabled)::before,
@@ -1074,7 +857,6 @@
 .legendary-offer {
   border-radius: 0;
 }
-.dock-log-door:disabled::before,
 .encounter-primary:disabled::before,
 .encounter-primary:not(.turn-prev):disabled::before,
 .turn-controls button:not(.nh-btn):disabled::before,
@@ -1102,9 +884,7 @@
   background: color-mix(in srgb, var(--danger) 12%, var(--surface-2));
   color: var(--danger-text);
 }
-.encounter-topbar .encounter-end {
-  flex: none;
-}
+
 /* On a phone the bar under the thumb keeps Previous, Next turn and the fight menu; ending the fight is in that
    menu. */
 @media (max-width: 979px) {

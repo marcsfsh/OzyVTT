@@ -114,26 +114,7 @@ main > :is(.app-bottom-tabs, .app-bottom-nav) {
   position: relative;
   isolation: isolate;
 }
-.scene-empty {
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: var(--space-5);
-  min-height: 14rem;
-  padding: var(--space-10) var(--space-4);
-  text-align: center;
-}
-.scene-empty p {
-  max-width: 34rem;
-  margin: 0;
-  color: var(--text-dim);
-  font-size: var(--fs-body);
-}
-.scene-empty .nh-btn--primary {
-  min-height: 3.25rem;
-  padding-inline: var(--space-8);
-  font-size: var(--fs-body);
-}
+
 /* Pane entrances are opacity-only: an animated (or `both`-filled) transform makes the element the
    containing block for `position: fixed` descendants, which would trap every fixed overlay in the pane. */
 @keyframes pane-in {

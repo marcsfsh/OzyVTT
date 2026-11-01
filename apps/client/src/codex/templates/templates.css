@@ -8,24 +8,6 @@
   min-height: 0;
 }
 
-.tpl-card {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  background: var(--material-plate);
-  border: 1px solid var(--line);
-  box-shadow: var(--material-lip);
-}
-
-.tpl-card.is-selected {
-  border-color: var(--cyan);
-  box-shadow:
-    var(--material-lip),
-    inset 3px 0 0 var(--cyan);
-}
-
 .tpl-card-icon {
   width: 1.2em;
   height: 1.2em;

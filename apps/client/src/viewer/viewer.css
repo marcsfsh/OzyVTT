@@ -13,21 +13,7 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-/* The idle screens hold no map, so they show the app's ground. */
-.viewer-pairing {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  /* The lines sit together in the middle, clear of the horizon; spread over the rows they drifted apart. */
-  align-content: center;
-  gap: var(--space-2);
-  padding: var(--space-8);
-  text-align: center;
-  overflow: hidden;
-  background: var(--sky);
-}
+
 /* The code is read across a room and typed on another device: as large as the card allows, on one line (seven
    display-face glyphs are about 5.5em wide). */
 .viewer-screen-code {
@@ -40,20 +26,7 @@
   color: var(--text);
   text-shadow: var(--heading-shadow, none);
 }
-.viewer-pairing .viewer-pairing-note {
-  font-size: clamp(0.9rem, 1.2vw, 1.15rem);
-}
-.viewer-pairing h1 {
-  margin: var(--space-2) 0;
-  font: var(--fw-display) clamp(2.5rem, 7vw, 5.5rem)/1 var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.viewer-pairing p {
-  color: var(--text-dim);
-  line-height: 1.5;
-  font-size: clamp(1rem, 1.5vw, 1.45rem);
-}
+
 .viewer-fullscreen:focus-visible {
   outline: none;
   box-shadow:

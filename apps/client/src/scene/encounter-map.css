@@ -388,14 +388,6 @@
   font-size: 0.78rem;
 }
 
-.map-button-icon {
-  display: inline-grid;
-  place-items: center;
-  margin-right: 0.35rem;
-  font-size: 1rem;
-  vertical-align: -0.15em;
-}
-
 .annotation-handle {
   fill: var(--cyan-hi);
   stroke: #0a0805;

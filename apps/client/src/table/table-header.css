@@ -25,64 +25,6 @@
   font-size: var(--fs-sm);
   white-space: nowrap;
 }
-.table-header-scene {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  max-width: 16rem;
-}
-.table-header-scene-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* "Live" is a chip: a tinted strip with a bar in its tone on the leading edge. */
-.table-header-live,
-.table-header-chip {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.5rem;
-  padding: 0 0.45rem;
-  border-left: 3px solid var(--cyan);
-  background: color-mix(in srgb, var(--cyan) 12%, var(--surface-2));
-  color: var(--cyan-hi);
-  font: 600 var(--fs-2xs) / 1 var(--font-label);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.table-header-chips {
-  display: inline-flex;
-  gap: var(--space-2);
-  flex: none;
-}
-.table-header-chips > .table-header-chip {
-  border-top: 0;
-  border-right: 0;
-  border-bottom: 0;
-  cursor: pointer;
-}
-/* Off reads quiet: a grey bar and dim words. */
-.table-header-chip.is-off {
-  border-left-color: var(--line-raised);
-  background: var(--surface-2);
-  color: var(--text-muted);
-}
-.table-header-staging {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.table-header-staged-name {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--violet-text);
-  font-size: var(--fs-sm);
-}
 
 /* Below 980px the header keeps one row: the scenes as an icon, the status, the TV as an icon and the sound with a
    short title. The fog and vision chips fold away and the player's Me moves to the tool row. */
@@ -92,33 +34,18 @@
     padding: 0 var(--space-2);
     gap: var(--space-1);
   }
-  .table-header-chips,
-  .table-header-scene-name,
-  .table-header-live {
-    display: none;
-  }
+
   .table-header .now-playing.is-compact {
     max-width: 8.5rem;
     padding: 0;
   }
-  /* A staged scene keeps one row too: the status takes the room left, the name gives way to Make live, and the
-     words round the name and Back to live's label are left to screen readers. */
-  .table-header-staging {
-    flex: 0 1 auto;
-    flex-wrap: nowrap;
-  }
-  .table-header-staged-name {
-    flex: 0 1 auto;
-    min-width: 2.5rem;
-  }
+
   .table-header-staged-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .table-header-staging > .nh-btn {
-    flex: none;
-  }
+
   .table-header.is-staging .table-status {
     flex-basis: 0;
   }

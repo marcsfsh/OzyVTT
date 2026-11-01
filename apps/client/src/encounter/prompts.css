@@ -187,22 +187,7 @@
   border-color: color-mix(in srgb, var(--line-strong) 45%, var(--cyan));
   background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan));
 }
-.initiative-gathering {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: var(--space-2);
-  padding: var(--space-2) 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--line-strong) 55%, var(--magenta));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta));
-  font-size: var(--fs-sm);
-  color: var(--text);
-}
-.initiative-gathering span {
-  flex: 1 1 12rem;
-}
+
 /* The spell areas the server runs: one line each, an unplaced one marked as not finished. */
 .spell-areas {
   margin-bottom: var(--space-2);
