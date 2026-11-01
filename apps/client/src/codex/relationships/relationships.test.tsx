@@ -170,7 +170,9 @@ describe("The factions grid", () => {
     const user = userEvent.setup();
     const view = renderGmCodex("/codex/relationships?view=grid");
     await user.click(await screen.findByRole("button", { name: /Adjust The Tidebound's standing/ }));
-    expect(await screen.findByRole("dialog", { name: "Standing with The Tidebound" })).toBeInTheDocument();
+    // The cell opens the faction's page with its standing in the side column (F story spec 2.3).
+    expect(window.location.pathname).toBe("/codex/pages/f1");
+    expect(new URLSearchParams(window.location.search).get("side")).toBe("standing");
     view.unmount();
 
     api.playerCodexApi.listPages.mockResolvedValue([

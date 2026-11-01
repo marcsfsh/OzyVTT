@@ -65,6 +65,8 @@ import { PlayerPageBody } from "./PlayerPage";
 import { SeeAsControl, usePreviewToken, type SeeAsViewer } from "./SeeAs";
 import { PageWriter } from "./PageWriter";
 import { GmTagColumn, SideHead, useEscapeToFacts } from "./SideColumn";
+import { StandingColumn } from "./StandingColumn";
+import { standingLabel, standingValueLabel } from "../chronicle";
 import { VersionBand, VersionsColumn, useVersions, versionLines } from "./VersionsColumn";
 import { addedSince } from "./versions";
 import "./page.css";
@@ -117,6 +119,9 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   const [phoneTab, setPhoneTab] = useState("overview");
   // The side column's one open part. A tag is in the address, so the browser's Back closes it.
   const tag = query.get("tag");
+  // A faction's standing is the side column's part named in the address (`?side=standing`), so the Factions grid can
+  // open a faction's page on it.
+  const standingOpen = query.get("side") === "standing";
   const openTag = (name: string) => {
     setRevealing(null);
     setVersions(null);
@@ -125,20 +130,39 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   const closeSide = useCallback(() => {
     setRevealing(null);
     setVersions(null);
-    setQuery((params) => params.delete("tag"));
+    setQuery((params) => {
+      params.delete("tag");
+      params.delete("side");
+    });
   }, [setQuery]);
+  const openStanding = () => {
+    setRevealing(null);
+    setVersions(null);
+    setQuery((params) => {
+      params.delete("tag");
+      params.set("side", "standing");
+    });
+  };
   // A reveal or the versions replace whatever part is open, a tag included.
   const openReveal = (block: CodexBlock) => {
-    if (tag) setQuery((params) => params.delete("tag"));
+    if (tag || standingOpen)
+      setQuery((params) => {
+        params.delete("tag");
+        params.delete("side");
+      });
     setVersions(null);
     setRevealing(block);
   };
   const openVersions = () => {
-    if (tag) setQuery((params) => params.delete("tag"));
+    if (tag || standingOpen)
+      setQuery((params) => {
+        params.delete("tag");
+        params.delete("side");
+      });
     setRevealing(null);
     setVersions({ revisionId: null });
   };
-  useEscapeToFacts(tag !== null || revealing !== null || versions !== null, closeSide);
+  useEscapeToFacts(tag !== null || revealing !== null || versions !== null || standingOpen, closeSide);
   const pins = usePagePins("gm", token, id);
   const followLink = usePageLinks(feeds.pages, gm.quickCreate);
   const knownTitles = useMemo(() => new Set(feeds.pages.map((summary) => pageLinkKey(summary.title))), [feeds.pages]);
@@ -461,46 +485,62 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
     </>
   );
 
-  // The side column's open part: a reveal, the versions or a tag, else nothing (the facts).
-  const sidePart = versions ? (
-    <>
-      <SideHead title={`Versions · ${history.revisions.length}`} onBack={closeSide} />
-      <VersionsColumn
-        revisions={history.revisions}
-        lines={lines}
-        nowAt={page.updatedAt}
-        line={history.line}
-        chosen={readingAt}
-        onChoose={(revisionId) => setVersions({ revisionId })}
-        opened={
-          phone && reading ? (
-            <div className="cx-version-open">
-              <VersionBand revision={reading} what={readingWhat} onRestore={() => void restore(reading.id)} />
-              <div className="cx-doc">{versionDocument}</div>
-            </div>
-          ) : undefined
-        }
-      />
-    </>
-  ) : revealing ? (
-    <>
-      <SideHead title={`Reveal ${revealing.title?.trim() || "this block"}`} tone="hidden" onBack={closeSide} />
-      <RevealColumn
-        key={revealing.id}
-        party={party}
-        busy={busy}
-        error={error}
-        preview={<CodexMarkdown text={revealing.text} token={token} audience="player" knownTitles={knownTitles} />}
-        links={linksSentence(revealing.text, feeds.pages)}
-        onReveal={(next) => void setAudience(revealing, next)}
-      />
-    </>
-  ) : tag ? (
-    <>
-      <SideHead onBack={closeSide} />
-      <GmTagColumn tag={tag} />
-    </>
-  ) : null;
+  const standingRow = feeds.campaign.standing.find((row) => row.factionPageId === id) ?? null;
+  const isFaction = page.entityType === "faction";
+  // The side column's open part: the standing, a reveal, the versions or a tag, else nothing (the facts).
+  const sidePart =
+    standingOpen && isFaction ? (
+      <>
+        <SideHead title="Standing toward the party" onBack={closeSide} />
+        <StandingColumn
+          // The standing arrives with the campaign feed; a new value starts the column again from it.
+          key={`${standingRow?.id ?? "none"}:${standingRow?.value ?? 0}`}
+          gmToken={token}
+          factionPageId={id}
+          standing={standingRow}
+          onSaved={() => void feeds.campaignFeed.reload()}
+          onClose={closeSide}
+        />
+      </>
+    ) : versions ? (
+      <>
+        <SideHead title={`Versions · ${history.revisions.length}`} onBack={closeSide} />
+        <VersionsColumn
+          revisions={history.revisions}
+          lines={lines}
+          nowAt={page.updatedAt}
+          line={history.line}
+          chosen={readingAt}
+          onChoose={(revisionId) => setVersions({ revisionId })}
+          opened={
+            phone && reading ? (
+              <div className="cx-version-open">
+                <VersionBand revision={reading} what={readingWhat} onRestore={() => void restore(reading.id)} />
+                <div className="cx-doc">{versionDocument}</div>
+              </div>
+            ) : undefined
+          }
+        />
+      </>
+    ) : revealing ? (
+      <>
+        <SideHead title={`Reveal ${revealing.title?.trim() || "this block"}`} tone="hidden" onBack={closeSide} />
+        <RevealColumn
+          key={revealing.id}
+          party={party}
+          busy={busy}
+          error={error}
+          preview={<CodexMarkdown text={revealing.text} token={token} audience="player" knownTitles={knownTitles} />}
+          links={linksSentence(revealing.text, feeds.pages)}
+          onReveal={(next) => void setAudience(revealing, next)}
+        />
+      </>
+    ) : tag ? (
+      <>
+        <SideHead onBack={closeSide} />
+        <GmTagColumn tag={tag} />
+      </>
+    ) : null;
 
   const metaPanel = (
     <>
@@ -509,6 +549,20 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
           {fields.length > 0 && (
             <MetaSection label="Facts">
               <FieldList fields={fields} />
+            </MetaSection>
+          )}
+          {isFaction && (
+            <MetaSection label="Standing">
+              <button
+                type="button"
+                className="cx-standing-fact interactive"
+                aria-label={`Change the standing: ${standingLabel(standingRow?.value ?? 0)} ${standingValueLabel(standingRow?.value ?? 0)}`}
+                onClick={openStanding}
+              >
+                <b>{standingLabel(standingRow?.value ?? 0)}</b>
+                <span className="cx-standing-n">{standingValueLabel(standingRow?.value ?? 0)}</span>
+                <span className="cx-standing-change">Change</span>
+              </button>
             </MetaSection>
           )}
           <MetaSection label="Relationships">
@@ -552,13 +606,15 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
               <Tabs
                 ariaLabel="Page sections"
                 tabs={
-                  versions
-                    ? [...PHONE_TABS, { id: "side", label: "History" }]
-                    : revealing
-                      ? [...PHONE_TABS, { id: "side", label: "Reveal" }]
-                      : tag
-                        ? [...PHONE_TABS, { id: "side", label: `#${tag}` }]
-                        : PHONE_TABS
+                  standingOpen && isFaction
+                    ? [...PHONE_TABS, { id: "side", label: "Standing" }]
+                    : versions
+                      ? [...PHONE_TABS, { id: "side", label: "History" }]
+                      : revealing
+                        ? [...PHONE_TABS, { id: "side", label: "Reveal" }]
+                        : tag
+                          ? [...PHONE_TABS, { id: "side", label: `#${tag}` }]
+                          : PHONE_TABS
                 }
                 activeId={sidePart ? "side" : phoneTab}
                 onChange={(next) => {

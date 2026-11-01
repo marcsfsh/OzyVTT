@@ -625,3 +625,52 @@ describe("Versions in the side column", () => {
     expect(sideColumn().getByRole("heading", { name: /^Versions/ })).toBeInTheDocument();
   });
 });
+
+describe("A faction's standing in the side column", () => {
+  const TIDEBOUND: CodexPage = { ...YSOLDE, id: "f1", title: "The Tidebound", entityType: "faction", tags: [] };
+  beforeEach(() => {
+    records.pageRecordApi.get.mockResolvedValue({ page: TIDEBOUND, connections: [] });
+    api.standingApi.list.mockResolvedValue([
+      {
+        id: "s1",
+        factionPageId: "f1",
+        value: -52,
+        revealedToPlayers: true,
+        createdAt: AT,
+        updatedAt: AT,
+        firstShownAt: AT
+      }
+    ]);
+    api.standingApi.set.mockResolvedValue({});
+  });
+
+  it("opens from the facts, moves by steps and by a word, and says the old number and the new", async () => {
+    const user = userEvent.setup();
+    renderGmCodex("/codex/pages/f1");
+    await screen.findByRole("complementary", { name: "About this page" });
+    const side = sideColumn();
+    await user.click(await side.findByRole("button", { name: "Change the standing: Hostile -52" }));
+    expect(await side.findByRole("heading", { name: "Standing toward the party" })).toBeInTheDocument();
+    await user.click(side.getByRole("button", { name: "+5" }));
+    expect(side.getByText("-52 → -47")).toBeInTheDocument();
+    await user.click(side.getByRole("button", { name: /^Friendly/ }));
+    // A word moves the number to the middle of its range: 15 to 44 is 30 (rounded).
+    expect(side.getByText("-52 → +30")).toBeInTheDocument();
+    expect(side.getByRole("button", { name: /^Friendly/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("records once through today's route and closes the column; the reason keeps its 120 limit", async () => {
+    const user = userEvent.setup();
+    renderGmCodex("/codex/pages/f1?side=standing");
+    await screen.findByRole("complementary", { name: "About this page" });
+    const side = sideColumn();
+    await user.click(await side.findByRole("button", { name: "-10" }));
+    const reason = side.getByLabelText("Why it moved");
+    expect(reason).toHaveAttribute("maxlength", "120");
+    await user.type(reason, "Burned the docks");
+    await user.click(side.getByRole("button", { name: "Record change" }));
+    await waitFor(() => expect(api.standingApi.set).toHaveBeenCalledWith("gm", "f1", -62, "Burned the docks"));
+    expect(api.standingApi.set).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get("side")).toBeNull());
+  });
+});

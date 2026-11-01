@@ -1074,3 +1074,92 @@ form.cx-folderrow {
   padding: var(--space-2) var(--space-3);
   border: 1px dashed color-mix(in srgb, var(--violet) 55%, transparent);
 }
+
+/* ----- A faction's standing in the side column (F story spec 2.3): the word first, then the numbers ----- */
+.cx-standing {
+  display: grid;
+  gap: var(--space-3);
+}
+.cx-standing-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+.cx-standing-word {
+  font: 600 26px / 1.1 var(--font-display);
+  text-transform: uppercase;
+}
+.cx-standing-n {
+  color: var(--text-dim);
+  font: 400 22px / 1 var(--font-numeric);
+}
+.cx-standing-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cx-standing-tiers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line-strong);
+}
+.cx-standing-tier {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 2px 0 0 transparent;
+  background: transparent;
+  color: var(--text);
+  font: 600 14px / 1.2 var(--font-body);
+  cursor: pointer;
+}
+.cx-standing-tiers li:last-child .cx-standing-tier {
+  border-bottom: 0;
+}
+.cx-standing-tier.is-on {
+  box-shadow: inset 2px 0 0 var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+  color: var(--cyan-hi);
+}
+.cx-standing-range {
+  color: var(--text-muted);
+  font: 400 16px / 1 var(--font-numeric);
+}
+.cx-standing-cup {
+  width: 100%;
+}
+.cx-standing-fact {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.cx-standing-fact .cx-standing-n {
+  font-size: 18px;
+}
+.cx-standing-change {
+  margin-left: auto;
+  color: var(--cyan-hi);
+  font-size: var(--fs-sm);
+}
+@media (max-width: 760px) {
+  .cx-standing-tier {
+    min-height: var(--tap-min);
+  }
+}

@@ -1,5 +1,5 @@
 import { useContext, useMemo, useState } from "react";
-import { Button, Eyebrow, IconMore, Menu, MenuItem, Modal, SegmentedControl, Tag, useToast, cx } from "@vtt/ui";
+import { Button, Eyebrow, IconMore, Menu, MenuItem, Modal, SegmentedControl, Tag, cx } from "@vtt/ui";
 import {
   dateToInstant,
   instantToDate,
@@ -10,11 +10,10 @@ import {
 import type { CodexConnection, PlayerCodexConnection } from "@vtt/domain";
 import { entityColor, entityDef, entityIconId } from "../entities";
 import { EntityIcon, iconChildren } from "../icons";
-import { StandingAdjuster } from "../StandingAdjuster";
 import { standingLabel, standingValueLabel } from "../chronicle";
 import { pagePath, relationshipsPath, type RelationshipsView as ViewId } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
-import { GmCodexContext, PlayerCodexContext, useCodexShell, useGmCodex } from "../shell/context";
+import { GmCodexContext, PlayerCodexContext, useCodexShell } from "../shell/context";
 import { PagePicker } from "../shared/PagePicker";
 import "./relationships.css";
 
@@ -438,26 +437,6 @@ function OverTime({
   );
 }
 
-/** The GM's standing dialog for one faction, from a cell of the grid. */
-function AdjustStanding({ faction, onClose }: Readonly<{ faction: Node; onClose: () => void }>) {
-  const { token } = useCodexShell();
-  const { feeds } = useGmCodex();
-  const { toast } = useToast();
-  return (
-    <StandingAdjuster
-      gmToken={token}
-      factionPageId={faction.id}
-      factionName={faction.title}
-      standing={feeds.campaign.standing.find((row) => row.factionPageId === faction.id) ?? null}
-      onSaved={() => {
-        void feeds.campaignFeed.reload();
-        toast("Standing updated.", { tone: "success" });
-      }}
-      onClose={onClose}
-    />
-  );
-}
-
 const VIEWS: ReadonlyArray<Readonly<{ value: ViewId; label: string }>> = [
   { value: "web", label: "Web" },
   { value: "grid", label: "Factions grid" },
@@ -472,7 +451,6 @@ export function RelationshipsView() {
   const { role, query, go, setFilter, phone } = useCodexShell();
   const gm = useContext(GmCodexContext);
   const player = useContext(PlayerCodexContext);
-  const [adjusting, setAdjusting] = useState<string | null>(null);
 
   const gmFeeds = gm?.feeds;
   const playerFeeds = player?.feeds;
@@ -540,13 +518,9 @@ export function RelationshipsView() {
         connections={connections}
         standing={standing}
         focusId={focus?.id ?? null}
-        onAdjust={role === "gm" ? setAdjusting : undefined}
+        onAdjust={role === "gm" ? (factionId) => go(`${pagePath(factionId)}?side=standing`) : undefined}
       />
     </div>
-  );
-  const adjustingPage = adjusting ? nodes.get(adjusting) : undefined;
-  const adjuster = gm && adjustingPage && (
-    <AdjustStanding key={adjustingPage.id} faction={adjustingPage} onClose={() => setAdjusting(null)} />
   );
   const tieTitle = focus ? `${focus.title}'s ties` : "Ties";
   const tieRows = <TieRows neighbours={neighbours} chosen={chosen} onChoose={setChosen} onCentre={centre} go={go} />;
@@ -607,7 +581,6 @@ export function RelationshipsView() {
             {role === "gm" && <span className="cx-hint">Dashed violet lines and rows are hidden.</span>}
           </Modal>
         )}
-        {adjuster}
       </div>
     );
 
@@ -626,7 +599,6 @@ export function RelationshipsView() {
         {tieRows}
         {role === "gm" && <span className="cx-hint">Dashed violet lines and rows are hidden.</span>}
       </aside>
-      {adjuster}
     </div>
   );
 }
