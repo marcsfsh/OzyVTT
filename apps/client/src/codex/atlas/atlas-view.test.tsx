@@ -23,6 +23,7 @@ const setParty = vi.fn();
 const updateMap = vi.fn();
 const revealMap = vi.fn();
 const revealMarker = vi.fn();
+const createMap = vi.fn();
 const deleteMarker = vi.fn();
 
 vi.mock("../api", async (importOriginal) => {
@@ -45,11 +46,34 @@ vi.mock("../api", async (importOriginal) => {
       revealMap: (...a: unknown[]) => revealMap(...a),
       setPartyMarker: (...a: unknown[]) => setPartyMarker(...a),
       revealMarker: (...a: unknown[]) => revealMarker(...a),
+      createMap: (...a: unknown[]) => createMap(...a),
       deleteMarker: (...a: unknown[]) => deleteMarker(...a)
     }
   };
 });
 vi.mock("../prep/api", () => ({ partyApi: { set: (...a: unknown[]) => setParty(...a) } }));
+// E2's library picker has its own fetch; here it is one map to choose.
+vi.mock("../../maps/MapPicker", () => ({
+  MapPicker: ({ onSelect }: { onSelect: (map: unknown) => void }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onSelect({
+          id: "a9",
+          name: "Old mill",
+          kind: "battlemap",
+          width: 1,
+          height: 1,
+          calibration: null,
+          scale: null,
+          folder: null
+        })
+      }
+    >
+      Old mill
+    </button>
+  )
+}));
 
 import { ToastProvider } from "@vtt/ui";
 import type { CodexMap, CodexMarker, CodexPageSummary } from "@vtt/domain";
@@ -335,7 +359,7 @@ describe("The GM's atlas", () => {
     revealMap.mockResolvedValue(MAP("m1", "Saltmere", false));
     render(<Harness />);
     await user.click(await screen.findByLabelText("More for Saltmere"));
-    await user.click(screen.getByRole("menuitem", { name: "Map details" }));
+    await user.click(screen.getByRole("menuitem", { name: /^Map details/ }));
     expect(screen.getByRole("list", { name: /chosen/i })).toHaveTextContent("coast");
     await user.type(screen.getByLabelText("Tags"), "Old Town{Enter}");
     await waitFor(() => expect(updateMap).toHaveBeenCalledWith("gm", "m1", { tags: ["coast", "old-town"] }));
@@ -425,5 +449,44 @@ describe("Selecting another pin passes the unsaved-changes guard", () => {
     await waitFor(() => expect(currentHref()).toBe("/codex/atlas/m1?q=tun&pin=k2"));
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(await screen.findByRole("region", { name: "Pin: Tunnel mouth" })).toBeInTheDocument();
+  });
+});
+
+describe("Adding a map and the map's More", () => {
+  it("adds a map from the library picker, named and placed inside the open map", async () => {
+    const user = userEvent.setup();
+    createMap.mockResolvedValue(MAP("m9", "The old mill", true, "m1"));
+    render(<Harness />);
+    await user.click(await screen.findByLabelText("More for Saltmere"));
+    await user.click(screen.getByRole("menuitem", { name: "Add a map inside" }));
+    await user.click(await screen.findByRole("button", { name: "Old mill" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Name the map" }));
+    expect(dialog.getByLabelText("Sits inside")).toHaveValue("m1");
+    expect(dialog.getByLabelText("Kind")).toHaveValue("battlemap");
+    await user.clear(dialog.getByLabelText("Name"));
+    await user.type(dialog.getByLabelText("Name"), "The old mill");
+    await user.click(dialog.getByRole("button", { name: "Add map" }));
+    await waitFor(() =>
+      expect(createMap).toHaveBeenCalledWith("gm", {
+        assetId: "a9",
+        name: "The old mill",
+        kind: "battlemap",
+        parentMapId: "m1"
+      })
+    );
+  });
+
+  it("renames the map from its More", async () => {
+    const user = userEvent.setup();
+    updateMap.mockResolvedValue(MAP("m1", "Saltmere Old Town"));
+    render(<Harness />);
+    await user.click(await screen.findByLabelText("More for Saltmere"));
+    await user.click(screen.getByRole("menuitem", { name: "Rename…" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Rename the map" }));
+    const field = dialog.getByRole("textbox");
+    await user.clear(field);
+    await user.type(field, "Saltmere Old Town");
+    await user.click(dialog.getByRole("button", { name: "Rename" }));
+    await waitFor(() => expect(updateMap).toHaveBeenCalledWith("gm", "m1", { name: "Saltmere Old Town" }));
   });
 });

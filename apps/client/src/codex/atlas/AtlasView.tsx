@@ -25,9 +25,9 @@ import {
   type CodexMarker,
   type CodexPageSummary
 } from "@vtt/domain";
-import { atlasApi, codexApi, type MapAsset } from "../api";
+import { atlasApi, codexApi } from "../api";
 import { partyApi } from "../prep/api";
-import { useConfirm } from "../../components/feedback";
+import { useConfirm, usePrompt } from "../../components/feedback";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { withQuery } from "../../router";
 import { DEFAULT_COLOR, DEFAULT_ICON, CodexIcon } from "../icons";
@@ -55,7 +55,6 @@ type AtlasActor = Readonly<{ id: string; name: string }>;
 type AtlasMeta = Readonly<{
   maps: readonly CodexMap[];
   pages: readonly CodexPageSummary[];
-  assets: readonly MapAsset[];
   /** The map the party pin is on, which the atlas opens on. */
   partyMapId: string | null;
 }>;
@@ -106,22 +105,21 @@ export function AtlasView({
 }: AtlasViewProps) {
   const phone = useMediaQuery(ATLAS_PHONE_QUERY);
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const { prompt, dialog: promptDialog } = usePrompt();
   const { toast } = useToast();
   const meta = useCodexQuery(
     useCallback(async (): Promise<AtlasMeta> => {
-      const [maps, pages, assets, party] = await Promise.all([
+      const [maps, pages, party] = await Promise.all([
         atlasApi.listMaps(gmToken),
         codexApi.listPages(gmToken),
-        atlasApi.listAssets(gmToken).catch(() => []),
         codexApi.party(gmToken).catch(() => null)
       ]);
-      return { maps, pages, assets, partyMapId: party?.marker.mapId ?? null };
+      return { maps, pages, partyMapId: party?.marker.mapId ?? null };
     }, [gmToken]),
     { failure: "Could not load the atlas." }
   );
   const maps = meta.data?.maps ?? EMPTY;
   const pages = meta.data?.pages ?? EMPTY;
-  const assets = meta.data?.assets ?? EMPTY;
   const loading = meta.loading;
   const setMeta = meta.setData;
 
@@ -147,7 +145,6 @@ export function AtlasView({
   const setEditing = (open: boolean) => setEditingPinId(open ? pinId : null);
   const [picking, setPicking] = useState(false);
   const [nestNew, setNestNew] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [centerOnPinId, setCenterOnPinId] = useState<string | null>(null);
   const [actionError, setError] = useState<string | null>(null);
   useEffect(() => setError(null), [meta.data]);
@@ -259,34 +256,23 @@ export function AtlasView({
       setError(cause instanceof Error ? cause.message : failure);
     }
   };
-  const uploadAsset = async (file: File) => {
-    setUploading(true);
-    setError(null);
+  const createMapFrom = async (
+    input: Readonly<{ assetId: string; name: string; kind: CodexMapKind; parentMapId: string | null }>
+  ) => {
     try {
-      await atlasApi.uploadAsset(gmToken, file);
-      const next = await atlasApi.listAssets(gmToken).catch(() => assets);
-      setMeta((prev) => prev && { ...prev, assets: next });
-      toast("Map image uploaded.", { tone: "success" });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The upload failed.");
-    } finally {
-      setUploading(false);
-    }
-  };
-  const createFromAsset = async (asset: MapAsset) => {
-    try {
-      const map = await atlasApi.createMap(gmToken, {
-        assetId: asset.id,
-        name: asset.name,
-        kind: asset.kind,
-        parentMapId: nestNew ? currentMapId : null
-      });
+      const map = await atlasApi.createMap(gmToken, input);
       setPicking(false);
       await meta.reload();
       onNavigate(atlasPath(map.id));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not add the map.");
     }
+  };
+  const renameMap = async () => {
+    if (!currentMap) return;
+    const name = await prompt({ title: "Rename the map", defaultValue: currentMap.name, confirmLabel: "Rename" });
+    if (name && name !== currentMap.name)
+      void mapWrite(() => atlasApi.updateMap(gmToken, currentMap.id, { name }), "Couldn't rename the map.");
   };
   const deleteMap = async () => {
     if (
@@ -669,15 +655,13 @@ export function AtlasView({
     <>
       <MapPicker
         open={picking}
-        currentMap={currentMap}
-        nest={nestNew}
-        onNestChange={setNestNew}
-        assets={assets}
-        uploading={uploading}
-        onUpload={(file) => void uploadAsset(file)}
-        onPick={(asset) => void createFromAsset(asset)}
+        token={gmToken}
+        maps={maps}
+        defaultParentId={nestNew ? currentMapId : null}
+        onCreate={(input) => void createMapFrom(input)}
         onClose={() => setPicking(false)}
       />
+      {promptDialog}
       {confirmDialog}
     </>
   );
@@ -696,7 +680,20 @@ export function AtlasView({
         <IconPlus /> Add a pin
       </Button>
       <Menu icon align="end" label={`More for ${currentMap.name}`} trigger={<IconMore />}>
-        <MenuItem onClick={() => (phone ? setPhoneView("details") : setTab("details"))}>Map details</MenuItem>
+        <MenuItem onClick={() => void renameMap()}>Rename…</MenuItem>
+        <MenuItem onClick={() => (phone ? setPhoneView("details") : setTab("details"))}>
+          Map details (kind, sits inside, tags)
+        </MenuItem>
+        <MenuItem
+          onClick={() =>
+            void mapWrite(
+              () => atlasApi.revealMap(gmToken, currentMap.id, !currentMap.revealedToPlayers),
+              "Couldn't change who can see this map."
+            )
+          }
+        >
+          {currentMap.revealedToPlayers ? "Hide from players" : "Show to players"}
+        </MenuItem>
         <MenuItem
           onClick={() => {
             setNestNew(true);
@@ -704,6 +701,9 @@ export function AtlasView({
           }}
         >
           Add a map inside
+        </MenuItem>
+        <MenuItem tone="danger" onClick={() => void deleteMap()}>
+          Delete map
         </MenuItem>
       </Menu>
     </div>

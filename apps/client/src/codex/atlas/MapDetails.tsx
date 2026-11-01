@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
-import { Badge, Button, Field, IconPlus, Input, Modal, Select, Switch, TagInput, FieldAudienceToggle } from "@vtt/ui";
+import { useMemo, useState } from "react";
+import { Button, Field, IconPlus, Input, Modal, Select, TagInput, FieldAudienceToggle } from "@vtt/ui";
 import type { CodexMap, CodexMapKind } from "@vtt/domain";
-import type { MapAsset } from "../api";
+import { MapPicker as LibraryPicker, type PickerMap } from "../../maps/MapPicker";
 
 const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
   { value: "world", label: "World" },
@@ -136,81 +136,107 @@ export function MapDetails({
   );
 }
 
-/** Picks an image from the shared map library, the one Scenes uses, and adds it as a map. */
+const KIND_WORD: Readonly<Record<CodexMapKind, string>> = {
+  world: "World map",
+  regional: "Regional map",
+  battlemap: "Battle map"
+};
+
+/**
+ * Add a map (F3 atlas spec 2.4): E2's map picker (folders, the library and its upload) for the picture, then its name,
+ * its kind and where it sits, as Details asks them.
+ */
 export function MapPicker({
   open,
-  currentMap,
-  nest,
-  onNestChange,
-  assets,
-  uploading,
-  onUpload,
-  onPick,
+  token,
+  maps,
+  defaultParentId,
+  onCreate,
   onClose
 }: Readonly<{
   open: boolean;
-  /** The open map, which a new map nests under by default. */
-  currentMap: CodexMap | null;
-  nest: boolean;
-  onNestChange: (nest: boolean) => void;
-  assets: readonly MapAsset[];
-  uploading: boolean;
-  onUpload: (file: File) => void;
-  onPick: (asset: MapAsset) => void;
+  token: string;
+  maps: readonly CodexMap[];
+  /** Where a new map sits at first: inside the open map for Add a map inside, else the top level. */
+  defaultParentId: string | null;
+  onCreate: (
+    input: Readonly<{ assetId: string; name: string; kind: CodexMapKind; parentMapId: string | null }>
+  ) => void;
   onClose: () => void;
 }>) {
-  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const [picked, setPicked] = useState<PickerMap | null>(null);
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<CodexMapKind>("regional");
+  const [parent, setParent] = useState<string>(defaultParentId ?? "");
+  const [shownFor, setShownFor] = useState(false);
+  // Each opening starts at the picture, inside the map it was asked from.
+  if (open !== shownFor) {
+    setShownFor(open);
+    if (open) {
+      setPicked(null);
+      setParent(defaultParentId ?? "");
+    }
+  }
+  const choose = (map: PickerMap) => {
+    setPicked(map);
+    setName(map.name);
+    setKind((map.kind as CodexMapKind) in KIND_WORD ? (map.kind as CodexMapKind) : "regional");
+  };
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={currentMap && nest ? `Add a map inside ${currentMap.name}` : "Add a map"}
-      size="md"
-      ariaLabel="Choose a map"
+      title={picked ? "Name the map" : "Add a map"}
+      size={picked ? "sm" : "lg"}
+      ariaLabel={picked ? "Name the map" : "Choose a map"}
+      footer={
+        picked ? (
+          <>
+            <Button variant="ghost" onClick={() => setPicked(null)}>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!name.trim()}
+              onClick={() => onCreate({ assetId: picked.id, name: name.trim(), kind, parentMapId: parent || null })}
+            >
+              Add map
+            </Button>
+          </>
+        ) : undefined
+      }
     >
-      {currentMap && (
-        <div className="atlas-nestrow">
-          <Switch checked={nest} onChange={onNestChange} label={`Nest inside "${currentMap.name}"`} />
-          <p className="atlas-hint">
-            {nest ? (
-              <>
-                The new map sits inside <strong>{currentMap.name}</strong>, under its Maps inside.
-              </>
-            ) : (
-              <>The new map is added at the top level.</>
-            )}
-          </p>
+      {picked ? (
+        <div className="atlas-newmap">
+          <Field label="Name" htmlFor="atlas-newmap-name">
+            <Input id="atlas-newmap-name" value={name} onChange={(event) => setName(event.target.value)} />
+          </Field>
+          <Field label="Kind" htmlFor="atlas-newmap-kind">
+            <Select
+              id="atlas-newmap-kind"
+              value={kind}
+              onChange={(event) => setKind(event.target.value as CodexMapKind)}
+            >
+              {(Object.keys(KIND_WORD) as CodexMapKind[]).map((value) => (
+                <option key={value} value={value}>
+                  {KIND_WORD[value]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Sits inside" htmlFor="atlas-newmap-parent">
+            <Select id="atlas-newmap-parent" value={parent} onChange={(event) => setParent(event.target.value)}>
+              <option value="">The top level</option>
+              {maps.map((map) => (
+                <option key={map.id} value={map.id}>
+                  {map.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
         </div>
-      )}
-      <div className="atlas-upload">
-        <Button variant="secondary" size="sm" disabled={uploading} onClick={() => uploadInputRef.current?.click()}>
-          <IconPlus /> {uploading ? "Uploading…" : "Upload a map image"}
-        </Button>
-        <input
-          ref={uploadInputRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) onUpload(file);
-            event.target.value = "";
-          }}
-        />
-      </div>
-      {assets.length === 0 ? (
-        <p className="atlas-empty">
-          No map images yet. Upload one to start your atlas. Encounters use the same images.
-        </p>
       ) : (
-        <div className="atlas-assetgrid">
-          {assets.map((asset) => (
-            <button key={asset.id} type="button" className="atlas-assetcard" onClick={() => onPick(asset)}>
-              <span className="atlas-ellipsis">{asset.name}</span>
-              <Badge tone="neutral">{asset.kind}</Badge>
-            </button>
-          ))}
-        </div>
+        <LibraryPicker token={token} kind="all" selectedId={null} onSelect={choose} />
       )}
     </Modal>
   );
