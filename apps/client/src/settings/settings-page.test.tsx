@@ -44,6 +44,26 @@ beforeEach(() => {
   command.mockClear();
 });
 
+describe("Encounters by moment", () => {
+  it("groups its eight rows under four headings, in the order an encounter meets them", () => {
+    renderAt("/settings/fights");
+    const groups = screen.getAllByRole("region").filter((region) => region.classList.contains("settings-moment-group"));
+    expect(
+      groups.map((group) => [
+        within(group).getByRole("heading", { level: 3 }).textContent,
+        within(group)
+          .getAllByRole("heading", { level: 4 })
+          .map((heading) => heading.textContent)
+      ])
+    ).toEqual([
+      ["When a token is staged", ["New tokens", "Health display"]],
+      ["When dice are rolled", ["Players' initiative", "Players' d20 rolls", "Players' damage"]],
+      ["On a player's turn", ["Rules assistant", "Who picks targets"]],
+      ["When a hit lands", ["Players' hits"]]
+    ]);
+  });
+});
+
 describe("a table setting's write", () => {
   it("says Saved on its row for a moment when it lands, and nothing when it fails", async () => {
     const user = userEvent.setup();
@@ -75,7 +95,7 @@ describe("the GM's Settings on a phone", () => {
     expect(window.location.pathname).toBe("/settings/fights");
     expect(screen.getByRole("heading", { name: "Encounters", level: 1 })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Settings sections" })).toBeNull();
-    expect(screen.getByRole("heading", { name: "Rules assistant", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Rules assistant" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back to Settings" }));
     expect(window.location.pathname).toBe("/settings");
@@ -112,7 +132,7 @@ describe("the GM's Settings", () => {
 
     await user.click(within(list).getByRole("link", { name: /^Encounters/ }));
     expect(window.location.pathname).toBe("/settings/fights");
-    expect(screen.getByRole("heading", { name: "Rules assistant", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Rules assistant" })).toBeInTheDocument();
     expect(within(list).getByRole("link", { name: /^Encounters/ })).toHaveAttribute("aria-current", "page");
   });
 
@@ -125,7 +145,8 @@ describe("the GM's Settings", () => {
       );
       expect(shown.length).toBeGreaterThan(0);
       for (const setting of shown) {
-        expect(screen.getByRole("heading", { name: new RegExp(`^${setting.label}`), level: 3 })).toBeInTheDocument();
+        // At any level: Encounters' rows sit under their moments' headings.
+        expect(screen.getByRole("heading", { name: new RegExp(`^${setting.label}`) })).toBeInTheDocument();
         expect(screen.getByText(setting.hint)).toBeInTheDocument();
       }
     }

@@ -469,3 +469,19 @@
 .setting-control .nh-segmented.is-choices .nh-segmented-option {
   justify-content: flex-start;
 }
+
+/* Encounters' moments (settings spec 2.3 and 4): a heading in 11px capitals at 0.12em, 18px over its group, 8px under. */
+.settings-moment-group {
+  display: flex;
+  flex-direction: column;
+}
+.settings-moment {
+  margin: 18px 0 8px;
+  color: var(--text-muted);
+  font: 600 11px / 1.3 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.settings-moment-group:first-of-type .settings-moment {
+  margin-top: 6px;
+}

@@ -53,11 +53,14 @@ export const SectionLine = createContext<string | undefined>(undefined);
 export function SettingsSection({
   id,
   children,
-  wide = false
+  wide = false,
+  grouped = false
 }: Readonly<{
   id: SettingsSectionId;
   children: ReactNode;
   wide?: boolean;
+  /** The rows come in groups of their own, each with its heading (Encounters' moments). */
+  grouped?: boolean;
 }>) {
   const section = SETTINGS_SECTIONS.find((candidate) => candidate.id === id)!;
   const line = useContext(SectionLine);
@@ -73,6 +76,16 @@ export function SettingsSection({
         <p className="settings-section-line">{section.hint}</p>
         {line && <p className="settings-head-now">{line}</p>}
       </header>
+      {grouped ? children : <Group className="settings-panel">{children}</Group>}
+    </section>
+  );
+}
+
+/** One group of a section's rows under its heading in small capitals (Encounters' moments, settings spec 2.3). */
+export function SettingsMoment({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
+  return (
+    <section className="settings-moment-group" aria-label={title}>
+      <h3 className="settings-moment">{title}</h3>
       <Group className="settings-panel">{children}</Group>
     </section>
   );
@@ -88,9 +101,12 @@ export function SettingRow({
   children,
   stacked = false,
   gmOnly = false,
-  hint
+  hint,
+  level = 3
 }: Readonly<{
   setting: SettingEntry;
+  /** Its heading's level: 4 under a group's own heading. */
+  level?: 3 | 4;
   children?: ReactNode;
   stacked?: boolean;
   /** A GM row in a section players also see. */
@@ -100,13 +116,14 @@ export function SettingRow({
 }>) {
   const flash = useContext(SavedFlashContext);
   const touch = () => flash?.touch(setting.id);
+  const Label = level === 4 ? "h4" : "h3";
   return (
     <div id={settingAnchor(setting.id)} className={cx("setting-row", stacked && "is-stacked")} tabIndex={-1}>
       <div className="setting-text">
-        <h3 className="setting-label">
+        <Label className="setting-label">
           {setting.label}
           {gmOnly && <GmOnlyTag />}
-        </h3>
+        </Label>
         <p className="setting-hint">{hint ?? setting.hint}</p>
       </div>
       {children !== undefined && (
