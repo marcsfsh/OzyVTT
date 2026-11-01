@@ -177,7 +177,7 @@ export function Landing({
                 </Button>
                 <Button
                   variant="ghost"
-                  className="link"
+                  className="landing-back"
                   onClick={() => {
                     onClearNotice();
                     setDoor("choose");
@@ -185,24 +185,24 @@ export function Landing({
                 >
                   Back
                 </Button>
+                {/* In a dialog: the steps would push the card past a phone's screen, and the landing never scrolls. */}
+                {bootstrapped && (
+                  <Button variant="link" className="landing-reset" onClick={() => setResetSteps(true)}>
+                    Forgot the password
+                  </Button>
+                )}
               </div>
             </form>
-            {/* In a dialog: the steps would push the card past a phone's screen, and the landing never scrolls. */}
             {bootstrapped && (
-              <div className="landing-reset">
-                <Button className="link" onClick={() => setResetSteps(true)}>
-                  Forgot the password
-                </Button>
-                <Modal
-                  open={resetSteps}
-                  onClose={() => setResetSteps(false)}
-                  size="sm"
-                  title="Reset the GM password"
-                  ariaLabel="Reset the GM password"
-                >
-                  <ResetSteps />
-                </Modal>
-              </div>
+              <Modal
+                open={resetSteps}
+                onClose={() => setResetSteps(false)}
+                size="sm"
+                title="Reset the GM password"
+                ariaLabel="Reset the GM password"
+              >
+                <ResetSteps />
+              </Modal>
             )}
           </section>
         )}

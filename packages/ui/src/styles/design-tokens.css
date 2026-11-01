@@ -265,6 +265,9 @@
     #07020f 82%,
     #050209 100%
   );
+  /* The same sky in its two halves, so a scene can move its horizon (`--landing-hz`): above the line, then below. */
+  --landing-sky-above: linear-gradient(180deg, #05010c 0%, #1e0840 54.7%, #7a1268 84.4%, #ff3d8b 100%);
+  --landing-sky-below: linear-gradient(180deg, #07020f 0%, #07020f 50%, #050209 100%);
   --landing-star: rgba(255, 255, 255, 0.85);
   --landing-star-dim: rgba(255, 255, 255, 0.45);
   --landing-sun: var(--grad-sun);
@@ -689,6 +692,8 @@
     #f1e4ee 82%,
     #ece5ee 100%
   );
+  --landing-sky-above: linear-gradient(180deg, #f3e9f4 0%, #ffdccb 50%, #ffb8c6 84.4%, #ff8fb3 100%);
+  --landing-sky-below: linear-gradient(180deg, #f1e4ee 0%, #f1e4ee 50%, #ece5ee 100%);
   --landing-star: rgba(255, 255, 255, 0);
   --landing-star-dim: rgba(255, 255, 255, 0);
   --landing-horizon: linear-gradient(

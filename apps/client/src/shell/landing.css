@@ -4,18 +4,40 @@
 /* The landing: the Chrome sun title screen (star field, a slatted sunset sun between two mountain ranges,
    the grid rolling toward the viewer, the chrome wordmark and two buttons). Raw colours live in the
    --landing-* tokens, re-skinned per theme. Reduced motion freezes the motion and keeps the scene. */
+/* Registered, so the scene eases between the title and the sign-in (arrival spec 4). */
+@property --landing-hz {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 64%;
+}
+@property --sun-d {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 300px;
+}
+@property --landing-ground {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 73%;
+}
 .landing {
   /* One horizon for the whole scene (arrival spec 4): the sky band, the mountains, the line and the grid all stand on
      it, and the logo and the ground's controls are placed against it. */
   --landing-hz: 64%;
   --sun-d: clamp(15rem, 23vw, 19rem);
   --landing-ground: 73%;
+  transition:
+    --landing-hz 400ms var(--ease-settle),
+    --sun-d 400ms var(--ease-settle),
+    --landing-ground 400ms var(--ease-settle);
   position: relative;
   /* `clip`: the scene overflows the frame, and a `hidden` box still scrolls when focus moves
      into it, which pushed the sign-in card off a phone screen. */
   overflow: clip;
   text-align: center;
-  background: var(--landing-sky);
+  background:
+    var(--landing-sky-above) top / 100% var(--landing-hz) no-repeat,
+    var(--landing-sky-below) bottom / 100% calc(100% - var(--landing-hz)) no-repeat;
 }
 /* Excluded: the flare, which must paint over the vignette (z-2) and the content (z-3) and cannot from
    inside the scene's stacking context; and the theme switch, which this rule would otherwise size and
@@ -415,20 +437,40 @@
   margin-inline: auto;
   text-align: left;
 }
-/* The GM sign-in card replaces the buttons: a panel with the GM violet on its leading edge. */
-.landing .card {
-  margin-inline: auto;
+/* Signing in is in place (arrival spec 2.2): the scene eases up, the horizon to 56% and the sun to 260px, and the card
+   stands where the buttons were. */
+.landing.landing--gm {
+  --landing-hz: 56%;
+  --sun-d: 260px;
+  --landing-ground: 60%;
+}
+/* The card is the Dialog pattern with the GM violet on its leading edge: 488px, its title on the horizon edge. */
+.landing .card.landing-gm {
+  width: min(30.5rem, 100%);
+  margin: 0;
+  padding: 22px 24px 20px 28px;
   text-align: left;
-  border-color: var(--line-strong);
-  background: var(--material-lip), var(--material-plate);
+  border: 1px solid var(--line-strong);
+  border-top: 0;
+  background:
+    var(--grad-horizon) top / 100% 2px no-repeat,
+    var(--material-lip),
+    var(--material-plate);
   box-shadow:
     inset 4px 0 0 var(--rim-gm),
     var(--shadow-2);
 }
+.landing .card.landing-gm h2 {
+  margin: 0 0 6px;
+}
+.landing .card.landing-gm > p {
+  margin: 0 0 14px;
+  color: var(--text-dim);
+}
 
 .landing-gm-form {
   display: grid;
-  gap: var(--space-3);
+  gap: 14px;
 }
 /* The password and its Show toggle share one row; the field takes the width. */
 .landing-password {
@@ -444,14 +486,15 @@
 .landing-keep {
   justify-self: start;
 }
+/* Enter table as the Cup, Back as a ghost, and Forgot the password as a link at the right. */
 .landing-gm-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
-.landing-reset {
-  margin-top: var(--space-3);
+.landing-gm-actions .landing-reset {
+  margin-left: auto;
 }
 /* In a dialog, which still inherits the landing's centred text. */
 .landing-reset-steps {
@@ -546,9 +589,26 @@
 .home-theme-switch {
   margin-top: var(--space-6);
 }
+@media (prefers-reduced-motion: reduce) {
+  .landing {
+    transition: none;
+  }
+}
 @media (max-width: 560px) {
   .landing {
     --landing-ground: 70%;
+  }
+  .landing.landing--gm {
+    --landing-hz: 48%;
+    --sun-d: 200px;
+    --landing-ground: 51%;
+  }
+  .landing > .landing-ground:not(.landing-scene):not(.landing-flare):not(.home-theme-switch):has(.landing-gm) {
+    padding: 0 14px;
+  }
+  /* The Cup full width, Back and Forgot the password on one row under it. */
+  .landing-gm-actions .nh-btn--primary {
+    flex: 1 1 100%;
   }
   .landing > .home-hero:not(.landing-scene):not(.landing-flare):not(.home-theme-switch) {
     top: 21%;
