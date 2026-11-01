@@ -1,0 +1,215 @@
+/* Browse's filter panel (compendium spec 2.2 and 4): 270px with 16px sides; groups 10px 0 12px with a hairline
+   between; choices 30px high with their counts in VT323 15px; the range's chart 36px high, bars 2px apart, the chosen
+   range cyan, the range 4px with 14px handles. */
+.cp-filter-panel {
+  flex: none;
+  width: 270px;
+  min-height: 0;
+  padding: 0 16px var(--space-4);
+  border-right: 1px solid var(--line-strong);
+}
+.cp-fp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 42px;
+  border-bottom: 1px solid var(--line);
+}
+.cp-fp-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text);
+  font: 600 12px / 1 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.cp-fp-on {
+  color: var(--cyan-hi);
+  font: 400 17px / 1 var(--font-numeric);
+  letter-spacing: 0;
+}
+.cp-fp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+.cp-fp-group:last-child {
+  border-bottom: 0;
+}
+.cp-fp-label {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font: 600 11px / 1.3 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.cp-fp-ticks {
+  display: flex;
+  flex-direction: column;
+}
+.cp-fp-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 30px;
+}
+.cp-fp-choice .nh-tick {
+  min-width: 0;
+}
+.cp-fp-count {
+  flex: none;
+  color: var(--text-muted);
+  font: 400 15px / 1 var(--font-numeric);
+}
+.cp-fp-more {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+/* The range: its chart, the two handles over one 4px track, and its two ends as fields. */
+.cp-fp-range {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cp-fp-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 36px;
+}
+.cp-fp-bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  background: var(--line-raised);
+}
+.cp-fp-bar.is-on {
+  background: var(--cyan);
+}
+.cp-fp-slider {
+  position: relative;
+  height: 14px;
+}
+.cp-fp-slider input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  pointer-events: none;
+  appearance: none;
+}
+.cp-fp-slider input:first-child::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--line-raised);
+}
+.cp-fp-slider input::-webkit-slider-runnable-track {
+  height: 4px;
+  background: none;
+}
+.cp-fp-slider input::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 0;
+  background: var(--cyan);
+  pointer-events: auto;
+  appearance: none;
+  cursor: pointer;
+}
+.cp-fp-slider input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 0;
+  background: var(--cyan);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.cp-fp-ends {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cp-fp-ends .nh-select,
+.cp-fp-ends select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.cp-fp-to {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* A folded filter: its name and current value as one row that opens in place. */
+.cp-fp-folds {
+  gap: 0;
+  padding-top: 4px;
+}
+.cp-fp-fold > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 40px;
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.2 var(--font-label);
+  cursor: pointer;
+  list-style: none;
+}
+.cp-fp-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.cp-fp-fold-value {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.cp-fp-fold-body {
+  padding: 0 0 var(--space-2);
+}
+
+/* Over the table with the panel: each active filter as a chip with its remove, Clear all and the count. */
+.cp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+@media (any-pointer: coarse), (max-width: 760px) {
+  .cp-fp-choice {
+    min-height: var(--tap-min);
+  }
+}
+/* Browse with its panel: the panel at the left and the toolbar, the chips and the table beside it. */
+.cp-browse {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cp-browse-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+}
+.cp-browse-main > .cp-chips {
+  padding-inline: var(--space-3);
+}
+/* In the phone's sheet the panel is the sheet's body. */
+.nh-modal .cp-filter-panel {
+  width: auto;
+  padding: 0;
+  border-right: 0;
+}

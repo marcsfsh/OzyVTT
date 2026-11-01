@@ -268,3 +268,69 @@ export function tableSummary(
 }
 
 const pluralLower = (kind: Kind) => kindPlural(kind).toLowerCase();
+
+/** A facet of the filter panel: the source, a kind's own filter, or the GM's state and who sees it. */
+export type Facet = Readonly<{ type: "source" } | { type: "kind"; key: string } | { type: "state" } | { type: "who" }>;
+
+/** The filters with one facet let go, so its counts show what each of its choices would add. */
+function withoutFacet(filters: TableFilters, facet: Facet): TableFilters {
+  switch (facet.type) {
+    case "source":
+      return { ...filters, sources: null };
+    case "state":
+      return { ...filters, states: ROW_STATES };
+    case "who":
+      return { ...filters, audiences: AUDIENCES };
+    case "kind": {
+      const kind = { ...filters.kind };
+      delete kind[facet.key];
+      return { ...filters, kind };
+    }
+  }
+}
+
+/**
+ * How many rows each of a facet's values would show with every other filter as it is (the panel's counts): one
+ * filtering pass with the facet let go, then one count by value.
+ */
+export function facetCounts(
+  rows: readonly CompendiumRow[],
+  filters: TableFilters,
+  kind: Kind | null,
+  facet: Facet
+): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  const valueOf =
+    facet.type === "source"
+      ? sourceKey
+      : facet.type === "state"
+        ? (row: CompendiumRow) => (row.state === undefined ? null : stateOf(row))
+        : facet.type === "who"
+          ? (row: CompendiumRow) => (row.state === undefined ? null : (row.audience ?? null))
+          : (row: CompendiumRow) =>
+              (kind ? KIND_FILTERS[kind].find((filter) => filter.key === facet.key)?.value(row.columns) : null) ?? null;
+  for (const row of filterRows(rows, withoutFacet(filters, facet), kind)) {
+    const value = valueOf(row);
+    if (value !== null) counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** The values a range covers from `low` to `high` in `ordered`, ends included, as the address keeps a range. */
+export function valuesBetween(ordered: readonly string[], low: string, high: string): string[] {
+  const from = ordered.indexOf(low);
+  const to = ordered.indexOf(high);
+  if (from === -1 || to === -1) return [];
+  return ordered.slice(Math.min(from, to), Math.max(from, to) + 1);
+}
+
+/** The ends a chosen list spans in `ordered` (an older link may have gaps), or every value when nothing is chosen. */
+export function spanOf(
+  ordered: readonly string[],
+  chosen: readonly string[] | undefined
+): readonly [string, string] | null {
+  if (ordered.length === 0) return null;
+  const at = (chosen ?? ordered).map((value) => ordered.indexOf(value)).filter((index) => index !== -1);
+  if (at.length === 0) return [ordered[0]!, ordered[ordered.length - 1]!];
+  return [ordered[Math.min(...at)]!, ordered[Math.max(...at)]!];
+}

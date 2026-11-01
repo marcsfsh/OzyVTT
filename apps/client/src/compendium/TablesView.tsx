@@ -76,6 +76,7 @@ export function TablesView({
       onOpen={(row) => go(withTableQuery(recordPath(row.kind, row.id), query))}
       mark={(row) => <SourceMark row={row} packs={packs} />}
       sourceWord={(row) => sourceWord(row, packs)}
+      panel={!compact && !inFlyout}
     />
   );
 }

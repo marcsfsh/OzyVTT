@@ -10,8 +10,11 @@ import {
   FilterChips,
   FilterFlyout,
   FiltersButton,
-  AudienceChip
+  AudienceChip,
+  Chip,
+  Modal
 } from "@vtt/ui";
+import { FilterPanel } from "./FilterPanel";
 import { ModifiedDropdown, OneChoice, SortButton, TickDropdown } from "../scenes/listTools";
 import {
   KIND_COLUMNS,
@@ -80,6 +83,9 @@ export type CompendiumTableProps = Readonly<{
   /** The phone's bar over the table. */
   head?: ReactNode;
   emptyText?: string;
+  /** Browse's filter panel at the left (the GM's full table): the toolbar's Source, first filter and Filters give way
+   *  to the active filters as chips. On a phone Filters opens the panel as a sheet. */
+  panel?: boolean;
 }>;
 
 /**
@@ -90,6 +96,8 @@ export type CompendiumTableProps = Readonly<{
  */
 export function CompendiumTable(props: CompendiumTableProps) {
   const { kind, rows, names, sources, gm, phone, query, setQuery, compact = false, inFlyout = false } = props;
+  const panel = props.panel === true && !compact && !inFlyout;
+  const [sheetOpen, setSheetOpen] = useState(false);
   const selectedId = props.selectedId ?? null;
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const flyoutId = `cp-table-filters${inFlyout ? "-flyout" : ""}`;
@@ -146,7 +154,7 @@ export function CompendiumTable(props: CompendiumTableProps) {
   const toolbar = (
     <div className={cx("cp-tool", compact && "is-compact")}>
       {kindDropdown}
-      {!phone && !compact && !inFlyout && (
+      {!phone && !compact && !inFlyout && !panel && (
         <TickDropdown
           name="Source"
           options={sources}
@@ -154,7 +162,7 @@ export function CompendiumTable(props: CompendiumTableProps) {
           onChange={(chosen) => setFilters({ ...filters, sources: chosen.length === sources.length ? null : chosen })}
         />
       )}
-      {firstFilter && firstOptions.length > 1 && !compact && !inFlyout && (
+      {firstFilter && firstOptions.length > 1 && !compact && !inFlyout && !panel && (
         <TickDropdown
           name={firstFilter.label}
           options={firstOptions}
@@ -167,12 +175,20 @@ export function CompendiumTable(props: CompendiumTableProps) {
           }
         />
       )}
-      <FiltersButton
-        open={flyoutOpen}
-        onToggle={() => setFlyoutOpen(!flyoutOpen)}
-        controls={flyoutId}
-        count={activeFilters(filters, gm)}
-      />
+      {panel ? (
+        phone && (
+          <Button size="sm" onClick={() => setSheetOpen(true)}>
+            Filters{activeFilters(filters, gm) > 0 ? ` (${activeFilters(filters, gm)})` : ""}
+          </Button>
+        )
+      ) : (
+        <FiltersButton
+          open={flyoutOpen}
+          onToggle={() => setFlyoutOpen(!flyoutOpen)}
+          controls={flyoutId}
+          count={activeFilters(filters, gm)}
+        />
+      )}
       <SortButton
         sort={sort}
         keys={sortKeys(kind, gm)}
@@ -184,12 +200,36 @@ export function CompendiumTable(props: CompendiumTableProps) {
         firstDirection={firstDirection}
         phone={phone}
       />
-      {!asList && (
+      {panel ? (
         <span className="cp-tool-count" role="status">
-          {rows ? tableSummary(shown.length, kind, filters, sort, labels) : "Loading the table."}
+          {rows ? `${shown.length.toLocaleString("en")} of ${all.length.toLocaleString("en")}` : "Loading the table."}
         </span>
+      ) : (
+        !asList && (
+          <span className="cp-tool-count" role="status">
+            {rows ? tableSummary(shown.length, kind, filters, sort, labels) : "Loading the table."}
+          </span>
+        )
       )}
     </div>
+  );
+  // The active filters as chips, each with its remove, and Clear all (compendium spec 2.2).
+  const chips = panel ? filterChips(filters, kind, sources, gm) : [];
+  const chipRow =
+    chips.length > 0 ? (
+      <div className="cp-chips" aria-label="Active filters" role="group">
+        {chips.map((chip) => (
+          <Chip key={chip.key} onRemove={() => setFilters(chip.clear(filters))} removeLabel={`Remove ${chip.label}`}>
+            {chip.label}
+          </Chip>
+        ))}
+        <Button size="sm" onClick={() => setFilters({ ...NO_FILTERS })}>
+          Clear all
+        </Button>
+      </div>
+    ) : null;
+  const filterPanel = (
+    <FilterPanel kind={kind} filters={filters} onFilters={setFilters} rows={all} sources={sources} gm={gm} />
   );
 
   const body = (() => {
@@ -332,6 +372,35 @@ export function CompendiumTable(props: CompendiumTableProps) {
     );
   })();
 
+  if (panel)
+    return (
+      <section className="cp-tables has-panel" aria-label={kind ? kindPlural(kind) : "Every kind"}>
+        {props.head}
+        <div className="cp-browse">
+          {!phone && filterPanel}
+          <div className="cp-browse-main">
+            {toolbar}
+            {chipRow}
+            <div className={cx("cp-tables-body", asList ? "scroll-y" : "scroll-both")}>{body}</div>
+          </div>
+        </div>
+        {phone && (
+          <Modal
+            open={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            title="Filters"
+            align="bottom"
+            footer={
+              <Button variant="primary" onClick={() => setSheetOpen(false)}>
+                Show {shown.length} {(kind ? kindPlural(kind) : "records").toLowerCase()}
+              </Button>
+            }
+          >
+            {filterPanel}
+          </Modal>
+        )}
+      </section>
+    );
   return (
     <section className={cx("cp-tables", compact && "is-compact")} aria-label={kind ? kindPlural(kind) : "Every kind"}>
       {props.head}
@@ -475,4 +544,67 @@ function TableFilterFlyout({
       </Button>
     </FilterFlyout>
   );
+}
+
+type FilterChip = Readonly<{ key: string; label: string; clear: (filters: TableFilters) => TableFilters }>;
+
+/** Each active filter as one chip: what it keeps in words, and the filters without it. */
+function filterChips(
+  filters: TableFilters,
+  kind: Kind | null,
+  sources: readonly SourceOption[],
+  gm: boolean
+): FilterChip[] {
+  const chips: FilterChip[] = [];
+  const list = (values: readonly string[], word: (value: string) => string) =>
+    values.length === 0 ? "none" : values.length <= 2 ? values.map(word).join(", ") : `${values.length} chosen`;
+  if (filters.q.trim())
+    chips.push({ key: "q", label: `Name: ${filters.q.trim()}`, clear: (current) => ({ ...current, q: "" }) });
+  if (filters.sources)
+    chips.push({
+      key: "source",
+      label: `Source: ${list(filters.sources, (value) => sources.find((option) => option.value === value)?.label ?? value)}`,
+      clear: (current) => ({ ...current, sources: null })
+    });
+  for (const filter of kind ? KIND_FILTERS[kind] : []) {
+    const chosen = filters.kind[filter.key];
+    if (!chosen) continue;
+    // A range reads as its ends.
+    const label =
+      chosen.length > 2 && (filter.key === "cr" || filter.key === "level")
+        ? `${filter.label} ${filter.word(chosen[0]!)} to ${filter.word(chosen[chosen.length - 1]!)}`
+        : `${filter.label}: ${list(chosen, filter.word)}`;
+    chips.push({
+      key: `f.${filter.key}`,
+      label,
+      clear: (current) => {
+        const next = { ...current.kind };
+        delete next[filter.key];
+        return { ...current, kind: next };
+      }
+    });
+  }
+  if (gm) {
+    if (filters.states.join(",") !== NO_FILTERS.states.join(","))
+      chips.push({
+        key: "state",
+        label: `State: ${list(filters.states, (value) => STATE_WORD[value as keyof typeof STATE_WORD])}`,
+        clear: (current) => ({ ...current, states: NO_FILTERS.states })
+      });
+    if (filters.audiences.length !== AUDIENCES.length)
+      chips.push({
+        key: "who",
+        label: `Who sees it: ${list(filters.audiences, (value) => AUDIENCE_WORD[value as keyof typeof AUDIENCE_WORD])}`,
+        clear: (current) => ({ ...current, audiences: AUDIENCES })
+      });
+    if (filters.problems)
+      chips.push({ key: "problems", label: "Has problems", clear: (current) => ({ ...current, problems: false }) });
+    if (filters.from || filters.to)
+      chips.push({
+        key: "modified",
+        label: "Modified: chosen days",
+        clear: (current) => ({ ...current, from: null, to: null })
+      });
+  }
+  return chips;
 }
