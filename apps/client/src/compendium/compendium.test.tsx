@@ -16,7 +16,8 @@ const { LYRA, MIRENA, AT } = vi.hoisted(() => ({
 const api = vi.hoisted(() => ({
   calls: [] as Array<[string, ...unknown[]]>,
   seeAs: { received: false } as { received: boolean },
-  importReport: null as unknown
+  importReport: null as unknown,
+  revisions: [] as unknown[]
 }));
 
 vi.mock("../homebrew/api", async (importOriginal) => {
@@ -144,7 +145,12 @@ vi.mock("../homebrew/api", async (importOriginal) => {
         api.calls.push(["seeAsContent", as]);
         return { as, kind: "spell", received: api.seeAs.received, entry: null };
       }),
-      revisions: async () => [],
+      revisions: async () => api.revisions,
+      revision: async (_token: string, _id: string, revisionId: number) => ({
+        id: revisionId,
+        record: { ...body(revisionId === 1 ? "Brine Spray" : "Brine Burst"), id: brine.id }
+      }),
+      restoreRevision: record("restoreRevision", document),
       duplicate: record("duplicate", { ...document, id: "hb-wand-of-sleet-b2c3d4", state: "draft" }),
       create: record("create", { ...document, id: "hb-gale-lance-c3d4e5", state: "draft" }),
       setAudience: record("setAudience", document),
@@ -441,5 +447,37 @@ describe("Sources at the side", () => {
     expect(srd.getByText("Read only. Make a homebrew copy of anything.")).toBeInTheDocument();
     expect(srd.getByText("Always in pickers")).toBeInTheDocument();
     expect(srd.queryByRole("switch")).not.toBeInTheDocument();
+  });
+});
+
+describe("a record's history in its side column", () => {
+  const rev = (id: number, over: Record<string, unknown>) => ({
+    id,
+    rev: id,
+    at: AT,
+    event: "publish",
+    device: "this-device",
+    deviceKey: null,
+    name: "Brine Burst",
+    state: "published",
+    pending: false,
+    audience: "characters",
+    characterIds: [LYRA],
+    changedFields: ["name"],
+    ...over
+  });
+
+  it("keeps the card, lists the versions with Now first, and reads one under its notice with Restore", async () => {
+    api.revisions = [rev(2, { changedFields: ["description"] }), rev(1, { event: "create", changedFields: [] })];
+    const user = mount("/compendium/spells/hb-brine-burst-a1b2c3?tab=history");
+    const side = within(await screen.findByRole("complementary", { name: "Versions" }));
+    expect(await side.findByRole("heading", { name: /^Versions · \d+$/ })).toBeInTheDocument();
+    const rows = side.getAllByRole("button").filter((button) => button.classList.contains("cp-histrow"));
+    expect(rows[0]).toHaveTextContent(/^Now/);
+    await user.click(rows[rows.length - 1]!);
+    expect(side.getByRole("status")).toHaveTextContent(/^Reading /);
+    await user.click(side.getByRole("button", { name: "Restore this version" }));
+    await waitFor(() => expect(api.calls.some((call) => call[0] === "restoreRevision")).toBe(true));
+    api.revisions = [];
   });
 });

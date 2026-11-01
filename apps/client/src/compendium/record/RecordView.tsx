@@ -598,6 +598,22 @@ function HomebrewRecord({
       </p>
     ) : null;
 
+  // History and Sharing keep the record's card and open their part in a side column (G pages spec 2.3 and 2.5); a phone
+  // shows the part as the tab's body.
+  const sideColumn = (label: string, part: ReactNode) =>
+    phone ? (
+      part
+    ) : (
+      <div className="cp-sidecol-split">
+        <div className="cp-sidecol-card scroll-y">
+          <CompendiumCard card={card} names={names} />
+        </div>
+        <aside className="cp-sidecol scroll-y" aria-label={label}>
+          {part}
+        </aside>
+      </div>
+    );
+
   const body = (() => {
     switch (tab) {
       case "card":
@@ -661,7 +677,8 @@ function HomebrewRecord({
           />
         );
       case "history":
-        return (
+        return sideColumn(
+          "Versions",
           <HistoryTab
             token={token}
             doc={doc}

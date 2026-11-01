@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, IconCopy, cx } from "@vtt/ui";
+import { Button, IconCopy, IconMore, Menu, MenuItem, cx } from "@vtt/ui";
 import { homebrewApi, type HomebrewRecordDocument, type HomebrewRevisionSummary } from "../../homebrew/api";
 import type { Draft } from "../../homebrew/schema";
 import type { Kind } from "../kinds";
 import { whenLabel } from "../pieces";
 import { CompareTable } from "./Compare";
-import { defaultPicks, historyRows, type HistoryRow } from "./history";
+import { historyRows, type HistoryRow } from "./history";
 import { DEVICE_WORDS, compareBodies } from "./words";
 import { formatDay } from "../../lib/formatWhen";
 
@@ -17,9 +17,10 @@ const dayOf = (at: string) => formatDay(at);
 const deviceWord = (row: HistoryRow) => (row.devices > 1 ? `${row.devices} devices` : DEVICE_WORDS[row.device]);
 
 /**
- * A record's history as a table: each version players got and the edits between them, when, from which device and
- * what changed. Two ticked rows compare field by field, and Restore puts the older one back as the editor's copy,
- * which reaches players only with Update. A copy also compares against the record it was made from.
+ * A record's history in its side column (G pages spec 2.3): VERSIONS · {N}, one compact row each (the newest reads
+ * Now), and choosing one reads it under the cyan notice with Restore this version, Back to now and Compare with now.
+ * Restore puts it back as the editor's copy, which reaches players only with Update. A copy also compares against the
+ * record it was made from.
  */
 export function HistoryTab({
   token,
@@ -45,7 +46,6 @@ export function HistoryTab({
 }>) {
   const [revisions, setRevisions] = useState<readonly HomebrewRevisionSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [picked, setPicked] = useState<readonly string[] | null>(null);
   const [bodies, setBodies] = useState<ReadonlyMap<number, Body>>(new Map());
 
   // Every write leaves a history row, so the list is read again whenever the record moves.
@@ -68,25 +68,18 @@ export function HistoryTab({
   }, [token, doc.id, doc.rev]);
 
   const rows = useMemo(() => (revisions ? historyRows(revisions, kind) : []), [revisions, kind]);
-  const picks = (picked ?? defaultPicks(rows)).filter((key) => rows.some((row) => row.key === key));
-  // Older on the left: the table is newest first, so the later index is the older row.
-  const chosen = rows.filter((row) => picks.includes(row.key) && row.revisionId !== null);
-  const [newer, older] = chosen.length === 2 ? chosen : [undefined, undefined];
+  // One version read at a time (G pages spec 2.3); the newest row is now.
+  const [readingKey, setReadingKey] = useState<string | null>(null);
+  const [comparing, setComparing] = useState(false);
+  const reading = rows.find((row) => row.key === readingKey && row.revisionId !== null) ?? null;
 
   useEffect(() => {
-    const wanted = [older?.revisionId, newer?.revisionId].filter(
-      (id): id is number => typeof id === "number" && !bodies.has(id)
-    );
-    if (wanted.length === 0) return;
+    const id = reading?.revisionId;
+    if (typeof id !== "number" || bodies.has(id)) return;
     let live = true;
-    void Promise.all(wanted.map((id) => homebrewApi.revision(token, doc.id, id))).then(
+    homebrewApi.revision(token, doc.id, id).then(
       (read) => {
-        if (!live) return;
-        setBodies((held) => {
-          const next = new Map(held);
-          for (const entry of read) next.set(entry.id, entry.record);
-          return next;
-        });
+        if (live) setBodies((held) => new Map(held).set(read.id, read.record));
       },
       (failure: unknown) => {
         if (live) setError(failure instanceof Error ? failure.message : "Couldn't read that version.");
@@ -95,130 +88,113 @@ export function HistoryTab({
     return () => {
       live = false;
     };
-  }, [token, doc.id, older?.revisionId, newer?.revisionId, bodies]);
+  }, [token, doc.id, reading?.revisionId, bodies]);
 
-  const toggle = (row: HistoryRow) => {
-    if (row.revisionId === null) return;
-    const now = picks.includes(row.key) ? picks.filter((key) => key !== row.key) : [...picks, row.key].slice(-2);
-    setPicked(now);
-  };
-
-  const leftBody = older?.revisionId ? bodies.get(older.revisionId) : undefined;
-  const rightBody = newer?.revisionId ? bodies.get(newer.revisionId) : undefined;
-  const compared = leftBody && rightBody ? compareBodies(kind, leftBody, rightBody) : null;
-  const restorable = older && older.revisionId !== null && rows[0]?.key !== older.key ? older : null;
-
-  const pickBox = (row: HistoryRow) =>
-    row.revisionId === null ? null : (
-      <input
-        type="checkbox"
-        className="cp-pick"
-        checked={picks.includes(row.key)}
-        onChange={() => toggle(row)}
-        aria-label={`Compare ${row.label}, ${whenLabel(row.at)}`}
-      />
-    );
+  const readBody = reading?.revisionId ? bodies.get(reading.revisionId) : undefined;
+  const compared = readBody ? compareBodies(kind, readBody, draft) : null;
+  const isNow = (row: HistoryRow) => rows[0]?.key === row.key;
 
   return (
     <div className="cp-historytab">
+      <h3 className="cp-side-title">{`Versions · ${rows.length}`}</h3>
       {error && (
         <p className="cp-blocked" role="alert">
           {error}
         </p>
       )}
       {!revisions && !error && <p className="cp-hint">Reading the history.</p>}
-      {revisions &&
-        (phone ? (
-          <ul className="cp-histlist" aria-label="Versions and edits">
-            {rows.map((row) => (
-              <li key={row.key} className={cx("cp-histrow", picks.includes(row.key) && "is-picked")}>
-                <label className="cp-histrow-main">
-                  {pickBox(row)}
-                  <span className="cp-row-main">
-                    <b className={cx(row.notLive && "cp-caution")}>{row.label}</b>
-                    <small>
-                      {whenLabel(row.at)} · {deviceWord(row)}
-                    </small>
-                    {row.changed.length > 0 && <small>{row.changed.join(", ")}</small>}
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <table className="cp-table cp-history-table">
-            <thead>
-              <tr>
-                <th scope="col">
-                  <span className="nh-sr-only">Compare</span>
-                </th>
-                <th scope="col">Version</th>
-                <th scope="col">When</th>
-                <th scope="col">Device</th>
-                <th scope="col">What changed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.key} className={cx(picks.includes(row.key) && "is-selected")}>
-                  <td className="cp-pick-cell">{pickBox(row)}</td>
-                  <td>
-                    <span className={cx(row.notLive && "cp-caution", row.version !== null && "cp-strong")}>
-                      {row.label}
-                    </span>
-                  </td>
-                  <td className="cp-when">{whenLabel(row.at)}</td>
-                  <td>{deviceWord(row)}</td>
-                  <td>{row.changed.join(", ") || <span className="cp-muted">None</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ))}
-      {older && newer && (
+      {reading && (
+        // The one notice over a version being read (T rule 21): which, when, and the ways out.
+        <div className="cp-version-band" role="status">
+          <span className="cp-version-band-text">{`Reading ${reading.label.replace(/^Version/, "v")} · ${whenLabel(reading.at)}`}</span>
+          <span className="cp-version-band-actions">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={busy || isNow(reading)}
+              onClick={() => void onRestore(reading.revisionId!).then((done) => done && setReadingKey(null))}
+            >
+              Restore this version
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setReadingKey(null)}>
+              Back to now
+            </Button>
+            <Menu icon align="end" label="More for this version" trigger={<IconMore />}>
+              <MenuItem onClick={() => setComparing((on) => !on)}>
+                {comparing ? "Hide the comparison" : "Compare with now"}
+              </MenuItem>
+            </Menu>
+          </span>
+        </div>
+      )}
+      {reading && comparing && (
         <>
-          <h4 className="cp-h">
-            {older.label} and {newer.notLive ? "the changes not live" : newer.label.toLowerCase()}
-          </h4>
           {!compared ? (
-            <p className="cp-hint">Reading both versions.</p>
+            <p className="cp-hint">Reading the version.</p>
           ) : compared.length === 0 ? (
-            <p className="cp-hint">No field differs between them.</p>
+            <p className="cp-hint">No field differs from now.</p>
           ) : (
             <CompareTable
               rows={compared}
-              leftLabel={older.label}
-              rightLabel={newer.notLive ? "Not live" : newer.label}
-              caption={`${older.label} beside ${newer.label}`}
+              leftLabel={reading.label}
+              rightLabel="Now"
+              caption={`${reading.label} beside now`}
             />
           )}
         </>
       )}
-      {(restorable || doc.pendingChanges) && (
+      {revisions && (
+        <ul className="cp-histlist" aria-label="Versions and edits">
+          {rows.map((row) => {
+            const on = reading?.key === row.key;
+            return (
+              <li key={row.key}>
+                <button
+                  type="button"
+                  className={cx("cp-histrow", on && "is-on")}
+                  aria-current={on ? "true" : undefined}
+                  disabled={row.revisionId === null}
+                  onClick={() => {
+                    setComparing(false);
+                    setReadingKey(on ? null : row.key);
+                  }}
+                >
+                  <span className={cx("cp-histrow-n", row.notLive && "cp-caution")}>
+                    {isNow(row) ? "Now" : row.version !== null ? `v${row.version}` : "Edit"}
+                  </span>
+                  <span className="cp-histrow-when">{whenLabel(row.at)}</span>
+                  <span className="cp-histrow-what">{row.changed.join(", ") || row.label}</span>
+                </button>
+                {/* A phone opens the chosen version under its row with Restore. */}
+                {phone && on && (
+                  <div className="cp-histrow-open">
+                    <small>{`${deviceWord(row)} · ${row.changed.join(", ") || "Nothing changed"}`}</small>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      disabled={busy || isNow(row)}
+                      onClick={() => void onRestore(row.revisionId!)}
+                    >
+                      Restore this version
+                    </Button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {doc.pendingChanges && (
         <div className="cp-actions-row">
-          {restorable && restorable.revisionId !== null && (
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={busy}
-              onClick={() => void onRestore(restorable.revisionId!)}
-            >
-              Restore {restorable.label.replace(/^Version/, "version")}
-            </Button>
-          )}
-          {doc.pendingChanges && (
-            <Button size="sm" disabled={busy} onClick={onDiscard}>
-              Discard the changes
-            </Button>
-          )}
+          <Button size="sm" disabled={busy} onClick={onDiscard}>
+            Discard the changes
+          </Button>
         </div>
       )}
-      {restorable && (
-        <p className="cp-hint">
-          Restore puts it back as{" "}
-          {doc.state === "published" ? "changes not live. Players get it with Update." : "the draft."}
-        </p>
-      )}
+      <p className="cp-hint">
+        Restore puts it back as{" "}
+        {doc.state === "published" ? "changes not live. Players get it with Update." : "the draft."}
+      </p>
       {doc.basedOn && <BasedOn token={token} doc={doc} kind={kind} draft={draft} onOpen={onOpenSource} />}
     </div>
   );
