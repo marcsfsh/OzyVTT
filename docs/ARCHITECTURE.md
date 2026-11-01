@@ -134,6 +134,12 @@ seconds before "offline".
 Role comes from the signed token, never from network position. Archived characters cannot be
 claimed, staged or added to an encounter.
 
+Arrival (ADR-0052) reads only what each view already holds. A player's pick page (`actors/ClaimCharacter.tsx`, its
+cards in `actors/ClaimCard.tsx`) shows the characters the player projection lists, with `claimStatus`. The GM's lobby
+(`table/Lobby.tsx`, the empty table while no map is live) reads `ownerSessionId`, `presence` and `playedAtTable` from
+the GM's view to say who plays each character. The join address is one block (`components/JoinAddress.tsx`, read
+from `HOST_PATHS.joinUrls`) in the lobby, the Encounter tab before a fight and Settings.
+
 A party character can be played at the table (ADR-0042, `played-at-table.ts`): its player keeps a printed sheet
 and tells the GM what they do. The GM-only `playedAtTable` mark refuses its claim, so it stays unclaimed and every
 prompt for it goes to the GM, by the same ownership rule as any unclaimed character's. `encounter.start` takes

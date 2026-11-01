@@ -197,7 +197,6 @@ const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: str
   ["apps/client/src/maps/calibration.css", 6, "SVG paint: grid strokes and drop-shadows over image content"],
   ["apps/client/src/scene/annotation.css", 3, "SVG paint: annotation strokes over image content"],
   ["apps/client/src/scene/encounter-map.css", 6, "SVG paint, and the black/white pair a token ring needs on any map"],
-  ["apps/client/src/styles.css", 2, "a two-stop black mask, read only for its alpha"],
   ["apps/client/src/viewer/viewer-controls.css", 1, "the white A/B measurement labels, over arbitrary map art"],
   ["apps/client/src/viewer/viewer.css", 5, "SVG paint and a scrim over the projected map"],
   ["packages/ui/src/primitives/Combobox.css", 1, "a shadow over an arbitrary backdrop"],

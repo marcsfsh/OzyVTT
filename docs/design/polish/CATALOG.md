@@ -107,7 +107,7 @@ and news stays in the corner, with eleven rules for the frame's other surfaces.
 
 ## B. Arrival
 
-Job: get a person into the right seat. Status: Designed (`B-arrival/SPEC.md`, `B-arrival/PLAN.md`, ADR-0052): the logo
+Job: get a person into the right seat. Status: Built (`B-arrival/SPEC.md`, `B-arrival/PLAN.md`, ADR-0052): the logo
 in the sky above a smaller sun, signing in on a card in place of the buttons, the party as a lineup before the sunset,
 and the GM's empty table as a lobby.
 

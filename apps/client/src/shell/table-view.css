@@ -90,37 +90,6 @@
   border-left: 0;
 }
 
-/* The empty map state stands in for a loaded map, so it takes the map's place. */
-.map-empty-hero {
-  position: relative;
-  flex: 1;
-  min-height: 12rem;
-  margin: var(--space-3);
-}
-/* The GM's box holds the scene button and the join address, more than a phone's map pane: it is a `.scroll-y`
-   region instead, with its decoration clipped to the box. */
-.map-empty-hero:not(.scroll-y),
-.map-empty-hero .empty-atmos {
-  overflow: clip;
-}
-.map-empty-hero > :not(.empty-atmos) {
-  position: relative;
-  z-index: 1;
-}
-.map-empty-hero .home-hero-bloom {
-  top: 8%;
-  height: 42%;
-  opacity: 0.22;
-}
-.map-empty-hero .home-hero-grid {
-  bottom: -14%;
-  height: 58%;
-  opacity: 0.55;
-}
-.empty-scene-prep {
-  margin-top: var(--space-4);
-}
-
 /* A player's own sheet ends with the shared replays. */
 .table-sheet-foot {
   display: flex;

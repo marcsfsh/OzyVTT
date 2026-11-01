@@ -366,33 +366,7 @@ textarea:focus {
   padding: 0 0 clamp(1.5rem, 5vw, 3rem);
   text-align: center;
 }
-.empty-atmos {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-.home-hero-bloom {
-  position: absolute;
-  left: 6%;
-  right: 6%;
-  top: 4%;
-  height: 46%;
-  background: var(--grad-bloom);
-  filter: blur(72px);
-  opacity: 0.32;
-  border-radius: 50%;
-}
-.home-hero-grid {
-  position: absolute;
-  left: -25%;
-  right: -25%;
-  bottom: -12%;
-  height: 62%;
-  opacity: 0.7;
-  -webkit-mask-image: linear-gradient(to top, #000, transparent);
-  mask-image: linear-gradient(to top, #000, transparent);
-}
+
 .home-hero-title {
   margin: 0;
 }

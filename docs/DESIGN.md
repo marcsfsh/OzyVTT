@@ -26,6 +26,21 @@ CSS is reference material, not production code. A missing state uses the same pr
 - Role clarity is part of the UX. A player should never wonder whether something is for them, and the GM should
   always be able to tell what players and the table screen can see.
 
+## Arrival
+
+The arrival screens (ADR-0052) share today's sunset, with one horizon the scene stands on.
+
+- The title: the logo in clear sky above a smaller sun (300px at 1280px, 240px on a phone), never on the sun; Join as a
+  player (the Cup) and Enter as GM (a raised plate with the GM violet on its leading edge) stand on the grid below the
+  horizon, and the theme switch keeps the bottom right.
+- Signing in is in place: the scene eases up (the horizon to 56%, 48% on a phone) and the GM's card stands where the
+  buttons were, with Enter table as the Cup, Back, and Forgot the password at the right. First run is the same card.
+- Picking a character is a lineup: with no map live the party stands on the sunset's horizon as tall cards (no logo
+  over the sun), one chosen and raised, claimed ones dimmed with their tag, and Play as in a glass foot. With a map live
+  the same cards sit in the table's panel, two to a row.
+- The GM's empty table is the lobby: where players join (the code, the address, Copy) and the party with who plays each
+  character, filling in as they claim, then Prepare an encounter. The join address has that one look everywhere.
+
 ## Look
 
 An arcade cabinet at dusk and at dawn. There are two themes and nothing else:
@@ -388,6 +403,7 @@ from the mockups.
 - Empty states (`EmptyState`): one line saying what is missing and one secondary button that fixes it, in the space the
   content would fill, with no heading, icon or box. For example, the log says "No rolls yet." above the dice, and an
   encounter without a map says "No map yet." with Pick a map. No illustrations; the sunset belongs to arrival screens.
+  The GM's empty table is the lobby rather than an empty state (Arrival above).
 - Icons are 20px stroked SVG. Never render an emoji or a text symbol as an icon.
 
 ## Motion
