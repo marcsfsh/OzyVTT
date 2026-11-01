@@ -328,7 +328,12 @@ export function isKnownPath(path: string): boolean {
       (segments.length === 2 && isSettingsSection(segments[1])) ||
       (segments.length === 3 && segments[1] === "api" && /^[A-Za-z][\w.-]{0,100}$/.test(segments[2])) ||
       // The Codex's tools, each its own page (F time spec 2.6).
-      (segments[1] === "codex" && (segments.length === 2 || (segments.length === 3 && isCodexTool(segments[2]))))
+      (segments[1] === "codex" && (segments.length === 2 || (segments.length === 3 && isCodexTool(segments[2])))) ||
+      // A credential's own page (I leftovers spec 2.5).
+      (segments.length === 4 &&
+        segments[1] === "access" &&
+        segments[2] === "credentials" &&
+        /^[A-Za-z0-9_-]{1,100}$/.test(segments[3]))
     );
   // The Table screen tab is the screens, a screen as a remote at `/screens/<id>`, or at `/sound` the sound board.
   if (segments[0] === "viewer-controls")

@@ -88,3 +88,105 @@
   color: var(--danger-text);
   font-size: var(--fs-sm);
 }
+
+/* A credential's own page (I leftovers spec 2.5): the title row, its line, Rotate and Revoke as rows, its history. */
+.credential-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 880px;
+}
+.credential-title {
+  margin: 0;
+  font: var(--fw-display) 24px / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.credential-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.credential-scopes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.credential-scopes code {
+  font: 400 15px / 1 var(--font-numeric);
+  color: var(--text);
+}
+.credential-eyebrow {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.credential-count {
+  font: 400 16px / 1 var(--font-numeric);
+  letter-spacing: 0;
+}
+.credential-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--material-plate);
+  border: 1px solid var(--line);
+  box-shadow: var(--material-lip);
+}
+.credential-event {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
+}
+.credential-event + .credential-event {
+  border-top: 1px solid var(--line);
+}
+.credential-event-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.credential-event-text span {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.credential-event.is-refused b {
+  color: var(--caution-text);
+}
+.credential-event-when {
+  flex: none;
+  color: var(--text-dim);
+  font: 400 16px / 1 var(--font-numeric);
+}
+.credentials-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.credentials-name:hover {
+  color: var(--cyan-hi);
+  text-decoration: underline;
+}
+@media (max-width: 650px) {
+  .credential-title {
+    font-size: 20px;
+  }
+  .credential-event {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: var(--space-2) var(--space-3);
+  }
+}

@@ -8,6 +8,7 @@ import {
 import { Button, EmptyState, Input, Menu, MenuItem, Modal, Tag, useToast, type TagTone, Tick } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
+import { navigate } from "../router";
 import { publishCredentials } from "./credentialCount";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import "./integrations-panel.css";
@@ -17,7 +18,7 @@ const SCOPES = IntegrationScopeSchema.options;
 const CREDENTIALS = "/api/v1/gm/integration-credentials";
 type Issued = Readonly<{ credential: IntegrationCredentialMetadata; token: string }>;
 
-const AUDIT_WORDS: Readonly<Record<CredentialAuditEvent["type"], string>> = {
+export const AUDIT_WORDS: Readonly<Record<CredentialAuditEvent["type"], string>> = {
   created: "Created",
   used: "Used",
   verification_failed: "Refused a wrong secret",
@@ -33,46 +34,24 @@ export const stateOf = (credential: IntegrationCredentialMetadata, now = new Dat
       ? "expired"
       : "active";
 // Active in cyan, the rest quiet (settings spec 2.4): a tag in VT323, its words carrying the state.
-const STATE_WORDS: Readonly<Record<CredentialState, [string, TagTone]>> = {
+export const STATE_WORDS: Readonly<Record<CredentialState, [string, TagTone]>> = {
   active: ["Active", "ready"],
   expired: ["Expired", "status"],
   revoked: ["Revoked", "status"]
 };
 
 // One way to write a date and time (theme rule 20), with its capitals kept.
-const when = (value: string | null) => (value ? formatWhen(value) : "Never");
+export const when = (value: string | null) => (value ? formatWhen(value) : "Never");
 
 /**
- * The integration credentials as a table: name, scopes, state, last use and expiry, with Rotate, Revoke and History
- * on each row. New credential (the Access section's primary, placed by the caller) opens a dialog; a new or rotated
- * secret is shown once, in a dialog that keeps it until the GM has copied it or says it is saved. On a phone the
- * table is a list with the name and state, and the row's actions sit in a menu.
+ * Rotate and Revoke, each after its confirm, with the new secret shown once in its dialog. The table and a
+ * credential's page share them; `onChanged` reads the credentials again.
  */
-export function CredentialsTable({
-  gmToken,
-  creating,
-  onCreatingChange
-}: Readonly<{ gmToken: string; creating: boolean; onCreatingChange: (open: boolean) => void }>) {
-  const [credentials, setCredentials] = useState<readonly IntegrationCredentialMetadata[] | null>(null);
+export function useCredentialActions(gmToken: string, onChanged: () => void) {
   const [issued, setIssued] = useState<{ name: string; token: string; rotated: boolean } | null>(null);
-  const [history, setHistory] = useState<{
-    credential: IntegrationCredentialMetadata;
-    events: readonly CredentialAuditEvent[];
-  } | null>(null);
-  const phone = useMediaQuery("(max-width: 650px)");
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
   const fail = useCallback((error: unknown) => toast((error as Error).message, { tone: "error" }), [toast]);
-
-  const load = useCallback(() => {
-    apiRequest<{ credentials: IntegrationCredentialMetadata[] }>(CREDENTIALS, { token: gmToken })
-      .then((data) => {
-        setCredentials(data.credentials);
-        publishCredentials(data.credentials);
-      })
-      .catch(fail);
-  }, [gmToken, fail]);
-  useEffect(load, [load]);
 
   const rotate = async (credential: IntegrationCredentialMetadata) => {
     const ok = await confirm({
@@ -85,7 +64,7 @@ export function CredentialsTable({
     try {
       const data = await apiRequest<Issued>(`${CREDENTIALS}/${credential.id}/rotate`, { token: gmToken, body: {} });
       setIssued({ name: credential.name, token: data.token, rotated: true });
-      load();
+      onChanged();
     } catch (error) {
       fail(error);
     }
@@ -102,22 +81,55 @@ export function CredentialsTable({
     try {
       await apiRequest(`${CREDENTIALS}/${credential.id}/revoke`, { token: gmToken, method: "POST" });
       toast(`${credential.name} is revoked.`, { tone: "success" });
-      load();
+      onChanged();
     } catch (error) {
       fail(error);
     }
   };
 
-  const showHistory = async (credential: IntegrationCredentialMetadata) => {
-    try {
-      const data = await apiRequest<{ events: CredentialAuditEvent[] }>(`${CREDENTIALS}/${credential.id}/audit`, {
-        token: gmToken
-      });
-      setHistory({ credential, events: data.events });
-    } catch (error) {
-      fail(error);
-    }
-  };
+  const dialogs = (
+    <>
+      {issued && <SecretDialog issued={issued} onDone={() => setIssued(null)} />}
+      {dialog}
+    </>
+  );
+  return { rotate, revoke, setIssued, fail, dialogs };
+}
+
+/**
+ * The integration credentials as a table: name, scopes, state, last use and expiry, with Rotate and Revoke on each
+ * row; a credential's name opens its own page with its history. New credential (the Access section's primary, placed by the caller) opens a dialog; a new or rotated
+ * secret is shown once, in a dialog that keeps it until the GM has copied it or says it is saved. On a phone the
+ * table is a list with the name and state, and the row's actions sit in a menu.
+ */
+export function CredentialsTable({
+  gmToken,
+  creating,
+  onCreatingChange
+}: Readonly<{ gmToken: string; creating: boolean; onCreatingChange: (open: boolean) => void }>) {
+  const [credentials, setCredentials] = useState<readonly IntegrationCredentialMetadata[] | null>(null);
+  const phone = useMediaQuery("(max-width: 650px)");
+  const { toast } = useToast();
+  const fail = useCallback((error: unknown) => toast((error as Error).message, { tone: "error" }), [toast]);
+
+  const load = useCallback(() => {
+    apiRequest<{ credentials: IntegrationCredentialMetadata[] }>(CREDENTIALS, { token: gmToken })
+      .then((data) => {
+        setCredentials(data.credentials);
+        publishCredentials(data.credentials);
+      })
+      .catch(fail);
+  }, [gmToken, fail]);
+  useEffect(load, [load]);
+  const { rotate, revoke, setIssued, dialogs } = useCredentialActions(gmToken, load);
+  // A credential's name opens its own page, with its history (I leftovers spec 2.5).
+  const openPage = (credential: IntegrationCredentialMetadata) =>
+    void navigate(`/settings/access/credentials/${encodeURIComponent(credential.id)}`);
+  const nameLink = (credential: IntegrationCredentialMetadata) => (
+    <button type="button" className="credentials-name" onClick={() => openPage(credential)}>
+      {credential.name}
+    </button>
+  );
 
   const stateBadge = (credential: IntegrationCredentialMetadata) => {
     const [words, tone] = STATE_WORDS[stateOf(credential)];
@@ -133,7 +145,6 @@ export function CredentialsTable({
         <MenuItem disabled={!live} tone="danger" onClick={() => void revoke(credential)}>
           Revoke
         </MenuItem>
-        <MenuItem onClick={() => void showHistory(credential)}>History</MenuItem>
       </Menu>
     ) : (
       <>
@@ -142,9 +153,6 @@ export function CredentialsTable({
         </Button>
         <Button size="sm" variant="destructive" disabled={!live} onClick={() => void revoke(credential)}>
           Revoke
-        </Button>
-        <Button size="sm" onClick={() => void showHistory(credential)}>
-          History
         </Button>
       </>
     );
@@ -165,7 +173,7 @@ export function CredentialsTable({
               className={credential.revokedAt ? "settings-list-row is-revoked" : "settings-list-row"}
             >
               <span className="settings-list-text">
-                <b>{credential.name}</b>
+                <b>{nameLink(credential)}</b>
                 <span>
                   {STATE_WORDS[stateOf(credential)][0]} · Last used {when(credential.lastUsedAt)}
                 </span>
@@ -192,7 +200,7 @@ export function CredentialsTable({
             {credentials.map((credential) => (
               <tr key={credential.id} className={credential.revokedAt ? "is-revoked" : undefined}>
                 <td>
-                  <b>{credential.name}</b>
+                  <b>{nameLink(credential)}</b>
                 </td>
                 <td className="credentials-scopes">
                   {credential.scopes.map((scope) => (
@@ -220,52 +228,7 @@ export function CredentialsTable({
           }}
         />
       )}
-      {issued && <SecretDialog issued={issued} onDone={() => setIssued(null)} />}
-      {history && (
-        <Modal
-          open
-          size="md"
-          title={`${history.credential.name} · History`}
-          ariaLabel={`History of ${history.credential.name}`}
-          onClose={() => setHistory(null)}
-        >
-          <dl className="credentials-facts">
-            <div>
-              <dt>Created</dt>
-              <dd className="tabular">{when(history.credential.createdAt)}</dd>
-            </div>
-            <div>
-              <dt>Expires</dt>
-              <dd className="tabular">{when(history.credential.expiresAt)}</dd>
-            </div>
-            <div>
-              <dt>Revoked</dt>
-              <dd className="tabular">{when(history.credential.revokedAt)}</dd>
-            </div>
-          </dl>
-          {history.events.length === 0 ? (
-            <p className="settings-empty">Nothing has happened to this credential yet.</p>
-          ) : (
-            <table className="settings-table">
-              <thead>
-                <tr>
-                  <th scope="col">When</th>
-                  <th scope="col">What happened</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.events.map((event) => (
-                  <tr key={event.id}>
-                    <td className="tabular">{when(event.occurredAt)}</td>
-                    <td>{AUDIT_WORDS[event.type]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Modal>
-      )}
-      {dialog}
+      {dialogs}
     </div>
   );
 }

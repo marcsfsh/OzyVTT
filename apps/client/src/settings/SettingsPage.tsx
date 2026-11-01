@@ -7,6 +7,7 @@ import { navigate, useRoute } from "../router";
 import { PhoneHeader, SectionBar } from "../shell/SectionBar";
 import { useLeaveTable } from "../shell/useLeaveTable";
 import { AccessSection } from "./AccessSection";
+import { CredentialPage } from "../integrations/CredentialPage";
 import { CharactersSection } from "./CharactersSection";
 import { DeviceSection } from "./DeviceSection";
 import { FightsSection } from "./FightsSection";
@@ -168,6 +169,14 @@ export function SettingsPage({
       body = <PlayersSection state={gm} gmToken={gmToken} onPreviewScreen={onPreviewPlayers ?? (() => {})} />;
     else if (section === "fights") body = <FightsSection state={gm} />;
     else if (section === "characters") body = <CharactersSection state={gm} />;
+    else if (section === "access" && route.segments[2] === "credentials" && route.segments[3])
+      body = (
+        <CredentialPage
+          gmToken={gmToken}
+          credentialId={decodeURIComponent(route.segments[3])}
+          onBack={() => void navigate("/settings/access")}
+        />
+      );
     else if (section === "access")
       body = (
         <AccessSection
