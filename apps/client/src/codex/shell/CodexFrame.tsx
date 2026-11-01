@@ -1,20 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { IconButton, Kbd, SegmentedControl } from "@vtt/ui";
+import { IconButton, Kbd } from "@vtt/ui";
 import { currentDevice, shortcutLabel } from "../../lib/shortcut";
 import { CodexIcon } from "../icons";
-import {
-  CAMPAIGN_PARTS,
-  CODEX_BAR,
-  CODEX_PHONE_TABS,
-  SECTION_TITLE,
-  barItemOf,
-  campaignPartOf,
-  pathForSection,
-  phoneTabOf,
-  type CampaignPart,
-  type CodexPhoneTab,
-  type CodexSection
-} from "../routes";
+import { SECTION_TITLE, barItemOf, codexBar, type CodexSection } from "../routes";
 import { replaceQuery, useRoute } from "../../router";
 import { useRecordLight } from "../../shell/recordLight";
 import { openSearch } from "../../shell/search-store";
@@ -22,15 +10,14 @@ import { SectionBar } from "../../shell/SectionBar";
 import { PhoneBarContext, type PhoneBarSlot } from "./PhoneBar";
 import "./shell.css";
 
-const CAMPAIGN_KEY = "codex-campaign-part";
-
 /**
- * The frame both Codex shells share. A laptop gets the section bar (Home, Search, Atlas, Story, Quests and
- * Relationships), the search box that opens the palette (Ctrl K), and the GM's New and GM menu. A phone gets a top
- * bar the view on screen fills (`CodexPhoneBar`), Campaign's switch under it on Story, Quests, Relationships and
- * Sessions, and the tab bar under the thumb. There is no left rail. Role-blind: the shells pass the GM's controls.
+ * The frame both Codex shells share (Codex frame rule 3.1, ADR-0054). A laptop gets the Titled bar: Codex, its pages
+ * as words (Home, Pages, Atlas, Story, Quests, Relationships, and Compendium for a player), the search field that opens
+ * the palette (Ctrl K), and the GM's New and More. A phone gets a header the view on screen can fill (`CodexPhoneBar`)
+ * with Search and the GM's New, and the same pages as a strip of words under it. The shells pass the GM's controls.
  */
 export function CodexFrame({
+  role,
   section,
   recordId = null,
   phone,
@@ -45,6 +32,8 @@ export function CodexFrame({
   overlays,
   children
 }: Readonly<{
+  /** Whose bar: a player's ends with the Compendium, which the GM has as a section of its own. */
+  role: "gm" | "player";
   /** Null for an address that names nothing, which lights no section. */
   section: CodexSection | null;
   /** The record the address opens, or null on a list: opening and leaving one runs its light. */
@@ -57,9 +46,9 @@ export function CodexFrame({
   /** The preview's own palette; the app's one search serves every other Codex. */
   paletteOpen?: boolean;
   onPaletteChange?: (open: boolean) => void;
-  /** The GM's New and GM menu, after the search box. */
+  /** The GM's New and More, after the search field. */
   laptopActions?: ReactNode;
-  /** The GM's controls in the phone's default top bar, before Search. */
+  /** The GM's controls in the phone's default header, after Search. */
   phoneActions?: ReactNode;
   notices?: ReactNode;
   /** Dialogs and drawers that sit outside the content region, the palette among them. */
@@ -85,33 +74,9 @@ export function CodexFrame({
   const shell = useRef<HTMLDivElement>(null);
   useRecordLight(shell, recordId, { content: ":scope > .cx-content" });
 
-  const litBar = section ? barItemOf(section) : null;
-  const litTab = section ? phoneTabOf(section) : null;
-  const part = section ? campaignPartOf(section) : null;
-
-  // Campaign reopens the part last used, so the tab is one tap back to where the GM was.
-  const [lastPart, setLastPart] = useState<CampaignPart>(() => {
-    try {
-      const stored = localStorage.getItem(CAMPAIGN_KEY);
-      return CAMPAIGN_PARTS.some((candidate) => candidate.id === stored) ? (stored as CampaignPart) : "story";
-    } catch {
-      return "story";
-    }
-  });
-  useEffect(() => {
-    if (!part || embedded) return;
-    setLastPart(part);
-    try {
-      localStorage.setItem(CAMPAIGN_KEY, part);
-    } catch {
-      /* private mode: Campaign opens on Story */
-    }
-  }, [part, embedded]);
-
-  const tabPath = (tab: CodexPhoneTab) =>
-    tab === "campaign"
-      ? (CAMPAIGN_PARTS.find((candidate) => candidate.id === lastPart)?.path ?? pathForSection("story"))
-      : pathForSection(tab);
+  const lit = section ? barItemOf(section) : null;
+  const pages = codexBar(role);
+  const onStrip = pages.some((item) => item.id === lit);
 
   const [barTarget, setBarTarget] = useState<HTMLElement | null>(null);
   const [claims, setClaims] = useState(0);
@@ -122,10 +87,10 @@ export function CodexFrame({
   const defaults = useMemo(
     () => (
       <>
-        {phoneActions}
         <IconButton label="Search" size="sm" onClick={openFind}>
           <CodexIcon iconId="search" className="cx-icon" />
         </IconButton>
+        {phoneActions}
       </>
     ),
     [phoneActions, openFind]
@@ -153,12 +118,9 @@ export function CodexFrame({
           name="Codex"
           navLabel="Codex sections"
           pagesLabel="Codex pages"
-          pages={(phone ? CODEX_PHONE_TABS : CODEX_BAR).map((item) => ({ id: item.id, label: item.label }))}
-          activeId={(phone ? litTab : litBar) ?? ""}
-          onChange={(id) => {
-            if (phone) go(tabPath(id as CodexPhoneTab));
-            else go(CODEX_BAR.find((item) => item.id === id)!.path);
-          }}
+          pages={pages.map((item) => ({ id: item.id, label: item.label }))}
+          activeId={onStrip ? lit! : ""}
+          onChange={(id) => go(pages.find((item) => item.id === id)!.path)}
           panel={() => shell.current?.querySelector(":scope > .cx-content")}
           phoneStrip={!recordId}
           search={searchBox}
@@ -169,7 +131,7 @@ export function CodexFrame({
                 <>
                   {/* A page in the strip is named by the strip, so the header names the section; one off it names
                       itself (rule 12). */}
-                  <h1 className="secbar-name">{litTab || !section ? "Codex" : SECTION_TITLE[section]}</h1>
+                  <h1 className="secbar-name">{onStrip || !section ? "Codex" : SECTION_TITLE[section]}</h1>
                   <span className="secbar-icons">{defaults}</span>
                 </>
               )}
@@ -177,22 +139,6 @@ export function CodexFrame({
             </>
           }
         >
-          {phone && part && (
-            <nav className="cx-campaign" aria-label="Campaign">
-              <SegmentedControl
-                size="sm"
-                current
-                ariaLabel="Campaign parts"
-                value={part}
-                onChange={(id) => {
-                  const target = CAMPAIGN_PARTS.find((candidate) => candidate.id === id);
-                  if (target) go(target.path);
-                }}
-                options={CAMPAIGN_PARTS.map((candidate) => ({ value: candidate.id, label: candidate.label }))}
-              />
-            </nav>
-          )}
-
           {notices}
           <div className="cx-content">{children}</div>
 

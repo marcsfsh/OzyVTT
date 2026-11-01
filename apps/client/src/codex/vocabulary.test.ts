@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { readSource, scanCopy } from "../copy-scan";
 import { recordPieceSources } from "../convention-sources";
-import { CAMPAIGN_PARTS, CODEX_BAR, CODEX_PHONE_TABS, SECTION_TITLE, codexDestinations } from "./routes";
+import { CODEX_BAR, SECTION_TITLE, codexBar, codexDestinations } from "./routes";
 import { CHRONICLE_KIND_META } from "./chronicle";
 
 /**
@@ -134,18 +134,24 @@ describe("The canonical glossary", () => {
 });
 
 describe("The words the navigation itself uses", () => {
-  it("names the laptop's sections, the phone's tabs and Campaign's parts in the decided words", () => {
-    expect(CODEX_BAR.map((item) => item.label)).toEqual([
+  it("names the bar's pages in the decided words, the Compendium in a player's strip alone", () => {
+    expect(codexBar("gm").map((item) => item.label)).toEqual([
       "Home",
-      "Search",
+      "Pages",
+      "Atlas",
+      "Story",
+      "Quests",
+      "Relationships"
+    ]);
+    expect(codexBar("player").map((item) => item.label)).toEqual([
+      "Home",
+      "Pages",
       "Atlas",
       "Story",
       "Quests",
       "Relationships",
       "Compendium"
     ]);
-    expect(CODEX_PHONE_TABS.map((tab) => tab.label)).toEqual(["Home", "Pages", "Atlas", "Campaign", "Search"]);
-    expect(CAMPAIGN_PARTS.map((part) => part.label)).toEqual(["Story", "Quests", "Relationships", "Sessions"]);
   });
 
   it("titles each section with the bar's own word, so a phone's top bar cannot drift from the nav", () => {

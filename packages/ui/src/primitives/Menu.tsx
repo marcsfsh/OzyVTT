@@ -4,6 +4,7 @@ import { edgeIn, ghostOut, openerX } from "../motion/overlay";
 import { cx } from "./util";
 import { IconChevron } from "./icons";
 import { OverlayEdge } from "./OverlayEdge";
+import "./Button.css";
 import "./Menu.css";
 
 interface MenuProps {
@@ -19,6 +20,8 @@ interface MenuProps {
   icon?: boolean;
   className?: string;
   triggerClassName?: string;
+  /** The trigger as a button of the kit: the Cup (a section bar's New with choices) or a Base line button. */
+  triggerButton?: "primary" | "secondary";
 }
 
 /** Disclosure menu on native <details>/<summary>: the caret rotates on open, the popover eases in, and it closes
@@ -32,7 +35,8 @@ export function Menu({
   hideCaret = false,
   icon = false,
   className,
-  triggerClassName
+  triggerClassName,
+  triggerButton
 }: MenuProps) {
   const ref = useRef<HTMLDetailsElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -122,18 +126,36 @@ export function Menu({
 
   return (
     <details ref={ref} className={cx("nh-menu", `nh-menu--${align}`, className)}>
-      <summary
-        className={cx("nh-menu-trigger", icon && "nh-menu-trigger--icon", "interactive", triggerClassName)}
-        aria-label={label}
-        aria-haspopup="menu"
-      >
-        <span className="nh-menu-trigger-label">{trigger}</span>
-        {!hideCaret && !icon && (
-          <span className="nh-menu-caret" aria-hidden="true">
-            <IconChevron />
-          </span>
-        )}
-      </summary>
+      {triggerButton ? (
+        // A button's paint on the summary: its label box as `Button` draws it, so the Cup's lines and plate apply.
+        <summary
+          className={cx(
+            "nh-btn",
+            `nh-btn--${triggerButton}`,
+            "nh-btn--sm",
+            "nh-menu-button",
+            "interactive",
+            triggerClassName
+          )}
+          aria-label={label}
+          aria-haspopup="menu"
+        >
+          <nh-label>{trigger}</nh-label>
+        </summary>
+      ) : (
+        <summary
+          className={cx("nh-menu-trigger", icon && "nh-menu-trigger--icon", "interactive", triggerClassName)}
+          aria-label={label}
+          aria-haspopup="menu"
+        >
+          <span className="nh-menu-trigger-label">{trigger}</span>
+          {!hideCaret && !icon && (
+            <span className="nh-menu-caret" aria-hidden="true">
+              <IconChevron />
+            </span>
+          )}
+        </summary>
+      )}
       <div ref={popoverRef} className="nh-menu-popover anim-popover" role="menu" onClick={closeAfterItem}>
         {children}
         <OverlayEdge ref={edgeRef} />

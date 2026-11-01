@@ -88,7 +88,7 @@ describe("A player at a GM-only address", () => {
     render(<PlayerCodex token="player" />);
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     expect(await screen.findByRole("heading", { level: 2, name: "Codex" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Campaign", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Relationships", selected: true })).toBeInTheDocument();
   });
 });
 

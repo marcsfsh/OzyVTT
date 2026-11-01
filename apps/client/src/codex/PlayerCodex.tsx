@@ -105,6 +105,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   return (
     <PlayerCodexContext.Provider value={player}>
       <CodexFrame
+        role="player"
         section={section}
         recordId={recordId}
         phone={phone}

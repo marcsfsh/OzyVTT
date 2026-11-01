@@ -1,5 +1,5 @@
 /**
- * The Codex's addresses, its section bar and its phone tabs in one place, so nothing else needs to know the path
+ * The Codex's addresses and its section bar's pages in one place, so nothing else needs to know the path
  * shapes. Data, not JSX: the shell reads these tables, and the Codex search offers the same destinations.
  */
 
@@ -112,14 +112,17 @@ export function retiredTarget(section: RetiredCodexSection, query: URLSearchPara
   }
 }
 
-// ----- The laptop's section bar and the phone's tab bar -----
+// ----- The section bar's pages -----
 
 export type CodexBarItem = Readonly<{ id: string; label: string; iconId: string; path: string }>;
 
-/** The laptop's section bar, left to right. */
+/**
+ * The Codex's pages, left to right on the Titled bar and its phone strip (Codex frame rule 3.1). Search is the bar's
+ * field, so it is no page. The Compendium is the GM's own section, so only a player's strip ends with it.
+ */
 export const CODEX_BAR: readonly CodexBarItem[] = [
   { id: "home", label: "Home", iconId: "home", path: pathForSection("home") },
-  { id: "search", label: "Search", iconId: "search", path: pathForSection("search") },
+  { id: "pages", label: "Pages", iconId: "scroll", path: pathForSection("pages") },
   { id: "atlas", label: "Atlas", iconId: "compass", path: pathForSection("atlas") },
   { id: "story", label: "Story", iconId: "book", path: pathForSection("story") },
   { id: "quests", label: "Quests", iconId: "quest", path: pathForSection("quests") },
@@ -127,14 +130,19 @@ export const CODEX_BAR: readonly CodexBarItem[] = [
   { id: "compendium", label: "Compendium", iconId: "scroll", path: pathForSection("compendium") }
 ];
 
+/** The bar's pages for one role. */
+export function codexBar(role: "gm" | "player"): readonly CodexBarItem[] {
+  return role === "gm" ? CODEX_BAR.filter((item) => item.id !== "compendium") : CODEX_BAR;
+}
+
 /**
- * Which bar item an address lights. A page opened from Search or a link lights none, and the GM menu's own sections
- * light the menu.
+ * Which of the bar's pages an address lights. Search and a tag light none (search is the bar's field), and the GM's
+ * own places light the bar's More.
  */
 export function barItemOf(section: CodexSection): string | null {
   switch (section) {
     case "home":
-    case "search":
+    case "pages":
     case "atlas":
     case "quests":
     case "relationships":
@@ -144,69 +152,12 @@ export function barItemOf(section: CodexSection): string | null {
     case "timeline":
     case "sessions":
       return "story";
-    case "tags":
-      return "search";
     case "templates":
     case "backup":
     case "settings":
       return "gm-menu";
-    case "pages":
-      return null;
-  }
-}
-
-/** The phone's tab bar under the thumb. Campaign opens the last of its four parts. */
-export const CODEX_PHONE_TABS: readonly Readonly<{ id: CodexPhoneTab; label: string; iconId: string }>[] = [
-  { id: "home", label: "Home", iconId: "home" },
-  { id: "pages", label: "Pages", iconId: "scroll" },
-  { id: "atlas", label: "Atlas", iconId: "compass" },
-  { id: "campaign", label: "Campaign", iconId: "calendar" },
-  { id: "search", label: "Search", iconId: "search" }
-];
-export type CodexPhoneTab = "home" | "pages" | "atlas" | "campaign" | "search";
-
-export function phoneTabOf(section: CodexSection): CodexPhoneTab | null {
-  switch (section) {
-    case "home":
-    case "atlas":
     case "search":
-      return section;
-    case "pages":
     case "tags":
-    case "compendium":
-      return "pages";
-    case "story":
-    case "timeline":
-    case "sessions":
-    case "quests":
-    case "relationships":
-    case "templates":
-      return "campaign";
-    case "backup":
-    case "settings":
-      return null;
-  }
-}
-
-/** Campaign's four parts, switched under the phone's top bar. */
-export const CAMPAIGN_PARTS: readonly Readonly<{ id: CampaignPart; label: string; path: string }>[] = [
-  { id: "story", label: "Story", path: pathForSection("story") },
-  { id: "quests", label: "Quests", path: pathForSection("quests") },
-  { id: "relationships", label: "Relationships", path: pathForSection("relationships") },
-  { id: "sessions", label: "Sessions", path: pathForSection("sessions") }
-];
-export type CampaignPart = "story" | "quests" | "relationships" | "sessions";
-
-export function campaignPartOf(section: CodexSection): CampaignPart | null {
-  switch (section) {
-    case "story":
-    case "timeline":
-      return "story";
-    case "quests":
-    case "relationships":
-    case "sessions":
-      return section;
-    default:
       return null;
   }
 }

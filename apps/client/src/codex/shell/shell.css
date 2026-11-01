@@ -63,7 +63,6 @@
 }
 .cx-gm-menu[open] > summary,
 .cx-gm-menu.is-on > summary {
-  border-color: var(--rim-gm);
   color: var(--violet-text);
 }
 /* Below 1280px the search box keeps its glyph and the shortcut, and gives the width to the sections. */
@@ -79,7 +78,7 @@
   }
 }
 
-/* ----- Phone: the top bar, Campaign's switch and the tab bar ----- */
+/* ----- Phone: the header a view can fill ----- */
 .cx-phonebar {
   display: flex;
   align-items: center;
@@ -141,19 +140,6 @@
   align-items: center;
   gap: var(--space-1);
   flex: none;
-}
-.cx-campaign {
-  padding: var(--space-2) var(--space-3) 0;
-  flex: none;
-}
-.cx-campaign .nh-segmented {
-  display: flex;
-  flex-wrap: nowrap;
-  width: 100%;
-}
-.cx-campaign .nh-segmented-option {
-  flex: 1 1 auto;
-  padding-inline: var(--space-1);
 }
 
 /* ----- Pieces every view uses ----- */

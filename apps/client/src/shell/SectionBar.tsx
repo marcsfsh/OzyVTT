@@ -33,6 +33,11 @@ export function BarPrimary({ label, onClick }: Readonly<{ label: string; onClick
   );
 }
 
+/** Whether the page under the bar shows its own Cup, so a section's New drawn some other way (a menu) steps down too. */
+export function useBarStepDown(): boolean {
+  return useContext(PageHasCup);
+}
+
 /** Watches what is beside the bar for a Cup of the page's own, as the mockups' `oneCup()` does after a page renders. */
 function usePageHasCup(bar: HTMLElement | null) {
   const [has, setHas] = useState(false);

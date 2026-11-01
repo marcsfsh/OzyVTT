@@ -203,13 +203,14 @@ export function CodexShell({
         onNewQuest={() => void newQuest()}
         onNewSession={() => void newSession()}
       />
-      <GmMenu section={section} compact={compact} party={party} go={go} onPreview={(id) => void openPreview(id)} />
+      <GmMenu section={section} party={party} go={go} onPreview={(id) => void openPreview(id)} />
     </>
   );
 
   return (
     <GmCodexContext.Provider value={gm}>
       <CodexFrame
+        role="gm"
         section={section}
         recordId={recordId}
         phone={phone}

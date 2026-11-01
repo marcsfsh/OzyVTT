@@ -12,7 +12,7 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { setViewport } from "../../test/viewport";
 import { CodexShell } from "./CodexShell";
-import { CODEX_BAR } from "./routes";
+import { codexBar } from "./routes";
 import { ACTORS, api, page, records, resetFakes, summary } from "../../test/codex-fakes";
 
 const listPages = api.codexApi.listPages;
@@ -40,7 +40,7 @@ const lit = () =>
     .filter((tab) => tab.getAttribute("aria-selected") === "true");
 
 describe("The laptop's section bar", () => {
-  it.each(CODEX_BAR.map((item) => [item.label, item.path] as const))(
+  it.each(codexBar("gm").map((item) => [item.label, item.path] as const))(
     "%s opens at %s with exactly one section lit",
     async (label, path) => {
       const user = userEvent.setup();
@@ -55,7 +55,7 @@ describe("The laptop's section bar", () => {
   );
 
   it("renders each section straight from its address, with no navigation first", async () => {
-    for (const item of CODEX_BAR) {
+    for (const item of codexBar("gm")) {
       const view = renderShell(item.path);
       await waitFor(() => expect(lit()[0]).toHaveAccessibleName(item.label));
       view.unmount();
@@ -70,10 +70,22 @@ describe("The laptop's section bar", () => {
     }
   });
 
-  it("lights nothing for a page, which opens from Search or a link", async () => {
-    renderShell("/codex/pages/p1");
+  it("lights Pages for a page, and nothing for search, which is the bar's field", async () => {
+    const view = renderShell("/codex/pages/p1");
     await waitFor(() => expect(getPage).toHaveBeenCalledWith("gm", "p1"));
+    expect(lit().map((tab) => tab.textContent)).toEqual(["Pages"]);
+    view.unmount();
+    renderShell("/codex/search");
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
     expect(lit()).toHaveLength(0);
+    expect(bar().queryByRole("tab", { name: "Search" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Search the Codex/ })).toBeInTheDocument();
+  });
+
+  it("leaves the Compendium out of the GM's bar, since it is a section of its own", async () => {
+    renderShell("/codex");
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    expect(bar().queryByRole("tab", { name: "Compendium" })).not.toBeInTheDocument();
   });
 
   it("has no left rail and no page tree", async () => {
@@ -93,26 +105,26 @@ describe("The laptop's section bar", () => {
   });
 });
 
-describe("The GM menu and New", () => {
-  it("holds Prep templates, Backup, Autosave and history, and See as players for Everyone and each character", async () => {
+describe("The bar's More and New", () => {
+  it("holds Prep templates, Backup, Autosave and history, and See the Codex as players for Everyone and each character", async () => {
     const user = userEvent.setup();
     renderShell("/codex");
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
-    await user.click(screen.getByText("GM menu"));
+    await user.click(screen.getByLabelText("More in the Codex"));
     const items = screen.getAllByRole("menuitem").map((item) => item.textContent);
     expect(items).toEqual(
       expect.arrayContaining([
         "Prep templates",
         "Backup",
         "Autosave and history",
-        "See as players: Everyone",
-        "See as Lyra Emberwise"
+        "See the Codex as players: Everyone",
+        "See the Codex as Lyra Emberwise"
       ])
     );
     // An archived character and a monster are no audience.
-    expect(items).not.toContain("See as Old Tam");
-    expect(items).not.toContain("See as Wolf");
+    expect(items).not.toContain("See the Codex as Old Tam");
+    expect(items).not.toContain("See the Codex as Wolf");
 
     await user.click(screen.getByRole("menuitem", { name: "Backup" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/backup"));
@@ -124,8 +136,8 @@ describe("The GM menu and New", () => {
     renderShell("/codex");
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
-    await user.click(screen.getByText("GM menu"));
-    await user.click(screen.getByRole("menuitem", { name: "See as Lyra Emberwise" }));
+    await user.click(screen.getByLabelText("More in the Codex"));
+    await user.click(screen.getByRole("menuitem", { name: "See the Codex as Lyra Emberwise" }));
     await waitFor(() => expect(createPreviewSession).toHaveBeenCalledWith("gm", "a-lyra"));
     expect(await screen.findByRole("dialog", { name: "Player Codex preview" })).toBeInTheDocument();
     // The preview's address is its own: the GM stays where they were.
@@ -186,44 +198,20 @@ describe("The browser's own buttons", () => {
   });
 });
 
-describe("The phone's tab bar under the thumb", () => {
+describe("The phone's strip of pages", () => {
   beforeEach(() => setViewport(390));
 
-  it("has Home, Pages, Atlas, Campaign and Search, with the section's tab on", async () => {
-    renderShell("/codex/pages");
+  it("runs the same pages under the header as a strip of words, with the section's page on", async () => {
+    renderShell("/codex/story");
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     expect(
       bar()
         .getAllByRole("tab")
         .map((tab) => tab.textContent)
-    ).toEqual(["Home", "Pages", "Atlas", "Campaign", "Search"]);
-    expect(lit().map((tab) => tab.textContent)).toEqual(["Pages"]);
-    // The laptop's section bar is gone.
-    expect(screen.queryByRole("tab", { name: "Relationships" })).not.toBeInTheDocument();
-  });
-
-  it("switches Campaign's four parts under the top bar, and Campaign reopens the last one", async () => {
-    const user = userEvent.setup();
-    const view = renderShell("/codex/story");
-    await waitFor(() => expect(listPages).toHaveBeenCalled());
-    const campaign = within(screen.getByRole("navigation", { name: "Campaign" }));
-    expect(campaign.getAllByRole("button").map((part) => part.textContent)).toEqual([
-      "Story",
-      "Quests",
-      "Relationships",
-      "Sessions"
-    ]);
-    expect(lit().map((tab) => tab.textContent)).toEqual(["Campaign"]);
-
-    await user.click(campaign.getByRole("button", { name: "Relationships" }));
-    await waitFor(() => expect(window.location.pathname).toBe("/codex/relationships"));
-    await user.click(bar().getByRole("tab", { name: "Home" }));
-    await waitFor(() => expect(window.location.pathname).toBe("/codex"));
+    ).toEqual(["Home", "Pages", "Atlas", "Story", "Quests", "Relationships"]);
+    expect(lit().map((tab) => tab.textContent)).toEqual(["Story"]);
+    // Campaign and its parts are gone.
     expect(screen.queryByRole("navigation", { name: "Campaign" })).not.toBeInTheDocument();
-
-    await user.click(bar().getByRole("tab", { name: "Campaign" }));
-    await waitFor(() => expect(window.location.pathname).toBe("/codex/relationships"));
-    view.unmount();
   });
 
   it("titles the top bar with the section when the view has no bar of its own", async () => {
@@ -231,20 +219,20 @@ describe("The phone's tab bar under the thumb", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Backup" })).toBeInTheDocument();
   });
 
-  it("keeps New, the GM menu and Search on a section's own top bar", async () => {
+  it("keeps Search, New and More on a section's own header", async () => {
     renderShell("/codex");
     expect(await screen.findByRole("heading", { level: 2, name: "Codex" })).toBeInTheDocument();
-    expect(screen.getByLabelText("GM menu")).toBeInTheDocument();
+    expect(screen.getByLabelText("More in the Codex")).toBeInTheDocument();
     expect(screen.getByLabelText("New")).toBeInTheDocument();
     expect(
       within(document.querySelector(".secbar-head") as HTMLElement).getByRole("button", { name: "Search" })
     ).toBeInTheDocument();
   });
 
-  it("keeps New and the GM menu reachable from the top bar", async () => {
+  it("keeps New and More reachable from the header", async () => {
     renderShell("/codex/story");
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    expect(screen.getByLabelText("GM menu")).toBeInTheDocument();
+    expect(screen.getByLabelText("More in the Codex")).toBeInTheDocument();
     expect(screen.getByLabelText("New")).toBeInTheDocument();
   });
 });
