@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EVERYONE, HIDDEN, type Audience } from "@vtt/ui";
 import { HiddenBlock } from "./HiddenBlock";
-import { RevealPanel } from "./RevealPanel";
+import { RevealColumn, RevealPanel } from "./RevealPanel";
 import { PagePicker } from "./PagePicker";
 
 const PARTY = [
@@ -154,5 +154,39 @@ describe("The page picker", () => {
     await user.click(screen.getByRole("button", { name: /Centre on/ }));
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+});
+
+describe("The reveal in a page's side column", () => {
+  it("chooses Everyone or characters as chips, names them on the Cup and sends the same payload as the dialog", async () => {
+    const user = userEvent.setup();
+    const onReveal = vi.fn();
+    render(
+      <RevealColumn
+        party={PARTY}
+        preview={<p>Ysolde owes the Tidebound.</p>}
+        links="The links go to Tidebound, which everyone can already see."
+        onReveal={onReveal}
+      />
+    );
+    const who = within(screen.getByRole("group", { name: "Who sees it" }));
+    expect(who.getByRole("button", { name: "Everyone" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Ysolde owes the Tidebound.")).toBeInTheDocument();
+    expect(screen.getByText(/its stamp shows the session/)).toBeInTheDocument();
+    await user.click(who.getByRole("button", { name: "Borin Stoneguard" }));
+    await user.click(who.getByRole("button", { name: "Lyra Emberwise" }));
+    expect(who.getByRole("button", { name: "Everyone" })).toHaveAttribute("aria-pressed", "false");
+    await user.click(
+      screen.getByRole("button", {
+        name: /^Reveal to (Borin Stoneguard and Lyra Emberwise|Lyra Emberwise and Borin Stoneguard)$/
+      })
+    );
+    expect(onReveal).toHaveBeenCalledWith({ audience: "characters", characterIds: ["borin", "lyra"] });
+  });
+
+  it("starts from who already sees the block", () => {
+    render(<RevealColumn party={PARTY} initial={LYRA} preview={<p>Text</p>} onReveal={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Lyra Emberwise" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Reveal to Lyra Emberwise" })).toBeEnabled();
   });
 });

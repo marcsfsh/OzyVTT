@@ -226,6 +226,9 @@ describe("Reading a page as the GM", () => {
   });
 });
 
+/** The page's side column, where a reveal opens (F finding spec 2.4). */
+const sideColumn = () => within(screen.getByRole("complementary", { name: "About this page" }));
+
 describe("Revealing", () => {
   it("reveals a block to everyone through the block's own audience route", async () => {
     const user = userEvent.setup();
@@ -235,15 +238,21 @@ describe("Revealing", () => {
     });
     renderGmCodex("/codex/pages/p1");
     await user.click(await screen.findByRole("button", { name: "Reveal The debt" }));
-    const panel = within(await screen.findByRole("dialog", { name: "Reveal The debt" }));
+    const panel = sideColumn();
+    expect(await panel.findByRole("heading", { name: "Reveal The debt" })).toBeInTheDocument();
     expect(panel.getByText("Ysolde owes the Tidebound four thousand gold.")).toBeInTheDocument();
+    // The text stays where it is beside the column.
+    expect(doc()).toHaveTextContent("She keeps the tide clock.");
     await user.click(panel.getByRole("button", { name: "Reveal to everyone" }));
 
     await waitFor(() =>
       expect(records.pageRecordApi.blocks.setAudience).toHaveBeenCalledWith("gm", "p1", "b1", { audience: "everyone" })
     );
+    expect(records.pageRecordApi.blocks.setAudience).toHaveBeenCalledTimes(1);
     expect(await screen.findByRole("region", { name: "The debt · Revealed to everyone" })).toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "Reveal The debt" })).not.toBeInTheDocument();
+    // Revealing closes the column back to the facts.
+    expect(sideColumn().queryByRole("heading", { name: "Reveal The debt" })).not.toBeInTheDocument();
+    expect(sideColumn().getByText("Relationships")).toBeInTheDocument();
   });
 
   it("reveals to chosen characters by name, and will not reveal to nobody", async () => {
@@ -251,13 +260,17 @@ describe("Revealing", () => {
     records.pageRecordApi.blocks.setAudience.mockResolvedValue(YSOLDE);
     renderGmCodex("/codex/pages/p1");
     await user.click(await screen.findByRole("button", { name: "Reveal The debt" }));
-    const panel = within(await screen.findByRole("dialog", { name: "Reveal The debt" }));
-    await user.click(panel.getByLabelText("Chosen characters"));
-    expect(panel.getByRole("button", { name: "Reveal" })).toBeDisabled();
+    const panel = sideColumn();
+    const who = within(await panel.findByRole("group", { name: "Who sees it" }));
     // The party is the table's characters: no archived character and no monster.
-    expect(panel.queryByLabelText("Old Tam")).not.toBeInTheDocument();
-    expect(panel.queryByLabelText("Wolf")).not.toBeInTheDocument();
-    await user.click(panel.getByLabelText("Borin Stoneguard"));
+    expect(who.queryByRole("button", { name: "Old Tam" })).not.toBeInTheDocument();
+    expect(who.queryByRole("button", { name: "Wolf" })).not.toBeInTheDocument();
+    await user.click(who.getByRole("button", { name: "Borin Stoneguard" }));
+    // Taking the last character off goes back to Everyone, so the reveal never goes to nobody.
+    await user.click(who.getByRole("button", { name: "Borin Stoneguard" }));
+    expect(who.getByRole("button", { name: "Everyone" })).toHaveAttribute("aria-pressed", "true");
+    expect(panel.getByRole("button", { name: "Reveal to everyone" })).toBeEnabled();
+    await user.click(who.getByRole("button", { name: "Borin Stoneguard" }));
     await user.click(panel.getByRole("button", { name: "Reveal to Borin Stoneguard" }));
 
     await waitFor(() =>
@@ -283,8 +296,8 @@ describe("Revealing", () => {
     records.pageRecordApi.blocks.setAudience.mockRejectedValue(new Error("The codex request failed (500)."));
     renderGmCodex("/codex/pages/p1");
     await user.click(await screen.findByRole("button", { name: "Reveal The debt" }));
-    const panel = within(await screen.findByRole("dialog", { name: "Reveal The debt" }));
-    await user.click(panel.getByRole("button", { name: "Reveal to everyone" }));
+    const panel = sideColumn();
+    await user.click(await panel.findByRole("button", { name: "Reveal to everyone" }));
     expect(await panel.findByRole("alert")).toHaveTextContent("The codex request failed (500).");
     expect(screen.getByRole("region", { name: "The debt · Hidden" })).toBeInTheDocument();
   });

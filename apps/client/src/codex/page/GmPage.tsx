@@ -37,7 +37,7 @@ import {
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex } from "../shell/context";
 import { HiddenBlock } from "../shared/HiddenBlock";
-import { RevealPanel } from "../shared/RevealPanel";
+import { RevealColumn, RevealPanel } from "../shared/RevealPanel";
 import { linksSentence, stampOf } from "../shared/reveals";
 import { useCodexQuery } from "../useCodexQuery";
 import { gmDocument, kindGroupOf } from "./document";
@@ -114,9 +114,20 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   const [phoneTab, setPhoneTab] = useState("overview");
   // The side column's one open part. A tag is in the address, so the browser's Back closes it.
   const tag = query.get("tag");
-  const openTag = (name: string) => go(`${pagePath(id)}?tag=${encodeURIComponent(name)}`);
-  const closeSide = useCallback(() => setQuery((params) => params.delete("tag")), [setQuery]);
-  useEscapeToFacts(tag !== null, closeSide);
+  const openTag = (name: string) => {
+    setRevealing(null);
+    go(`${pagePath(id)}?tag=${encodeURIComponent(name)}`);
+  };
+  const closeSide = useCallback(() => {
+    setRevealing(null);
+    setQuery((params) => params.delete("tag"));
+  }, [setQuery]);
+  // A reveal replaces whatever part is open, a tag included.
+  const openReveal = (block: CodexBlock) => {
+    if (tag) setQuery((params) => params.delete("tag"));
+    setRevealing(block);
+  };
+  useEscapeToFacts(tag !== null || revealing !== null, closeSide);
   const pins = usePagePins("gm", token, id);
   const followLink = usePageLinks(feeds.pages, gm.quickCreate);
   const knownTitles = useMemo(() => new Set(feeds.pages.map((summary) => pageLinkKey(summary.title))), [feeds.pages]);
@@ -236,7 +247,8 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
 
   const overlays = (
     <>
-      {revealing && (
+      {/* The editor has no side column, so a reveal from it stays a dialog. */}
+      {editing && revealing && (
         <RevealPanel
           title={revealing.title}
           party={party}
@@ -276,7 +288,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
             void read.reload();
           }}
           onReloadPage={() => read.reload()}
-          onRevealBlock={(block) => setRevealing(block)}
+          onRevealBlock={openReveal}
           onBlockAudience={(block, next) => void setAudience(block, next)}
           onOpenConnection={openConnection}
           onOpenPin={openPin}
@@ -359,7 +371,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
           busy={busy}
           menu={phone}
           onAudienceChange={(next) => void setAudience(block, next)}
-          onReveal={() => setRevealing(block)}
+          onReveal={() => openReveal(block)}
           onHide={() => void setAudience(block, { audience: "hidden", characterIds: [] })}
         >
           <CodexMarkdown
@@ -413,6 +425,27 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
     </>
   );
 
+  // The side column's open part: a reveal, else a tag, else nothing (the facts).
+  const sidePart = revealing ? (
+    <>
+      <SideHead title={`Reveal ${revealing.title?.trim() || "this block"}`} tone="hidden" onBack={closeSide} />
+      <RevealColumn
+        key={revealing.id}
+        party={party}
+        busy={busy}
+        error={error}
+        preview={<CodexMarkdown text={revealing.text} token={token} audience="player" knownTitles={knownTitles} />}
+        links={linksSentence(revealing.text, feeds.pages)}
+        onReveal={(next) => void setAudience(revealing, next)}
+      />
+    </>
+  ) : tag ? (
+    <>
+      <SideHead onBack={closeSide} />
+      <GmTagColumn tag={tag} />
+    </>
+  ) : null;
+
   const metaPanel = (
     <>
       {seeAs.on ? null : (
@@ -460,11 +493,17 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
               <PhoneRecordHeader title={page.title}>{visibility}</PhoneRecordHeader>
               <Tabs
                 ariaLabel="Page sections"
-                tabs={tag ? [...PHONE_TABS, { id: "tag", label: `#${tag}` }] : PHONE_TABS}
-                activeId={tag ? "tag" : phoneTab}
+                tabs={
+                  revealing
+                    ? [...PHONE_TABS, { id: "side", label: "Reveal" }]
+                    : tag
+                      ? [...PHONE_TABS, { id: "side", label: `#${tag}` }]
+                      : PHONE_TABS
+                }
+                activeId={sidePart ? "side" : phoneTab}
                 onChange={(next) => {
-                  if (next === "tag") return;
-                  if (tag) closeSide();
+                  if (next === "side") return;
+                  if (sidePart) closeSide();
                   setPhoneTab(next);
                 }}
                 className="cx-phonetabs"
@@ -472,11 +511,8 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
             </>
           )}
           {error && <Alert tone="danger">{error}</Alert>}
-          {tag && !seeAs.on ? (
-            <>
-              <SideHead onBack={closeSide} />
-              <GmTagColumn tag={tag} />
-            </>
+          {sidePart && !seeAs.on ? (
+            sidePart
           ) : seeAs.on || phoneTab === "overview" ? (
             <>
               {!seeAs.on && fields.length > 0 && (
@@ -548,14 +584,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
         </div>
         {!seeAs.on && (
           <aside className="cx-page-meta scroll-y" aria-label="About this page">
-            {tag ? (
-              <>
-                <SideHead onBack={closeSide} />
-                <GmTagColumn tag={tag} />
-              </>
-            ) : (
-              metaPanel
-            )}
+            {sidePart ?? metaPanel}
           </aside>
         )}
       </div>

@@ -404,3 +404,23 @@ button.cx-datebar-date:hover {
   color: inherit;
   font-size: inherit;
 }
+
+/* The reveal in a page's side column: chips for who, the preview, the stamp's line and the Cup at full width. */
+.cx-reveal-column {
+  display: grid;
+  gap: var(--space-2);
+}
+.cx-reveal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-1);
+}
+.cx-reveal-column .cx-reveal-preview {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--violet);
+  background: color-mix(in srgb, var(--violet) 6%, transparent);
+}
+.cx-reveal-cup {
+  width: 100%;
+}
