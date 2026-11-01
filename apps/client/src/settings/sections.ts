@@ -193,6 +193,13 @@ export const SETTING = entries({
     hint: "A new encounter opens on your table first, so you can place tokens before players see it.",
     words: "staging preview encounter arrange"
   },
+  waitingList: {
+    section: "device",
+    audience: "gm",
+    label: "Waiting list",
+    hint: "Where what waits on you shows on the Table: over the turn, or in its own tab.",
+    words: "needs attention queue waiting list tab"
+  },
   leaveTable: {
     section: "device",
     label: "Leave the table",

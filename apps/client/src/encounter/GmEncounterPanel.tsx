@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/map-catalog";
-import { Button, Drawer, IconChevronLeft } from "@vtt/ui";
+import { Button, Drawer, IconBell, IconChevronLeft } from "@vtt/ui";
 import { command } from "../lib/command";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { MonsterBrowser } from "./MonsterBrowser";
@@ -25,6 +25,7 @@ import { orderEntries } from "../table/ladderRows";
 import { selectToken, useSelectedToken } from "../scene/selectedToken";
 import { useMapView, useSwitchMoments } from "../table/phoneSwitch";
 import { NotesTab } from "../table/NotesTab";
+import { useWaitingList } from "../settings/preferences";
 import { rollsLine, StartFight } from "./StartFight";
 
 /** A monster defeated in the last fight on this scene stays out of the next one unless the GM adds it back. */
@@ -56,6 +57,8 @@ export type GmPanelSlots = Readonly<{
   /** The Encounter tab's head on a laptop: the sound and the join address that the strip over the map once held. */
   head?: ReactNode;
   needs?: ReactNode;
+  /** The waiting list alone, for its own tab when the GM keeps it there. */
+  waiting?: ReactNode;
   needsCount?: number;
   dice?: ReactNode;
   log?: ReactNode;
@@ -606,8 +609,21 @@ export function GmEncounterPanel({
   );
 
   const fighting = state.combat.active;
+  const waitingPlace = useWaitingList();
   const needsCount = slots?.needsCount ?? 0;
   // What waits on the GM leads the Fight tab, and the tab's count follows the GM to the other tabs.
+  // The list's own tab is the bell and its count, named "Waiting" for a screen reader.
+  const waitingLabel = (
+    <span className="table-tab-waiting">
+      <IconBell />
+      {needsCount > 0 && (
+        <span className="table-tab-count" aria-hidden="true">
+          {needsCount}
+        </span>
+      )}
+      <span className="nh-sr-only">{needsCount > 0 ? `Waiting, ${needsCount}` : "Waiting"}</span>
+    </span>
+  );
   const fightLabel = (
     <>
       Encounter
@@ -626,10 +642,11 @@ export function GmEncounterPanel({
         {!phone && fighting && fightMenu}
       </div>
     ) : null;
-  const fightBody = fighting ? (
+  // The waiting list's place is the GM's (ADR-0058): over the turn, which scrolls under it, or in its own first tab.
+  const listInTab = waitingPlace === "tab";
+  const turnBody = fighting ? (
     <>
       {head}
-      {slots?.needs}
       {actBody}
       {/* The order with each row's tools (score, HP, conditions, the sheet), on every size until the row tools get
           their own design. */}
@@ -641,9 +658,16 @@ export function GmEncounterPanel({
   ) : (
     <>
       {head}
-      {slots?.needs}
       {setupBody}
     </>
+  );
+  const fightBody = listInTab ? (
+    turnBody
+  ) : (
+    <div className="encounter-split">
+      {slots?.needs}
+      <div className="encounter-split-turn scroll-y">{turnBody}</div>
+    </div>
   );
   const logBody = (
     <div className="table-log-tab">
@@ -669,8 +693,15 @@ export function GmEncounterPanel({
   const mapView = useMapView(phone);
   const tabs: PanelTab[] = [
     ...(mapView ? [mapView] : []),
+    ...(listInTab && slots?.waiting ? [{ id: "waiting", label: waitingLabel, content: slots.waiting }] : []),
     // The turn stays mounted on a phone while the map shows, so a target chosen there keeps its picker in the foot.
-    { id: "fight", label: fightLabel, content: fightBody, ...(mapView ? { keep: true } : {}) },
+    {
+      id: "fight",
+      label: listInTab ? "Encounter" : fightLabel,
+      content: fightBody,
+      ...(listInTab ? {} : { scrolls: false }),
+      ...(mapView ? { keep: true } : {})
+    },
     { id: "log", label: "Log", content: logBody, scrolls: false },
     { id: "party", label: "Party", content: partyBody },
     ...(slots?.tonight || slots?.codex

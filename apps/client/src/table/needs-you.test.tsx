@@ -16,6 +16,7 @@ vi.mock("../socket", () => ({
 import { clearTargeting, useTargeting } from "../encounter/targeting";
 import { NeedsYou } from "./NeedsYou";
 import { needsItems } from "./needs";
+import { setWaitingList } from "../settings/preferences";
 
 const IDS = {
   lyra: "10000000-0000-4000-8000-0000000000d1",
@@ -193,6 +194,29 @@ describe("Needs you", () => {
       </ToastProvider>
     );
     expect(container.querySelector(".needs-you")).toBeNull();
+    // Alone in its own tab it says so, and keeps the way back over the turn.
+    act(() => setWaitingList("tab"));
+    render(
+      <ToastProvider>
+        <NeedsYou state={quiet} token={null} alone />
+      </ToastProvider>
+    );
+    expect(screen.getByText("Nothing waits on you.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Over the turn" })).toBeTruthy();
+    act(() => setWaitingList("turn"));
+  });
+
+  it("moves itself between the turn and its own tab from its head", () => {
+    render(
+      <ToastProvider>
+        <NeedsYou state={table()} token={null} />
+      </ToastProvider>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Own tab" }));
+    expect(localStorage.getItem("vtt.waiting-list")).toBe("tab");
+    expect(screen.getByRole("button", { name: "Over the turn" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Over the turn" }));
+    expect(localStorage.getItem("vtt.waiting-list")).toBe("turn");
   });
 });
 

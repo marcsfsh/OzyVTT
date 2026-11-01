@@ -64,5 +64,7 @@ describe("the search over settings", () => {
   it("never offers the GM a player's way out, nor a player a GM row", () => {
     expect(settingsFor("gm").map((setting) => setting.id)).not.toContain("leaveTable");
     expect(settingsFor("player").map((setting) => setting.id)).not.toContain("arrangeScenes");
+    expect(settingsFor("player").map((setting) => setting.id)).not.toContain("waitingList");
+    expect(settingsFor("gm").map((setting) => setting.id)).toContain("waitingList");
   });
 });

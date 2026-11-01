@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GameStateSchema, type GmView, type PlayerView } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
@@ -19,6 +19,7 @@ import { InFooter } from "./footerSlot";
 import { TablePanel } from "./TablePanel";
 import { TableDock } from "./TableDock";
 import { PhoneSwitch } from "./phoneSwitch";
+import { setWaitingList } from "../settings/preferences";
 
 // The panel beside the map is one tablist per role and moment: its tabs are real tabs tied to their panels, the
 // chosen one is remembered per device, and the footer holds the view's one primary.
@@ -101,10 +102,14 @@ const slots = {
   token: <p>The token</p>,
   party: <p>The party</p>,
   needs: <p>Needs you · 2</p>,
+  waiting: <p>The list alone</p>,
   needsCount: 2
 };
 
-afterEach(() => localStorage.clear());
+afterEach(() => {
+  localStorage.clear();
+  setWaitingList("turn");
+});
 
 const tabNames = (list: HTMLElement) =>
   within(list)
@@ -158,6 +163,34 @@ describe("the GM's panel", () => {
     expect(screen.getByText("Tonight board")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Codex" }));
     expect(screen.getByText("The Codex")).toBeTruthy();
+  });
+
+  it("with the list in its own tab: the bell's tab comes first and holds it, and Encounter is the turn alone", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("vtt.table-tab.gm.laptop", "waiting");
+    setWaitingList("tab");
+    const view = render(
+      <ToastProvider>
+        <EncounterPanel role="gm" state={gmView(true)} selectedMap={null} slots={slots} />
+      </ToastProvider>
+    );
+    const list = screen.getByRole("tablist", { name: "The encounter · round 2" });
+    expect(tabNames(list)).toEqual(["2Waiting, 2", "Encounter", "Log", "Party"]);
+    expect(within(screen.getByRole("tabpanel", { name: "Waiting, 2" })).getByText("The list alone")).toBeTruthy();
+    await user.click(within(list).getByRole("tab", { name: "Encounter" }));
+    const fight = screen.getByRole("tabpanel", { name: "Encounter" });
+    expect(within(fight).queryByText("Needs you · 2")).toBeNull();
+    expect(within(fight).getByRole("region", { name: "Now acting · Lyra" })).toBeTruthy();
+    // Moving the list back drops its tab, and a remembered list tab falls back to Encounter.
+    await user.click(within(list).getByRole("tab", { name: "Waiting, 2" }));
+    act(() => setWaitingList("turn"));
+    expect(tabNames(screen.getByRole("tablist", { name: "The encounter · round 2" }))).toEqual([
+      fightTab,
+      "Log",
+      "Party"
+    ]);
+    expect(screen.getByRole("tab", { name: /^Encounter/, selected: true })).toBeTruthy();
+    view.unmount();
   });
 
   it("on a phone: the Switch, Map first, then Encounter with the acting creature and the order, Log and Party", () => {

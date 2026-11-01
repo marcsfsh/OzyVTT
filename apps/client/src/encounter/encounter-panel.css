@@ -75,7 +75,7 @@
   flex: 1 1 0;
   min-height: 0;
 }
-.table-panel-body > .encounter-order {
+:is(.table-panel-body, .encounter-split-turn) > .encounter-order {
   display: flex;
   flex-direction: column;
   flex: 1 1 0;
@@ -99,12 +99,12 @@
   border-top: 1px solid var(--line-strong);
 }
 /* In the Fight tab the acting creature scrolls with the tab, so it keeps its whole height. */
-.table-panel-body > .encounter-acting {
+:is(.table-panel-body, .encounter-split-turn) > .encounter-acting {
   flex: none;
   padding-top: 0;
   border-top: 0;
 }
-.table-panel-body > .encounter-order-tools {
+:is(.table-panel-body, .encounter-split-turn) > .encounter-order-tools {
   flex: none;
 }
 .encounter-acting-body {

@@ -166,6 +166,17 @@ describe("the GM's Settings", () => {
     );
   });
 
+  it("keeps the waiting list's place on this device, over the turn until the GM moves it", async () => {
+    const user = userEvent.setup();
+    renderAt("/settings/device");
+    const choices = await screen.findByRole("group", { name: "Waiting list" });
+    expect(within(choices).getByRole("button", { name: "Top of Encounter" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(choices).getByRole("button", { name: "Its own tab" }));
+    expect(localStorage.getItem("vtt.waiting-list")).toBe("tab");
+    await user.click(within(choices).getByRole("button", { name: "Top of Encounter" }));
+    expect(localStorage.getItem("vtt.waiting-list")).toBe("turn");
+  });
+
   it("puts one primary in the bar, the view's own: New credential in Access", () => {
     const { container } = renderAt("/settings/access");
     const primaries = container.querySelectorAll(".nh-btn--primary");
@@ -282,6 +293,7 @@ describe("a player's Settings", () => {
     expect(screen.getByRole("heading", { name: "Device", level: 2 })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Theme" })).toBeInTheDocument();
     expect(screen.queryByText(SETTING.arrangeScenes.label)).toBeNull();
+    expect(screen.queryByText(SETTING.waitingList.label)).toBeNull();
     expect(screen.queryByText("GM only")).toBeNull();
   });
 

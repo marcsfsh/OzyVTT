@@ -1,7 +1,8 @@
 import { DamageRollPrompt } from "../encounter/DamageRollPrompt";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmActor, GmView, TargetAsk } from "@vtt/domain";
-import { Button, IconBell, useToast } from "@vtt/ui";
+import { Button, IconBell, IconChevron, IconChevronRight, useToast } from "@vtt/ui";
+import { setWaitingList, useWaitingList } from "../settings/preferences";
 import { useRollPreference } from "../dice/roll-preference";
 import { command, read } from "../lib/command";
 import { beginTargeting, setTargetingResult } from "../encounter/targeting";
@@ -354,11 +355,17 @@ function NeedsCard({
 }
 
 /**
- * The GM's queue of decisions, above the panel's tabs: each item says what happened in numbers and carries its own
- * buttons, so nothing waits in a scrolled list. Renders nothing while nothing waits. A new item is announced.
+ * The GM's waiting list: each item says what happened in numbers and carries its own buttons. It sits at the top of the
+ * Encounter tab or, by the GM's choice, in its own first tab (`alone`), and its head holds the switch between the two
+ * (ADR-0058). Over the turn it renders nothing while nothing waits; alone it says so. A new item is announced.
  */
-export function NeedsYou({ state, token }: Readonly<{ state: GmView; token: string | null }>) {
+export function NeedsYou({
+  state,
+  token,
+  alone = false
+}: Readonly<{ state: GmView; token: string | null; alone?: boolean }>) {
   const items = needsItems(state);
+  const place = useWaitingList();
   const { rollMode } = useRollPreference();
   const { toast } = useToast();
   const [announcement, setAnnouncement] = useState("");
@@ -379,29 +386,47 @@ export function NeedsYou({ state, token }: Readonly<{ state: GmView; token: stri
     // Only a change in which items wait announces anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys]);
+  // The switch names the other place: Own tab while the list is over the turn, Over the turn while it has its tab.
+  const placeSwitch =
+    place === "tab" ? (
+      <Button variant="secondary" size="sm" className="needs-you-place" onClick={() => setWaitingList("turn")}>
+        <IconChevron className="needs-you-place-up" /> Over the turn
+      </Button>
+    ) : (
+      <Button variant="secondary" size="sm" className="needs-you-place" onClick={() => setWaitingList("tab")}>
+        Own tab <IconChevronRight />
+      </Button>
+    );
   return (
     <>
       <p className="nh-sr-only" aria-live="polite">
         {announcement}
       </p>
-      {items.length > 0 && (
-        <section className="needs-you scroll-y" aria-labelledby="needs-you-heading">
-          <h2 className="needs-you-head" id="needs-you-heading">
-            <IconBell />
-            <span>Needs you · {items.length}</span>
-          </h2>
-          <ul className="needs-you-list">
-            {items.map((item) => (
-              <NeedsCard
-                key={item.key}
-                item={item}
-                state={state}
-                rollMode={rollMode}
-                distance={distance}
-                onFeedback={(text) => toast(text)}
-              />
-            ))}
-          </ul>
+      {(items.length > 0 || alone) && (
+        <section className={`needs-you${alone ? " is-alone" : " scroll-y"}`} aria-labelledby="needs-you-heading">
+          <div className="needs-you-headrow">
+            <h2 className="needs-you-head" id="needs-you-heading">
+              <IconBell />
+              <span>Needs you · {items.length}</span>
+            </h2>
+            {placeSwitch}
+          </div>
+          {items.length === 0 ? (
+            <p className="table-panel-empty">Nothing waits on you.</p>
+          ) : (
+            <ul className="needs-you-list">
+              {items.map((item) => (
+                <NeedsCard
+                  key={item.key}
+                  item={item}
+                  state={state}
+                  rollMode={rollMode}
+                  distance={distance}
+                  onFeedback={(text) => toast(text)}
+                />
+              ))}
+            </ul>
+          )}
         </section>
       )}
     </>

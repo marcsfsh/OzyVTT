@@ -1,6 +1,13 @@
 import { Button, setReduceTransparency, Switch, ThemeToggle, useReduceTransparency } from "@vtt/ui";
 import { tableDiceLine, useRollPreference } from "../dice/roll-preference";
-import { setAutoArrange, setPinchZoom, useAutoArrange, usePinchZoom } from "./preferences";
+import {
+  setAutoArrange,
+  setPinchZoom,
+  setWaitingList,
+  useAutoArrange,
+  usePinchZoom,
+  useWaitingList
+} from "./preferences";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import { SettingChoices } from "./SettingChoices";
@@ -21,6 +28,7 @@ export function DeviceSection({
   const { rollInput, setRollInput } = dice;
   const autoArrange = useAutoArrange();
   const pinchZoom = usePinchZoom();
+  const waitingList = useWaitingList();
   const transparency = useReduceTransparency();
   return (
     <SettingsSection id="device">
@@ -61,6 +69,19 @@ export function DeviceSection({
       {role === "gm" && (
         <SettingRow setting={SETTING.arrangeScenes} gmOnly>
           <Switch checked={autoArrange} onChange={setAutoArrange} label="Open new encounters for arranging" />
+        </SettingRow>
+      )}
+      {role === "gm" && (
+        <SettingRow setting={SETTING.waitingList} gmOnly>
+          <SettingChoices
+            ariaLabel="Waiting list"
+            value={waitingList}
+            onChange={(value) => setWaitingList(value === "tab" ? "tab" : "turn")}
+            options={[
+              { value: "turn", label: "Top of Encounter" },
+              { value: "tab", label: "Its own tab" }
+            ]}
+          />
         </SettingRow>
       )}
       {role === "player" && onLeave && (

@@ -158,6 +158,7 @@ export function TableView(props: TableViewProps) {
             </>
           ),
           needs: <NeedsYou state={props.state} token={token} />,
+          waiting: <NeedsYou state={props.state} token={token} alone />,
           needsCount: needsItems(props.state).length,
           dice,
           log,
