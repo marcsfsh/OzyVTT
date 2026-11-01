@@ -3,6 +3,9 @@ import {
   Button,
   Field,
   IconChevronLeft,
+  IconEye,
+  IconEyeOff,
+  IconMore,
   Input,
   Menu,
   MenuItem,
@@ -13,7 +16,9 @@ import {
 } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import {
+  durationOf,
   exportDocument,
   failure,
   readArchive,
@@ -41,6 +46,9 @@ export function ReplayList({
   const { toast } = useToast();
   const [busy, setBusy] = useState<number | null>(null);
   const [renaming, setRenaming] = useState<ArchiveSummary | null>(null);
+  const phone = useMediaQuery("(max-width: 760px)");
+  const [chosenId, setChosenId] = useState<number | null>(null);
+  const chosen = archives?.find((archive) => archive.id === chosenId) ?? archives?.[0] ?? null;
 
   const setShared = async (archive: ArchiveSummary, shared: boolean) => {
     setBusy(archive.id);
@@ -122,40 +130,91 @@ export function ReplayList({
           </EmptyState>
         )}
         {archives !== null && archives.length > 0 && (
-          <ul className="replay-rows">
-            {archives.map((archive) => {
-              return (
-                <li key={archive.id} className="replay-row">
-                  <div className="replay-row-text">
-                    <span className="replay-row-title">{replayTitle(archive)}</span>
-                    <span className="replay-row-meta tabular">{replayMeta(archive)}</span>
-                  </div>
+          <div className="replay-split">
+            {/* The list as a table (E3 replays spec 2.1), newest first; the chosen row is lit and its replay sits
+                beside it on a laptop. A phone's row opens the replay's page. */}
+            <table className="replay-table">
+              <thead>
+                <tr>
+                  <th scope="col">Replay</th>
+                  <th scope="col">Fought</th>
+                  <th scope="col">Turns</th>
+                  <th scope="col">Length</th>
                   {role === "gm" && (
-                    <RevealSwitch
-                      revealed={archive.playerVisible}
-                      ariaLabel="Show this replay to players"
-                      disabled={busy === archive.id}
-                      onChange={(shared) => void setShared(archive, shared)}
-                    />
+                    <th scope="col">
+                      <span className="nh-sr-only">Players see it</span>
+                    </th>
                   )}
-                  <div className="replay-row-actions">
-                    <Button variant="secondary" size="sm" onClick={() => onOpen(archive.id)}>
-                      Watch
-                    </Button>
+                </tr>
+              </thead>
+              <tbody>
+                {archives.map((archive) => (
+                  <tr key={archive.id} className={chosen?.id === archive.id ? "is-on" : undefined}>
+                    <td>
+                      <button
+                        type="button"
+                        className="replay-table-open interactive"
+                        aria-pressed={chosen?.id === archive.id}
+                        onClick={() => (phone ? onOpen(archive.id) : setChosenId(archive.id))}
+                      >
+                        <b>{replayTitle(archive)}</b>
+                        {archive.name && archive.encounterName && <small>{archive.encounterName}</small>}
+                      </button>
+                    </td>
+                    <td className="tabular">{new Date(archive.endedAt).toLocaleDateString()}</td>
+                    <td className="tabular">{archive.turnCount}</td>
+                    <td className="tabular">{durationOf(archive.startedAt, archive.endedAt) ?? "Unknown"}</td>
                     {role === "gm" && (
-                      <Menu trigger="More" label="More actions for this replay" align="end">
-                        <MenuItem onClick={() => setRenaming(archive)}>Rename…</MenuItem>
-                        <MenuItem onClick={() => void download(archive)}>Download JSON</MenuItem>
-                        <MenuItem tone="danger" onClick={() => void remove(archive)}>
-                          Delete replay
-                        </MenuItem>
-                      </Menu>
+                      <td>
+                        {archive.playerVisible ? (
+                          <>
+                            <IconEye />
+                            <span className="nh-sr-only">Players see it</span>
+                          </>
+                        ) : (
+                          <>
+                            <IconEyeOff />
+                            <span className="nh-sr-only">Hidden from players</span>
+                          </>
+                        )}
+                      </td>
                     )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!phone && chosen && (
+              <aside className="replay-beside" aria-label={replayTitle(chosen)}>
+                <div className="replay-beside-head">
+                  <h3>{replayTitle(chosen)}</h3>
+                  {role === "gm" && (
+                    <Menu trigger={<IconMore />} icon label="More actions for this replay" align="end">
+                      <MenuItem onClick={() => setRenaming(chosen)}>Rename…</MenuItem>
+                      <MenuItem onClick={() => void download(chosen)}>Download JSON</MenuItem>
+                      <MenuItem tone="danger" onClick={() => void remove(chosen)}>
+                        Delete replay
+                      </MenuItem>
+                    </Menu>
+                  )}
+                </div>
+                <p className="replay-beside-line tabular">{replayMeta(chosen)}</p>
+                {role === "gm" && (
+                  <span className="replay-beside-reveal">
+                    <RevealSwitch
+                      revealed={chosen.playerVisible}
+                      ariaLabel="Show this replay to players"
+                      disabled={busy === chosen.id}
+                      onChange={(shared) => void setShared(chosen, shared)}
+                    />
+                    <span aria-hidden="true">{chosen.playerVisible ? "Players see it" : "Hidden from players"}</span>
+                  </span>
+                )}
+                <Button variant="primary" onClick={() => onOpen(chosen.id)}>
+                  Watch
+                </Button>
+              </aside>
+            )}
+          </div>
         )}
       </div>
       {dialog}

@@ -33,28 +33,41 @@ function serve(encounters: readonly unknown[]) {
 describe("the replay list", () => {
   beforeEach(() => apiRequest.mockReset());
 
-  it("names a replay by its encounter and day, with its length in turns and minutes", async () => {
+  it("lists replays as a table, named by their encounter and day, with their turns and length", async () => {
     serve([archive(), archive({ id: 8, encounterName: null, turnCount: 3 })]);
     render(<ReplayList role="gm" token="gm" onOpen={() => {}} />, { wrapper: ToastProvider });
-    expect(await screen.findByText(`Goblin cave · ${dateOnly(ENDED)}`)).toBeTruthy();
-    expect(screen.getByText("1 turn · 12 min")).toBeTruthy();
-    // A fight with no live scene is a Fight.
-    expect(screen.getByText(`Encounter · ${dateOnly(ENDED)}`)).toBeTruthy();
-    expect(screen.getByText("3 turns · 12 min")).toBeTruthy();
+    const table = await screen.findByRole("table");
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent(`Goblin cave · ${dateOnly(ENDED)}`);
+    expect(rows[0]).toHaveTextContent("12 min");
+    // A fight with no live scene is an Encounter.
+    expect(rows[1]).toHaveTextContent(`Encounter · ${dateOnly(ENDED)}`);
+    expect(rows[1]).toHaveTextContent("3");
   });
 
-  it("puts the GM's name first, with the encounter and day under it", async () => {
-    serve([archive({ name: "Ambush at the bridge" })]);
+  it("puts the GM's name first, and shows the chosen replay beside the table", async () => {
+    const user = userEvent.setup();
+    serve([archive({ name: "Ambush at the bridge" }), archive({ id: 8, turnCount: 3 })]);
     render(<ReplayList role="gm" token="gm" onOpen={() => {}} />, { wrapper: ToastProvider });
-    expect(await screen.findByText("Ambush at the bridge")).toBeTruthy();
-    expect(screen.getByText(`Goblin cave · ${dateOnly(ENDED)} · 1 turn · 12 min`)).toBeTruthy();
+    const beside = await screen.findByRole("complementary", { name: "Ambush at the bridge" });
+    expect(within(beside).getByText(`Goblin cave · ${dateOnly(ENDED)} · 1 turn · 12 min`)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: `Goblin cave · ${dateOnly(ENDED)}` }));
+    expect(screen.getByRole("complementary", { name: `Goblin cave · ${dateOnly(ENDED)}` })).toHaveTextContent(
+      "3 turns · 12 min"
+    );
+    // Players see it writes the replay's visibility.
+    await user.click(screen.getByRole("switch", { name: "Show this replay to players" }));
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/api/v1/replays/8/visibility",
+      expect.objectContaining({ body: { playerVisible: true } })
+    );
   });
 
   it("lets the GM rename one", async () => {
     serve([archive()]);
     const user = userEvent.setup();
     render(<ReplayList role="gm" token="gm" onOpen={() => {}} />, { wrapper: ToastProvider });
-    await user.click(await screen.findByText("More"));
+    await user.click(await screen.findByLabelText("More actions for this replay"));
     await user.click(screen.getByRole("menuitem", { name: "Rename…" }));
     const dialog = screen.getByRole("dialog", { name: "Rename the replay" });
     await user.type(within(dialog).getByLabelText("Name"), "Ambush at the bridge");
@@ -65,10 +78,11 @@ describe("the replay list", () => {
     );
   });
 
-  it("offers a player no rename", async () => {
+  it("offers a player no rename and no eye", async () => {
     serve([archive({ encounterName: undefined, playerVisible: true })]);
     render(<ReplayList role="player" token="player" onOpen={() => {}} />, { wrapper: ToastProvider });
-    expect(await screen.findByText(`Encounter · ${dateOnly(ENDED)}`)).toBeTruthy();
-    expect(screen.queryByText("More")).toBeNull();
+    expect(await screen.findByRole("button", { name: `Encounter · ${dateOnly(ENDED)}` })).toBeTruthy();
+    expect(screen.queryByLabelText("More actions for this replay")).toBeNull();
+    expect(screen.queryByText("Players see it")).toBeNull();
   });
 });

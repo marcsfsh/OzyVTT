@@ -333,3 +333,82 @@
   outline-offset: calc(-1 * var(--bezel-inset));
   filter: var(--rim-glow);
 }
+
+/* The replays list as a table with the chosen replay beside it (E3 replays spec 2.1 and 4). */
+.replay-split {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+.replay-table {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-collapse: collapse;
+}
+.replay-table th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--text-muted);
+  font: 600 11px / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-align: left;
+  text-transform: uppercase;
+}
+.replay-table td {
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.replay-table tr.is-on td {
+  background: color-mix(in srgb, var(--cyan) 6%, transparent);
+}
+.replay-table tr.is-on td:first-child {
+  box-shadow: inset 2px 0 0 var(--cyan);
+}
+.replay-table-open {
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.replay-table-open small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.replay-beside {
+  display: grid;
+  flex: 0 0 340px;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-left: 1px solid var(--line);
+}
+.replay-beside-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.replay-beside-head h3 {
+  margin: 0;
+  font: var(--fw-display) 18px / 1.2 var(--font-display);
+  text-transform: uppercase;
+}
+.replay-beside-line {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.replay-beside-reveal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-dim);
+  font-size: 13px;
+}
