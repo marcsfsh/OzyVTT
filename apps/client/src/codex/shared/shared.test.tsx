@@ -136,6 +136,8 @@ describe("The page picker", () => {
     const onChange = vi.fn();
     render(<PagePicker label="Centre on" pages={PAGES} value="tide" onChange={onChange} />);
     await user.click(screen.getByRole("button", { name: "Centre on: Tidebound" }));
+    // A's search dialog, titled for what it links, offering only pages.
+    expect(screen.getByRole("dialog", { name: "Link a page to Centre on" })).toBeInTheDocument();
     await user.type(screen.getByRole("combobox", { name: "Find a page" }), "lan");
     const options = screen.getAllByRole("option");
     expect(options.map((option) => option.textContent)).toEqual(["Lantern HillLocation", "Lantern OrderFaction"]);

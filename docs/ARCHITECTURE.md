@@ -1042,6 +1042,15 @@ write that moves the party pin to a point on any map, or makes one. Search filte
 GM's home counts, recent changes and reveal check, are built in `codex/find.ts`; a player's search
 and home are built in `player-reads.ts` from that player's own reads.
 
+In the client, the Codex's addresses carry what a reader chose, so a page and Back return to it (ADR-0064): search's
+filters and its chosen result (`?q=`, `?types=`, `?visibility=`, `?hit=` from `searchHitKey`), the pages index's one
+group (`?group=`, `?folder=` or `?tag=`) and its order (`?sort=name`), and a tag open in a page's side column (`?tag=`
+on the page's address; `/codex/tags/:tag` redirects to the index filtered to it). The side column holds one part at a
+time (`codex/page/SideColumn.tsx`): the tag (`TagView` over the reader's own feeds), a reveal (`RevealColumn`, the
+dialog's body without its dialog) or the versions (`codex/page/VersionsColumn.tsx`, with what changed worked out in
+the browser from each revision and the next newer one in `codex/page/versions.ts`). Quests, Tonight, the table's Codex
+tab and the page editor keep `RevealPanel` and `RevisionHistory` as dialogs.
+
 The Encounters tab asks the Codex which records point at each table encounter: `GET /api/v1/codex/encounter-links` (GM only,
 `codex/scene-links.ts`) lists the sessions that stage it or name it in their prep's Encounters, and the pins on the
 atlas that name it.
@@ -1127,7 +1136,10 @@ through `shell/search-store.ts`), mounted by `App.tsx` while someone is signed i
 places are the Codex (the Codex's search for the viewer's token, `searchAsPlayer` for a player, then the Codex
 commands from `codex/CommandPalette.tsx`'s `useCodexActions`, with the creates the GM's mounted Codex registers in
 `codex/codex-commands.ts`), the Compendium (the GM's), Rules (the glossary, opening `RulesReference` at an entry) and
-Go to (the bars' pages and the settings index). It starts at the section on screen; the Codex's and Compendium's bar
+Go to (the bars' pages and the settings index); the Codex's hits end with See all results, which opens
+`/codex/search?q=`, ahead of the commands. The page picker (`codex/shared/PagePicker.tsx`) opens the same dialog's
+form offering only the pages its caller passes, and the GM's See as players preview keeps `CommandPalette` for the
+previewed player's search. It starts at the section on screen; the Codex's and Compendium's bar
 boxes and an old `openSearch=1` open it at their place. While the connection is down, or until a snapshot arrives
 after it returns, `shell/ReconnectBar.tsx` draws its band and `useTableCurrent()` is false for the controls that read
 it. At the table a player's prompt slot (`table/PromptSlot.tsx`) renders on glass in the map's pane, or as

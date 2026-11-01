@@ -629,6 +629,22 @@ Prep's Party and the level dialog (ADR-0051; `docs/design/polish/D-characters/`)
   hidden as tags), the text at the left in its 680px measure, and open groups at the right (Facts, Relationships, On
   the Atlas, Mentioned on, Tags, In the journal). A player gets the same page with every hidden part left out and
   nothing that says so. A phone has Overview, Relations and Mentions as words, with the facts in two columns.
+- Search is panes (ADR-0064): Kinds with their counts and, for the GM, Who sees it at the left (220px); the field, the
+  count, the results' More (the sort and when it changed) and the results as rows in the middle (420px); the chosen
+  result at the right with the match lit, its facts and Open the page. The arrows move the choice, Enter opens it, and
+  a line from a page's hidden block reads "Hidden block:". A phone has the field, the kinds as chips and rows that open
+  under themselves. The search dialog's hits end with See all {N} results.
+- The pages index puts KINDS, the GM's FOLDERS · ONLY YOU and TAGS (#name chips with counts) at the left (240px) and
+  the chosen group's rows at the right under a toolbar: Find a page by name, the count in plain words ("4 people"),
+  Changed or Name, New page. A hidden page's name is violet with its Hidden tag. A phone has the kinds and the tags as
+  chips over the rows.
+- A page's side column takes one part at a time in place of the facts, each under Back: a tag ("#thornwick · 4
+  pages", then what carries it), a reveal ("Reveal {name}" in violet, Who sees it as chips, What they will read, the
+  stamp's line and the Cup) and the versions (Versions · {N}, one line a version; choosing one reads it in the main
+  column under the cyan notice with Restore this version and Back to now). The text stays where it is. On a phone each
+  is a tab after Overview, Relations and Mentions.
+- Choosing a page to link (a relationship, a field, a session's prep, a quest) opens the search dialog titled "Link a
+  page to {what}", offering only pages.
 - Writing is in place: Edit turns the page into its writer, with Preview, Saved and Done as the Cup in the title row,
   the toolbar over one bordered text field, and the fields as a Cradle with Everyone and Hidden for each. Preview saves
   first, then shows the page exactly as players get it under a violet line; See as players on a page is the same view.

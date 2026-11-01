@@ -253,6 +253,23 @@ describe("What it can do", () => {
     noPalette();
   });
 
+  it("ends the hits with See all results, which opens the Codex's search page, and keeps New page last", async () => {
+    search.mockResolvedValue({ hits: [HIT], truncated: false });
+    const user = userEvent.setup();
+    renderGm();
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    await user.keyboard("{Control>}k{/Control}");
+    const box = within(await palette());
+    await user.type(box.getByLabelText("Search the Codex"), "strahd");
+    const seeAll = await box.findByRole("button", { name: /See all 1 result/ });
+    const names = box.getAllByRole("option").map((option) => option.textContent ?? "");
+    expect(names.findIndex((name) => name.startsWith("See all"))).toBe(1);
+    expect(names.at(-1)).toMatch(/^New page "strahd"/);
+    await user.click(seeAll);
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/search"));
+    expect(new URLSearchParams(window.location.search).get("q")).toBe("strahd");
+  });
+
   it("offers a GO TO verb for every place the shell opens: one list, never two", async () => {
     const user = userEvent.setup();
     renderGm();

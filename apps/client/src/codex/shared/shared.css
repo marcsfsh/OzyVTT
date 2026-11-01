@@ -224,60 +224,19 @@
   flex: none;
   color: var(--text-dim);
 }
-.cx-picker-pop {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  width: max(100%, 300px);
-  max-width: calc(100vw - 2 * var(--space-3));
-  max-height: 24rem;
-  padding: var(--space-1);
-  border: 1px solid var(--line-raised);
-  background: var(--surface-1);
-  box-shadow: var(--shadow-drop-2);
-}
-.cx-picker-search {
-  width: 100%;
-}
-.cx-picker-list {
-  margin: var(--space-1) 0 0;
-  padding: 0;
-  list-style: none;
-  min-height: 0;
-}
-.cx-picker-option {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--tap-min);
-  padding: var(--space-1) var(--space-2);
-  color: var(--text);
-  font: 600 var(--fs-sm) / 1.2 var(--font-body);
-  cursor: pointer;
-}
-.cx-picker-option.is-active {
-  background: var(--tab-on);
-}
-.cx-picker-option[aria-selected="true"] {
-  box-shadow: inset 3px 0 0 var(--cyan);
-}
-.cx-picker-title {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cx-picker-meta,
-.cx-picker-empty {
+/* A kind beside a page's name in the writer's link menu. */
+.cx-picker-meta {
   color: var(--text-muted);
   font: 500 var(--fs-xs) / 1 var(--font-body);
 }
-.cx-picker-empty {
-  padding: var(--space-2);
+/* The picker's dialog is the search dialog's; the page already chosen keeps a cyan edge. */
+.cx-picker-option[aria-selected="true"] {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.cx-picker-dialog .search-dialog-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* ----- The mini map ----- */

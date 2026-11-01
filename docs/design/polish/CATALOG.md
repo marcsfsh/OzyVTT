@@ -317,9 +317,10 @@ built: sorting by column head, the map's picture beside the list and on the card
 Job: the campaign's memory, written by the GM and read by everyone. Status: frame Built (`F-codex/SPEC.md`,
 `F-codex/PLAN.md`, ADR-0054): the Titled bar, the dashboard home, wiki pages, writing in place with a Preview switch,
 and the story's Chronicle, Timeline and Sessions tabs each with its own design. F1.3 to F1.5, F2.1, F2.5, F2.6 and F2.8
-Designed (`F-finding-pages/SPEC.md`, `F-finding-pages/PLAN.md`, ADR-0064): search as panes, the pages index with the
-kinds, folders and tags at the side, a page's tag, reveal and versions in its side column, and one search dialog for the
-palette and the picker. F4.5, F4.7 (where it sits) and F5.1 to F5.3 Designed (`F-story-people/SPEC.md`,
+Built in part (`F-finding-pages/SPEC.md`, `F-finding-pages/PLAN.md`, ADR-0064): search as panes, the pages index with
+the kinds, folders and tags at the side, a page's tag, reveal and versions in its side column, and one search dialog for
+the palette and the picker. Not built: a field's and the whole page's reveal in the column, a phone's Reveal tab from a
+hidden block, Added since marked in place, and the See as preview's own palette. F4.5, F4.7 (where it sits) and F5.1 to F5.3 Designed (`F-story-people/SPEC.md`,
 `F-story-people/PLAN.md`, ADR-0066): quests by status at the side, relationships as a ring on glass, a faction's
 standing in its page's side column, the composer at the head of the line, and a Downtime tab. F3.1 to F3.3 and the
 Downtime tab's contents Designed (`F3-atlas/SPEC.md`, `F3-atlas/PLAN.md`, ADR-0067): the maps as a tree at the side, the
@@ -335,8 +336,8 @@ Codex's tools in Settings.
 | F1.1 | Codex frame     | `/codex...`        | GM, player | `codex/CodexShell.tsx`, `codex/PlayerCodex.tsx`, `codex/shell/CodexFrame.tsx`, `codex/shell/PhoneBar.tsx`, `codex/codex.css` |
 | F1.2 | Home            | `/codex`           | GM, player | `codex/home/HomeView.tsx`                                                                                                    |
 | F1.3 | Search          | `/codex/search`    | GM, player | `codex/search/SearchView.tsx`, `codex/SearchResults.tsx`                                                                     |
-| F1.4 | Command palette | search box, Ctrl K | GM, player | `codex/CommandPalette.tsx`                                                                                                   |
-| F1.5 | Tag             | `/codex/tags/:tag` | GM, player | `codex/TagView.tsx`                                                                                                          |
+| F1.4 | Command palette | search box, Ctrl K | GM, player | `shell/SearchDialog.tsx` (the Codex's place), `codex/CommandPalette.tsx` (See as preview)                                     |
+| F1.5 | Tag             | a page's side column, `/codex/pages?tag=` | GM, player | `codex/TagView.tsx`, `codex/page/SideColumn.tsx`                                                      |
 
 ### F2. Pages
 
@@ -346,8 +347,8 @@ Codex's tools in Settings.
 | F2.2 | Page             | `/codex/pages/:id`     | GM, player | `codex/page/GmPage.tsx`, `codex/page/PlayerPage.tsx`, `codex/page/MetaPanel.tsx`, `codex/shared/HiddenBlock.tsx`, `codex/page/page.css` |
 | F2.3 | Page writer      | `?mode=edit`           | GM         | `codex/page/PageWriter.tsx`, `codex/page/DocEditor.tsx`, `codex/page/RelationshipEditor.tsx`                                            |
 | F2.4 | New page         | New menu               | GM         | `codex/QuickCreate.tsx`                                                                                                                 |
-| F2.5 | Reveal           | a page, quest, Tonight | GM         | `codex/shared/RevealPanel.tsx`                                                                                                          |
-| F2.6 | Version history  | a page                 | GM         | `codex/RevisionHistory.tsx`                                                                                                             |
+| F2.5 | Reveal           | a page, quest, Tonight | GM         | `codex/shared/RevealPanel.tsx` (`RevealColumn` on a page)                                                                               |
+| F2.6 | Version history  | a page                 | GM         | `codex/page/VersionsColumn.tsx`, `codex/RevisionHistory.tsx` (the editor)                                                               |
 | F2.7 | What players see | GM menu                | GM         | `codex/CodexShell.tsx`                                                                                                                  |
 | F2.8 | Page picker      | link fields            | GM         | `codex/shared/PagePicker.tsx`                                                                                                           |
 

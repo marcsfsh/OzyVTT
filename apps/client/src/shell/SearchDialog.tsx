@@ -70,10 +70,11 @@ export function useCodexSearchRows(
       action.kind === "hit" ? searchHitKindLabel(action.hit) : action.kind === "goto" ? "Codex page" : "Codex command",
     open: () => runCodexAction(action, { commands: mine, onOpenHit: (hit) => onNavigate(pathForHit(hit)), onNavigate })
   }));
-  // The last row opens every result on the Codex's search page (F finding spec 2.1).
+  // After the hits, a row opens every result on the Codex's search page (F finding spec 2.1); the commands, New
+  // page "{text}" last of all, keep their place after it (rule 3.1).
   const hits = actions.filter((action) => action.kind === "hit").length;
   if (query.trim() && state.status === "ready" && hits > 0)
-    rows.push({
+    rows.splice(hits, 0, {
       key: "see-all",
       name: state.truncated ? "See all results" : `See all ${hits} ${hits === 1 ? "result" : "results"}`,
       line: "The Codex's search page",
