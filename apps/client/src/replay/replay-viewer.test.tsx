@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { GameStateSchema } from "@vtt/domain";
 
 const apiRequest = vi.fn();
@@ -80,5 +80,19 @@ describe("the replay viewer's header", () => {
     serve([summary({ name: "Ambush at the bridge", encounterName: undefined })], playerDocument);
     render(<ReplayViewer role="player" token="player" archiveId={7} onBack={() => {}} />, { wrapper: ToastProvider });
     expect(await screen.findByRole("heading", { name: "Ambush at the bridge" })).toBeTruthy();
+  });
+
+  it("lists the whole fight beside the map, the turn on screen lit, and goes to a turn when pressed", async () => {
+    const twoTurns = {
+      ...gmDocument,
+      turnCount: 2,
+      turns: [gmDocument.turns[0], { ...gmDocument.turns[0], index: 1, label: "Round 2", revision: 2 }]
+    };
+    serve([summary()], twoTurns);
+    render(<ReplayViewer role="gm" token="gm" archiveId={7} onBack={() => {}} />, { wrapper: ToastProvider });
+    const first = await screen.findByRole("button", { name: /^Round 1/ });
+    expect(first).toHaveAttribute("aria-current", "step");
+    fireEvent.click(screen.getByRole("button", { name: /^Round 2/ }));
+    expect(screen.getByRole("button", { name: /^Round 2/ })).toHaveAttribute("aria-current", "step");
   });
 });

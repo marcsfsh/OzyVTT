@@ -307,8 +307,9 @@
   .replay-side-pane > h3 {
     display: none;
   }
-  .replay-side.is-order .replay-side-log,
-  .replay-side.is-log .replay-side-order {
+  .replay-side.is-order :is(.replay-side-log, .replay-side-fight),
+  .replay-side.is-log :is(.replay-side-order, .replay-side-fight),
+  .replay-side.is-fight :is(.replay-side-order, .replay-side-log) {
     display: none;
   }
 }
@@ -411,4 +412,38 @@
   gap: var(--space-2);
   color: var(--text-dim);
   font-size: 13px;
+}
+
+/* The whole fight beside the map (E3 replays spec 2.2): a row a turn, the one on screen lit, each pressable. */
+.replay-turns {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.replay-turn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 4px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.replay-turn.is-on {
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 6%, transparent);
+}
+.replay-turn small {
+  color: var(--text-muted);
+  font-size: 12px;
 }

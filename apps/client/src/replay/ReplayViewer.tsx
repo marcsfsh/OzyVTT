@@ -181,6 +181,9 @@ function GmViewer({
           }}
         />
         <ReplaySide
+          turns={steps.map((entry) => ({ label: entry.label, at: when(entry.at) }))}
+          current={index}
+          onSeek={playback.seek}
           order={
             <ol className="replay-initiative">
               {step.state.combat.initiative.map((entry) => {
@@ -317,6 +320,9 @@ function PlayerViewer({
           }}
         />
         <ReplaySide
+          turns={turns.map((entry) => ({ label: entry.label, at: when(entry.at) }))}
+          current={playback.index}
+          onSeek={playback.seek}
           order={
             <ol className="replay-initiative">
               {turn.combat.initiative.map((entry) => {

@@ -273,8 +273,27 @@ export function ReplayNotice({ children }: Readonly<{ children: ReactNode }>) {
  * log. Below 850px the two become tabs inside that region (as in `DockAccordion.tsx`), since a
  * phone cannot show both end to end under the map band.
  */
-export function ReplaySide({ order, log }: Readonly<{ order: ReactNode; log: ReactNode }>) {
-  const [pane, setPane] = useState<"order" | "log">("order");
+/** One turn of the whole fight, for the list beside the map. */
+export type FightTurn = Readonly<{ label: string; at: ReactNode }>;
+
+/**
+ * Beside the map: the whole fight, a row a turn with the one on screen lit and each pressable to go to it (E3 replays
+ * spec 2.2), then the turn order and what happened during this turn.
+ */
+export function ReplaySide({
+  order,
+  log,
+  turns,
+  current,
+  onSeek
+}: Readonly<{
+  order: ReactNode;
+  log: ReactNode;
+  turns?: readonly FightTurn[];
+  current?: number;
+  onSeek?: (index: number) => void;
+}>) {
+  const [pane, setPane] = useState<"fight" | "order" | "log">(turns ? "fight" : "order");
   return (
     <aside className={`replay-side frame-col is-${pane}`}>
       <SegmentedControl
@@ -282,13 +301,34 @@ export function ReplaySide({ order, log }: Readonly<{ order: ReactNode; log: Rea
         size="sm"
         ariaLabel="What to show beside the map"
         value={pane}
-        onChange={(value) => setPane(value === "log" ? "log" : "order")}
+        onChange={(value) => setPane(value === "log" ? "log" : value === "fight" ? "fight" : "order")}
         options={[
+          ...(turns ? [{ value: "fight", label: "Every turn" }] : []),
           { value: "order", label: "Turn order" },
           { value: "log", label: "This turn" }
         ]}
       />
       <div className="replay-side-scroll scroll-y frame-fill">
+        {turns && (
+          <section className="replay-side-pane replay-side-fight">
+            <h3>Every turn of the encounter</h3>
+            <ol className="replay-turns">
+              {turns.map((turn, index) => (
+                <li key={index}>
+                  <button
+                    type="button"
+                    className={index === current ? "replay-turn is-on interactive" : "replay-turn interactive"}
+                    aria-current={index === current ? "step" : undefined}
+                    onClick={() => onSeek?.(index)}
+                  >
+                    <span>{turn.label}</span>
+                    <small>{turn.at}</small>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
         <section className="replay-side-pane replay-side-order">
           <h3>Turn order</h3>
           {order}
