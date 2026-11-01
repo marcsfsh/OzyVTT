@@ -146,10 +146,7 @@
 
 /* ----- One operation: the document and its metadata panel ----- */
 .api-doc {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 18rem;
-  align-items: start;
-  gap: var(--space-6);
+  display: block;
 }
 .api-doc-main {
   display: flex;
@@ -273,33 +270,99 @@
   font-size: var(--fs-xs);
   white-space: pre;
 }
-.api-doc-meta {
-  position: sticky;
-  top: 0;
-  padding: var(--space-3) var(--space-4);
-  border: var(--rim-w) solid var(--line-strong);
-  background: var(--surface-2);
-}
 .api-doc-meta dl {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
   margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
 }
+/* The line names each fact by its value; the labels are for screen readers. */
 .api-doc-meta dt {
-  color: var(--text-muted);
-  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .api-doc-meta dd {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  margin: 2px 0 0;
-  color: var(--text);
-  font-size: var(--fs-sm);
+  margin: 0;
   overflow-wrap: anywhere;
+}
+.api-doc-meta dl > div {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  min-width: 0;
+}
+.api-doc-meta dl > div:not(.nh-sr-only) + div:not(.nh-sr-only)::before {
+  content: "·";
+  margin-right: var(--space-3);
+  color: var(--text-muted);
+}
+.api-doc-meta .api-meta-detail {
+  margin-left: 0.35em;
+  color: var(--text-muted);
+}
+.api-doc-meta .api-meta-detail::before {
+  content: "(";
+}
+.api-doc-meta .api-meta-detail::after {
+  content: ")";
+}
+.api-doc-meta code {
+  font: 400 16px / 1 var(--font-numeric);
+  color: var(--text);
+}
+/* REQUEST and RESPONSE side by side, two equal columns 20px apart (I leftovers spec 2.2). */
+.api-sides {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.api-side {
+  min-width: 0;
+}
+.api-side-head {
+  margin: 0;
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.api-side-head .api-response-code {
+  font: 400 16px / 1 var(--font-numeric);
+  letter-spacing: 0;
+}
+.api-response-line {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.api-other-responses {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+}
+.api-other-responses > li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-sm);
+}
+.api-other-responses > li + li {
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 650px) {
+  .api-sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .api-meta-list {
   margin: 0;
@@ -316,9 +379,6 @@
 @media (max-width: 979px) {
   .api-doc {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .api-doc-meta {
-    position: static;
   }
 }
 @media (max-width: 650px) {

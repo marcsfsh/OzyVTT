@@ -153,6 +153,7 @@ export function ApiReference({
               row={open}
               components={document.components?.schemas ?? {}}
               origin={window.location.origin}
+              command={commands.get(open.key) ?? null}
               onBack={onClose}
             />
           </div>

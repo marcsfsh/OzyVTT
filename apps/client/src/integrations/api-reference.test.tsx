@@ -77,6 +77,7 @@ vi.mock("../lib/api", () => ({
 }));
 
 import { ToastProvider } from "@vtt/ui";
+import { setViewport } from "../../test/viewport";
 import type { OpenApiDocument } from "./openapi-model";
 import { ApiReference } from "./ApiReference";
 import { NO_FILTERS, operationRows, tagsOf, visibleRows } from "./api-rows";
@@ -228,6 +229,32 @@ describe("an operation", () => {
     expect(document.querySelector(".api-code")).toHaveTextContent("import requests");
     await user.click(screen.getByRole("button", { name: "Back to All operations" }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("puts the request and the response side by side, the other responses under it", async () => {
+    renderReference("createIntegrationCredential");
+    const request = await screen.findByRole("region", { name: "Request" });
+    const response = screen.getByRole("region", { name: "Response · 201" });
+    expect(within(request).getByRole("table", { name: "Body fields" })).toHaveTextContent("name");
+    expect(within(request).getByRole("heading", { name: "Example request" })).toBeInTheDocument();
+    expect(within(response).getByText("Created.")).toBeInTheDocument();
+    expect(
+      within(within(response).getByRole("list", { name: "Other responses" })).getByText("400")
+    ).toBeInTheDocument();
+    const line = screen.getByRole("complementary", { name: "About this operation" });
+    expect(within(line).getByText("Command").nextElementSibling).toHaveTextContent("No command");
+  });
+
+  it("shows one side at a time under a control on a phone", async () => {
+    setViewport(390);
+    const user = userEvent.setup();
+    renderReference("createIntegrationCredential");
+    const control = await screen.findByRole("group", { name: "Request or response" });
+    expect(screen.getByRole("region", { name: "Request" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Response · 201" })).toBeNull();
+    await user.click(within(control).getByRole("button", { name: "Response · 201" }));
+    expect(screen.getByRole("region", { name: "Response · 201" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Request" })).toBeNull();
   });
 
   it("names each parameter's place, type and notes, and builds an example when the document has none", async () => {
