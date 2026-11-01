@@ -239,6 +239,15 @@ The table (Play), as Two docks (ADR-0025, ADR-0050):
   the acting creature: a 44px face, its name in Chakra Petch capitals with who runs it, the life bar with AC and speed,
   then the cost tabs and the options the chosen tab lists. The foot holds the Cup with Previous beside it as a Base line
   control and who is next under it.
+- What waits on the GM is the waiting list (ADR-0058): at the top of Encounter, over the turn, which scrolls under it
+  (the list takes up to half the panel, then scrolls itself), or by the GM's choice in its own first tab, the bell its
+  label. The switch is in the list's head (Own tab, Over the turn) and in Settings, Device. Each item is a card: a 3px
+  amber rim (grey for what waits on a player, listed last), the creature's 22px face, the title, its line and its
+  buttons on Base lines with the main one lit on the cyan line. A tab whose entries grew since it was last opened
+  carries the count after its word in quiet VT323 (Log); opening it drops the count.
+- The bell is the one signal that something waits on the GM: 16px amber with its count on a small badge, no words. It
+  shows on the list's head, the Encounter tab or the list's tab, the acting Ladder row, the live chip, a phone's Play
+  tab and the Compendium's home, and renders nothing when nothing waits.
 
 Before an encounter, the same frame changes in three places:
 
@@ -504,7 +513,8 @@ its pages from these patterns.
   naming what is missing (from `factsOf` and `needsOf`, see `docs/design/IMPLEMENTATION.md`) over Make live. A new
   encounter is a Draft page with its checklist beside Pick a map, made when the map is picked. A map's grid keeps its
   steps.
-- Decisions owed wait in one place: a pending card on the GM's Encounter tab, a prompt at the top of a player's Table tab.
+- Decisions owed wait in one place: the GM's waiting list (over the turn or in its own tab), a prompt at the top of a
+  player's Table tab.
 - Time is a timeline. History is a list of versions with Compare and Restore.
 - A map is present without taking over. Anything placed on a map has two ways in: a button and then a click on the map,
   or a right-click at the spot, which is a long press on a phone.
@@ -596,7 +606,7 @@ Prep's Party and the level dialog (ADR-0051; `docs/design/polish/D-characters/`)
 
 - The Titled bar: Compendium, then Home, Browse, Sources and Sharing, with the search, Rules as a Base line control and
   New homebrew as the Cup (ADR-0055).
-- Home is shelves: Needs you as a strip with an amber edge, the nine kinds as cards three to a row (two on a phone)
+- Home is shelves: what waits on the GM as a strip with an amber edge under the bell, the nine kinds as cards three to a row (two on a phone)
   with their counts, their homebrew and drafts in magenta and a few records with homebrew first, and the sources on one
   line at the foot.
 - Browse is a filter panel at the left (270px) and the table: each choice counts what it would show, the kind's range

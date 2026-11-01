@@ -160,7 +160,7 @@ settled parts.
 
 ### C3. Running the encounter (GM)
 
-First round Designed (`C3-gm-panel/SPEC.md`, `C3-gm-panel/PLAN.md`, ADR-0058): the waiting list over the turn or in its
+First round Built (`C3-gm-panel/SPEC.md`, `C3-gm-panel/PLAN.md`, ADR-0058): the waiting list over the turn or in its
 own tab (the GM's switch), cards, the panel's tabs with unread counts, and a bell in place of the words Needs you,
 everywhere. Second round Designed (`C3-running/SPEC.md`, `C3-running/PLAN.md`, ADR-0059): one form to start, a
 creature's tools under its row, the options as a menu on the panel's tabs, Add monsters as the Compendium's panes, and
@@ -169,7 +169,7 @@ the roll as the button in waiting cards. The Notes and Party tabs follow F and D
 | Id    | Surface                      | Opens at                 | Who        | Files                                                                                                                                                   |
 | ----- | ---------------------------- | ------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C3.1  | GM panel tabs                | panel                    | GM         | `encounter/GmEncounterPanel.tsx`                                                                                                                        |
-| C3.2  | Needs you                    | top of Encounter         | GM         | `table/NeedsYou.tsx`                                                                                                                                    |
+| C3.2  | The waiting list             | top of Encounter or tab  | GM         | `table/NeedsYou.tsx`                                                                                                                                    |
 | C3.3  | Start the encounter          | Encounter, no fight      | GM         | `encounter/StartFight.tsx`, `scenes/ScenePrepPanel.tsx`, `encounter/EncounterBudget.tsx`                                                                |
 | C3.4  | Acting console               | Encounter, in a fight    | GM         | `encounter/ActingConsole.tsx`, `encounter/ActingCard.tsx`, `encounter/ActionRunner.tsx`, `encounter/GmActionList.tsx`, `encounter/ActionResultCard.tsx` |
 | C3.5  | Turn order and tools         | Encounter or Order tab   | GM         | `encounter/GmInitiativeRow.tsx`, `encounter/ConfirmRow.tsx`, `encounter/SpellAreas.tsx`                                                                 |

@@ -7,9 +7,8 @@
   min-width: 0;
   min-height: 0;
 }
-/* What must be answered sits above the tabs and never takes more than half the panel; past that it scrolls. It gives
-   way before the tabs and the footer do, so the bar under the thumb stays on screen however short the panel. */
-.table-panel > .needs-you,
+/* A player's prompt sits above the tabs and never takes more than half the panel; past that it scrolls. It gives way
+   before the tabs and the footer do, so the bar under the thumb stays on screen however short the panel. */
 .table-panel > .prompt-slot {
   flex: 0 1 auto;
   min-height: 0;
@@ -118,8 +117,7 @@
 .table-panel-foot-row > .table-panel-primary {
   flex: 1 1 auto;
 }
-/* The staged scene's builder and the claim picker take the whole panel. */
-.table-panel-staging,
+/* The claim picker takes the whole panel. */
 .table-panel-claim {
   padding: 0;
 }
@@ -129,9 +127,6 @@
   margin: 0;
 }
 @media (max-width: 979px) {
-  .table-panel > .needs-you {
-    max-height: 45%;
-  }
   /* A player's prompt is what they must do now, so on a phone it may take most of the short panel whole. */
   .table-panel > .prompt-slot {
     max-height: 65%;

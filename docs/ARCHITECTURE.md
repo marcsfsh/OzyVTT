@@ -894,7 +894,7 @@ number; a hit's proposal (`awaitingRoll`) and the saves the action opened (`dama
 meanwhile) then take it. Who picks a player's targets in an encounter is `GameState.targeting` (ADR-0044, set with
 `table.set-targeting`). At `gm`, `action.resolve` refuses a player's own targets or area (`gmPicksTargets` in
 `target-asks.ts`), and their tap sends `action.ask-target` instead, which waits in `combat.targetAsks` with how they
-chose to cast it; the GM aims it from Needs you and resolves it as their own, and that committed resolve, the player's
+chose to cast it; the GM aims it from the waiting list and resolves it as their own, and that committed resolve, the player's
 `action.withdraw-target-ask` or the turn ending clears it. On the client every roll prompt
 shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`). A call
@@ -935,7 +935,7 @@ names no family is the GM's own ruling on the whole command.
 - The GM's tab is the Compendium (`apps/client/src/compendium/`, ADR-0033, ADR-0055): one table per kind with the
   SRD and the homebrew together, and each record at its own address with its parts (Card, Sharing and History for
   homebrew, Card and Your copies for an SRD record) and the studio at `?tab=edit`. Home (`OverviewView.tsx`) is the
-  shelves: Needs you, the kinds as kit `KindCard`s with a few records each, and the sources. Browse puts
+  shelves: what waits on the GM (under the bell), the kinds as kit `KindCard`s with a few records each, and the sources. Browse puts
   `FilterPanel.tsx` beside the table: its counts are worked out in the client from the rows in memory
   (`facetCounts` in `tableModel.ts`, each facet letting its own selection go), and a range writes the values between
   its ends so the address keeps its list form. A record opens as three panes (the filters, the results as
@@ -1137,10 +1137,14 @@ which `scene/EncounterMap.tsx` renders into the dock through `table/dockTools.ts
 map with its own controls (`scene/MapControls.tsx`) and the Tray chip; and one panel (`table/TablePanel.tsx`) whose
 tabs are Encounter, Log, Party and Notes for the GM, and whose footer holds the view's one primary. The live encounter
 picker (`table/LiveScenePicker.tsx`) opens from the live chip in the GM's top bar. The Encounter tab's head holds the
-sound, Join before an encounter and the GM's Encounter menu during one. The GM's Needs you leads the Encounter tab,
-above the acting creature's card and its cost tabs (`encounter/ActingConsole.tsx`, `encounter/TurnTabs.tsx`) and the
+sound, Join before an encounter and the GM's Encounter menu during one. The GM's waiting list (`table/NeedsYou.tsx`, from
+`needsItems` in `table/needs.ts`; ADR-0058) leads the Encounter tab over the turn, or sits in its own first tab by the
+GM's choice (`waitingList` in `settings/preferences.ts`, kept on the device); either way it sits above the acting
+creature's card and its cost tabs (`encounter/ActingConsole.tsx`, `encounter/TurnTabs.tsx`) and the
 order with its row tools; Start an encounter (`encounter/StartFight.tsx`) lists the staged characters and monsters to
-tick. A player's tabs are Turn, Sheet, Log and Party in an encounter (Me, Log and Party between encounters). The Turn
+tick. The bell (kit `AttentionBell`) counts `owedItems`, what the GM owes without what waits on a player, on
+the list, its tab, the acting Ladder row, the live chip and a phone's Play tab; Log's unread count
+(`table/unreadTabs.ts`) keeps the newest line seen per device. A player's tabs are Turn, Sheet, Log and Party in an encounter (Me, Log and Party between encounters). The Turn
 tab leads with the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts and the round, then the cost tabs;
 End turn is the footer's one primary, and off the player's turn the footer says when it comes.
 
