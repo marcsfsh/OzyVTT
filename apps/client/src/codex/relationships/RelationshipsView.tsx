@@ -1,5 +1,5 @@
 import { useContext, useMemo, useState } from "react";
-import { Eyebrow, IconEyeOff, SegmentedControl, useToast, cx } from "@vtt/ui";
+import { Button, Eyebrow, IconMore, Menu, MenuItem, Modal, SegmentedControl, Tag, useToast, cx } from "@vtt/ui";
 import {
   dateToInstant,
   instantToDate,
@@ -8,7 +8,7 @@ import {
   type CodexInWorldDate
 } from "@vtt/domain";
 import type { CodexConnection, PlayerCodexConnection } from "@vtt/domain";
-import { entityColor, entityIconId } from "../entities";
+import { entityColor, entityDef, entityIconId } from "../entities";
 import { EntityIcon, iconChildren } from "../icons";
 import { StandingAdjuster } from "../StandingAdjuster";
 import { standingLabel, standingValueLabel } from "../chronicle";
@@ -58,73 +58,117 @@ function tiesOf(focus: Node, connections: readonly AnyConnection[], nodes: Reado
   return ties;
 }
 
-/** Ties grouped under their label, the way a page's panel lists them. */
-function TieList({ ties, go }: Readonly<{ ties: readonly Tie[]; go: (path: string) => void }>) {
-  const groups = new Map<string, Tie[]>();
-  for (const tie of ties) {
-    const rows = groups.get(tie.label) ?? [];
-    // A page that mentions this one twice is one row.
-    if (!rows.some((row) => row.other.id === tie.other.id)) groups.set(tie.label, [...rows, tie]);
-  }
-  if (ties.length === 0) return <p className="cx-hint">No relationships yet.</p>;
-  return (
-    <div className="cx-meta-groups">
-      {[...groups.entries()].map(([label, rows]) => (
-        <div key={label} className="cx-meta-group">
-          <span className="cx-meta-key">{label}</span>
-          {rows.map((tie) => (
-            <button
-              key={tie.key}
-              type="button"
-              className={cx("cx-meta-link", tie.hidden && "is-hidden")}
-              onClick={() => go(pagePath(tie.other.id))}
-            >
-              <EntityIcon type={tie.other.entityType} />
-              <span className="cx-meta-link-title">{tie.other.title}</span>
-              {tie.hidden && (
-                <span className="cx-meta-hidden">
-                  <IconEyeOff />
-                  Hidden
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
+/** One neighbour on the ring and in the ties panel: its page, the words on its line, and whether players see it. */
+type Neighbour = Readonly<{
+  other: Node;
+  origin: "declared" | "mention";
+  /** The words at the line's middle: "Member of", "Mentions". */
+  line: string;
+  /** The tie as the focus page reads it, for the panel: "Member of The Tidebound". */
+  label: string;
+  hidden: boolean;
+}>;
 
-/** One page and its neighbours on labelled lines; a Hidden line is dashed violet. A neighbour re-centres the web. */
-function Web({
-  focus,
-  ties,
-  onCentre
-}: Readonly<{ focus: Node; ties: readonly Tie[]; onCentre: (id: string) => void }>) {
-  const width = 860;
-  const height = 600;
-  // One node per neighbour, its line naming every declared tie, or "mentions" when the text is the only tie.
-  const neighbours = new Map<string, { other: Node; ties: Tie[] }>();
+/** The focus page's neighbours in the order the panel lists them: one each, its line naming every declared tie, or
+ *  "mentions" when the text is the only tie. */
+function neighboursOf(ties: readonly Tie[]): Neighbour[] {
+  const byPage = new Map<string, { other: Node; ties: Tie[] }>();
   for (const tie of ties) {
-    const entry = neighbours.get(tie.other.id) ?? { other: tie.other, ties: [] };
+    const entry = byPage.get(tie.other.id) ?? { other: tie.other, ties: [] };
     entry.ties.push(tie);
-    neighbours.set(tie.other.id, entry);
+    byPage.set(tie.other.id, entry);
   }
-  const lines = [...neighbours.values()].map(({ other, ties: own }) => {
+  return [...byPage.values()].map(({ other, ties: own }) => {
     const declared = own.filter((tie) => tie.connection.origin === "declared");
     const shown = declared.length > 0 ? declared : own.slice(0, 1);
     return {
       other,
       origin: declared.length > 0 ? "declared" : "mention",
-      label: [...new Set(shown.map((tie) => edgeWord(tie.connection)))].join(", "),
+      line: capitalized([...new Set(shown.map((tie) => edgeWord(tie.connection)))].join(", ")),
+      label: [...new Set(shown.map((tie) => tie.label))].join(", "),
       hidden: shown.every((tie) => tie.hidden)
     };
   });
-  const radius = Math.min(250, 120 + lines.length * 12);
-  const placed = lines.map((line, index) => {
-    const angle = (index / Math.max(1, lines.length)) * Math.PI * 2 - Math.PI / 2;
-    return { line, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
-  });
+}
+
+/** The ring keeps eight ties; a ninth and more fold into "+N more" (F story spec 2.2). */
+const RING_MAX = 8;
+
+/**
+ * The ties as rows: each neighbour's face, its name, the tie and what the page is, Hidden for the GM, and More (open
+ * the page or centre on it). Choosing a row lights its line on the ring.
+ */
+function TieRows({
+  neighbours,
+  chosen,
+  onChoose,
+  onCentre,
+  go
+}: Readonly<{
+  neighbours: readonly Neighbour[];
+  chosen: string | null;
+  onChoose: (id: string) => void;
+  onCentre: (id: string) => void;
+  go: (path: string) => void;
+}>) {
+  if (neighbours.length === 0) return <p className="cx-hint">No relationships yet.</p>;
+  return (
+    <ul className="cx-tie-rows">
+      {neighbours.map((neighbour) => (
+        <li key={neighbour.other.id} className={cx("cx-tie-row", chosen === neighbour.other.id && "is-on")}>
+          <button
+            type="button"
+            className="cx-tie-hit interactive"
+            aria-pressed={chosen === neighbour.other.id}
+            onClick={() => onChoose(neighbour.other.id)}
+          >
+            <span className="cx-tie-face" aria-hidden="true">
+              <EntityIcon type={neighbour.other.entityType} />
+            </span>
+            <span className="cx-tie-text">
+              <b className={cx(neighbour.hidden && "is-hidden")}>{neighbour.other.title}</b>
+              <small>{`${neighbour.label} · ${entityDef(neighbour.other.entityType).label}`}</small>
+            </span>
+            {neighbour.hidden && <Tag tone="hidden">Hidden</Tag>}
+          </button>
+          <Menu icon align="end" label={`More for ${neighbour.other.title}`} trigger={<IconMore />}>
+            <MenuItem onClick={() => go(pagePath(neighbour.other.id))}>Open the page</MenuItem>
+            <MenuItem onClick={() => onCentre(neighbour.other.id)}>Centre on it</MenuItem>
+          </Menu>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The ring: the centred page in the middle and up to eight neighbours placed evenly from the top, clockwise, in the
+ * panel's order, each line named at its middle; a hidden tie's line is dashed violet. The chosen tie's line is lit.
+ * A neighbour re-centres the ring; past eight, "+N more" lights the list.
+ */
+function Web({
+  focus,
+  neighbours,
+  chosen,
+  onCentre,
+  onMore
+}: Readonly<{
+  focus: Node;
+  neighbours: readonly Neighbour[];
+  chosen: string | null;
+  onCentre: (id: string) => void;
+  onMore: () => void;
+}>) {
+  const width = 860;
+  const height = 620;
+  const radius = 240;
+  const shown = neighbours.slice(0, RING_MAX);
+  const more = neighbours.length - shown.length;
+  const spots = shown.length + (more > 0 ? 1 : 0);
+  const at = (index: number) => {
+    const angle = (index / Math.max(1, spots)) * Math.PI * 2 - Math.PI / 2;
+    return { x: Math.round(Math.cos(angle) * radius), y: Math.round(Math.sin(angle) * radius) };
+  };
   const node = (target: Node, x: number, y: number, size: number, hiddenNode: boolean, centre: boolean) => (
     <g
       transform={`translate(${x} ${y})`}
@@ -146,6 +190,7 @@ function Web({
       </text>
     </g>
   );
+  const morePlace = at(shown.length);
   return (
     <svg
       className="cx-web"
@@ -153,28 +198,57 @@ function Web({
       role="img"
       aria-label={`${focus.title} and the pages tied to it`}
     >
-      {placed.map(({ line, x, y }) => (
-        <g key={line.other.id} className={cx("cx-web-edge", line.hidden && "is-hidden")} data-origin={line.origin}>
-          <line x1={0} y1={0} x2={x} y2={y} />
-          <text x={x / 2} y={y / 2 - 6} textAnchor="middle" className="cx-web-edgelabel">
-            {line.label}
-          </text>
-        </g>
-      ))}
-      {node(focus, 0, 0, 28, focus.revealedToPlayers === false, true)}
-      {placed.map(({ line, x, y }) => (
-        <a
-          key={`n${line.other.id}`}
-          href={pagePath(line.other.id)}
-          aria-label={`Centre on ${line.other.title}`}
-          onClick={(event) => {
-            event.preventDefault();
-            onCentre(line.other.id);
+      {shown.map((line, index) => {
+        const { x, y } = at(index);
+        return (
+          <g
+            key={line.other.id}
+            className={cx("cx-web-edge", line.hidden && "is-hidden", chosen === line.other.id && "is-chosen")}
+            data-origin={line.origin}
+          >
+            <line x1={0} y1={0} x2={x} y2={y} />
+            <text x={x / 2} y={y / 2 + 4} textAnchor="middle" className="cx-web-edgelabel">
+              {line.line}
+            </text>
+          </g>
+        );
+      })}
+      {node(focus, 0, 0, 34, focus.revealedToPlayers === false, true)}
+      {shown.map((line, index) => {
+        const { x, y } = at(index);
+        return (
+          <a
+            key={`n${line.other.id}`}
+            href={pagePath(line.other.id)}
+            aria-label={`Centre on ${line.other.title}`}
+            onClick={(event) => {
+              event.preventDefault();
+              onCentre(line.other.id);
+            }}
+          >
+            {node(line.other, x, y, 25, line.other.revealedToPlayers === false, false)}
+          </a>
+        );
+      })}
+      {more > 0 && (
+        <g
+          className="cx-web-more"
+          role="button"
+          tabIndex={0}
+          aria-label={`${more} more ties, in the list`}
+          transform={`translate(${morePlace.x} ${morePlace.y})`}
+          onClick={onMore}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onMore();
+            }
           }}
         >
-          {node(line.other, x, y, 20, line.other.revealedToPlayers === false, false)}
-        </a>
-      ))}
+          <circle r={25} />
+          <text y={5} textAnchor="middle">{`+${more} more`}</text>
+        </g>
+      )}
     </svg>
   );
 }
@@ -421,10 +495,23 @@ export function RelationshipsView() {
         .sort((a, b) => a.title.localeCompare(b.title)),
     [pages]
   );
-  const view = (VIEWS.find((candidate) => candidate.value === query.get("view"))?.value ??
-    (phone ? "grid" : "web")) as ViewId;
+  const view = (VIEWS.find((candidate) => candidate.value === query.get("view"))?.value ?? "web") as ViewId;
   const focus = nodes.get(query.get("focus") ?? "") ?? factions[0] ?? pages[0] ?? null;
   const ties = useMemo(() => (focus ? tiesOf(focus, connections, nodes) : []), [focus, connections, nodes]);
+  const neighbours = useMemo(() => neighboursOf(ties), [ties]);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [tiesOpen, setTiesOpen] = useState(false);
+  const [tiesLit, setTiesLit] = useState(false);
+  const centre = (id: string) => {
+    setChosen(null);
+    go(relationshipsPath(id));
+  };
+  // "+N more" lights the list (on a phone, opens it) so the folded ties are found there.
+  const showMore = () => {
+    setTiesLit(true);
+    setTiesOpen(true);
+    window.setTimeout(() => setTiesLit(false), 1200);
+  };
   // Only a declared tie has dates, so only those go over time.
   const declaredTies = useMemo(() => ties.filter((tie) => tie.connection.origin === "declared"), [ties]);
 
@@ -462,6 +549,10 @@ export function RelationshipsView() {
     <AdjustStanding key={adjustingPage.id} faction={adjustingPage} onClose={() => setAdjusting(null)} />
   );
   const tieTitle = focus ? `${focus.title}'s ties` : "Ties";
+  const tieRows = <TieRows neighbours={neighbours} chosen={chosen} onChoose={setChosen} onCentre={centre} go={go} />;
+  const web = focus && (
+    <Web focus={focus} neighbours={neighbours} chosen={chosen} onCentre={centre} onMore={showMore} />
+  );
 
   const loading = gm ? gm.feeds.list.loading : (player?.feeds.loading ?? false);
   if (pages.length === 0 && loading)
@@ -490,6 +581,7 @@ export function RelationshipsView() {
         <div className="cx-rel-phonebody">
           {picker}
           {switcher}
+          {view === "web" && web}
           {view === "grid" && (
             <>
               <Eyebrow>Factions grid</Eyebrow>
@@ -498,32 +590,42 @@ export function RelationshipsView() {
             </>
           )}
           {view === "time" && <OverTime ties={declaredTies} calendar={calendar} />}
-          <Eyebrow>{tieTitle}</Eyebrow>
-          <TieList ties={ties} go={go} />
+          {/* The ties rise from the foot as a sheet (F story spec 2.2). */}
+          <Button className="cx-rel-tiesbutton" onClick={() => setTiesOpen(true)}>
+            {`${neighbours.length} ${neighbours.length === 1 ? "tie" : "ties"}`}
+          </Button>
         </div>
+        {tiesOpen && (
+          <Modal
+            open
+            size="md"
+            align="bottom"
+            title={`${tieTitle} · ${neighbours.length}`}
+            onClose={() => setTiesOpen(false)}
+          >
+            {tieRows}
+            {role === "gm" && <span className="cx-hint">Dashed violet lines and rows are hidden.</span>}
+          </Modal>
+        )}
         {adjuster}
       </div>
     );
 
+  // The view takes the whole page under the bar; Centre on, the views and the ties sit on glass over it.
   return (
-    <div className="cx-rel">
-      <div className="cx-sub">
-        {picker}
-        <span className="cx-grow" />
-        {switcher}
+    <div className="cx-rel cx-rel-stage">
+      <div className={cx("cx-rel-view", view !== "web" && "is-under-glass scroll-y")}>
+        {view === "web" && web}
+        {view === "grid" && grid}
+        {view === "time" && <OverTime ties={declaredTies} calendar={calendar} />}
       </div>
-      <div className="cx-rel-cols">
-        <div className="cx-rel-main scroll-y">
-          {view === "web" && focus && <Web focus={focus} ties={ties} onCentre={(id) => go(relationshipsPath(id))} />}
-          {view === "grid" && grid}
-          {view === "time" && <OverTime ties={declaredTies} calendar={calendar} />}
-        </div>
-        <aside className="cx-page-meta scroll-y" aria-label={tieTitle}>
-          <Eyebrow>{tieTitle}</Eyebrow>
-          <TieList ties={ties} go={go} />
-          {role === "gm" && <span className="cx-hint">Dashed violet lines and rows are hidden.</span>}
-        </aside>
-      </div>
+      <div className="cx-rel-glass is-top">{picker}</div>
+      <div className="cx-rel-glass is-bottom">{switcher}</div>
+      <aside className={cx("cx-rel-glass cx-rel-ties scroll-y", tiesLit && "is-lit")} aria-label={tieTitle}>
+        <h2 className="cx-rel-ties-title">{`${tieTitle} · ${neighbours.length}`}</h2>
+        {tieRows}
+        {role === "gm" && <span className="cx-hint">Dashed violet lines and rows are hidden.</span>}
+      </aside>
       {adjuster}
     </div>
   );

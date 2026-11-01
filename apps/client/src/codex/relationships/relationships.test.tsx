@@ -86,9 +86,9 @@ describe("The web", () => {
     const edges = web().querySelectorAll(".cx-web-edge");
     expect(edges).toHaveLength(3);
     expect([...edges].map((edge) => [edge.getAttribute("data-origin"), edge.textContent])).toEqual([
-      ["declared", "member of"],
-      ["declared", "rival of"],
-      ["mention", "mentions"]
+      ["declared", "Member of"],
+      ["declared", "Rival of"],
+      ["mention", "Mentions"]
     ]);
     // The GM-only tie is drawn dashed violet.
     expect(edges[1]).toHaveClass("is-hidden");
@@ -102,7 +102,7 @@ describe("The web", () => {
     ]);
     renderGmCodex("/codex/relationships?focus=f1");
     await waitFor(() => expect(web().querySelectorAll(".cx-web-edge")).toHaveLength(3));
-    const ysolde = [...web().querySelectorAll(".cx-web-edge")].find((edge) => edge.textContent === "member of");
+    const ysolde = [...web().querySelectorAll(".cx-web-edge")].find((edge) => edge.textContent === "Member of");
     expect(ysolde).toHaveAttribute("data-origin", "declared");
     expect(screen.getAllByRole("link", { name: "Centre on Ysolde Varn" })).toHaveLength(1);
   });
@@ -115,14 +115,42 @@ describe("The web", () => {
     await waitFor(() => expect(web()).toHaveAccessibleName("Ysolde Varn and the pages tied to it"));
   });
 
-  it("lists the ties beside the web under their labels, a Hidden one marked, and a tie opens its page", async () => {
+  it("lists the ties on glass, a Hidden one marked, choosing one lights its line, and More opens its page", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/relationships?focus=f1");
-    await waitFor(() => expect(ties().getByText("Member of The Tidebound")).toBeInTheDocument());
-    expect(ties().getByText("Rival of")).toBeInTheDocument();
+    await screen.findByRole("complementary", { name: /ties$/ });
+    expect(await ties().findByRole("heading", { name: "The Tidebound's ties · 3" })).toBeInTheDocument();
+    expect(ties().getByText("Member of The Tidebound · Character")).toBeInTheDocument();
+    expect(ties().getByText("Rival of · Faction")).toBeInTheDocument();
     expect(ties().getByRole("button", { name: /The Lantern Order/ })).toHaveTextContent("Hidden");
     await user.click(ties().getByRole("button", { name: /Ysolde Varn/ }));
+    expect(ties().getByRole("button", { name: /Ysolde Varn/ })).toHaveAttribute("aria-pressed", "true");
+    const lit = [...web().querySelectorAll(".cx-web-edge.is-chosen")].map((edge) => edge.textContent);
+    expect(lit).toEqual(["Member of"]);
+    const more = ties().getByLabelText("More for Ysolde Varn");
+    await user.click(more);
+    await user.click(
+      within(more.closest(".cx-tie-row") as HTMLElement).getByRole("menuitem", { name: "Open the page" })
+    );
     expect(window.location.pathname).toBe("/codex/pages/p1");
+  });
+
+  it("keeps eight ties on the ring and folds the rest into +N more, which lights the list", async () => {
+    const many = Array.from({ length: 11 }, (_, index) =>
+      summary({ id: `n${index}`, title: `Neighbour ${index + 1}`, entityType: "character" })
+    );
+    api.codexApi.listPages.mockResolvedValue([...PAGES, ...many]);
+    api.codexApi.listConnections.mockResolvedValue(
+      many.map((page, index) => tie({ id: `m${index}`, fromId: page.id, toPageId: "f1", label: "knows" }))
+    );
+    const user = userEvent.setup();
+    renderGmCodex("/codex/relationships?focus=f1");
+    await waitFor(() => expect(web().querySelectorAll(".cx-web-edge")).toHaveLength(8));
+    const more = screen.getByRole("button", { name: "3 more ties, in the list" });
+    expect(more).toHaveTextContent("+3 more");
+    expect(ties().getAllByRole("listitem")).toHaveLength(11);
+    await user.click(more);
+    expect(screen.getByRole("complementary", { name: /ties$/ })).toHaveClass("is-lit");
   });
 });
 
@@ -215,11 +243,19 @@ describe("A player's Relationships (viewer safety)", () => {
 describe("Relationships on a phone", () => {
   beforeEach(() => setViewport(390));
 
-  it("opens on the factions grid in a sideways scroller, with the ties below", async () => {
+  it("opens on the ring, with the ties as a sheet from the foot", async () => {
+    const user = userEvent.setup();
     renderGmCodex("/codex/relationships?focus=f1");
     expect(await screen.findByRole("heading", { level: 2, name: "Codex" })).toBeInTheDocument();
-    expect(screen.getByRole("table")).toBeInTheDocument();
+    await waitFor(() => expect(web()).toHaveAccessibleName("The Tidebound and the pages tied to it"));
+    await user.click(screen.getByRole("button", { name: "3 ties" }));
+    const sheet = within(await screen.findByRole("dialog", { name: "The Tidebound's ties · 3" }));
+    expect(sheet.getByText("Member of The Tidebound · Character")).toBeInTheDocument();
+  });
+
+  it("keeps the factions grid in a sideways scroller", async () => {
+    renderGmCodex("/codex/relationships?focus=f1&view=grid");
+    expect(await screen.findByRole("table")).toBeInTheDocument();
     expect(screen.getByText("Swipe the grid sideways to see every column.")).toBeInTheDocument();
-    expect(screen.getByText("Member of The Tidebound")).toBeInTheDocument();
   });
 });
