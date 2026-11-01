@@ -11,6 +11,7 @@ import {
   playMusic,
   projectViewerSound,
   removeSoundEverywhere,
+  seekTrack,
   saveScenePreset,
   setLayerPlaying,
   setPaused,
@@ -186,6 +187,31 @@ describe("the playlist", () => {
     expect(fresh.music.current?.startedAt).toBe(60_000);
     const resumed = viewerSoundAt(projectViewerSound(fresh, 81_000), 81_000);
     expect(resumed).toMatchObject({ paused: false, music: { positionMs: 21_000 }, ambient: [{ positionMs: 16_000 }] });
+  });
+});
+
+describe("seeking the playing track (ADR-0065)", () => {
+  it("starts the track again from the position with a new play, and moves the hand-over with it", () => {
+    const fresh = board();
+    playMusic(fresh, undefined, deps(10_000));
+    const before = fresh.music.current!.playId;
+    seekTrack(fresh, 60_000, deps(20_000));
+    expect(fresh.music.current).toMatchObject({ assetId: TAVERN, startedAt: 20_000 - 60_000 });
+    expect(fresh.music.current!.playId).not.toBe(before);
+    expect(nextSoundEvent(fresh)).toBe(20_000 - 60_000 + 180_000 - SOUND_CROSSFADE_MS);
+  });
+
+  it("clamps past the end, holds a pause, and is refused with nothing playing", () => {
+    const fresh = board();
+    expect(() => seekTrack(fresh, 1_000, deps(5_000))).toThrow("Nothing is playing to move through.");
+    playMusic(fresh, undefined, deps(10_000));
+    seekTrack(fresh, 999_999, deps(12_000));
+    expect(fresh.music.current!.startedAt).toBe(12_000 - 180_000);
+    setPaused(fresh, true, deps(13_000));
+    seekTrack(fresh, 30_000, deps(50_000));
+    // Paused at 13s: the track stands at 30s from the pause, and the board stays paused.
+    expect(fresh.pausedAt).toBe(13_000);
+    expect(fresh.music.current!.startedAt).toBe(13_000 - 30_000);
   });
 });
 

@@ -401,15 +401,8 @@
   font: 400 16px / 1 var(--font-numeric);
 }
 .sound-playing-track {
-  position: relative;
   flex: 1 1 auto;
-  height: 4px;
-  background: var(--line-raised);
-}
-.sound-playing-track > span {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: var(--cyan);
+  min-width: 6rem;
 }
 .sound-playing-controls {
   display: inline-flex;

@@ -2729,6 +2729,10 @@ export const SoundStopSchema = z
   });
 export const SoundNextTrackSchema = z.object({ commandId: z.uuid() }).strict();
 export const SoundPauseSchema = z.object({ commandId: z.uuid(), paused: z.boolean() }).strict();
+/** GM moves the playing track to a position, in milliseconds from its start (ADR-0065). */
+export const SoundSeekSchema = z
+  .object({ commandId: z.uuid(), positionMs: z.number().int().nonnegative().max(86_400_000) })
+  .strict();
 /** Saves what the board holds now as a scene's sound, clears it, or turns its start-when-live on or off. */
 export const SoundScenePresetSchema = z
   .object({

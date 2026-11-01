@@ -224,6 +224,16 @@ export function advanceMusic(board: SoundBoard, deps: SoundDeps) {
   return true;
 }
 
+/** Moves the playing track to a position (ADR-0065): a new play from there, so every screen picks it up, clamped to
+ *  the track's length. A paused board keeps its pause, and the track carries on from the new place when it resumes. */
+export function seekTrack(board: SoundBoard, positionMs: number, deps: SoundDeps) {
+  const current = board.music.current;
+  if (!current) throw new CommandRejectedError("Nothing is playing to move through.");
+  const at = Math.min(Math.max(0, positionMs), current.durationMs);
+  const clock = board.pausedAt ?? deps.now;
+  board.music.current = { ...current, playId: deps.newId(), startedAt: clock - at };
+}
+
 export function stopMusic(board: SoundBoard) {
   board.music.current = null;
   board.music.upNext = [];

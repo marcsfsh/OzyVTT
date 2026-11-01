@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SoundBoardSchema, type SoundBoardView } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
@@ -150,7 +150,13 @@ describe("the sound board", () => {
     const bar = await screen.findByRole("region", { name: "Now playing" });
     expect(within(bar).getByText("Tavern Song")).toBeInTheDocument();
     expect(within(bar).getByText("Rain")).toBeInTheDocument();
-    expect(within(bar).getByRole("progressbar", { name: "Track position" })).toHaveAttribute("aria-valuemax", "184");
+    // The scrubber seeks once, on release.
+    const scrubber = within(bar).getByRole("slider", { name: "Track position" });
+    fireEvent.change(scrubber, { target: { value: "50" } });
+    fireEvent.pointerUp(scrubber);
+    expect(sent.filter(([event]) => event === "sound:seek")).toEqual([
+      ["sound:seek", expect.objectContaining({ positionMs: 92_000 })]
+    ]);
     await user.click(within(bar).getByRole("button", { name: "Pause" }));
     expect(sent).toContainEqual(["sound:pause", expect.objectContaining({ paused: true })]);
     await user.click(within(bar).getByRole("button", { name: "Stop all" }));

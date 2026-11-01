@@ -232,6 +232,7 @@ import type {
   SoundArrangeSchema,
   SoundNextTrackSchema,
   SoundPauseSchema,
+  SoundSeekSchema,
   SoundPlaySchema,
   SoundScenePresetSchema,
   SoundStopSchema,
@@ -1238,6 +1239,11 @@ export interface ClientToServerEvents {
   ) => void;
   "sound:stop": (
     payload: CommandPayload<typeof SoundStopSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  /** GM moves the playing track to a position (ADR-0065). */
+  "sound:seek": (
+    payload: CommandPayload<typeof SoundSeekSchema>,
     acknowledgement: (result: SoundCommandResult) => void
   ) => void;
   "sound:next-track": (

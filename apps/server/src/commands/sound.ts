@@ -2,6 +2,7 @@ import {
   SoundArrangeSchema,
   SoundNextTrackSchema,
   SoundPauseSchema,
+  SoundSeekSchema,
   SoundPlaySchema,
   SoundScenePresetSchema,
   SoundStopSchema
@@ -14,6 +15,7 @@ import {
   nextTrack,
   playEffect,
   playMusic,
+  seekTrack,
   prunePresets,
   saveScenePreset,
   setLayerPlaying,
@@ -132,6 +134,21 @@ export const soundCommands = [
     async run({ request }, kit) {
       const { commandId, paused } = request;
       return accepted(kit, await soundOf(kit).run(commandId, (board, deps) => setPaused(board, paused, deps)));
+    }
+  }),
+
+  defineCommand({
+    type: "sound.seek",
+    operationId: "seekSound",
+    description:
+      "Moves the playing track to a position, in milliseconds from its start (GM-grade only, ADR-0065). The track gets a new play from there, so every table screen moves with it; past its length it clamps to the end. A paused board keeps its pause. Refused with nothing playing.",
+    summary: "Move the playing track to a position (GM).",
+    schema: SoundSeekSchema,
+    malformed: "The seek command is malformed.",
+    gmOnly: GM_ONLY,
+    async run({ request }, kit) {
+      const { commandId, positionMs } = request;
+      return accepted(kit, await soundOf(kit).run(commandId, (board, deps) => seekTrack(board, positionMs, deps)));
     }
   }),
 

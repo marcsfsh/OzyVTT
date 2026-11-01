@@ -155,6 +155,12 @@ describe("the sound board", () => {
     const board = await test.json(await fetch(`${test.base}/api/v1/game/sound`, { headers: test.gm }));
     expect(board.data.view.board.music.current).toMatchObject({ assetId: sound.id, volume: 0.7 });
 
+    // Seeking (ADR-0065): the GM moves the track; a player is refused.
+    expect((await test.command("sound/seek", { positionMs: 20_000 }, test.playerToken)).status).toBe(403);
+    const sought = await test.command("sound/seek", { positionMs: 20_000 });
+    expect(sought.status).toBe(200);
+    expect(test.server.store.revision).toBe(revision);
+
     const unknown = await test.command("sound/arrange", { effects: [{ assetId: randomUUID(), volume: 1 }] });
     expect(unknown.status).toBe(409);
     expect((await test.json(unknown)).error.message).toBe("That sound is no longer in the library.");

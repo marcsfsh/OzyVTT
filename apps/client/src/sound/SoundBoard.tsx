@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SoundBoard as Board, SoundBoardView } from "@vtt/domain";
-import { Eyebrow, IconButton, IconPause, IconPlay, IconSkip, IconStop } from "@vtt/ui";
+import { Eyebrow, IconButton, IconPause, IconPlay, IconSkip, IconStop, Slider } from "@vtt/ui";
 import { SharedScreenSwitch } from "../viewer/SharedScreenSwitch";
 import { ScreenSoundStatus } from "./ScreenSoundStatus";
 import { SceneSounds } from "./SceneSounds";
@@ -54,6 +54,7 @@ function PlayingBar({
   const sounding = isSounding(board);
   const layers = board.ambient.filter((layer) => layer.playing).map((layer) => nameOf(layer.assetId));
   const position = usePosition(view);
+  const [dragging, setDragging] = useState<number | null>(null);
   const track = board.music.current ? nameOf(board.music.current.assetId) : null;
   return (
     <section className="sound-playing" aria-label="Now playing">
@@ -67,18 +68,18 @@ function PlayingBar({
       </span>
       {position && (
         <span className="sound-playing-time" role="group" aria-label="Where the track is">
-          <span className="sound-playing-clock">{clock(position.at)}</span>
-          <span
+          {/* While dragging the time under the thumb shows; one seek goes on release (E3 spec 2.3). */}
+          <span className="sound-playing-clock">{clock(dragging ?? position.at)}</span>
+          <Slider
             className="sound-playing-track"
-            role="progressbar"
-            aria-label="Track position"
-            aria-valuemin={0}
-            aria-valuemax={Math.round(position.length / 1000)}
-            aria-valuenow={Math.round(position.at / 1000)}
-            aria-valuetext={`${clock(position.at)} of ${clock(position.length)}`}
-          >
-            <span style={{ width: `${(position.at / Math.max(1, position.length)) * 100}%` }} />
-          </span>
+            label="Track position"
+            value={(dragging ?? position.at) / Math.max(1, position.length)}
+            onChange={(fraction) => setDragging(Math.round(fraction * position.length))}
+            onCommit={(fraction) => {
+              setDragging(null);
+              void send("sound:seek", { positionMs: Math.round(fraction * position.length) });
+            }}
+          />
           <span className="sound-playing-clock">{clock(position.length)}</span>
         </span>
       )}
