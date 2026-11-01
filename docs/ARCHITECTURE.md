@@ -1060,7 +1060,11 @@ their group in the address (`?status=`, "none" for every quest, and `?who=`); th
 new chronicle record's composer is `EntryComposer`'s inline form at the head of the line (ADR-0066). The Atlas keeps
 the map and the pin in its address (`/codex/atlas/{mapId}?pin={markerId}`); its tree, layers and pins come from
 `codex/atlas/AtlasPanel.tsx` (`MapTree`, `LayerRows`), and `AtlasMap` takes a `pinMenu` for a pin's own menu beside
-the spot menu (ADR-0067).
+the spot menu (ADR-0067). The GM's calendar is a page of its own at `/codex/calendar?part=` (`codex/CalendarPage.tsx`,
+ADR-0070) that saves as you go through today's check and `PUT`; an old `/codex/calendar?y=&m=` and a player's
+`/codex/calendar` still land on the story. A timeline record opens in the story's side column with `?record=` on the
+timeline's address (`EntryCard`'s column layout), and prep templates put the kinds beside the library
+(`codex/templates/TemplatesView.tsx`), with `PlanSession.tsx` on the Sessions tab.
 
 The Encounters tab asks the Codex which records point at each table encounter: `GET /api/v1/codex/encounter-links` (GM only,
 `codex/scene-links.ts`) lists the sessions that stage it or name it in their prep's Encounters, and the pins on the
@@ -1277,7 +1281,9 @@ Settings (ADR-0036, ADR-0057) lives in `settings/`. `sections.ts` declares the s
 Characters, Device, Access and API) with their audience and every setting's label and hint; the page, its search and the
 tests read it. `SettingsPage.tsx` draws the title row (the section bar with no pages, the section's primary at its end),
 the side list (`SettingsList.tsx`, the kit's `SideList` rows with icons and counts, and `SettingsSearch.tsx` at its
-top, whose matches take the rows' place) and the section the address names (`/settings/<section>`). On a phone
+top, whose matches take the rows' place) and the section the address names (`/settings/<section>`). The GM's list also
+has the Codex's tools (`codexTools.ts`, ADR-0070), each at `/settings/codex/<tool>` and drawn by `CodexToolSection.tsx`
+from the Codex's own `BackupView` and `CodexSettingsView` with a `part`; the search finds them. On a phone
 `/settings` is the list and a section has Back. `sectionLines.ts` writes what each section holds now from the GM's
 state and the device (`integrations/credentialCount.ts` holds the active credentials); a section's head shows it. A
 table setting's write says Saved on its row (`SavedFlashProvider` in `SettingRow.tsx`), and Encounters groups its rows

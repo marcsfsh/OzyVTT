@@ -328,9 +328,11 @@ Downtime tab's contents Built in part (`F3-atlas/SPEC.md`, `F3-atlas/PLAN.md`, A
 the pins at the right with a pin's page and menu, the pin editor in tabs, and the Downtime tab's characters at the side.
 Not built: the pins as rows with More, Move pin, a pin page drawn from its linked page's text and facts, and pin counts
 for maps that are not open.
-F4.4, F4.6 and F6.1 to F6.4 Designed (`F-time-tools/SPEC.md`, `F-time-tools/PLAN.md`, ADR-0070): prep templates as one
-page with the kinds at the side, Plan session on the Sessions tab, a calendar page, a record in the side column, and the
-Codex's tools in Settings.
+F4.4, F4.6 and F6.1 to F6.3 Built in part (`F-time-tools/SPEC.md`, `F-time-tools/PLAN.md`, ADR-0070): prep templates
+as one page with the kinds at the side, Plan session on the Sessions tab, the calendar page, a timeline record in the
+side column, and the Codex's tools in Settings. Not built: dragging a kind into a place, editing a template on a phone,
+the chronicle's clocks in the side column, and `/codex/backup` and `/codex/settings` redirecting to Settings. F6.4
+stays as it was.
 
 ### F1. Frame and finding
 
@@ -370,9 +372,9 @@ Codex's tools in Settings.
 | F4.1 | Story (Chronicle)         | `/codex/story`    | GM, player | `codex/story/sections.tsx`, `codex/story/Chronicle.tsx`, `codex/story/EntryCard.tsx`, `codex/story/story.css`         |
 | F4.2 | Timeline                  | `/codex/timeline` | GM, player | `codex/story/Timeline.tsx`                                                                                            |
 | F4.3 | Sessions and session page | `/codex/sessions` | GM, player | `codex/story/Sessions.tsx`, `codex/story/SessionPage.tsx`, `codex/story/PrepEditor.tsx`, `codex/story/PrepReader.tsx` |
-| F4.4 | Calendar and your date    | date bar          | GM         | `codex/CalendarEditor.tsx`, `codex/shared/DateBar.tsx`                                                                |
+| F4.4 | Calendar and your date    | `/codex/calendar` | GM         | `codex/CalendarPage.tsx`, `codex/CalendarEditor.tsx`, `codex/shared/DateBar.tsx`                                      |
 | F4.5 | Add to the chronicle      | Story             | GM         | `codex/story/EntryComposer.tsx`                                                                                       |
-| F4.6 | Record dialog             | a timeline record | GM, player | `codex/story/sections.tsx` (`RecordDialog`)                                                                           |
+| F4.6 | Record column             | a timeline record | GM, player | `codex/story/sections.tsx`, `codex/story/EntryCard.tsx` (the column)                                                  |
 | F4.7 | Downtime and clocks       | Story             | GM, player | `codex/story/Downtime.tsx`                                                                                            |
 
 ### F5. People and quests

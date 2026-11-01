@@ -193,8 +193,9 @@ The shells:
   capitals at 17px, a divider, the pages as words with the horizon ink, then the section's search and its primary
   (the Cup at 42px) at the right end. No icons on the pages. Settings alone keeps the title row without the pages: its
   sections are a side list (ADR-0057), the search at its top, each section with its icon and a count, and the section
-  beside it at 880px with its name, its line and what it holds now in its head. A phone opens Settings on that list,
-  and a section full screen under Back and its name.
+  beside it at 880px with its name, its line and what it holds now in its head. Under the sections the GM's list has
+  CODEX (ADR-0070): Backup, Restore, Bring in notes, Autosave and Version history, each its own page of the Codex
+  tool's rows. A phone opens Settings on that list, and a section or a tool full screen under Back and its name.
 - GM, phone. No top bar. The four sections and More are the bottom tabs (64px, five equal tabs); More opens a sheet
   above them with the menu's rows and Search. Play or Table carries the live lamp while an encounter runs. The header
   row belongs to the page on screen: a section's page
@@ -619,7 +620,7 @@ Prep's Party and the level dialog (ADR-0051; `docs/design/polish/D-characters/`)
 
 - The Titled bar (ADR-0054): Codex, then Home, Pages, Atlas, Story, Quests and Relationships (a player's strip ends with
   Compendium), the search field with Ctrl K, New as the Cup with its menu (page, quest, session) and More, which holds
-  Prep templates, Backup, Autosave and history and See the Codex as players. A phone runs the same pages as a strip of
+  Prep templates, Backup, Autosave and history, Calendar and See the Codex as players. A phone runs the same pages as a strip of
   words under its header, with Search and New as icons.
 - Home is the dashboard: the date bar as a Cradle (the campaign's date in VT323 cyan, with whether players have it),
   the five kinds as cards in a row, Recently changed as an open group of rows, and at the right (330px) the next
@@ -674,7 +675,20 @@ Prep's Party and the level dialog (ADR-0051; `docs/design/polish/D-characters/`)
   downtime as the Cup and what waits to be confirmed above the rows. The chronicle is
   one line of sessions (the next amber, played ones cyan) with their entries; the timeline draws its zoom on a line in
   the horizon gradient with a card under each point; Sessions leads with the next session's card, then the played ones
-  two to a row.
+  two to a row, with PLAN SESSION {n} at the right (360px; Made from as chips with the default chosen, Copies these
+  sections, Played on, Create session {n} as the Cup), above the list on a phone. A record pressed on the timeline opens
+  in the side column (ADR-0070), kept in `?record=`: Back to Timeline and its kind with More at the head, its date in
+  VT323 cyan, its session and who sees it as a word, its text, links and tags, then Edit, Hide from players (or Show to
+  players) and Delete. A phone opens it as the tab's page with Timeline as Back.
+- Prep templates are one page of three columns (ADR-0070): TEMPLATES as the side list (250px; each with its section
+  count, the default marked and a More) and ADD A SECTION under it, the seven kinds with how many the template holds
+  (a press adds one at the end and says what it holds); the chosen template in the middle; New session from this
+  template and Made from this template at the right (340px). A phone has the templates as chips and reads them.
+- The calendar is its own page at `/codex/calendar` (ADR-0070), opened by Edit calendar and the bar's More: Story as the
+  crumb with CALENDAR and Saved; CALENDAR (Months, Eras, Weekdays, Year suffix) and DATES (Your date, Players' date) at
+  the left; the chosen part at the right with its action, one line and its rows (a month's days in VT323). It saves as
+  you go; a change that moves dates players can see waits under the rows with the records it moves, Undo the change
+  and Save anyway. Your date keeps its small dialog. A phone has the parts as chips.
 - Who sees it is Everyone, Hidden or chosen characters. A field has two audiences, Everyone or Hidden, chosen on its
   own row.
 - Links in body text are cyan with a thin line under them. The words are Hidden, Revealed, Reveal, Hide again, See as
