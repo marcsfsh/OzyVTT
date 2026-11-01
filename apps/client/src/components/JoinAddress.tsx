@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { HOST_PATHS } from "@vtt/api-contract";
-import { Button, IconButton, IconCopy, QrCode, Roll, Select, canMove, comet, useToast } from "@vtt/ui";
+import { Button, IconButton, IconCopy, Modal, QrCode, Roll, Select, canMove, comet, useToast } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import "./join-address.css";
@@ -46,13 +46,19 @@ async function copyText(text: string): Promise<boolean> {
  * layout shows the code at once on a laptop, for the Table before anyone has joined; `row` keeps it behind a button;
  * `strip` is one line for the strip above the map, with Copy as an icon.
  */
-export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string; layout?: "hero" | "row" | "strip" }>) {
+export function JoinAddress({
+  token,
+  layout = "row"
+}: Readonly<{ token: string; layout?: "hero" | "row" | "strip" | "settings" }>) {
   const [urls, setUrls] = useState<readonly string[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
   // The hero shows the code at once where there is room; on a phone it waits behind a button like the row.
   const roomy = useMediaQuery("(min-width: 980px)");
-  const shownAtOnce = layout === "hero" && roomy;
+  // Settings shows the code beside the address on a laptop, with Show it larger (settings rule 3.8).
+  const settingsLaptop = !useMediaQuery("(max-width: 760px)") && layout === "settings";
+  const shownAtOnce = (layout === "hero" && roomy) || settingsLaptop;
+  const [larger, setLarger] = useState(false);
   const [qrToggled, setQrToggled] = useState(false);
   const qrOpen = shownAtOnce || qrToggled;
   const { toast } = useToast();
@@ -129,10 +135,16 @@ export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string;
           <Button variant="secondary" onClick={() => void copy()}>
             <Roll value={justCopied ? "Copied" : "Copy"} />
           </Button>
-          {!shownAtOnce && (
-            <Button variant="secondary" aria-expanded={qrOpen} onClick={() => setQrToggled((open) => !open)}>
-              {qrOpen ? "Hide QR code" : "Show QR code"}
+          {settingsLaptop ? (
+            <Button variant="secondary" onClick={() => setLarger(true)}>
+              Show it larger
             </Button>
+          ) : (
+            !shownAtOnce && (
+              <Button variant="secondary" aria-expanded={qrOpen} onClick={() => setQrToggled((open) => !open)}>
+                {qrOpen ? "Hide QR code" : "Show QR code"}
+              </Button>
+            )
           )}
         </div>
         <p className="join-address-hint">Phones on the same Wi-Fi open it or scan the code.</p>
@@ -141,6 +153,14 @@ export function JoinAddress({ token, layout = "row" }: Readonly<{ token: string;
         <div className="join-address-qr">
           <QrCode value={url} label={`QR code for ${url}`} />
         </div>
+      )}
+      {settingsLaptop && (
+        <Modal open={larger} onClose={() => setLarger(false)} title="Join the table" size="sm">
+          <div className="join-address-qr is-large">
+            <QrCode value={url} label={`QR code for ${url}, larger`} />
+          </div>
+          <p className="join-address-hint">{url}</p>
+        </Modal>
       )}
     </section>
   );

@@ -86,3 +86,17 @@
 .join-address-text {
   position: relative;
 }
+
+/* In Settings (settings spec 4): the address in VT323 at 26px, the code 112px beside it on a laptop, and Show it
+   larger opening it at 320px. */
+.join-address--settings .join-address-url {
+  font: 400 26px / 1.1 var(--font-numeric);
+  letter-spacing: 0.02em;
+}
+.join-address--settings .join-address-qr {
+  width: 112px;
+}
+.join-address-qr.is-large {
+  width: min(320px, 100%);
+  margin-inline: auto;
+}

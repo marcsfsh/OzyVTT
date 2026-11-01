@@ -69,7 +69,7 @@ export function PlayersSection({
   return (
     <SettingsSection id="players">
       <SettingRow setting={SETTING.joinAddress} stacked>
-        <JoinAddress token={gmToken} />
+        <JoinAddress token={gmToken} layout="settings" />
       </SettingRow>
 
       <SettingRow setting={SETTING.partyVisibility} stacked>

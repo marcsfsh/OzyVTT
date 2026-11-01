@@ -1,8 +1,9 @@
-import { Button, SegmentedControl, setReduceTransparency, Switch, ThemeToggle, useReduceTransparency } from "@vtt/ui";
+import { Button, setReduceTransparency, Switch, ThemeToggle, useReduceTransparency } from "@vtt/ui";
 import { tableDiceLine, useRollPreference } from "../dice/roll-preference";
 import { setAutoArrange, setPinchZoom, useAutoArrange, usePinchZoom } from "./preferences";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
+import { SettingChoices } from "./SettingChoices";
 
 /**
  * Device: what this browser chooses for itself, for every role. The GM's arranging choice sits here because it is
@@ -41,7 +42,7 @@ export function DeviceSection({
       {/* A player's dice follow the table's mode, so the rule replaces the control. */}
       {dice.chooses ? (
         <SettingRow setting={SETTING.rollInput}>
-          <SegmentedControl
+          <SettingChoices
             ariaLabel="How you roll"
             value={rollInput}
             onChange={(value) => setRollInput(value as "digital" | "manual")}

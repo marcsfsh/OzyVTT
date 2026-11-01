@@ -21,7 +21,7 @@ import {
   type SettingEntry,
   type SettingsSectionId
 } from "./sections";
-import { PrimarySlot, SectionLine, SettingsSection } from "./SettingRow";
+import { PrimarySlot, SavedFlashProvider, SectionLine, SettingsSection } from "./SettingRow";
 import { SettingsList } from "./SettingsList";
 import { sectionLine } from "./sectionLines";
 import { FAMILY_COPY } from "./FightsSection";
@@ -177,7 +177,9 @@ export function SettingsPage({
       <div className="settings cx-shell is-single">
         {/* A phone has no top bar, so the page names itself (frame spec 2.2). */}
         <PhoneHeader title="Settings" />
-        <div className="settings-content scroll-y">{body}</div>
+        <div className="settings-content scroll-y">
+          <SavedFlashProvider>{body}</SavedFlashProvider>
+        </div>
         {dialog}
       </div>
     );
@@ -213,7 +215,7 @@ export function SettingsPage({
                   className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
                   key={section}
                 >
-                  {body}
+                  <SavedFlashProvider>{body}</SavedFlashProvider>
                 </div>
               </div>
             </SectionBar>
@@ -280,7 +282,7 @@ export function SettingsPage({
                 className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
                 key={section}
               >
-                {body}
+                <SavedFlashProvider>{body}</SavedFlashProvider>
               </div>
             )}
           </SectionBar>

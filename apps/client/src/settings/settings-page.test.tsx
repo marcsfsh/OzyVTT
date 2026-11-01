@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const command = vi.fn(async (..._args: unknown[]) => ({ ok: true }) as Record<string, unknown>);
@@ -42,6 +42,23 @@ const renderAt = (path: string, props: Partial<Parameters<typeof SettingsPage>[0
 
 beforeEach(() => {
   command.mockClear();
+});
+
+describe("a table setting's write", () => {
+  it("says Saved on its row for a moment when it lands, and nothing when it fails", async () => {
+    const user = userEvent.setup();
+    renderAt("/settings/fights");
+    const row = document.getElementById("setting-playerHits")!;
+    await user.click(within(row).getByRole("button", { name: "Applied immediately" }));
+    expect(command).toHaveBeenCalledWith("encounter:set-player-damage-mode", { mode: "direct" });
+    await waitFor(() => expect(row.querySelector(".setting-saved")).toHaveTextContent("Saved"));
+
+    command.mockResolvedValueOnce({ ok: false, message: "The table refused it." });
+    const targets = document.getElementById("setting-targeting")!;
+    await user.click(within(targets).getByRole("button", { name: "The GM" }));
+    expect(await screen.findByText("The table refused it.")).toBeInTheDocument();
+    expect(targets.querySelector(".setting-saved")).toBeNull();
+  });
 });
 
 describe("the GM's Settings on a phone", () => {

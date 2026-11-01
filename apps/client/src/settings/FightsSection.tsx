@@ -1,5 +1,5 @@
 import type { DiceMode, GmView, RuleExceptions, RuleFamily, RuleMode, Targeting } from "@vtt/domain";
-import { Badge, RevealSwitch, SegmentedControl, Select, Tick } from "@vtt/ui";
+import { Badge, RevealSwitch, Select, Tick } from "@vtt/ui";
 import { HealthStyleOptions } from "../encounter/health-display";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
@@ -18,6 +18,7 @@ import {
   PLAYER_INITIATIVE
 } from "./table-words";
 import { useTableWrites } from "./table-writes";
+import { SettingChoices } from "./SettingChoices";
 
 /**
  * One toggle per server rule family, never finer: the engine classifies every rule into these six
@@ -54,7 +55,7 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
   return (
     <SettingsSection id="fights">
       <SettingRow setting={SETTING.rulesAssistant} stacked>
-        <SegmentedControl
+        <SettingChoices
           ariaLabel="Rules assistant"
           value={policy.dial}
           onChange={(value) => void setDial(value as RuleMode)}
@@ -91,7 +92,7 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
       </SettingRow>
 
       <SettingRow setting={SETTING.playerHits}>
-        <SegmentedControl
+        <SettingChoices
           ariaLabel={PLAYER_HITS.label}
           value={state.combat.playerDamageMode}
           onChange={(value) =>
@@ -106,7 +107,7 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
       </SettingRow>
 
       <SettingRow setting={SETTING.playerInitiative}>
-        <SegmentedControl
+        <SettingChoices
           ariaLabel={PLAYER_INITIATIVE.label}
           value={state.combat.playerInitiativeMode}
           onChange={(value) =>
@@ -121,7 +122,7 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
       </SettingRow>
 
       <SettingRow setting={SETTING.d20Dice} stacked>
-        <SegmentedControl
+        <SettingChoices
           ariaLabel="Players' d20 rolls"
           value={state.playerDice.d20}
           onChange={(value) =>
@@ -133,7 +134,7 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
       </SettingRow>
 
       <SettingRow setting={SETTING.damageDice} stacked>
-        <SegmentedControl
+        <SettingChoices
           ariaLabel="Players' damage"
           value={state.playerDice.damage}
           onChange={(value) =>
@@ -145,7 +146,7 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
       </SettingRow>
 
       <SettingRow setting={SETTING.targeting} stacked>
-        <SegmentedControl
+        <SettingChoices
           ariaLabel="Who picks targets"
           value={state.targeting}
           onChange={(value) =>
@@ -172,7 +173,7 @@ export function FightsSection({ state }: Readonly<{ state: GmView }>) {
             <HealthStyleOptions />
           </Select>
           <span className="settings-inline-label">{HEALTH_AUDIENCE_LABEL}</span>
-          <SegmentedControl
+          <SettingChoices
             ariaLabel={HEALTH_AUDIENCE_LABEL}
             disabled={health.style === "band"}
             value={health.audience}

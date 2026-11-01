@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "@vtt/ui";
+import { setViewport } from "../../test/viewport";
 import { JoinAddress, joinCandidates } from "./JoinAddress";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -51,6 +52,32 @@ describe("the join address", () => {
     await user.click(screen.getByRole("button", { name: "Copy" }));
     expect(writeText).toHaveBeenCalledWith("http://192.168.1.50:3001");
     expect(await screen.findByText("Join address copied.")).toBeInTheDocument();
+  });
+
+  it("in Settings on a laptop shows the code beside the address, and Show it larger opens it in a dialog", async () => {
+    const user = userEvent.setup();
+    serve(["http://192.168.1.50:3001"]);
+    render(
+      <ToastProvider>
+        <JoinAddress token="gm" layout="settings" />
+      </ToastProvider>
+    );
+    expect(await screen.findByRole("img", { name: "QR code for http://192.168.1.50:3001" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show QR code" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Show it larger" }));
+    expect(screen.getByRole("img", { name: "QR code for http://192.168.1.50:3001, larger" })).toBeInTheDocument();
+  });
+
+  it("in Settings on a phone keeps the code behind Show QR code", async () => {
+    setViewport(390);
+    serve(["http://192.168.1.50:3001"]);
+    render(
+      <ToastProvider>
+        <JoinAddress token="gm" layout="settings" />
+      </ToastProvider>
+    );
+    expect(await screen.findByRole("button", { name: "Show QR code" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show it larger" })).toBeNull();
   });
 
   it("says what to do when the host has no network address", async () => {
