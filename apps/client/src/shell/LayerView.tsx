@@ -5,7 +5,7 @@ import { RestPrompt } from "../rest/RestPrompt";
 import { lazySurface } from "../components/lazySurface";
 import { NotFoundPage } from "../components/NotFoundView";
 import { CharacterSheet } from "../sheet/CharacterSheet";
-import { navigate, pathForGmTab, type AddressLayer } from "../router";
+import { levelPath, navigate, pathForGmTab, type AddressLayer } from "../router";
 import type { Connection } from "./useSession";
 
 const CharacterBuilder = lazySurface(
@@ -66,6 +66,17 @@ export function LayerView({
           role={role}
           actorId={layer.actorId}
           connection={connection}
+          startDown={new URLSearchParams(window.location.search).get("to") === "down"}
+          /* The level dialog opens over the sheet, which stays behind it (characters spec 2.3). */
+          behind={
+            <SheetLayer
+              actorId={layer.actorId}
+              role={role}
+              state={state}
+              token={token}
+              onClose={() => navigate(home)}
+            />
+          }
           onClose={() => navigate(`/characters/${layer.actorId}`)}
           onDone={() => navigate(`/characters/${layer.actorId}`)}
         />
@@ -118,7 +129,7 @@ function SheetLayer({
         state={state}
         presentation="page"
         token={token}
-        onLevel={() => navigate(`/characters/${actorId}/level`)}
+        onLevel={(direction) => navigate(levelPath(actorId, direction))}
         onClose={onClose}
       />
     </div>
@@ -145,7 +156,7 @@ function PlayerSheetPage({
         token={token}
         top={<RestPrompt state={state} />}
         {...(state.builderPolicy.playerBuilder === "open"
-          ? { onLevel: () => navigate(`/characters/${actorId}/level`) }
+          ? { onLevel: (direction) => navigate(levelPath(actorId, direction)) }
           : {})}
         {...(mine && !releasing
           ? { doors: { release: { name: actor.name, onSelect: () => void release(actor.name) } } }

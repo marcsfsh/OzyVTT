@@ -92,6 +92,10 @@ export function navigate(path: string, opts: Readonly<{ replace?: boolean }> = {
   });
 }
 
+/** The level dialog's address over a character's sheet; `?to=down` opens it on Level down. */
+export const levelPath = (actorId: string, direction: "up" | "down" = "up") =>
+  withQuery(`/characters/${actorId}/level`, { to: direction === "down" ? "down" : null });
+
 /** The current address including its query, in the form `navigate` takes. */
 export function currentHref(): string {
   return `${window.location.pathname}${window.location.search}`;

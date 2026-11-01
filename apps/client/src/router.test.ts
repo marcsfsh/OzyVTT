@@ -10,6 +10,7 @@ import {
   lastLocationForSection,
   lastLocationForTab,
   layerOf,
+  levelPath,
   litGmSection,
   litPlayerSection,
   PLAYER_LOG_PATH,
@@ -41,6 +42,12 @@ afterEach(() => {
 });
 
 describe("The address table", () => {
+  it("opens the level dialog on the sheet, on Level down when asked", () => {
+    expect(levelPath("a1")).toBe("/characters/a1/level");
+    expect(levelPath("a1", "down")).toBe("/characters/a1/level?to=down");
+    expect(layerOf("/characters/a1/level")).toEqual({ kind: "level", actorId: "a1" });
+  });
+
   it("addresses the Viewer tab /viewer-controls, because the server reserves GET /viewer", () => {
     // `GET /viewer` is a 307 to the standalone TV viewer, so the SPA can never receive that address.
     expect(pathForGmTab("viewer")).toBe("/viewer-controls");

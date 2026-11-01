@@ -57,7 +57,7 @@ const state = {
 } as unknown as GmView;
 
 describe("the party strip's sheet", () => {
-  it("opens the level page for the GM", async () => {
+  it("opens the level dialog over the sheet for the GM", async () => {
     const user = userEvent.setup();
     render(
       <ToastProvider>

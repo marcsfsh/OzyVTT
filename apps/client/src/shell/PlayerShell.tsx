@@ -2,7 +2,7 @@ import type { PlayerView } from "@vtt/domain";
 import { MyCharacter } from "../actors/MyCharacter";
 import { lazySurface } from "../components/lazySurface";
 import { NotFoundPage } from "../components/NotFoundView";
-import { isGmOnlyPath, isKnownPath, layerOf, litPlayerTab, navigate, useRoute, type Route } from "../router";
+import { isGmOnlyPath, isKnownPath, layerOf, levelPath, litPlayerTab, navigate, useRoute, type Route } from "../router";
 import { isFullPageLayer, LayerView } from "./LayerView";
 import { TableView } from "./TableView";
 import { PlayerIdentity } from "../table/PlayerIdentity";
@@ -53,7 +53,7 @@ export function PlayerShell({
           state={state}
           token={token}
           onCreateCharacter={() => navigate("/builder")}
-          onLevel={(actorId) => navigate(`/characters/${actorId}/level`)}
+          onLevel={(actorId, direction) => navigate(levelPath(actorId, direction))}
           onGoToTable={() => navigate("/table")}
         />
       );

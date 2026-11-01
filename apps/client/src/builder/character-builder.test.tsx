@@ -973,6 +973,32 @@ describe("the Level flow's class choice", () => {
       </ToastProvider>
     );
 
+  it("opens over the sheet as a dialog on the next level, with Level down in its More menu", async () => {
+    heldOffers();
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <LevelFlow
+          state={levelView(sheet())}
+          role="gm"
+          actorId={HERO}
+          behind={<p>The sheet behind</p>}
+          onClose={() => {}}
+          onDone={() => {}}
+        />
+      </ToastProvider>
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Level 4 for Mira" });
+    expect(screen.getByText("The sheet behind")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Level up to 4" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Level down to 2" })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByLabelText("More for this level"));
+    await user.click(screen.getByRole("menuitem", { name: "Level down to 2" }));
+    const down = await screen.findByRole("dialog", { name: "Level 2 for Mira" });
+    expect(within(down).getByRole("heading", { name: "Leveling down to 2" })).toBeInTheDocument();
+    expect(within(down).getByRole("button", { name: "Level down to 2" })).toBeInTheDocument();
+  });
+
   it("offers the classes the character has, and the rest one tap away", async () => {
     heldOffers();
     const user = userEvent.setup();

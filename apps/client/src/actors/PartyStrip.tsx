@@ -2,7 +2,7 @@ import { useState } from "react";
 import { rosterActors, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { CharacterSheet } from "../sheet/CharacterSheet";
-import { navigate } from "../router";
+import { levelPath, navigate } from "../router";
 import { CLAIM_WORD, claimStateOf, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { partyVisibilityOf } from "./MyCharacter";
 import "./party-strip.css";
@@ -107,9 +107,9 @@ export function PartyStrip(props: Props) {
           state={props.state}
           onClose={() => setOpenId(null)}
           /* The GM levels anyone here; a player only opens their own entry. */
-          onLevel={() => {
+          onLevel={(direction) => {
             setOpenId(null);
-            navigate(`/characters/${openActor.id}/level`);
+            navigate(levelPath(openActor.id, direction));
           }}
         />
       )}

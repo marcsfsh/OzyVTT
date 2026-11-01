@@ -275,7 +275,7 @@ describe("the compact band", () => {
     expect(sent("character:next-level")).toEqual([{ actorId: HERO }]);
     expect(panel.getByRole("button", { name: "Level down to 6" })).toBeTruthy();
     await user.click(panel.getByRole("button", { name: "Level up to 8" }));
-    expect(onLevel).toHaveBeenCalled();
+    expect(onLevel).toHaveBeenCalledWith("up");
     // On a phone the menu doesn't repeat what the Level box holds.
     await user.click(screen.getByLabelText("Sheet menu for Lyra"));
     expect(screen.queryByRole("menuitem", { name: "Level up to 8" })).toBeNull();

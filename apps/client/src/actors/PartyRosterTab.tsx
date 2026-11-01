@@ -16,7 +16,7 @@ import {
 } from "@vtt/ui";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { useConfirm } from "../components/feedback";
-import { navigate } from "../router";
+import { levelPath, navigate } from "../router";
 import { PrepBarSlot } from "../shell/AppBar";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { PdfImportModal } from "./PdfImportModal";
@@ -208,7 +208,7 @@ export function PartyRosterTab({
       busy={busy}
       neverPlayed={neverPlayed(actor)}
       onOpen={() => setSheetActorId(actor.id)}
-      onLevel={() => navigate(`/characters/${actor.id}/level`)}
+      onLevel={() => navigate(levelPath(actor.id))}
       onAtTable={(on) => void markAtTable(actor, on)}
       onRelease={() => void forceRelease.release(actor)}
       onArchive={(next) => void setArchived(actor, next)}
@@ -346,9 +346,9 @@ export function PartyRosterTab({
           role="gm"
           state={state}
           onClose={() => setSheetActorId(null)}
-          onLevel={() => {
+          onLevel={(direction) => {
             setSheetActorId(null);
-            navigate(`/characters/${sheetActor.id}/level`);
+            navigate(levelPath(sheetActor.id, direction));
           }}
         />
       )}

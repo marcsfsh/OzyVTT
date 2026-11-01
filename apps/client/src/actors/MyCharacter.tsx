@@ -10,7 +10,7 @@ import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./ac
 import { command } from "../lib/command";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "../encounter/StabilizeControl";
 import { RestPrompt } from "../rest/RestPrompt";
-import { CharacterSheet } from "../sheet/CharacterSheet";
+import { CharacterSheet, type LevelDirection } from "../sheet/CharacterSheet";
 import "./my-character.css";
 import { ActorAvatar } from "./ActorAvatar";
 
@@ -241,7 +241,7 @@ export function MyCharacter({
   /** The builder door; the claim screen has its own copy. */
   onCreateCharacter: () => void;
   /** Levelling follows the same builder policy as creating. */
-  onLevel: (actorId: string) => void;
+  onLevel: (actorId: string, direction: LevelDirection) => void;
   /** An unclaimed player is sent to the Table, where the claim picker lives. */
   onGoToTable: () => void;
 }>) {
@@ -294,7 +294,7 @@ export function MyCharacter({
           presentation="page"
           token={token}
           top={<RestPrompt state={state} />}
-          {...(builderOpen ? { onLevel: () => onLevel(mine.id) } : {})}
+          {...(builderOpen ? { onLevel: (direction: LevelDirection) => onLevel(mine.id, direction) } : {})}
           doors={{
             ...(tier !== "off" ? { party: () => setPartyOpen(true) } : {}),
             createCharacter: onCreateCharacter,

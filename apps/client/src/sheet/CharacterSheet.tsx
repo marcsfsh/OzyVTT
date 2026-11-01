@@ -71,6 +71,9 @@ import { atTableBlocked, setPlayedAtTable } from "../actors/playedAtTable";
  *  it was opened from, or the table's panel. */
 export type SheetPresentation = "page" | "dialog" | "panel";
 
+/** Which way the level dialog opens. */
+export type LevelDirection = "up" | "down";
+
 /** A laptop's sheet, the Ledger's columns, from this width; below it the narrow sheet with its compact band. */
 const WIDE_QUERY = "(min-width: 980px)";
 /** The laptop sheet's own widths (a dialog is narrower than the window): the band in one row, the abilities and the
@@ -130,7 +133,8 @@ export function CharacterSheet({
   /** Controls at the end of the header, after the menu: the standalone page's theme switch. */
   headerEnd?: ReactNode;
   /** Opens the level page for this character. */
-  onLevel?: () => void;
+  /** Opens the level dialog, on Level down for the menu's and the level box's down items. */
+  onLevel?: (direction: LevelDirection) => void;
   onClose: () => void;
 }>) {
   const { toast } = useToast();
@@ -271,8 +275,12 @@ export function CharacterSheet({
   const canRest = !controller.inFight && (actor.kind === "player-character" || role === "gm");
 
   const menuItems: SheetMenuItems = {
-    ...(canLevel && !phoneViews && levelUpTo !== null ? { levelUp: { to: levelUpTo, onSelect: onLevel! } } : {}),
-    ...(canLevel && !phoneViews && level! > 1 ? { levelDown: { to: level! - 1, onSelect: onLevel! } } : {}),
+    ...(canLevel && !phoneViews && levelUpTo !== null
+      ? { levelUp: { to: levelUpTo, onSelect: () => onLevel!("up") } }
+      : {}),
+    ...(canLevel && !phoneViews && level! > 1
+      ? { levelDown: { to: level! - 1, onSelect: () => onLevel!("down") } }
+      : {}),
     ...(actor.kind === "player-character" && definition ? { editNames: () => setEditingNames(true) } : {}),
     ...(token ? { tokenImage: () => setPickingToken(true) } : {}),
     ...(role === "gm" && actor.kind === "player-character" && "ownerSessionId" in actor && !actor.archived
@@ -308,7 +316,7 @@ export function CharacterSheet({
         className={soleClassName(definition)}
         levelUpTo={levelUpTo}
         brings={next?.lines ?? null}
-        {...(canLevel ? { onLevelUp: onLevel!, onLevelDown: onLevel! } : {})}
+        {...(canLevel ? { onLevelUp: () => onLevel!("up"), onLevelDown: () => onLevel!("down") } : {})}
       />
     ) : null;
   const close =
@@ -561,7 +569,7 @@ export function CharacterSheet({
           ? {
               points: experience,
               level,
-              ...(canLevel && levelUpTo === level + 1 ? { onLevelUp: onLevel! } : {})
+              ...(canLevel && levelUpTo === level + 1 ? { onLevelUp: () => onLevel!("up") } : {})
             }
           : undefined
       }
@@ -583,7 +591,7 @@ export function CharacterSheet({
           })}
       next={
         canLevel && levelUpTo !== null ? (
-          <NextLevel level={levelUpTo} lines={next?.lines ?? []} onLevelUp={onLevel!} />
+          <NextLevel level={levelUpTo} lines={next?.lines ?? []} onLevelUp={() => onLevel!("up")} />
         ) : null
       }
     />
