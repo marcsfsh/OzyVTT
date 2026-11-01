@@ -8,7 +8,9 @@ import {
   FindField,
   Button,
   EmptyState,
-  IconPlus
+  IconPlus,
+  SideListGroup,
+  SideListRow
 } from "@vtt/ui";
 import { countOf } from "@vtt/domain";
 import { CodexIcon, pinSwatchVar } from "../icons";
@@ -313,4 +315,98 @@ export function MapsInside({
       )}
     </div>
   );
+}
+
+type TreeMap = Readonly<{ id: string; name: string; parentMapId: string | null; revealedToPlayers?: boolean }>;
+
+/**
+ * MAPS as a tree at the side (F3 atlas spec 2.1): every map nested under the map it sits in, each row the map icon, its
+ * name and, for the open map, its pin count in VT323; the open map lit. Pressing a map opens it. A hidden map's name
+ * reads violet for the GM.
+ */
+export function MapTree({
+  maps,
+  currentMapId,
+  pinCount,
+  gm,
+  onEnter
+}: Readonly<{
+  maps: readonly TreeMap[];
+  currentMapId: string | null;
+  /** The open map's pins; the others' are not loaded, so they show none. */
+  pinCount: number;
+  gm: boolean;
+  onEnter: (mapId: string) => void;
+}>) {
+  const ids = new Set(maps.map((map) => map.id));
+  const kids = new Map<string | null, TreeMap[]>();
+  for (const map of maps) {
+    // A map whose parent is not in the list (a player cannot open it) sits at the top.
+    const parent = map.parentMapId && ids.has(map.parentMapId) ? map.parentMapId : null;
+    kids.set(parent, [...(kids.get(parent) ?? []), map]);
+  }
+  const rows: ReactNode[] = [];
+  const walk = (parent: string | null, depth: number) => {
+    for (const map of [...(kids.get(parent) ?? [])].sort((a, b) => a.name.localeCompare(b.name))) {
+      rows.push(
+        <SideListRow
+          key={map.id}
+          label={
+            <span className={gm && map.revealedToPlayers === false ? "atlas-tree-hidden" : undefined}>{map.name}</span>
+          }
+          ariaLabel={map.name}
+          leading={<CodexIcon iconId="compass" />}
+          depth={depth}
+          count={map.id === currentMapId ? pinCount : undefined}
+          current={map.id === currentMapId}
+          onSelect={() => onEnter(map.id)}
+        />
+      );
+      walk(map.id, depth + 1);
+    }
+  };
+  walk(null, 0);
+  return <SideListGroup eyebrow="Maps">{rows}</SideListGroup>;
+}
+
+/** ON THE MAP: the layers as rows reading On or Off under the tree. */
+export function LayerRows({
+  layers,
+  onToggle,
+  gm
+}: Readonly<{ layers: AtlasLayers; onToggle: (layer: AtlasLayer) => void; gm: boolean }>) {
+  return (
+    <SideListGroup eyebrow="On the map" className="atlas-layerrows">
+      {LAYER_META.filter((layer) => gm || !layer.gmOnly).map((layer) => (
+        <SideListRow
+          key={layer.id}
+          label={layer.label}
+          ariaLabel={`${layer.label}: ${layers[layer.id] ? "on" : "off"}`}
+          leading={layer.gmOnly ? <IconEyeOff /> : <CodexIcon iconId={layer.iconId} className="atlas-layer-icon" />}
+          count={layers[layer.id] ? "On" : "Off"}
+          current={layers[layer.id]}
+          onSelect={() => onToggle(layer.id)}
+        />
+      ))}
+    </SideListGroup>
+  );
+}
+
+/** The maps in the tree's order (each under the one it sits in, by name), for a phone's row of chips. */
+export function treeOrder<T extends TreeMap>(maps: readonly T[]): readonly T[] {
+  const ids = new Set(maps.map((map) => map.id));
+  const kids = new Map<string | null, T[]>();
+  for (const map of maps) {
+    const parent = map.parentMapId && ids.has(map.parentMapId) ? map.parentMapId : null;
+    kids.set(parent, [...(kids.get(parent) ?? []), map]);
+  }
+  const out: T[] = [];
+  const walk = (parent: string | null) => {
+    for (const map of [...(kids.get(parent) ?? [])].sort((a, b) => a.name.localeCompare(b.name))) {
+      out.push(map);
+      walk(map.id);
+    }
+  };
+  walk(null);
+  return out;
 }

@@ -172,12 +172,29 @@ describe("The GM's atlas", () => {
     const table = await screen.findByRole("table");
     await waitFor(() => expect(within(table).getByText("Ysolde Varn")).toBeInTheDocument());
     expect(within(table).getByText("Tunnel mouth")).toBeInTheDocument();
-    expect(screen.getByText("Regional map")).toBeInTheDocument();
-    expect(
-      within(screen.getByRole("complementary", { name: "Saltmere" })).getAllByText("Everyone")[0]
-    ).toBeInTheDocument();
-    // One hidden pin here and one hidden map inside.
-    expect(screen.getByText(/1 pin and 1 map\s+hidden/)).toBeInTheDocument();
+    // The map's line on glass: what it is, its pins and how many are hidden.
+    expect(screen.getByText("Regional map · 2 pins · 1 hidden")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Pins · 2" })).toBeInTheDocument();
+  });
+
+  it("nests each map under the map it sits in, and pressing one opens it", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await screen.findByRole("table");
+    const tree = within(screen.getByRole("group", { name: "Maps" }));
+    const rows = tree.getAllByRole("button");
+    expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual([
+      "Drowned Isles",
+      "Saltmere",
+      "Docks",
+      "Tunnels"
+    ]);
+    expect(tree.getByRole("button", { name: "Saltmere" })).toHaveAttribute("aria-current", "true");
+    // The open map shows its pin count; a hidden map inside reads violet.
+    expect(tree.getByRole("button", { name: "Saltmere" })).toHaveTextContent("2");
+    expect(tree.getByRole("button", { name: "Tunnels" }).querySelector(".atlas-tree-hidden")).not.toBeNull();
+    await user.click(tree.getByRole("button", { name: "Drowned Isles" }));
+    await waitFor(() => expect(listMarkers).toHaveBeenLastCalledWith("gm", "m2"));
   });
 
   it("reads a pin first and edits it on Edit pin", async () => {
@@ -254,31 +271,13 @@ describe("The GM's atlas", () => {
     render(<Harness />);
     await screen.findByRole("table");
     await waitFor(() => expect(document.querySelector('[data-pin-id="k2"]')).not.toBeNull());
-    await user.click(screen.getByRole("button", { name: "Hidden pins" }));
+    await user.click(screen.getByRole("button", { name: "Hidden pins: on" }));
     expect(document.querySelector('[data-pin-id="k2"]')).toBeNull();
     expect(document.querySelector('[data-pin-id="k1"]')).not.toBeNull();
     // The people layer stands Ysolde at the tower.
     expect(document.querySelector('[data-pin-id="k1"] .atlas-person')).not.toBeNull();
-    await user.click(screen.getByRole("button", { name: "People" }));
+    await user.click(screen.getByRole("button", { name: "People: on" }));
     expect(document.querySelector('[data-pin-id="k1"] .atlas-person')).toBeNull();
-  });
-
-  it("lists the maps inside, marks the hidden ones, and reaches the other top-level maps", async () => {
-    const user = userEvent.setup();
-    render(<Harness />);
-    await screen.findByRole("table");
-    await user.click(screen.getByRole("tab", { name: "Maps inside" }));
-    const inside = screen.getByRole("list", { name: "Maps inside this one" });
-    const tunnels = within(inside).getByRole("button", { name: /Tunnels/ });
-    expect(within(tunnels).getByRole("img", { name: "Hidden" }).querySelector("svg")).toHaveAttribute(
-      "fill",
-      "currentColor"
-    );
-    expect(
-      within(within(inside).getByRole("button", { name: /Docks/ })).queryByRole("img", { name: "Hidden" })
-    ).toBeNull();
-    const others = screen.getByRole("list", { name: "Other top-level maps" });
-    expect(within(others).getByRole("button", { name: /Drowned Isles/ })).toBeInTheDocument();
   });
 
   it("keeps a map's settings in Details: its tags, slugified, and who sees it", async () => {
@@ -287,7 +286,8 @@ describe("The GM's atlas", () => {
     updateMap.mockResolvedValue({ ...MAP("m1", "Saltmere"), tags: ["coast", "old-town"] });
     revealMap.mockResolvedValue(MAP("m1", "Saltmere", false));
     render(<Harness />);
-    await user.click(await screen.findByRole("button", { name: "Edit this map" }));
+    await user.click(await screen.findByLabelText("More for Saltmere"));
+    await user.click(screen.getByRole("menuitem", { name: "Map details" }));
     expect(screen.getByRole("list", { name: /chosen/i })).toHaveTextContent("coast");
     await user.type(screen.getByLabelText("Tags"), "Old Town{Enter}");
     await waitFor(() => expect(updateMap).toHaveBeenCalledWith("gm", "m1", { tags: ["coast", "old-town"] }));

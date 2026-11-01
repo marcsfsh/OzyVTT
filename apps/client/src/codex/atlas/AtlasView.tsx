@@ -3,12 +3,14 @@ import {
   Alert,
   Button,
   IconEyeOff,
-  IconPencil,
-  IconButton,
   IconChevronLeft,
-  SegmentedControl,
+  IconMore,
+  IconPlus,
+  Menu,
+  MenuItem,
+  Modal,
   Skeleton,
-  Tabs,
+  cx,
   useToast,
   EVERYONE,
   HIDDEN,
@@ -34,7 +36,7 @@ import type { QuickCreateRequest } from "../QuickCreate";
 import { useCodexQuery } from "../useCodexQuery";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { AtlasMap, type MapMenuItem, type MapPoint } from "./AtlasMap";
-import { AtlasCrumbs, LayerChips, LayersMenu, MapsInside, PinFilter, PinTable } from "./AtlasPanel";
+import { AtlasCrumbs, LayerRows, LayersMenu, MapTree, PinFilter, PinTable, treeOrder } from "./AtlasPanel";
 import { factionGround, peopleAtPins, useAtlasLayers } from "./layers";
 import { MapDetails, MapPicker } from "./MapDetails";
 import { PinEditor } from "./PinEditor";
@@ -56,8 +58,9 @@ type AtlasMeta = Readonly<{
   /** The map the party pin is on, which the atlas opens on. */
   partyMapId: string | null;
 }>;
-type PanelTab = "pins" | "maps" | "details";
-type PhoneView = "map" | PanelTab;
+/** The right column: the pins, or the map's details from its More (a pin and its editor take it over). */
+type PanelTab = "pins" | "details";
+type PhoneView = "map" | "pins" | "details";
 
 export type AtlasViewProps = Readonly<{
   gmToken: string;
@@ -201,7 +204,7 @@ export function AtlasView({
 
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const selected = markers.find((marker) => marker.id === pinId) ?? null;
-  const { roots, chain, children } = useMapTree(maps, currentMapId);
+  const { chain, children } = useMapTree(maps, currentMapId);
   const parentName = currentMap?.parentMapId
     ? (maps.find((map) => map.id === currentMap.parentMapId)?.name ?? null)
     : null;
@@ -510,27 +513,6 @@ export function AtlasView({
       />
     </>
   );
-  const mapsBody = (
-    <MapsInside
-      children={children}
-      roots={roots}
-      currentRootId={chain[0]?.id ?? null}
-      gm
-      onEnter={enterMap}
-      footer={
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            setNestNew(true);
-            setPicking(true);
-          }}
-        >
-          Add a map inside
-        </Button>
-      }
-    />
-  );
   const detailsBody = currentMap && (
     <MapDetails
       map={currentMap}
@@ -606,6 +588,52 @@ export function AtlasView({
     </>
   );
 
+  const pinsHead = currentMap && (
+    <div className="atlas-pins-head">
+      <h2 className="atlas-pins-title">{`Pins · ${markers.length}`}</h2>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => {
+          setPlacing((now) => (now === "pin" ? null : "pin"));
+          if (phone) setPhoneView("map");
+        }}
+      >
+        <IconPlus /> Add a pin
+      </Button>
+      <Menu icon align="end" label={`More for ${currentMap.name}`} trigger={<IconMore />}>
+        <MenuItem onClick={() => (phone ? setPhoneView("details") : setTab("details"))}>Map details</MenuItem>
+        <MenuItem
+          onClick={() => {
+            setNestNew(true);
+            setPicking(true);
+          }}
+        >
+          Add a map inside
+        </MenuItem>
+      </Menu>
+    </div>
+  );
+  const pinsHint = markers.length > 0 && (
+    <p className="atlas-hint">Right-click a pin to open it, or the map to add a pin there.</p>
+  );
+  // Where you are, the map's line and the party's button, on glass over the map (F3 atlas spec 2.1).
+  const mapGlass = currentMap && (
+    <div className="atlas-glass is-top">
+      <AtlasCrumbs chain={chain} onEnter={enterMap} />
+      <span className="atlas-mapline">
+        {[
+          mapKindLine(currentMap.kind, parentName),
+          countOf(markers.length, "pin"),
+          hiddenPinCount > 0 ? `${hiddenPinCount} hidden` : null
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </span>
+      {partyButton}
+    </div>
+  );
+
   if (phone)
     return (
       <div className="atlas is-phone">
@@ -618,62 +646,80 @@ export function AtlasView({
           }
           actions={<LayersMenu layers={layers} onToggle={toggleLayer} gm />}
         />
-        <SegmentedControl
-          ariaLabel="Atlas view"
-          className="atlas-phoneswitch"
-          value={phoneView}
-          onChange={(next) => setPhoneView(next as PhoneView)}
-          options={[
-            { value: "map", label: "Map" },
-            { value: "pins", label: "Pins" },
-            { value: "maps", label: "Maps inside" },
-            { value: "details", label: "Details" }
-          ]}
-        />
+        {/* The maps as a row of chips, the open one lit (F3 atlas spec 2.1). */}
+        <div className="nh-filterchips atlas-mapchips" role="group" aria-label="Maps">
+          {treeOrder(maps).map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className={cx("nh-filterchip", "interactive", entry.id === currentMapId && "is-on")}
+              aria-pressed={entry.id === currentMapId}
+              onClick={() => enterMap(entry.id)}
+            >
+              {entry.name}
+            </button>
+          ))}
+        </div>
         {error && <Alert tone="danger">{error}</Alert>}
-        {phoneView === "map" && (
-          <div className="atlas-phonemap">
-            {map}
-            {pinSide && <div className={`atlas-sheet${editing ? " is-tall" : ""} scroll-y`}>{pinSide}</div>}
-          </div>
-        )}
-        {phoneView === "pins" && <div className="atlas-phonelist scroll-y">{pinsBody}</div>}
-        {phoneView === "maps" && <div className="atlas-phonelist scroll-y">{mapsBody}</div>}
-        {phoneView === "details" && (
-          <div className="atlas-phonelist scroll-y">
-            {visibilityLine}
-            {detailsBody}
-          </div>
+        <div className="atlas-phonemap">
+          {map}
+          {pinSide && <div className={`atlas-sheet${editing ? " is-tall" : ""} scroll-y`}>{pinSide}</div>}
+          {!pinSide && currentMap && (
+            <Button className="atlas-pinsbutton" onClick={() => setPhoneView("pins")}>
+              {`Pins · ${markers.length}`}
+            </Button>
+          )}
+        </div>
+        {/* The pins rise from the foot as a sheet; the map's details take it from its More. */}
+        {phoneView !== "map" && currentMap && (
+          <Modal
+            open
+            size="md"
+            align="bottom"
+            title={phoneView === "details" ? currentMap.name : `Pins · ${markers.length}`}
+            onClose={() => setPhoneView("map")}
+          >
+            {phoneView === "details" ? (
+              <>
+                {visibilityLine}
+                {detailsBody}
+              </>
+            ) : (
+              <>
+                {pinsHead}
+                {pinsBody}
+              </>
+            )}
+          </Modal>
         )}
         {dialogs}
       </div>
     );
 
   return (
-    <div className="atlas">
+    <div className="atlas atlas-cols">
+      <nav className="atlas-tree scroll-y" aria-label="Maps and layers">
+        <MapTree maps={maps} currentMapId={currentMapId} pinCount={markers.length} gm onEnter={enterMap} />
+        <LayerRows layers={layers} onToggle={toggleLayer} gm />
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setNestNew(false);
+            setPicking(true);
+          }}
+        >
+          <IconPlus /> Add a map
+        </Button>
+      </nav>
       <div className="atlas-stage">
-        <div className="atlas-toolbar">
-          <AtlasCrumbs chain={chain} onEnter={enterMap} />
-          <span className="atlas-grow" />
-          <LayerChips layers={layers} onToggle={toggleLayer} gm />
-          {partyButton}
-        </div>
         {error && <Alert tone="danger">{error}</Alert>}
-        <div className="atlas-mapframe">{map}</div>
+        <div className="atlas-mapframe">
+          {map}
+          {mapGlass}
+        </div>
       </div>
       <aside className="atlas-panel" aria-label={currentMap ? currentMap.name : "Atlas"}>
-        {currentMap && (
-          <header className="atlas-panel-head">
-            <div className="atlas-panel-titles">
-              <h2 className="atlas-panel-title">{currentMap.name}</h2>
-              <span className="atlas-panel-kind">{mapKindLine(currentMap.kind, parentName)}</span>
-              {visibilityLine}
-            </div>
-            <IconButton label="Edit this map" size="sm" onClick={() => setTab("details")}>
-              <IconPencil />
-            </IconButton>
-          </header>
-        )}
         {pinSide ? (
           <div className="atlas-panel-body scroll-y">
             <button type="button" className="atlas-back" onClick={deselectPin}>
@@ -681,32 +727,22 @@ export function AtlasView({
             </button>
             {pinSide}
           </div>
+        ) : tab === "details" && currentMap ? (
+          <div className="atlas-panel-body scroll-y">
+            <button type="button" className="atlas-back" onClick={() => setTab("pins")}>
+              <IconChevronLeft /> All pins
+            </button>
+            <h2 className="atlas-panel-title">{currentMap.name}</h2>
+            {visibilityLine}
+            {detailsBody}
+          </div>
         ) : (
           currentMap && (
-            <>
-              <Tabs
-                className="atlas-panel-tabs"
-                ariaLabel="Map panel"
-                idBase="atlas-panel"
-                activeId={tab}
-                onChange={(next) => setTab(next as PanelTab)}
-                tabs={[
-                  { id: "pins", label: "Pins" },
-                  { id: "maps", label: "Maps inside" },
-                  { id: "details", label: "Details" }
-                ]}
-              />
-              <div
-                className="atlas-panel-body scroll-y"
-                role="tabpanel"
-                id={`atlas-panel-panel-${tab}`}
-                aria-labelledby={`atlas-panel-tab-${tab}`}
-              >
-                {tab === "pins" && pinsBody}
-                {tab === "maps" && mapsBody}
-                {tab === "details" && detailsBody}
-              </div>
-            </>
+            <div className="atlas-panel-body scroll-y">
+              {pinsHead}
+              {pinsBody}
+              {pinsHint}
+            </div>
           )
         )}
       </aside>
