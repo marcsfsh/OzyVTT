@@ -617,7 +617,39 @@ export function ReactionPrompt({
             reaction.kind === "triggered" ||
             reaction.kind === "casts-spell" ? (
             <>
-              {/* Taking the hit comes first; using the reaction is the prompt's one primary. */}
+              {/* Theme rule 5 (C4 spec 2.3): using the reaction is the roll row, the whole row the button; keeping it
+                  is a Base line control under it. */}
+              <button
+                type="button"
+                className="roll-row reaction-use"
+                disabled={busy}
+                title={
+                  reaction.kind === "attack-would-hit"
+                    ? `Spend the reaction for +${reaction.acBonus} AC against the attack.`
+                    : reaction.kind === "casts-spell"
+                      ? `Spend the reaction to try to stop ${reaction.sourceName}'s spell.`
+                      : reaction.kind === "triggered" && reaction.targetActorId === null
+                        ? "Spend the reaction."
+                        : `Spend the reaction against ${reaction.sourceName}.`
+                }
+                onClick={() => answer(true)}
+              >
+                <span className="roll-row-text">
+                  {useLabel}
+                  <small aria-hidden="true">
+                    {reaction.kind === "attack-would-hit"
+                      ? `+${reaction.acBonus} AC against the attack`
+                      : reaction.kind === "casts-spell"
+                        ? `against ${reaction.sourceName}'s spell`
+                        : "spends your reaction"}
+                  </small>
+                </span>
+                {reaction.kind === "attack-would-hit" && (
+                  <span className="roll-row-n" aria-hidden="true">
+                    +{reaction.acBonus}
+                  </span>
+                )}
+              </button>
               <Button
                 type="button"
                 variant="secondary"
@@ -637,23 +669,6 @@ export function ReactionPrompt({
                     ? "Let it go"
                     : "Decline"}
               </Button>
-              <button
-                type="button"
-                className="encounter-primary reaction-use"
-                disabled={busy}
-                title={
-                  reaction.kind === "attack-would-hit"
-                    ? `Spend the reaction for +${reaction.acBonus} AC against the attack.`
-                    : reaction.kind === "casts-spell"
-                      ? `Spend the reaction to try to stop ${reaction.sourceName}'s spell.`
-                      : reaction.kind === "triggered" && reaction.targetActorId === null
-                        ? "Spend the reaction."
-                        : `Spend the reaction against ${reaction.sourceName}.`
-                }
-                onClick={() => answer(true)}
-              >
-                {useLabel}
-              </button>
             </>
           ) : (
             <>

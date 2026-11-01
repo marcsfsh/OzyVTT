@@ -25,20 +25,29 @@
 .dying-label.dead {
   color: var(--danger);
 }
+/* Saves and Fails as the cost tabs' lamps (C4 spec 2.4): three 16px squares each, unlit on the raised line, a
+   success lit cyan with the reaction lamp's glow, a failure lit red. */
 .dying-pips {
   display: inline-flex;
   align-items: center;
-  gap: 0.22rem;
+  gap: 4px;
+}
+.dying-lamps-word {
+  margin-right: 2px;
+  color: var(--text-muted);
+  font: 600 11px / 1 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
 }
 .pip {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line-strong);
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line-raised);
 }
 .pip.success.filled {
-  background: var(--success);
-  border-color: var(--success);
+  background: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
 }
 .pip.failure.filled {
   background: var(--danger);
@@ -46,7 +55,7 @@
 }
 .pip-divider {
   width: 1px;
-  height: 0.7rem;
+  height: 16px;
   background: var(--line);
-  margin: 0 0.2rem;
+  margin: 0 6px;
 }

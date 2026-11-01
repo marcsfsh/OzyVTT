@@ -124,10 +124,17 @@ export function DyingTracker({
             className="dying-pips"
             aria-label={`${deathSaves.successes} successes, ${deathSaves.failures} failures`}
           >
+            {/* The cost tabs' lamps (C4 spec 2.4): Saves light cyan, Fails red, an unlit lamp on the raised line. */}
+            <span className="dying-lamps-word" aria-hidden="true">
+              Saves
+            </span>
             {[0, 1, 2].map((index) => (
               <span key={`s${index}`} className={`pip success${index < deathSaves.successes ? " filled" : ""}`} />
             ))}
             <span className="pip-divider" />
+            <span className="dying-lamps-word" aria-hidden="true">
+              Fails
+            </span>
             {[0, 1, 2].map((index) => (
               <span key={`f${index}`} className={`pip failure${index < deathSaves.failures ? " filled" : ""}`} />
             ))}

@@ -119,7 +119,8 @@ describe("the player's prompt slot", () => {
     const numbers = [...document.querySelectorAll(".prompt-card-numbers > div")].map((cell) => cell.textContent);
     expect(numbers).toEqual(["16Their roll", "15Your AC", "20With Shield"]);
     expect(screen.getByRole("button", { name: "Take the hit" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Cast Shield" }).className).toContain("encounter-primary");
+    // Using it is the roll row, the whole row the button (C4 spec 2.3).
+    expect(screen.getByRole("button", { name: "Cast Shield" }).className).toContain("roll-row");
     expect(screen.getByText("1 more after this: DC 15 Dexterity saving throw")).toBeTruthy();
     // The reaction is announced for a screen reader.
     expect(screen.getByText("Reaction: Goblin 1's attack would hit you.")).toBeTruthy();
