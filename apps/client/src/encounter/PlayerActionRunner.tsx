@@ -464,21 +464,35 @@ export function PlayerActionRunner({
     }
     take(option.summary);
   };
+  // What a cast asks opens under its row (C4 spec 2.5): the chosen row lit, the ask on a light wash under it; pressing
+  // the row again, or Cancel, closes it.
   const castDetail =
     casting && casting.spell ? (
-      <CastDetail
-        spell={casting.spell}
-        action={casting.summary}
-        content={spellIndex.get(casting.spell.id)}
-        options={castChoices(casting)}
-        aimed
-        busy={busy}
-        onBack={() => setCasting(null)}
-        onCast={(choice, shaping) => {
-          setCasting(null);
-          castWith(casting, choice, shaping);
-        }}
-      />
+      <div className="turn-open-row">
+        <button
+          type="button"
+          className="turn-open-row-head interactive"
+          aria-expanded="true"
+          onClick={() => setCasting(null)}
+        >
+          {casting.summary.name}
+        </button>
+        <div className="turn-open-row-ask">
+          <CastDetail
+            spell={casting.spell}
+            action={casting.summary}
+            content={spellIndex.get(casting.spell.id)}
+            options={castChoices(casting)}
+            aimed
+            busy={busy}
+            onBack={() => setCasting(null)}
+            onCast={(choice, shaping) => {
+              setCasting(null);
+              castWith(casting, choice, shaping);
+            }}
+          />
+        </div>
+      </div>
     ) : null;
 
   return (

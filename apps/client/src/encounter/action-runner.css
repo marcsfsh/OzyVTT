@@ -646,3 +646,26 @@
 .action-targeting-spend {
   margin-top: 0.6rem;
 }
+
+/* A cast's ask open under its row (C4 spec 2.5): the row lit as chosen on a 7% cyan wash, the ask under it on 4%. */
+.turn-open-row {
+  display: grid;
+}
+.turn-open-row-head {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: color-mix(in srgb, var(--cyan) 7%, transparent);
+  box-shadow: inset 2px 0 0 var(--cyan);
+  color: var(--text);
+  font: 600 14px / 1.25 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.turn-open-row-ask {
+  padding: 10px 12px 12px;
+  background: color-mix(in srgb, var(--cyan) 4%, transparent);
+  box-shadow: inset 2px 0 0 var(--cyan);
+}
