@@ -686,7 +686,7 @@ test("the GM presents a map on a paired table screen", async ({ open, request })
     true
   );
   await viewer.reload();
-  await expect(viewer.getByRole("heading", { name: "Presentation paused" })).toBeVisible();
+  await expect(viewer.getByRole("heading", { name: "Paused" })).toBeVisible();
   await expectPageFits(viewer);
 
   const gm = await open("/");

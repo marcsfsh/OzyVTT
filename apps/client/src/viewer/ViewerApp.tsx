@@ -16,6 +16,7 @@ import { ScreenLadder } from "./ScreenParts";
 import { ScreenPairing } from "./ScreenPairing";
 import { TableSound } from "./TableSound";
 import "./viewer.css";
+import { HorizonScreen } from "./HorizonScreen";
 
 type Point = Readonly<{ x: number; y: number }>;
 type ViewerAnnotation = Readonly<{
@@ -259,14 +260,8 @@ export function MapStage({
     zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
   };
 
-  if (!presentation.activeMap)
-    return (
-      <section className="viewer-waiting">
-        <span className="viewer-eyebrow">Connected</span>
-        <h1>Waiting for a map</h1>
-        <p>The GM controls what appears here.</p>
-      </section>
-    );
+  // No map is the whole screen's own state in `ViewerApp`, so the stage always has one.
+  if (!presentation.activeMap) return null;
   const measurementPoints = presentation.measurement?.points.map((point) => `${point.x},${point.y}`).join(" ");
   const onActiveMap = presentation.encounter.mapAssetId === presentation.activeMap.assetId;
   const tokens = onActiveMap ? presentation.encounter.tokens : [];
@@ -520,22 +515,24 @@ export function ViewerApp() {
   if (connection === "pairing") return <ScreenPairing onPaired={() => void connect()} />;
   if (!presentation)
     return (
-      <main className="viewer-waiting">
-        <span className="viewer-eyebrow">Table screen</span>
-        <h1>{connection === "reconnecting" ? "Reconnecting…" : "Connecting…"}</h1>
+      <HorizonScreen eyebrow="Table screen" heading={connection === "reconnecting" ? "Reconnecting…" : "Connecting…"}>
         <p role="alert">{message}</p>
-      </main>
+      </HorizonScreen>
     );
   // Sound plays whether or not a map is shown: music during a break is the GM's call alone.
   const sound = <TableSound sound={presentation.sound} receivedAt={receivedAt} live={connection === "live"} />;
   if (!presentation.enabled)
     return (
-      <main className="viewer-waiting">
-        <span className="viewer-eyebrow">Connected</span>
-        <h1>Presentation paused</h1>
+      <HorizonScreen eyebrow="Connected" heading="Paused" after={sound}>
         <p>The GM will begin when the table is ready.</p>
-        {sound}
-      </main>
+      </HorizonScreen>
+    );
+  // With no map the whole screen waits: the ladder shows only beside a map (table screen spec 2.2).
+  if (!presentation.activeMap)
+    return (
+      <HorizonScreen eyebrow="Connected" heading="Waiting for a map" after={sound}>
+        <p>The GM controls what appears here.</p>
+      </HorizonScreen>
     );
   return (
     <main

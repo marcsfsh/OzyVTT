@@ -492,3 +492,92 @@
   fill: var(--void);
   fill-opacity: 1;
 }
+
+/* ----- The horizon screens (table screen spec 2.2 and 4): pairing, connecting, paused, waiting for a map ----- */
+.viewer-horizon {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--void);
+  text-align: center;
+}
+/* The line across the screen at 46%, 3px with its glow. */
+.viewer-horizon-line {
+  position: absolute;
+  top: 46%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--grad-horizon);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--magenta) 45%, transparent);
+}
+/* What this is sits above the line, 30px over it; its detail starts 34px under it. */
+.viewer-horizon-above {
+  position: absolute;
+  left: var(--space-6);
+  right: var(--space-6);
+  bottom: calc(54% + clamp(20px, 2.35vw, 45px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+.viewer-horizon-above .viewer-eyebrow {
+  color: var(--text-muted);
+  font: 600 clamp(11px, 1vw, 20px) / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.viewer-horizon-above h1 {
+  margin: 0;
+  color: var(--text);
+  font: 600 clamp(28px, 3.125vw, 60px) / 1.05 var(--font-display);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.viewer-horizon-below {
+  position: absolute;
+  top: calc(46% + 3px + clamp(24px, 2.65vw, 51px));
+  left: var(--space-6);
+  right: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+.viewer-horizon-below p {
+  max-width: 48rem;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: clamp(15px, 1.48vw, 28px);
+  line-height: 1.45;
+}
+.viewer-horizon-below .viewer-pairing-note {
+  color: var(--text-muted);
+  font-size: clamp(13px, 1.17vw, 22px);
+}
+.viewer-horizon .viewer-screen-code {
+  margin: 0;
+  color: var(--text);
+  font: 400 clamp(64px, 10.3vw, 198px) / 1 var(--font-numeric);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+/* A phone held upright: the same screen with smaller type; a heading may wrap between words. */
+@media (max-aspect-ratio: 4/3) {
+  .viewer-horizon-above h1 {
+    font-size: 28px;
+    white-space: normal;
+  }
+  .viewer-horizon .viewer-screen-code {
+    font-size: 64px;
+  }
+  .viewer-horizon-below p {
+    font-size: 15px;
+  }
+  .viewer-horizon-below .viewer-pairing-note {
+    font-size: 13px;
+  }
+}

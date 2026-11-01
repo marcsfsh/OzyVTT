@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { VIEWER_PATHS } from "@vtt/api-contract";
 import { ApiError, apiRequest } from "../lib/api";
+import { HorizonScreen } from "./HorizonScreen";
 
 type Pairing = Readonly<{ code: string; expiresAt: string }>;
 type Current = Readonly<{ status: "waiting"; pairing: Pairing }> | Readonly<{ status: "paired" }>;
@@ -77,32 +78,28 @@ export function ScreenPairing({ onPaired }: Readonly<{ onPaired: () => void }>) 
   }, []);
 
   return (
-    <main className="viewer-pairing" aria-labelledby="pair-title">
-      <div className="viewer-pairing-card">
-        <span className="viewer-eyebrow">TABLE SCREEN</span>
-        <h1 id="pair-title">Pair this screen</h1>
-        {pairing ? (
-          <>
-            <p>On the GM's device, open Table screen settings and type this code.</p>
-            <strong
-              className="viewer-screen-code tabular"
-              aria-label={`Pairing code ${pairing.code.split("").join(" ")}`}
-            >
-              {spacedCode(pairing.code)}
-            </strong>
-            <p className="viewer-pairing-note">
-              The code changes every 10 minutes. This screen shows only what the GM presents.
-            </p>
-          </>
-        ) : (
-          <p>{message || "Getting a code…"}</p>
-        )}
-        {pairing && message && (
-          <p className="viewer-feedback" role="alert">
-            {message}
+    <HorizonScreen eyebrow="Table screen" heading="Pair this screen" headingId="pair-title">
+      {pairing ? (
+        <>
+          <strong
+            className="viewer-screen-code tabular"
+            aria-label={`Pairing code ${pairing.code.split("").join(" ")}`}
+          >
+            {spacedCode(pairing.code)}
+          </strong>
+          <p>On the GM's device, open Table screen settings and type this code.</p>
+          <p className="viewer-pairing-note">
+            The code changes every 10 minutes. This screen shows only what the GM presents.
           </p>
-        )}
-      </div>
-    </main>
+        </>
+      ) : (
+        <p>{message || "Getting a code…"}</p>
+      )}
+      {pairing && message && (
+        <p className="viewer-feedback" role="alert">
+          {message}
+        </p>
+      )}
+    </HorizonScreen>
   );
 }
