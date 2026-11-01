@@ -673,14 +673,17 @@ function HomebrewRecord({
           />
         );
       case "sharing":
-        return (
+        return sideColumn(
+          "Share",
           <SharingTab
             doc={doc}
             kind={kind}
             name={name}
+            line={line}
             party={party}
             busy={record.busy}
             onAudience={record.setAudience}
+            onPublish={() => record.publish()}
           />
         );
       case "history":

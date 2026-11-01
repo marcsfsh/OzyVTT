@@ -481,3 +481,26 @@ describe("a record's history in its side column", () => {
     api.revisions = [];
   });
 });
+
+describe("a record's sharing in its side column", () => {
+  it("keeps the card, names what the Cup will do from the boxes, and writes through the audience route", async () => {
+    const user = mount("/compendium/spells/hb-brine-burst-a1b2c3?tab=sharing");
+    const side = within(await screen.findByRole("complementary", { name: "Share" }));
+    const boxes = within(side.getByRole("list", { name: "Who sees it" }));
+    expect(boxes.getByRole("checkbox", { name: /Lyra Emberwise/ })).toBeChecked();
+    expect(side.getByRole("button", { name: "Share with Lyra Emberwise" })).toBeDisabled();
+    await user.click(boxes.getByRole("checkbox", { name: /Lyra Emberwise/ }));
+    expect(side.getByRole("button", { name: "Hide it" })).toBeEnabled();
+    await user.click(boxes.getByRole("checkbox", { name: /Mirena Dawnbright/ }));
+    await user.click(side.getByRole("button", { name: "Share with Mirena Dawnbright" }));
+    await waitFor(() =>
+      expect(api.calls).toContainEqual([
+        "setAudience",
+        "hb-brine-burst-a1b2c3",
+        { audience: "characters", characterIds: [MIRENA] },
+        4
+      ])
+    );
+    expect(side.getByText("What they will read")).toBeInTheDocument();
+  });
+});

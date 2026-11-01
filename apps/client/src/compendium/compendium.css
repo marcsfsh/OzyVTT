@@ -1806,3 +1806,19 @@
   gap: var(--space-2);
   margin-bottom: var(--space-3);
 }
+
+/* SHARE in the record's side column (G pages spec 2.5): what they will read, then the Cup at full width. */
+.cp-share-preview {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--line-raised);
+  background: var(--surface-1);
+}
+.cp-share-preview small {
+  color: var(--text-dim);
+}
+.cp-share-cup {
+  width: 100%;
+  margin-top: var(--space-2);
+}
