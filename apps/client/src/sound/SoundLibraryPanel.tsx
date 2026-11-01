@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import type { SoundBoard } from "@vtt/domain";
 import {
   Button,
-  IconButton,
+  Chip,
+  IconMore,
   IconMusic,
   IconPencil,
   IconPlus,
@@ -10,6 +11,8 @@ import {
   IconTrash,
   IconVolume,
   Input,
+  Menu,
+  MenuItem,
   useToast
 } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
@@ -64,6 +67,16 @@ export function SoundLibraryPanel({
       void send("sound:arrange", { music: { tracks: slots(board.music.tracks), shuffle: board.music.shuffle } });
     else if (slot === "ambient") void send("sound:arrange", { ambient: slots(board.ambient) });
     else void send("sound:arrange", { effects: slots(board.effects) });
+  };
+
+  /** Takes a sound off one part of the board, in one write. */
+  const takeOff = (slot: Slot, sound: SoundAsset) => {
+    const without = (list: readonly { assetId: string; volume: number }[]) =>
+      list.filter((entry) => entry.assetId !== sound.id).map(({ assetId, volume }) => ({ assetId, volume }));
+    if (slot === "music")
+      void send("sound:arrange", { music: { tracks: without(board.music.tracks), shuffle: board.music.shuffle } });
+    else if (slot === "ambient") void send("sound:arrange", { ambient: without(board.ambient) });
+    else void send("sound:arrange", { effects: without(board.effects) });
   };
 
   const rename = async (event: React.FormEvent) => {
@@ -147,42 +160,37 @@ export function SoundLibraryPanel({
                   </small>
                 </span>
               )}
+              {/* Kind chips (E3 spec 2.3): lit where the sound is on the board; an unlit chip adds it at the start
+                  level, a lit one takes it off. */}
               <span className="sound-asset-add" role="group" aria-label={`Put ${sound.name} on the board`}>
                 {(
                   [
-                    ["music", "Music", "In playlist", "the playlist", <IconMusic key="icon" />],
-                    ["ambient", "Ambience", "In ambience", "the ambience", <IconVolume key="icon" />],
-                    ["effects", "Effect", "In effects", "the effects", <IconSparkle key="icon" />]
+                    ["music", "Music", "the playlist", <IconMusic key="icon" />],
+                    ["ambient", "Ambience", "the ambience", <IconVolume key="icon" />],
+                    ["effects", "Effect", "the effects", <IconSparkle key="icon" />]
                   ] as const
-                ).map(([slot, label, added, where, icon]) =>
-                  onBoard(slot, sound.id) ? (
-                    // Already there: said in words at full strength, with no dimmed button.
-                    <span key={slot} className="sound-asset-in">
-                      {icon} {added}
-                    </span>
-                  ) : (
-                    <Button
+                ).map(([slot, label, where, icon]) => {
+                  const on = onBoard(slot, sound.id);
+                  return (
+                    <Chip
                       key={slot}
-                      size="sm"
-                      aria-label={`Add ${sound.name} to ${where}`}
-                      onClick={() => add(slot, sound)}
+                      pressed={on}
+                      aria-label={on ? `Take ${sound.name} off ${where}` : `Add ${sound.name} to ${where}`}
+                      onClick={() => (on ? takeOff(slot, sound) : add(slot, sound))}
                     >
                       {icon} {label}
-                    </Button>
-                  )
-                )}
+                    </Chip>
+                  );
+                })}
               </span>
-              <span className="sound-row-tools">
-                <IconButton
-                  label={`Rename ${sound.name}`}
-                  onClick={() => setRenaming({ id: sound.id, name: sound.name })}
-                >
-                  <IconPencil />
-                </IconButton>
-                <IconButton label={`Delete ${sound.name}`} onClick={() => void remove(sound)}>
-                  <IconTrash />
-                </IconButton>
-              </span>
+              <Menu trigger={<IconMore />} icon align="end" label={`More for ${sound.name}`}>
+                <MenuItem icon={<IconPencil />} onClick={() => setRenaming({ id: sound.id, name: sound.name })}>
+                  Rename
+                </MenuItem>
+                <MenuItem icon={<IconTrash />} tone="danger" onClick={() => void remove(sound)}>
+                  Delete
+                </MenuItem>
+              </Menu>
             </li>
           ))}
         </ul>

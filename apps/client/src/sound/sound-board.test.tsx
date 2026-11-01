@@ -112,11 +112,13 @@ describe("the sound board", () => {
     expect(within(side).getByRole("button", { name: /^Ambience/ })).toHaveTextContent("1");
     await user.click(within(side).getByRole("button", { name: /^All sounds/ }));
     expect(new URLSearchParams(window.location.search).get("part")).toBe("library");
-    // Rain is already a layer, so its row says so in words and offers nothing again.
-    expect(screen.getByText("In ambience")).toBeInTheDocument();
+    // Rain is already a layer, so its Ambience chip is lit and would take it off.
+    expect(screen.getByRole("button", { name: "Take Rain off the ambience" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Take Rain off the ambience" }));
+    expect(sent).toContainEqual(["sound:arrange", expect.objectContaining({ ambient: [] })]);
     // Not on the board lists only the sounds on no part.
     await user.click(within(side).getByRole("button", { name: /^Not on the board/ }));
-    expect(screen.queryByText("In ambience")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Take Rain off the ambience" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Add Tavern Song to the playlist" }));
     expect(sent).toContainEqual([
       "sound:arrange",
