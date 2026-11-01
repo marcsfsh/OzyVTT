@@ -550,3 +550,78 @@ describe("A tag in the side column", () => {
     expect(api.codexApi.listPages).not.toHaveBeenCalled();
   });
 });
+
+describe("Versions in the side column", () => {
+  const revision = (over: Record<string, unknown>) => ({
+    id: 1,
+    pageId: "p1",
+    rev: 1,
+    title: "Ysolde Varn",
+    playerBody: "The harbourmaster of Saltmere.",
+    blocks: [],
+    bannerAssetId: null,
+    tags: [],
+    authoredAt: AT,
+    authorTag: "gm",
+    ...over
+  });
+  beforeEach(() => {
+    api.codexApi.listRevisions.mockResolvedValue([
+      revision({
+        id: 3,
+        rev: 3,
+        authoredAt: LATER,
+        playerBody: YSOLDE.playerBody,
+        blocks: [{ id: "b1", anchor: 1, title: "The debt", text: "Ysolde owes the Tidebound four thousand gold." }]
+      }),
+      revision({ id: 2, rev: 2, title: "Ysolde" })
+    ]);
+  });
+
+  async function openVersions(user: ReturnType<typeof userEvent.setup>) {
+    renderGmCodex("/codex/pages/p1");
+    await screen.findByRole("heading", { level: 1, name: "Ysolde Varn" });
+    await user.click(screen.getByLabelText("More"));
+    await user.click(screen.getByRole("menuitem", { name: "Version history" }));
+    return sideColumn();
+  }
+
+  it("lists Now and then each version newest first, each saying what changed after it", async () => {
+    const user = userEvent.setup();
+    const side = await openVersions(user);
+    expect(await side.findByRole("heading", { name: "Versions · 2" })).toBeInTheDocument();
+    const rows = within(side.getByRole("list", { name: "Versions" })).getAllByRole("button");
+    expect(rows.map((row) => row.querySelector(".cx-version-n")?.textContent)).toEqual(["Now", "v3", "v2"]);
+    expect(rows[0]).toHaveAttribute("aria-current", "true");
+    // v2 was renamed and its text grew by the next save; v3 is the page as it is but for its fields.
+    expect(rows[2]).toHaveTextContent(/Renamed to Ysolde Varn/);
+    expect(rows[1]).toHaveTextContent("Added Lena's letters");
+    expect(side.getByText(/One version is saved per|Every save is kept/)).toBeInTheDocument();
+  });
+
+  it("reads a version under its notice, with what has been added since, and Back to now returns", async () => {
+    const user = userEvent.setup();
+    const side = await openVersions(user);
+    const rows = within(await side.findByRole("list", { name: "Versions" })).getAllByRole("button");
+    await user.click(rows[2]!);
+    expect(await screen.findByRole("status", { name: "" })).toHaveTextContent(/^Reading v2 from /);
+    expect(doc()).toHaveTextContent("The harbourmaster of Saltmere.");
+    expect(doc()).not.toHaveTextContent("Ysolde owes the Tidebound");
+    expect(doc()).toHaveTextContent("Added since: The debt");
+    await user.click(screen.getByRole("button", { name: "Back to now" }));
+    expect(doc()).toHaveTextContent("Ysolde owes the Tidebound four thousand gold.");
+  });
+
+  it("restores a version once through today's route and returns to now", async () => {
+    const user = userEvent.setup();
+    api.codexApi.restoreRevision.mockResolvedValue(YSOLDE);
+    const side = await openVersions(user);
+    const rows = within(await side.findByRole("list", { name: "Versions" })).getAllByRole("button");
+    await user.click(rows[2]!);
+    await user.click(await screen.findByRole("button", { name: "Restore this version" }));
+    await waitFor(() => expect(api.codexApi.restoreRevision).toHaveBeenCalledWith("gm", "p1", 2));
+    expect(api.codexApi.restoreRevision).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Back to now" })).not.toBeInTheDocument());
+    expect(sideColumn().getByRole("heading", { name: /^Versions/ })).toBeInTheDocument();
+  });
+});

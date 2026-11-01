@@ -22,7 +22,6 @@ import { codexApi, standingApi } from "../api";
 import { pageRecordApi } from "../api-records";
 import type { CodexBlock, CodexPage, CodexPageConnection } from "@vtt/domain";
 import { CodexMarkdown } from "../CodexMarkdown";
-import { RevisionHistory } from "../RevisionHistory";
 import { PageTimeline } from "../PageTimeline";
 import { usePageLinks } from "../pageLinks";
 import {
@@ -66,6 +65,8 @@ import { PlayerPageBody } from "./PlayerPage";
 import { SeeAsControl, usePreviewToken, type SeeAsViewer } from "./SeeAs";
 import { PageWriter } from "./PageWriter";
 import { GmTagColumn, SideHead, useEscapeToFacts } from "./SideColumn";
+import { VersionBand, VersionsColumn, useVersions, versionLines } from "./VersionsColumn";
+import { addedSince } from "./versions";
 import "./page.css";
 
 const PHONE_TABS = [
@@ -110,24 +111,34 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   const [revealing, setRevealing] = useState<CodexBlock | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // Versions in the side column; `revisionId` is the version being read in the main column, null for now.
+  const [versions, setVersions] = useState<Readonly<{ revisionId: number | null }> | null>(null);
+  const history = useVersions(token, id, versions !== null);
   const [phoneTab, setPhoneTab] = useState("overview");
   // The side column's one open part. A tag is in the address, so the browser's Back closes it.
   const tag = query.get("tag");
   const openTag = (name: string) => {
     setRevealing(null);
+    setVersions(null);
     go(`${pagePath(id)}?tag=${encodeURIComponent(name)}`);
   };
   const closeSide = useCallback(() => {
     setRevealing(null);
+    setVersions(null);
     setQuery((params) => params.delete("tag"));
   }, [setQuery]);
-  // A reveal replaces whatever part is open, a tag included.
+  // A reveal or the versions replace whatever part is open, a tag included.
   const openReveal = (block: CodexBlock) => {
     if (tag) setQuery((params) => params.delete("tag"));
+    setVersions(null);
     setRevealing(block);
   };
-  useEscapeToFacts(tag !== null || revealing !== null, closeSide);
+  const openVersions = () => {
+    if (tag) setQuery((params) => params.delete("tag"));
+    setRevealing(null);
+    setVersions({ revisionId: null });
+  };
+  useEscapeToFacts(tag !== null || revealing !== null || versions !== null, closeSide);
   const pins = usePagePins("gm", token, id);
   const followLink = usePageLinks(feeds.pages, gm.quickCreate);
   const knownTitles = useMemo(() => new Set(feeds.pages.map((summary) => pageLinkKey(summary.title))), [feeds.pages]);
@@ -209,8 +220,10 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   const restore = async (revisionId: number) => {
     try {
       await codexApi.restoreRevision(token, id, revisionId);
-      setHistoryOpen(false);
+      // Restoring returns to now, with the versions still open beside it.
+      setVersions({ revisionId: null });
       await read.reload();
+      void history.reload();
     } catch {
       setError("Couldn't restore that version.");
     }
@@ -258,14 +271,6 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
           links={linksSentence(revealing.text, feeds.pages)}
           onCancel={() => setRevealing(null)}
           onReveal={(next) => void setAudience(revealing, next)}
-        />
-      )}
-      {historyOpen && (
-        <RevisionHistory
-          gmToken={token}
-          pageId={id}
-          onRestore={(revisionId) => void restore(revisionId)}
-          onClose={() => setHistoryOpen(false)}
         />
       )}
       {dialog}
@@ -350,7 +355,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   );
   const more = (
     <Menu icon align="end" label="More" trigger={<IconMore />}>
-      <MenuItem onClick={() => setHistoryOpen(true)}>Version history</MenuItem>
+      <MenuItem onClick={openVersions}>Version history</MenuItem>
       <MenuItem onClick={() => go(relationshipsPath(id))}>Show in Relationships</MenuItem>
       <MenuItem tone="danger" onClick={() => void remove()}>
         Delete page
@@ -425,8 +430,59 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
     </>
   );
 
-  // The side column's open part: a reveal, else a tag, else nothing (the facts).
-  const sidePart = revealing ? (
+  // The version being read, what changed after each version, and the page now in a revision's shape.
+  const now = { ...page, blocks: page.blocks };
+  const lines = versionLines(history.revisions, now);
+  const readingAt = versions?.revisionId ?? null;
+  const reading = history.revisions.find((revision) => revision.id === readingAt) ?? null;
+  const readingWhat = reading ? (lines[history.revisions.indexOf(reading)] ?? "Saved") : "";
+  const versionDocument = reading && (
+    <>
+      {addedSince(reading, now).map((name) => (
+        <p key={name} className="cx-version-added">{`Added since: ${name}`}</p>
+      ))}
+      {gmDocument(reading.playerBody, reading.blocks).map((item, index) =>
+        item.kind === "text" ? (
+          <DocText
+            key={`v${index}`}
+            text={item.text}
+            token={token}
+            audience="gm"
+            onNavigate={followLink}
+            knownTitles={knownTitles}
+          />
+        ) : (
+          <section key={item.block.id} className="cx-version-block" aria-label={item.block.title ?? "A block"}>
+            {item.block.title && <h3 className="cx-block-title">{item.block.title}</h3>}
+            <CodexMarkdown text={item.block.text} token={token} knownTitles={knownTitles} />
+          </section>
+        )
+      )}
+    </>
+  );
+
+  // The side column's open part: a reveal, the versions or a tag, else nothing (the facts).
+  const sidePart = versions ? (
+    <>
+      <SideHead title={`Versions · ${history.revisions.length}`} onBack={closeSide} />
+      <VersionsColumn
+        revisions={history.revisions}
+        lines={lines}
+        nowAt={page.updatedAt}
+        line={history.line}
+        chosen={readingAt}
+        onChoose={(revisionId) => setVersions({ revisionId })}
+        opened={
+          phone && reading ? (
+            <div className="cx-version-open">
+              <VersionBand revision={reading} what={readingWhat} onRestore={() => void restore(reading.id)} />
+              <div className="cx-doc">{versionDocument}</div>
+            </div>
+          ) : undefined
+        }
+      />
+    </>
+  ) : revealing ? (
     <>
       <SideHead title={`Reveal ${revealing.title?.trim() || "this block"}`} tone="hidden" onBack={closeSide} />
       <RevealColumn
@@ -483,6 +539,8 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
               <IconButton label="Edit" size="sm" onClick={() => setEditing(true)}>
                 <IconPencil />
               </IconButton>
+              {/* More reaches Version history (the History tab) and the rest on a phone too. */}
+              {more}
             </>
           }
         />
@@ -494,11 +552,13 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
               <Tabs
                 ariaLabel="Page sections"
                 tabs={
-                  revealing
-                    ? [...PHONE_TABS, { id: "side", label: "Reveal" }]
-                    : tag
-                      ? [...PHONE_TABS, { id: "side", label: `#${tag}` }]
-                      : PHONE_TABS
+                  versions
+                    ? [...PHONE_TABS, { id: "side", label: "History" }]
+                    : revealing
+                      ? [...PHONE_TABS, { id: "side", label: "Reveal" }]
+                      : tag
+                        ? [...PHONE_TABS, { id: "side", label: `#${tag}` }]
+                        : PHONE_TABS
                 }
                 activeId={sidePart ? "side" : phoneTab}
                 onChange={(next) => {
@@ -580,7 +640,19 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
                 : "You are reading this page as a player with no character reads it."}
             </p>
           )}
-          <article className="cx-doc">{document}</article>
+          {reading && !seeAs.on ? (
+            <>
+              <VersionBand
+                revision={reading}
+                what={readingWhat}
+                onRestore={() => void restore(reading.id)}
+                onBack={() => setVersions({ revisionId: null })}
+              />
+              <article className="cx-doc is-version">{versionDocument}</article>
+            </>
+          ) : (
+            <article className="cx-doc">{document}</article>
+          )}
         </div>
         {!seeAs.on && (
           <aside className="cx-page-meta scroll-y" aria-label="About this page">

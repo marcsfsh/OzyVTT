@@ -980,3 +980,97 @@ form.cx-folderrow {
 .cx-side-title.is-hidden {
   color: var(--violet-text);
 }
+
+/* ----- Versions in the side column (F finding spec 2.5): one line a version, the chosen one lit ----- */
+/* minmax(0, 1fr): a long line truncates instead of widening the page. */
+.cx-versions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cx-versions-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cx-version {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 2px 0 0 transparent;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.cx-version.is-on {
+  box-shadow: inset 2px 0 0 var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+}
+.cx-version-n {
+  flex: none;
+  min-width: 2.5em;
+  font: 400 18px / 1 var(--font-numeric);
+}
+.cx-version-when {
+  flex: none;
+  font: 600 12.5px / 1.2 var(--font-body);
+  white-space: nowrap;
+}
+.cx-version-what {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-version-open {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+/* The one notice over a version being read (T rule 21): a cyan fill with its cyan line under it. */
+.cx-version-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: 8px 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cyan) 55%, transparent);
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+  color: var(--cyan-hi);
+  font-size: 13px;
+}
+.cx-version-open .cx-version-band {
+  padding: 8px 12px;
+}
+.cx-version-band-text {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.cx-version-band-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.cx-version-added {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--cyan);
+  color: var(--cyan-hi);
+  font-size: var(--fs-sm);
+}
+.cx-version-block {
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed color-mix(in srgb, var(--violet) 55%, transparent);
+}
