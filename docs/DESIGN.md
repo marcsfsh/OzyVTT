@@ -262,15 +262,18 @@ Before an encounter, the same frame changes in three places:
 - The dock's head shows the VCR counter at STOP with "No encounter running" and how many of the party and how many
   enemies are on the map under it; the Encounter tab's head holds the join address with a Copy button.
 - The map shows every token with its plain ring; nobody wears the sun frame.
-- Encounter shows Start an encounter: In this encounter lists the staged combatants, ticked, with hidden creatures marked; the two
-  initiative switches; Who plays, each party character At the table or On their device (ADR-0042), a claimed one held
-  on its device; Surprised as one chip per combatant, with the rule underneath; and START THE ENCOUNTER pinned at the
-  bottom over a live count and an accurate description of who rolls. With players rolling, say that the players roll
-  for their claimed characters; do not promise an automatic roll for everyone. The list is the staged combatants,
-  including tokens still in the tray, with Add combatants available. The switches start from the
-  encounter's Encounter settings (ADR-0039). On a phone, Start an encounter is a card under the map with the combatants' faces and
-  rows (In this encounter, Who plays when the party is in it, Initiative, Surprised), each opening a sheet, above the primary; the header holds the
-  STOP counter, the encounter picker and a Join button.
+- Encounter before a fight is one form (ADR-0059), the same on a phone in the Switch's Encounter view: In this
+  encounter as a Cradle (one row per creature with its tick and a More menu to show or hide it or take it off the list,
+  New tokens shown to players at its head, the map line and the Add buttons under it), Who plays (each party character
+  At the table or On their device, ADR-0042, a claimed one held on its device), Initiative (the two switches, starting
+  from the encounter's settings, ADR-0039, and the dice line), Surprised as one chip per creature with the rule, the
+  difficulty as an open group, and START THE ENCOUNTER in the foot over an accurate line of who rolls. With players
+  rolling, say that the players roll for their claimed characters; do not promise an automatic roll for everyone.
+- During a fight a creature's tools open under its row in Turn order and tools: Hit points, Conditions and effects and
+  Position as Cradles, then This creature with Take out of the encounter in red, which asks first. The encounter's
+  options are a More at the end of the panel's tabs (in the header on a phone). Add monsters is the Compendium's browse:
+  filters with counts, the rows, the chosen stat block and its Cup. In a waiting card the roll is a row, and the whole
+  row is the button.
 
 The table screen (the shared TV) is for reading across a room. Gameplay has no controls; pairing, fullscreen and
 optional local map framing remain available as device utilities.

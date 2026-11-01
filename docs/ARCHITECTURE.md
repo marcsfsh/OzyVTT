@@ -1137,12 +1137,14 @@ which `scene/EncounterMap.tsx` renders into the dock through `table/dockTools.ts
 map with its own controls (`scene/MapControls.tsx`) and the Tray chip; and one panel (`table/TablePanel.tsx`) whose
 tabs are Encounter, Log, Party and Notes for the GM, and whose footer holds the view's one primary. The live encounter
 picker (`table/LiveScenePicker.tsx`) opens from the live chip in the GM's top bar. The Encounter tab's head holds the
-sound, Join before an encounter and the GM's Encounter menu during one. The GM's waiting list (`table/NeedsYou.tsx`, from
+sound and Join before an encounter; during one the Encounter menu (`encounter/FightMenu.tsx`) is a More at the end of
+the panel's tabs (`TablePanel`'s `tabsEnd`, ADR-0059), in the header on a phone. The GM's waiting list (`table/NeedsYou.tsx`, from
 `needsItems` in `table/needs.ts`; ADR-0058) leads the Encounter tab over the turn, or sits in its own first tab by the
 GM's choice (`waitingList` in `settings/preferences.ts`, kept on the device); either way it sits above the acting
 creature's card and its cost tabs (`encounter/ActingConsole.tsx`, `encounter/TurnTabs.tsx`) and the
-order with its row tools; Start an encounter (`encounter/StartFight.tsx`) lists the staged characters and monsters to
-tick. The bell (kit `AttentionBell`) counts `owedItems`, what the GM owes without what waits on a player, on
+order, whose rows open their tools in place (`encounter/RowTools.tsx`); Start an encounter (`encounter/StartFight.tsx`)
+is one form whose list names the staged characters and monsters once, the staging parts (`scenes/ScenePrepPanel.tsx`
+with `hideTray`) under it; `encounter/MonsterBrowser.tsx` adds monsters in three panes. The bell (kit `AttentionBell`) counts `owedItems`, what the GM owes without what waits on a player, on
 the list, its tab, the acting Ladder row, the live chip and a phone's Play tab; Log's unread count
 (`table/unreadTabs.ts`) keeps the newest line seen per device. A player's tabs are Turn, Sheet, Log and Party in an encounter (Me, Log and Party between encounters). The Turn
 tab leads with the turn card (`encounter/PlayerTurnCard.tsx`): YOUR TURN or who acts and the round, then the cost tabs;

@@ -162,7 +162,7 @@ settled parts.
 
 First round Built (`C3-gm-panel/SPEC.md`, `C3-gm-panel/PLAN.md`, ADR-0058): the waiting list over the turn or in its
 own tab (the GM's switch), cards, the panel's tabs with unread counts, and a bell in place of the words Needs you,
-everywhere. Second round Designed (`C3-running/SPEC.md`, `C3-running/PLAN.md`, ADR-0059): one form to start, a
+everywhere. Second round Built (`C3-running/SPEC.md`, `C3-running/PLAN.md`, ADR-0059): one form to start, a
 creature's tools under its row, the options as a menu on the panel's tabs, Add monsters as the Compendium's panes, and
 the roll as the button in waiting cards. The Notes and Party tabs follow F and D.
 
