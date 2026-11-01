@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { HOST_PATHS } from "@vtt/api-contract";
-import { Button, IconButton, IconCopy, Modal, QrCode, Roll, Select, canMove, comet, useToast } from "@vtt/ui";
+import { Button, IconCopy, Modal, QrCode, Roll, Select, canMove, comet, useToast } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import "./join-address.css";
@@ -42,22 +42,21 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /**
- * "Players join at http://...": the address players open, with Copy and a QR code drawn on this device. The `hero`
- * layout shows the code at once on a laptop, for the Table before anyone has joined; `row` keeps it behind a button;
- * `strip` is one line for the strip above the map, with Copy as an icon.
+ * "Players join at http://...": the one join block (arrival rule 11): the address in VT323, Copy on a Base line and a
+ * QR code drawn on this device. The `lobby` layout shows the code at once, for the GM's empty table; `row` keeps it
+ * behind a button, in the Encounter tab before a fight; `settings` sets it beside the address on a laptop.
  */
 export function JoinAddress({
   token,
   layout = "row"
-}: Readonly<{ token: string; layout?: "hero" | "row" | "strip" | "settings" }>) {
+}: Readonly<{ token: string; layout?: "lobby" | "row" | "settings" }>) {
   const [urls, setUrls] = useState<readonly string[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
-  // The hero shows the code at once where there is room; on a phone it waits behind a button like the row.
-  const roomy = useMediaQuery("(min-width: 980px)");
   // Settings shows the code beside the address on a laptop, with Show it larger (settings rule 3.8).
   const settingsLaptop = !useMediaQuery("(max-width: 760px)") && layout === "settings";
-  const shownAtOnce = (layout === "hero" && roomy) || settingsLaptop;
+  // The lobby shows the code at once at every width (arrival spec 2.4).
+  const shownAtOnce = layout === "lobby" || settingsLaptop;
   const [larger, setLarger] = useState(false);
   const [qrToggled, setQrToggled] = useState(false);
   const qrOpen = shownAtOnce || qrToggled;
@@ -116,24 +115,14 @@ export function JoinAddress({
     ) : (
       <code className="join-address-url">{url}</code>
     );
-  if (layout === "strip")
-    return (
-      <section ref={section} className="join-address join-address--strip" aria-label="Join address">
-        <span className="join-address-label">Players join at</span>
-        {choice}
-        <IconButton label="Copy the join address" size="sm" onClick={() => void copy()}>
-          <IconCopy />
-        </IconButton>
-      </section>
-    );
   return (
     <section ref={section} className={`join-address join-address--${layout}`} aria-label="Join address">
       <div className="join-address-text">
         <span className="join-address-label">Players join at</span>
         {choice}
         <div className="join-address-actions">
-          <Button variant="secondary" onClick={() => void copy()}>
-            <Roll value={justCopied ? "Copied" : "Copy"} />
+          <Button onClick={() => void copy()}>
+            <IconCopy /> <Roll value={justCopied ? "Copied" : "Copy"} />
           </Button>
           {settingsLaptop ? (
             <Button variant="secondary" onClick={() => setLarger(true)}>
@@ -147,7 +136,7 @@ export function JoinAddress({
             )
           )}
         </div>
-        <p className="join-address-hint">Phones on the same Wi-Fi open it or scan the code.</p>
+        <p className="join-address-hint">Phones on the same Wi-Fi as this computer open it, or scan the code.</p>
       </div>
       {qrOpen && (
         <div className="join-address-qr">

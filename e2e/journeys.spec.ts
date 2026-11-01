@@ -88,8 +88,7 @@ test("the title screen keeps its logo in clear sky above the sun and its ways in
 });
 
 test("the first evening: the GM password, the join address, a player, the table screen and a live encounter", async ({
-  open,
-  hasTouch
+  open
 }) => {
   // The GM password, set once on the host.
   const gm = await open("/");
@@ -129,7 +128,7 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expect(gmSection(gm, "Play")).toHaveAttribute("aria-selected", "true");
   await expectPageFits(gm);
 
-  // The address players open, from the Table's empty state, with Copy and a QR code drawn here.
+  // The address players open, from the lobby on the empty table, with Copy and a QR code drawn here.
   const join = gm.getByRole("region", { name: "Join address" });
   await expect(join.getByText("Players join at")).toBeVisible();
   // One network address shows as text; several as a choice, the first already chosen.
@@ -140,7 +139,7 @@ test("the first evening: the GM password, the join address, a player, the table 
   await press(join.getByRole("button", { name: "Copy" }));
   await expect(gm.getByText("Join address copied.")).toBeVisible();
   expect(await gm.evaluate(() => navigator.clipboard.readText())).toBe(address);
-  if (hasTouch) await press(join.getByRole("button", { name: "Show QR code" }));
+  // The lobby shows the code at once, on a phone too.
   await expect(join.getByRole("img", { name: `QR code for ${address}` })).toBeVisible();
   await expectPageFits(gm);
 

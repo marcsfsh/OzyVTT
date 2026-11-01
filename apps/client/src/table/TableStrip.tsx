@@ -1,7 +1,6 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { Button, Modal, ToastOutlet, VcrCounter } from "@vtt/ui";
-import { JoinAddress } from "../components/JoinAddress";
+import { ToastOutlet, VcrCounter } from "@vtt/ui";
 import { NowPlaying } from "../sound/NowPlaying";
 import { LiveScenePicker } from "./LiveScenePicker";
 import { idleStatus } from "./status";
@@ -39,7 +38,6 @@ export function TableStrip(props: StripProps) {
           <>
             <LiveScenePicker state={props.state} compact />
             <NowPlaying token={props.token} compact />
-            {!fighting && <JoinButton token={props.token} />}
             <div className="table-strip-end" ref={props.endRef} />
           </>
         ) : (
@@ -48,20 +46,5 @@ export function TableStrip(props: StripProps) {
         )}
       </div>
     </header>
-  );
-}
-
-/** The phone's Join: the join address, its Copy and QR code, in a sheet under the thumb. */
-function JoinButton({ token }: Readonly<{ token: string }>) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <Button variant="secondary" size="sm" className="table-strip-join" onClick={() => setOpen(true)}>
-        Join
-      </Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Join the table" align="bottom">
-        <JoinAddress token={token} layout="row" />
-      </Modal>
-    </>
   );
 }

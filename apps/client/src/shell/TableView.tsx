@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { Button, IconScene } from "@vtt/ui";
+import { EmptyState } from "@vtt/ui";
 import { ClaimCharacter } from "../actors/ClaimCharacter";
 import { JoinAddress } from "../components/JoinAddress";
+import { Lobby } from "../table/Lobby";
 import { partyVisibilityOf } from "../actors/MyCharacter";
 import { PartyStrip } from "../actors/PartyStrip";
 import { DicePanel } from "../dice/DicePanel";
@@ -14,7 +15,6 @@ import type { MapSelection } from "../maps/map-catalog";
 import { ReplayShelf } from "../replay/ReplayShelf";
 import { EncounterMap } from "../scene/EncounterMap";
 import { navigate, pathForGmTab } from "../router";
-import { SCENES_PATHS } from "../scenes/routes";
 import { PartyRest } from "../rest/PartyRest";
 import { RestPrompt } from "../rest/RestPrompt";
 import { needsItems } from "../table/needs";
@@ -115,26 +115,11 @@ export function TableView(props: TableViewProps) {
       healthDisplay={props.role === "gm" ? props.state.combat.healthDisplay : undefined}
       state={state}
     />
-  ) : claimingOnly ? null : (
-    /* No map yet. The GM's box is the first evening's start: the scene, and the address players open. */
-    <div className={`empty map-empty-hero${gm ? " map-empty-hero--gm scroll-y" : ""}`}>
-      <div className="empty-atmos" aria-hidden="true">
-        <span className="home-hero-bloom" />
-        <span className="home-hero-grid grid-floor" />
-      </div>
-      <strong>No map loaded yet</strong>
-      <span>
-        {role === "gm"
-          ? "Prepare an encounter: pick a map and who is in it, then make it live."
-          : "The map appears here when the GM makes an encounter live."}
-      </span>
-      {gm && (
-        <Button variant="secondary" className="empty-scene-prep" onClick={() => navigate(SCENES_PATHS.newScene)}>
-          <IconScene /> Prepare an encounter
-        </Button>
-      )}
-      {gm && <JoinAddress token={token} layout="hero" />}
-    </div>
+  ) : claimingOnly ? null : gm && props.role === "gm" ? (
+    /* No map yet: the GM's empty table is the lobby (arrival spec 2.4). */
+    <Lobby state={props.state} token={token} />
+  ) : (
+    <EmptyState>The map appears here when the GM makes an encounter live.</EmptyState>
   );
 
   const dice = <DicePanel role={role} state={state} />;
@@ -169,7 +154,7 @@ export function TableView(props: TableViewProps) {
           head: phone ? undefined : (
             <>
               <NowPlaying token={token} compact />
-              {!state.combat.active && state.combat.mapAssetId && <JoinAddress token={token} layout="strip" />}
+              {!state.combat.active && state.combat.mapAssetId && <JoinAddress token={token} layout="row" />}
             </>
           ),
           needs: <NeedsYou state={props.state} token={token} />,

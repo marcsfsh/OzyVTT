@@ -1,0 +1,128 @@
+/* The lobby (arrival spec 2.4, 4): two columns 64px apart, 150px in from each side on a laptop; the code 220px, the
+   address in VT323 28px; party rows 60px with a 40px face; the count in VT323 cyan. */
+/* It fills the map's cell, so its columns follow the cell's width, not the window's. */
+.lobby-host {
+  container-type: inline-size;
+  height: 100%;
+  min-height: 0;
+}
+.lobby {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  align-content: start;
+  gap: 40px;
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-6) var(--space-5);
+  background: var(--bg);
+}
+@container (min-width: 1000px) {
+  .lobby {
+    gap: 64px;
+    padding: var(--space-8) 150px;
+  }
+}
+@container (max-width: 560px) {
+  .lobby {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+}
+.lobby-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  color: var(--heading-ink);
+  font: var(--fw-display) 20px / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+}
+.lobby-count {
+  color: var(--cyan-hi);
+  font: 400 18px / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+.lobby-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lobby-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  border-bottom: 1px solid var(--line);
+}
+.lobby-row .nh-portrait {
+  --nh-portrait: 40px;
+}
+.lobby-row-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lobby-row-text b {
+  font-weight: 600;
+}
+.lobby-row-text span {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+/* Who plays: on a player's device (cyan), at the table (gold) or open to claim (unlit); the lamp 8px. */
+.lobby-who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.lobby-who .nh-status-lamp {
+  width: 8px;
+  height: 8px;
+}
+.lobby-who.is-table .nh-status-lamp {
+  --lamp-on: var(--caution);
+}
+.lobby-who.is-away {
+  opacity: 0.65;
+}
+.lobby-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+.lobby-foot .nh-btn {
+  flex: none;
+}
+.lobby-line {
+  flex: 1 1 12rem;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+/* A phone: the code beside Players join at, then the party, and Prepare an encounter pinned above the tabs. */
+@media (max-width: 760px) {
+  .lobby {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+    padding: var(--space-4) var(--space-4) 0;
+  }
+  .lobby-foot {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: var(--space-4);
+  }
+  .lobby-line {
+    display: none;
+  }
+}
