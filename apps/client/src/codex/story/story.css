@@ -1815,3 +1815,52 @@ button.story-hline-card:hover,
 .story-sessionplan .story-empty {
   padding: 0;
 }
+
+/* A record in the story's side column, and as a phone's page (F time spec 2.5). */
+.story-recordcol {
+  padding: 0;
+}
+.story-entry.is-column {
+  border: 0;
+  background: none;
+  padding: var(--space-3) var(--space-4);
+}
+.story-col-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.story-col-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.story-col-date {
+  margin: var(--space-1) 0 0;
+  color: var(--cyan);
+  font-family: var(--font-numeric);
+  font-size: 22px;
+  line-height: 1.1;
+}
+.story-col-meta,
+.story-col-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.story-col-eyebrow {
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.story-recordpage .story-entry.is-column {
+  padding: var(--space-3);
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
@@ -135,6 +135,25 @@ describe("The GM's timeline", () => {
     expect(aside.getByText("The ford is walled.")).toBeInTheDocument();
     await user.click(aside.getByRole("button", { name: "Open the page" }));
     expect(window.location.pathname).toBe("/codex/pages/e1");
+  });
+
+  it("opens a record in the side column, kept in the address, and Back closes it", async () => {
+    const user = userEvent.setup();
+    renderGmStory(GmTimelineSection, "/codex/timeline?zoom=month&y=1492&m=0", {
+      records: [ENTRY, VOTE],
+      calendar: CALENDAR
+    });
+    await user.click(screen.getByRole("button", { name: /We crossed the mists/ }));
+    expect(new URLSearchParams(window.location.search).get("record")).toBe("j1");
+    const column = within(screen.getByRole("complementary", { name: /We crossed the mists/ }));
+    expect(column.getByRole("button", { name: "Session 3" })).toBeInTheDocument();
+    expect(column.getByRole("img", { name: "Hidden from players" })).toBeInTheDocument();
+    expect(column.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(column.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+
+    await user.click(column.getByRole("button", { name: "Back to Timeline" }));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get("record")).toBeNull());
+    expect(screen.queryByRole("complementary", { name: /We crossed the mists/ })).not.toBeInTheDocument();
   });
 
   it("zooms by the address, and the campaign's mark opens its year", async () => {

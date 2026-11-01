@@ -41,7 +41,7 @@ vi.mock("../api", async (importOriginal) => {
 
 import type { CodexChronicleRecord, CodexPageSummary, CodexQuest, CodexSession, GmCodexCalendar } from "@vtt/domain";
 import { revealAheadOfPlayers } from "../chronicle";
-import { GmStorySection } from "./sections";
+import { GmStorySection, GmTimelineSection } from "./sections";
 import { gmRecord, renderGmStory, type GmStoryFeeds } from "./harness";
 
 /**
@@ -1120,5 +1120,28 @@ describe("The composer at the head of the line", () => {
     await user.click(addHere[1]!);
     expect(composer.getByLabelText("Session")).toHaveValue("s1");
     expect((await fileWith(user, composer)).sessionId).toBe("s1");
+  });
+});
+
+describe("A record in the timeline's side column", () => {
+  it("edits the open record in the composer, and shows it to players as the chronicle does", async () => {
+    const user = userEvent.setup();
+    api.reveal.mockResolvedValue({});
+    renderGmStory(GmTimelineSection, "/codex/timeline?zoom=month&y=1492&m=0&record=j1", {
+      records: [
+        gmRecord({ id: "j1", text: "We crossed the mists.", revealedToPlayers: false, calendarInstant: 1492 * 60 })
+      ],
+      calendar: {
+        ...CALENDAR,
+        currentDate: { year: 1492, month: 0, day: 20 },
+        publishedDate: { year: 1492, month: 0, day: 10 }
+      }
+    });
+    const column = within(screen.getByRole("complementary", { name: /We crossed the mists/ }));
+    await user.click(column.getByRole("button", { name: "Show to players" }));
+    await waitFor(() => expect(api.reveal).toHaveBeenCalledWith("gm", "j1", true));
+
+    await user.click(column.getByRole("button", { name: "Edit" }));
+    expect(await screen.findByRole("dialog", { name: "Edit a chronicle record" })).toBeInTheDocument();
   });
 });

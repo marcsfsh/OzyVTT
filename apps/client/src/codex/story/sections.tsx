@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Badge,
@@ -208,8 +208,13 @@ function RecordDialog({
 function useRecordCard(story: ReturnType<typeof useGmStory>, onDone?: () => void) {
   const { shell, gm, feeds, records, calendar, setComposer } = story;
   const actions = useChronicleActions(shell.token, calendar, story.reload, (message) => story.setError(message));
-  const render = (record: CodexChronicleRecord, focused = false) => (
+  const render = (
+    record: CodexChronicleRecord,
+    focused = false,
+    column: Readonly<{ onBack?: () => void }> | null = null
+  ) => (
     <EntryCard
+      column={column}
       gmToken={shell.token}
       record={record}
       records={records}
@@ -231,6 +236,28 @@ function useRecordCard(story: ReturnType<typeof useGmStory>, onDone?: () => void
     />
   );
   return { render, actions };
+}
+
+/**
+ * The record open in the story's side column, kept in `?record=` (F time spec 2.5). Opening one is a history entry, so
+ * the browser's Back closes it as the column's Back does.
+ */
+function useOpenRecord(shell: ReturnType<typeof useCodexShell>) {
+  const pushed = useRef(false);
+  const openId = shell.query.get("record");
+  const open = (id: string) => {
+    const query = new URLSearchParams(shell.query);
+    query.set("record", id);
+    pushed.current = true;
+    shell.go(`${window.location.pathname}?${query.toString()}`);
+  };
+  const close = () => {
+    if (pushed.current) {
+      pushed.current = false;
+      window.history.back();
+    } else shell.setFilter({ record: null, entry: null });
+  };
+  return { openId, open, close };
 }
 
 /** The composer, opened from Add to the chronicle, from Log downtime and from Edit. */
@@ -318,8 +345,10 @@ function useNextSession(sessions: readonly CodexSession[]): NextSessionCard | nu
 /** The phone's Story for the GM: both dates, the zoomable timeline, and the chronicle's records one tap away. */
 function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory> }>) {
   const { shell, gm, feeds, records, calendar, reload, error, setComposer, lineOf } = story;
-  const [opened, setOpened] = useState<string | null>(shell.query.get("entry"));
-  const card = useRecordCard(story, () => setOpened(null));
+  const opener = useOpenRecord(shell);
+  // A search hit's `?entry=` opens its record here too, since the phone has no spine to focus it on.
+  const opened = opener.openId ?? shell.query.get("entry");
+  const card = useRecordCard(story, opener.close);
   const zoom = zoomOf(shell.query, "month");
   const next = useNextSession(feeds.sessions);
   const shown = filterRecords(records, shell.query);
@@ -331,6 +360,16 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
     return (
       <div className="story is-phone">
         <StoryLoading />
+      </div>
+    );
+  // A record opens as the tab's page, with Timeline to go back (F time spec 2.5).
+  if (openedRecord)
+    return (
+      <div className="story is-phone scroll-y story-recordpage">
+        <CodexPhoneBar back={{ label: "Timeline", onClick: opener.close }} />
+        {card.render(openedRecord, false, {})}
+        <StoryComposer story={story} />
+        {card.actions.dialog}
       </div>
     );
   return (
@@ -381,14 +420,9 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
         onShow={(year, month, value) =>
           shell.setFilter({ y: String(year), m: month === null ? null : String(month), zoom: value })
         }
-        onSelect={(record) => setOpened(record.id)}
+        onSelect={(record) => opener.open(record.id)}
       />
       {!downtimeFirst && <StoryDowntime story={story} />}
-      <RecordDialog
-        record={openedRecord}
-        onClose={() => setOpened(null)}
-        renderRecord={(record) => card.render(record)}
-      />
       <StoryComposer story={story} />
       {card.actions.dialog}
     </div>
@@ -573,9 +607,10 @@ function TimelineAside({
 
 export function GmTimelineSection() {
   const story = useGmStory();
-  const { shell, feeds, records, calendar, error, followLink, lineOf } = story;
-  const [selected, setSelected] = useState<string | null>(null);
-  const card = useRecordCard(story, () => setSelected(null));
+  const { shell, feeds, records, calendar, error, lineOf } = story;
+  const opener = useOpenRecord(shell);
+  const selected = opener.openId;
+  const card = useRecordCard(story, opener.close);
   const next = useNextSession(feeds.sessions);
   if (shell.phone) return <GmPhoneStory story={story} />;
   const zoom = zoomOf(shell.query, "ages");
@@ -616,19 +651,13 @@ export function GmTimelineSection() {
           onShow={(year, month, value) =>
             shell.setFilter({ y: String(year), m: month === null ? null : String(month), zoom: value })
           }
-          onSelect={(each) => setSelected(each.id)}
+          onSelect={(each) => opener.open(each.id)}
           aside={
-            <TimelineAside
-              record={record}
-              calendarLabel={record?.inWorldLabel ?? null}
-              token={shell.token}
-              audience="gm"
-              onFollow={followLink}
-              onOpenPage={(pageId) => shell.go(pagePath(pageId))}
-              onClose={() => setSelected(null)}
-            >
-              {record && record.kind !== "event" ? card.render(record) : undefined}
-            </TimelineAside>
+            record && (
+              <aside className="story-aside story-recordcol scroll-y" aria-label={record.title ?? lineOf(record)}>
+                {card.render(record, false, { onBack: opener.close })}
+              </aside>
+            )
           }
         />
       )}

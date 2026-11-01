@@ -1,4 +1,14 @@
-import { Badge, Button, IconEyeOff, FieldAudienceToggle } from "@vtt/ui";
+import {
+  Badge,
+  Button,
+  Crumb,
+  IconEyeOff,
+  IconMore,
+  FieldAudienceToggle,
+  Menu,
+  MenuItem,
+  VisibilityBadge
+} from "@vtt/ui";
 import { formatWorldDate, type CodexChronicleRecord, type CodexPageSummary, type GmCodexCalendar } from "@vtt/domain";
 import {
   CHRONICLE_KIND_META,
@@ -39,7 +49,8 @@ export function EntryCard({
   onReveal,
   onApplyDowntime,
   onEdit,
-  onRemove
+  onRemove,
+  column = null
 }: Readonly<{
   gmToken: string;
   record: CodexChronicleRecord;
@@ -58,6 +69,11 @@ export function EntryCard({
   onApplyDowntime: () => void;
   onEdit: () => void;
   onRemove: () => void;
+  /**
+   * The story's side column (F time spec 2.5): Back and the kind with More at the head, the date in VT323, who sees
+   * it as a word, and Edit, Hide from players and Delete at the foot. A phone's page passes no Back: its bar has one.
+   */
+  column?: Readonly<{ onBack?: () => void }> | null;
 }>) {
   const meta = CHRONICLE_KIND_META[record.kind];
   const isEvent = record.kind === "event";
@@ -75,32 +91,67 @@ export function EntryCard({
     if (page) onOpenPage(page.id);
   };
 
+  const pageTitle = (pageId: string) => pages.find((page) => page.id === pageId)?.title ?? "Its page";
+  const replayId = record.kind === "combat" ? record.sourceEncounterId : null;
+  const more = column && (isEvent || replayId !== null || (record.attachMarkerId && onOpenMarker)) && (
+    <Menu icon align="end" label="More for this record" trigger={<IconMore />}>
+      {isEvent && <MenuItem onClick={() => onOpenPage(record.id)}>Open the page</MenuItem>}
+      {record.attachMarkerId && onOpenMarker && (
+        <MenuItem onClick={() => onOpenMarker(record.attachMarkerId!)}>Open the pin</MenuItem>
+      )}
+      {replayId !== null && onOpenReplay && <MenuItem onClick={() => onOpenReplay(replayId)}>Open the replay</MenuItem>}
+    </Menu>
+  );
+  const session =
+    record.sessionId && onOpenSession ? (
+      <button type="button" className="story-linkbutton" onClick={() => onOpenSession(record.sessionId!)}>
+        {record.sessionNumber !== null ? `Session ${record.sessionNumber}` : "This session"}
+      </button>
+    ) : (
+      record.sessionNumber !== null && <span className="story-entry-when">Session {record.sessionNumber}</span>
+    );
+
+  const head = column ? (
+    <>
+      <header className="story-col-head">
+        {column.onBack && <Crumb label="Timeline" onClick={column.onBack} />}
+        <span className="story-col-kind">
+          <CodexIcon iconId={meta.iconId} className="story-entry-kindicon" /> {meta.label}
+        </span>
+        <span className="story-grow" />
+        {more}
+      </header>
+      <p className="story-col-date">{record.inWorldLabel ?? chronicleWhenLabel(record)}</p>
+      <p className="story-col-meta">
+        {session}
+        {isDeadline && <Badge tone={deadlineStateTone(fired)}>{deadlineStateLabel(fired)}</Badge>}
+        <VisibilityBadge revealed={record.revealedToPlayers} />
+      </p>
+    </>
+  ) : (
+    <header className="story-entry-head">
+      <CodexIcon iconId={meta.iconId} className="story-entry-kindicon" />
+      <Badge tone={meta.tone}>{meta.label}</Badge>
+      {isDeadline && <Badge tone={deadlineStateTone(fired)}>{deadlineStateLabel(fired)}</Badge>}
+      <span className="story-entry-when">{chronicleWhenLabel(record)}</span>
+      {session}
+      <span className="story-grow" />
+      <FieldAudienceToggle
+        field={isEvent ? "this event" : "this entry"}
+        hidden={!record.revealedToPlayers}
+        onChange={(hidden) => onReveal(!hidden)}
+      />
+    </header>
+  );
+
   return (
     <article
       id={`codex-entry-${record.id}`}
       aria-current={focused ? "true" : undefined}
       aria-label={`${meta.label}: ${record.title ?? chronicleWhenLabel(record)}`}
-      className={`story-entry${focused ? " is-focused" : ""}${record.revealedToPlayers ? "" : " is-hidden"}`}
+      className={`story-entry${focused ? " is-focused" : ""}${record.revealedToPlayers ? "" : " is-hidden"}${column ? " is-column" : ""}`}
     >
-      <header className="story-entry-head">
-        <CodexIcon iconId={meta.iconId} className="story-entry-kindicon" />
-        <Badge tone={meta.tone}>{meta.label}</Badge>
-        {isDeadline && <Badge tone={deadlineStateTone(fired)}>{deadlineStateLabel(fired)}</Badge>}
-        <span className="story-entry-when">{chronicleWhenLabel(record)}</span>
-        {record.sessionId && onOpenSession ? (
-          <button type="button" className="story-linkbutton" onClick={() => onOpenSession(record.sessionId!)}>
-            {record.sessionNumber !== null ? `Session ${record.sessionNumber}` : "This session"}
-          </button>
-        ) : (
-          record.sessionNumber !== null && <span className="story-entry-when">Session {record.sessionNumber}</span>
-        )}
-        <span className="story-grow" />
-        <FieldAudienceToggle
-          field={isEvent ? "this event" : "this entry"}
-          hidden={!record.revealedToPlayers}
-          onChange={(hidden) => onReveal(!hidden)}
-        />
-      </header>
+      {head}
       {record.title && <h4 className="story-entry-title">{record.title}</h4>}
       {record.text.trim() && (
         <div className="story-entry-body">
@@ -114,6 +165,14 @@ export function EntryCard({
           </span>
           <CodexMarkdown text={record.gmText} token={gmToken} onNavigate={follow} />
         </div>
+      )}
+      {column && !isEvent && record.attachPageId && (
+        <p className="story-col-links">
+          <span className="story-col-eyebrow">Links</span>
+          <button type="button" className="story-linkbutton" onClick={() => onOpenPage(record.attachPageId!)}>
+            {pageTitle(record.attachPageId)}
+          </button>
+        </p>
       )}
       {record.tags.length > 0 && (
         <ul className="story-tags" aria-label="Entry tags">
@@ -155,38 +214,60 @@ export function EntryCard({
           {standingChangeLabel(standing, pages.find((page) => page.id === standing.factionPageId)?.title ?? null)}
         </p>
       )}
-      <footer className="story-entry-foot">
-        {isEvent && (
-          <Button size="sm" onClick={() => onOpenPage(record.id)}>
-            Open page
+      {column ? (
+        <footer className="story-entry-foot">
+          {isEvent ? (
+            <Button size="sm" onClick={() => onOpenPage(record.id)}>
+              Open the page
+            </Button>
+          ) : (
+            <Button size="sm" onClick={onEdit}>
+              Edit
+            </Button>
+          )}
+          <Button size="sm" onClick={() => onReveal(!record.revealedToPlayers)}>
+            {record.revealedToPlayers ? "Hide from players" : "Show to players"}
           </Button>
-        )}
-        {!isEvent && record.attachPageId && (
-          <Button size="sm" onClick={() => onOpenPage(record.attachPageId!)}>
-            Open page
-          </Button>
-        )}
-        {record.attachMarkerId && onOpenMarker && (
-          <Button size="sm" onClick={() => onOpenMarker(record.attachMarkerId!)}>
-            Open pin
-          </Button>
-        )}
-        {record.kind === "combat" && record.sourceEncounterId !== null && onOpenReplay && (
-          <Button size="sm" onClick={() => onOpenReplay(record.sourceEncounterId!)}>
-            Open replay
-          </Button>
-        )}
-        {!isEvent && (
-          <Button size="sm" onClick={onEdit}>
-            Edit
-          </Button>
-        )}
-        {!isEvent && (
-          <Button variant="destructive" size="sm" onClick={onRemove}>
-            Delete
-          </Button>
-        )}
-      </footer>
+          {!isEvent && (
+            <Button variant="destructive" size="sm" onClick={onRemove}>
+              Delete
+            </Button>
+          )}
+        </footer>
+      ) : (
+        <footer className="story-entry-foot">
+          {isEvent && (
+            <Button size="sm" onClick={() => onOpenPage(record.id)}>
+              Open page
+            </Button>
+          )}
+          {!isEvent && record.attachPageId && (
+            <Button size="sm" onClick={() => onOpenPage(record.attachPageId!)}>
+              Open page
+            </Button>
+          )}
+          {record.attachMarkerId && onOpenMarker && (
+            <Button size="sm" onClick={() => onOpenMarker(record.attachMarkerId!)}>
+              Open pin
+            </Button>
+          )}
+          {record.kind === "combat" && record.sourceEncounterId !== null && onOpenReplay && (
+            <Button size="sm" onClick={() => onOpenReplay(record.sourceEncounterId!)}>
+              Open replay
+            </Button>
+          )}
+          {!isEvent && (
+            <Button size="sm" onClick={onEdit}>
+              Edit
+            </Button>
+          )}
+          {!isEvent && (
+            <Button variant="destructive" size="sm" onClick={onRemove}>
+              Delete
+            </Button>
+          )}
+        </footer>
+      )}
     </article>
   );
 }
