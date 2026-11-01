@@ -34,8 +34,13 @@ const HITS = [
   hit({ kind: "session", id: "s3", title: "Session 3", entityType: null, type: "session" })
 ];
 
-const table = () => within(screen.getByRole("table"));
-const rows = () => table().getAllByRole("row").slice(1);
+const results = () => within(screen.getByRole("list", { name: "Results" }));
+const rows = () => results().getAllByRole("listitem");
+/** Opens a result: choose its row, then the chosen pane's Open the page. */
+async function openRow(user: ReturnType<typeof userEvent.setup>, index: number) {
+  await user.click(within(rows()[index]!).getByRole("button"));
+  await user.click(screen.getByRole("button", { name: "Open the page" }));
+}
 /** Where a row sent the browser, whatever the destination does with its address once it opens. */
 const pushed = () => vi.spyOn(window.history, "pushState");
 
@@ -45,11 +50,11 @@ beforeEach(() => {
   records.findApi.search.mockResolvedValue({ hits: HITS, truncated: false, total: 6 });
 });
 
-describe("Search, the GM's table", () => {
-  it("lists every kind of record in one table, each naming its type in words", async () => {
+describe("Search, the GM's panes", () => {
+  it("lists every kind of record as rows, each naming its kind in words", async () => {
     renderGmCodex("/codex/search?q=strahd");
     await waitFor(() => expect(rows()).toHaveLength(6));
-    expect(rows().map((row) => within(row).getAllByRole("cell")[2].textContent)).toEqual([
+    expect(rows().map((row) => row.querySelector(".cx-hit-kind")?.textContent)).toEqual([
       "Character",
       "Pin",
       "Map",
@@ -60,14 +65,59 @@ describe("Search, the GM's table", () => {
     expect(screen.getByRole("status")).toHaveTextContent("6 results");
   });
 
-  it("marks the searched words, and shows a line from hidden text in violet as Hidden", async () => {
+  it("counts each kind at the side, and a kind filters the rows to it", async () => {
+    const user = userEvent.setup();
     renderGmCodex("/codex/search?q=strahd");
     await waitFor(() => expect(rows()).toHaveLength(6));
-    const journal = rows()[3];
-    expect(within(journal).getByText("Strahd", { selector: "mark" })).toBeInTheDocument();
-    expect(journal.querySelector(".cx-matchline")).toHaveClass("is-hidden");
+    const kinds = within(screen.getByRole("group", { name: "Kinds" }));
+    expect(kinds.getByRole("button", { name: /^All/ })).toHaveTextContent("6");
+    await user.click(kinds.getByRole("button", { name: /^Pin/ }));
+    expect(new URLSearchParams(window.location.search).get("types")).toBe("marker");
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(screen.getByRole("status")).toHaveTextContent("1 result");
+    expect(records.findApi.search).toHaveBeenCalledTimes(1);
+  });
+
+  it("chooses the first result on arrival and shows its match beside the list", async () => {
+    renderGmCodex("/codex/search?q=strahd");
+    await waitFor(() => expect(rows()).toHaveLength(6));
+    expect(within(rows()[0]!).getByRole("button")).toHaveAttribute("aria-current", "true");
+    const pane = within(screen.getByRole("region", { name: "Strahd" }));
+    expect(pane.getByText("Strahd", { selector: "mark" })).toBeInTheDocument();
+    expect(pane.getByText(/waits in the castle/)).toBeInTheDocument();
+  });
+
+  it("moves the choice with the arrows and opens it with Enter", async () => {
+    const user = userEvent.setup();
+    renderGmCodex("/codex/search?q=strahd");
+    await waitFor(() => expect(rows()).toHaveLength(6));
+    await user.click(screen.getByLabelText("Search"));
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect(within(rows()[2]!).getByRole("button")).toHaveAttribute("aria-current", "true");
+    expect(new URLSearchParams(window.location.search).get("hit")).toBe("map:m1");
+    await user.keyboard("{ArrowUp}{Enter}");
+    expect(window.location.pathname).toBe("/codex/atlas/m2");
+  });
+
+  it("marks the searched words, and says a line from hidden text is hidden, in violet", async () => {
+    renderGmCodex("/codex/search?q=strahd");
+    await waitFor(() => expect(rows()).toHaveLength(6));
+    const journal = rows()[3]!;
+    expect(within(journal).getAllByText("Strahd", { selector: "mark" }).length).toBeGreaterThan(0);
+    expect(journal.querySelector(".cx-matchline.is-hidden")).not.toBeNull();
     expect(within(journal).getByText("Hidden text:")).toBeInTheDocument();
-    expect(within(rows()[1]).getAllByText("Hidden").length).toBeGreaterThan(0);
+  });
+
+  it("reads a hit in a page's hidden block as so, with its tag in the chosen pane", async () => {
+    records.findApi.search.mockResolvedValue({
+      hits: [hit({ id: "p9", title: "Ireena", match: { line: "Strahd wants Ireena.", hidden: true } })],
+      truncated: false,
+      total: 1
+    });
+    renderGmCodex("/codex/search?q=strahd");
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(within(rows()[0]!).getByText("Hidden block:")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Ireena" })).getByText("1 block hidden")).toBeInTheDocument();
   });
 
   it("says the search failed, and never that nothing matched", async () => {
@@ -89,9 +139,8 @@ describe("Search, the GM's table", () => {
     renderGmCodex("/codex/search");
     await waitFor(() => expect(records.findApi.search).toHaveBeenCalledTimes(1));
     await user.type(screen.getByLabelText("Search"), "strahd");
-    await waitFor(() => expect(new URLSearchParams(window.location.search).get("q")).toBe("strahd"));
     await waitFor(() => expect(records.findApi.search).toHaveBeenCalledTimes(2));
-    expect(records.findApi.search.mock.calls.map((call) => call[1].q)).toEqual(["", "strahd"]);
+    expect(records.findApi.search.mock.calls[1][1].q).toBe("strahd");
   });
 
   it("lists every record again once the box is cleared, in one request", async () => {
@@ -104,14 +153,13 @@ describe("Search, the GM's table", () => {
     expect(records.findApi.search.mock.calls[1][1].q).toBe("");
   });
 
-  it("sends the filters in the address to the server, which does the filtering", async () => {
+  it("sends who sees it, when it changed and the sort to the server", async () => {
     renderGmCodex("/codex/search?visibility=hidden&types=character,location&from=2026-09-01&sort=modified:desc");
     await waitFor(() => expect(records.findApi.search).toHaveBeenCalled());
     expect(records.findApi.search.mock.calls[0]).toEqual([
       "gm",
       {
         q: "",
-        types: ["character", "location"],
         visibility: "hidden",
         modifiedFrom: "2026-09-01",
         modifiedTo: null,
@@ -119,34 +167,27 @@ describe("Search, the GM's table", () => {
         limit: 200
       }
     ]);
-    expect(screen.getByText("Visibility: Hidden")).toBeInTheDocument();
-    expect(screen.getByText("Type: 2 of 13")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "Who sees it" })).getByRole("button", { name: "Hidden" })
+    ).toHaveAttribute("aria-current", "true");
   });
 
-  it("filters to Hidden from the Visibility menu", async () => {
+  it("filters to Hidden from Who sees it, and back to all", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/search");
-    await user.click(await screen.findByRole("button", { name: /Visibility: All/ }));
-    await user.click(screen.getByLabelText("Hidden"));
+    const who = within(await screen.findByRole("group", { name: "Who sees it" }));
+    await user.click(who.getByRole("button", { name: "Hidden" }));
     expect(new URLSearchParams(window.location.search).get("visibility")).toBe("hidden");
     await waitFor(() => expect(records.findApi.search.mock.calls.at(-1)![1].visibility).toBe("hidden"));
+    await user.click(who.getByRole("button", { name: "Hidden" }));
+    expect(new URLSearchParams(window.location.search).get("visibility")).toBeNull();
   });
 
-  it("asks for nothing once every type is cleared", async () => {
+  it("sorts by several columns in order from the results' More", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/search");
-    await waitFor(() => expect(records.findApi.search).toHaveBeenCalledTimes(1));
-    await user.click(screen.getByRole("button", { name: /Type: all 13/ }));
-    await user.click(screen.getByRole("button", { name: "Clear" }));
-    expect(new URLSearchParams(window.location.search).get("types")).toBe("none");
-    expect(await screen.findByText("Nothing matches. Change the words or the filters.")).toBeInTheDocument();
-    expect(records.findApi.search).toHaveBeenCalledTimes(1);
-  });
-
-  it("sorts by several columns in order, as a spreadsheet does", async () => {
-    const user = userEvent.setup();
-    renderGmCodex("/codex/search");
-    await user.click(await screen.findByRole("button", { name: "Sort: Name" }));
+    await user.click(await screen.findByLabelText("Sort and when it changed"));
+    await user.click(screen.getByRole("menuitem", { name: "Sort: Name…" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Sort" }));
     await user.selectOptions(dialog.getByLabelText("Sort by: column"), "type");
     await user.click(dialog.getByRole("button", { name: "Add a level" }));
@@ -156,7 +197,6 @@ describe("Search, the GM's table", () => {
     await waitFor(() =>
       expect(records.findApi.search.mock.calls.at(-1)![1].sort).toEqual(["type:asc", "modified:desc"])
     );
-    expect(screen.getByRole("button", { name: "Sort: Type, then Modified" })).toBeInTheDocument();
   });
 
   it("says when the list was cut at the limit", async () => {
@@ -172,7 +212,7 @@ describe("Every jump prepares its destination", () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/search?q=strahd");
     await waitFor(() => expect(rows()).toHaveLength(6));
-    await user.click(within(rows()[0]).getByRole("button"));
+    await openRow(user, 0);
     expect(window.location.pathname).toBe("/codex/pages/p1");
   });
 
@@ -181,7 +221,7 @@ describe("Every jump prepares its destination", () => {
     const push = pushed();
     renderGmCodex("/codex/search?q=strahd");
     await waitFor(() => expect(rows()).toHaveLength(6));
-    await user.click(within(rows()[1]).getByRole("button"));
+    await openRow(user, 1);
     expect(push.mock.calls.at(-1)?.[2]).toBe("/codex/atlas/m2?pin=pin1");
   });
 
@@ -190,7 +230,7 @@ describe("Every jump prepares its destination", () => {
     const push = pushed();
     renderGmCodex("/codex/search?q=strahd");
     await waitFor(() => expect(rows()).toHaveLength(6));
-    await user.click(within(rows()[2]).getByRole("button"));
+    await openRow(user, 2);
     expect(push.mock.calls.at(-1)?.[2]).toBe("/codex/atlas/m1");
   });
 
@@ -199,13 +239,13 @@ describe("Every jump prepares its destination", () => {
     const push = pushed();
     const view = renderGmCodex("/codex/search?q=strahd");
     await waitFor(() => expect(rows()).toHaveLength(6));
-    await user.click(within(rows()[3]).getByRole("button"));
+    await openRow(user, 3);
     expect(push.mock.calls.at(-1)?.[2]).toBe("/codex/story?entry=j1");
     view.unmount();
 
     renderGmCodex("/codex/search?q=strahd");
     await waitFor(() => expect(rows()).toHaveLength(6));
-    await user.click(within(rows()[4]).getByRole("button"));
+    await openRow(user, 4);
     expect(window.location.pathname).toBe("/codex/quests/q2");
   });
 });
@@ -226,8 +266,7 @@ describe("A player's Search (viewer safety)", () => {
     expect(records.findApi.searchAsPlayer.mock.calls[0][0]).toBe("player");
     expect(records.findApi.searchAsPlayer.mock.calls[0][1].visibility).toBe("all");
     expect(records.findApi.search).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: /Visibility/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Who sees it" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Who sees it" })).not.toBeInTheDocument();
     expect(screen.queryByText("Hidden")).not.toBeInTheDocument();
   });
 
@@ -236,8 +275,8 @@ describe("A player's Search (viewer safety)", () => {
     const push = pushed();
     renderPlayerCodex("/codex/search?q=strahd");
     await waitFor(() => expect(rows()).toHaveLength(3));
-    expect(rows().map((row) => within(row).getAllByRole("cell")[1].textContent)).toEqual(["Character", "Pin", "Quest"]);
-    await user.click(within(rows()[1]).getByRole("button"));
+    expect(rows().map((row) => row.querySelector(".cx-hit-kind")?.textContent)).toEqual(["Character", "Pin", "Quest"]);
+    await openRow(user, 1);
     expect(push.mock.calls.at(-1)?.[2]).toBe("/codex/atlas/m2?pin=pin1");
   });
 
@@ -264,7 +303,10 @@ describe("Search on a phone", () => {
   it("puts the box in the top bar, narrows by kind with chips, and remembers recent searches", async () => {
     const user = userEvent.setup();
     const view = renderGmCodex("/codex/search?q=strahd");
-    expect(await screen.findByText(/waits in the castle/)).toBeInTheDocument();
+    // A row opens under itself with the part that matched and the way in.
+    await user.click((await screen.findAllByRole("button", { name: /^Strahd/ }))[0]!);
+    expect(screen.getByText(/waits in the castle/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open the page" })).toBeInTheDocument();
     await user.click(within(screen.getByRole("group", { name: "Kinds" })).getByRole("button", { name: "Places" }));
     expect(new URLSearchParams(window.location.search).get("types")).toBe("location");
     view.unmount();
