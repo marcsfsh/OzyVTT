@@ -69,7 +69,7 @@ describe("the GM sign-in", () => {
 
   it("offers neither door while a stored session is tried", () => {
     landing({ gmPrompt: false, resuming: true });
-    expect(screen.getByRole("button", { name: "Join as Player" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Join as a player" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Enter as GM" })).toBeDisabled();
   });
 });

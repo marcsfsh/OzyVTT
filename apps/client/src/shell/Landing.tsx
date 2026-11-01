@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Input, Modal, Switch, ThemeToggle, Wordmark } from "@vtt/ui";
+import { Button, Input, Modal, Switch, ThemeToggle, Wordmark, cx } from "@vtt/ui";
 import { Notice, type NoticeMessage } from "../components/feedback";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { LandingScene } from "./LandingScene";
@@ -98,7 +98,7 @@ export function Landing({
     else onSetPassword(password);
   };
   return (
-    <div className={driving ? "landing landing--drive" : "landing"}>
+    <div className={cx("landing", driving && "landing--drive", door === "gm" && "landing--gm")}>
       {/* The title screen's art, with the vignette from `.landing::before` over it. */}
       <LandingScene />
       {/* A sibling of the scene, outside it: it must paint over the vignette and the content, and the
@@ -109,103 +109,106 @@ export function Landing({
           <Wordmark variant="cabinet" className="home-hero-mark" />
         </h1>
       </header>
-      {door === "choose" ? (
-        <section className="choices anim-view">
-          <Button variant="primary" size="md" lift onClick={onJoin} disabled={busy || resuming}>
-            {busy ? "Connecting…" : "Join as Player"}
-          </Button>
-          <Button
-            variant="secondary"
-            lift
-            disabled={resuming}
-            onClick={() => {
-              onClearNotice();
-              setDoor("gm");
-            }}
-          >
-            Enter as GM
-          </Button>
-        </section>
-      ) : (
-        <section className="card landing-gm anim-view" aria-labelledby="landing-gm-title">
-          <h2 id="landing-gm-title">{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
-          <p>
-            {bootstrapped
-              ? "Enter the GM password to run the table."
-              : "Use at least 12 characters. Set it on this computer, the one that runs OzyVTT, before players join."}
-          </p>
-          <form
-            className="landing-gm-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submit();
-            }}
-          >
-            <div className="landing-password">
-              <Input
-                type={shown ? "text" : "password"}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="GM password"
-                aria-label="GM password"
-                autoComplete={bootstrapped ? "current-password" : "new-password"}
-                autoFocus
-              />
-              <Button
-                variant="ghost"
-                className="landing-password-show"
-                aria-label="Show password"
-                aria-pressed={shown}
-                onClick={() => setShown((current) => !current)}
-              >
-                {shown ? "Hide" : "Show"}
-              </Button>
-            </div>
+      {/* Below the horizon, on the grid: the two ways in, or the GM's card in their place (arrival spec 2.1, 2.2). */}
+      <div className="landing-ground">
+        {door === "choose" ? (
+          <section className="choices anim-view">
+            <Button variant="primary" size="md" lift onClick={onJoin} disabled={busy || resuming}>
+              {busy ? "Connecting…" : "Join as a player"}
+            </Button>
+            <Button
+              variant="secondary"
+              lift
+              disabled={resuming}
+              onClick={() => {
+                onClearNotice();
+                setDoor("gm");
+              }}
+            >
+              Enter as GM
+            </Button>
+          </section>
+        ) : (
+          <section className="card landing-gm anim-view" aria-labelledby="landing-gm-title">
+            <h2 id="landing-gm-title">{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
+            <p>
+              {bootstrapped
+                ? "Enter the GM password to run the table."
+                : "Use at least 12 characters. Set it on this computer, the one that runs OzyVTT, before players join."}
+            </p>
+            <form
+              className="landing-gm-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submit();
+              }}
+            >
+              <div className="landing-password">
+                <Input
+                  type={shown ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="GM password"
+                  aria-label="GM password"
+                  autoComplete={bootstrapped ? "current-password" : "new-password"}
+                  autoFocus
+                />
+                <Button
+                  variant="ghost"
+                  className="landing-password-show"
+                  aria-label="Show password"
+                  aria-pressed={shown}
+                  onClick={() => setShown((current) => !current)}
+                >
+                  {shown ? "Hide" : "Show"}
+                </Button>
+              </div>
+              {bootstrapped && (
+                <Switch
+                  className="landing-keep"
+                  checked={keepSignedIn}
+                  onChange={setKeepSignedIn}
+                  label="Keep me signed in on this computer"
+                />
+              )}
+              <div className="landing-gm-actions">
+                <Button variant="primary" type="submit" disabled={busy || !password}>
+                  {busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="link"
+                  onClick={() => {
+                    onClearNotice();
+                    setDoor("choose");
+                  }}
+                >
+                  Back
+                </Button>
+              </div>
+            </form>
+            {/* In a dialog: the steps would push the card past a phone's screen, and the landing never scrolls. */}
             {bootstrapped && (
-              <Switch
-                className="landing-keep"
-                checked={keepSignedIn}
-                onChange={setKeepSignedIn}
-                label="Keep me signed in on this computer"
-              />
+              <div className="landing-reset">
+                <Button className="link" onClick={() => setResetSteps(true)}>
+                  Forgot the password
+                </Button>
+                <Modal
+                  open={resetSteps}
+                  onClose={() => setResetSteps(false)}
+                  size="sm"
+                  title="Reset the GM password"
+                  ariaLabel="Reset the GM password"
+                >
+                  <ResetSteps />
+                </Modal>
+              </div>
             )}
-            <div className="landing-gm-actions">
-              <Button variant="primary" type="submit" disabled={busy || !password}>
-                {busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}
-              </Button>
-              <Button
-                variant="ghost"
-                className="link"
-                onClick={() => {
-                  onClearNotice();
-                  setDoor("choose");
-                }}
-              >
-                Back
-              </Button>
-            </div>
-          </form>
-          {/* In a dialog: the steps would push the card past a phone's screen, and the landing never scrolls. */}
-          {bootstrapped && (
-            <div className="landing-reset">
-              <Button className="link" onClick={() => setResetSteps(true)}>
-                Forgot the password
-              </Button>
-              <Modal
-                open={resetSteps}
-                onClose={() => setResetSteps(false)}
-                size="sm"
-                title="Reset the GM password"
-                ariaLabel="Reset the GM password"
-              >
-                <ResetSteps />
-              </Modal>
-            </div>
-          )}
-        </section>
-      )}
-      {/* Auth errors are the one inline exception to toast-only feedback. */}
-      <Notice notice={notice} />
+          </section>
+        )}
+        {/* Auth errors are the one inline exception to toast-only feedback. */}
+        <Notice notice={notice} />
+      </div>
       <div className="home-theme-switch">
         <ThemeToggle compact={phone} />
       </div>

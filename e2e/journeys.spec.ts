@@ -74,6 +74,19 @@ async function liveSceneOnNewMap(gm: Page, file: string, buffer: Buffer) {
   await makeLiveFromPage(gm);
 }
 
+test("the title screen keeps its logo in clear sky above the sun and its ways in on the grid", async ({ open }) => {
+  const page = await open("/");
+  await expect(page.getByRole("button", { name: "Join as a player" })).toBeVisible();
+  const box = async (selector: string) => (await page.locator(selector).first().boundingBox())!;
+  const logo = await box(".home-hero-mark");
+  const sun = await box(".landing-sun");
+  const horizon = await box(".landing-horizon");
+  const choices = await box(".choices");
+  // Arrival rule 1: at least 48px of sky between the logo and the top of the sun; the buttons stand below the horizon.
+  expect(sun.y - (logo.y + logo.height), "sky between the logo and the sun").toBeGreaterThanOrEqual(48);
+  expect(choices.y, "the ways in sit below the horizon").toBeGreaterThan(horizon.y);
+});
+
 test("the first evening: the GM password, the join address, a player, the table screen and a live encounter", async ({
   open,
   hasTouch
@@ -133,7 +146,7 @@ test("the first evening: the GM password, the join address, a player, the table 
 
   // A player opens that address, sees who each character is, claims one and lands on My character.
   const player = await open(address!);
-  await press(player.getByRole("button", { name: "Join as Player" }));
+  await press(player.getByRole("button", { name: "Join as a player" }));
   await expect(player.getByRole("heading", { name: "Pick your character" })).toBeVisible();
   // The later journeys play the other two.
   const card = player.getByRole("listitem").filter({ hasText: PARTY[2] });
@@ -204,7 +217,7 @@ test("the first evening: the GM password, the join address, a player, the table 
 test("a player joins and claims a character", async ({ open }) => {
   const player = await open("/");
   await ensureGmPassword(player.request);
-  await press(player.getByRole("button", { name: "Join as Player" }));
+  await press(player.getByRole("button", { name: "Join as a player" }));
   await expect(player.getByRole("heading", { name: "Pick your character" })).toBeVisible();
   await expectPageFits(player);
 
@@ -226,7 +239,7 @@ test("a player joins and claims a character", async ({ open }) => {
 
   // After a reload, joining again resumes the same session: their character, on the page they left.
   await player.reload();
-  await press(player.getByRole("button", { name: "Join as Player" }));
+  await press(player.getByRole("button", { name: "Join as a player" }));
   await expect(playerSection(player, "Sheet")).toHaveAttribute("aria-selected", "true");
   await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
 });

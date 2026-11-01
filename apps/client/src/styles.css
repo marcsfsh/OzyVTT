@@ -396,9 +396,7 @@ textarea:focus {
 .home-hero-title {
   margin: 0;
 }
-.home-hero-title .nh-wordmark {
-  display: block;
-  font-size: clamp(3rem, 13vw, 8rem);
+.home-hero-title .nh-wordmark-cabinet {
   line-height: 0.95;
 }
 
