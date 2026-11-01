@@ -524,8 +524,12 @@ its pages from these patterns.
   naming what is missing (from `factsOf` and `needsOf`, see `docs/design/IMPLEMENTATION.md`) over Make live. A new
   encounter is a Draft page with its checklist beside Pick a map, made when the map is picked. A map's grid keeps its
   steps.
-- Decisions owed wait in one place: the GM's waiting list (over the turn or in its own tab), a prompt at the top of a
-  player's Table tab.
+- Decisions owed wait in one place: the GM's waiting list (over the turn or in its own tab), and for a player one prompt
+  at a time on glass at the map's foot (ADR-0061; at the foot of the open Switch view on a phone), its eyebrow naming
+  its kind only (Saving throw, Reaction, Death save, Damage, Initiative, Your turn) and the rest counted under it. A
+  reaction's answer is its roll row with the decline under it; a death save shows Saves and Fails as lamps over its
+  row. Away from the table the leading prompt is the amber band, a call rolling on it and anything else offering Go
+  to the table.
 - Time is a timeline. History is a list of versions with Compare and Restore.
 - A map is present without taking over. Anything placed on a map has two ways in: a button and then a click on the map,
   or a right-click at the spot, which is a long press on a phone.

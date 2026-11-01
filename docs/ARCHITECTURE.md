@@ -1125,8 +1125,10 @@ commands from `codex/CommandPalette.tsx`'s `useCodexActions`, with the creates t
 Go to (the bars' pages and the settings index). It starts at the section on screen; the Codex's and Compendium's bar
 boxes and an old `openSearch=1` open it at their place. While the connection is down, or until a snapshot arrives
 after it returns, `shell/ReconnectBar.tsx` draws its band and `useTableCurrent()` is false for the controls that read
-it. Away from the table a player's roll calls are bands in the pane's first row (`RollCallPrompts`); the band's bonus
-is the server's number from the character's derived sheet. Toasts keep the bottom right of a laptop and sit above the
+it. At the table a player's prompt slot (`table/PromptSlot.tsx`) renders on glass in the map's pane, or as
+`TablePanel`'s overlay on a phone, and in the panel's top while no map is live (ADR-0061). Away from the table the
+leading prompt is a band in the pane's first row (`table/PromptBand.tsx`): a call's band rolls it, and its bonus is the
+server's number from the character's derived sheet; any other prompt's band offers Go to the table. Toasts keep the bottom right of a laptop and sit above the
 bottom tabs on a phone. A confirm or prompt (`components/feedback.tsx`) opens from the bottom on a phone. Not found
 (`components/NotFoundView.tsx`) is an `EmptyState`; `AppErrorBoundary` draws `SomethingBroke` on `shell/LandingScene.tsx`.
 

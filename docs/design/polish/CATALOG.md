@@ -183,7 +183,7 @@ the roll as the button in waiting cards. The Notes and Party tabs follow F and D
 
 ### C4. Playing a character (player)
 
-Designed with C6 (`C4-C6-player/SPEC.md`, `C4-C6-player/PLAN.md`, ADR-0061): a prompt on glass over the map, its eyebrow
+Built with C6 (`C4-C6-player/SPEC.md`, `C4-C6-player/PLAN.md`, ADR-0061): a prompt on glass over the map, its eyebrow
 naming only its kind, a reaction's answer as its roll row, and the death saves as lamps. C4.1 and C4.2 are C's; C4.4 and
 C4.5 stay as they are, and C4.6 is Designed with replays (`E3-replays/SPEC.md` 2.5). Each question in a round offers
 five options, each built from settled parts.
@@ -211,7 +211,7 @@ waiting list. Each question in a round offers five options, each built from sett
 
 ### C6. Encounter dialogs
 
-Designed with C4 (`C4-C6-player/SPEC.md`, ADR-0061): what a cast or a feature asks opens under its row, and so does the
+Built in part with C4 (`C4-C6-player/SPEC.md`, ADR-0061; the sheet's asks and the spell card are left): what a cast or a feature asks opens under its row, and so does the
 spell card. Add equipment's catalogue keeps A's dialog; C6.8, the token picker, is Designed with E2
 (`E2-maps-tokens/SPEC.md`, ADR-0063).
 
