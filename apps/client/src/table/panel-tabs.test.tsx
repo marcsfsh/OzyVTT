@@ -150,8 +150,9 @@ describe("the GM's panel", () => {
     expect(document.querySelectorAll(".chrome")).toHaveLength(0);
     // The order and its row tools fold under the acting creature.
     expect(within(fight).getByText("Turn order and tools")).toBeTruthy();
-    // With no strip over the map, the Encounter menu heads the tab (table spec 2.1).
-    expect(within(fight).getByRole("button", { name: "Encounter options" })).toBeTruthy();
+    // The encounter's options are a More at the end of the panel's tabs (C3 running spec 2.3).
+    expect(within(fight).queryByRole("button", { name: "Encounter options" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Encounter options" }).closest(".table-panel-tabrow")).not.toBeNull();
     expect(screen.getByRole("button", { name: "End turn" })).toBeTruthy();
     expect(screen.getByText("Next: Borin")).toBeTruthy();
     // A tab shows its own panel and is remembered on this device.

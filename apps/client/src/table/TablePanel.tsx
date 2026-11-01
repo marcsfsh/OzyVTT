@@ -29,6 +29,7 @@ export function TablePanel({
   active,
   onActive,
   footer,
+  tabsEnd,
   phone = false
 }: Readonly<{
   label: string;
@@ -38,6 +39,8 @@ export function TablePanel({
   active: string;
   onActive: (id: string) => void;
   footer?: ReactNode;
+  /** A control at the end of the row of tabs: the GM's More for the encounter's options (C3 running spec 2.3). */
+  tabsEnd?: ReactNode;
   /** On a phone the footer is the bar under the thumb, and a target picker's Cancel and Roll move into it. */
   phone?: boolean;
 }>) {
@@ -56,7 +59,7 @@ export function TablePanel({
   useEffect(
     () =>
       onLogEntry(() => {
-        const strip = panel.current?.querySelector<HTMLElement>(":scope > .table-panel-tabs");
+        const strip = panel.current?.querySelector<HTMLElement>(":scope > .table-panel-tabrow > .table-panel-tabs");
         const log = document.getElementById(`${idBase}-tab-log`);
         if (!strip || !log || showing.current === "log") return;
         tabTrip(strip, document.getElementById(`${idBase}-tab-${showing.current}`), log);
@@ -67,14 +70,17 @@ export function TablePanel({
     <section ref={panel} className="table-panel" aria-label={label}>
       <FooterSlotContext.Provider value={phone ? slot : null}>
         {!switcher && top}
-        <Tabs
-          className={`table-panel-tabs${switcher ? " is-switch" : ""}`}
-          ariaLabel={label}
-          idBase={idBase}
-          activeId={current.id}
-          onChange={onActive}
-          tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label }))}
-        />
+        <div className={`table-panel-tabrow${tabsEnd ? " has-end" : ""}`}>
+          <Tabs
+            className={`table-panel-tabs${switcher ? " is-switch" : ""}`}
+            ariaLabel={label}
+            idBase={idBase}
+            activeId={current.id}
+            onChange={onActive}
+            tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label }))}
+          />
+          {tabsEnd && <span className="table-panel-tabs-end">{tabsEnd}</span>}
+        </div>
         {ladder && <div className="table-switch-ladder">{ladder}</div>}
         {switcher && top}
         {tabs.map((tab) => {

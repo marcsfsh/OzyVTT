@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
-import { IconChevron, Select, Switch, MenuHead } from "@vtt/ui";
+import { IconChevron, IconMore, MenuHead, Select, Switch } from "@vtt/ui";
 import { command } from "../lib/command";
 import { HealthAudienceOptions, HealthStyleOptions, healthStylePhrase, type HealthStyle } from "./health-display";
 import "./fight-menu.css";
@@ -174,7 +174,7 @@ export function FightMenu({
             Encounter <IconChevron />
           </>
         ) : (
-          "⋯"
+          <IconMore />
         )}
       </button>
       {menuOpen &&

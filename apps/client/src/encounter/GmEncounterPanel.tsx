@@ -564,7 +564,6 @@ export function GmEncounterPanel({
       onFeedback={setMessage}
       onAddMonsters={() => setBrowsing(true)}
       onEnd={() => void end()}
-      labelled
       {...(fightExperience ? { onAwardExperience: (inLair: boolean) => void awardFightExperience(inLair) } : {})}
     />
   );
@@ -628,13 +627,9 @@ export function GmEncounterPanel({
       {needsCount > 0 && <span className="nh-sr-only">, {needsCount} waiting</span>}
     </span>
   );
-  const head =
-    slots?.head || (!phone && fighting) ? (
-      <div className="encounter-tab-head">
-        {slots?.head}
-        {!phone && fighting && fightMenu}
-      </div>
-    ) : null;
+  // The encounter's options are a More at the end of the panel's tabs on a laptop (C3 running spec 2.3), in the header
+  // on a phone.
+  const head = slots?.head ? <div className="encounter-tab-head">{slots.head}</div> : null;
   // The waiting list's place is the GM's (ADR-0058): over the turn, which scrolls under it, or in its own first tab.
   const listInTab = waitingPlace === "tab";
   const turnBody = fighting ? (
@@ -741,6 +736,7 @@ export function GmEncounterPanel({
       <TablePanel
         label={fighting ? `The encounter · round ${state.combat.round}` : "The table"}
         tabs={shownTabs}
+        {...(fighting && !phone ? { tabsEnd: fightMenu } : {})}
         active={tab}
         onActive={setTab}
         phone={phone}
