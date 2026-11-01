@@ -26,6 +26,7 @@ import { selectToken, useSelectedToken } from "../scene/selectedToken";
 import { useMapView, useSwitchMoments } from "../table/phoneSwitch";
 import { NotesTab } from "../table/NotesTab";
 import { useWaitingList } from "../settings/preferences";
+import { onOpenRow } from "./openRow";
 import { useUnreadCount } from "../table/unreadTabs";
 import { useCombatLog } from "./CombatLog";
 import { rollsLine, StartFight } from "./StartFight";
@@ -144,6 +145,8 @@ export function GmEncounterPanel({
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   // Rows are one line by default; at most one row's tools are open at a time.
   const [expandedActorId, setExpandedActorId] = useState<string | null>(null);
+  // The token's menu asks to open a creature's row: turn to Encounter and open its tools (C2 spec 2.2).
+  const [orderOpen, setOrderOpen] = useState(false);
   /** The damage type for the row tools' number; not cleared between rows (one fireball, several tokens). */
   const [hpDamageType, setHpDamageType] = useState<string | null>(null);
   const knownActorIdsRef = useRef<ReadonlySet<string>>(new Set(state.actors.map((actor) => actor.id)));
@@ -638,7 +641,11 @@ export function GmEncounterPanel({
       {actBody}
       {/* The order with each row's tools (score, HP, conditions, the sheet), on every size until the row tools get
           their own design. */}
-      <details className="encounter-order-tools">
+      <details
+        className="encounter-order-tools"
+        open={orderOpen}
+        onToggle={(event) => setOrderOpen((event.currentTarget as HTMLDetailsElement).open)}
+      >
         <summary>Turn order and tools</summary>
         {orderBody}
       </details>
@@ -724,6 +731,15 @@ export function GmEncounterPanel({
     entry.id === "log" && unreadLog > 0 ? { ...entry, label: <UnreadLabel word="Log" count={unreadLog} /> } : entry
   );
   // The session outlives the roll while its result shows, and the result is read on the Encounter view.
+  useEffect(
+    () =>
+      onOpenRow((actorId) => {
+        setTab("fight");
+        setOrderOpen(true);
+        setExpandedActorId(actorId);
+      }),
+    [setTab]
+  );
   useSwitchMoments({
     enabled: mapView !== null,
     tab,

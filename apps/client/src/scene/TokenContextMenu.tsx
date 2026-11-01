@@ -3,13 +3,13 @@ import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
 import { IconButton, IconX, MenuHead, Select, useToast } from "@vtt/ui";
 import { ConditionEditor } from "../encounter/conditions";
-import { HpAdjust } from "../encounter/HpAdjust";
 import { HealthAudienceOptions, HealthStyleOptions, type HealthStyle } from "../encounter/health-display";
 import { command } from "../lib/command";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { titleCase } from "../encounter/format";
 import { resolveAtHeld, useTargeting } from "../encounter/targeting";
 import { useMenuDismiss, useMenuPlacement } from "./menuPlacement";
+import { openRow } from "../encounter/openRow";
 import "./token-menu.css";
 
 type Actor = GmActor | PlayerActor;
@@ -262,7 +262,8 @@ export function TokenControls({
     <>
       {moveModes}
       {height}
-      {role === "gm" && <HpAdjust actor={actor} controls={["damage", "heal"]} onFeedback={setFeedback} />}
+      {/* The amount, Damage, Heal and the GM's conditions live under the creature's row now (C3 running spec 2.2). */}
+      {role === "gm" && <p className="token-context-head">The token</p>}
       {role === "gm" && (
         <label className="token-context-size">
           Size
@@ -310,21 +311,20 @@ export function TokenControls({
           </Select>
         </label>
       )}
-      <details className="token-context-conditions">
-        <summary className="token-context-conditions-summary">
-          Conditions{actor.conditions.length > 0 ? ` (${actor.conditions.length})` : ""}
-        </summary>
-        <ConditionEditor
-          actorId={actor.id}
-          conditions={actor.conditions}
-          effects={actor.effects}
-          viewer={role}
-          onFeedback={setFeedback}
-        />
-      </details>
-      <button type="button" className="token-context-item" onClick={onOpenSheet}>
-        Open {actor.kind === "player-character" ? "character sheet" : "stat block"}
-      </button>
+      {role === "player" && (
+        <details className="token-context-conditions">
+          <summary className="token-context-conditions-summary">
+            Conditions{actor.conditions.length > 0 ? ` (${actor.conditions.length})` : ""}
+          </summary>
+          <ConditionEditor
+            actorId={actor.id}
+            conditions={actor.conditions}
+            effects={actor.effects}
+            viewer={role}
+            onFeedback={setFeedback}
+          />
+        </details>
+      )}
       {role === "gm" && gmToken && (
         <button type="button" className="token-context-item" onClick={onPickImage}>
           Set token image…
@@ -345,6 +345,15 @@ export function TokenControls({
           {hiddenFromPlayers ? "Show to players" : "Hide from players"}
         </button>
       )}
+      {role === "gm" && placed && (
+        <button type="button" className="token-context-item" onClick={onReturnToTray}>
+          Return to tray
+        </button>
+      )}
+      {role === "gm" && <p className="token-context-head">Its sheet and turn</p>}
+      <button type="button" className="token-context-item" onClick={onOpenSheet}>
+        Open {actor.kind === "player-character" ? "character sheet" : "stat block"}
+      </button>
       <button
         type="button"
         className="token-context-item"
@@ -354,9 +363,9 @@ export function TokenControls({
       >
         {reactionUsed ? "Reaction spent · Restore" : "Use reaction"}
       </button>
-      {role === "gm" && placed && (
-        <button type="button" className="token-context-item" onClick={onReturnToTray}>
-          Return to tray
+      {role === "gm" && (
+        <button type="button" className="token-context-item" onClick={() => openRow(actor.id)}>
+          Hit points and conditions
         </button>
       )}
       {feedback && (

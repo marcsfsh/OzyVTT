@@ -15,7 +15,6 @@ vi.mock("../socket", () => {
 });
 
 import { socket } from "../socket";
-import { TokenContextMenu } from "../scene/TokenContextMenu";
 import { EncounterPanel } from "./EncounterPanel";
 import { HpAdjust } from "./HpAdjust";
 import { ApplyDamageSchema } from "@vtt/domain/commands";
@@ -43,21 +42,9 @@ const lastHpCall = () =>
     .filter(([event]) => event.startsWith("actor:apply-damage") || event === "actor:heal")
     .at(-1)!;
 
-const mount = () =>
-  render(
-    <TokenContextMenu
-      actor={ACTOR}
-      role="gm"
-      gmToken="gm-token"
-      x={20}
-      y={20}
-      reactionUsed={false}
-      placed
-      onOpenSheet={() => {}}
-      onReturnToTray={() => {}}
-      onClose={() => {}}
-    />
-  );
+// The amount, Damage, Heal and the type left the token's menu for the creature's row (C2 spec 2.2), so the chooser is
+// mounted as the row draws it.
+const mount = () => render(<HpAdjust actor={ACTOR} controls={["damage", "heal"]} onFeedback={() => {}} />);
 
 /** Pick a row out of the chooser's listbox by its visible label. */
 async function chooseType(user: ReturnType<typeof userEvent.setup>, label: string) {
