@@ -88,7 +88,7 @@ export function ScenesShell({
 }: Readonly<{
   state: GmView;
   token: string;
-  /** The library changed here, so the table's and the shared screen's copies are read again. */
+  /** The library changed here, so the table's and the table screen's copies are read again. */
   onLibraryChanged: () => void;
   onOpenMap: (map: MapAsset) => void;
 }>) {

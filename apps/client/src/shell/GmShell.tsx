@@ -100,7 +100,7 @@ export function GmShell({
     return scene ? sceneActions.makeLive(scene) : false;
   };
 
-  // The map library loads on each tab that picks a map (Table, Scenes and Shared screen) and after a change in Scenes.
+  // The map library loads on each tab that picks a map (Table, Scenes and Table screen) and after a change in Scenes.
   // A tab change cancels the load in flight, so the tab it lands on has to start its own.
   const loadMaps = useCallback(
     (isCancelled: () => boolean = () => false) =>
@@ -129,7 +129,7 @@ export function GmShell({
     };
   }, [loadMaps, gmTab]);
   const onLibraryChanged = useCallback(() => void loadMaps(), [loadMaps]);
-  // A map opened in Scenes becomes the shared screen's map choice, as the library's selection was.
+  // A map opened in Scenes becomes the table screen's map choice, as the library's selection was.
   const onOpenMap = useCallback(
     (map: MapAsset) =>
       setSelectedMap((current) =>

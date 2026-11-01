@@ -296,7 +296,7 @@ export function GmEncounterPanel({
     if (
       !(await askConfirm({
         title: "End the encounter?",
-        body: "Turn order stays saved for reference, but the shared screen will hide it.",
+        body: "Turn order stays saved for reference, but the table screen will hide it.",
         confirmLabel: "End the encounter",
         danger: true
       }))

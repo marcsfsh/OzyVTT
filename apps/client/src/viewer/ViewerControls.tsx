@@ -201,7 +201,7 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
     >
       <header className="viewer-controls-heading neon-beam">
         <div className="viewer-controls-title">
-          <h2 id="viewer-controls-title">Shared screen</h2>
+          <h2 id="viewer-controls-title">Table screen</h2>
           <p>Paired screens show the map you present, with only what players can see on it.</p>
         </div>
         <div className="viewer-controls-status">
@@ -356,7 +356,7 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
             <span>Open on the table screen</span>
             {viewerUrls.length > 1 ? (
               <Select
-                aria-label="Second-screen network address"
+                aria-label="Table screen address"
                 value={viewerUrl}
                 onChange={(event) => setSelectedViewerUrl(event.target.value)}
               >
@@ -369,7 +369,7 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
             ) : (
               <code>{viewerUrl}</code>
             )}
-            <Button variant="secondary" onClick={() => void copy(viewerUrl, "Viewer address copied.")}>
+            <Button variant="secondary" onClick={() => void copy(viewerUrl, "Address copied.")}>
               Copy address
             </Button>
           </div>

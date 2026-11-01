@@ -277,7 +277,7 @@ export function MapStage({
     <section
       className="viewer-stage"
       ref={stageSurface}
-      aria-label={presentation.activeMap.altText || "Shared battlemap"}
+      aria-label={presentation.activeMap.altText || "The map on the table screen"}
       onPointerDown={beginPan}
       onPointerMove={continuePan}
       onPointerUp={endPan}
@@ -288,7 +288,7 @@ export function MapStage({
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        aria-label={presentation.activeMap.altText || "Shared battlemap"}
+        aria-label={presentation.activeMap.altText || "The map on the table screen"}
       >
         <image
           href={href}

@@ -24,7 +24,7 @@ const points = (polygon: readonly number[]) => {
  * The map's cover, as SVG masks. Manual fog: a white base (fog everywhere) with each stroke in order painting black
  * (reveal) or white (hide). Dynamic vision: dark everywhere, the party's remembered ground half dark, and what is in
  * sight now clear; the server drew the polygons, so this only paints them. The GM sees the cover dimmed; players and
- * the shared screen get it solid, so the part of a token under it is covered (the server leaves out tokens wholly under
+ * the table screen get it solid, so the part of a token under it is covered (the server leaves out tokens wholly under
  * the fog or out of sight).
  */
 export function FogOverlay({

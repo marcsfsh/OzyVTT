@@ -12,7 +12,7 @@ import "./rule-ask.css";
  *
  * What each side may see is set by the projection: a player's copy of an ask carries no `command`
  * (only the rule, family, sentence and time), so player rows cannot name a target or position. The
- * public shared screen gets nothing about asks.
+ * public table screen gets nothing about asks.
  */
 
 /**

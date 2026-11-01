@@ -692,10 +692,10 @@ test("the GM presents a map on a paired table screen", async ({ open, request })
   const gm = await open("/");
   await signInAsGm(gm);
   await openGmSection(gm, "Table screen");
-  await expect(gm.getByRole("heading", { name: "Shared screen", level: 2 })).toBeVisible();
+  await expect(gm.getByRole("heading", { name: "Table screen", level: 2 })).toBeVisible();
   await expect(gm.getByText("Den TV", { exact: false }).first()).toBeVisible();
 
-  // The Shared screen offers the GM's current map: the live scene's, when an earlier journey left one.
+  // The Table screen offers the GM's current map: the live scene's, when an earlier journey left one.
   const present = gm.getByRole("button", { name: /^Present / });
   const shown = (await present.textContent())!.replace(/^Present /, "");
   await press(present);

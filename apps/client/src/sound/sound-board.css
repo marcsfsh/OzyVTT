@@ -1,4 +1,4 @@
-/* The GM's sound board (Shared screen > Sound). Only SoundBoard.tsx imports this; the Table tab's pocket control
+/* The GM's sound board (Table screen > Sound). Only SoundBoard.tsx imports this; the Table tab's pocket control
    has its own sheet. */
 
 .sound-board {

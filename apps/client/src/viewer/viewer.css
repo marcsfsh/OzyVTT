@@ -1,4 +1,4 @@
-/* Component styles for the shared screen (viewer.html only; the page reset is viewer-page.css).
+/* Component styles for the table screen (viewer.html only; the page reset is viewer-page.css).
    Constraints:
    - No role hue: nothing here reads `--rim-gm`, `--rim-player` or their washes.
    - Keep the looser spacing scale in viewer-page.css's `#viewer-root` block.
@@ -483,7 +483,7 @@
     0 0 0 4px var(--focus-ring-color);
 }
 
-/* Dynamic vision on the shared screen is the fog's flat opaque darkness. The party's remembered ground shows through
+/* Dynamic vision on the table screen is the fog's flat opaque darkness. The party's remembered ground shows through
    at about half strength. */
 .vision-overlay-player {
   fill: var(--void);

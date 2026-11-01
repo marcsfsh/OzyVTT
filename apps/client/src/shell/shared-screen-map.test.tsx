@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ToastProvider } from "@vtt/ui";
 
-// The shared screen's controls, reduced to the map the shell offers them.
+// The table screen's controls, reduced to the map the shell offers them.
 vi.mock("../viewer/ViewerControls", () => ({
   ViewerControls: ({ map }: { map?: { altText: string } }) => <p>Offered: {map?.altText ?? "no map"}</p>
 }));
@@ -28,10 +28,10 @@ const renderShell = () =>
     </ToastProvider>
   );
 
-describe("the Shared screen's map", () => {
+describe("the Table screen's map", () => {
   // Opened straight from its address, or reached before the Table's load came back, it once offered no map and
   // left Present disabled.
-  it("offers the newest battle map when the GM opens the Shared screen first", async () => {
+  it("offers the newest battle map when the GM opens the Table screen first", async () => {
     serveScenes();
     goTo("/viewer-controls");
     renderShell();

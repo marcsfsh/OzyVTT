@@ -159,7 +159,7 @@ describe("The play glossary", () => {
     expect(
       at(
         "apps/client/src/encounter/GmEncounterPanel.tsx",
-        "Turn order stays saved for reference, but the shared screen will hide it."
+        "Turn order stays saved for reference, but the table screen will hide it."
       ),
       "object-literal confirm body"
     ).toBe(true);

@@ -835,7 +835,7 @@
   margin-top: var(--space-1);
 }
 
-/* Dynamic vision. Players and the shared screen get the darkness as a flat opaque plate with a hard edge, and the
+/* Dynamic vision. Players and the table screen get the darkness as a flat opaque plate with a hard edge, and the
    ground the party has seen through it at about half strength; the GM's look through a creature's eyes is the fog's
    violet veil. Walls, windows and lights are GM-only marks, so violet; a door's handle is a control, so magenta. */
 .vision-overlay-player {

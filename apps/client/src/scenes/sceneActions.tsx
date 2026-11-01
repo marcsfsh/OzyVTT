@@ -23,13 +23,13 @@ export function useSceneActions(
     return result.ok;
   };
 
-  /** Players and the shared screen switch at once, so a fight in progress is parked first and the GM is asked. */
+  /** Players and the table screen switch at once, so a fight in progress is parked first and the GM is asked. */
   const makeLive = async (scene: Scene): Promise<boolean> => {
     if (
       options.combatActive &&
       !(await confirm({
         title: `Make "${scene.name}" live?`,
-        body: "Players and the shared screen switch now, and the current encounter waits until you switch back.",
+        body: "Players and the table screen switch now, and the current encounter waits until you switch back.",
         confirmLabel: "Make live"
       }))
     )

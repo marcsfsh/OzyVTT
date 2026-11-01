@@ -159,7 +159,7 @@ export const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boo
   { title: "Map assets & calibration", match: (path) => path.startsWith("/api/v1/map-assets") },
   { title: "Token images", match: (path) => path.startsWith("/api/v1/token-assets") },
   { title: "Sound library", match: (path) => path.startsWith("/api/v1/sound-assets") },
-  { title: "Table viewer", match: (path) => path.startsWith("/api/v1/viewer") },
+  { title: "Table screen", match: (path) => path.startsWith("/api/v1/viewer") },
   // Titles follow the Codex glossary ("pages", "atlas", "journal", "calendar"). New paths appear on
   // their own because the live document is rendered; `ungrouped` catches anything a matcher misses.
   { title: "Codex (pages, atlas, journal & calendar)", match: (path) => path.startsWith("/api/v1/codex") },

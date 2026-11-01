@@ -85,7 +85,7 @@ function Transport({
 }
 
 /**
- * The GM's sound board, the Shared screen tab's second view: what plays on the table screen and how loud, the
+ * The GM's sound board, the Table screen tab's second view: what plays on the table screen and how loud, the
  * library it plays from, and each scene's own sound. Sound comes out of the table screen only; this device and
  * the players' stay silent.
  */
@@ -114,7 +114,7 @@ export function SoundBoard({
     <section className="sound-board pane-frame pane-scene frame-col anim-view" aria-labelledby="sound-board-title">
       <header className="sound-board-heading neon-beam">
         <div className="sound-board-title">
-          <Eyebrow>Shared display</Eyebrow>
+          <Eyebrow>Table screen</Eyebrow>
           <h2 id="sound-board-title">Sound</h2>
           <p>Music and sound play on the table screen only, never on players' devices.</p>
         </div>

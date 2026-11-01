@@ -48,7 +48,7 @@ describe("The address table", () => {
     expect(gmTabForPath("/viewer")).toBeNull();
   });
 
-  it("gives the sound board its own address in the Shared screen tab, for the GM only", () => {
+  it("gives the sound board its own address in the Table screen tab, for the GM only", () => {
     expect(SOUND_BOARD_PATH).toBe("/viewer-controls/sound");
     expect(gmTabForPath(SOUND_BOARD_PATH)).toBe("viewer");
     expect(isKnownPath(SOUND_BOARD_PATH)).toBe(true);

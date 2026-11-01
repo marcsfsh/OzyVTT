@@ -5,7 +5,7 @@
   color: var(--text);
 }
 
-/* The shared screen keeps the looser spacing scale: it is read from across a room. Do not follow
+/* The table screen keeps the looser spacing scale: it is read from across a room. Do not follow
    the app if its scale is tightened again. */
 #viewer-root {
   --space-1: 4px;

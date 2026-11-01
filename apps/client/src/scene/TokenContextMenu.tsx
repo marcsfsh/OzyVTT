@@ -337,8 +337,8 @@ export function TokenControls({
           disabled={busy}
           title={
             hiddenFromPlayers
-              ? "Reveal this token to players and the shared screen"
-              : "Hide this token from players and the shared screen"
+              ? "Reveal this token to players and the table screen"
+              : "Hide this token from players and the table screen"
           }
           onClick={toggleReveal}
         >

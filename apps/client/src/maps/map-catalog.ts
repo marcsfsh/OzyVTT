@@ -7,7 +7,7 @@ import { socket } from "../socket";
  * grid is set (i.e. whether tokens will snap).
  */
 
-/** The map a surface is using, as the shell passes it between the library, the table and the shared screen. */
+/** The map a surface is using, as the shell passes it between the library, the table and the table screen. */
 export type MapSelection = Readonly<{
   id: string;
   name: string;

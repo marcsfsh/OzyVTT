@@ -1,5 +1,5 @@
 /* The GM's shared-screen controls. Only ViewerControls.tsx imports this, inside the GM's tab; the
-   shared screen itself never loads it. */
+   table screen itself never loads it. */
 
 .viewer-controls {
   gap: var(--space-4);

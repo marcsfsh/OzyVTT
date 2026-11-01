@@ -20,7 +20,7 @@ export type ScenesContextValue = Readonly<{
   /** Below 980px: the workbench stacks and an editor's map becomes a bar that opens full screen. */
   narrow: boolean;
   go: (path: string) => void;
-  /** The map the GM opened, for the shared screen's map choice. */
+  /** The map the GM opened, for the table screen's map choice. */
   onOpenMap: (map: MapAsset) => void;
 }>;
 

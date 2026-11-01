@@ -83,7 +83,7 @@ export function ScreenPairing({ onPaired }: Readonly<{ onPaired: () => void }>) 
         <h1 id="pair-title">Pair this screen</h1>
         {pairing ? (
           <>
-            <p>On the GM's device, open Shared screen and enter this code.</p>
+            <p>On the GM's device, open Table screen settings and type this code.</p>
             <strong
               className="viewer-screen-code tabular"
               aria-label={`Pairing code ${pairing.code.split("").join(" ")}`}

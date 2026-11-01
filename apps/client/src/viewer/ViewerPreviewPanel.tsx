@@ -33,7 +33,7 @@ function openingPlace(): Place {
 }
 
 /**
- * The GM's in-tab preview of the shared screen: mints a short-lived read-only viewer cookie and renders the real
+ * The GM's in-tab preview of the table screen: mints a short-lived read-only viewer cookie and renders the real
  * `/viewer.html` in an iframe at a TV's size, scaled to the panel, so it lays out as the TV does. Resizing keeps the
  * screen's proportions. "Pop out" opens it in its own window.
  */
