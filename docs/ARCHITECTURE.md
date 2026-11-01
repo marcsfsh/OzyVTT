@@ -138,7 +138,10 @@ Arrival (ADR-0052) reads only what each view already holds. A player's pick page
 cards in `actors/ClaimCard.tsx`) shows the characters the player projection lists, with `claimStatus`. The GM's lobby
 (`table/Lobby.tsx`, the empty table while no map is live) reads `ownerSessionId`, `presence` and `playedAtTable` from
 the GM's view to say who plays each character. The join address is one block (`components/JoinAddress.tsx`, read
-from `HOST_PATHS.joinUrls`) in the lobby, the Encounter tab before a fight and Settings.
+from `HOST_PATHS.joinUrls`) in the lobby, the Encounter tab before a fight and Settings; the roster no longer shows it
+(ADR-0051). The roster's bands (`actors/RosterBand.tsx`) keep Played at the table, Release and Archive or Delete in
+each character's More menu, and a player reads another party member through `actors/PartyMemberBand.tsx`, which
+shows only what the party tier sent.
 
 A party character can be played at the table (ADR-0042, `played-at-table.ts`): its player keeps a printed sheet
 and tells the GM what they do. The GM-only `playedAtTable` mark refuses its claim, so it stays unclaimed and every
@@ -158,7 +161,8 @@ Every byte that reaches a player or the shared screen goes through a projection 
 audience. There are five:
 
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
-  get only `public` actors, a health band with no exact HP, and owner-only sheet resources
+  get only `public` actors, exact hit points for party characters and a health band for every other creature
+  (`playerHp`), and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
   owner identity, GM notes and hidden turns are removed. A live encounter's map reaches players before
   its combat, with the public tokens the GM has placed; the turn order and the tray wait for
@@ -969,6 +973,9 @@ names no family is the GM's own ruling on the whole command.
   table beside the game state, and read back only by its owner. A D&D Beyond PDF can be
   imported as an actor definition. What a character's next level brings is read from the same
   survey at the next level (`next-level.ts`, `character:next-level`), for whoever may level it.
+  Levelling opens as a dialog over the sheet (`builder/LevelFlow.tsx` with `behind`, ADR-0051): `/characters/<id>/level`
+  renders the sheet with the dialog open (`?to=down` opens it on Level down), and once a level is chosen the builder's
+  level step runs it as a `character:rebuild`.
   The builder's own rolls carry the purpose `builder`, so a sheet's latest roll leaves them out.
 - A feature's granted spell can change how it is cast: components its castings go without (`waives`), a cast on its
   caster only (`self`) or healing dice at their highest (`maximized`), merged with any other source of the same spell

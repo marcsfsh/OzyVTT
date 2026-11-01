@@ -966,10 +966,18 @@ describe("the Level flow's class choice", () => {
     return held;
   }
 
-  const mountLevel = (definition: ActorDefinition) =>
+  const mountLevel = (definition: ActorDefinition, startDown = false) =>
     render(
       <ToastProvider>
-        <LevelFlow state={levelView(definition)} role="gm" actorId={HERO} onClose={() => {}} onDone={() => {}} />
+        <LevelFlow
+          state={levelView(definition)}
+          role="gm"
+          actorId={HERO}
+          behind={null}
+          startDown={startDown}
+          onClose={() => {}}
+          onDone={() => {}}
+        />
       </ToastProvider>
     );
 
@@ -1059,7 +1067,8 @@ describe("the Level flow's class choice", () => {
         choices: [
           { level: 1, kind: "class-levels", id: "cleric", payload: { classes: ["cleric", "fighter", "cleric"] } }
         ]
-      })
+      }),
+      true
     );
     expect(
       await screen.findByText(/Level 3 went to Cleric\./, { selector: ".cb-level-preview p" })

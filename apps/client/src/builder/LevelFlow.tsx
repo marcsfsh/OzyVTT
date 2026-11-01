@@ -6,6 +6,7 @@ import {
   Alert,
   Button,
   ChoiceGrid,
+  EmptyState,
   IconMore,
   Menu,
   MenuItem,
@@ -34,8 +35,8 @@ import { useBuilderOffers } from "./useBuilderOffers";
 import "./character-builder.css";
 
 /**
- * Level up and level down (`/characters/<id>/level`): a level rail, then the wizard seeded from this
- * character's own ledger. Every decision at or below a level survives a rebuild at that level, so
+ * Level up and level down (`/characters/<id>/level`): a dialog over the sheet that picks the level and its class, then
+ * the wizard seeded from this character's own ledger. Every decision at or below a level survives a rebuild at that level, so
  * levelling back up restores earlier choices and HP rolls exactly.
  *
  * Gates: no ledger (a PDF import or pre-wizard sheet) cannot be rebuilt; up stops at the table's max
@@ -72,8 +73,8 @@ export function LevelFlow({
   role: "gm" | "player";
   actorId: string;
   connection?: "online" | "reconnecting" | "offline";
-  /** The sheet the dialog opens over (characters spec 2.3); without it the flow is a page of its own. */
-  behind?: ReactNode;
+  /** The sheet the dialog opens over (characters spec 2.3), which stays behind it. */
+  behind: ReactNode;
   /** Open the dialog on Level down (the sheet's Level down item). */
   startDown?: boolean;
   onClose: () => void;
@@ -88,7 +89,6 @@ export function LevelFlow({
   const [newClassOpen, setNewClassOpen] = useState(false);
   /** The dialog's More menu turns it to Level down, with what is kept. */
   const [goingDown, setGoingDown] = useState(startDown);
-  const dialog = behind !== undefined;
 
   const actor = state.actors.find((entry) => entry.id === actorId) ?? null;
   /**
@@ -235,7 +235,7 @@ export function LevelFlow({
       </p>
       <ChoiceGrid
         ariaLabel={`Level ${current + 1} goes to`}
-        /* The classes the character has, and the rest only once asked for, so the page stays short. */
+        /* The classes the character has, and the rest only once asked for, so the dialog stays short. */
         options={newClassOpen || goingNew ? choices : held}
         value={upClass}
         onChange={setNextClass}
@@ -291,150 +291,84 @@ export function LevelFlow({
     </section>
   );
 
-  if (dialog) {
-    /* Over the sheet (characters spec 2.3): the dialog opens on the next level up, and its More menu turns it to
-       Level down. The level's hit points and choices then run in the builder's level step. */
-    const showDown = goingDown && current > 1;
-    const steps = showDown
-      ? [{ label: "What is kept" }, { label: "Review and apply" }]
-      : [{ label: "Class" }, { label: "Hit points and choices" }, { label: "Review and apply" }];
-    return (
-      <LevelPage
-        behind={behind}
-        title={
-          showDown ? `Level ${current - 1} for ${actor.name}` : `Level ${Math.min(cap, current + 1)} for ${actor.name}`
-        }
-        onClose={onClose}
-        footer={
-          showDown ? (
-            <>
-              <Button variant="ghost" onClick={() => setGoingDown(false)}>
-                Back to level up
-              </Button>
-              <Button variant="primary" className="cb-level-down" onClick={down}>
-                Level down to {current - 1}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              {current > 1 && (
-                <Menu trigger={<IconMore />} icon align="end" label="More for this level">
-                  <MenuItem onClick={() => setGoingDown(true)}>Level down to {current - 1}</MenuItem>
-                </Menu>
-              )}
-              <Button variant="primary" className="cb-level-up" disabled={atCap} onClick={up}>
-                Level up to {Math.min(cap, current + 1)}
-              </Button>
-            </>
-          )
-        }
-      >
-        <Steps ariaLabel={showDown ? "Level down" : "Level up"} current={0} steps={steps} className="cb-level-steps" />
-        {summary}
-        {showDown ? (
-          downPreview
-        ) : atCap ? (
-          <p className="cb-note">At the table's level cap ({cap}). Its More menu holds Level down.</p>
-        ) : (
-          classSection
-        )}
-      </LevelPage>
-    );
-  }
-
+  /* Over the sheet (characters spec 2.3): the dialog opens on the next level up, and its More menu turns it to
+     Level down. The level's hit points and choices then run in the builder's level step. */
+  const showDown = goingDown && current > 1;
+  const steps = showDown
+    ? [{ label: "What is kept" }, { label: "Review and apply" }]
+    : [{ label: "Class" }, { label: "Hit points and choices" }, { label: "Review and apply" }];
   return (
     <LevelPage
+      behind={behind}
+      title={
+        showDown ? `Level ${current - 1} for ${actor.name}` : `Level ${Math.min(cap, current + 1)} for ${actor.name}`
+      }
+      onClose={onClose}
       footer={
-        <>
-          <Button variant="primary" className="cb-level-up" disabled={atCap} onClick={up}>
-            Level up to {Math.min(cap, current + 1)}
-          </Button>
-          <Button variant="secondary" disabled={current <= 1} onClick={down}>
-            Level down to {Math.max(1, current - 1)}
-          </Button>
-          <Button variant="ghost" onClick={onClose}>
-            Back to the sheet
-          </Button>
-        </>
+        showDown ? (
+          <>
+            <Button variant="ghost" onClick={() => setGoingDown(false)}>
+              Back to level up
+            </Button>
+            <Button variant="primary" className="cb-level-down" onClick={down}>
+              Level down to {current - 1}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            {current > 1 && (
+              <Menu trigger={<IconMore />} icon align="end" label="More for this level">
+                <MenuItem onClick={() => setGoingDown(true)}>Level down to {current - 1}</MenuItem>
+              </Menu>
+            )}
+            <Button variant="primary" className="cb-level-up" disabled={atCap} onClick={up}>
+              Level up to {Math.min(cap, current + 1)}
+            </Button>
+          </>
+        )
       }
     >
-      <header className="cb-level-head">
-        <span className="nh-eyebrow">Level up or down</span>
-        <h2>{actor.name}</h2>
-        {summary}
-      </header>
-
-      {/* Buttons: a 20-stop slider is unusable at 390px. */}
-      <ol className="cb-level-rail" aria-label="Levels">
-        {Array.from({ length: cap }, (_, index) => index + 1).map((level) => (
-          <li
-            key={level}
-            className={`cb-level-pip${level === current ? " current" : ""}${level < current ? " reached" : ""}`}
-            aria-current={level === current ? "step" : undefined}
-          >
-            {level}
-          </li>
-        ))}
-      </ol>
-
-      {!atCap && classSection}
-
-      {atCap && <p className="cb-note">At the table's level cap ({cap}).</p>}
-
-      {downPreview}
+      <Steps ariaLabel={showDown ? "Level down" : "Level up"} current={0} steps={steps} className="cb-level-steps" />
+      {summary}
+      {showDown ? (
+        downPreview
+      ) : atCap ? (
+        <p className="cb-note">At the table's level cap ({cap}). Its More menu holds Level down.</p>
+      ) : (
+        classSection
+      )}
     </LevelPage>
   );
 }
 
-/** The flow's page: a centred column that scrolls inside the pane (the page itself never does), over a footer that
- *  keeps the level buttons in view at any height. */
+/** The level dialog over the sheet: the Dialog pattern at 620px, a sheet from the bottom on a phone (characters spec
+ *  2.3, theme rule 16). */
 function LevelPage({
   children,
   footer,
   behind,
   title,
   onClose
-}: Readonly<{
-  children: ReactNode;
-  footer?: ReactNode;
-  /** Over the sheet: the Dialog pattern, 620px, a sheet from the bottom on a phone (characters spec 2.3). */
-  behind?: ReactNode;
-  title?: string;
-  onClose?: () => void;
-}>) {
-  // A sheet from the bottom on a phone (theme rule 16).
+}: Readonly<{ children: ReactNode; footer?: ReactNode; behind: ReactNode; title: string; onClose: () => void }>) {
   const phone = useMediaQuery("(max-width: 760px)");
-  if (behind !== undefined)
-    return (
-      <>
-        {behind}
-        <Modal
-          open
-          onClose={onClose ?? (() => undefined)}
-          title={title}
-          ariaLabel={title}
-          className="cb-level-dialog"
-          align={phone ? "bottom" : "center"}
-          footer={footer}
-        >
-          <div className="cb-level">{children}</div>
-        </Modal>
-      </>
-    );
   return (
-    <div className="cb-level-page">
-      <div className="cb-level-body scroll-y">
+    <>
+      {behind}
+      <Modal
+        open
+        onClose={onClose}
+        title={title}
+        ariaLabel={title}
+        className="cb-level-dialog"
+        align={phone ? "bottom" : "center"}
+        footer={footer}
+      >
         <div className="cb-level">{children}</div>
-      </div>
-      {footer && (
-        <div className="cb-level-foot">
-          <div className="cb-level-actions">{footer}</div>
-        </div>
-      )}
-    </div>
+      </Modal>
+    </>
   );
 }
 
@@ -490,21 +424,25 @@ function classChoices(
   return [...held, ...fresh];
 }
 
+/** A gate is the dialog's empty state (T rule 3): its title names what stops the level, one line says why, and Back
+ *  closes it. */
 function Gate({
   title,
   children,
   onClose,
   behind
-}: Readonly<{ title: string; children: ReactNode; onClose: () => void; behind?: ReactNode }>) {
+}: Readonly<{ title: string; children: ReactNode; onClose: () => void; behind: ReactNode }>) {
   return (
     <LevelPage behind={behind} title={title} onClose={onClose}>
-      <section className="cb-level-gate">
-        <h2>{title}</h2>
-        <p>{children}</p>
-        <Button variant="secondary" onClick={onClose}>
-          Back
-        </Button>
-      </section>
+      <EmptyState
+        action={
+          <Button variant="secondary" onClick={onClose}>
+            Back
+          </Button>
+        }
+      >
+        {children}
+      </EmptyState>
     </LevelPage>
   );
 }

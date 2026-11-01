@@ -127,103 +127,17 @@
   }
 }
 
-/* Level flow: the rail, the two directions, and the level-down preview. The page is a block scroll region, so the
-   column inside keeps its height and scrolls inside the pane. */
-/* The level page fills the pane: the column scrolls, and the footer with the level buttons stays in view. */
-.cb-level-page {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-}
-.cb-level-body {
-  flex: 1;
-  min-height: 0;
-}
+/* The level dialog's body: the steps, the level line, then the class choice or level down's preview. */
 .cb-level {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
-  width: 100%;
-  max-width: 46rem;
-  margin: 0 auto;
-  padding: 1.4rem var(--space-4) var(--space-6);
 }
-.cb-level-foot {
-  flex: none;
-  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--line);
-  background: var(--surface-1);
-}
-.cb-level-foot .cb-level-actions {
-  max-width: 46rem;
-  margin: 0 auto;
-}
-.cb-level-head h2 {
-  margin: 0.2rem 0 0;
-  font: var(--fw-display) 1.5rem/1.15 var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.cb-level-head p {
-  margin: var(--space-1) 0 0;
-  color: var(--text-dim);
-}
-.cb-level-rail {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.cb-level-pip {
-  display: grid;
-  place-items: center;
-  min-width: 2rem;
-  min-height: 2rem;
-  padding: 0 0.35rem;
-  border: 1px solid var(--line);
-  border-radius: 0;
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font: 600 0.8rem/1 var(--font-body);
-}
-/* A phone fits the twenty levels in two rows. */
-@media (max-width: 560px) {
-  .cb-level-pip {
-    min-width: 1.6rem;
-    min-height: 1.6rem;
-    padding: 0 0.2rem;
-  }
-}
-.cb-level-pip.reached {
-  color: var(--text);
-  border-color: var(--line-strong);
-}
-.cb-level-pip.current {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--text-on-neon);
-  box-shadow: var(--glow-magenta);
-}
-.cb-level-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-.cb-level-actions > * {
-  flex: 1 1 10rem;
-}
-/* On a phone the primary takes its own row, and the other two share the next. */
-@media (max-width: 560px) {
-  .cb-level-actions > .cb-level-up {
-    flex-basis: 100%;
-  }
-}
+
+/* Level down's preview: an open group under the steps, since the dialog is the only box. */
 .cb-level-preview {
-  padding: 0.9rem var(--space-4);
-  border: 1px solid transparent;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
 }
 .cb-level-preview h3 {
   margin: 0 0 0.35rem;
@@ -233,62 +147,6 @@
   margin: 0;
   color: var(--text-dim);
   font-size: 0.9rem;
-}
-.cb-level-gate {
-  padding: 1.4rem;
-  border: 1px solid transparent;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  align-items: flex-start;
-}
-.cb-level-gate h2 {
-  margin: 0;
-  font: var(--fw-display) 1.2rem/1.2 var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.cb-level-gate p {
-  margin: 0;
-  color: var(--text-dim);
-}
-
-/* Panel material on a backing layer behind the content; `inset: -1px` spans the border box. The gate
-   also gets the rim glow as a filter on the layer (on the element it would make a containing block for
-   fixed overlays). */
-.cb-level-gate,
-.cb-level-preview {
-  position: relative;
-  isolation: isolate;
-  border-radius: 0;
-  background: none;
-}
-.cb-level-gate::before,
-.cb-level-preview::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  box-sizing: border-box;
-  pointer-events: none;
-  border: var(--rim-w) solid var(--rim-color);
-  background: var(--material-fill);
-  background-origin: border-box;
-  background-clip: border-box;
-  outline: 1px solid var(--bezel-color);
-  outline-offset: calc(-1 * var(--bezel-inset));
-  transition:
-    border-color var(--dur-hover),
-    background var(--dur-hover);
-}
-.cb-level-gate {
-  --material-fill: var(--material-lip), var(--material-plate);
-}
-.cb-level-gate::before {
-  filter: var(--rim-glow);
-}
-.cb-level-preview {
-  --material-fill: var(--material-plate);
 }
 
 /* A multiclass draft's classes in the order taken: each one's levels, and the way to drop a later one. The
@@ -388,10 +246,6 @@
   .nh-modal.cb-level-dialog {
     max-width: min(100vw - 2rem, 38.75rem);
   }
-}
-.cb-level-dialog .cb-level {
-  padding: 0;
-  max-width: none;
 }
 .cb-level-dialog .cb-level-summary {
   margin: 0;

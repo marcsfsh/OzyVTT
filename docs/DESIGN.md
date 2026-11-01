@@ -209,7 +209,7 @@ The shells:
   and Log. Table is the Switch: Map, Turn (Me before an encounter), Log and Party, the turn order's cards under it and End turn in
   reach in every view; choosing a target turns to Map, and an owed prompt or the player's turn turns to Turn.
 
-Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar (ADR-0053).
+Prep holds Encounters, Party (the roster, as bands; see Characters), Maps, Tokens, Sound and Replays, in that order in its section bar (ADR-0053).
 New encounter is the bar's Cup on Prep's lists and steps down to a Base line control on a record. Encounters is a shelf:
 its toolbar has Filters, the state chips, the count, Your order and New map, then a card an encounter with its map as
 the picture, its one state tag (Live, Encounter parked, Replay, Ended, Prepared or Draft) and whether it is ready.
@@ -498,7 +498,7 @@ its pages from these patterns.
   two cards to a row.
 - Making something is a set of steps: steps down the left, each marked done (cyan check), current (cyan outline) or
   needing a choice (amber !); questions in the middle; a live preview on the right. On a phone the steps are a strip of
-  chips and the preview is a bar above Next.
+  chips and the preview is a bar above Next. The level dialog keeps its steps short, as a row along its top.
 - An encounter's page is the table's workbench: the record's title row, the tools as the dock, the map with its Tray chip
   and controls, and a panel with Who is in it, Rules (its Encounter settings, ADR-0039) and Light and sound, its foot
   naming what is missing (from `factsOf` and `needsOf`, see `docs/design/IMPLEMENTATION.md`) over Make live. A new
@@ -546,6 +546,24 @@ The sheet is the Ledger (ADR-0047; `docs/design/polish/D1-character-sheet/`).
   row in Device carries it, and the GM's own Settings sections, which a player never sees, do not. Individual controls retain their semantic
   colours: the view's primary is the Cup, targeting stays cyan, and danger actions retain their warning treatment.
 - The latest-roll line shows only rolls made from this sheet (`sheet-roll-ids.ts`).
+
+## Characters
+
+Prep's Party and the level dialog (ADR-0051; `docs/design/polish/D-characters/`).
+
+- The roster is one band per character, drawn as the sheet's vitals band: the face, the name with its class line and
+  tags, one plate of AC, Hit points, Speed and Passive Perception, then who plays (a lamp: cyan on a player's device,
+  gold at the table, unlit open to claim), Open sheet, Level up and a More menu that holds Played at the table, Release,
+  and Archive or Delete. Archived characters are one closed open group at the end. The join address is not on the
+  roster.
+- New character is the Cup in Prep's bar; Roll a random character and Import (a D&D Beyond PDF or a JSON file) are Base
+  line controls in the roster's toolbar. Samples are one description line with Remove sample characters.
+- Levelling is a 620px dialog over the sheet, titled "Level 8 for Borin", opening on the next level up, its steps along
+  its top; its More menu holds Level down with what is kept. On a phone it is a sheet from the bottom.
+- A party member opens as a 560px dialog drawn as the band, showing only what the GM's party tier sends: the face, the
+  class line, conditions as tags, the plate, the abilities (modifier over score) and, with resources, Hit Point Dice
+  and spell slots on one line. A player with nothing claimed sees "You aren't playing anyone yet." and Pick a
+  character.
 
 ## The Codex
 

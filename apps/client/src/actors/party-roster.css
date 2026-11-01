@@ -43,20 +43,7 @@
   gap: 0.4rem;
   margin-left: auto;
 }
-.party-card-preview {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  padding: 0 0.9rem 0.6rem;
-}
-.party-card-preview-label {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
+
 .party-archived {
   margin-top: 1.4rem;
 }

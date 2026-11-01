@@ -27,7 +27,7 @@ Status words: Designed (plan written), Built, Next (the next design round), Open
 | 1    | T, the theme spec (Built; its shared parts Designed)                               | Gathers the rules D1 proved so every area starts from them |
 | 2    | A, the frame (Built)                                                              | Every surface sits in it                                   |
 | 3    | C, the table (frame, C2 to C6 Designed)                                           | Combat first: the surface used most, by everyone           |
-| 4    | D, characters (D2, D3 Designed)                                                   | Finishes what D1 started                                   |
+| 4    | D, characters (Built)                                                             | Finishes what D1 started                                   |
 | 5    | B, arrival (Designed)                                                             | The first thing a new player sees                          |
 | 6    | E, prep (frame, E2, sound and replays Designed)                                   | The GM's weekly work                                       |
 | 7    | F, the Codex (Designed: frame, finding, story, people, the Atlas, time and tools) | Read by everyone between sessions                          |
@@ -228,7 +228,7 @@ spell card. Add equipment's catalogue keeps A's dialog; C6.8, the token picker, 
 
 ## D. Characters
 
-Job: who you play, from making them to looking them up. Status: D1 Built; D2 and D3 Designed (`D-characters/SPEC.md`,
+Job: who you play, from making them to looking them up. Status: Built (`D-characters/SPEC.md`,
 `D-characters/PLAN.md`, ADR-0051): the roster as bands, the builder's steps and detail, levelling in a dialog and a
 party member as a band.
 
@@ -249,11 +249,11 @@ party member as a band.
 
 | Id   | Surface                                   | Opens at             | Who        | Files                                                      |
 | ---- | ----------------------------------------- | -------------------- | ---------- | ---------------------------------------------------------- |
-| D2.1 | Roster (Prep, Party)                      | `/roster`            | GM         | `actors/PartyRosterTab.tsx`, `actors/party-roster.css`     |
+| D2.1 | Roster (Prep, Party)                      | `/roster`            | GM         | `actors/PartyRosterTab.tsx`, `actors/RosterBand.tsx`       |
 | D2.2 | Import preview                            | roster               | GM         | `actors/PartyRosterTab.tsx` (`ImportPreview`)              |
 | D2.3 | Import a D&D Beyond PDF                   | roster, claim screen | GM, player | `actors/PdfImportModal.tsx`, `actors/pdf-import.css`       |
 | D2.4 | My character, nothing claimed             | `/me`                | Player     | `actors/MyCharacter.tsx`                                   |
-| D2.5 | The rest of the party, party member sheet | sheet menu           | Player     | `actors/MyCharacter.tsx` (`PartyList`, `PartyMemberSheet`) |
+| D2.5 | The rest of the party, party member band  | sheet menu           | Player     | `actors/MyCharacter.tsx`, `actors/PartyMemberBand.tsx`     |
 | D2.6 | Release confirm                           | sheet menu           | Player     | `actors/MyCharacter.tsx` (`useReleaseCharacter`)           |
 
 ### D3. Making and levelling
