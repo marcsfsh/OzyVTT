@@ -384,3 +384,11 @@
   align-items: center;
   min-width: 0;
 }
+
+/* The lit kind's line under ADD A SECTION: what that kind holds. */
+.tpl-kind-foot {
+  margin: 0;
+  padding: 0 var(--space-3);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}

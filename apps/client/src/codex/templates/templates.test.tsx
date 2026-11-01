@@ -164,7 +164,7 @@ describe("The prep template library", () => {
   it("adds a typed section from Add a section, each type said in one line", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(await screen.findByText("Add a section"));
+    await user.click(await screen.findByText("Add a section", { selector: ".tpl-addtrigger" }));
     const clocks = screen.getByRole("menuitem", { name: /^Clocks/ });
     expect(clocks).toHaveTextContent("Holds deadlines picked from the calendar.");
     const addMenu = clocks.closest<HTMLElement>("[role='menu']")!;
@@ -178,6 +178,33 @@ describe("The prep template library", () => {
       .getAllByRole("textbox", { name: /Section \d title/ })
       .map((input) => (input as HTMLInputElement).value);
     expect(titles).toEqual(["Strong start", "Secrets and clues", "Cast", "Clocks"]);
+  });
+
+  it("adds a section by its kind from the side list, at the end, with the counts following", async () => {
+    renderView();
+    const user = userEvent.setup();
+    const kinds = within(await screen.findByRole("group", { name: "Add a section" }));
+    const count = (name: string) => kinds.getByRole("button", { name }).textContent;
+    expect(count("Add a section: Text")).toContain("1");
+    expect(count("Add a section: Clocks")).toContain("0");
+
+    await user.click(kinds.getByRole("button", { name: "Add a section: Clocks" }));
+    const titles = () =>
+      screen.getAllByRole("textbox", { name: /Section \d title/ }).map((input) => (input as HTMLInputElement).value);
+    expect(titles()).toEqual(["Strong start", "Secrets and clues", "Cast", "Clocks"]);
+    expect(count("Add a section: Clocks")).toContain("1");
+    expect(screen.getByText("Clocks · Holds deadlines picked from the calendar.")).toBeInTheDocument();
+
+    kinds.getByRole("button", { name: "Add a section: Text" }).focus();
+    await user.keyboard("{Enter}");
+    expect(titles()).toEqual(["Strong start", "Secrets and clues", "Cast", "Clocks", "Text"]);
+    expect(count("Add a section: Text")).toContain("2");
+  });
+
+  it("offers no kinds for the starting template, which is read-only", async () => {
+    renderView({ templateId: BUILT_IN.id });
+    await screen.findByRole("group", { name: "Templates" });
+    expect(screen.queryByRole("group", { name: "Add a section" })).not.toBeInTheDocument();
   });
 
   it("makes a new session from the template, copying its sections, and opens it", async () => {

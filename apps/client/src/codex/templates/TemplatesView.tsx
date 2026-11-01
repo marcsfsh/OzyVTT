@@ -15,13 +15,19 @@ import {
   useToast,
   Crumb
 } from "@vtt/ui";
-import { CODEX_PREP_LIMITS, type CodexAutosaveSettings, type CodexPrepTemplate, type CodexSession } from "@vtt/domain";
+import {
+  CODEX_PREP_LIMITS,
+  type CodexAutosaveSettings,
+  type CodexPrepSectionType,
+  type CodexPrepTemplate,
+  type CodexSession
+} from "@vtt/domain";
 import { useConfirm } from "../../components/feedback";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { nextSessionNumber } from "../creates";
 import { CodexIcon } from "../icons";
 import { prepSessionApi, templateApi } from "../prep/api";
-import { sectionTypeLabel } from "../prep/sections";
+import { SECTION_TYPES, sectionTypeLabel } from "../prep/sections";
 import { sessionTitle } from "../sessions";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexQuery } from "../useCodexQuery";
@@ -78,6 +84,13 @@ export function TemplatesView({
   const builtIn = templates.find((template) => template.builtIn) ?? null;
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const [addRequest, setAddRequest] = useState<{
+    type: CodexPrepSectionType;
+    nonce: number;
+    templateId: string;
+  } | null>(null);
+  const [draftKinds, setDraftKinds] = useState<readonly CodexPrepSectionType[] | null>(null);
+  const kinds = draftKinds ?? selected?.sections.map((section) => section.type) ?? [];
 
   const replace = useCallback(
     (template: CodexPrepTemplate) =>
@@ -191,6 +204,34 @@ export function TemplatesView({
     </SideListGroup>
   );
 
+  // ADD A SECTION as the side list's second group (F time spec 2.2): each kind with how many the template holds; a press
+  // adds one at the end and lights the kind, whose foot says what it holds. Dragging a kind into a place is not built.
+  const litKind =
+    addRequest?.templateId === selected?.id
+      ? (SECTION_TYPES.find((entry) => entry.type === addRequest?.type) ?? null)
+      : null;
+  const kindsList = selected && !selected.builtIn && (
+    <>
+      <SideListGroup eyebrow="Add a section" className="tpl-sidelist">
+        {SECTION_TYPES.map((entry) => (
+          <SideListRow
+            key={entry.type}
+            label={entry.label}
+            ariaLabel={`Add a section: ${entry.label}`}
+            count={kinds.filter((kind) => kind === entry.type).length}
+            current={entry.type === litKind?.type}
+            onSelect={() => setAddRequest({ type: entry.type, nonce: Date.now(), templateId: selected.id })}
+          />
+        ))}
+      </SideListGroup>
+      {litKind && (
+        <p className="tpl-kind-foot" aria-live="polite">
+          {litKind.label} · {litKind.holds}
+        </p>
+      )}
+    </>
+  );
+
   if (library.loading && !library.data)
     return (
       <div className="tpl-view">
@@ -252,6 +293,7 @@ export function TemplatesView({
         >
           <IconPlus /> New template
         </Button>
+        {kindsList}
       </nav>
       <div className="tpl-main scroll-y">
         {error && <Alert tone="danger">{error}</Alert>}
@@ -267,6 +309,8 @@ export function TemplatesView({
             onSaved={replace}
             onDuplicate={() => void duplicate(selected)}
             onSetDefault={(isDefault) => void setDefault(selected, isDefault)}
+            addRequest={addRequest}
+            onKindsChange={setDraftKinds}
           />
         )}
       </div>

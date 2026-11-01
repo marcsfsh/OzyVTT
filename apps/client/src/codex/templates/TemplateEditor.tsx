@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, IconDrag, IconMore, IconPlus, Input, Menu, MenuItem, SaveState, Switch } from "@vtt/ui";
 import type { CodexAutosaveSettings } from "@vtt/domain";
 import { newId } from "../../lib/ids";
@@ -43,7 +43,9 @@ export function TemplateEditor({
   nameRef,
   onSaved,
   onDuplicate,
-  onSetDefault
+  onSetDefault,
+  addRequest,
+  onKindsChange
 }: Readonly<{
   gmToken: string;
   template: CodexPrepTemplate;
@@ -55,6 +57,10 @@ export function TemplateEditor({
   onSaved: (template: CodexPrepTemplate) => void;
   onDuplicate: () => void;
   onSetDefault: (isDefault: boolean) => void;
+  /** A kind pressed in the page's side list, with a fresh nonce for each press. */
+  addRequest?: Readonly<{ type: CodexPrepSectionType; nonce: number }> | null;
+  /** The draft's section kinds, so the side list counts what is on the page before it saves. */
+  onKindsChange?: (kinds: readonly CodexPrepSectionType[]) => void;
 }>) {
   const [draft, setDraft] = useState<TemplateDraft>(() => draftOf(template));
   const revRef = useRef(template.rev);
@@ -105,6 +111,14 @@ export function TemplateEditor({
   const addSection = (type: CodexPrepSectionType) =>
     setSections([...draft.sections, { id: newId(), title: freshTitle(type, draft.sections), prompt: "", type }]);
   const removeSection = (id: string) => setSections(draft.sections.filter((section) => section.id !== id));
+  // A kind pressed in the page's ADD A SECTION list adds it at the end, once a press (F time spec 2.2).
+  // A press made for the template open before this one has already been spent.
+  const [addedNonce, setAddedNonce] = useState<number | null>(() => addRequest?.nonce ?? null);
+  if (addRequest && addRequest.nonce !== addedNonce && !readOnly) {
+    setAddedNonce(addRequest.nonce);
+    if (draft.sections.length < CODEX_PREP_LIMITS.templateSections) addSection(addRequest.type);
+  }
+  useEffect(() => onKindsChange?.(draft.sections.map((section) => section.type)), [draft.sections, onKindsChange]);
 
   const reorder = useReorder(
     draft.sections,
