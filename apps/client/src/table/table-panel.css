@@ -203,6 +203,9 @@
   padding: var(--space-3);
   overflow: hidden;
 }
+.table-log-tab .combat-log-frame {
+  flex: 1 1 auto;
+}
 .table-log-tab .combat-log-list {
   flex: 1 1 auto;
   min-height: 0;
